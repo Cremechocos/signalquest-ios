@@ -348,7 +348,7 @@ struct AntennaReportThreadView: View {
                 if isTeam { teamAuthor(comment.author?.name?.nonEmpty) }
                 bubbleBody(text: comment.content, images: comment.images.compactMap(AntennaReportImage.parse), isTeam: isTeam)
                 if let date = comment.createdAt {
-                    Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                    Text(date, format: .sqRelative)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .padding(.horizontal, SQSpace.xs)

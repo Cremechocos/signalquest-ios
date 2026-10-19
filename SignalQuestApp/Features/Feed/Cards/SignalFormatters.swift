@@ -91,6 +91,27 @@ enum SignalFormatters {
     }
 }
 
+/// Date relative courte : « il y a 5 min », « il y a 3 j », puis « il y a 5 mois »
+/// en toutes lettres — l'abréviation « m. » se lit minutes autant que mois.
+struct SQRelativeDateFormatStyle: FormatStyle {
+    var locale: Locale = .autoupdatingCurrent
+
+    func format(_ value: Date) -> String {
+        let style: Date.RelativeFormatStyle.UnitsStyle = abs(value.timeIntervalSinceNow) < 28 * 86_400 ? .abbreviated : .wide
+        return Date.RelativeFormatStyle(presentation: .named, unitsStyle: style, locale: locale).format(value)
+    }
+
+    func locale(_ locale: Locale) -> SQRelativeDateFormatStyle {
+        var copy = self
+        copy.locale = locale
+        return copy
+    }
+}
+
+extension FormatStyle where Self == SQRelativeDateFormatStyle {
+    static var sqRelative: SQRelativeDateFormatStyle { SQRelativeDateFormatStyle() }
+}
+
 /// A small accent palette indexed by network technology. Routed through the
 /// editorial DA palette (`SQBrand.techColor`, web --color-5g/4g/3g/2g) so the
 /// cards share the exact technology colours used elsewhere in the app.
@@ -293,7 +314,7 @@ struct CardHeader: View {
                     .accessibilityHidden(true)
                     .accessibilityIdentifier("feed.metadata.separator")
             }
-            Text(createdAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+            Text(createdAt, format: .sqRelative)
                 .sqSingleLine()
                 .accessibilityIdentifier("feed.metadata.date")
         }

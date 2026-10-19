@@ -735,7 +735,7 @@ private struct StoryViewersSheet: View {
                                 Text(entry.user.displayName).foregroundStyle(SQColor.label)
                                 Spacer()
                                 if let viewedAt = entry.viewedAt {
-                                    Text(viewedAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                                    Text(viewedAt, format: .sqRelative)
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }

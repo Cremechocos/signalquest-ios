@@ -952,7 +952,7 @@ struct PhotoDetailView: View {
                     .foregroundStyle(SQColor.label)
                 Spacer()
                 if let date = photo.uploadedAt ?? photo.createdAt {
-                    Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                    Text(date, format: .sqRelative)
                         .font(.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -1092,7 +1092,7 @@ struct PhotoDetailView: View {
                         .foregroundStyle(SQColor.label)
                     Spacer()
                     if let date = comment.createdAt {
-                        Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                        Text(date, format: .sqRelative)
                             .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                     }

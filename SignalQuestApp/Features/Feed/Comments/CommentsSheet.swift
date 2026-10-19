@@ -544,7 +544,7 @@ struct CommentsSheet: View {
                     }
                     if let created = comment.createdAt {
                         Text(verbatim: "·").accessibilityHidden(true)
-                        Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                        Text(created, format: .sqRelative)
                     }
                 }
                 .font(SQType.caption)
