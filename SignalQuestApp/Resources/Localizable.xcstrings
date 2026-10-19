@@ -14662,6 +14662,22 @@
         }
       }
     },
+    "Sites au statut « En service » ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites with the “Live” status; “Technically operational” and “Project approved” count as planned."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites au statut « En service » ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet."
+          }
+        }
+      }
+    },
     "Sites en service dans %lld km" : {
       "localizations" : {
         "en" : {

@@ -922,12 +922,11 @@ private struct ZoneAntennasSection: View {
                     .font(SQType.caption(.semibold))
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            if !data.activeDefinition.isEmpty {
-                Text(verbatim: data.activeDefinition)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // La définition du serveur nomme ses champs (`active`, `planned`) : l'app dit la même règle à l'utilisateur.
+            Text("Sites au statut « En service » ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
