@@ -108,6 +108,14 @@ final class NotificationRoutingTests: XCTestCase {
         }
     }
 
+    func testFavoriteAlertOpensTheSiteInItsMarketWhenTheChargeGivesIt() {
+        let router = AppRouter()
+        router.handle(type: "favorite_antenna_issue", conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM")
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertEqual(router.openSiteId, "DROM:97100001")
+        XCTAssertEqual(router.openSiteMarket, "DROM")
+    }
+
     func testSiteFollowOpensTheSiteInItsMarket() {
         let router = AppRouter()
         router.handle(type: "site_follow", conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM")

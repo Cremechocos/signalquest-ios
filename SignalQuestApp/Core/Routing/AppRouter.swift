@@ -301,9 +301,10 @@ final class AppRouter: ObservableObject {
         case "bug_status_change", "bug_response", "bug_comment", "bug_resolved_reward", "new_bug":
             route(toBug: bugId)
         // Antenne suivie ou proche d'un lieu : le site porte son code sous `siteId`
-        // ou `antennaId` (push) et `codeSiteOp` (centre de notifications).
+        // ou `antennaId` (push) et `codeSiteOp` (centre de notifications), et son marché quand
+        // la charge le donne.
         case "site", "antenna", "validation", "favorite_antenna_issue", "zone_antenna_issue":
-            route(toSite: siteId)
+            route(toSite: siteId, market: market)
         // Site suivi (message, activation, nouvelle bande, panne confirmée) : la charge porte
         // son marché, sans lequel un site hors de France ne se retrouve pas.
         case "site_follow":
