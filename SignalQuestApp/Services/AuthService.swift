@@ -185,6 +185,9 @@ protocol AuthServicing: Sendable {
     func logout() async throws
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
+    /// Le jeton existe peut-être mais le Keychain ne l'a pas rendu (appareil pas
+    /// encore déverrouillé) : ce n'est pas une absence de session.
+    func credentialsAreUnreadable() -> Bool
     /// Identité de la connexion HTTP, indépendante des rotations de son token.
     func credentialSessionID() -> UUID?
     func installAuthTokenForDebugQA(_ token: String)
@@ -217,6 +220,7 @@ extension AuthServicing {
     func cacheUser(_ user: AuthUser) {}
     func cachedUser() -> AuthUser? { nil }
     func hasStoredCredentials() -> Bool { false }
+    func credentialsAreUnreadable() -> Bool { false }
     func wipeE2EEIfIdentityChanged(to userId: String) async {}
 }
 
@@ -567,6 +571,10 @@ final class AuthService: AuthServicing {
         api.credentials.accessToken() != nil
     }
 
+    func credentialsAreUnreadable() -> Bool {
+        api.credentials.isUnreadable
+    }
+
     func installAuthTokenForDebugQA(_ token: String) {
         #if DEBUG
         try? api.credentials.setAccessToken(token)
@@ -691,6 +699,7 @@ final class AuthSessionViewModel: ObservableObject {
         // immédiatement l'enregistrement push et des reprises de files ; ils doivent
         // tous voir le nouveau propriétaire, jamais le précédent.
         service.cacheUser(user)
+        infoMessage = nil
         state = .authenticated(user)
     }
 
@@ -718,7 +727,9 @@ final class AuthSessionViewModel: ObservableObject {
         // `/api/auth/me` ne peut pas authentifier cette ouverture invitée.
         // Évite un écran de chargement jusqu'au timeout réseau après relance.
         guard service.hasStoredCredentials() else {
-            state = .loggedOut
+            // Jeton illisible (Keychain pas encore déverrouillé), pas absent :
+            // on propose de réessayer au lieu d'afficher l'écran de connexion.
+            state = service.credentialsAreUnreadable() ? .offline : .loggedOut
             return
         }
         // PERF-START-01 : démarrage à froid optimiste. Si on a un token ET un
@@ -780,6 +791,9 @@ final class AuthSessionViewModel: ObservableObject {
             // garder l'affichage optimiste.
         }
     }
+
+    /// Le dernier amorçage a échoué faute de pouvoir lire le jeton.
+    var credentialsAreUnreadable: Bool { service.credentialsAreUnreadable() }
 
     func retryBootstrap() async {
         state = .checking
@@ -1006,9 +1020,11 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
+    #if DEBUG
     func enterDemoMode() {
         state = .authenticated(.mock)
     }
+    #endif
 
     func cancelTwoFactor() {
         // L'erreur du code refusé ne doit pas rester affichée sur la connexion.

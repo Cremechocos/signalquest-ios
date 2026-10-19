@@ -20,6 +20,7 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
     var meResult: Result<AuthUser, Error> = .success(.mock)
     var storedCredentials = false
+    var credentialsUnreadable = false
     var credentialID: UUID?
     var signupResponse: LoginResponse?
     var signupCredentialID: UUID?
@@ -38,6 +39,7 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
         return try meResult.get()
     }
     func hasStoredCredentials() -> Bool { storedCredentials }
+    func credentialsAreUnreadable() -> Bool { credentialsUnreadable }
     func cacheUser(_ user: AuthUser) { cacheUserCalls.append(user); cached = user }
     func cachedUser() -> AuthUser? { cached }
     func clearLocalSession() async { clearLocalSessionCount += 1; cached = nil }
@@ -72,8 +74,96 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     func logout() async throws { throw Unused.notImplemented }
 }
 
+/// Keychain en mémoire dont les lectures ou les suppressions peuvent échouer.
+final class FlakyTokenStore: TokenStore, @unchecked Sendable {
+    private var storage: [String: String] = [:]
+    var readsFail = false
+    var removalsFail = false
+    func string(for key: String) throws -> String? {
+        if readsFail { throw KeychainError.unexpectedStatus(-25308) }
+        return storage[key]
+    }
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws { storage[key] = value }
+    func remove(_ key: String) throws {
+        if removalsFail { throw KeychainError.unexpectedStatus(-25308) }
+        storage[key] = nil
+    }
+    func removeAll() throws { storage.removeAll() }
+}
+
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    func testUnreadableCredentialsOfferARetryInsteadOfTheLoginScreen() async {
+        let service = MockAuthService()
+        service.credentialsUnreadable = true
+        let session = AuthSessionViewModel(service: service)
+
+        await session.bootstrap()
+
+        XCTAssertEqual(session.state, .offline)
+        XCTAssertTrue(session.credentialsAreUnreadable)
+        service.credentialsUnreadable = false
+        service.storedCredentials = true
+        service.cacheUser(.mock)
+        await session.retryBootstrap()
+        XCTAssertEqual(session.state, .authenticated(.mock))
+    }
+
+    func testSignInDropsAStaleInfoMessage() async {
+        let service = MockAuthService()
+        service.appleResponses = [.success(LoginResponse(user: .mock, requires2FA: false, tempToken: nil))]
+        let session = AuthSessionViewModel(service: service)
+        await session.bootstrap()
+        session.infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
+
+        _ = await session.signInWithApple(identityToken: "synthetic", fullName: nil, acceptedTerms: false)
+
+        XCTAssertEqual(session.state, .authenticated(.mock))
+        XCTAssertNil(session.infoMessage)
+    }
+
+    func testProfileDecodingToleratesAnEmptyAvatarAndMissingFields() throws {
+        let tolerant = try JSONDecoder.signalQuest.decode(
+            AuthUser.self, from: Data(#"{"id":"u-1","avatarUrl":"","role":null,"email":null,"name":"Camille"}"#.utf8))
+        XCTAssertEqual(tolerant.id, "u-1")
+        XCTAssertNil(tolerant.avatarUrl)
+        XCTAssertEqual(tolerant.role, "user")
+        XCTAssertEqual(tolerant.name, "Camille")
+        XCTAssertThrowsError(try JSONDecoder.signalQuest.decode(AuthUser.self, from: Data(#"{"avatarUrl":""}"#.utf8)))
+
+        let roundTrip = try JSONDecoder.signalQuest.decode(AuthUser.self, from: JSONEncoder.signalQuest.encode(AuthUser.mock))
+        XCTAssertEqual(roundTrip, .mock)
+    }
+
+    func testCredentialStoreTellsAnUnreadableKeychainFromAnAbsentToken() throws {
+        let keychain = FlakyTokenStore()
+        let credentials = CredentialStore(tokenStore: keychain)
+        XCTAssertNil(credentials.accessToken())
+        XCTAssertFalse(credentials.isUnreadable, "Un jeton absent n'est pas un Keychain illisible")
+
+        try credentials.setAccessToken("synthetic-token")
+        let relaunched = CredentialStore(tokenStore: keychain)
+        keychain.readsFail = true
+        XCTAssertNil(relaunched.accessToken())
+        XCTAssertTrue(relaunched.isUnreadable)
+        keychain.readsFail = false
+        XCTAssertEqual(relaunched.accessToken(), "synthetic-token")
+        XCTAssertFalse(relaunched.isUnreadable)
+    }
+
+    func testTokenWhoseRemovalFailedIsNotServedAgain() throws {
+        let keychain = FlakyTokenStore()
+        let credentials = CredentialStore(tokenStore: keychain)
+        try credentials.setAccessToken("synthetic-token")
+        keychain.removalsFail = true
+
+        credentials.clearAll()
+
+        XCTAssertNil(credentials.accessToken(), "Le jeton ne doit pas revenir du Keychain après la déconnexion")
+        try credentials.setAccessToken("next-token")
+        XCTAssertEqual(credentials.accessToken(), "next-token")
+    }
+
     func testAppleAccountCreationWaitsForTermsAndOnlyThenAuthenticates() async {
         let service = MockAuthService()
         service.appleResponses = [

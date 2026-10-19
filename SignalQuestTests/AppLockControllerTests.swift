@@ -65,6 +65,56 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertFalse(lock.isInBackground)
     }
 
+    func testColdLaunchAfterTheAutoLogoutDelayEndsTheSession() {
+        let defaults = UserDefaults(suiteName: "app-lock-cold-\(UUID().uuidString)")!
+        var wall = Date(timeIntervalSince1970: 1_800_000_000)
+        let make = {
+            AppLockController(settings: { .init(enabled: true, lockGrace: 30, autoLogout: 900) },
+                wallClock: { wall }, defaults: defaults,
+                canAuthenticateDeviceOwner: { true }, authenticate: { _, _ in false })
+        }
+        make().didEnterBackground()
+
+        // Le processus a été arrêté en arrière-plan, puis relancé 20 minutes plus tard.
+        wall = wall.addingTimeInterval(1_200)
+        let relaunched = make()
+        XCTAssertTrue(relaunched.coldLaunchExceedsAutoLogout())
+        XCTAssertTrue(relaunched.isLocked)
+        XCTAssertFalse(relaunched.coldLaunchExceedsAutoLogout(), "L'heure enregistrée ne sert qu'une fois")
+    }
+
+    func testColdLaunchWithinTheDelayKeepsTheSessionAndDisabledLockIgnoresIt() {
+        let defaults = UserDefaults(suiteName: "app-lock-cold-short-\(UUID().uuidString)")!
+        var wall = Date(timeIntervalSince1970: 1_800_000_000)
+        var enabled = true
+        let make = {
+            AppLockController(settings: { .init(enabled: enabled, lockGrace: 30, autoLogout: 900) },
+                wallClock: { wall }, defaults: defaults,
+                canAuthenticateDeviceOwner: { true }, authenticate: { _, _ in false })
+        }
+        make().didEnterBackground()
+        wall = wall.addingTimeInterval(300)
+        XCTAssertFalse(make().coldLaunchExceedsAutoLogout())
+
+        make().didEnterBackground()
+        wall = wall.addingTimeInterval(3_600)
+        enabled = false
+        XCTAssertFalse(make().coldLaunchExceedsAutoLogout())
+    }
+
+    func testReturningToForegroundForgetsThePersistedBackgroundTime() {
+        let defaults = UserDefaults(suiteName: "app-lock-foreground-\(UUID().uuidString)")!
+        var wall = Date(timeIntervalSince1970: 1_800_000_000)
+        let lock = AppLockController(settings: { .init(enabled: true, lockGrace: 30, autoLogout: 900) },
+            wallClock: { wall }, defaults: defaults,
+            canAuthenticateDeviceOwner: { true }, authenticate: { _, _ in false })
+        lock.didEnterBackground()
+        XCTAssertFalse(lock.willEnterForeground())
+        XCTAssertNil(defaults.object(forKey: AppLockSettings.backgroundedAtKey))
+        wall = wall.addingTimeInterval(5_000)
+        XCTAssertFalse(lock.coldLaunchExceedsAutoLogout())
+    }
+
     func testGracePeriodAllowsShortAbsenceAndLocksAtItsBoundary() {
         var time: TimeInterval = 100
         let lock = AppLockController(settings: { .init(enabled: true, lockGrace: 30, autoLogout: 0) },

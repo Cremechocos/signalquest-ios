@@ -47,6 +47,9 @@ struct InstallationIdentity: Sendable {
     private final class Storage: @unchecked Sendable {
         let store: TokenStore
         private let lock = NSLock()
+        /// Identifiant de secours quand le Keychain ne répond pas : valable pour
+        /// ce processus seulement, jamais écrit à la place de l'identifiant d'installation.
+        var transientDeviceID: String?
 
         init(store: TokenStore) {
             self.store = store
@@ -67,8 +70,16 @@ struct InstallationIdentity: Sendable {
 
     func deviceID() -> String {
         storage.withLock { store in
-            if let existing = (try? store.string(for: Key.deviceID)) ?? nil,
-               !existing.isEmpty {
+            let stored: String?
+            do {
+                stored = try store.string(for: Key.deviceID)
+            } catch {
+                if let transient = storage.transientDeviceID { return transient }
+                let transient = UUID().uuidString.lowercased()
+                storage.transientDeviceID = transient
+                return transient
+            }
+            if let existing = stored, !existing.isEmpty {
                 return existing
             }
             let created = UUID().uuidString.lowercased()

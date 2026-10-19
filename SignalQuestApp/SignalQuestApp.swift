@@ -226,8 +226,16 @@ struct AppRootView: View {
                 await services.bootstrapIfNeeded(session: session)
                 refreshEmailVerificationIfPossible()
                 await registerPushIfAuthenticated(session.state)
-                // Verrouillage biométrique à l'ouverture (si activé + authentifié).
-                if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
+                // Verrouillage biométrique à l'ouverture (si activé + authentifié). Si
+                // iOS avait fermé l'app et que le délai de déconnexion est écoulé,
+                // la session se ferme aussi.
+                if case .authenticated = session.state {
+                    if appLock.coldLaunchExceedsAutoLogout() {
+                        Task { await session.logout() }
+                    } else {
+                        appLock.lockOnActivationIfNeeded()
+                    }
+                }
                 // La présence est indépendante des coordonnées : le mode local
                 // pilote seulement l'ajout de la position au heartbeat.
                 if case .authenticated = session.state {
@@ -303,6 +311,11 @@ struct AppRootView: View {
                     services.routing.activate(windowRouter)
                     // Badge de l'icône : le nombre de conversations non lues connu, et non 0 (M16).
                     services.syncIconBadge()
+                    // Jeton illisible au lancement (Keychain pas encore déverrouillé) :
+                    // on relance l'amorçage au retour au premier plan.
+                    if case .offline = session.state, session.credentialsAreUnreadable {
+                        Task { await session.retryBootstrap() }
+                    }
                     // Verrouillage / déconnexion par inactivité au retour au 1er plan.
                     var locksOut = false
                     if case .authenticated = session.state, appLock.willEnterForeground() {

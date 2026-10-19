@@ -35,9 +35,21 @@ final class CredentialStore: @unchecked Sendable {
     // appel faisait une lecture Keychain (IPC securityd). Le Keychain reste la source
     // persistante ; le cache est tenu à jour sur TOUS les chemins d'écriture.
     private var _cachedAccessToken: String?
+    /// La dernière lecture du Keychain a échoué (≠ jeton absent) : appareil pas
+    /// encore déverrouillé après un redémarrage, par exemple.
+    private var _lastReadFailed = false
+    /// Le jeton a été retiré mais le Keychain n'a pas confirmé la suppression :
+    /// on ne le relit pas tant qu'une nouvelle connexion n'en pose pas un autre.
+    private var _tokenWithdrawn = false
+
     func accessToken() -> String? {
         lock.lock(); defer { lock.unlock() }
         return accessTokenLocked()
+    }
+
+    /// Vrai si le jeton n'a pas pu être lu (et non s'il est absent).
+    var isUnreadable: Bool {
+        lock.withLock { accessTokenLocked() == nil && _lastReadFailed }
     }
 
     private func accessTokenLocked() -> String? {
@@ -45,14 +57,38 @@ final class CredentialStore: @unchecked Sendable {
         // relit toujours le Keychain (source de vérité) — on ne fige jamais un « nil »
         // (sinon un token écrit après un premier accès resterait invisible). PERF-KEY-02.
         if let cached = _cachedAccessToken { return cached }
-        let token = try? tokenStore.string(for: Key.accessToken)
-        _cachedAccessToken = token
-        return token
+        if _tokenWithdrawn { return nil }
+        do {
+            let token = try tokenStore.string(for: Key.accessToken)
+            _lastReadFailed = false
+            _cachedAccessToken = token
+            return token
+        } catch {
+            _lastReadFailed = true
+            return nil
+        }
+    }
+
+    /// Retire le jeton du Keychain, avec un second essai ; si la suppression
+    /// échoue toujours, le jeton n'est plus servi par cette instance.
+    private func removeAccessTokenLocked() {
+        for _ in 0..<2 {
+            do {
+                try tokenStore.remove(Key.accessToken)
+                _tokenWithdrawn = false
+                return
+            } catch {
+                continue
+            }
+        }
+        _tokenWithdrawn = true
     }
 
     func setAccessToken(_ token: String) throws {
         try lock.withLock {
             try tokenStore.set(token, for: Key.accessToken)
+            _tokenWithdrawn = false
+            _lastReadFailed = false
             _cachedAccessToken = token
             sessionID = UUID()
             revision = UUID()
@@ -62,7 +98,7 @@ final class CredentialStore: @unchecked Sendable {
 
     func clearAccessToken() {
         lock.withLock {
-            try? tokenStore.remove(Key.accessToken)
+            removeAccessTokenLocked()
             _cachedAccessToken = nil
             sessionID = UUID()
             revision = UUID()
@@ -120,7 +156,7 @@ final class CredentialStore: @unchecked Sendable {
 
     func clearAll() {
         lock.withLock {
-            try? tokenStore.remove(Key.accessToken)
+            removeAccessTokenLocked()
             try? tokenStore.remove(Key.refreshToken)
             _cachedAccessToken = nil
             _tempToken = nil

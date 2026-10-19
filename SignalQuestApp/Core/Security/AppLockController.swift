@@ -9,6 +9,9 @@ enum AppLockSettings {
     static let lockGraceKey = "sq_security_appLockGraceSeconds"
     /// Inactivité (s) avant déconnexion complète. 0 = jamais.
     static let autoLogoutKey = "sq_security_autoLogoutSeconds"
+    /// Heure (horloge murale) du dernier passage en arrière-plan : elle survit à
+    /// la fin du processus, pour que le délai s'applique aussi après un lancement à froid.
+    static let backgroundedAtKey = "sq_security_backgroundedAtEpoch"
 
     static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
     static var lockGrace: TimeInterval { UserDefaults.standard.double(forKey: lockGraceKey) }
@@ -54,6 +57,8 @@ final class AppLockController: ObservableObject {
 
     private let settings: () -> Settings
     private let now: () -> TimeInterval
+    private let wallClock: () -> Date
+    private let defaults: UserDefaults
     private let authenticate: @MainActor (String, Bool) async -> Bool
     private let authenticationAvailable: @MainActor () -> Bool
     private var backgroundedAt: TimeInterval?
@@ -62,7 +67,10 @@ final class AppLockController: ObservableObject {
 
     init(
         settings: @escaping () -> Settings = { .current },
-        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        // Horloge monotone qui continue pendant la veille (≠ `systemUptime`).
+        now: @escaping () -> TimeInterval = { Double(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000 },
+        wallClock: @escaping () -> Date = Date.init,
+        defaults: UserDefaults = .standard,
         canAuthenticateDeviceOwner: @escaping @MainActor () -> Bool = { BiometricAuth.canAuthenticateDeviceOwner },
         authenticate: @escaping @MainActor (String, Bool) async -> Bool = {
             await BiometricAuth.authenticate(reason: $0, allowPasscode: $1)
@@ -70,6 +78,8 @@ final class AppLockController: ObservableObject {
     ) {
         self.settings = settings
         self.now = now
+        self.wallClock = wallClock
+        self.defaults = defaults
         authenticationAvailable = canAuthenticateDeviceOwner
         self.canAuthenticateDeviceOwner = canAuthenticateDeviceOwner()
         self.authenticate = authenticate
@@ -90,10 +100,14 @@ final class AppLockController: ObservableObject {
         let settings = settings()
         guard settings.enabled else {
             backgroundedAt = nil
+            defaults.removeObject(forKey: AppLockSettings.backgroundedAtKey)
             return
         }
         // Plusieurs notifications/scènes ne doivent pas prolonger le délai.
-        if backgroundedAt == nil { backgroundedAt = now() }
+        if backgroundedAt == nil {
+            backgroundedAt = now()
+            defaults.set(wallClock().timeIntervalSince1970, forKey: AppLockSettings.backgroundedAtKey)
+        }
         // Verrouillage immédiat : on masque le contenu DÈS la mise en arrière-plan
         // (pas de flash au retour, et l'aperçu du sélecteur d'apps est masqué).
         if Self.safeInterval(settings.lockGrace) == 0 {
@@ -115,6 +129,7 @@ final class AppLockController: ObservableObject {
         defer { isInBackground = false }
         guard let backgroundedAt else { return false }
         self.backgroundedAt = nil
+        defaults.removeObject(forKey: AppLockSettings.backgroundedAtKey)
         let settings = settings()
         guard settings.enabled else { return false }
         let duration = now() - backgroundedAt
@@ -129,6 +144,25 @@ final class AppLockController: ObservableObject {
             lock()
         }
         return false
+    }
+
+    /// Lancement à froid : si l'app a été fermée en arrière-plan et que le délai
+    /// d'inactivité de la déconnexion est dépassé (horloge murale, la seule qui
+    /// traverse la fin du processus), renvoie `true` pour déconnecter. Une heure
+    /// illisible ou dans le futur compte comme un dépassement, comme en cours de session.
+    func coldLaunchExceedsAutoLogout() -> Bool {
+        guard backgroundedAt == nil,
+              let stamp = defaults.object(forKey: AppLockSettings.backgroundedAtKey) as? Double else { return false }
+        defaults.removeObject(forKey: AppLockSettings.backgroundedAtKey)
+        let settings = settings()
+        guard settings.enabled else { return false }
+        let autoLogout = Self.safeInterval(settings.autoLogout)
+        guard autoLogout > 0 else { return false }
+        let duration = wallClock().timeIntervalSince1970 - stamp
+        let elapsed = duration.isFinite && duration >= 0 ? duration : .infinity
+        guard elapsed >= autoLogout else { return false }
+        lock()
+        return true
     }
 
     /// Demande Face ID / Touch ID ; déverrouille en cas de succès.
@@ -176,6 +210,7 @@ final class AppLockController: ObservableObject {
         isLocked = false
         isInBackground = false
         backgroundedAt = nil
+        defaults.removeObject(forKey: AppLockSettings.backgroundedAtKey)
         unlockError = nil
     }
 

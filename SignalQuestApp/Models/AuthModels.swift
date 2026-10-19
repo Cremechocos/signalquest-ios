@@ -41,6 +41,38 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     var isEmailVerificationPending: Bool { emailVerified == false }
 }
 
+extension AuthUser {
+    private enum Keys: String, CodingKey {
+        case id, email, emailVerified, name, handle, handleChangedAt, avatarUrl, bio, role
+        case twoFactorEnabled, notifyMessagesPush, notifySocialPush, notifyMessagesInApp
+        case callsDoNotDisturb, appleLinked
+    }
+
+    /// Seul `id` est indispensable : une URL d'avatar vide ou invalide, un champ
+    /// absent ou d'un autre type ne doivent pas bloquer la connexion ni le démarrage.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        func optional<T: Decodable>(_ type: T.Type, _ key: Keys) -> T? {
+            (try? c.decodeIfPresent(type, forKey: key)) ?? nil
+        }
+        id = try c.decode(String.self, forKey: .id)
+        email = optional(String.self, .email) ?? ""
+        emailVerified = optional(Bool.self, .emailVerified)
+        name = optional(String.self, .name)
+        handle = optional(String.self, .handle)
+        handleChangedAt = optional(String.self, .handleChangedAt)
+        avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
+        bio = optional(String.self, .bio)
+        role = optional(String.self, .role) ?? "user"
+        twoFactorEnabled = optional(Bool.self, .twoFactorEnabled)
+        notifyMessagesPush = optional(Bool.self, .notifyMessagesPush)
+        notifySocialPush = optional(Bool.self, .notifySocialPush)
+        notifyMessagesInApp = optional(Bool.self, .notifyMessagesInApp)
+        callsDoNotDisturb = optional(Bool.self, .callsDoNotDisturb)
+        appleLinked = optional(Bool.self, .appleLinked)
+    }
+}
+
 // MARK: - Login / signup
 
 struct LoginRequest: Codable {
