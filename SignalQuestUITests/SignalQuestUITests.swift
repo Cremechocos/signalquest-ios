@@ -160,8 +160,9 @@ final class SignalQuestUITests: XCTestCase {
     func testLaunchShowsLogin() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
-        XCTAssertTrue(app.staticTexts["SignalQuest"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 5))
+        // Connexion Halo (13/10) : titre « Connexion », bouton d'envoi identifié.
+        XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 15))
+        XCTAssertEqual(app.buttons["login.submit"].label, "Se connecter")
         XCTAssertTrue(app.buttons["login.continueGuest"].exists)
         XCTAssertFalse(app.buttons["Explorer la carte sans compte"].exists)
         XCTAssertFalse(app.buttons["Lancer un speedtest sans compte"].exists)
@@ -644,8 +645,11 @@ final class SignalQuestUITests: XCTestCase {
         let author = app.buttons["comment.author.parent-50"].firstMatch
         XCTAssertTrue(author.waitForExistence(timeout: 5))
         author.tap()
-        XCTAssertTrue(app.navigationBars["Camille"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.firstMatch.tap()
+        // Profil Halo (13/10) : barre de navigation masquée, retour par le bouton rond.
+        let name = app.staticTexts["profile.member.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.label, "Camille")
+        app.buttons["profile.member.back"].tap()
         XCTAssertTrue(last.waitForExistence(timeout: 5))
         let visibleAgain = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hittable == true"), object: last
