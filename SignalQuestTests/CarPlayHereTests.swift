@@ -79,14 +79,25 @@ final class CarPlayHereTests: XCTestCase {
         let normal = NearestAntennaTemplateBuilder.items(for: .init(path: path, quality: quality()))
         let unavailable = NearestAntennaTemplateBuilder.itemsWithoutLocation(path: path)
 
-        XCTAssertEqual(unavailable.map(\.title), [String(localized: "Position inconnue"),
-                                                  String(localized: "Connexion")])
+        let connection = String(localized: "carplay.here.connection", defaultValue: "Connexion")
+        XCTAssertEqual(unavailable.map(\.title), [String(localized: "Position inconnue"), connection])
         XCTAssertEqual(
             unavailable.last?.detail,
-            try XCTUnwrap(normal.first { $0.title == String(localized: "Connexion") }).detail
+            try XCTUnwrap(normal.first { $0.title == connection }).detail
         )
         XCTAssertFalse(unavailable.contains { $0.title == String(localized: "Réseau ici") })
         XCTAssertFalse(unavailable.contains { $0.title == String(localized: "Antenne la plus proche") })
+    }
+
+    /// La ligne décrit le réseau en cours, pas l'écran d'authentification : en anglais
+    /// elle dit « Connection », pas « Sign in » (traduction de la clé « Connexion »).
+    func testConnectionRowIsNotTheSignInLabelInEnglish() throws {
+        let path = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj"))
+        let english = try XCTUnwrap(Bundle(path: path))
+        XCTAssertEqual(
+            english.localizedString(forKey: "carplay.here.connection", value: nil, table: nil),
+            "Connection"
+        )
     }
 
     /// Distance ET direction : la distance seule ne dit pas où regarder.

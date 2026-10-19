@@ -19614,6 +19614,22 @@
         }
       }
     },
+    "carplay.here.connection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion"
+          }
+        }
+      }
+    },
     "cette famille seule" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -127,7 +127,7 @@ enum NearestAntennaTemplateBuilder {
 
     private static func connectionItem(for path: NetworkPathStatus) -> CPInformationItem {
         CPInformationItem(
-            title: String(localized: "Connexion"),
+            title: String(localized: "carplay.here.connection", defaultValue: "Connexion"),
             detail: [path.operatorName, path.displayName]
                 .compactMap { $0 }
                 .filter { !$0.isEmpty }
