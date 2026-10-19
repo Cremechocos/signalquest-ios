@@ -19,6 +19,7 @@ enum SQDiagnostics {
         case speedtestQueue = "speedtest_queue"
         case decoding
         case metricKit = "metrickit"
+        case mainHang = "main_hang"
         case qa
     }
 

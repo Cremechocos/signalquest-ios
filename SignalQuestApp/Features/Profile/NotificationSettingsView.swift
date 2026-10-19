@@ -96,13 +96,14 @@ private struct FavoriteCountSettingsRow: View {
 
     var body: some View {
         SQSettingsRowLabel("Antennes suivies", systemImage: "star",
-                           value: favorites.hasLoaded ? favorites.favorites.count.formatted() : nil)
+                           value: favorites.hasLoaded ? favorites.favorites.count.formatted() : nil,
+                           showsChevron: true)
     }
 }
 
-/// Écrans ouverts depuis Notifications et ses sous-écrans, poussés par valeur.
+/// Écrans ouverts depuis Notifications, poussés par `pushed`.
 enum NotificationSettingsDestination: Hashable {
-    case zoneAlerts, favoriteAntennas, places
+    case zoneAlerts, favoriteAntennas
 }
 
 /// Écran « Notifications » : l'autorisation iOS d'abord, puis ce que l'app
@@ -115,6 +116,12 @@ struct NotificationSettingsView: View {
     /// Autorisation iOS réelle : refusée, aucun interrupteur ne sert (UXP-02).
     @State private var authorization: UNAuthorizationStatus?
     @State private var e2eeNotificationPrivacy: E2EEV2NotificationPrivacy = .full
+    @State private var pushed: NotificationSettingsDestination?
+
+    private func push(_ destination: NotificationSettingsDestination) {
+        MainThreadHangProbe.mark("notifications.push.\(destination)")
+        pushed = destination
+    }
 
     init(userService: UserServicing) {
         _model = StateObject(wrappedValue: NotificationSettingsModel(userService: userService))
@@ -199,14 +206,17 @@ struct NotificationSettingsView: View {
                                  \.notifyCommunityOutagesPush)
                 // Plan 3, vague 2 : ce qui déclenche l'alerte près de ses lieux.
                 if model.prefs.notifyCommunityOutagesPush == true {
-                    NavigationLink(value: NotificationSettingsDestination.zoneAlerts) {
-                        SQSettingsRowLabel("Pannes près de mes lieux", systemImage: "mappin.and.ellipse")
+                    Button { push(.zoneAlerts) } label: {
+                        SQSettingsRowLabel("Pannes près de mes lieux", systemImage: "mappin.and.ellipse",
+                                           showsChevron: true)
                     }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("notifications.zoneAlerts")
                 }
-                NavigationLink(value: NotificationSettingsDestination.favoriteAntennas) {
+                Button { push(.favoriteAntennas) } label: {
                     FavoriteCountSettingsRow(favorites: services.favoriteAntennas)
                 }
+                .buttonStyle(.plain)
                 preferenceToggle("Activité des antennes suivies", systemImage: "star.bubble", \.notifySiteFollowsPush,
                                  subtitle: String(localized: "Pannes, messages, activations et nouvelles bandes"))
                 HStack(spacing: SQSpace.sm) {
@@ -234,13 +244,12 @@ struct NotificationSettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Notifications")
-        // Par valeur, comme le reste de la pile du Profil : iOS 16 ne mélange
-        // pas sans risque liens à fermeture et destinations par valeur.
-        .navigationDestination(for: NotificationSettingsDestination.self) { destination in
+        // Push par état, comme toute la pile du Profil : un lien par valeur ne
+        // pousse plus rien sous un écran lui-même poussé par état.
+        .navigationDestinationItemCompat($pushed) { destination in
             switch destination {
             case .zoneAlerts: ZoneAlertSettingsView(service: ZoneAlertService(api: services.api))
             case .favoriteAntennas: FavoriteAntennasView(favorites: services.favoriteAntennas)
-            case .places: PrivacySettingsView(service: services.privacy)
             }
         }
         .toolbar(.hidden, for: .navigationBar)

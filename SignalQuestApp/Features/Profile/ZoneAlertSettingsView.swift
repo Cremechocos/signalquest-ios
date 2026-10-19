@@ -90,6 +90,7 @@ private extension ZoneAlertChange {
 struct ZoneAlertSettingsView: View {
     @StateObject private var model: ZoneAlertSettingsModel
     @EnvironmentObject private var services: AppServices
+    @State private var showsPlaces = false
 
     init(service: ZoneAlertService) {
         _model = StateObject(wrappedValue: ZoneAlertSettingsModel(service: service))
@@ -123,6 +124,7 @@ struct ZoneAlertSettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Pannes près de mes lieux")
+        .navigationDestination(isPresented: $showsPlaces) { PrivacySettingsView(service: services.privacy) }
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.load() }
         .task { if model.settings == nil { await model.load() } }
@@ -151,10 +153,10 @@ struct ZoneAlertSettingsView: View {
                 }
             }
             .accessibilityIdentifier("zoneAlerts.radius")
-            // Destination déclarée par Notifications, l'écran parent.
-            NavigationLink(value: NotificationSettingsDestination.places) {
-                Label("Mes lieux", systemImage: "mappin.and.ellipse")
+            Button { showsPlaces = true } label: {
+                SQPushRowLabel { Label("Mes lieux", systemImage: "mappin.and.ellipse") }
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("zoneAlerts.places")
         } header: {
             Text("Autour de mes lieux")

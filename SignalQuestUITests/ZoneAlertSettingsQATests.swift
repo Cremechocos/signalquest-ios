@@ -61,7 +61,7 @@ final class ZoneAlertSettingsQATests: XCTestCase {
         XCTAssertTrue(from.waitForNonExistence(timeout: 5), "Sans heures calmes, plus d'horaires")
         XCTAssertEqual(quiet.value as? String, "0")
 
-        // Troisième niveau de la pile, poussé par valeur comme les autres.
+        // Troisième niveau de la pile, poussé par état comme les autres.
         let places = app.descendants(matching: .any)["zoneAlerts.places"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(places, in: app), "« Mes lieux » absent")
         places.tap()

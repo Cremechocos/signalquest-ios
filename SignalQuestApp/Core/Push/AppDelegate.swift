@@ -59,6 +59,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Sorties par chien de garde ou mémoire, blocages, énergie : ce que
         // Crashlytics ne voit pas seul (OBS-01).
         MetricKitReporter.shared.start()
+        // Gels du fil principal sous iOS 16, avec l'écran en cause.
+        MainThreadHangProbe.shared.start()
         #if DEBUG
         // Preuve de bout en bout de la remontée : un non-fatal reconnaissable,
         // envoyé au prochain lancement par le SDK.

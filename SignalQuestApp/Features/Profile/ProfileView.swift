@@ -41,6 +41,12 @@ struct ProfileView: View {
     @State private var showEdit = false
     /// Écran poussé depuis le Profil (une ligne du menu, une tuile, « À faire »).
     @State private var pushed: ProfileDestination?
+
+    /// Note l'écran demandé pour la sonde de gel (iOS 16), avant tout rendu.
+    private func push(_ destination: ProfileDestination) {
+        MainThreadHangProbe.mark("profile.push.\(destination)")
+        pushed = destination
+    }
     /// Choix du @pseudo depuis l'en-tête quand le compte n'en a pas encore.
     @State private var showHandleSheet = false
     @State private var stats: UserStats?
@@ -126,7 +132,10 @@ struct ProfileView: View {
         // NavigationLink du Profil (par valeur comme par closure) gelait l'app,
         // alors que les boutons à feuille et les pushes programmatiques des
         // autres onglets répondaient.
-        .navigationDestinationItemCompat($pushed) { destination(for: $0) }
+        .navigationDestinationItemCompat($pushed) { shown in
+            destination(for: shown)
+                .onAppear { MainThreadHangProbe.mark("profile.shown.\(shown)") }
+        }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
         .toolbar(.hidden, for: .navigationBar)
@@ -203,7 +212,6 @@ struct ProfileView: View {
         .sheet(item: $deepLinkE2EEApproval) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
-                    .trustedDevicesDestinations(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {
@@ -216,7 +224,6 @@ struct ProfileView: View {
         .sheet(item: $deepLinkE2EEApprovalQR) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalQR: link.id)
-                    .trustedDevicesDestinations(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {
@@ -542,34 +549,34 @@ struct ProfileView: View {
             // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
             // rares fonctions Premium utilisées, était à cinq niveaux.
             menuSection("Suivis") {
-                Button { pushed = ProfileDestination.favorites } label: {
+                Button { push(ProfileDestination.favorites) } label: {
                     FavoriteCountMenuRow(favorites: services.favoriteAntennas)
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.sentinelle } label: {
+                Button { push(ProfileDestination.sentinelle) } label: {
                     menuRow(title: "Sentinelle", icon: "wifi.router")
                 }
             }
 
             menuSection("Contributions") {
-                Button { pushed = ProfileDestination.measurements } label: {
+                Button { push(ProfileDestination.measurements) } label: {
                     menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.photos } label: {
+                Button { push(ProfileDestination.photos) } label: {
                     menuRow(title: "Photos", icon: "photo.stack")
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.antennaReports } label: {
+                Button { push(ProfileDestination.antennaReports) } label: {
                     menuRow(title: "Signalements d’antenne", icon: "exclamationmark.bubble")
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.outages } label: {
+                Button { push(ProfileDestination.outages) } label: {
                     menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle")
                 }
                 menuSeparator
                 // Territoires : plus en tuile sous le niveau (décision du 29/09).
-                Button { pushed = ProfileDestination.territories } label: {
+                Button { push(ProfileDestination.territories) } label: {
                     menuRow(title: "Territoires", icon: "square.grid.3x3")
                 }
             }
@@ -578,15 +585,15 @@ struct ProfileView: View {
             // a de telles données, sinon une ligne dit ce qu'ils apportent.
             menuSection("Avec l’app Android") {
                 if androidPresence.showsAndroidScreens {
-                    Button { pushed = ProfileDestination.sessions } label: {
+                    Button { push(ProfileDestination.sessions) } label: {
                         menuRow(title: "Enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
                     }
                     menuSeparator
-                    Button { pushed = ProfileDestination.radioLogs } label: {
+                    Button { push(ProfileDestination.radioLogs) } label: {
                         menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
                     }
                     menuSeparator
-                    Button { pushed = ProfileDestination.identifications } label: {
+                    Button { push(ProfileDestination.identifications) } label: {
                         menuRow(title: "Mes identifications", icon: "checkmark.seal")
                     }
                 } else {
@@ -606,24 +613,24 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.updateRecommended")
                     menuSeparator
                 }
-                Button { pushed = ProfileDestination.settings } label: {
+                Button { push(ProfileDestination.settings) } label: {
                     menuRow(title: "Réglages", icon: "gearshape")
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.privacy } label: {
+                Button { push(ProfileDestination.privacy) } label: {
                     menuRow(title: "Confidentialité", icon: "hand.raised")
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.subscription } label: {
+                Button { push(ProfileDestination.subscription) } label: {
                     SubscriptionMenuRow(store: services.entitlements)
                 }
                 menuSeparator
-                Button { pushed = ProfileDestination.glossary } label: {
+                Button { push(ProfileDestination.glossary) } label: {
                     menuRow(title: "Aide et glossaire", icon: "questionmark.circle")
                 }
                 .accessibilityIdentifier("profile.glossary")
                 menuSeparator
-                Button { pushed = ProfileDestination.bugs } label: {
+                Button { push(ProfileDestination.bugs) } label: {
                     menuRow(title: "Bugs et idées", icon: "ladybug",
                             subtitle: String(localized: "Signaler un problème, proposer une amélioration"),
                             badge: unseenBugReplies > 0 ? unseenBugReplies.formatted() : nil)
@@ -632,7 +639,7 @@ struct ProfileView: View {
                 // Réservé aux administrateurs ; le serveur refuse de toute façon les autres comptes.
                 if case .authenticated(let user) = session.state, user.role == "admin" {
                     menuSeparator
-                    Button { pushed = ProfileDestination.adminBugs } label: {
+                    Button { push(ProfileDestination.adminBugs) } label: {
                         menuRow(title: "Admin · bugs et retours", icon: "wrench.and.screwdriver",
                                 subtitle: String(localized: "Trier et répondre à tous les signalements"))
                     }
@@ -785,7 +792,7 @@ struct ProfileView: View {
         subtitle: String?,
         destination: ProfileDestination
     ) -> some View {
-        Button { pushed = destination } label: {
+        Button { push(destination) } label: {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 ProfileMenuIcon(systemImage: icon, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                     .padding(.bottom, SQSpace.xs)
@@ -834,18 +841,18 @@ struct ProfileView: View {
     private func todoLink(_ todo: UserOverview.Todo) -> some View {
         switch todo {
         case .claimMissions(let count, let rewardXp):
-            Button { pushed = ProfileDestination.rewards } label: {
+            Button { push(ProfileDestination.rewards) } label: {
                 ProfileMenuRow(title: "Missions à réclamer", icon: "gift", subtitle: String(localized: "+\(rewardXp) pts"),
                                badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
-            Button { pushed = ProfileDestination.pendingPhotos } label: {
+            Button { push(ProfileDestination.pendingPhotos) } label: {
                 ProfileMenuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.photos")
         case .identificationConflicts(let count):
-            Button { pushed = ProfileDestination.identifications } label: {
+            Button { push(ProfileDestination.identifications) } label: {
                 ProfileMenuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted(),
                                accentIcon: true)
             }

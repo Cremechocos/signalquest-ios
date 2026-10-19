@@ -82,6 +82,25 @@ final class Lot1ReliabilityTests: XCTestCase {
         XCTAssertTrue(MetricKitReporter.hasMeasurements(["build": "161", "hours": "24.0", "cpu_s": "17.0"]))
     }
 
+    /// Un gel est signalé une fois, au seuil de 5 s ; une suspension de l'app
+    /// n'en est pas un ; le gel suivant, après une réponse, l'est de nouveau.
+    func testHangProbeReportsEachMainThreadFreezeOnceAndIgnoresSuspension() {
+        let second: UInt64 = 1_000_000_000
+        var clock = MainThreadHangProbe.Clock(now: 0)
+        XCTAssertNil(clock.tick(now: 1 * second))
+        XCTAssertNil(clock.tick(now: 4 * second))
+        XCTAssertNil(clock.tick(now: 4 * second + second / 2), "Sous le seuil")
+        XCTAssertEqual(clock.tick(now: 5 * second), 5)
+        XCTAssertNil(clock.tick(now: 6 * second), "Un même gel ne part qu'une fois")
+        clock.pong(now: 6 * second)
+        XCTAssertNil(clock.tick(now: 7 * second))
+        // Dix minutes sans top : l'app était en arrière-plan, le fil principal aussi.
+        XCTAssertNil(clock.tick(now: 607 * second))
+        XCTAssertNil(clock.tick(now: 608 * second))
+        for now in 609...611 { XCTAssertNil(clock.tick(now: UInt64(now) * second)) }
+        XCTAssertEqual(clock.tick(now: 612 * second), 5, "Nouveau gel après la reprise")
+    }
+
     func testDecodingContextNamesTheFieldPathWithoutAnyValue() throws {
         struct Probe: Decodable { struct Item: Decodable { let count: Int }; let items: [Item] }
         let json = Data(#"{"items":[{"count":1},{"count":"secret-value"}]}"#.utf8)

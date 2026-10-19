@@ -614,26 +614,10 @@ struct E2EEV2ActivationScreen: View {
     }
 }
 
-/// Écrans ouverts depuis Appareils, poussés par valeur. Déclarés par la pile
-/// qui ouvre Appareils (Réglages ou les feuilles du Profil), comme Mes lieux
-/// l'est par Notifications plutôt que par Pannes près de mes lieux.
+/// Écrans ouverts depuis Appareils, poussés par `pushed`.
 enum TrustedDevicesDestination: Hashable {
     case accountKey(ownUserId: String, ownerNamespace: String)
     case recovery
-}
-
-extension View {
-    /// Destinations des liens d'Appareils, pour la pile qui l'affiche.
-    func trustedDevicesDestinations(api: APIClient) -> some View {
-        navigationDestination(for: TrustedDevicesDestination.self) { destination in
-            switch destination {
-            case let .accountKey(ownUserId, ownerNamespace):
-                E2EEV2AccountKeyView(ownUserId: ownUserId, ownerNamespace: ownerNamespace)
-            case .recovery:
-                E2EEV2RecoveryResetView(api: api)
-            }
-        }
-    }
 }
 
 struct E2EEV2TrustedDevicesView: View {
@@ -643,6 +627,7 @@ struct E2EEV2TrustedDevicesView: View {
     @State private var approvalInput = ""
     @State private var initialApprovalConsumed = false
     @State private var showsApprovalScanner = false
+    @State private var pushed: TrustedDevicesDestination?
     private let api: APIClient
     private let initialApprovalId: String?
     /// QR ouvert par le lien universel (appareil photo du système) : chargé
@@ -701,12 +686,15 @@ struct E2EEV2TrustedDevicesView: View {
             if model.currentDevice?.status == .approved, !model.accountKeyMissing,
                let session = LocalAccountScope.sessionSnapshot() {
                 Section {
-                    NavigationLink(value: TrustedDevicesDestination.accountKey(
-                        ownUserId: String(session.ownerScopeId.dropFirst("user:".count)),
-                        ownerNamespace: session.ownerNamespace
-                    )) {
-                        Label("Clé de ton compte", systemImage: "key.horizontal")
+                    Button {
+                        pushed = .accountKey(
+                            ownUserId: String(session.ownerScopeId.dropFirst("user:".count)),
+                            ownerNamespace: session.ownerNamespace
+                        )
+                    } label: {
+                        SQPushRowLabel { Label("Clé de ton compte", systemImage: "key.horizontal") }
                     }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("e2ee.accountKey")
                 }
             }
@@ -875,10 +863,13 @@ struct E2EEV2TrustedDevicesView: View {
 
             if model.hasLocalIdentity {
                 Section {
-                    NavigationLink(value: TrustedDevicesDestination.recovery) {
-                        Label("Récupération et perte d’accès", systemImage: "key.viewfinder")
-                            .frame(minHeight: 48)
+                    Button { pushed = .recovery } label: {
+                        SQPushRowLabel {
+                            Label("Récupération et perte d’accès", systemImage: "key.viewfinder")
+                                .frame(minHeight: 48)
+                        }
                     }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("Récupération")
                 } footer: {
@@ -900,6 +891,14 @@ struct E2EEV2TrustedDevicesView: View {
         .tint(SQColor.brandRed)
         .navigationTitle("Appareils")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestinationItemCompat($pushed) { destination in
+            switch destination {
+            case let .accountKey(ownUserId, ownerNamespace):
+                E2EEV2AccountKeyView(ownUserId: ownUserId, ownerNamespace: ownerNamespace)
+            case .recovery:
+                E2EEV2RecoveryResetView(api: api)
+            }
+        }
         .refreshable { await model.load() }
         .sheet(isPresented: $showsApprovalScanner) {
             E2EEV2ApprovalScannerView { code in
@@ -2118,7 +2117,7 @@ final class SettingsViewModel: ObservableObject {
     }
 }
 
-/// Écrans ouverts depuis les Réglages, poussés par valeur.
+/// Écrans ouverts depuis les Réglages, poussés par `pushed`.
 private enum SettingsDestination: Hashable {
     case password, devices, privacy, notifications, glossary, bugs
 }
@@ -2127,6 +2126,13 @@ struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
+    /// Écran poussé depuis une ligne des Réglages.
+    @State private var pushed: SettingsDestination?
+
+    private func push(_ destination: SettingsDestination) {
+        MainThreadHangProbe.mark("settings.push.\(destination)")
+        pushed = destination
+    }
     @State private var twoFactorEnrollment: TwoFactorEnrollmentService?
     @State private var twoFactorDisable: TwoFactorEnrollmentService?
     @State private var isDisabling2FA = false
@@ -2195,9 +2201,10 @@ struct SettingsView: View {
             .listRowBackground(Color.clear)
 
             Section {
-                NavigationLink(value: SettingsDestination.password) {
-                    SQSettingsRowLabel("Mot de passe", systemImage: "key")
+                Button { push(SettingsDestination.password) } label: {
+                    SQSettingsRowLabel("Mot de passe", systemImage: "key", showsChevron: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.password")
                 twoFactorRow
                 Button {
@@ -2213,9 +2220,10 @@ struct SettingsView: View {
                 // Masqué tant que la v2 dort : l'écran créait une identité locale
                 // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
                 if E2EEV2RuntimeWriteGate.enabled {
-                    NavigationLink(value: SettingsDestination.devices) {
-                        SQSettingsRowLabel("Appareils", systemImage: "lock.shield")
+                    Button { push(SettingsDestination.devices) } label: {
+                        SQSettingsRowLabel("Appareils", systemImage: "lock.shield", showsChevron: true)
                     }
+                    .buttonStyle(.plain)
                 }
             } header: {
                 Text("Compte").sqKicker()
@@ -2288,16 +2296,18 @@ struct SettingsView: View {
             // `Section` fait résoudre vers TableRowContent ; le modificateur qui
             // le suit ancre la résolution côté vues.
             Section {
-                NavigationLink(value: SettingsDestination.privacy) {
-                    SQSettingsRowLabel("Confidentialité", systemImage: "hand.raised")
+                Button { push(SettingsDestination.privacy) } label: {
+                    SQSettingsRowLabel("Confidentialité", systemImage: "hand.raised", showsChevron: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.privacy")
                 // Notifications, appels et antennes suivies : un écran à part,
                 // qui enregistre chaque réglage au geste (TRX-03) et que le lien
                 // « Réglages de notifications » d'iOS ouvre directement (TRX-21).
-                NavigationLink(value: SettingsDestination.notifications) {
-                    SQSettingsRowLabel("Notifications", systemImage: "bell")
+                Button { push(SettingsDestination.notifications) } label: {
+                    SQSettingsRowLabel("Notifications", systemImage: "bell", showsChevron: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.notifications")
             }
             .listRowBackground(SQColor.surface)
@@ -2354,14 +2364,17 @@ struct SettingsView: View {
             .listRowBackground(SQColor.surface)
 
             Section {
-                NavigationLink(value: SettingsDestination.glossary) {
-                    SQSettingsRowLabel("Aide et glossaire", systemImage: "questionmark.circle")
+                Button { push(SettingsDestination.glossary) } label: {
+                    SQSettingsRowLabel("Aide et glossaire", systemImage: "questionmark.circle", showsChevron: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.glossary")
-                NavigationLink(value: SettingsDestination.bugs) {
+                Button { push(SettingsDestination.bugs) } label: {
                     SQSettingsRowLabel("Bugs et idées", systemImage: "ladybug",
-                                       subtitle: String(localized: "Signaler un problème, proposer une amélioration"))
+                                       subtitle: String(localized: "Signaler un problème, proposer une amélioration"),
+                                       showsChevron: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.bugs")
                 if let contact = AppConfig.current.contactMailtoURL {
                     Link(destination: contact) {
@@ -2419,9 +2432,9 @@ struct SettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
-        // Par valeur, comme le Profil : la destination n'est plus recréée à chaque rendu (iOS 16).
-        .navigationDestination(for: SettingsDestination.self) { destination(for: $0) }
-        .trustedDevicesDestinations(api: services.api)
+        // Push par état, comme le Profil : sous iOS 16.7, les NavigationLink du
+        // Profil gelaient l'app (voir ProfileView).
+        .navigationDestinationItemCompat($pushed) { destination(for: $0) }
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()
@@ -2740,6 +2753,25 @@ struct SQSettingsHeader: View {
         let version = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? "—"
         return "SignalQuest \(version) (\(build))"
+    }
+}
+
+/// Ligne qui pousse un écran par un Button : le chevron qu'un NavigationLink
+/// dessinait, à droite de son libellé.
+struct SQPushRowLabel<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack {
+            content
+            Spacer(minLength: 0)
+            // Même chevron que celui des NavigationLink du système.
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color(uiColor: .tertiaryLabel))
+                .accessibilityHidden(true)
+        }
+        .contentShape(Rectangle())
     }
 }
 

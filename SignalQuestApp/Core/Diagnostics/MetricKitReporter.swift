@@ -1,5 +1,6 @@
 import Foundation
 import MetricKit
+import os
 
 /// Rapports MetricKit relayés à Crashlytics comme non-fatals (OBS-01). Ils
 /// couvrent ce que Crashlytics ne voit pas : sorties par le chien de garde ou
@@ -114,5 +115,85 @@ final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked S
 
     private static func format(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+}
+
+/// Sonde de gel du fil principal, sous iOS 16 seulement. MetricKit y compte
+/// les blocages sans jamais livrer leur pile : un testeur sous iOS 16.7 voyait
+/// l'app se figer sur le Profil, sans rien dans Crashlytics. Si le fil
+/// principal ne répond plus pendant 5 s, un non-fatal part avec la dernière
+/// étape notée (`mark`), envoyé par le SDK au lancement suivant.
+final class MainThreadHangProbe: @unchecked Sendable {
+    static let shared = MainThreadHangProbe()
+
+    /// Horloge de la sonde, sans minuterie ni fil : testable telle quelle.
+    struct Clock {
+        static let threshold: UInt64 = 5_000_000_000
+        /// Au-delà entre deux tops, l'app était suspendue, pas figée.
+        static let suspensionGap: UInt64 = 3_000_000_000
+        private var lastTick: UInt64
+        private var lastPong: UInt64
+        private var reported = false
+
+        init(now: UInt64) {
+            lastTick = now
+            lastPong = now
+        }
+
+        /// Durée du gel, en secondes, la seule fois où il franchit le seuil.
+        mutating func tick(now: UInt64) -> Double? {
+            if now &- lastTick > Self.suspensionGap {
+                lastPong = now
+                reported = false
+            }
+            lastTick = now
+            let stalled = now &- lastPong
+            guard stalled >= Self.threshold, !reported else { return nil }
+            reported = true
+            return Double(stalled) / 1_000_000_000
+        }
+
+        /// Le fil principal a répondu : le gel suivant sera signalé à nouveau.
+        mutating func pong(now: UInt64) {
+            lastPong = now
+            reported = false
+        }
+    }
+
+    private static let step = OSAllocatedUnfairLock(initialState: "launch")
+    private let queue = DispatchQueue(label: "fr.signalquest.hang-probe", qos: .utility)
+    /// Lu et écrit sur `queue` seulement.
+    private var clock = Clock(now: DispatchTime.now().uptimeNanoseconds)
+    private var timer: DispatchSourceTimer?
+
+    /// Dernière étape de navigation, un nom d'écran (jamais de contenu).
+    static func mark(_ value: String) {
+        step.withLock { $0 = value }
+    }
+
+    func start() {
+        guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 17 else { return }
+        queue.async { [self] in
+            guard timer == nil else { return }
+            clock = Clock(now: DispatchTime.now().uptimeNanoseconds)
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(200))
+            timer.setEventHandler { [self] in tick() }
+            timer.resume()
+            self.timer = timer
+        }
+    }
+
+    private func tick() {
+        if let stalled = clock.tick(now: DispatchTime.now().uptimeNanoseconds) {
+            SQDiagnostics.recordReport("main_hang", area: .mainHang, info: [
+                "step": Self.step.withLock { $0 },
+                "stalled_s": String(format: "%.0f", stalled),
+            ])
+        }
+        DispatchQueue.main.async { [self] in
+            let now = DispatchTime.now().uptimeNanoseconds
+            queue.async { [self] in clock.pong(now: now) }
+        }
     }
 }
