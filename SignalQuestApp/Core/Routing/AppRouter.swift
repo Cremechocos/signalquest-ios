@@ -142,6 +142,9 @@ final class AppRouter: ObservableObject {
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
+    /// Ami dont la fiche s'ouvre sur la carte (alerte de partage de position en direct) ;
+    /// la carte le cherche parmi les amis vivants et le cadre.
+    @Published var pendingLiveFriendId: String?
     /// Couche à allumer avec ce cadrage : speedtests et pannes sont éteints par
     /// défaut, « Voir sur la carte » cadrait sur un point invisible (MES-15).
     @Published var pendingMapLayer: MapDisplayItem.Kind?
@@ -188,10 +191,10 @@ final class AppRouter: ObservableObject {
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil || openBugId != nil
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
-            || openSentinelleTargetId != nil
+            || openSentinelleTargetId != nil || openFriendRequests
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || openProfileScreen != nil || openANFRMap
-            || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
+            || pendingMapFocus != nil || pendingLiveFriendId != nil || pendingDriveTest || pendingSpeedtestStart
             || pendingShare != nil || pendingSharedPost != nil
     }
 
@@ -303,7 +306,8 @@ final class AppRouter: ObservableObject {
         // Antenne suivie ou proche d'un lieu : le site porte son code sous `siteId`
         // ou `antennaId` (push) et `codeSiteOp` (centre de notifications), et son marché quand
         // la charge le donne.
-        case "site", "antenna", "validation", "favorite_antenna_issue", "zone_antenna_issue":
+        case "site", "antenna", "validation", "favorite_antenna_issue", "zone_antenna_issue",
+             "zone_new_antenna", "zone_antenna_upgrade":
             route(toSite: siteId, market: market)
         // Site suivi (message, activation, nouvelle bande, panne confirmée) : la charge porte
         // son marché, sans lequel un site hors de France ne se retrouve pas.
@@ -337,7 +341,18 @@ final class AppRouter: ObservableObject {
         // repli teste `reportId` puis `conversationId` avant `siteId`, et une clé
         // ajoutée au payload le détournerait sans qu'on s'en aperçoive.
         case "community_outage":
-            route(toCommunityOutageId: outageId, fallbackSiteId: siteId)
+            route(toCommunityOutageId: outageId, fallbackSiteId: siteId, market: market)
+        // Partage de position en direct : la carte, où l'ami apparaît. La demande, elle, se
+        // traite dans la conversation qui la porte (le bouton Accepter y est).
+        case let type? where type.hasPrefix("live_share_"):
+            if type == "live_share_request", conversationId != nil {
+                route(toConversation: conversationId)
+            } else {
+                route(toLiveFriend: userId)
+            }
+        // Notification d'essai : rien à ouvrir.
+        case "test_push":
+            break
         case "sentinelle", "sentinelle_incident", "sentinelle_follower":
             route(toSentinelle: targetId)
         case "e2ee_v2_device_approval":
@@ -355,7 +370,7 @@ final class AppRouter: ObservableObject {
             } else if userId != nil {
                 route(toUserProfile: userId)
             } else if siteId != nil {
-                route(toSite: siteId)
+                route(toSite: siteId, market: market)
             }
         }
     }
@@ -418,6 +433,12 @@ final class AppRouter: ObservableObject {
         if let id { openUserProfileId = id }
     }
 
+    /// Alerte de partage de position : la carte, sur la fiche de l'ami quand son identifiant est connu.
+    func route(toLiveFriend id: String?) {
+        selectedTab = .map
+        if let id, !id.isEmpty { pendingLiveFriendId = id }
+    }
+
     func route(toSite id: String?, market: String? = nil) {
         selectedTab = .map
         guard let id else { return }
@@ -451,9 +472,9 @@ final class AppRouter: ObservableObject {
     /// une notification de rétablissement n'y figurerait même plus (la fiche ne montre que les
     /// pannes ouvertes). Sans `outageId` — un payload plus ancien — on retombe sur le site, qui
     /// reste mieux que rien.
-    func route(toCommunityOutageId id: String?, fallbackSiteId siteId: String?) {
+    func route(toCommunityOutageId id: String?, fallbackSiteId siteId: String?, market: String? = nil) {
         guard let id, !id.isEmpty else {
-            route(toSite: siteId)
+            route(toSite: siteId, market: market)
             return
         }
         selectedTab = .map

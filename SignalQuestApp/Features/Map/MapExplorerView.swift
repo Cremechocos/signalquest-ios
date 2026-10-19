@@ -2064,6 +2064,8 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.openCommunityOutage) { _, _ in openCommunityOutageFromRouterIfNeeded() }
         // Tap sur une notification de panne : seul l'identifiant a voyagé.
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
+        // Alerte de partage de position : la fiche de l'ami.
+        .onChangeCompat(of: router.pendingLiveFriendId) { _, _ in openLiveFriendFromRouterIfNeeded() }
         .onAppear {
             viewportRefreshID &+= 1
             // L'onglet Carte peut ne pas être monté pendant une modification de zone.
@@ -2077,6 +2079,7 @@ struct MapExplorerView: View {
             focusFromRouterIfNeeded()
             openCommunityOutageFromRouterIfNeeded()
             openCommunityOutageFromNotificationIfNeeded()
+            openLiveFriendFromRouterIfNeeded()
         }
     }
 
@@ -2099,14 +2102,43 @@ struct MapExplorerView: View {
     /// ici : « Rétabli sur… » notifie précisément une panne qu'aucune liste ne rend plus.
     ///
     /// Une fois l'objet en main, on repasse par le chemin de la page « Pannes signalées » : cadrage
-    /// et ouverture de feuille restent décidés à un seul endroit. Un échec est silencieux — la
-    /// carte reste sur ce qu'elle affichait, ce qui vaut mieux qu'une alerte pour un tap.
+    /// et ouverture de feuille restent décidés à un seul endroit. Un échec le dit par le bandeau
+    /// de la carte : panne supprimée ou close, ou la vraie cause (hors ligne, session expirée).
     private func openCommunityOutageFromNotificationIfNeeded() {
         guard let outageId = router.openCommunityOutageId else { return }
         router.openCommunityOutageId = nil
         Task {
-            guard let outage = try? await services.communityOutages.detail(outageId: outageId) else { return }
-            router.route(toCommunityOutage: outage)
+            do {
+                let outage = try await services.communityOutages.detail(outageId: outageId)
+                router.route(toCommunityOutage: outage)
+            } catch {
+                guard !error.isCancellation else { return }
+                if case .http(404, _, _, _, _)? = error as? APIError {
+                    model.showMarketNotice(String(localized: "Cette panne n’est plus disponible"))
+                } else {
+                    model.showMarketNotice(error.userFacingMessage)
+                }
+            }
+        }
+    }
+
+    /// Ouvre la fiche de l'ami visé par une alerte de partage de position, cadrée sur lui.
+    /// Les amis vivants arrivent après l'ouverture de la carte : brève attente, puis la carte
+    /// reste telle quelle si l'ami n'y figure pas.
+    private func openLiveFriendFromRouterIfNeeded() {
+        guard let friendId = router.pendingLiveFriendId else { return }
+        router.pendingLiveFriendId = nil
+        Task {
+            for _ in 0..<8 {
+                if let friend = model.liveFriends.first(where: { $0.id == friendId }) {
+                    selectedFriend = friend
+                    if let location = friend.location {
+                        requestCamera(center: CLLocationCoordinate2D(latitude: location.lat, longitude: location.lng), zoom: 15)
+                    }
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
         }
     }
 

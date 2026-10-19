@@ -124,6 +124,80 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(router.openSiteMarket, "DROM")
     }
 
+    /// Nouvelle antenne ou montée de génération près d'un lieu : le site s'ouvre dans le marché de la charge.
+    func testZoneAntennaAlertsOpenTheSiteInTheirMarket() {
+        for type in ["zone_new_antenna", "zone_antenna_upgrade"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM")
+            XCTAssertEqual(router.selectedTab, .map, type)
+            XCTAssertEqual(router.openSiteId, "DROM:97100001", type)
+            XCTAssertEqual(router.openSiteMarket, "DROM", type)
+        }
+    }
+
+    /// Une panne sans identifiant retombe sur le site, dans son marché.
+    func testCommunityOutageWithoutIdFallsBackToTheSiteInItsMarket() {
+        let router = AppRouter()
+        router.handle(type: "community_outage", conversationId: nil, postId: nil,
+                      siteId: "DROM:97100001", market: "DROM")
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertEqual(router.openSiteId, "DROM:97100001")
+        XCTAssertEqual(router.openSiteMarket, "DROM")
+        XCTAssertNil(router.openCommunityOutageId)
+
+        let withId = AppRouter()
+        withId.handle(type: "community_outage", conversationId: nil, postId: nil,
+                      siteId: "0382203", outageId: "outage-1", market: "FR")
+        XCTAssertEqual(withId.openCommunityOutageId, "outage-1")
+        XCTAssertNil(withId.openSiteId)
+    }
+
+    func testLiveShareAlertsOpenTheMapOnTheFriendWhenKnown() {
+        for type in ["live_share_accepted", "live_share_declined", "live_share_stopped",
+                     "live_share_follower_start", "live_share_tracking"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: "conv-1", postId: nil, userId: "friend-1")
+            XCTAssertEqual(router.selectedTab, .map, type)
+            XCTAssertEqual(router.pendingLiveFriendId, "friend-1", type)
+            XCTAssertNil(router.openConversationId, type)
+            XCTAssertTrue(router.hasPendingContentRoute, type)
+
+            let anonymous = AppRouter()
+            anonymous.handle(type: type, conversationId: "conv-1", postId: nil)
+            XCTAssertEqual(anonymous.selectedTab, .map, type)
+            XCTAssertNil(anonymous.pendingLiveFriendId, type)
+        }
+    }
+
+    /// La demande de suivi se traite dans la conversation, où se trouve le bouton Accepter.
+    func testLiveShareRequestKeepsOpeningItsConversation() {
+        let router = AppRouter()
+        router.handle(type: "live_share_request", conversationId: "conv-2", postId: nil)
+        XCTAssertEqual(router.selectedTab, .community)
+        XCTAssertEqual(router.openConversationId, "conv-2")
+
+        let withoutConversation = AppRouter()
+        withoutConversation.handle(type: "live_share_request", conversationId: nil, postId: nil)
+        XCTAssertEqual(withoutConversation.selectedTab, .map)
+    }
+
+    func testTestPushOpensNothing() {
+        let router = AppRouter()
+        router.handle(type: "test_push", conversationId: nil, postId: nil, siteId: "0382203")
+        XCTAssertEqual(router.selectedTab, .home)
+        XCTAssertNil(router.openSiteId)
+        XCTAssertFalse(router.hasPendingContentRoute)
+    }
+
+    /// Une demande d'ami reçue à froid garde la priorité sur l'onglet d'arrivée de l'introduction.
+    func testFriendRequestCountsAsAPendingContentRoute() {
+        let router = AppRouter()
+        router.handle(type: "friend_request", conversationId: nil, postId: nil)
+        XCTAssertTrue(router.hasPendingContentRoute)
+        XCTAssertFalse(router.routeFromOnboarding(to: .map))
+        XCTAssertEqual(router.selectedTab, .community)
+    }
+
     func testANFRUpdateOpensTheANFRScreen() {
         let router = AppRouter()
         router.handle(type: "anfr_update", conversationId: nil, postId: nil)
