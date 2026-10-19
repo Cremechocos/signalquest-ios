@@ -71,7 +71,8 @@ struct CoverageCardView: View {
                         SQMetricTile.wrapping(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
                         SQMetricTile.wrapping(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
                         SQMetricTile.wrapping(label: "Points", value: signal?.pointsCount.map(String.init) ?? "—")
-                        SQMetricTile.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
+                        // « moy. » ne reprend jamais un RSRP ponctuel : sans moyenne, le tiret.
+                        SQMetricTile.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm))
                     } else {
                         SQMetricTile.wrapping(label: "Tech", value: signal?.technology ?? "—", highlight: true)
                         SQMetricTile.wrapping(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))

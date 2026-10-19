@@ -2,6 +2,8 @@ import Foundation
 
 protocol CommentsServicing: Sendable {
     func list(postId: String, cursor: String?) async throws -> SocialCommentsResponse
+    /// Une page de `limit` commentaires (le détail d'un post n'en montre qu'un).
+    func list(postId: String, cursor: String?, limit: Int) async throws -> SocialCommentsResponse
     func add(postId: String, text: String, parentId: String?) async throws -> SocialComment
     /// Les réponses d'un commentaire, chargées À LA DEMANDE.
     ///
@@ -18,6 +20,10 @@ protocol CommentsServicing: Sendable {
 }
 
 extension CommentsServicing {
+    func list(postId: String, cursor: String?, limit: Int) async throws -> SocialCommentsResponse {
+        try await list(postId: postId, cursor: cursor)
+    }
+
     /// Les doubles de test et de démonstration n'ont rien à supprimer.
     func delete(postId: String, commentId: String) async throws {}
 }
@@ -36,7 +42,11 @@ final class CommentsService: CommentsServicing {
     }
 
     func list(postId: String, cursor: String? = nil) async throws -> SocialCommentsResponse {
-        var query: [URLQueryItem] = [URLQueryItem(name: "limit", value: "50")]
+        try await list(postId: postId, cursor: cursor, limit: 50)
+    }
+
+    func list(postId: String, cursor: String?, limit: Int) async throws -> SocialCommentsResponse {
+        var query: [URLQueryItem] = [URLQueryItem(name: "limit", value: String(limit))]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         return try await api.request(
             APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))/comments", query: query),

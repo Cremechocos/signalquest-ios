@@ -370,7 +370,7 @@ struct CardActionsBar: View {
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
+            .accessibilityLabel(item.favoritedByMe ? "Retirer des enregistrés" : "Enregistrer la publication")
             .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
             .sqLikePop(trigger: item.favoritedByMe)
             Button(action: onShare) {

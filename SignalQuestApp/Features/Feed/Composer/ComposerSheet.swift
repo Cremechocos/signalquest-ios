@@ -79,8 +79,8 @@ final class ComposerViewModel: ObservableObject {
     }
     @Published var selectedItem: PhotosPickerItem?
     @Published var previewImage: UIImage?
-    /// Données brutes de la photo choisie, conservées pour l'encodage/downscale
-    /// hors du main thread au moment de publier (PERF-COMP-01).
+    /// Données brutes de la photo choisie : `publishPost` les ré-encode (1600 px,
+    /// sans métadonnées) hors du main thread AVANT de les mettre en file.
     private var pickedImageData: Data?
     @Published var isBusy = false
     @Published var errorMessage: String?
@@ -130,7 +130,8 @@ final class ComposerViewModel: ObservableObject {
             guard !Task.isCancelled, let self else { return }
             let found = (try? await self.service.searchUsers(query: token.query, limit: 6)) ?? []
             guard !Task.isCancelled else { return }
-            self.mentionSuggestions = found
+            // Sans @pseudo, la mention ne désignerait personne : elle n'est pas proposée.
+            self.mentionSuggestions = found.filter { $0.handle?.isEmpty == false }
         }
     }
 
@@ -303,8 +304,8 @@ final class ComposerViewModel: ObservableObject {
         Haptics.selection()
     }
 
-    /// Le service d'upload applique le contrat commun : orientation rendue dans
-    /// les pixels, downscale et suppression EXIF avant tout envoi réseau.
+    /// `publishPost` applique le contrat commun avant la mise en file : orientation
+    /// rendue dans les pixels, downscale et suppression EXIF.
     /// Rien sans aperçu : une photo retirée partait encore avec la publication.
     var imageDataForUpload: Data? {
         previewImage == nil ? nil : pickedImageData
@@ -384,8 +385,9 @@ final class ComposerViewModel: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do {
-            // Le service ré-encode, réduit et retire les EXIF hors du main thread,
-            // puis conserve le brouillon dans son outbox jusqu'à l'accusé serveur.
+            // Le service ré-encode, réduit et retire les EXIF hors du main thread
+            // AVANT la mise en file, puis garde l'envoi dans son outbox jusqu'à
+            // l'accusé serveur.
             let imageData = imageDataForUpload
             let safeBody = body.isEmpty ? fallbackBody : body
             _ = try await service.publishPost(
@@ -444,8 +446,12 @@ struct ComposerSheet: View {
     @State private var selectedMode: ComposerMode = .edit
     /// Éditeur « Flouter » de la photo jointe (plan 3, vague 1).
     @State private var showBlurEditor = false
+    @State private var confirmsClearDraft = false
     @FocusState private var isInputFocused: Bool
     private let startingWith: ComposerStartAttachment?
+    /// Appelé à la fermeture si une publication (ou une modification) a eu lieu,
+    /// ou attend dans la file d'envoi : le fil se recharge alors, pas autrement.
+    private let onPublished: () -> Void
     /// Photothèque ouverte d'emblée quand on arrive par le bouton Photo du fil.
     @State private var showStartPhotoPicker = false
 
@@ -455,8 +461,10 @@ struct ComposerSheet: View {
         userService: UserServicing? = nil,
         editing: UnifiedSocialFeedItem? = nil,
         startingWith: ComposerStartAttachment? = nil,
-        sharing: ComposerSharedContent? = nil
+        sharing: ComposerSharedContent? = nil,
+        onPublished: @escaping () -> Void = {}
     ) {
+        self.onPublished = onPublished
         self.startingWith = editing == nil ? startingWith : nil
         // Créé une seule fois, dans l'autoclosure : la vue parente réévalue
         // cet init à chaque rendu, et un modèle neuf relit puis réécrit le
@@ -603,6 +611,20 @@ struct ComposerSheet: View {
                                 .overlay(alignment: .topTrailing) {
                                     removeButton(label: "Retirer le speedtest") { model.detachSpeedtest() }
                                 }
+                            if let date = speedtest.timestamp {
+                                // C'est la dernière mesure enregistrée : sa date se voit
+                                // avant de publier, surtout si elle n'est pas récente.
+                                let isStale = Date().timeIntervalSince(date) > 6 * 3600
+                                Text("Speedtest du \(date.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(SQType.caption(isStale ? .semibold : .regular))
+                                    .foregroundStyle(isStale ? SQColor.accentInk : SQColor.labelSecondary)
+                                    .accessibilityIdentifier("composer.speedtest.date")
+                                if isStale {
+                                    Text("Cette mesure n'est pas récente. Lance un nouveau speedtest si tu veux partager l'état actuel de ton réseau.")
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                }
+                            }
                         }
 
                         quickHashtagsBar
@@ -628,9 +650,7 @@ struct ComposerSheet: View {
                         .accessibilityIdentifier("composer.queued")
                 }
                 if let error = model.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.dangerInk)
+                    SQInlineError(message: error)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
@@ -662,10 +682,22 @@ struct ComposerSheet: View {
         .onChangeCompat(of: model.selectedItem) { _, _ in
             Task { await model.loadPickerImage() }
         }
+        .confirmationDialog("Supprimer le brouillon ?", isPresented: $confirmsClearDraft, titleVisibility: .visible) {
+            Button("Supprimer", role: .destructive) {
+                model.clearDraft()
+                Haptics.medium()
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Le texte que tu as écrit sera effacé.")
+        }
         .sheet(isPresented: $showBlurEditor) {
             if let image = model.previewImage {
                 PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
             }
+        }
+        .onDisappear {
+            if model.didPublish || model.isQueued { onPublished() }
         }
         .sqSheet()
     }
@@ -673,15 +705,15 @@ struct ComposerSheet: View {
     /// Fermer à gauche ; « Aperçu » et « Publier » à droite.
     private var topBar: some View {
         HStack(spacing: SQSpace.sm) {
-            MapChipIconButton(systemImage: "xmark", label: model.isQueued ? "Fermer" : "Annuler",
+            // Le brouillon est gardé à la fermeture : « Fermer », pas « Annuler ».
+            MapChipIconButton(systemImage: "xmark", label: "Fermer",
                               identifier: "composer.close") {
                 dismiss()
             }
             if !model.text.isEmpty {
                 MapChipIconButton(systemImage: "trash", label: "Supprimer le brouillon",
                                   identifier: "composer.clearDraft") {
-                    model.clearDraft()
-                    Haptics.medium()
+                    confirmsClearDraft = true
                 }
             }
             Spacer(minLength: 0)
@@ -855,14 +887,14 @@ struct ComposerSheet: View {
         }
     }
 
-    /// Caractères restants, à l'encre secondaire ; ambre puis rouge à l'approche de la limite.
+    /// Caractères restants, à l'encre secondaire ; encre carmin puis rouge à l'approche de la limite.
     private var characterCounter: some View {
         let limit = 500
         let remaining = limit - model.text.count
         return Text(verbatim: remaining.formatted())
             .font(SQType.caption(.semibold))
             .monospacedDigit()
-            .foregroundStyle(remaining < 0 ? SQColor.dangerInk : (remaining <= 100 ? SQColor.warning : SQColor.labelSecondary))
+            .foregroundStyle(remaining < 0 ? SQColor.dangerInk : (remaining <= 100 ? SQColor.accentInk : SQColor.labelSecondary))
             .contentTransition(.numericText())
             .sqAnimation(SQMotion.snappy, value: remaining)
             .accessibilityLabel(Text("\(remaining) caractères restants"))

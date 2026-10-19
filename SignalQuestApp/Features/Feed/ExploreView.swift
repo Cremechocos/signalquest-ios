@@ -170,7 +170,8 @@ final class ExploreViewModel: ObservableObject {
             return
         }
         isSearching = true
-        defer { isSearching = false }
+        // Une recherche remplacée en cours de route ne remet pas le drapeau à faux.
+        defer { if !Task.isCancelled { isSearching = false } }
         let antennasService = antennas
         async let map = Self.mapResults(for: query, antennas: antennasService)
         do {
@@ -462,7 +463,11 @@ struct ExploreView: View {
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
                     onReport: { presentedSheet = .report(item) },
-                    onPollVote: { option in model.votePoll(item, option: option) }
+                    onPollVote: { option in model.votePoll(item, option: option) },
+                    onAuthorTap: {
+                        presentedSheet = nil
+                        pushProfileAfterDismiss(item.author)
+                    }
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
@@ -912,6 +917,25 @@ struct ExploreView: View {
             onReact: { emoji in interact(with: item) { try await service.react(postId: $0, emoji: emoji) } },
             onPollVote: { option in model.votePoll(item, option: option) }
         )
+        // Appui long et bouton ⋯ de la carte : couper les notifications, signaler.
+        .contextMenu { exploreMenu(for: item) }
+        .environment(\.feedCardMenu, AnyView(exploreMenu(for: item)))
+    }
+
+    @ViewBuilder
+    private func exploreMenu(for item: UnifiedSocialFeedItem) -> some View {
+        Button { model.muteNotifications(item) } label: {
+            let muted = item.notificationsMutedByMe == true
+            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let icon = muted ? "bell" : "bell.slash"
+            Label(title, systemImage: icon)
+        }
+        // On ne signale pas sa propre publication.
+        if !item.canManage {
+            Button(role: .destructive) { presentedSheet = .report(item) } label: {
+                Label("Signaler", systemImage: "flag")
+            }
+        }
     }
 
     // MARK: Suggestions
@@ -936,6 +960,15 @@ struct ExploreView: View {
                 }
                 .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
+        }
+    }
+
+    /// Pousse le profil après la fermeture de la feuille : un push immédiat
+    /// pendant l'animation serait avalé.
+    private func pushProfileAfterDismiss(_ author: SocialFeedAuthor) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 380_000_000)
+            profileAuthor = author
         }
     }
 
@@ -968,7 +1001,7 @@ struct ExploreView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Voir le profil de \(author.displayName)")
 
-            followButton(isOn: followed, onTitle: String(localized: "Abonné"), offTitle: String(localized: "Suivre")) {
+            followButton(isOn: followed, onTitle: String(localized: "Suivi"), offTitle: String(localized: "Suivre")) {
                 model.toggleFollow(author)
             }
             .disabled(model.followBusyIds.contains(author.id))

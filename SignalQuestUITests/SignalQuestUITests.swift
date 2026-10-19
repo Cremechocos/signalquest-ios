@@ -751,12 +751,15 @@ final class SignalQuestUITests: XCTestCase {
                 let clear = app.buttons["Supprimer le brouillon"]
                 XCTAssertTrue(clear.waitForExistence(timeout: 5), "Ancien brouillon synthétique impossible à réinitialiser")
                 clear.tap()
+                let confirm = app.buttons["Supprimer"].firstMatch
+                XCTAssertTrue(confirm.waitForExistence(timeout: 5), "La suppression du brouillon demande confirmation")
+                confirm.tap()
             }
             XCTAssertEqual(composerText(in: composerTextField(in: app)), "", "Le compte A de fixture doit commencer sans ancien brouillon")
             draft.tap()
             draft.typeText(draftSentinel)
             XCTAssertEqual(composerText(in: composerTextField(in: app)), draftSentinel)
-            app.buttons["Annuler"].tap()
+            app.buttons["composer.close"].tap()
 
             relaunch(app, arguments: ["--qa-tab-profile"])
             assertAuthenticatedUser(fixture.users.a, in: app)
@@ -839,7 +842,7 @@ final class SignalQuestUITests: XCTestCase {
         let draft = composerTextField(in: app)
         XCTAssertEqual(composerText(in: draft), "", "Le compte B voit un brouillon privé qui ne lui appartient pas")
         XCTAssertNotEqual(composerText(in: draft), sentinel)
-        app.buttons["Annuler"].tap()
+        app.buttons["composer.close"].tap()
     }
 
     private func composerTextField(in app: XCUIApplication) -> XCUIElement {

@@ -378,16 +378,42 @@ struct FriendsListView: View {
     }
 
     private func requestRow(_ request: FriendRequest) -> some View {
-        HStack(spacing: SQSpace.sm2) {
-            SQAvatar(url: request.user?.avatarUrl, name: request.user?.displayName ?? "?")
-                .accessibilityHidden(true)
-            Text(request.user?.displayName ?? String(localized: "Utilisateur"))
-                .font(SQType.subhead)
-                .foregroundStyle(SQColor.label)
-                .sqSingleLine()
+        let name = request.user?.displayName ?? String(localized: "Utilisateur")
+        return HStack(spacing: SQSpace.sm2) {
+            // Le profil du demandeur s'ouvre avant d'accepter.
+            Button {
+                guard let user = request.user else { return }
+                profileAuthor = SocialFeedAuthor(
+                    id: user.id,
+                    name: user.name,
+                    handle: user.handle,
+                    avatarUrl: user.avatarUrl,
+                    isFriend: false,
+                    isFollowing: nil,
+                    liveRadio: nil
+                )
+            } label: {
+                HStack(spacing: SQSpace.sm2) {
+                    SQAvatar(url: request.user?.avatarUrl, name: request.user?.displayName ?? "?")
+                        .accessibilityHidden(true)
+                    Text(name)
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.label)
+                        .sqSingleLine()
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .disabled(request.user == nil)
+            .accessibilityHint("Ouvre le profil de \(name)")
             Spacer(minLength: SQSpace.sm)
-            compactButton("Accepter", accented: true) { Task { await model.accept(request) } }
-            compactButton("Refuser", accented: false) { Task { await model.decline(request) } }
+            compactButton("Accepter", label: String(localized: "Accepter \(name)"), accented: true) {
+                Task { await model.accept(request) }
+            }
+            compactButton("Refuser", label: String(localized: "Refuser \(name)"), accented: false) {
+                Task { await model.decline(request) }
+            }
         }
         .padding(.vertical, SQSpace.xs)
         .disabled(model.busyRequestIds.contains(request.id))
@@ -395,7 +421,7 @@ struct FriendsListView: View {
 
     /// Petits boutons capsule des rangées : accepter = brique pleine,
     /// refuser = tuile crème secondaire — sans bordure (règle No-Border).
-    private func compactButton(_ title: String, accented: Bool, action: @escaping () -> Void) -> some View {
+    private func compactButton(_ title: String, label: String, accented: Bool, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.medium()
             action()
@@ -411,6 +437,7 @@ struct FriendsListView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
     }
 
     /// Rond « Écrire » : ouvre le fil existant avec cet ami, sinon le crée.
@@ -499,7 +526,7 @@ struct FriendsListView: View {
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.label)
                 if let custom = friend.presence?.customStatus {
-                    Text(custom).font(.caption).foregroundStyle(SQColor.labelSecondary)
+                    Text(custom).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                 } else if let last = friend.presence?.lastSeenAt, friend.presence?.isOnline != true {
                     Text(last, format: .relative(presentation: .named))
                         .font(SQFont.body(12, relativeTo: .caption2))

@@ -52,10 +52,7 @@ struct SignalDetailSheet: View {
                     isPinned: item.isPinned
                 )
                 if let actionError {
-                    Label(actionError, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.dangerInk)
-                        .accessibilityIdentifier("signal.detail.actionError")
+                    SQInlineError(message: actionError)
                 }
                 if actionBusy {
                     ProgressView("En cours")
@@ -451,7 +448,7 @@ struct SignalDetailSheet: View {
     private func loadFirstCommentIfNeeded() async {
         guard item.commentsCount > 0 else { return }
         // Silencieux en cas d'échec : le lien vers les commentaires reste.
-        firstComment = try? await services.comments.list(postId: item.backendPostId, cursor: nil).comments.first
+        firstComment = try? await services.comments.list(postId: item.backendPostId, cursor: nil, limit: 1).comments.first
     }
 
     private func rangeText(signal: SocialSignalSummary) -> String {
@@ -478,7 +475,10 @@ struct SignalDetailSheet: View {
                 .accessibilityIdentifier("signal.detail.hidden")
         } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
-            let center = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+            let center = CLLocationCoordinate2D(
+                latitude: item.canManage ? lat : (lat * 1000).rounded() / 1000,
+                longitude: item.canManage ? lng : (lng * 1000).rounded() / 1000
+            )
             let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
             SQRegionMap(region: .constant(region), items: [SQMapPin(coordinate: center)]) { pin in
                 MapMarker(coordinate: pin.coordinate, tint: accent)
@@ -494,7 +494,9 @@ struct SignalDetailSheet: View {
 
     private func coordinatesText(lat: Double?, lon: Double?) -> String {
         guard let lat, let lon else { return "" }
-        return String(format: "%.5f, %.5f", lat, lon)
+        // Le détail précis (5 décimales, environ 1 m) reste pour l'auteur ; les
+        // autres lecteurs voient la position arrondie (3 décimales, environ 100 m).
+        return String(format: item.canManage ? "%.5f, %.5f" : "%.3f, %.3f", lat, lon)
     }
 
     private func loadSpeedtestDetailIfNeeded() async {

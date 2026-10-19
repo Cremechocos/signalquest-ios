@@ -183,6 +183,39 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
+    /// Épingle ou désépingle (un seul post épinglé à la fois, comme dans le fil).
+    func togglePin(_ item: UnifiedSocialFeedItem) {
+        let willPin = !item.isPinned
+        Task {
+            do {
+                try await service.setPinned(postId: item.id, pinned: willPin)
+                items = items.map { current in
+                    var copy = current
+                    if current.id == item.id { copy.pinnedAt = willPin ? Date() : nil }
+                    else if willPin { copy.pinnedAt = nil }
+                    return copy
+                }
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    /// Retire la publication tout de suite ; elle revient à sa place si le serveur refuse.
+    func delete(_ item: UnifiedSocialFeedItem) {
+        let index = items.firstIndex { $0.id == item.id } ?? 0
+        items.removeAll { $0.id == item.id }
+        Task {
+            do { try await service.deletePost(postId: item.id) }
+            catch {
+                if !items.contains(where: { $0.id == item.id }) {
+                    items.insert(item, at: min(index, items.count))
+                }
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     func muteNotifications(_ item: UnifiedSocialFeedItem) {
         Task {
             do {
@@ -321,6 +354,8 @@ struct UserProfileView: View {
     /// Demande d'ami envoyée pendant cette session (le profil n'expose pas l'état
     /// « en attente ») : bascule le libellé du menu sur « Demande envoyée ».
     @State private var friendRequestSent = false
+    @State private var editingPost: UnifiedSocialFeedItem?
+    @State private var pendingDeletion: UnifiedSocialFeedItem?
 
     private enum ProfileSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -380,11 +415,7 @@ struct UserProfileView: View {
                             }
                         }
                         if !loadFailed {
-                            Text("Publications")
-                                .sqKicker()
-                                .accessibilityAddTraits(.isHeader)
-                                .padding(.leading, SQSpace.xs)
-                            postsSection
+                            postsBlock
                         }
                     }
                 }
@@ -432,6 +463,9 @@ struct UserProfileView: View {
         } message: {
             Text(conversationError ?? "")
         }
+        .sheet(item: $editingPost) { post in
+            ComposerSheet(service: services.feed, editing: post, onPublished: { Task { await model.load() } })
+        }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .detail(let opened):
@@ -466,6 +500,32 @@ struct UserProfileView: View {
                 ReportSheet(target: .profile(model.userId), service: services.reports)
             }
         }
+    }
+
+    /// Profil privé : on ne peut ni l'ouvrir ni retirer l'amitié, mais on peut
+    /// toujours le signaler ou le bloquer.
+    private var privateProfileMenu: some View {
+        Menu {
+            Button {
+                presentedSheet = .reportUser
+            } label: {
+                Label("Signaler ce profil", systemImage: "flag")
+            }
+            Button(role: .destructive) {
+                showBlockConfirm = true
+            } label: {
+                Label("Bloquer", systemImage: "hand.raised")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Plus d’options")
+        .accessibilityIdentifier("profile.member.more")
     }
 
     /// Menu de gestion de la relation : bouton « ⋯ » circulaire 40 pt
@@ -560,7 +620,7 @@ struct UserProfileView: View {
     /// Bloque l'utilisateur consulté (Guideline 1.2) puis ferme l'écran : son
     /// contenu disparaît immédiatement de la pile de navigation courante.
     private func blockUser() async {
-        guard let id = model.profile?.id else { return }
+        let id = model.profile?.id ?? model.userId
         do {
             try await services.friends.block(userId: id)
             RecentlyViewedStore.remove(.profile, targetId: id)
@@ -583,6 +643,8 @@ struct UserProfileView: View {
             Spacer()
             if let profile = model.profile, !profile.isSelf {
                 manageMenu(profile)
+            } else if model.isPrivate {
+                privateProfileMenu
             }
         }
     }
@@ -741,14 +803,16 @@ struct UserProfileView: View {
         .accessibilityIdentifier("profile.member.stats")
     }
 
+    /// Sous 1 000, le nombre entier passe par une variation plurielle du catalogue
+    /// (le français met 0 au singulier) ; au-delà, le nombre abrégé est toujours pluriel.
     private func followersLabel(_ count: Int?) -> String {
-        let value = SignalFormatters.count(count)
-        return count == 1 ? String(localized: "\(value) abonné") : String(localized: "\(value) abonnés")
+        guard let count, count < 1_000 else { return String(localized: "\(SignalFormatters.count(count)) abonnés") }
+        return String(localized: "\(count) abonnés")
     }
 
     private func followingLabel(_ count: Int?) -> String {
-        let value = SignalFormatters.count(count)
-        return count == 1 ? String(localized: "\(value) abonnement") : String(localized: "\(value) abonnements")
+        guard let count, count < 1_000 else { return String(localized: "\(SignalFormatters.count(count)) abonnements") }
+        return String(localized: "\(count) abonnements")
     }
 
     /// Réseaux réellement mesurés par la personne.
@@ -930,7 +994,7 @@ struct UserProfileView: View {
         // Capsule « Crème » : encre pleine quand non suivi, surface + ombre
         // repos quand suivi (cf. GradientButton .primary / .secondary).
         GradientButton(
-            profile.isFollowing ? "Abonné" : "Suivre",
+            profile.isFollowing ? "Suivi" : "Suivre",
             systemImage: profile.isFollowing ? "checkmark" : "person.badge.plus",
             style: profile.isFollowing ? .secondary : .primary
         ) {
@@ -942,6 +1006,38 @@ struct UserProfileView: View {
     }
 
     // MARK: Posts
+
+    /// Titre « Publications » (ou « récentes » sur un autre profil), puis la liste.
+    private var postsBlock: some View {
+        VStack(alignment: .leading, spacing: SQSpace.lg) {
+            // Un autre profil n'affiche que ses publications récentes du fil public :
+            // le titre ne promet pas la liste complète.
+            let title = model.profile?.isSelf == true ? Text("Publications") : Text("Publications récentes")
+            title
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            .padding(.leading, SQSpace.xs)
+            postsWithDeletionDialog
+        }
+    }
+
+    /// Les publications, avec la confirmation avant d'en supprimer une des tiennes.
+    private var postsWithDeletionDialog: some View {
+        postsSection
+            .confirmationDialog(
+                "Supprimer cette publication ?",
+                isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Supprimer", role: .destructive) {
+                    if let item = pendingDeletion { model.delete(item) }
+                    pendingDeletion = nil
+                }
+                Button("Annuler", role: .cancel) { pendingDeletion = nil }
+            } message: {
+                Text("Cette action est irréversible.")
+            }
+    }
 
     @ViewBuilder
     private var postsSection: some View {
@@ -975,6 +1071,9 @@ struct UserProfileView: View {
                         // Sans ce vote, le sondage disparaissait du profil (AF-FIL-06).
                         onPollVote: { option in model.votePoll(item, option: option) }
                     )
+                    // Même menu que dans le fil : appui long et bouton ⋯ de la carte.
+                    .contextMenu { postMenu(for: item) }
+                    .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
                     .sqFadeUp()
                     .onAppear {
                         if item.id == model.items.last?.id {
@@ -992,6 +1091,35 @@ struct UserProfileView: View {
                     // le chargement au défilement ne se relancerait pas tout seul.
                     loadMoreButton
                 }
+            }
+        }
+    }
+
+    /// Actions d'une publication du profil : modifier, épingler et supprimer les
+    /// tiennes ; couper les notifications et signaler les autres.
+    @ViewBuilder
+    private func postMenu(for item: UnifiedSocialFeedItem) -> some View {
+        if item.canManage {
+            Button { editingPost = item } label: {
+                Label("Modifier", systemImage: "pencil")
+            }
+            Button { model.togglePin(item) } label: {
+                Label(item.isPinned ? "Désépingler" : "Épingler",
+                      systemImage: item.isPinned ? "pin.slash" : "pin")
+            }
+            Button(role: .destructive) { pendingDeletion = item } label: {
+                Label("Supprimer", systemImage: "trash")
+            }
+        }
+        Button { model.muteNotifications(item) } label: {
+            let muted = item.notificationsMutedByMe == true
+            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let icon = muted ? "bell" : "bell.slash"
+            Label(title, systemImage: icon)
+        }
+        if !item.canManage {
+            Button(role: .destructive) { presentedSheet = .report(item) } label: {
+                Label("Signaler", systemImage: "flag")
             }
         }
     }
@@ -1425,7 +1553,7 @@ struct MemberFollowListView: View {
             model.toggleFollow(person)
         } label: {
             Group {
-                if person.following { Text("Abonné") } else { Text("Suivre") }
+                if person.following { Text("Suivi") } else { Text("Suivre") }
             }
                 .font(SQType.subhead(.bold))
                 .foregroundStyle(person.following ? SQColor.label : SQColor.onInk)

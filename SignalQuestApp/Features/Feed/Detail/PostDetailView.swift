@@ -19,6 +19,8 @@ struct PostDetailView: View {
     @StateObject private var actions: PostDetailActions
     /// Auteur dont on pousse le profil public.
     @State private var profileAuthor: SocialFeedAuthor?
+    /// Prévenu quand la publication vient d'être supprimée (identifiant du post).
+    private let onDeleted: @MainActor (String) -> Void
 
     init(
         item: UnifiedSocialFeedItem,
@@ -26,8 +28,10 @@ struct PostDetailView: View {
         messagesService: MessagesServicing,
         commentsService: CommentsServicing,
         reportsService: ReportsServicing,
-        onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in }
+        onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in },
+        onDeleted: @escaping @MainActor (String) -> Void = { _ in }
     ) {
+        self.onDeleted = onDeleted
         self.item = item
         self.feedService = feedService
         self.messagesService = messagesService
@@ -220,6 +224,7 @@ struct PostDetailView: View {
         do {
             try await feedService.deletePost(postId: actions.item.id)
             Haptics.success()
+            onDeleted(actions.item.id)
             dismiss()
         } catch {
             if !error.isCancellation { actions.fail(error) }

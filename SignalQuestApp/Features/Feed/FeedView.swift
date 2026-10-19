@@ -14,6 +14,10 @@ final class FeedViewModel: ObservableObject {
     @Published var actionError: String?
     /// Pouls réseau (héro) — nil tant qu'aucune donnée / position n'est disponible.
     @Published var pulse: NetworkPulse?
+    /// Stories ouvertes depuis le chargement du rail : leur anneau passe en gris
+    /// aussitôt, sans attendre le prochain rechargement du fil.
+    @Published private(set) var viewedStoryIds: Set<String> = []
+    private var lastPulseLoadAt: Date?
 
     private let service: SocialFeedServicing
     private let storiesService: StoriesServicing?
@@ -29,8 +33,11 @@ final class FeedViewModel: ObservableObject {
     /// de prompt de localisation depuis le feed : on ne l'interroge que si
     /// l'autorisation est déjà accordée ou qu'une position est déjà connue. Échec
     /// silencieux : le héro disparaît simplement.
-    func loadPulse() async {
+    func loadPulse(force: Bool = false) async {
         if AppEnvironment.usesDemoData { pulse = .demo; return }
+        // Revenir sur le fil ne relance pas la mesure à chaque fois : cinq minutes
+        // de validité, sauf tirer pour rafraîchir.
+        if !force, pulse != nil, let last = lastPulseLoadAt, Date().timeIntervalSince(last) < 300 { return }
         guard let location else { return }
         let status = location.authorizationStatus
         let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
@@ -39,6 +46,7 @@ final class FeedViewModel: ObservableObject {
         do {
             let result = try await service.networkPulse(latitude: coordinate.latitude, longitude: coordinate.longitude, radiusMeters: nil)
             pulse = result.hasData ? result : nil
+            lastPulseLoadAt = Date()
         } catch {
             // Silencieux : le héro n'est simplement pas affiché.
         }
@@ -350,19 +358,22 @@ final class FeedViewModel: ObservableObject {
     /// à une suppression réussie.
     func deletePost(_ item: UnifiedSocialFeedItem) {
         guard let page else { return }
-        let snapshot = page
-        self.page = SocialFeedPage(
-            items: page.items.filter { $0.id != item.id },
-            nextCursor: page.nextCursor,
-            stories: page.stories,
-            trendingHashtags: page.trendingHashtags,
-            suggestedUsers: page.suggestedUsers,
-            requestId: page.requestId
-        )
+        let index = page.items.firstIndex { $0.id == item.id } ?? 0
+        removeItem(item.id)
         Task {
             do { try await service.deletePost(postId: item.id) }
             catch {
-                self.page = snapshot
+                // Réinsère la seule publication retirée, à sa place : le reste du
+                // fil a pu changer entre-temps (réaction, rechargement).
+                if let current = self.page, !current.items.contains(where: { $0.id == item.id }) {
+                    var items = current.items
+                    items.insert(item, at: min(index, items.count))
+                    self.page = SocialFeedPage(
+                        items: items, nextCursor: current.nextCursor, stories: current.stories,
+                        trendingHashtags: current.trendingHashtags, suggestedUsers: current.suggestedUsers,
+                        requestId: current.requestId
+                    )
+                }
                 if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
@@ -433,6 +444,36 @@ final class FeedViewModel: ObservableObject {
         )
     }
 
+    func markStoryViewed(_ id: String) {
+        viewedStoryIds.insert(id)
+    }
+
+    /// Retire des publications et des stories d'un membre qu'on vient de bloquer.
+    func removeAuthor(_ userId: String) {
+        guard let page else { return }
+        self.page = SocialFeedPage(
+            items: page.items.filter { $0.author.id != userId },
+            nextCursor: page.nextCursor,
+            stories: page.stories.filter { $0.author.id != userId },
+            trendingHashtags: page.trendingHashtags,
+            suggestedUsers: page.suggestedUsers.filter { $0.id != userId },
+            requestId: page.requestId
+        )
+    }
+
+    /// Retire une publication supprimée depuis son détail, sans recharger le fil.
+    func removeItem(_ id: String) {
+        guard let page else { return }
+        self.page = SocialFeedPage(
+            items: page.items.filter { $0.id != id },
+            nextCursor: page.nextCursor,
+            stories: page.stories,
+            trendingHashtags: page.trendingHashtags,
+            suggestedUsers: page.suggestedUsers,
+            requestId: page.requestId
+        )
+    }
+
     func removeStory(_ id: String) {
         guard let page else { return }
         self.page = SocialFeedPage(
@@ -467,6 +508,11 @@ final class FeedViewModel: ObservableObject {
     /// Un commentaire publié depuis la feuille compte aussitôt sur la carte.
     func commentPosted(on item: UnifiedSocialFeedItem) {
         Task { await applyLocalToggle(itemId: item.id) { var copy = $0; copy.commentsCount += 1; return copy } }
+    }
+
+    /// Un commentaire supprimé depuis la feuille se retire aussitôt du compteur de la carte.
+    func commentDeleted(on item: UnifiedSocialFeedItem) {
+        Task { await applyLocalToggle(itemId: item.id) { var copy = $0; copy.commentsCount = max(0, copy.commentsCount - 1); return copy } }
     }
 
     private func applyLocalToggle(itemId: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) async {
@@ -631,7 +677,8 @@ struct FeedView: View {
                                 presentedStoryStart = idx
                             }
                         },
-                        onHide: { hideStories(of: $0) }
+                        onHide: { hideStories(of: $0) },
+                        viewedIds: model.viewedStoryIds
                     )
                     // Rail débordant : annule le padding écran pour que le
                     // scroll fuie sous les bords (1re bulle alignée à 20 pt).
@@ -749,7 +796,7 @@ struct FeedView: View {
         }
         .refreshable {
             await model.load()
-            await model.loadPulse()
+            await model.loadPulse(force: true)
         }
         .navigationDestination(isPresented: $showExplore) {
             ExploreView(service: services.feed)
@@ -775,9 +822,9 @@ struct FeedView: View {
                 messagesService: services.messages,
                 commentsService: services.comments,
                 reportsService: services.reports,
-                onItemChanged: { model.acceptDetailItem($0) }
+                onItemChanged: { model.acceptDetailItem($0) },
+                onDeleted: { model.removeItem($0) }
             )
-            .onDisappear { Task { await model.load() } }
         }
         .alert("Publication", isPresented: Binding(
             get: { failedRoutedPostID != nil || routedPostMissing },
@@ -799,9 +846,21 @@ struct FeedView: View {
         // Échec d'une action : bandeau passager, ou message dans la fiche
         // ouverte, qui masquerait le bandeau (SOC-14).
         .onChangeCompat(of: model.actionError) { _, message in
-            guard let message, presentedSheet == nil else { return }
+            guard let message, !isCoveredByModal else { return }
             inAppNotifications.showError(message)
             model.actionError = nil
+        }
+        // Une erreur arrivée sous une feuille (composer, story, récap…) s'affiche
+        // à sa fermeture plutôt que derrière elle.
+        .onChangeCompat(of: isCoveredByModal) { _, covered in
+            guard !covered, let message = model.actionError else { return }
+            inAppNotifications.showError(message)
+            model.actionError = nil
+        }
+        // Membre bloqué depuis son profil ou une conversation : ses publications
+        // et ses stories quittent le fil tout de suite.
+        .onReceive(NotificationCenter.default.publisher(for: .sqMemberBlocked)) { note in
+            if let userId = note.userInfo?["userId"] as? String { model.removeAuthor(userId) }
         }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
@@ -830,8 +889,7 @@ struct FeedView: View {
         .sheet(item: $editingPost) { post in
             // Même composer qu'à la création : deux écrans divergeraient
             // dès la première évolution de la saisie.
-            ComposerSheet(service: services.feed, editing: post)
-                .onDisappear { Task { await model.load() } }
+            ComposerSheet(service: services.feed, editing: post, onPublished: { Task { await model.load() } })
         }
         .sheet(isPresented: $showRecap) {
             WeeklyRecapSheet(service: services.feed, onPublished: { Task { await model.load() } })
@@ -897,7 +955,8 @@ struct FeedView: View {
                     onCommentPosted: {
                         recordSignal("comment", for: item)
                         model.commentPosted(on: item)
-                    }
+                    },
+                    onCommentDeleted: { model.commentDeleted(on: item) }
                 )
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
@@ -924,6 +983,7 @@ struct FeedView: View {
             if let stories = visibleStories, !stories.isEmpty, let start = presentedStoryStart {
                 StoryViewer(stories: Array(stories[min(start, stories.count - 1)...]),
                             onMarkViewed: { story in
+                                model.markStoryViewed(story.id)
                                 Task { try? await services.stories.markViewed(story.id) }
                             },
                             onAuthorTap: { story in
@@ -959,13 +1019,19 @@ struct FeedView: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(item: $composerRequest) { request in
-            ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start, sharing: request.shared)
-                .onDisappear { Task { await model.load() } }
+            ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start, sharing: request.shared,
+                          onPublished: { Task { await model.load() } })
         }
         .sheet(isPresented: $isPulseExpanded) { pulseSheet }
         .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
             hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
         }
+    }
+
+    /// Une feuille ou un plein écran couvre le fil : un bandeau d'erreur y serait invisible.
+    private var isCoveredByModal: Bool {
+        presentedSheet != nil || composerRequest != nil || editingPost != nil || showStoryComposer
+            || presentedStoryStart != nil || showRecap || isPulseExpanded
     }
 
     /// Compte connecté, pour l'initiale de la bulle « Ta story ».
@@ -1909,4 +1975,9 @@ extension SocialFeedPage {
         return (try? JSONDecoder.signalQuest.decode(SocialFeedPage.self, from: Data(json.utf8)))
             ?? SocialFeedPage(items: [], nextCursor: nil, stories: [], trendingHashtags: [], suggestedUsers: [], requestId: nil)
     }
+}
+
+extension Notification.Name {
+    /// Posté par `FriendsService.block` : `userInfo["userId"]` est le membre bloqué.
+    static let sqMemberBlocked = Notification.Name("SignalQuest.MemberBlocked")
 }

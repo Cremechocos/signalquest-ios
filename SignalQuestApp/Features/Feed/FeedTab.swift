@@ -91,7 +91,7 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         case .friends: return "Aucune publication de tes amis pour l'instant."
         case .telecom: return "Aucune mesure ni identification partagée récemment."
         case .photos: return "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication."
-        case .saved: return "Touche le marque-page d'une publication pour la retrouver ici."
+        case .saved: return "Enregistre une publication pour la retrouver ici."
         }
     }
 }

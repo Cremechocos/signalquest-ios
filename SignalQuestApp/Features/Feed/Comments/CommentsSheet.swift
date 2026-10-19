@@ -25,6 +25,8 @@ final class CommentsViewModel: ObservableObject {
     /// Commentaire publié : nourrit le classement « Pour toi » après réussite,
     /// plus à la simple ouverture de la feuille (SOC-19).
     var onCommentPosted: (() -> Void)?
+    /// Commentaire supprimé : le compteur de la carte d'origine suit.
+    var onCommentDeleted: (() -> Void)?
 
     struct ReplyPage {
         var comments: [SocialComment] = []
@@ -222,6 +224,7 @@ final class CommentsViewModel: ObservableObject {
             try await service.delete(postId: postId, commentId: comment.id)
             actionErrorMessage = nil
             deletedCount += 1
+            onCommentDeleted?()
             withAnimation(SQMotion.resolve(SQMotion.standard, UIAccessibility.isReduceMotionEnabled)) {
                 comments.removeAll { $0.id == comment.id }
                 for parentID in Array(repliesByParent.keys) {
@@ -271,6 +274,7 @@ struct CommentsSheet: View {
 
     @State private var reportedComment: SocialComment?
     @State private var pendingCommentDeletion: SocialComment?
+    @FocusState private var inputFocused: Bool
     @Environment(\.signedInUser) private var currentUser
     /// Nombre connu à l'ouverture (celui de la publication), affiché dans le
     /// titre. Figé : le parent peut déjà compter les commentaires envoyés ici.
@@ -287,9 +291,11 @@ struct CommentsSheet: View {
          reports: ReportsServicing? = nil,
          onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil,
          commentsCount: Int? = nil,
-         onCommentPosted: (() -> Void)? = nil) {
+         onCommentPosted: (() -> Void)? = nil,
+         onCommentDeleted: (() -> Void)? = nil) {
         let model = CommentsViewModel(service: service, postId: postId)
         model.onCommentPosted = onCommentPosted
+        model.onCommentDeleted = onCommentDeleted
         _model = StateObject(wrappedValue: model)
         self.profileService = profileService
         self.reports = reports
@@ -459,7 +465,10 @@ struct CommentsSheet: View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             commentRow(comment)
             HStack(spacing: SQSpace.lg) {
-                Button("Répondre") { model.beginReply(to: comment) }
+                Button("Répondre") {
+                    model.beginReply(to: comment)
+                    inputFocused = true
+                }
                     .foregroundStyle(SQColor.labelSecondary)
                     .frame(minHeight: 44)
                 let page = model.repliesByParent[comment.id]
@@ -482,6 +491,8 @@ struct CommentsSheet: View {
                     }
                     .accessibilityIdentifier("comments.replies.\(comment.id)")
                 }
+                Spacer(minLength: 0)
+                moreButton(comment)
             }
             .font(SQType.caption(.bold))
             .buttonStyle(.plain)
@@ -555,9 +566,35 @@ struct CommentsSheet: View {
                     .foregroundStyle(SQColor.label)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            likeButton(comment)
+            if isReply {
+                VStack(spacing: 0) {
+                    likeButton(comment)
+                    moreButton(comment)
+                }
+            } else {
+                likeButton(comment)
+            }
         }
         .contextMenu { commentMenu(comment) }
+    }
+
+    /// Bouton « ⋯ » visible : supprimer le sien, signaler celui des autres, comme
+    /// l'appui long, mais découvrable (modération, App Store règle 1.2).
+    @ViewBuilder
+    private func moreButton(_ comment: SocialComment) -> some View {
+        if comment.author.id == LocalAccountScope.currentUserId || reports != nil {
+            Menu {
+                commentMenu(comment)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Plus d’options")
+            .accessibilityIdentifier("comment.more.\(comment.id)")
+        }
     }
 
     /// Supprimer le sien, signaler celui des autres : ni l'un ni l'autre
@@ -666,6 +703,7 @@ struct CommentsSheet: View {
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1...4)
+                    .focused($inputFocused)
                     .padding(.horizontal, SQSpace.md2)
                     .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)

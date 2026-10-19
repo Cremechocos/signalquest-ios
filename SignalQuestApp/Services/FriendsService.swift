@@ -19,7 +19,7 @@ struct Friend: Codable, Identifiable, Equatable {
     let presence: FriendPresence?
 
     var id: String { friendshipId }
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? (email?.components(separatedBy: "@").first ?? "Ami") }
+    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Ami") }
 }
 
 struct FriendRequestUser: Codable, Equatable {
@@ -27,7 +27,7 @@ struct FriendRequestUser: Codable, Equatable {
     let name: String?
     let handle: String?
     let avatarUrl: URL?
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? "Utilisateur" }
+    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur") }
 }
 
 struct FriendRequest: Codable, Identifiable, Equatable {
@@ -51,7 +51,7 @@ struct BlockedUser: Codable, Identifiable, Equatable {
     let avatarUrl: URL?
     let blockedAt: Date?
     var id: String { userId }
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? "Utilisateur" }
+    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur") }
 }
 
 protocol FriendsServicing: Sendable {
@@ -156,6 +156,10 @@ final class FriendsService: FriendsServicing {
 
     func block(userId: String) async throws {
         let _: SuccessResponse = try await api.requestJSON("/api/users/blocks", body: ["userId": userId])
+        // Le fil retire aussitôt les publications et les stories de ce membre.
+        await MainActor.run {
+            NotificationCenter.default.post(name: .sqMemberBlocked, object: nil, userInfo: ["userId": userId])
+        }
     }
 
     /// Sans cette route, un blocage était **irréversible depuis l'app** : un
