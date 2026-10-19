@@ -60,6 +60,8 @@ struct SignalQuestHomeView: View {
     /// `nil` tant que le service ne l'a pas encore publiée.
     @State private var locationStatus: CLAuthorizationStatus?
     @State private var showSignup = false
+    /// Zone hors des marchés du registre : les modules de zone le disent au lieu d'un « rien à signaler ».
+    @State private var marketUncovered = false
 
     /// La semaine du compte dans le classement de ses amis.
     struct WeekSummary: Equatable {
@@ -109,6 +111,8 @@ struct SignalQuestHomeView: View {
             if tab == .home { Task { await refreshNearby(forceFresh: false) } }
         }
         .onChangeCompat(of: user?.id) { _, _ in
+            // Inscription réussie depuis l'Accueil invité : la feuille n'a plus lieu d'être.
+            if user != nil { showSignup = false }
             layout = HomeLayoutStore.layout()
             Task { await refresh(forceFresh: true) }
         }
@@ -171,11 +175,26 @@ struct SignalQuestHomeView: View {
 
     /// Sans position et sans autorisation : les modules de zone le disent au lieu de rester vides.
     private var needsLocation: Bool {
-        userLocation == nil && (currentLocationStatus == .notDetermined || currentLocationStatus == .denied)
+        userLocation == nil && (currentLocationStatus == .notDetermined || currentLocationStatus == .denied
+                                || locationRestricted)
     }
 
-    private var firstName: String {
-        user?.name?.split(separator: " ").first.map(String.init) ?? String(localized: "à toi")
+    /// Contrôle parental ou gestion de l'appareil : l'utilisateur ne peut pas l'accorder lui-même.
+    private var locationRestricted: Bool { currentLocationStatus == .restricted }
+
+    /// Message d'un module de zone sans position ; la restriction n'a pas de réglage à ouvrir.
+    private func locationNeededMessage(_ text: LocalizedStringKey) -> some View {
+        moduleMessage(locationRestricted ? "La localisation est restreinte sur cet appareil." : text)
+    }
+
+    private var firstName: String? {
+        user?.name?.split(separator: " ").first.map(String.init)
+    }
+
+    /// Sans prénom, la salutation reste complète plutôt que « Bonjour, à toi ».
+    private var greeting: Text {
+        if let firstName { return Text("Bonjour, \(firstName)") }
+        return Text("Bonjour")
     }
 
     // MARK: En-tête
@@ -201,7 +220,7 @@ struct SignalQuestHomeView: View {
                         .minimumScaleFactor(0.5)
                 } else {
                     Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).sqKicker()
-                    Text("Bonjour, \(firstName)")
+                    greeting
                         .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                         .foregroundStyle(SQColor.label)
                         // Aux grandes tailles, le prénom rétrécit plutôt que de se couper (UI-16) ;
@@ -630,9 +649,10 @@ struct SignalQuestHomeView: View {
     /// refusée, elle ne reviendrait plus : le bouton ouvre alors les Réglages.
     private var locationTile: some View {
         let denied = currentLocationStatus == .denied
+        let restricted = locationRestricted
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
-                Image(systemName: denied ? "location.slash" : "location")
+                Image(systemName: denied || restricted ? "location.slash" : "location")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.ink2)
                     .accessibilityHidden(true)
@@ -640,22 +660,26 @@ struct SignalQuestHomeView: View {
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
             }
-            Text(denied
+            Text(restricted
+                 ? "La localisation est restreinte sur cet appareil (contrôle parental ou gestion de l’appareil) : SignalQuest ne peut pas l’utiliser."
+                 : denied
                  ? "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir le verdict, les pannes et les mesures autour de toi."
                  : "Autorise la localisation pour voir le verdict, les pannes et l’opérateur le plus rapide autour de toi.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(denied ? "Ouvrir les Réglages" : "Activer la localisation", style: .secondary) {
-                if denied {
-                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                    UIApplication.shared.open(url)
-                } else {
-                    services.location.requestWhenInUse()
+            if !restricted {
+                GradientButton(denied ? "Ouvrir les Réglages" : "Activer la localisation", style: .secondary) {
+                    if denied {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    } else {
+                        services.location.requestWhenInUse()
+                    }
                 }
+                .fixedSize()
+                .accessibilityIdentifier("home.location.enable")
             }
-            .fixedSize()
-            .accessibilityIdentifier("home.location.enable")
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -672,7 +696,9 @@ struct SignalQuestHomeView: View {
                     .foregroundStyle(SQColor.ink2)
             }
             if let outages = nearbyOutages {
-                if outages.isEmpty {
+                if marketUncovered {
+                    moduleMessage("SignalQuest ne couvre pas encore cette zone.")
+                } else if outages.isEmpty {
                     HStack(spacing: SQSpace.sm2) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 17, weight: .bold))
@@ -699,7 +725,7 @@ struct SignalQuestHomeView: View {
                     }
                 }
             } else if needsLocation {
-                moduleMessage("Active la localisation pour voir les pannes autour de toi.")
+                locationNeededMessage("Active la localisation pour voir les pannes autour de toi.")
             } else if locationFixFailed || outagesFailed {
                 moduleFailure()
             } else {
@@ -910,7 +936,9 @@ struct SignalQuestHomeView: View {
         moduleCard {
             moduleHeader("Ça bouge près de toi", systemImage: "sparkles")
             if let sites = evolutions {
-                if sites.isEmpty {
+                if marketUncovered {
+                    moduleMessage("SignalQuest ne couvre pas encore cette zone.")
+                } else if sites.isEmpty {
                     moduleMessage("Rien de nouveau déclaré autour de toi pour l’instant.")
                 } else {
                     ForEach(sites.prefix(3), id: \.id) { site in
@@ -918,7 +946,7 @@ struct SignalQuestHomeView: View {
                     }
                 }
             } else if needsLocation {
-                moduleMessage("Active la localisation pour voir les sites qui évoluent autour de toi.")
+                locationNeededMessage("Active la localisation pour voir les sites qui évoluent autour de toi.")
             } else if locationFixFailed || evolutionsFailed {
                 moduleFailure()
             } else {
@@ -990,10 +1018,16 @@ struct SignalQuestHomeView: View {
 
     /// La génération la plus récente parmi des jetons comme « 4G », « 5G ».
     static func highestGeneration(_ technologies: [String]) -> String? {
+        // « 5G 3500 » ou « 2G/3G » : seuls les chiffres collés à un « G » sont une génération.
         technologies
-            .compactMap { token -> Int? in
-                let digits = token.uppercased().filter(\.isNumber)
-                return token.uppercased().contains("G") ? Int(digits) : nil
+            .flatMap { token -> [Int] in
+                var found: [Int] = []
+                var rest = token.uppercased()[...]
+                while let range = rest.range(of: #"\d{1,2}G"#, options: .regularExpression) {
+                    if let generation = Int(rest[range].dropLast()) { found.append(generation) }
+                    rest = rest[range.upperBound...]
+                }
+                return found
             }
             .max()
             .map { "\($0)G" }
@@ -1157,7 +1191,7 @@ struct SignalQuestHomeView: View {
                     .accessibilityHint("Compare les opérateurs autour de toi")
                 }
             } else if needsLocation {
-                moduleMessage("Active la localisation pour comparer les opérateurs autour de toi.")
+                locationNeededMessage("Active la localisation pour comparer les opérateurs autour de toi.")
             } else if locationFixFailed {
                 moduleFailure()
             } else {
@@ -1181,7 +1215,7 @@ struct SignalQuestHomeView: View {
                     }
                 }
             } else if needsLocation {
-                moduleMessage("Active la localisation pour voir les mesures autour de toi.")
+                locationNeededMessage("Active la localisation pour voir les mesures autour de toi.")
             } else if locationFixFailed {
                 moduleFailure()
             } else {
@@ -1487,6 +1521,7 @@ struct SignalQuestHomeView: View {
         let simPlmn = services.networkPath.simPLMN().plmn
         let market = await services.markets.marketForLocation(latitude: lat, longitude: lng)
         marketEntry = market
+        marketUncovered = market == nil
 
         let wantsNetwork = has(.network)
         let wantsMeasures = has(.nearbyMeasures)
@@ -1502,7 +1537,7 @@ struct SignalQuestHomeView: View {
         async let recentTask: [AndroidSpeedtestMarker]? = wantsMeasures
             ? await recentNearbySpeedtests(latitude: lat, longitude: lng) : nil
         async let rankingTask: [OperatorMetricStat]? = wantsOperators
-            ? await services.nearbyQuality.operatorRanking(metric: .download, latitude: lat, longitude: lng, maxAge: maxAge)
+            ? try? await services.nearbyQuality.loadOperatorRanking(metric: .download, latitude: lat, longitude: lng, maxAge: maxAge)
             : nil
         async let outagesTask: [CommunityOutage]? = wantsOutages
             ? await nearbyOutageList(around: location, market: market?.code) : nil
@@ -1511,7 +1546,8 @@ struct SignalQuestHomeView: View {
 
         if wantsNetwork { networkQuality = await qualityTask }
         if let recent = await recentTask { nearbyMeasures = recent }
-        if wantsOperators { operatorStats = await rankingTask ?? [] }
+        // Comme les pannes : un échec garde ce que le module montrait ; à vide, il se dit sans données.
+        if wantsOperators { operatorStats = await rankingTask ?? operatorStats ?? [] }
         let outages = await outagesTask
         if let outages { nearbyOutages = outages }
         outagesFailed = wantsOutages && outages == nil && nearbyOutages == nil

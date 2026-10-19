@@ -144,6 +144,17 @@ final class HomeLayoutTests: XCTestCase {
                       "Aux grandes tailles de texte, chaque module prend la pleine largeur")
     }
 
+    /// Seuls les chiffres collés à un « G » comptent comme génération.
+    @MainActor
+    func testHighestGenerationReadsOnlyDigitsAttachedToG() {
+        XCTAssertEqual(SignalQuestHomeView.highestGeneration(["4G", "5G"]), "5G")
+        XCTAssertEqual(SignalQuestHomeView.highestGeneration(["5G 3500"]), "5G")
+        XCTAssertEqual(SignalQuestHomeView.highestGeneration(["2G/3G"]), "3G")
+        XCTAssertEqual(SignalQuestHomeView.highestGeneration(["4g+5g"]), "5G")
+        XCTAssertNil(SignalQuestHomeView.highestGeneration(["LTE", "3500"]))
+        XCTAssertNil(SignalQuestHomeView.highestGeneration([]))
+    }
+
     func testLoneSmallTakesTheFullRow() {
         var layout = HomeLayout.default
         layout.remove(.week)
