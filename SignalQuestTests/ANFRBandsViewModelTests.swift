@@ -859,6 +859,48 @@ extension ANFRMapViewModelTests {
         XCTAssertEqual(week.antennaCount, 169_742)
     }
 
+    /// Corps servis par la prod le 19/10 (a24e00cc5), `dates` et `sites` réduits.
+    func testDecodesTheServedLiteFormatAndComparison() throws {
+        let archives = """
+        {"dates":["2026-10-08","2026-10-07","2026-10-01"],"current":"2026-10-15","weeks":[
+          {"date":"2026-10-08","counts":{"new":6,"added":20,"activated":82,"deleted":62,"catchUp":33,"modified":0},"total":170,"siteCount":55,"antennaCount":170},
+          {"date":"2026-10-07","counts":{"new":465,"added":390,"activated":534,"deleted":1955,"catchUp":94,"modified":0},"total":3344,"siteCount":2159,"antennaCount":3344},
+          {"date":"2026-10-01","counts":{"new":428,"added":353,"activated":982,"deleted":739,"catchUp":114,"modified":1},"total":2502,"siteCount":852,"antennaCount":2503}],
+         "requestId":"e52f8982"}
+        """
+        let weeks = try JSONDecoder.signalQuest.decode(ANFRArchiveWeeks.self, from: Data(archives.utf8)).weeks
+        XCTAssertEqual(weeks.map(\.date), ["2026-10-08", "2026-10-07", "2026-10-01"])
+        XCTAssertEqual(weeks.map(\.siteCount), [55, 2159, 852], "le serveur annonce le format léger")
+        XCTAssertEqual(weeks.last?.antennaCount, 2503)
+
+        let lite = """
+        {"source":"archive","snapshotDate":"2026-10-08","lastUpdate":"08 oct. 2026","fields":"lite","siteCount":55,"antennaCount":170,"sites":[
+          {"supId":"444456","lat":48.684999999999995,"lon":-1.3619444444444446,"city":"AVRANCHES","operators":["ORANGE"],"changes":{"new":0,"added":0,"activated":1,"deleted":0,"modified":0},"catchUp":0},
+          {"supId":"465938","lat":49.11083333333333,"lon":6.173055555555556,"city":"METZ","operators":["ORANGE"],"changes":{"new":0,"added":0,"activated":4,"deleted":0,"modified":0},"catchUp":0}]}
+        """
+        let snapshot = try JSONDecoder.signalQuest.decode(ANFRMapSnapshot.self, from: Data(lite.utf8))
+        XCTAssertTrue(snapshot.isLite)
+        XCTAssertEqual(snapshot.antennaCount, 170)
+        XCTAssertEqual(snapshot.sites.map(\.supId), ["444456", "465938"])
+        XCTAssertEqual(snapshot.sites[1].operators, [.orange])
+        XCTAssertEqual(snapshot.sites[1].summary?.count(for: .activated), 4)
+
+        let diff = """
+        {"from":"2026-10-07","to":"current","weeks":["2026-10-08","2026-10-15"],"siteCount":4761,"antennaCount":6363,"sites":[
+          {"supId":"29489","lat":44.52583333333333,"lon":-0.10555555555555556,"city":"SAVIGNAC","operators":["SFR"],"changes":{"new":0,"added":0,"activated":0,"deleted":1,"modified":0},"catchUp":0,"lastChangeDate":"2026-10-15"},
+          {"supId":"36929","lat":47.7175,"lon":7.166666666666667,"city":"BURNHAUPT LE BAS","operators":["BOUYGUES TELECOM"],"changes":{"new":0,"added":0,"activated":0,"deleted":2,"modified":0},"catchUp":0,"lastChangeDate":"2026-10-15"}],
+         "requestId":"5e9e7b11"}
+        """
+        let comparison = try JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: Data(diff.utf8))
+        XCTAssertEqual(comparison.weeks, ["2026-10-08", "2026-10-15"])
+        XCTAssertEqual(comparison.siteCount, 4761)
+        XCTAssertEqual(comparison.antennaCount, 6363, "le poids annoncé, pas le recomptage des sites reçus")
+        XCTAssertEqual(comparison.sites[1].operators, [.bouygues])
+        XCTAssertEqual(comparison.sites[1].dominantModType, .deleted)
+        XCTAssertEqual(comparison.sites[1].summary?.lastChangeDate, "2026-10-15")
+        XCTAssertTrue(comparison.snapshot.isLite)
+    }
+
     func testTheOld2022RelevésOpenInLiteOnlyWhenTheServerOffersIt() async {
         let service = FakeService()
         service.snapshots["current"] = snapshot(mixedSites)
