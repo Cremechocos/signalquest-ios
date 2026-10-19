@@ -293,6 +293,16 @@ final class CarPlayNavigationTests: XCTestCase {
         XCTAssertEqual(ManeuverMapper.symbolName(for: "Continuez tout droit"), "arrow.up")
     }
 
+    /// Le rond-point et l'arrivée l'emportent sur la direction qu'ils mentionnent.
+    func testRoundaboutAndArrivalBeatTheDirectionTheyMention() {
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Au rond-point, prenez la deuxième sortie à droite"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "At the roundabout, take the second exit on the left"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Your destination is on the right"), "mappin.and.ellipse")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Votre destination est sur la gauche"), "mappin.and.ellipse")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Arrivée à droite"), "mappin.and.ellipse")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Turn right onto Main Street"), "arrow.turn.up.right")
+    }
+
     /// Le nom de la voie ne décide jamais du sens : « Wright » n'est pas « right ».
     func testStreetNameNeverFlipsTheArrow() {
         XCTAssertEqual(ManeuverMapper.symbolName(for: "Turn left onto Wright Street"), "arrow.turn.up.left")

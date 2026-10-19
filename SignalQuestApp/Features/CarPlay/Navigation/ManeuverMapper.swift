@@ -82,6 +82,13 @@ enum ManeuverMapper {
         switch true {
         case mentions("demi tour", "faites demi", "u turn"):
             return "arrow.uturn.left"
+        // Rond-point et arrivée avant les virages : « Au rond-point, prenez la
+        // deuxième sortie à droite » reste un rond-point, « Votre destination est
+        // à droite » reste l'arrivée.
+        case mentions("rond point", "giratoire", "roundabout"):
+            return "arrow.triangle.turn.up.right.circle"
+        case words.contains(where: { $0.hasPrefix("arriv") }), mentions("destination"):
+            return "mappin.and.ellipse"
         case mentions("légèrement à droite", "serrez à droite", "slight right", "keep right", "bear right"):
             return "arrow.up.right"
         case mentions("légèrement à gauche", "serrez à gauche", "slight left", "keep left", "bear left"):
@@ -90,10 +97,6 @@ enum ManeuverMapper {
             return "arrow.turn.up.right"
         case mentions("gauche", "left"):
             return "arrow.turn.up.left"
-        case mentions("rond point", "giratoire", "roundabout"):
-            return "arrow.triangle.turn.up.right.circle"
-        case words.contains(where: { $0.hasPrefix("arriv") }), mentions("destination"):
-            return "mappin.and.ellipse"
         default:
             return "arrow.up"
         }
