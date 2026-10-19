@@ -73,6 +73,25 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.distance(meters: 2_414, system: .imperial, locale: fr), "1,5 mi")
     }
 
+    /// Les widgets et la Live Activity recopient les règles de `SQUnits` (la cible
+    /// widget ne le voit pas) : débit, unité et distance restent identiques.
+    func testWidgetUnitsFollowTheAppRules() {
+        let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
+        for mbps in [0.0, 6.4, 99.96, 100, 412.4, 999.4, 1_000, 1_240, .nan, -3] {
+            XCTAssertEqual(WidgetUnits.throughputValue(mbps: mbps, locale: fr), SQUnits.throughputValue(mbps: mbps, locale: fr), "\(mbps)")
+            XCTAssertEqual(WidgetUnits.throughputValue(mbps: mbps, locale: en), SQUnits.throughputValue(mbps: mbps, locale: en), "\(mbps)")
+            XCTAssertEqual(WidgetUnits.throughputUnit(mbps: mbps), SQUnits.throughputUnit(mbps: mbps), "\(mbps)")
+            XCTAssertEqual(WidgetUnits.throughput(mbps: mbps, locale: fr), SQUnits.throughput(mbps: mbps, locale: fr), "\(mbps)")
+        }
+        XCTAssertEqual(WidgetUnits.throughputValue(mbps: 6.4, locale: fr), "6,4", "6,4 ne s'arrondit plus à 6")
+        XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 1_240, locale: fr), "1,2G")
+        XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 412, locale: fr), "412")
+        for meters in [30.0, 180, 340, 999, 1_000, 2_414, 12_345, .nan] {
+            XCTAssertEqual(WidgetUnits.distance(meters: meters, imperial: false, locale: fr), SQUnits.distance(meters: meters, system: .metric, locale: fr), "\(meters)")
+            XCTAssertEqual(WidgetUnits.distance(meters: meters, imperial: true, locale: fr), SQUnits.distance(meters: meters, system: .imperial, locale: fr), "\(meters)")
+        }
+    }
+
     /// Un rayon rond ne prend pas de décimale inutile (« 5 km », pas « 5,0 km »),
     /// et suit la préférence métrique ou impériale.
     func testCompactDistanceKeepsRoundRadiiRound() {

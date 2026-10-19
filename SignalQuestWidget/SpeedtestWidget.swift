@@ -204,8 +204,7 @@ struct SpeedDialView: View {
 
     private var numberString: String {
         guard value > 0, value.isFinite else { return "—" }
-        if value >= 100 { return "\(Int(value.rounded()))" }
-        return String(format: "%.1f", value)
+        return WidgetUnits.throughputValue(mbps: value)
     }
 
     var body: some View {
@@ -250,7 +249,7 @@ struct SpeedDialView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                Text("Mbps")
+                Text(WidgetUnits.throughputUnit(mbps: value))
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .lineLimit(1)
@@ -267,7 +266,7 @@ struct SpeedDialView: View {
         }
         .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Débit \(numberString) mégabits par seconde, \(speedQualityLabel(value))")
+        .accessibilityLabel("Débit \(numberString) \(WidgetUnits.throughputUnit(mbps: value)), \(speedQualityLabel(value))")
     }
 }
 
@@ -320,7 +319,7 @@ private struct MetricRow: View {
     let icon: String
     let label: LocalizedStringKey
     let value: String
-    let unit: LocalizedStringKey
+    let unit: String
     let tint: Color
 
     var body: some View {
@@ -342,7 +341,7 @@ private struct MetricRow: View {
                     .foregroundStyle(WidgetPalette.label)
                     .monospacedDigit()
                     .lineLimit(1)
-                Text(unit)
+                Text(verbatim: unit)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
             }
@@ -459,7 +458,7 @@ struct SpeedtestWidgetEntryView: View {
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 6)
                 HStack(spacing: 14) {
-                    CompactMetric(icon: "arrow.up", value: s.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—", tint: WidgetPalette.brandDeep)
+                    CompactMetric(icon: "arrow.up", value: s.uploadMbps.map { WidgetUnits.compactThroughput(mbps: $0) } ?? "—", tint: WidgetPalette.brandDeep)
                     CompactMetric(icon: "bolt.fill", value: s.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—", tint: WidgetPalette.latency)
                 }
                 .frame(maxWidth: .infinity)
@@ -493,8 +492,8 @@ struct SpeedtestWidgetEntryView: View {
                 Spacer(minLength: 6)
                 VStack(spacing: 7) {
                     MetricRow(icon: "arrow.up", label: "Envoi",
-                              value: s.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—",
-                              unit: "Mbps", tint: WidgetPalette.brandDeep)
+                              value: s.uploadMbps.map { WidgetUnits.throughputValue(mbps: $0) } ?? "—",
+                              unit: s.uploadMbps.map { WidgetUnits.throughputUnit(mbps: $0) } ?? WidgetUnits.throughputUnit(mbps: 0), tint: WidgetPalette.brandDeep)
                     MetricRow(icon: "bolt.fill", label: "Latence",
                               value: s.pingMs.map { "\(Int($0.rounded()))" } ?? "—",
                               unit: "ms", tint: WidgetPalette.latency)
@@ -518,7 +517,7 @@ struct SpeedtestWidgetEntryView: View {
             Image(systemName: "speedometer")
         } currentValueLabel: {
             // Sans test, « — » plutôt qu'un 0 qui se lirait comme une mesure.
-            Text(entry.snapshot == nil ? "—" : "\(Int(dl.rounded()))")
+            Text(entry.snapshot == nil ? "—" : WidgetUnits.compactThroughput(mbps: dl))
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
@@ -534,16 +533,16 @@ struct SpeedtestWidgetEntryView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "speedometer")
                         .font(.system(size: 13, weight: .bold))
-                    Text("\(Int(s.downloadMbps.rounded()))")
+                    Text(WidgetUnits.throughputValue(mbps: s.downloadMbps))
                         .font(.system(size: 18, weight: .heavy, design: .rounded))
                         .monospacedDigit()
-                    Text("Mbps")
+                    Text(WidgetUnits.throughputUnit(mbps: s.downloadMbps))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
                 HStack(spacing: 8) {
-                    Label(s.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—", systemImage: "arrow.up")
+                    Label(s.uploadMbps.map { WidgetUnits.compactThroughput(mbps: $0) } ?? "—", systemImage: "arrow.up")
                     Label(s.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—", systemImage: "bolt.fill")
                 }
                 .font(.system(size: 11, weight: .medium))
@@ -563,7 +562,7 @@ struct SpeedtestWidgetEntryView: View {
 
     private var accessoryInline: some View {
         Label(
-            entry.snapshot.map { "\(Int($0.downloadMbps.rounded())) Mbps ↓" } ?? "Speedtest",
+            entry.snapshot.map { "\(WidgetUnits.throughput(mbps: $0.downloadMbps)) ↓" } ?? "Speedtest",
             systemImage: "speedometer"
         )
         .sqAccessoryBackground()

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WidgetKit
 
 /// Système d'unités choisi par le membre (`GET/PATCH /api/user/preferences`).
 enum SQUnitsSystem: String, Codable, CaseIterable, Sendable {
@@ -189,10 +190,20 @@ enum SQUnits {
 final class SQUnitsStore: ObservableObject {
     @Published private(set) var system: SQUnitsSystem = SQUnits.current
 
+    init() {
+        // Les widgets lisent la préférence dans l'App Group, y compris pour un choix
+        // fait avant qu'ils ne la connaissent.
+        WidgetSharedStore.saveImperialUnits(system == .imperial)
+    }
+
     /// Applique une valeur venue du serveur (ou choisie par l'utilisateur).
     func apply(_ system: SQUnitsSystem) {
         guard system != self.system || UserDefaults.standard.string(forKey: SQUnits.defaultsKey) == nil else { return }
         UserDefaults.standard.set(system.rawValue, forKey: SQUnits.defaultsKey)
+        if system != self.system {
+            WidgetSharedStore.saveImperialUnits(system == .imperial)
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         self.system = system
     }
 }

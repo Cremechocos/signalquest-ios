@@ -39,10 +39,8 @@ struct NetworkWidgetEntryView: View {
 
     private var distanceText: String? {
         guard let d = entry.glance?.nearestDistanceMeters else { return nil }
-        // Décimale à la langue de l'appareil : « 1,2 km » en français.
-        return d >= 1000
-            ? "\((d / 1000).formatted(.number.precision(.fractionLength(1)))) km"
-            : "\(Int(d)) m"
+        // Unité choisie par le membre (km/m ou mi/ft), décimale à la langue de l'appareil.
+        return WidgetUnits.distance(meters: d, imperial: WidgetSharedStore.prefersImperialUnits())
     }
 
     var body: some View {
@@ -66,10 +64,10 @@ struct NetworkWidgetEntryView: View {
             Spacer(minLength: 0)
             if let d = g?.lastDownloadMbps {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(Int(d.rounded()))")
+                    Text(WidgetUnits.throughputValue(mbps: d))
                         .font(.system(size: 30, weight: .bold))
                         .monospacedDigit()
-                    Text("Mbps").font(.caption2).foregroundStyle(.secondary)
+                    Text(WidgetUnits.throughputUnit(mbps: d)).font(.caption2).foregroundStyle(.secondary)
                 }
             } else {
                 Text("Lance un test pour voir ton réseau").font(.caption2).foregroundStyle(.secondary)

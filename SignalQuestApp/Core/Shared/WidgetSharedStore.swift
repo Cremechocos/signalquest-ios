@@ -132,6 +132,7 @@ enum WidgetSharedStore {
     private static let speedtestKey = "sq.widget.lastSpeedtest.v1"
     private static let recentKey = "sq.widget.recentSpeedtests.v1"
     private static let networkGlanceKey = "sq.widget.networkGlance.v1"
+    private static let imperialUnitsKey = "sq.widget.imperialUnits.v1"
     private static let maxRecent = 12
 
     private static var defaults: UserDefaults? {
@@ -172,6 +173,16 @@ enum WidgetSharedStore {
         return try? JSONDecoder().decode(NetworkGlanceSnapshot.self, from: data)
     }
 
+    /// Préférence d'unités du membre, recopiée par l'app : la cible widget ne lit
+    /// pas les `UserDefaults` de l'app. Absente = métrique.
+    static func saveImperialUnits(_ imperial: Bool) {
+        defaults?.set(imperial, forKey: imperialUnitsKey)
+    }
+
+    static func prefersImperialUnits() -> Bool {
+        defaults?.bool(forKey: imperialUnitsKey) ?? false
+    }
+
     /// Efface les instantanés affichés par les widgets. Appelé à la
     /// déconnexion : le dernier test, le nom du Wi-Fi et « réseau autour de
     /// moi » restaient sinon visibles sur l'écran d'accueil (MES-13).
@@ -180,5 +191,51 @@ enum WidgetSharedStore {
         for key in [speedtestKey, recentKey, networkGlanceKey] {
             defaults.removeObject(forKey: key)
         }
+    }
+}
+
+/// Débits et distances des widgets et de la Live Activity. La cible widget ne voit
+/// pas `SQUnits` : ses règles sont recopiées ici (« Mbit/s » puis « Gbit/s » dès
+/// 1 000, une décimale sous 100, km/m ou mi/ft selon la préférence) et un test
+/// vérifie qu'elles restent identiques.
+enum WidgetUnits {
+    /// Le nombre seul, pour un grand chiffre dont l'unité est posée à part.
+    static func throughputValue(mbps: Double, locale: Locale = .current) -> String {
+        guard mbps.isFinite, mbps >= 0 else { return "—" }
+        if mbps >= 1_000 {
+            return (mbps / 1_000).formatted(.number.precision(.fractionLength(1)).locale(locale))
+        }
+        return mbps.formatted(.number.precision(.fractionLength(mbps < 100 ? 1 : 0)).locale(locale))
+    }
+
+    static func throughputUnit(mbps: Double) -> String {
+        mbps >= 1_000 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
+    }
+
+    /// « 412 Mbit/s », « 1,2 Gbit/s ».
+    static func throughput(mbps: Double, locale: Locale = .current) -> String {
+        guard mbps.isFinite, mbps >= 0 else { return "—" }
+        return "\(throughputValue(mbps: mbps, locale: locale)) \(throughputUnit(mbps: mbps))"
+    }
+
+    /// Sans place pour l'unité (Dynamic Island, jauge d'écran verrouillé) : un « G »
+    /// signale les gigabits, aucune lettre sous 1 000 Mbit/s.
+    static func compactThroughput(mbps: Double, locale: Locale = .current) -> String {
+        throughputValue(mbps: mbps, locale: locale) + (mbps.isFinite && mbps >= 1_000 ? "G" : "")
+    }
+
+    /// Distance depuis des mètres : mêmes seuils que `SQUnits.distance`.
+    static func distance(meters: Double, imperial: Bool, locale: Locale = .current) -> String {
+        guard meters.isFinite else { return "—" }
+        let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1)).locale(locale)
+        if imperial {
+            let miles = meters / 1609.344
+            return miles >= 0.1
+                ? "\(miles.formatted(oneDecimal)) mi"
+                : "\(Int((meters / 0.3048).rounded())) ft"
+        }
+        return meters >= 1000
+            ? "\((meters / 1000).formatted(oneDecimal)) km"
+            : "\(Int(meters.rounded())) m"
     }
 }

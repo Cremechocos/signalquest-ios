@@ -58,22 +58,6 @@
         }
       }
     },
-    "Débit des derniers tests : moyenne %lld mégabits par seconde, record %lld mégabits par seconde" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speed of recent tests: average %lld megabits per second, best %lld megabits per second"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Débit des derniers tests : moyenne %lld mégabits par seconde, record %lld mégabits par seconde"
-          }
-        }
-      }
-    },
     "Exceptionnel" : {
       "localizations" : {
         "en" : {
@@ -426,22 +410,6 @@
         }
       }
     },
-    "%lld Mbps ↓" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mbps ↓"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mbps ↓"
-          }
-        }
-      }
-    },
     "%lld ms" : {
       "localizations" : {
         "en" : {
@@ -538,22 +506,6 @@
         }
       }
     },
-    "Débit %@ mégabits par seconde, %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Débit %1$@ mégabits par seconde, %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Throughput %@ megabits per second, %@"
-          }
-        }
-      }
-    },
     "Lance un Drive Test" : {
       "localizations" : {
         "en" : {
@@ -614,22 +566,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lancer un Speedtest SignalQuest"
-          }
-        }
-      }
-    },
-    "Mbps" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mbps"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mbit/s"
           }
         }
       }
@@ -889,6 +825,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slow"
+          }
+        }
+      }
+    },
+    "Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mbit/s"
+          }
+        }
+      }
+    },
+    "Gbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gbit/s"
+          }
+        }
+      }
+    },
+    "Débit %@ %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Throughput %1$@ %2$@, %3$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit %1$@ %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Débit des derniers tests : moyenne %@, record %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed of recent tests: average %1$@, best %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit des derniers tests : moyenne %1$@, record %2$@"
           }
         }
       }

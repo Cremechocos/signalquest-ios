@@ -101,11 +101,15 @@ struct SpeedtestTrendEntryView: View {
             chart
 
             HStack(spacing: 10) {
-                stat("Moy.", avg)
-                stat("Record", best)
-                Text("Mbps")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WidgetPalette.labelSecondary)
+                // Une seule unité tant que le record reste sous 1 000 Mbit/s ; au-delà,
+                // chaque valeur porte la sienne (moyenne en Mbit/s, record en Gbit/s).
+                stat("Moy.", avg, showsUnit: best >= 1_000)
+                stat("Record", best, showsUnit: best >= 1_000)
+                if best < 1_000 {
+                    Text(WidgetUnits.throughputUnit(mbps: best))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(WidgetPalette.labelSecondary)
+                }
                 Spacer(minLength: 4)
                 if let last = entry.recent.first {
                     Text(last.date, style: .relative)
@@ -166,18 +170,23 @@ struct SpeedtestTrendEntryView: View {
         .frame(maxHeight: .infinity)
         // Les barres ne disent rien à VoiceOver : un résumé chiffré les remplace.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(localized: "Débit des derniers tests : moyenne \(Int(avg.rounded())) mégabits par seconde, record \(Int(best.rounded())) mégabits par seconde"))
+        .accessibilityLabel(String(localized: "Débit des derniers tests : moyenne \(WidgetUnits.throughput(mbps: avg)), record \(WidgetUnits.throughput(mbps: best))"))
     }
 
-    private func stat(_ label: LocalizedStringKey, _ value: Double) -> some View {
+    private func stat(_ label: LocalizedStringKey, _ value: Double, showsUnit: Bool) -> some View {
         HStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(WidgetPalette.labelSecondary)
-            Text("\(Int(value.rounded()))")
+            Text(WidgetUnits.throughputValue(mbps: value))
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .foregroundStyle(WidgetPalette.label)
                 .monospacedDigit()
+            if showsUnit {
+                Text(WidgetUnits.throughputUnit(mbps: value))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WidgetPalette.labelSecondary)
+            }
         }
         .lineLimit(1)
         .fixedSize()

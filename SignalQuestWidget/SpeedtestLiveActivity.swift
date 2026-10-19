@@ -17,9 +17,10 @@ struct SpeedtestLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     IslandMetric(
-                        value: Int(context.state.downloadMbps.rounded()),
+                        value: WidgetUnits.throughputValue(mbps: context.state.downloadMbps),
+                        numericValue: context.state.downloadMbps,
                         label: "Réception",
-                        unit: "Mbps",
+                        unit: WidgetUnits.throughputUnit(mbps: context.state.downloadMbps),
                         tint: speedColor(context.state.downloadMbps),
                         icon: "arrow.down"
                     )
@@ -28,9 +29,10 @@ struct SpeedtestLiveActivity: Widget {
 
                 DynamicIslandExpandedRegion(.trailing) {
                     IslandMetric(
-                        value: Int(context.state.uploadMbps.rounded()),
+                        value: WidgetUnits.throughputValue(mbps: context.state.uploadMbps),
+                        numericValue: context.state.uploadMbps,
                         label: "Envoi",
-                        unit: "Mbps",
+                        unit: WidgetUnits.throughputUnit(mbps: context.state.uploadMbps),
                         tint: SpeedtestLiveStyle.upload,
                         icon: "arrow.up"
                     )
@@ -63,7 +65,7 @@ struct SpeedtestLiveActivity: Widget {
             } compactLeading: {
                 CompactGlyph(state: context.state)
             } compactTrailing: {
-                Text("\(Int(context.state.downloadMbps.rounded()))")
+                Text(WidgetUnits.compactThroughput(mbps: context.state.downloadMbps))
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(speedColor(context.state.downloadMbps))
                     .monospacedDigit()
@@ -82,8 +84,8 @@ private struct LockScreenSpeedtestActivity: View {
     let state: SpeedtestActivityAttributes.ContentState
     let attributes: SpeedtestActivityAttributes
 
-    private var downloadValue: Int { Int(state.downloadMbps.rounded()) }
-    private var uploadValue: Int { Int(state.uploadMbps.rounded()) }
+    private var downloadValue: String { WidgetUnits.throughputValue(mbps: state.downloadMbps) }
+    private var uploadValue: String { WidgetUnits.throughputValue(mbps: state.uploadMbps) }
     private var pingValue: Int { Int(state.pingMs.rounded()) }
     private var progress: Double { clamped(state.progress) }
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
@@ -94,8 +96,8 @@ private struct LockScreenSpeedtestActivity: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 // Chiffre en encre : la qualité reste portée par la barre et l'icône.
-                AnimatedNumber(value: downloadValue, size: 40, tint: .primary)
-                Text("Mbps")
+                AnimatedNumber(value: downloadValue, numericValue: state.downloadMbps, size: 40, tint: .primary)
+                Text(WidgetUnits.throughputUnit(mbps: state.downloadMbps))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
@@ -110,7 +112,7 @@ private struct LockScreenSpeedtestActivity: View {
                 .frame(height: 7)
 
             HStack(spacing: 14) {
-                InlineMetric(label: "Envoi", value: "\(uploadValue)", numericValue: Double(uploadValue), unit: "Mbps", icon: "arrow.up", tint: SpeedtestLiveStyle.upload)
+                InlineMetric(label: "Envoi", value: uploadValue, numericValue: state.uploadMbps, unit: WidgetUnits.throughputUnit(mbps: state.uploadMbps), icon: "arrow.up", tint: SpeedtestLiveStyle.upload)
                 InlineMetric(label: "Latence", value: state.pingMs > 0 ? "\(pingValue)" : "-", numericValue: Double(pingValue), unit: "ms", icon: "bolt.fill", tint: SpeedtestLiveStyle.ping)
 
                 if state.isBurst {
@@ -186,7 +188,7 @@ private struct InlineMetric: View {
     let label: LocalizedStringKey
     let value: String
     let numericValue: Double
-    let unit: LocalizedStringKey
+    let unit: String
     let icon: String
     let tint: Color
 
@@ -207,7 +209,7 @@ private struct InlineMetric: View {
                         .foregroundStyle(.primary)
                         .monospacedDigit()
                         .stableNumericTransition(numericValue)
-                    Text(unit)
+                    Text(verbatim: unit)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -219,27 +221,29 @@ private struct InlineMetric: View {
 
 @available(iOS 16.1, *)
 private struct AnimatedNumber: View {
-    let value: Int
+    let value: String
+    let numericValue: Double
     let size: CGFloat
     let tint: Color
 
     var body: some View {
-        Text("\(value)")
+        Text(verbatim: value)
             .font(.system(size: size, weight: .black, design: .rounded))
             .foregroundStyle(tint)
             .monospacedDigit()
             .minimumScaleFactor(0.74)
             .lineLimit(1)
-            .stableNumericTransition(Double(value))
+            .stableNumericTransition(numericValue)
     }
 }
 
 @available(iOS 16.1, *)
 private struct IslandMetric: View {
-    let value: Int
+    let value: String
+    let numericValue: Double
     /// Lu par VoiceOver ; la flèche dit déjà le sens à l'écran.
     let label: LocalizedStringKey
-    let unit: LocalizedStringKey
+    let unit: String
     let tint: Color
     let icon: String
 
@@ -251,12 +255,12 @@ private struct IslandMetric: View {
 
             VStack(alignment: .leading, spacing: -1) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(value)")
+                    Text(verbatim: value)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(tint)
                         .monospacedDigit()
-                        .stableNumericTransition(Double(value))
-                    Text(unit)
+                        .stableNumericTransition(numericValue)
+                    Text(verbatim: unit)
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.7))
                 }
