@@ -39,6 +39,8 @@ struct ProfileView: View {
     /// Écrans nourris par l'app Android, montrés seulement avec des données.
     @StateObject private var androidPresence: AndroidDataPresence
     @State private var showEdit = false
+    /// Écran poussé depuis le Profil (une ligne du menu, une tuile, « À faire »).
+    @State private var pushed: ProfileDestination?
     /// Choix du @pseudo depuis l'en-tête quand le compte n'en a pas encore.
     @State private var showHandleSheet = false
     @State private var stats: UserStats?
@@ -120,9 +122,11 @@ struct ProfileView: View {
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
-        // Navigation par valeur : une destination construite dans le corps de la
-        // vue était recréée à chaque rendu du Profil, ce qu'iOS 16 supporte mal.
-        .navigationDestination(for: ProfileDestination.self) { destination(for: $0) }
+        // Push par état, comme Accueil et Communauté : sous iOS 16.7, tout
+        // NavigationLink du Profil (par valeur comme par closure) gelait l'app,
+        // alors que les boutons à feuille et les pushes programmatiques des
+        // autres onglets répondaient.
+        .navigationDestinationItemCompat($pushed) { destination(for: $0) }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
         .toolbar(.hidden, for: .navigationBar)
@@ -538,34 +542,34 @@ struct ProfileView: View {
             // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
             // rares fonctions Premium utilisées, était à cinq niveaux.
             menuSection("Suivis") {
-                NavigationLink(value: ProfileDestination.favorites) {
+                Button { pushed = ProfileDestination.favorites } label: {
                     FavoriteCountMenuRow(favorites: services.favoriteAntennas)
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.sentinelle) {
+                Button { pushed = ProfileDestination.sentinelle } label: {
                     menuRow(title: "Sentinelle", icon: "wifi.router")
                 }
             }
 
             menuSection("Contributions") {
-                NavigationLink(value: ProfileDestination.measurements) {
+                Button { pushed = ProfileDestination.measurements } label: {
                     menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.photos) {
+                Button { pushed = ProfileDestination.photos } label: {
                     menuRow(title: "Photos", icon: "photo.stack")
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.antennaReports) {
+                Button { pushed = ProfileDestination.antennaReports } label: {
                     menuRow(title: "Signalements d’antenne", icon: "exclamationmark.bubble")
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.outages) {
+                Button { pushed = ProfileDestination.outages } label: {
                     menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle")
                 }
                 menuSeparator
                 // Territoires : plus en tuile sous le niveau (décision du 29/09).
-                NavigationLink(value: ProfileDestination.territories) {
+                Button { pushed = ProfileDestination.territories } label: {
                     menuRow(title: "Territoires", icon: "square.grid.3x3")
                 }
             }
@@ -574,15 +578,15 @@ struct ProfileView: View {
             // a de telles données, sinon une ligne dit ce qu'ils apportent.
             menuSection("Avec l’app Android") {
                 if androidPresence.showsAndroidScreens {
-                    NavigationLink(value: ProfileDestination.sessions) {
+                    Button { pushed = ProfileDestination.sessions } label: {
                         menuRow(title: "Enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
                     }
                     menuSeparator
-                    NavigationLink(value: ProfileDestination.radioLogs) {
+                    Button { pushed = ProfileDestination.radioLogs } label: {
                         menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
                     }
                     menuSeparator
-                    NavigationLink(value: ProfileDestination.identifications) {
+                    Button { pushed = ProfileDestination.identifications } label: {
                         menuRow(title: "Mes identifications", icon: "checkmark.seal")
                     }
                 } else {
@@ -602,24 +606,24 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.updateRecommended")
                     menuSeparator
                 }
-                NavigationLink(value: ProfileDestination.settings) {
+                Button { pushed = ProfileDestination.settings } label: {
                     menuRow(title: "Réglages", icon: "gearshape")
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.privacy) {
+                Button { pushed = ProfileDestination.privacy } label: {
                     menuRow(title: "Confidentialité", icon: "hand.raised")
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.subscription) {
+                Button { pushed = ProfileDestination.subscription } label: {
                     SubscriptionMenuRow(store: services.entitlements)
                 }
                 menuSeparator
-                NavigationLink(value: ProfileDestination.glossary) {
+                Button { pushed = ProfileDestination.glossary } label: {
                     menuRow(title: "Aide et glossaire", icon: "questionmark.circle")
                 }
                 .accessibilityIdentifier("profile.glossary")
                 menuSeparator
-                NavigationLink(value: ProfileDestination.bugs) {
+                Button { pushed = ProfileDestination.bugs } label: {
                     menuRow(title: "Bugs et idées", icon: "ladybug",
                             subtitle: String(localized: "Signaler un problème, proposer une amélioration"),
                             badge: unseenBugReplies > 0 ? unseenBugReplies.formatted() : nil)
@@ -628,7 +632,7 @@ struct ProfileView: View {
                 // Réservé aux administrateurs ; le serveur refuse de toute façon les autres comptes.
                 if case .authenticated(let user) = session.state, user.role == "admin" {
                     menuSeparator
-                    NavigationLink(value: ProfileDestination.adminBugs) {
+                    Button { pushed = ProfileDestination.adminBugs } label: {
                         menuRow(title: "Admin · bugs et retours", icon: "wrench.and.screwdriver",
                                 subtitle: String(localized: "Trier et répondre à tous les signalements"))
                     }
@@ -781,7 +785,7 @@ struct ProfileView: View {
         subtitle: String?,
         destination: ProfileDestination
     ) -> some View {
-        NavigationLink(value: destination) {
+        Button { pushed = destination } label: {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 ProfileMenuIcon(systemImage: icon, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                     .padding(.bottom, SQSpace.xs)
@@ -830,18 +834,18 @@ struct ProfileView: View {
     private func todoLink(_ todo: UserOverview.Todo) -> some View {
         switch todo {
         case .claimMissions(let count, let rewardXp):
-            NavigationLink(value: ProfileDestination.rewards) {
+            Button { pushed = ProfileDestination.rewards } label: {
                 ProfileMenuRow(title: "Missions à réclamer", icon: "gift", subtitle: String(localized: "+\(rewardXp) pts"),
                                badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
-            NavigationLink(value: ProfileDestination.pendingPhotos) {
+            Button { pushed = ProfileDestination.pendingPhotos } label: {
                 ProfileMenuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.photos")
         case .identificationConflicts(let count):
-            NavigationLink(value: ProfileDestination.identifications) {
+            Button { pushed = ProfileDestination.identifications } label: {
                 ProfileMenuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted(),
                                accentIcon: true)
             }
@@ -920,7 +924,7 @@ struct ProfileView: View {
     }
 }
 
-/// Écrans ouverts depuis le Profil, poussés par valeur.
+/// Écrans ouverts depuis le Profil, poussés par `pushed`.
 private enum ProfileDestination: Hashable {
     case favorites, sentinelle, measurements, photos, pendingPhotos, antennaReports, outages, territories
     case sessions, radioLogs, identifications
