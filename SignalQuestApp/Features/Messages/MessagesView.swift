@@ -1292,12 +1292,14 @@ struct MessagesView: View {
                         .frame(minWidth: 20, minHeight: 20)
                         .background(SQColor.brandRed, in: Capsule())
                         .accessibilityHidden(true)
+                } else {
+                    // Le total seulement sans non lues : deux nombres côte à côte se lisent mal.
+                    Text(verbatim: "\(summary.count)")
+                        .font(SQType.subhead)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityHidden(true)
                 }
-                Text(verbatim: "\(summary.count)")
-                    .font(SQType.subhead)
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityHidden(true)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(SQColor.labelTertiary)

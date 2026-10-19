@@ -190,7 +190,7 @@ struct MessageComposerBar: View {
                 .disabled(isEditing)
                 Divider()
                 Toggle(isOn: $ephemeralEnabled) {
-                    Label("Messages éphémères (\(ProtectedConversationSheet.durationLabel(ephemeralSeconds)))", systemImage: "timer")
+                    Label(String(localized: "Messages éphémères (\(ProtectedConversationSheet.durationLabel(ephemeralSeconds)))"), systemImage: "timer")
                 }
             } label: {
                 Image(systemName: "plus")
