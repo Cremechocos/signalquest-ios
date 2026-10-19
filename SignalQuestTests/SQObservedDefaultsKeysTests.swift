@@ -36,6 +36,47 @@ final class SQObservedDefaultsKeysTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: "sq.hasCompletedOnboarding"), "L'ancienne reste pour une version antérieure")
     }
 
+    // MARK: Tutoiement / vouvoiement (ADDR-1)
+
+    func testAddressQuestionIsAskedOnlyToAnAccountThatHasNotChosen() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func ask(authenticated: Bool = true, chosen: Bool? = false, french: Bool = true, lastAsked: Date? = nil) -> Bool {
+            SQAddress.shouldAsk(isAuthenticated: authenticated, chosen: chosen, appIsFrench: french,
+                                lastAsked: lastAsked, now: now)
+        }
+        XCTAssertTrue(ask())
+        XCTAssertFalse(ask(authenticated: false), "Jamais à un invité")
+        XCTAssertFalse(ask(chosen: true), "Compte qui a déjà choisi")
+        XCTAssertFalse(ask(chosen: nil), "Serveur qui n'expose pas le réglage, hors ligne ou avant le chargement : pas de question")
+        XCTAssertFalse(ask(french: false), "Pas de question hors français")
+    }
+
+    func testAddressQuestionIsAskedAtMostOncePerDayPerDevice() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func ask(_ lastAsked: Date?) -> Bool {
+            SQAddress.shouldAsk(isAuthenticated: true, chosen: false, appIsFrench: true, lastAsked: lastAsked, now: now)
+        }
+        XCTAssertFalse(ask(now.addingTimeInterval(-3_600)))
+        XCTAssertFalse(ask(now.addingTimeInterval(-24 * 3_600 + 60)))
+        XCTAssertTrue(ask(now.addingTimeInterval(-24 * 3_600)))
+        XCTAssertTrue(ask(now.addingTimeInterval(-3 * 24 * 3_600)))
+        XCTAssertTrue(ask(now.addingTimeInterval(3_600)), "Une horloge reculée ne musèle pas la question")
+    }
+
+    func testAddressFormCacheIsPerAccountAndPurgedAtLogout() {
+        let first = "user:addr-test-\(UUID().uuidString)", second = "user:addr-test-\(UUID().uuidString)"
+        defer { SQAddress.purge(ownerScopeId: first); SQAddress.purge(ownerScopeId: second) }
+        let standard = UserDefaults.standard
+        SQAddress.remember(.formal, ownerScopeId: first)
+        XCTAssertEqual(standard.string(forKey: SQAddress.cacheKey(ownerScopeId: first)), "formal")
+        XCTAssertNil(standard.string(forKey: SQAddress.cacheKey(ownerScopeId: second)), "Un autre compte ne reçoit pas ce ton")
+        XCTAssertNotEqual(SQAddress.cacheKey(ownerScopeId: first), SQAddress.cacheKey(ownerScopeId: second))
+        SQAddress.setFormal(true)
+        SQAddress.purge(ownerScopeId: first)
+        XCTAssertNil(standard.string(forKey: SQAddress.cacheKey(ownerScopeId: first)))
+        XCTAssertFalse(SQAddress.isFormal, "Après la déconnexion, l'app repasse au tutoiement")
+    }
+
     func testNoObservedKeyHasADot() throws {
         let constants = SQObservedDefaultsKeys.renamed.map(\.new) + [SQOledPalette.storageKey, MapBackdrop.storageKey]
         for key in constants {

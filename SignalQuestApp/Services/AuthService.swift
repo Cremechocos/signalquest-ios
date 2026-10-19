@@ -434,6 +434,7 @@ final class AuthService: AuthServicing {
         PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
         CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
+        SQAddress.purge(ownerScopeId: ownerScopeId)
     }
 
     /// Ce que l'appareil garde pour un compte quand il le quitte pour de bon
