@@ -142,6 +142,7 @@ struct MapAdvancedFilterSheet: View {
                         toggleTechnology(technology.value)
                     } label: {
                         MapTechTag(technology: technology.value, label: technology.label)
+                            .accessibilityHidden(true)
                         Text(technology.label).font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
                     }
                     .mapRowDivider(index > 0)
@@ -734,7 +735,6 @@ struct MapTechTag: View {
             .padding(.horizontal, 7)
             .frame(minHeight: 22)
             .background(SQBrand.techColor(technology), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .accessibilityHidden(true)
     }
 }
 

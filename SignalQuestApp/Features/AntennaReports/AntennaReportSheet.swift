@@ -63,118 +63,127 @@ struct AntennaReportSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg) {
-                MapSheetHeader(
-                    title: String(localized: "Signaler un problème"),
-                    subtitle: String(localized: "Site \(siteLabel)"),
-                    closeIdentifier: "antennaReport.form.close"
-                ) { dismiss() }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    MapSheetHeader(
+                        title: String(localized: "Signaler un problème"),
+                        subtitle: String(localized: "Site \(siteLabel)"),
+                        closeIdentifier: "antennaReport.form.close"
+                    ) { dismiss() }
 
-                formSection("Problème", footer: "Ton signalement part à l’équipe de modération, qui pourra te répondre.") {
-                    pickerRow("Type", value: reportType.label, identifier: "antennaReport.form.type") {
-                        Picker(selection: $reportType) {
-                            ForEach(availableTypes) { type in
-                                Label(type.label, systemImage: type.systemImage).tag(type)
+                    formSection("Problème", footer: "Ton signalement part à l’équipe de modération, qui pourra te répondre.") {
+                        pickerRow("Type", value: reportType.label, identifier: "antennaReport.form.type") {
+                            Picker(selection: $reportType) {
+                                ForEach(availableTypes) { type in
+                                    Label(type.label, systemImage: type.systemImage).tag(type)
+                                }
+                            } label: {
+                                Text("Type de problème")
                             }
-                        } label: {
-                            Text("Type de problème")
                         }
                     }
-                }
 
-                if isLeaderReport, let leaderReport {
-                    formSection(
-                        "Opérateur porteur",
-                        footer: leaderReport.sharingKind == "crozon"
-                            ? "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
-                            : "Site en zone blanche : un seul opérateur le porte pour tous les autres."
-                    ) {
-                        if let current = leaderReport.currentLeader {
-                            HStack {
-                                Text("Opérateur affiché").foregroundStyle(SQColor.label)
-                                Spacer(minLength: SQSpace.sm)
-                                Text(verbatim: AntennaLeaderReport.displayName(current))
-                                    .foregroundStyle(SQColor.labelSecondary)
+                    if isLeaderReport, let leaderReport {
+                        formSection(
+                            "Opérateur porteur",
+                            footer: leaderReport.sharingKind == "crozon"
+                                ? "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
+                                : "Site en zone blanche : un seul opérateur le porte pour tous les autres."
+                        ) {
+                            if let current = leaderReport.currentLeader {
+                                HStack {
+                                    Text("Opérateur affiché").foregroundStyle(SQColor.label)
+                                    Spacer(minLength: SQSpace.sm)
+                                    Text(verbatim: AntennaLeaderReport.displayName(current))
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                }
+                                .font(SQType.body)
+                                .padding(.horizontal, SQSpace.md)
+                                .frame(minHeight: 48)
+                                Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
                             }
-                            .font(SQType.body)
-                            .padding(.horizontal, SQSpace.md)
-                            .frame(minHeight: 48)
+                            pickerRow("Opérateur qui porte le site",
+                                      value: suggestedLeader.map(AntennaLeaderReport.displayName) ?? String(localized: "À choisir"),
+                                      identifier: "antennaReport.form.leader") {
+                                Picker(selection: $suggestedLeader) {
+                                    Text("À choisir").tag(String?.none)
+                                    ForEach(leaderReport.choices, id: \.self) { key in
+                                        Text(verbatim: AntennaLeaderReport.displayName(key)).tag(String?.some(key))
+                                    }
+                                } label: {
+                                    Text("Opérateur qui porte le site")
+                                }
+                            }
+                        }
+                    }
+
+                    if reportType.suggestsValues {
+                        formSection("Correction proposée · facultatif") {
+                            fieldRow("Valeur actuelle affichée", text: $currentValue, identifier: "antennaReport.form.current")
                             Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
+                            fieldRow("Valeur correcte selon toi", text: $suggestedValue, identifier: "antennaReport.form.suggested")
                         }
-                        pickerRow("Opérateur qui porte le site",
-                                  value: suggestedLeader.map(AntennaLeaderReport.displayName) ?? String(localized: "À choisir"),
-                                  identifier: "antennaReport.form.leader") {
-                            Picker(selection: $suggestedLeader) {
-                                Text("À choisir").tag(String?.none)
-                                ForEach(leaderReport.choices, id: \.self) { key in
-                                    Text(verbatim: AntennaLeaderReport.displayName(key)).tag(String?.some(key))
+                    }
+
+                    if !availableSectors.isEmpty {
+                        formSection("Secteur concerné · facultatif") {
+                            pickerRow("Secteur", value: selectedSectorLabel, identifier: "antennaReport.form.sector") {
+                                Picker(selection: $sector) {
+                                    Text("Non précisé").tag(Int?.none)
+                                    ForEach(Array(availableSectors.enumerated()), id: \.element) { index, deg in
+                                        Text(sectorLabel(index: index, azimuth: deg)).tag(Int?.some(deg))
+                                    }
+                                } label: {
+                                    Text("Secteur")
                                 }
-                            } label: {
-                                Text("Opérateur qui porte le site")
                             }
                         }
                     }
-                }
 
-                if reportType.suggestsValues {
-                    formSection("Correction proposée · facultatif") {
-                        fieldRow("Valeur actuelle affichée", text: $currentValue, identifier: "antennaReport.form.current")
-                        Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
-                        fieldRow("Valeur correcte selon toi", text: $suggestedValue, identifier: "antennaReport.form.suggested")
+                    formSection(reportType == .other ? "Précisions · obligatoire" : "Précisions · facultatif") {
+                        TextField("Décris ce qui ne va pas", text: $reason, axis: .vertical)
+                            .lineLimit(3...6)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                            .padding(SQSpace.md)
+                            .frame(minHeight: 84, alignment: .topLeading)
+                            .accessibilityIdentifier("antennaReport.form.reason")
+                    }
+
+                    if let duplicateMessage {
+                        Label(duplicateMessage, systemImage: "checkmark.circle")
+                            .font(SQType.caption)
+                            .foregroundStyle(OutageTint.resolvedInk)
+                            .padding(SQSpace.md)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .sqSurface(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .accessibilityIdentifier("antennaReport.form.duplicate")
+                    }
+
+                    if let error {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                            .padding(SQSpace.md)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .sqSurface(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .accessibilityIdentifier("antennaReport.form.error")
+                        .id("antennaReport.error")
+                        .sqAnnounce(error)
                     }
                 }
-
-                if !availableSectors.isEmpty {
-                    formSection("Secteur concerné · facultatif") {
-                        pickerRow("Secteur", value: selectedSectorLabel, identifier: "antennaReport.form.sector") {
-                            Picker(selection: $sector) {
-                                Text("Non précisé").tag(Int?.none)
-                                ForEach(Array(availableSectors.enumerated()), id: \.element) { index, deg in
-                                    Text(sectorLabel(index: index, azimuth: deg)).tag(Int?.some(deg))
-                                }
-                            } label: {
-                                Text("Secteur")
-                            }
-                        }
-                    }
-                }
-
-                formSection(reportType == .other ? "Précisions · obligatoire" : "Précisions · facultatif") {
-                    TextField("Décris ce qui ne va pas", text: $reason, axis: .vertical)
-                        .lineLimit(3...6)
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.label)
-                        .padding(SQSpace.md)
-                        .frame(minHeight: 84, alignment: .topLeading)
-                        .accessibilityIdentifier("antennaReport.form.reason")
-                }
-
-                if let duplicateMessage {
-                    Label(duplicateMessage, systemImage: "checkmark.circle")
-                        .font(SQType.caption)
-                        .foregroundStyle(OutageTint.resolvedInk)
-                        .padding(SQSpace.md)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .sqSurface(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                        .accessibilityIdentifier("antennaReport.form.duplicate")
-                }
-
-                if let error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.dangerInk)
-                        .padding(SQSpace.md)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .sqSurface(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                        .accessibilityIdentifier("antennaReport.form.error")
-                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.lg)
-            .padding(.bottom, SQSpace.xl)
+            .scrollDismissesKeyboard(.interactively)
+            .onChangeCompat(of: error) { _, newValue in
+                // L'erreur est sous les champs : on la ramène à l'écran plutôt que de la laisser hors cadre.
+                guard newValue != nil else { return }
+                withAnimation { proxy.scrollTo("antennaReport.error", anchor: .center) }
+            }
         }
-        .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
             GradientButton(String(localized: "Envoyer le signalement"), systemImage: "paperplane.fill", isBusy: isBusy) {
                 Task { await send() }
@@ -279,7 +288,8 @@ struct AntennaReportSheet: View {
             if result.duplicate == true {
                 // Déjà signalé ce type pour ce site (HTTP 200) : on le dit sans
                 // fermer, pour que l'utilisateur sache que c'est bien pris en compte.
-                duplicateMessage = result.message ?? String(localized: "Tu avais déjà signalé ce problème pour ce site. Merci !")
+                // Le texte du serveur n'existe qu'en français : la phrase vient de l'app.
+                duplicateMessage = String(localized: "Tu avais déjà signalé ce problème pour ce site. Merci !")
             } else {
                 dismiss()
             }

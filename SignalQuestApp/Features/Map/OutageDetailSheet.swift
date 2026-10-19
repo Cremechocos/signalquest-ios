@@ -69,7 +69,7 @@ struct OutageDetailSheet: View {
                 ForEach(site.services, id: \.label) { service in
                     HStack(spacing: 6) {
                         Circle().fill(serviceColor(service.status)).frame(width: 8, height: 8)
-                        Text(service.label)
+                        Text(LocalizedStringKey(service.label))
                             .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                         Spacer(minLength: 0)

@@ -400,4 +400,13 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertEqual(antennas[1].clusters[1].count, 173)
         XCTAssertEqual(antennas[1].clusters[1].lat, 48.85)
     }
+
+    /// Le niveau de confiance d'une cellule observée est traduit ; une valeur inconnue reste telle
+    /// quelle, et la casse du serveur n'y change rien.
+    func testObservedCellConfidenceLevelIsLocalizedAndTolerant() {
+        XCTAssertNotEqual(ObservedCellSheet.confidenceLabel("HIGH"), "HIGH")
+        XCTAssertEqual(ObservedCellSheet.confidenceLabel("high"), ObservedCellSheet.confidenceLabel("HIGH"))
+        XCTAssertNotEqual(ObservedCellSheet.confidenceLabel("MEDIUM"), ObservedCellSheet.confidenceLabel("LOW"))
+        XCTAssertEqual(ObservedCellSheet.confidenceLabel("experimental"), "experimental")
+    }
 }

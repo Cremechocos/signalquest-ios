@@ -102,13 +102,25 @@ struct ObservedCellSheet: View {
             ("NR-ARFCN", cell.nrarfcn.map(String.init)),
             ("Bande", cell.band.map { SQUnits.band($0, isNR: cell.nrarfcn != nil) }),
             ("Confiance", cell.confidenceLevel.map { level in
-                cell.confidenceScore.map { "\(level) (\(Int($0))/100)" } ?? level
+                let label = Self.confidenceLabel(level)
+                return cell.confidenceScore.map { "\(label) (\(Int($0))/100)" } ?? label
             }),
             ("Mesures", cell.observationCount.map { "\($0)" }),
             ("Précision GPS médiane", cell.medianAccuracyMeters.map { SQUnits.distance(meters: $0) }),
             ("Première mesure", cell.firstObservedAt.map { SignalFormatters.date($0) }),
             ("Dernière mesure", cell.lastObservedAt.map { SignalFormatters.date($0, relative: true) })
         ]
+    }
+
+    /// Niveau de confiance du serveur (« HIGH », « MEDIUM », « LOW ») dans la langue de l'app ; une
+    /// valeur inconnue reste telle quelle plutôt que d'être devinée.
+    static func confidenceLabel(_ level: String) -> String {
+        switch level.uppercased() {
+        case "HIGH": return String(localized: "Élevée")
+        case "MEDIUM": return String(localized: "Moyenne")
+        case "LOW": return String(localized: "Faible")
+        default: return level
+        }
     }
 
     /// Autres cellules au même endroit — souvent le même pylône vu par d'autres

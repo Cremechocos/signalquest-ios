@@ -2738,7 +2738,7 @@ struct MapExplorerView: View {
     /// La carte recharge seule à chaque déplacement : pas de bouton « rafraîchir ».
     private var mapFabStack: some View {
         VStack(spacing: SQSpace.sm2) {
-            mapFab(icon: "square.3.layers.3d", label: "Carte") {
+            mapFab(icon: "square.3.layers.3d", label: "Couches") {
                 showLayersSheet = true
             }
             .accessibilityIdentifier("map.layers")

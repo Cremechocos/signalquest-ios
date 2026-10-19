@@ -1593,7 +1593,7 @@ struct AntennaDetailSheet: View {
                                 detailRow("Bande passante utile", carrier.effectiveDownlinkBandwidthMhz.map { "\($0) MHz" })
                                 detailRow("Part en réception", carrier.downlinkAllocationPercent.map { "\(Int($0.rounded())) %" })
                                 detailRow("Puissance", carrier.txPowerDbm.map { "\($0) dBm" })
-                                detailRow("Secteur", [carrier.sectorAzimuthDeg.map { "\(Int($0.rounded()))°" }, carrier.sectorBeamwidthDeg.map { "beam \(Int($0.rounded()))°" }, carrier.antennaType].compactMap { $0 }.joined(separator: " · "))
+                                detailRow("Secteur", [carrier.sectorAzimuthDeg.map { "\(Int($0.rounded()))°" }, carrier.sectorBeamwidthDeg.map { String(localized: "ouverture \(Int($0.rounded()))°") }, carrier.antennaType].compactMap { $0 }.joined(separator: " · "))
                                 detailRow("Identifiants de cellule", carrier.cellIds.prefix(5).joined(separator: " · "), term: .cellIdentifiers)
                                 detailRow("Identifiants physiques (PCI)", carrier.physicalIds.prefix(5).joined(separator: " · "))
                                 detailRow("Mise à jour", SignalFormatters.date(carrier.dateLastChanged))

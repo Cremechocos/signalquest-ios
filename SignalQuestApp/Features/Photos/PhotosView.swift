@@ -1291,14 +1291,16 @@ struct PhotoUploadView: View {
                         HStack(spacing: SQSpace.md) {
                             SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 40, font: .system(size: 16, weight: .medium))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(selectedSite.map { $0.siteId ?? $0.id } ?? String(localized: "Choisir un site"))
+                                // L'adresse nomme le site quand on la connaît ; le code passe en second.
+                                Text(selectedSite.map { $0.address ?? String(localized: "Site \($0.siteId ?? $0.id)") } ?? String(localized: "Choisir un site"))
                                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                     .foregroundStyle(SQColor.label)
-                                if let address = selectedSite?.address {
-                                    Text(address)
+                                    .lineLimit(2)
+                                if let site = selectedSite, site.address != nil {
+                                    Text("Site \(site.siteId ?? site.id)")
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
-                                        .lineLimit(2)
+                                        .lineLimit(1)
                                 }
                             }
                             Spacer()
@@ -1375,9 +1377,7 @@ struct PhotoUploadView: View {
                     .opacity(uploadDisabled ? 0.5 : 1)
 
                     if let uploadError {
-                        Label(uploadError, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
+                        SQInlineError(message: uploadError)
                     }
                 }
                 .padding(SQSpace.lg)

@@ -70,13 +70,20 @@ struct AntennaReportsListView: View {
                 Section {
                     EmptyStateView(
                         title: "Aucun signalement",
-                        message: "Depuis la fiche d'une antenne, touche « Signaler un problème » pour aider à corriger les données.",
+                        message: "Ouvre la fiche d'une antenne sur la carte et touche « Signaler une erreur sur ce site » pour aider à corriger les données.",
                         systemImage: "exclamationmark.bubble"
                     )
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 }
             } else {
+                // Un rafraîchissement raté garde la liste affichée : on le dit au-dessus.
+                if let error = model.errorMessage {
+                    Section {
+                        SQInlineError(message: error)
+                            .listRowBackground(Color.clear)
+                    }
+                }
                 Section {
                     ForEach(model.reports) { report in
                         NavigationLink {
