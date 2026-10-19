@@ -3,9 +3,9 @@ import CoreLocation
 
 /// Les antennes suivies.
 ///
-/// Un favori n'est pas un marque-page mais une demande d'être prévenu : l'écran le dit en tête,
-/// et met l'interrupteur de notification AVANT la liste. Sans lui, on pourrait suivre dix sites
-/// et ne jamais comprendre pourquoi rien n'arrive.
+/// Un suivi n'est pas un marque-page mais une demande d'être prévenu : l'écran le dit en tête et
+/// renvoie vers l'interrupteur unique de Notifications (« Activité des antennes suivies »). Sans
+/// lui, on pourrait suivre dix sites et ne jamais comprendre pourquoi rien n'arrive.
 struct FavoriteAntennasView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var networkPath: NetworkPathMonitor
@@ -22,9 +22,6 @@ struct FavoriteAntennasView: View {
             Section {
                 header
                     .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
-                    .listRowBackground(Color.clear)
-                notifyCard
-                    .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
             .listRowSeparator(.hidden)
@@ -58,7 +55,7 @@ struct FavoriteAntennasView: View {
                 }
             } else {
                 Section {
-                    ForEach(favorites.favorites) { favorite in
+                    ForEach(favorites.favorites, id: \.followKey) { favorite in
                         row(favorite)
                             .listRowBackground(SQColor.surface)
                             .listRowSeparatorTint(SQColor.separator)
@@ -114,58 +111,17 @@ struct FavoriteAntennasView: View {
                     .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
-                Text("Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
+                Text("Tu es prévenu des pannes et de l’activité des antennes que tu suis, avec une seule alerte par panne. Un pylône partagé se suit opérateur par opérateur, depuis sa fiche.")
                     .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Les alertes se règlent dans Réglages, Notifications.")
+                    .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// L'interrupteur et son état. Tant que la liste n'est pas chargée, il est
-    /// grisé et dit pourquoi, au lieu d'un « Indisponible » sans motif.
-    private var notifyCard: some View {
-        HStack(spacing: SQSpace.sm2) {
-            SQIconPastille(systemImage: "exclamationmark.triangle", size: 38, tint: SQColor.accentInk, fill: SQColor.accentSoft,
-                           font: SQFont.body(17, .semibold, relativeTo: .body))
-            Toggle(isOn: Binding(
-                get: { favorites.notifyOnIssues },
-                set: { newValue in
-                    guard let scope = favorites.captureActionScope() else { return }
-                    Task { await favorites.setNotifyOnIssues(newValue, matching: scope) }
-                    // Une alerte sans notifications n'arrive jamais (TRX-01).
-                    if newValue {
-                        Task { await services.notificationPriming.considerPriming(after: .antennaAlert) }
-                    }
-                }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Me prévenir en cas de panne")
-                        .font(SQType.callout(.bold))
-                        .foregroundStyle(SQColor.label)
-                    Text(notifyState)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .tint(SQColor.brandRed)
-            .disabled(!favorites.hasLoaded)
-        }
-        .padding(SQSpace.md)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-    }
-
-    private var notifyState: String {
-        if !favorites.hasLoaded {
-            return favorites.isLoading
-                ? String(localized: "Chargement…")
-                : String(localized: "Indisponible hors connexion")
-        }
-        return favorites.notifyOnIssues
-            ? String(localized: "Notifications activées")
-            : String(localized: "Notifications désactivées")
     }
 
     /// Modifications en attente : une notice ambre, avec de quoi réessayer.
@@ -192,7 +148,7 @@ struct FavoriteAntennasView: View {
         VStack(spacing: SQSpace.md) {
             EmptyStateView(
                 title: "Aucune antenne suivie",
-                message: "Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé.",
+                message: "Ouvre la fiche d’une antenne sur la carte et touche l’étoile. Tu seras prévenu des pannes et de l’activité de cet opérateur sur ce site.",
                 systemImage: "star"
             )
             GradientButton("Ouvrir la carte", systemImage: "map", style: .secondary) {
@@ -238,7 +194,7 @@ struct FavoriteAntennasView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if favorites.isPending(siteId: favorite.siteId, market: favorite.market) {
+            if favorites.isPending(siteId: favorite.siteId, market: favorite.market, operator: favorite.operator) {
                 Image(systemName: "clock").accessibilityLabel("Synchronisation en attente")
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -274,8 +230,10 @@ struct CompactListMargins: ViewModifier {
     }
 }
 
-/// L'étoile de suivi, posée dans la fiche antenne.
+/// L'étoile « Suivre », posée dans la fiche antenne.
 ///
+/// Elle suit l'opérateur AFFICHÉ sur la fiche : un autre opérateur du même pylône se suit depuis
+/// sa propre fiche. Sans opérateur connu (fiche « ALL »), il n'y a rien à suivre : pas d'étoile.
 /// Optimiste : l'état bascule au doigt, le service remet l'état d'avant si le serveur refuse.
 /// Attendre l'aller-retour ferait douter d'un simple appui.
 struct FavoriteAntennaButton: View {
@@ -283,39 +241,49 @@ struct FavoriteAntennaButton: View {
     let siteId: String
     let market: String
     let operatorName: String?
+    /// Nom de l'opérateur tel que la fiche l'écrit, pour VoiceOver.
+    var operatorLabel: String?
     let name: String?
     let address: String?
     let latitude: Double?
     let longitude: Double?
     @State private var showsSyncError = false
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
 
-    private var isOn: Bool { favorites.isFavorite(siteId: siteId, market: market) }
+    private var isOn: Bool { favorites.isFavorite(siteId: siteId, market: market, operator: operatorName) }
+
+    /// Un suivi vise un opérateur précis : « ALL » ou l'absence d'opérateur n'en désigne aucun.
+    private var followedOperator: String? {
+        FavoriteAntenna.isFollowableOperator(operatorName) ? operatorName : nil
+    }
 
     /// Sans compte, aucun suivi possible : l'étoile restait sans effet (AF-CARTE-13).
     @ViewBuilder
     var body: some View {
-        if case .authenticated = session.state {
+        if case .authenticated = session.state, followedOperator != nil {
             star
         }
     }
+
+    private var spokenOperator: String { operatorLabel ?? followedOperator ?? "" }
 
     private var star: some View {
         Button {
             guard let scope = favorites.captureActionScope() else { return }
             Task {
                 // Si l'état est inconnu, ce premier geste le charge. Il ne doit
-                // pas retirer un favori que l'ancienne étoile vide ne montrait pas.
+                // pas retirer un suivi que l'ancienne étoile vide ne montrait pas.
                 guard favorites.hasLoaded else {
                     await favorites.load()
                     if favorites.isCurrent(scope) { showsSyncError = favorites.errorMessage != nil }
                     return
                 }
-                await favorites.toggle(
+                let nowFollowing = await favorites.toggle(
                     FavoriteAntenna(
                         siteId: siteId,
                         market: market,
-                        operator: operatorName,
+                        operator: followedOperator,
                         name: name,
                         address: address,
                         latitude: latitude,
@@ -323,6 +291,10 @@ struct FavoriteAntennaButton: View {
                     ), matching: scope
                 )
                 if favorites.isCurrent(scope) { showsSyncError = favorites.errorMessage != nil }
+                // Une alerte sans notifications n'arrive jamais (TRX-01).
+                if nowFollowing, favorites.isCurrent(scope) {
+                    await services.notificationPriming.considerPriming(after: .antennaAlert)
+                }
             }
         } label: {
             Image(systemName: favorites.hasLoaded ? (isOn ? "star.fill" : "star") : "arrow.clockwise")
@@ -333,11 +305,12 @@ struct FavoriteAntennaButton: View {
         .buttonStyle(.plain)
         .disabled(favorites.isLoading && !favorites.hasLoaded)
         .accessibilityLabel(favorites.hasLoaded
-            ? (isOn ? Text("Ne plus suivre cette antenne") : Text("Suivre cette antenne")) : Text("Charger les antennes suivies"))
-        .accessibilityHint(favorites.isPending(siteId: siteId, market: market)
+            ? (isOn ? Text("Ne plus suivre \(spokenOperator)") : Text("Suivre \(spokenOperator)")) : Text("Charger les antennes suivies"))
+        .accessibilityValue(favorites.hasLoaded && isOn ? Text("Suivi") : Text(""))
+        .accessibilityHint(favorites.isPending(siteId: siteId, market: market, operator: operatorName)
             ? Text("Synchronisation en attente") : Text(""))
         .accessibilityAddTraits(isOn ? [.isSelected] : [])
-        .alert("Synchronisation des favoris", isPresented: $showsSyncError) {
+        .alert("Synchronisation des suivis", isPresented: $showsSyncError) {
             Button("Réessayer") { Task { await favorites.load() } }
             Button("Fermer", role: .cancel) {}
         } message: {

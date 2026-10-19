@@ -302,6 +302,15 @@ struct SiteFollowKey: Equatable, Sendable {
         self.siteId = siteId
     }
 
+    init?(_ favorite: FavoriteAntenna) {
+        self.init(market: favorite.market, operatorKey: favorite.operator, siteId: favorite.siteId)
+    }
+
+    /// Corps strict de `POST /api/me/follows` : le serveur refuse toute autre clé.
+    var followBody: [String: String] {
+        ["kind": "site", "market": market, "operator": operatorKey, "siteId": siteId]
+    }
+
     /// L'identifiant passe en query string : certains contiennent « : ».
     var queryItems: [URLQueryItem] {
         [URLQueryItem(name: "market", value: market),

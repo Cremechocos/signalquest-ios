@@ -35,17 +35,15 @@ final class FavoritesMixedBackendInteropTests: XCTestCase {
             await ios.service.load()
             try require(ios.service.hasLoaded && ios.service.errorMessage == nil, "Le client natif doit charger le snapshot Android")
             try require(Set(ios.service.favorites.map(\.id)) == ["FR:MIXED-SHARED", "FR:ANDROID-KEEP"], "Deux favoris Android attendus")
-            try require(!ios.service.notifyOnIssues, "La préférence initiale Android doit être désactivée")
 
             let canadian = FavoriteAntenna(siteId: "MIXED-SHARED", market: "CA", operator: nil, name: "Mixed Canadian site")
             let french = FavoriteAntenna(siteId: "MIXED-SHARED", market: "FR", operator: nil)
             _ = await ios.service.toggle(canadian)
             try require(ios.service.pendingCount == 0 && ios.service.errorMessage == nil, "L'ajout CA doit être confirmé par le serveur")
             await ios.service.remove(french)
-            await ios.service.setNotifyOnIssues(true)
             let expected: Set<String> = ["CA:MIXED-SHARED", "FR:ANDROID-KEEP"]
             try require(ios.service.pendingCount == 0 && ios.service.errorMessage == nil, "Les intentions iOS doivent toutes être confirmées")
-            try require(Set(ios.service.favorites.map(\.id)) == expected && ios.service.notifyOnIssues, "Le snapshot iOS doit refléter les trois changements")
+            try require(Set(ios.service.favorites.map(\.id)) == expected, "Le snapshot iOS doit refléter les changements")
 
             let state = try await harness.databaseState()
             let account = try state.account(handoff.scenario.A)

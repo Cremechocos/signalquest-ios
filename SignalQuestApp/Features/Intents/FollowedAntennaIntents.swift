@@ -40,9 +40,11 @@ struct FollowedAntennaQuery: EntityQuery {
         }
     }
 
+    /// Une entrée par site : la fiche s'ouvre sur le site, quel que soit l'opérateur suivi.
     @MainActor
     func suggestedEntities() async throws -> [FollowedAntennaEntity] {
-        await Self.favorites().map(FollowedAntennaEntity.init)
+        var seen = Set<String>()
+        return await Self.favorites().filter { seen.insert($0.id).inserted }.map(FollowedAntennaEntity.init)
     }
 
     @MainActor

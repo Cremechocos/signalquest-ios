@@ -1701,7 +1701,7 @@ private struct HomeFollowedSitesModule: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                ForEach(shown) { favorite in
+                ForEach(shown, id: \.followKey) { favorite in
                     row(favorite)
                 }
                 if favorites.favorites.count > shown.count {
@@ -1722,7 +1722,7 @@ private struct HomeFollowedSitesModule: View {
         .sqCardBackground()
         .accessibilityIdentifier("home.module.followedSites")
         .task { if !favorites.hasLoaded { await favorites.load() } }
-        .task(id: shown.map(\.id)) { await loadStatuses() }
+        .task(id: shown.map(\.followKey)) { await loadStatuses() }
     }
 
     private func row(_ favorite: FavoriteAntenna) -> some View {

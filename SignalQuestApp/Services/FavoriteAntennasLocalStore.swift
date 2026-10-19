@@ -10,6 +10,9 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
     var serverRevision: String?
     var pending: [FavoriteAntennaIntent]
     var attemptedRequestIDs: Set<String>
+    /// `true` une fois la liste lue sur `/api/me/follows`. Absent des fichiers écrits avant la
+    /// bascule : leur liste vient alors de l'ancienne passerelle et reste affichée en attendant.
+    var followsConfirmed: Bool?
 
     init(ownerScopeID: String) {
         version = 1
@@ -20,28 +23,28 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
         serverRevision = nil
         pending = []
         attemptedRequestIDs = []
+        followsConfirmed = nil
     }
 
-    var hasSnapshot: Bool { serverRevision != nil && confirmedNotifications != nil }
+    var hasSnapshot: Bool { followsConfirmed == true }
     var favorites: [FavoriteAntenna] {
         var result = confirmedFavorites
         for intent in pending {
             switch intent.operation {
-            case .upsert:
+            case .upsert, .follow:
                 guard let favorite = intent.favorite else { continue }
-                if let index = result.firstIndex(where: { $0.id == favorite.id }) { result[index] = favorite }
+                if let index = result.firstIndex(where: { $0.followKey == favorite.followKey }) { result[index] = favorite }
                 else { result.append(favorite) }
             case .remove:
-                result.removeAll { $0.id == intent.targetKey }
+                // Le retrait de l'ancienne passerelle ne porte pas l'opérateur : tout le site part.
+                result.removeAll { $0.isSameSite(key: intent.targetKey) }
+            case .unfollow:
+                guard let favorite = intent.favorite else { continue }
+                result.removeAll { $0.isFollowed(siteKey: intent.siteKey, operator: favorite.operator) }
             case .preferences: break
             }
         }
         return result
-    }
-
-    var notifyOnIssues: Bool {
-        pending.last(where: { $0.operation == .preferences })?.notifyFavoriteAntennaIssuesPush
-            ?? confirmedNotifications ?? false
     }
 
     mutating func enqueue(_ intent: FavoriteAntennaIntent) {
@@ -56,7 +59,9 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
     }
 
     mutating func receive(_ response: FavoriteAntennasResponse, acknowledging requestId: String? = nil) {
-        confirmedFavorites = response.favorites
+        // La passerelle ne sert qu'un favori par site : une fois la liste des suivis lue, elle
+        // ne la remplace plus.
+        if followsConfirmed != true { confirmedFavorites = response.favorites }
         confirmedNotifications = response.notifyFavoriteAntennaIssuesPush
         serverRevision = response.revision
         if let requestId {
@@ -66,12 +71,26 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
         localRevision += 1
     }
 
+    /// La liste relue sur `/api/me/follows` devient la liste confirmée.
+    mutating func receive(follows: [FavoriteAntenna]) {
+        confirmedFavorites = follows
+        followsConfirmed = true
+        localRevision += 1
+    }
+
+    /// Une écriture de suivi a abouti : son intention n'a plus lieu d'être.
+    mutating func acknowledge(_ requestId: String) {
+        attemptedRequestIDs.remove(requestId)
+        pending.removeAll { $0.requestId == requestId }
+        localRevision += 1
+    }
+
     /// Libère d'abord les emplacements supprimés, afin qu'un ajout refusé à la
     /// limite de 500 ne bloque pas le retrait demandé ensuite par l'utilisateur.
     var nextIntent: FavoriteAntennaIntent? {
         var targets = Set<String>()
         let eligible = pending.filter { targets.insert($0.targetKey).inserted }
-        return eligible.first(where: { $0.operation == .remove })
+        return eligible.first(where: { $0.operation == .remove || $0.operation == .unfollow })
             ?? eligible.first(where: { $0.operation == .preferences }) ?? eligible.first
     }
 
@@ -91,7 +110,7 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
               confirmedFavorites.count <= 500, pending.count <= 2000,
               (serverRevision == nil && confirmedNotifications == nil)
                 || (serverRevision?.isEmpty == false && confirmedNotifications != nil),
-              Set(confirmedFavorites.map(\.id)).count == confirmedFavorites.count,
+              Set(confirmedFavorites.map(\.followKey)).count == confirmedFavorites.count,
               Set(pending.map(\.requestId)).count == pending.count,
               attemptedRequestIDs.isSubset(of: Set(pending.map(\.requestId))),
               Set(unsent.map(\.targetKey)).count == unsent.count,
@@ -100,6 +119,11 @@ struct FavoriteAntennasLocalState: Codable, Equatable, Sendable {
                   switch intent.operation {
                   case .upsert:
                       return intent.favorite.map { !$0.siteId.filter { !$0.isWhitespace }.isEmpty && !$0.market.isEmpty } == true
+                  case .follow, .unfollow:
+                      return intent.favorite.map {
+                          !$0.siteId.filter { !$0.isWhitespace }.isEmpty && !$0.market.isEmpty
+                              && !FavoriteAntenna.operatorToken($0.operator).isEmpty
+                      } == true
                   case .remove:
                       return intent.siteId?.isEmpty == false && intent.market?.isEmpty == false
                   case .preferences:

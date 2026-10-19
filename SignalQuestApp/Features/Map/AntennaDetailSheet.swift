@@ -242,9 +242,8 @@ struct AntennaDetailSheet: View {
                 await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 await loadMarketEntry()
                 await outagesLoad
-                // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi, et
-                // un appui écrirait une liste incomplète — le service refuse d'ailleurs d'écrire
-                // avant d'avoir chargé.
+                // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
+                // service refuse d'écrire avant d'avoir lu la liste des suivis.
                 await services.favoriteAntennas.load()
             }
         }
@@ -649,6 +648,7 @@ struct AntennaDetailSheet: View {
                         siteId: site.writeSiteId,
                         market: market,
                         operatorName: selectedOperator,
+                        operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry),
                         name: site.address,
                         address: site.address,
                         latitude: site.latitude,

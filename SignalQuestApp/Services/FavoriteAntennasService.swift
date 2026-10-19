@@ -1,9 +1,14 @@
 import Foundation
 import Combine
 
-/// Favoris du compte courant : snapshot confirmé + intentions locales durables.
-/// Toutes les mutations réseau sont atomiques et sérialisées, jamais un PUT de
-/// liste complète. Une intention n'est retirée qu'après son reçu serveur.
+/// Antennes suivies du compte courant : suivis de sites (`/api/me/follows`) confirmés +
+/// intentions locales durables. Un suivi est propre à un opérateur. Toutes les mutations
+/// réseau sont atomiques et sérialisées, jamais un PUT de liste complète. Une intention
+/// n'est retirée qu'après sa confirmation serveur.
+///
+/// Les intentions déjà en file avant la bascule (`upsert`, `remove`, `preferences`) partent
+/// encore par la passerelle `/api/android/favorite-antennas` (protocole 2), puis la liste
+/// des suivis est relue : aucun geste n'écrit dans les deux modèles.
 @MainActor
 final class FavoriteAntennasService: ObservableObject {
     struct ActionScope: Equatable, Sendable {
@@ -21,7 +26,6 @@ final class FavoriteAntennasService: ObservableObject {
 
     var errorMessage: String? { ownsPresentation ? presentedError : nil }
     var favorites: [FavoriteAntenna] { ownsPresentation ? presentedState?.favorites ?? [] : [] }
-    var notifyOnIssues: Bool { ownsPresentation ? presentedState?.notifyOnIssues ?? false : false }
     var hasLoaded: Bool { ownsPresentation && presentedState?.hasSnapshot == true }
     var pendingCount: Int { ownsPresentation ? presentedState?.pending.count ?? 0 : 0 }
     var hasAccount: Bool { sessionSnapshot() != nil }
@@ -40,7 +44,9 @@ final class FavoriteAntennasService: ObservableObject {
     private var localReady: Set<String> = []
     private var localLoad: (id: UUID, owner: String, task: Task<FavoriteAntennasLocalState?, Error>)?
     private var synchronization: (id: UUID, task: Task<Void, Never>)?
+    /// Passerelle des anciennes intentions en file (protocole 2).
     private static let path = "/api/android/favorite-antennas"
+    private static let followsPath = "/api/me/follows"
 
     init(api: APIClient, store: (any FavoriteAntennasStoring)? = nil,
          sessionSnapshot: @escaping () -> LocalAccountSession? = LocalAccountScope.sessionSnapshot) {
@@ -49,8 +55,12 @@ final class FavoriteAntennasService: ObservableObject {
         self.sessionSnapshot = sessionSnapshot
     }
 
-    func isFavorite(siteId: String, market: String) -> Bool {
-        favorites.contains { $0.id == FavoriteAntenna.key(siteId: siteId, market: market) }
+    /// Sans opérateur : le site est suivi chez au moins un opérateur. Avec : chez celui-là.
+    func isFavorite(siteId: String, market: String, operator operatorName: String? = nil) -> Bool {
+        let target = FavoriteAntenna.key(siteId: siteId, market: market)
+        return favorites.contains {
+            operatorName == nil ? $0.isSameSite(key: target) : $0.isFollowed(siteKey: target, operator: operatorName)
+        }
     }
 
     /// Capture synchrone dans le geste UI, avant de créer un Task qui pourrait
@@ -64,9 +74,14 @@ final class FavoriteAntennasService: ObservableObject {
         sessionSnapshot() == scope.session && api.credentials.snapshot().sessionID == scope.credentialsID
     }
 
-    func isPending(siteId: String, market: String) -> Bool {
+    func isPending(siteId: String, market: String, operator operatorName: String? = nil) -> Bool {
         guard ownsPresentation else { return false }
-        return presentedState?.pending.contains { $0.targetKey == FavoriteAntenna.key(siteId: siteId, market: market) } == true
+        let target = FavoriteAntenna.key(siteId: siteId, market: market)
+        return presentedState?.pending.contains {
+            $0.operation != .preferences && $0.siteKey == target
+                && (operatorName == nil || $0.favorite == nil
+                    || FavoriteAntenna.operatorToken($0.favorite?.operator) == FavoriteAntenna.operatorToken(operatorName))
+        } == true
     }
 
     /// À raccorder au reset de présentation du compte. Les caches de A restent
@@ -83,10 +98,16 @@ final class FavoriteAntennasService: ObservableObject {
         guard scope.map(isCurrent) != false else { return false }
         guard let context = activateCurrentContext(), await loadLocal(context) else { return false }
         if !hasLoaded { await synchronize(context) }
-        guard isCurrent(context), hasLoaded else { return isFavorite(siteId: favorite.siteId, market: favorite.market) }
-        let present = !isFavorite(siteId: favorite.siteId, market: favorite.market)
-        await enqueue(.favorite(favorite, present: present), context: context)
-        return isCurrent(context) && isFavorite(siteId: favorite.siteId, market: favorite.market)
+        let operatorName = favorite.operator
+        guard isCurrent(context), hasLoaded else { return isFavorite(siteId: favorite.siteId, market: favorite.market, operator: operatorName) }
+        // Un suivi vise un opérateur précis : sans lui (« ALL »), il n'y a rien à suivre.
+        guard FavoriteAntenna.isFollowableOperator(operatorName) else {
+            presentedError = String(localized: "Cette antenne ne peut pas être suivie.")
+            return false
+        }
+        let present = !isFavorite(siteId: favorite.siteId, market: favorite.market, operator: operatorName)
+        await enqueue(.follow(favorite, present: present), context: context)
+        return isCurrent(context) && isFavorite(siteId: favorite.siteId, market: favorite.market, operator: operatorName)
     }
 
     func remove(_ favorite: FavoriteAntenna, matching scope: ActionScope? = nil) async {
@@ -94,17 +115,11 @@ final class FavoriteAntennasService: ObservableObject {
         guard let context = activateCurrentContext(), await loadLocal(context) else { return }
         if !hasLoaded { await synchronize(context) }
         guard isCurrent(context), hasLoaded else { return }
-        // La suppression d'une ligne n'est pas un toggle : même si Android l'a
-        // déjà retirée, le geste ne doit jamais la recréer.
-        await enqueue(.favorite(favorite, present: false), context: context)
-    }
-
-    func setNotifyOnIssues(_ enabled: Bool, matching scope: ActionScope? = nil) async {
-        guard scope.map(isCurrent) != false else { return }
-        guard let context = activateCurrentContext(), await loadLocal(context) else { return }
-        if !hasLoaded { await synchronize(context) }
-        guard isCurrent(context), hasLoaded, notifyOnIssues != enabled else { return }
-        await enqueue(.notifications(enabled), context: context)
+        // La suppression d'une ligne n'est pas un toggle : même si un autre appareil l'a
+        // déjà retirée, le geste ne doit jamais la recréer. Une ligne sans opérateur (reste
+        // de l'ancien cache) se retire comme avant, par site.
+        await enqueue(FavoriteAntenna.isFollowableOperator(favorite.operator) ? .follow(favorite, present: false)
+                                                                              : .favorite(favorite, present: false), context: context)
     }
 
     /// Uniquement après confirmation de suppression de ce compte côté serveur.
@@ -185,14 +200,14 @@ final class FavoriteAntennasService: ObservableObject {
 
     private func enqueue(_ intent: FavoriteAntennaIntent, context expected: Context) async {
         guard isCurrent(expected), var state = states[expected.owner] else { return }
-        if let favorite = intent.favorite {
-            guard !favorite.siteId.filter({ !$0.isWhitespace }).isEmpty, favorite.siteId.count <= 128,
+        if let favorite = intent.favorite, intent.operation == .upsert || intent.operation == .follow {
+            guard !favorite.siteId.filter({ !$0.isWhitespace }).isEmpty, favorite.siteId.count <= 96,
                   !favorite.market.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                presentedError = String(localized: "Cette antenne ne peut pas être ajoutée aux favoris.")
+                presentedError = String(localized: "Cette antenne ne peut pas être suivie.")
                 return
             }
-            if !state.favorites.contains(where: { $0.id == favorite.id }) && state.favorites.count >= 500 {
-                presentedError = String(localized: "Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre.")
+            if !state.favorites.contains(where: { $0.followKey == favorite.followKey }) && state.favorites.count >= 500 {
+                presentedError = String(localized: "Tu peux suivre au maximum 500 antennes. Arrête d’en suivre une avant d’en ajouter une autre.")
                 return
             }
         }
@@ -246,60 +261,131 @@ final class FavoriteAntennasService: ObservableObject {
             if isCurrent(expected) { isLoading = false; isSynchronizing = false }
         }
         do {
-            let snapshot = try await request(APIEndpoint(path: Self.path,
-                headers: ["Cache-Control": "no-cache"]), context: expected)
-            guard isCurrent(expected), var state = states[expected.owner] else { return }
-            state.receive(snapshot)
-            publish(state, for: expected)
-            guard await persist(state, for: expected) else { return }
-            isLoading = false
-            while isCurrent(expected), let intent = states[expected.owner]?.nextIntent {
-                try Task.checkCancellation()
-                // L'intention la plus récente, y compris celles ajoutées pendant
-                // un aller-retour précédent, est durable AVANT de partir au réseau.
-                guard var pending = states[expected.owner] else { return }
-                pending.markAttempted(intent.requestId)
-                publish(pending, for: expected)
-                guard await persist(pending, for: expected) else { return }
-                guard states[expected.owner]?.pending.contains(where: { $0.requestId == intent.requestId }) == true else { continue }
-                let endpoint = APIEndpoint(path: Self.path, method: .patch,
-                    headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(intent),
-                    idempotencyKey: intent.requestId)
-                let response: FavoriteAntennasResponse
-                do { response = try await mutate(endpoint, intent: intent, context: expected) }
-                catch {
-                    if error is TerminalCapacityRejection, isCurrent(expected), var rejected = states[expected.owner] {
-                        rejected.rejectTerminal(intent.requestId)
-                        publish(rejected, for: expected)
-                        guard await persist(rejected, for: expected) else { return }
-                        // L'UUID refusé est terminal côté serveur. Une action
-                        // inverse plus récente peut continuer ; un nouvel ajout
-                        // nécessitera un nouveau geste et donc un nouvel UUID.
-                        if !rejected.pending.contains(where: { $0.targetKey == intent.targetKey }) {
-                            presentedError = error.userFacingMessage
-                        }
-                        continue
-                    }
-                    throw error
-                }
-                guard response.success == true else { throw APIError.decoding("unconfirmed-favorite-mutation") }
-                guard isCurrent(expected), var latest = states[expected.owner] else { return }
-                latest.receive(response, acknowledging: intent.requestId)
-                publish(latest, for: expected)
-                guard await persist(latest, for: expected) else { return }
-            }
+            // Les intentions d'abord, puis la liste des suivis : elle reflète alors ce qui vient
+            // de partir. Une intention ajoutée pendant la relecture déclenche un nouveau tour,
+            // car elle ne trouverait plus de worker pour l'envoyer.
+            repeat {
+                guard try await sendPendingIntents(expected) else { return }
+                let follows = try await requestFollows(expected)
+                guard isCurrent(expected), var state = states[expected.owner] else { return }
+                state.receive(follows: follows.antennas)
+                publish(state, for: expected)
+                guard await persist(state, for: expected) else { return }
+            } while isCurrent(expected) && states[expected.owner]?.nextIntent != nil
         } catch {
             guard isCurrent(expected), !error.isCancellation else { return }
             presentedError = error.userFacingMessage
-            // Le snapshot et les intentions restent locaux. Un réessai réutilise
+            // La liste et les intentions restent locales. Un réessai réutilise
             // leurs requestId ; aucune liste vide ni restauration périmée n'est envoyée.
         }
     }
 
-    private func request(_ endpoint: APIEndpoint, context expected: Context) async throws -> FavoriteAntennasResponse {
+    /// Envoie les intentions une à une. `false` : le contexte a changé ou le disque a refusé.
+    private func sendPendingIntents(_ expected: Context) async throws -> Bool {
+        while isCurrent(expected), let intent = states[expected.owner]?.nextIntent {
+            try Task.checkCancellation()
+            // L'intention la plus récente, y compris celles ajoutées pendant
+            // un aller-retour précédent, est durable AVANT de partir au réseau.
+            guard var pending = states[expected.owner] else { return false }
+            pending.markAttempted(intent.requestId)
+            publish(pending, for: expected)
+            guard await persist(pending, for: expected) else { return false }
+            guard states[expected.owner]?.pending.contains(where: { $0.requestId == intent.requestId }) == true else { continue }
+            if intent.operation == .follow || intent.operation == .unfollow {
+                do { try await sendFollow(intent, context: expected) }
+                catch {
+                    guard Self.isTerminalFollowRejection(error), isCurrent(expected), var rejected = states[expected.owner] else { throw error }
+                    // Refus définitif (site ou opérateur inconnu, limite atteinte) : réessayer ne
+                    // changerait rien, le geste est annulé et la liste relue dit la vérité.
+                    rejected.rejectTerminal(intent.requestId)
+                    publish(rejected, for: expected)
+                    guard await persist(rejected, for: expected) else { return false }
+                    if !rejected.pending.contains(where: { $0.targetKey == intent.targetKey }) {
+                        presentedError = Self.followRejectionMessage(error)
+                    }
+                    continue
+                }
+                guard isCurrent(expected), var done = states[expected.owner] else { return false }
+                done.acknowledge(intent.requestId)
+                publish(done, for: expected)
+                guard await persist(done, for: expected) else { return false }
+                continue
+            }
+            let endpoint = APIEndpoint(path: Self.path, method: .patch,
+                headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(intent),
+                idempotencyKey: intent.requestId)
+            let response: FavoriteAntennasResponse
+            do { response = try await mutate(endpoint, intent: intent, context: expected) }
+            catch {
+                if error is TerminalCapacityRejection, isCurrent(expected), var rejected = states[expected.owner] {
+                    rejected.rejectTerminal(intent.requestId)
+                    publish(rejected, for: expected)
+                    guard await persist(rejected, for: expected) else { return false }
+                    // L'UUID refusé est terminal côté serveur. Une action
+                    // inverse plus récente peut continuer ; un nouvel ajout
+                    // nécessitera un nouveau geste et donc un nouvel UUID.
+                    if !rejected.pending.contains(where: { $0.targetKey == intent.targetKey }) {
+                        presentedError = error.userFacingMessage
+                    }
+                    continue
+                }
+                throw error
+            }
+            guard response.success == true else { throw APIError.decoding("unconfirmed-favorite-mutation") }
+            guard isCurrent(expected), var latest = states[expected.owner] else { return false }
+            latest.receive(response, acknowledging: intent.requestId)
+            publish(latest, for: expected)
+            guard await persist(latest, for: expected) else { return false }
+        }
+        return true
+    }
+
+    /// Suivre : `POST` avec l'opérateur affiché (idempotent, 200 si le suivi existe déjà).
+    /// Ne plus suivre : l'id est lu par `/status`, et seul le suivi de CET opérateur part ;
+    /// un suivi déjà absent est un retrait réussi.
+    private func sendFollow(_ intent: FavoriteAntennaIntent, context expected: Context) async throws {
         guard isCurrent(expected) else { throw APIError.cancelled }
-        let response = try await api.request(endpoint, as: FavoriteAntennasResponse.self,
-            expectedSessionID: expected.credentialsID)
+        guard let favorite = intent.favorite, let key = SiteFollowKey(favorite) else {
+            throw APIError.http(status: 400, code: "INVALID_PARAMS", message: "", requestId: nil, retryAfter: nil)
+        }
+        switch intent.operation {
+        case .follow:
+            try await api.request(APIEndpoint(path: Self.followsPath, method: .post,
+                headers: ["Content-Type": "application/json"], body: try JSONEncoder().encode(key.followBody)),
+                expectedSessionID: expected.credentialsID)
+        case .unfollow:
+            let status = try await api.request(APIEndpoint(path: "\(Self.followsPath)/status", query: key.queryItems),
+                as: SiteFollowStatus.self, expectedSessionID: expected.credentialsID)
+            guard let followId = status.followId, status.following else { return }
+            do {
+                try await api.request(APIEndpoint(path: "\(Self.followsPath)/\(followId)", method: .delete),
+                    expectedSessionID: expected.credentialsID)
+            } catch APIError.http(status: 404, _, _, _, _) {}
+        case .upsert, .remove, .preferences: break
+        }
+    }
+
+    private static func isTerminalFollowRejection(_ error: Error) -> Bool {
+        guard case APIError.http(let status, _, _, _, _) = error else { return false }
+        return [400, 403, 404, 409, 413, 422].contains(status)
+    }
+
+    /// Le message du serveur est en français : les refus attendus ont leur libellé localisé.
+    private static func followRejectionMessage(_ error: Error) -> String {
+        guard case APIError.http(let status, let code, _, _, _) = error else { return error.userFacingMessage }
+        if code == "FOLLOW_LIMIT" {
+            return String(localized: "Tu peux suivre au maximum 500 antennes. Arrête d’en suivre une avant d’en ajouter une autre.")
+        }
+        if code == "SITE_NOT_FOUND" || code == "INVALID_PARAMS" || status == 404 {
+            return String(localized: "Cette antenne ne peut pas être suivie pour cet opérateur.")
+        }
+        return error.userFacingMessage
+    }
+
+    private func requestFollows(_ expected: Context) async throws -> SiteFollowsResponse {
+        guard isCurrent(expected) else { throw APIError.cancelled }
+        let response = try await api.request(APIEndpoint(path: Self.followsPath, headers: ["Cache-Control": "no-cache"]),
+            as: SiteFollowsResponse.self, expectedSessionID: expected.credentialsID)
         guard isCurrent(expected) else { throw APIError.cancelled }
         try response.validate()
         return response
