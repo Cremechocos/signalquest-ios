@@ -178,6 +178,9 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         let request = try XCTUnwrap(captured.first)
         XCTAssertEqual(request.0.httpMethod, "POST")
         XCTAssertEqual(request.0.url?.path, "/api/e2ee/v2/conversations")
+        // DM-REQ-1 : la création v2 déclare la capacité, le reçu pouvant porter `request`.
+        let capabilities = try XCTUnwrap(request.0.value(forHTTPHeaderField: ClientProtocolContract.capabilitiesHeaderName))
+        XCTAssertTrue(capabilities.split(separator: ",").contains("message_requests_v1"))
         XCTAssertEqual(request.1["conversationId"] as? String, conversationId)
         let stored = try XCTUnwrap(try fixture.keys.load(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
         XCTAssertEqual(stored.epochNumber, 1)
@@ -185,6 +188,51 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertTrue(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
         XCTAssertEqual(acks.paths, ["/api/e2ee/v2/conversations/\(conversationId)/epochs/1/ack"],
                        "Le créateur accuse sa première époque, une fois la clé gardée (v0.4.26)")
+    }
+
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    private func receiptJSON(request: String?, extra: String = "") -> Data {
+        let block = request.map { ",\"request\":\($0)" } ?? ""
+        let epoch = "{\"id\":\"epoch_conv_0123456789abcdef\",\"epochNumber\":\"1\",\"status\":\"active\",\"createdAt\":\"2026-10-01T05:40:00.000Z\"}"
+        return Data("{\"conversationId\":\"conv_0123456789abcdef\",\"epoch\":\(epoch),\"recipientCount\":\"2\"\(block)\(extra)}".utf8)
+    }
+
+    /// Le bloc `request` du reçu de création est admis, avec `remaining` en nombre comme le serveur l'écrit ;
+    /// sans lui le reçu se lit comme avant, et toute autre clé reste refusée.
+    func testCreationReceiptAcceptsTheRequestBlockAndStillRefusesUnknownKeys() {
+        let block = #"{"role":"sender","status":"pending","remaining":1}"#
+        func parse(_ data: Data) -> E2EEV2EpochContractV2.Accepted? {
+            E2EEV2ConversationCreationReceipt.parse(data, conversationId: "conv_0123456789abcdef", recipientCount: 2)
+        }
+        XCTAssertNotNil(parse(receiptJSON(request: nil)))
+        XCTAssertNotNil(parse(receiptJSON(request: block)))
+        XCTAssertEqual(E2EEV2ConversationCreationReceipt.request(in: receiptJSON(request: block))?.remaining, 1)
+        XCTAssertNil(E2EEV2ConversationCreationReceipt.request(in: receiptJSON(request: nil)))
+        XCTAssertNil(parse(receiptJSON(request: block, extra: ",\"surprise\":\"x\"")))
+        XCTAssertNil(parse(receiptJSON(request: "\"oui\"")))
+        // Un nombre n'est admis que sous `remaining` : `recipientCount` en nombre reste refusé.
+        let epoch = "{\"id\":\"epoch_conv_0123456789abcdef\",\"epochNumber\":\"1\",\"status\":\"active\",\"createdAt\":\"2026-10-01T05:40:00.000Z\"}"
+        XCTAssertNil(parse(Data("{\"conversationId\":\"conv_0123456789abcdef\",\"epoch\":\(epoch),\"recipientCount\":2}".utf8)))
+        // Un bloc d'une autre forme ne se lit pas, sans invalider la création.
+        let odd = #"{"role":"sender","status":"pending","remaining":7}"#
+        XCTAssertNil(E2EEV2ConversationCreationReceipt.request(in: receiptJSON(request: odd)))
+        XCTAssertNotNil(parse(receiptJSON(request: odd)))
+    }
+
+    /// Même règle pour le reçu d'un envoi v2.
+    func testSendReceiptReadsTheOptionalRequestBlock() {
+        let tag = Data(repeating: 7, count: 32).base64EncodedString()
+        func receipt(_ request: String?, extra: String = "") -> Data {
+            let block = request.map { ",\"request\":\($0)" } ?? ""
+            return Data("{\"envelopeId\":\"env_0123456789abcdef\",\"clientRequestId\":\"req_0123456789abcdef\",\"serverTagB64\":\"\(tag)\",\"serverTimeMs\":\"1790000000000\",\"keyId\":\"key_0123456789abcdef\"\(block)\(extra)}".utf8)
+        }
+        XCTAssertNotNil(E2EEV2MessageReceiptV2.parse(receipt(nil), clientRequestId: "req_0123456789abcdef"))
+        XCTAssertNil(E2EEV2MessageReceiptV2.parse(receipt(nil), clientRequestId: "req_0123456789abcdef")?.request)
+        let sent = E2EEV2MessageReceiptV2.parse(receipt(#"{"role":"sender","status":"pending","remaining":0}"#), clientRequestId: "req_0123456789abcdef")
+        XCTAssertEqual(sent?.request?.remaining, 0)
+        XCTAssertEqual(sent?.request?.messageRequest, MessageRequest.senderSent)
+        XCTAssertNil(E2EEV2MessageReceiptV2.parse(receipt(#"{"role":"sender","status":"pending","remaining":0}"#, extra: ",\"autre\":\"x\""), clientRequestId: "req_0123456789abcdef"))
     }
 
     /// Point 5 du relevé Android (04/10) : un reçu perdu ne laisse jamais de

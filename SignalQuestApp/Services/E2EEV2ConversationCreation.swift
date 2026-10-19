@@ -319,14 +319,24 @@ enum E2EEV2ConversationMigration {
 /// Reçu de création (proposition iOS, E.2) : la conversation v2 et son époque
 /// 1 acceptée. JSON strict, entiers en chaînes (D.0).
 enum E2EEV2ConversationCreationReceipt {
-    /// `{conversationId, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
+    /// `{conversationId, epoch: {id, epochNumber, status, createdAt}, recipientCount}`, et en plus
+    /// `request` (DM-REQ-1) pour un client qui déclare `message_requests_v1` : toute autre clé est refusée.
     static func parse(_ data: Data, conversationId: String, recipientCount: Int) -> E2EEV2EpochContractV2.Accepted? {
-        guard let root = E2EEV2EpochContractV2.object(data),
-              Set(root.keys) == ["conversationId", "epoch", "recipientCount"],
+        guard let root = E2EEV2EpochContractV2.object(data, smallIntegerKeys: E2EEV2MessageRequestBlock.numberKeys),
+              Set(root.keys).subtracting(["request"]) == ["conversationId", "epoch", "recipientCount"],
+              root["request"] == nil || root["request"]?.objectValue != nil,
               root["conversationId"]?.stringValue == conversationId,
               let accepted = E2EEV2EpochContractV2.epoch(root["epoch"]), accepted.epochNumber == 1,
               root["recipientCount"]?.stringValue == String(recipientCount) else { return nil }
         return accepted
+    }
+
+    /// Le bloc `request` du reçu (DM-REQ-1) : `{role: sender, status: pending, remaining: 1}` à la création.
+    /// `nil` quand le reçu n'en porte pas, ou qu'il n'a pas cette forme.
+    static func request(in data: Data) -> E2EEV2MessageRequestBlock? {
+        guard let root = E2EEV2EpochContractV2.object(data, smallIntegerKeys: E2EEV2MessageRequestBlock.numberKeys),
+              let object = root["request"]?.objectValue else { return nil }
+        return E2EEV2MessageRequestBlock.parse(object)
     }
 }
 
@@ -627,6 +637,10 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             try finish(prepared, accepted: accepted, context: context, devices: devices)
         } catch {
             return .failure(localError("e2ee-created-epoch-storage-failed"))
+        }
+        // DM-REQ-1 : la création ouvre une demande ; la conversation qui s'ouvre ensuite le sait.
+        if let block = E2EEV2ConversationCreationReceipt.request(in: response) {
+            MessageRequestEvents.post(conversationId: prepared.conversationId, request: block.messageRequest)
         }
         // Le créateur accuse sa première époque une fois la clé gardée (§2.6,
         // v0.4.26), comme tout destinataire.

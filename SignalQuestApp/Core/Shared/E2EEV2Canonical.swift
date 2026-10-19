@@ -81,6 +81,15 @@ enum E2EEV2CanonicalJSON {
         return try parser.parseDocument()
     }
 
+    /// Comme `parseStrict`, avec une seule exception de nombre : sous une clé de `smallIntegerKeys`,
+    /// un entier décimal de 1 à 3 chiffres, sans zéro de tête, sans fraction ni exposant, est lu comme
+    /// la chaîne de ses chiffres. Réservé au champ `remaining` du bloc `request` des demandes de message
+    /// (DM-REQ-1), que le serveur écrit en nombre ; tout autre nombre reste refusé.
+    static func parseStrict(_ data: Data, smallIntegerKeys: Set<String>) throws -> E2EEV2JSON {
+        var parser = Parser(bytes: Array(data), smallIntegerKeys: smallIntegerKeys)
+        return try parser.parseDocument()
+    }
+
     private static func write(_ value: E2EEV2JSON, into out: inout Data) {
         switch value {
         case .null:
@@ -133,9 +142,11 @@ enum E2EEV2CanonicalJSON {
     private struct Parser {
         let bytes: [UInt8]
         var index = 0
+        let smallIntegerKeys: Set<String>
 
-        init(bytes: [UInt8]) {
+        init(bytes: [UInt8], smallIntegerKeys: Set<String> = []) {
             self.bytes = bytes
+            self.smallIntegerKeys = smallIntegerKeys
         }
 
         mutating func parseDocument() throws -> E2EEV2JSON {
@@ -152,7 +163,7 @@ enum E2EEV2CanonicalJSON {
             }
         }
 
-        private mutating func parseValue(depth: Int) throws -> E2EEV2JSON {
+        private mutating func parseValue(depth: Int, key: String? = nil) throws -> E2EEV2JSON {
             guard depth <= E2EEV2CanonicalJSON.maxDepth else { throw E2EEV2CanonicalJSONError.tooDeep }
             guard index < bytes.count else { throw E2EEV2CanonicalJSONError.invalidSyntax }
             switch bytes[index] {
@@ -163,10 +174,26 @@ enum E2EEV2CanonicalJSON {
             case UInt8(ascii: "f"): try expect("false"); return .bool(false)
             case UInt8(ascii: "n"): try expect("null"); return .null
             case UInt8(ascii: "-"), UInt8(ascii: "0")...UInt8(ascii: "9"):
+                if let key, smallIntegerKeys.contains(key) { return .string(try parseSmallInteger()) }
                 throw E2EEV2CanonicalJSONError.unsupportedNumber
             default:
                 throw E2EEV2CanonicalJSONError.invalidSyntax
             }
+        }
+
+        /// Entier décimal de 1 à 3 chiffres, sans signe ni zéro de tête ; le jeton doit se terminer là.
+        private mutating func parseSmallInteger() throws -> String {
+            let start = index
+            while index < bytes.count, (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(bytes[index]) { index += 1 }
+            let digits = bytes[start..<index]
+            guard (1...3).contains(digits.count), digits.count == 1 || digits.first != UInt8(ascii: "0") else {
+                throw E2EEV2CanonicalJSONError.unsupportedNumber
+            }
+            // « 1.0 », « 1e2 » : pas un entier simple.
+            if index < bytes.count, [UInt8(ascii: "."), UInt8(ascii: "e"), UInt8(ascii: "E")].contains(bytes[index]) {
+                throw E2EEV2CanonicalJSONError.unsupportedNumber
+            }
+            return String(decoding: digits, as: UTF8.self)
         }
 
         private mutating func expect(_ literal: String) throws {
@@ -199,7 +226,7 @@ enum E2EEV2CanonicalJSON {
                 }
                 index += 1
                 skipWhitespace()
-                members[key] = try parseValue(depth: depth + 1)
+                members[key] = try parseValue(depth: depth + 1, key: key)
                 skipWhitespace()
                 guard index < bytes.count else { throw E2EEV2CanonicalJSONError.invalidSyntax }
                 if bytes[index] == UInt8(ascii: ",") { index += 1; continue }

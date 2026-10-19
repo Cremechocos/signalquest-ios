@@ -289,6 +289,51 @@ final class ModelDecodeTests: XCTestCase {
                        ShelvedSummary(count: 0, unreadCount: 0))
     }
 
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    /// Seule la présence de `requestsSummary` dit que le serveur propose les demandes.
+    func testRequestsSummaryIsOptionalAndTolerant() throws {
+        func decode(_ json: String) throws -> ConversationsResponse {
+            try JSONDecoder.signalQuest.decode(ConversationsResponse.self, from: Data(json.utf8))
+        }
+        XCTAssertNil(try decode(#"{"conversations":[]}"#).requestsSummary)
+        XCTAssertEqual(try decode(#"{"conversations":[],"requestsSummary":{"count":2,"unreadCount":1}}"#).requestsSummary,
+                       MessageRequestsSummary(count: 2, unreadCount: 1))
+        XCTAssertEqual(try decode(#"{"conversations":[],"requestsSummary":{}}"#).requestsSummary,
+                       MessageRequestsSummary(count: 0, unreadCount: 0))
+        XCTAssertEqual(try decode(#"{"conversations":[],"requestsSummary":{"count":-3,"unreadCount":"x"}}"#).requestsSummary,
+                       MessageRequestsSummary(count: 0, unreadCount: 0))
+    }
+
+    func testConversationCarriesTheRequestBlockOnBothSides() throws {
+        func decode(_ extra: String) throws -> MessageConversation {
+            try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(#"{"id":"c1","participants":[]\#(extra)}"#.utf8))
+        }
+        XCTAssertNil(try decode("").request, "Sans bloc, la conversation est ordinaire")
+        let incoming = try XCTUnwrap(try decode(#","request":{"role":"recipient","status":"pending","id":"r1","createdAt":"2026-10-01T10:00:00.000Z","sender":{"id":"u9","handle":"kevin","name":"Kevin R.","reputation":"new","avatarUrl":null}}"#).request)
+        XCTAssertTrue(incoming.isIncomingPending)
+        XCTAssertEqual(incoming.id, "r1")
+        XCTAssertEqual(incoming.sender?.displayName, "Kevin R.")
+        XCTAssertEqual(incoming.sender?.tier, .new)
+        let first = try XCTUnwrap(try decode(#","request":{"role":"sender","status":"pending","remaining":1}"#).request)
+        XCTAssertTrue(first.remindsSender)
+        XCTAssertFalse(first.locksSenderComposer)
+        let sent = try XCTUnwrap(try decode(#","request":{"role":"sender","status":"pending","remaining":0}"#).request)
+        XCTAssertTrue(sent.locksSenderComposer)
+        // Un palier inconnu n'affiche aucune pastille ; un rôle inconnu n'est pas une demande affichable.
+        XCTAssertNil(try decode(#","request":{"role":"recipient","status":"pending","sender":{"id":"u9","reputation":"legend"}}"#).request?.sender?.tier)
+        XCTAssertNil(try decode(#","request":{"role":"moderator","status":"pending"}"#).request)
+        XCTAssertNil(try decode(#","request":"oui""#).request)
+    }
+
+    func testCreatedMessageResponseReadsTheSenderRequest() throws {
+        let decoded = try JSONDecoder.signalQuest.decode(
+            CreatedMessageResponse.self,
+            from: Data(#"{"message":{"id":"m1","conversationId":"c1","senderId":"u1","content":"Salut","createdAt":"2026-10-01T10:00:00.000Z"},"request":{"role":"sender","status":"pending","remaining":0}}"#.utf8)
+        )
+        XCTAssertEqual(decoded.request, MessageRequest.senderSent)
+    }
+
     func testConversationCarriesShelvedFlagAndDate() throws {
         func decode(_ extra: String) throws -> MessageConversation {
             try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(#"{"id":"c1","participants":[]\#(extra)}"#.utf8))

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct ConversationsResponse: Decodable {
     let conversations: [MessageConversation]
@@ -10,8 +11,13 @@ struct ConversationsResponse: Decodable {
     /// Archivées sans avoir quitté : nombre et non-lues, servis avec la liste par
     /// défaut seulement. Absent sur un serveur qui ne propose pas l'archivage.
     let shelvedSummary: ShelvedSummary?
+    /// Demandes de message en attente (DM-REQ-1), servies avec la liste par défaut
+    /// seulement. Absent sur un serveur qui ne propose pas les demandes.
+    let requestsSummary: MessageRequestsSummary?
 
-    private enum CodingKeys: String, CodingKey { case conversations, hasMore, nextCursor, pinLimit, shelvedSummary }
+    private enum CodingKeys: String, CodingKey {
+        case conversations, hasMore, nextCursor, pinLimit, shelvedSummary, requestsSummary
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -21,6 +27,7 @@ struct ConversationsResponse: Decodable {
         pinLimit = (try? c.decodeIfPresent(Int.self, forKey: .pinLimit))
             ?? (try? c.decodeIfPresent(String.self, forKey: .pinLimit)).flatMap { $0.flatMap(Int.init) }
         shelvedSummary = (try? c.decodeIfPresent(ShelvedSummary.self, forKey: .shelvedSummary)) ?? nil
+        requestsSummary = (try? c.decodeIfPresent(MessageRequestsSummary.self, forKey: .requestsSummary)) ?? nil
     }
 }
 
@@ -44,6 +51,233 @@ struct ShelvedSummary: Decodable, Equatable, Sendable {
     }
 }
 
+// MARK: - Demandes de message (DM-REQ-1)
+
+/// `{count, unreadCount}` de la ligne « Demandes de message ». Comme `ShelvedSummary`,
+/// seule la présence de la clé dit que le serveur propose les demandes.
+struct MessageRequestsSummary: Decodable, Equatable, Sendable {
+    let count: Int
+    let unreadCount: Int
+
+    private enum CodingKeys: String, CodingKey { case count, unreadCount }
+
+    init(count: Int, unreadCount: Int) {
+        self.count = max(0, count)
+        self.unreadCount = max(0, unreadCount)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        count = max(0, (try? c.decodeIfPresent(Int.self, forKey: .count)) ?? 0)
+        unreadCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .unreadCount)) ?? 0)
+    }
+}
+
+/// Palier de réputation (REP-1) de l'expéditeur d'une demande. Une valeur inconnue
+/// n'affiche aucune pastille plutôt qu'un texte inventé.
+enum MessageRequestTier: String, Equatable, Sendable {
+    case new, member, contributor, trusted
+
+    var label: String {
+        switch self {
+        case .new: return String(localized: "Nouveau")
+        case .member: return String(localized: "Membre")
+        case .contributor: return String(localized: "Contributeur")
+        case .trusted: return String(localized: "Confiance")
+        }
+    }
+}
+
+/// L'expéditeur d'une demande reçue : pseudo, avatar et palier. Jamais d'e-mail.
+struct MessageRequestSender: Codable, Equatable, Sendable {
+    let id: String
+    let handle: String?
+    let name: String?
+    let avatarUrl: URL?
+    /// Chaîne du palier REP-1 (`new`, `member`, `contributor`, `trusted`), absente sans palier.
+    let reputation: String?
+
+    var tier: MessageRequestTier? { reputation.flatMap(MessageRequestTier.init(rawValue:)) }
+
+    var displayName: String {
+        for candidate in [name, handle] {
+            if let value = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty { return value }
+        }
+        return String(localized: "Membre")
+    }
+
+    init(id: String, handle: String?, name: String?, avatarUrl: URL?, reputation: String?) {
+        self.id = id
+        self.handle = handle
+        self.name = name
+        self.avatarUrl = avatarUrl
+        self.reputation = reputation
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, handle, name, avatarUrl, reputation }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        handle = c.decodeFlexibleString(forKey: .handle)
+        name = c.decodeFlexibleString(forKey: .name)
+        avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
+        reputation = c.decodeFlexibleString(forKey: .reputation)
+    }
+}
+
+/// Le bloc `request` d'une conversation (contrat DM-REQ-1, §7). `role` distingue les deux
+/// côtés : le destinataire voit `id`, `createdAt` et l'expéditeur ; l'expéditeur voit
+/// `remaining` (1 : le premier message n'est pas parti, 0 : « Demande envoyée »). Pour
+/// l'expéditeur, `status` reste `pending` même après un refus (le refus est invisible).
+struct MessageRequest: Codable, Equatable, Sendable {
+    enum Role: String, Codable, Sendable { case sender, recipient }
+
+    let role: Role
+    let status: String
+    let id: String?
+    let createdAt: Date?
+    let remaining: Int?
+    let sender: MessageRequestSender?
+
+    init(role: Role, status: String = "pending", id: String? = nil, createdAt: Date? = nil,
+         remaining: Int? = nil, sender: MessageRequestSender? = nil) {
+        self.role = role
+        self.status = status
+        self.id = id
+        self.createdAt = createdAt
+        self.remaining = remaining
+        self.sender = sender
+    }
+
+    private enum CodingKeys: String, CodingKey { case role, status, id, createdAt, remaining, sender }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Un rôle inconnu n'est pas une demande que cette version sache afficher.
+        role = try c.decode(Role.self, forKey: .role)
+        status = c.decodeFlexibleString(forKey: .status) ?? "pending"
+        id = c.decodeFlexibleString(forKey: .id)
+        createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? nil
+        remaining = (try? c.decodeIfPresent(Int.self, forKey: .remaining))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .remaining)).flatMap { $0.flatMap(Int.init) }
+        sender = (try? c.decodeIfPresent(MessageRequestSender.self, forKey: .sender)) ?? nil
+    }
+
+    /// Demande reçue qui attend ma décision : la conversation s'ouvre en aperçu.
+    var isIncomingPending: Bool { role == .recipient && status == "pending" }
+
+    /// Demande envoyée dont le premier message est parti : « Demande envoyée » remplace le compositeur.
+    var locksSenderComposer: Bool { role == .sender && (remaining ?? 0) <= 0 }
+
+    /// Demande envoyée dont le premier message n'est pas encore parti : le rappel s'affiche.
+    var remindsSender: Bool { role == .sender && (remaining ?? 0) >= 1 }
+
+    /// Après l'envoi du premier message (ou un 403 `MESSAGE_REQUEST_PENDING`) : plus rien à envoyer.
+    static let senderSent = MessageRequest(role: .sender, status: "pending", remaining: 0)
+}
+
+/// Les changements d'état d'une demande connus hors de la conversation ouverte : le reçu d'un
+/// envoi v1 en porte un (`{message, request}`), et la conversation ouverte le lit ici.
+enum MessageRequestEvents {
+    static let didChange = Notification.Name("SignalQuest.MessageRequestDidChange")
+    static let conversationIdKey = "conversationId"
+    static let requestKey = "request"
+
+    /// Le dernier état annoncé par conversation, pour la conversation qui s'ouvre juste après la
+    /// création (l'événement part avant qu'elle n'écoute). Court : une valeur plus vieille ne sert plus.
+    private static let recent = OSAllocatedUnfairLock<[String: (request: MessageRequest, at: Date)]>(initialState: [:])
+    static let recentLifetime: TimeInterval = 60
+
+    static func recentRequest(conversationId: String, now: Date = Date()) -> MessageRequest? {
+        recent.withLock { entries in
+            guard let entry = entries[conversationId], now.timeIntervalSince(entry.at) <= recentLifetime else {
+                entries[conversationId] = nil
+                return nil
+            }
+            return entry.request
+        }
+    }
+
+    static func post(conversationId: String, request: MessageRequest) {
+        recent.withLock { $0[conversationId] = (request, Date()) }
+        NotificationCenter.default.post(
+            name: didChange, object: nil,
+            userInfo: [conversationIdKey: conversationId, requestKey: request]
+        )
+    }
+
+    static func request(in notification: Notification, conversationId: String) -> MessageRequest? {
+        guard notification.userInfo?[conversationIdKey] as? String == conversationId else { return nil }
+        return notification.userInfo?[requestKey] as? MessageRequest
+    }
+}
+
+extension E2EEV2MessageRequestBlock {
+    /// L'état de demande côté expéditeur que porte un reçu v2 (`role: sender`, `status: pending`).
+    var messageRequest: MessageRequest {
+        MessageRequest(role: .sender, status: "pending", remaining: remaining)
+    }
+}
+
+/// Plafond quotidien de demandes atteint (429 `MESSAGE_REQUEST_LIMIT`, contrat §3) : un compte
+/// récent ouvre au plus 5 demandes par jour. `until` est la fin de la fenêtre (`details.until`
+/// en v2, `Retry-After` en v1) ; le texte, lui, ne dépend pas de l'heure.
+struct MessageRequestLimitError: Error, LocalizedError, Equatable {
+    let until: Date?
+
+    static let code = "MESSAGE_REQUEST_LIMIT"
+    static let pendingCode = "MESSAGE_REQUEST_PENDING"
+
+    var errorDescription: String? {
+        String(localized: "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire demain, ou dès maintenant si la personne t’ajoute en ami.")
+    }
+
+    /// 429 `MESSAGE_REQUEST_LIMIT` d'une route v2 : `details.until` (date ISO 8601).
+    init(failure: E2EEV2TransportFailure) {
+        if case .string(let text)? = failure.details?["until"] {
+            until = SQDateParsing.parse(text)
+        } else {
+            until = nil
+        }
+    }
+
+    /// 429 `MESSAGE_REQUEST_LIMIT` d'une route v1 : seul `Retry-After` (secondes) est retenu.
+    init(retryAfter: Int?, now: Date = Date()) {
+        until = retryAfter.map { now.addingTimeInterval(TimeInterval(max(0, $0))) }
+    }
+
+    init(until: Date?) { self.until = until }
+
+    static func isLimit(_ failure: E2EEV2TransportFailure) -> Bool {
+        failure.statusCode == 429 && failure.code == code
+    }
+
+    static func isPending(_ failure: E2EEV2TransportFailure) -> Bool {
+        failure.statusCode == 403 && failure.code == pendingCode
+    }
+}
+
+extension Error {
+    /// Le plafond quotidien de demandes, v1 (`APIError`) ou déjà converti (v2).
+    var messageRequestLimit: MessageRequestLimitError? {
+        if let limit = self as? MessageRequestLimitError { return limit }
+        if let api = self as? APIError, case .http(let status, let code, _, _, let retryAfter) = api,
+           status == 429, code == MessageRequestLimitError.code {
+            return MessageRequestLimitError(retryAfter: retryAfter)
+        }
+        return nil
+    }
+
+    /// 403 `MESSAGE_REQUEST_PENDING` d'une route v1 : la demande n'est pas encore acceptée.
+    var isMessageRequestPending: Bool {
+        if let api = self as? APIError, case .http(let status, let code, _, _, _) = api {
+            return status == 403 && code == MessageRequestLimitError.pendingCode
+        }
+        return false
+    }
+}
+
 /// La liste des conversations et la limite d'épinglage servie avec elle.
 struct ConversationList: Sendable {
     let conversations: [MessageConversation]
@@ -53,6 +287,8 @@ struct ConversationList: Sendable {
     var nextCursor: String? = nil
     /// Présent seulement quand le serveur sait archiver une conversation.
     var shelvedSummary: ShelvedSummary? = nil
+    /// Présent seulement quand le serveur propose les demandes de message (DM-REQ-1).
+    var requestsSummary: MessageRequestsSummary? = nil
 }
 
 struct MessageConversation: Decodable, Identifiable, Equatable {
@@ -82,6 +318,9 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     /// Archivée pour soi, sans avoir quitté (clé additive de la liste).
     var shelved = false
     var shelvedAt: Date? = nil
+    /// Demande de message (DM-REQ-1) : servie seulement aux clients qui déclarent
+    /// `message_requests_v1`, et absente quand la conversation n'en est pas une.
+    var request: MessageRequest? = nil
 
     /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
     /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
@@ -125,7 +364,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
-        case directPeerUserId, e2eeV2, muted, mentionsMuted, shelved, shelvedAt
+        case directPeerUserId, e2eeV2, muted, mentionsMuted, shelved, shelvedAt, request
     }
 
     init(
@@ -180,6 +419,8 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         mentionsMuted = ((try? c.decodeIfPresent(Bool.self, forKey: .mentionsMuted)) ?? nil) ?? false
         shelvedAt = (try? c.decodeIfPresent(Date.self, forKey: .shelvedAt)) ?? nil
         shelved = ((try? c.decodeIfPresent(Bool.self, forKey: .shelved)) ?? nil) ?? (shelvedAt != nil)
+        // Lecture tolérante : une demande illisible vaut « pas de demande ».
+        request = (try? c.decodeIfPresent(MessageRequest.self, forKey: .request)) ?? nil
     }
 }
 
@@ -274,6 +515,27 @@ struct CreateConversationResponse: Codable, Equatable {
     let conversationId: String
     let reused: Bool?
     let e2eePendingUserIds: [String]?
+    /// Demande de message ouverte par cette création (DM-REQ-1), pour un client qui
+    /// déclare `message_requests_v1` ; absente sinon.
+    let request: MessageRequest?
+
+    private enum CodingKeys: String, CodingKey { case conversationId, reused, e2eePendingUserIds, request }
+
+    init(conversationId: String, reused: Bool? = nil, e2eePendingUserIds: [String]? = nil, request: MessageRequest? = nil) {
+        self.conversationId = conversationId
+        self.reused = reused
+        self.e2eePendingUserIds = e2eePendingUserIds
+        self.request = request
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        conversationId = try c.decode(String.self, forKey: .conversationId)
+        reused = try c.decodeIfPresent(Bool.self, forKey: .reused)
+        e2eePendingUserIds = try c.decodeIfPresent([String].self, forKey: .e2eePendingUserIds)
+        // Une demande illisible ne fait pas échouer une conversation déjà créée.
+        request = (try? c.decodeIfPresent(MessageRequest.self, forKey: .request)) ?? nil
+    }
 }
 
 // MARK: - Partage live
@@ -632,6 +894,7 @@ extension MessageConversation {
         copy.mentionsMuted = mentionsMuted
         copy.shelved = shelved
         copy.shelvedAt = shelvedAt
+        copy.request = request
         return copy
     }
 }
@@ -811,6 +1074,17 @@ struct MessageItem: Decodable, Identifiable, Equatable {
 
 struct CreatedMessageResponse: Decodable {
     let message: MessageItem
+    /// État de la demande après l'envoi (DM-REQ-1) : `{role: sender, remaining: 0}` pour le
+    /// premier message d'une demande, avec la capacité `message_requests_v1`.
+    let request: MessageRequest?
+
+    private enum CodingKeys: String, CodingKey { case message, request }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        message = try c.decode(MessageItem.self, forKey: .message)
+        request = (try? c.decodeIfPresent(MessageRequest.self, forKey: .request)) ?? nil
+    }
 }
 
 // MARK: Messages enregistrés (favoris — parité Android)

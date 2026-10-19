@@ -113,6 +113,12 @@ enum E2EEV2EpochContractV2 {
         return (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue
     }
 
+    /// Comme `object`, avec les nombres admis sous `smallIntegerKeys` seulement (voir `E2EEV2CanonicalJSON`).
+    static func object(_ data: Data, smallIntegerKeys: Set<String>) -> [String: E2EEV2JSON]? {
+        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes else { return nil }
+        return (try? E2EEV2CanonicalJSON.parseStrict(data, smallIntegerKeys: smallIntegerKeys))?.objectValue
+    }
+
     static func epoch(_ value: E2EEV2JSON?) -> Accepted? {
         guard let epoch = value?.objectValue, Set(epoch.keys) == ["id", "epochNumber", "status", "createdAt"],
               let epochId = epoch["id"]?.stringValue, E2EEV2Canonical.isOpaque(epochId),

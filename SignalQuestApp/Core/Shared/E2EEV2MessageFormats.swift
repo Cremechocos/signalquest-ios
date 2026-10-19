@@ -510,19 +510,49 @@ struct E2EEV2MessageReceiptV2: Codable, Equatable, Sendable {
     let serverTagB64: String
     let serverTimeMs: Int64
     let keyId: String
+    /// Demande de message (DM-REQ-1) : présente seulement si le serveur répond à un client qui déclare
+    /// `message_requests_v1`, pour le premier message d'une demande (`remaining` vaut alors 0).
+    var request: E2EEV2MessageRequestBlock? = nil
 
     static func parse(_ data: Data, clientRequestId: String) -> E2EEV2MessageReceiptV2? {
-        guard data.count <= 4_096, let root = (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue,
-              Set(root.keys) == ["envelopeId", "clientRequestId", "serverTagB64", "serverTimeMs", "keyId"],
+        let keys: Set<String> = ["envelopeId", "clientRequestId", "serverTagB64", "serverTimeMs", "keyId"]
+        // Seule clé de plus admise : `request`, dont `remaining` est un nombre pour le serveur.
+        guard data.count <= 4_096,
+              let root = (try? E2EEV2CanonicalJSON.parseStrict(data, smallIntegerKeys: E2EEV2MessageRequestBlock.numberKeys))?.objectValue,
+              Set(root.keys).subtracting(["request"]) == keys,
               let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
               root["clientRequestId"]?.stringValue == clientRequestId,
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
               let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
+        var request: E2EEV2MessageRequestBlock?
+        if let served = root["request"] {
+            guard let object = served.objectValue else { return nil }
+            request = E2EEV2MessageRequestBlock.parse(object)
+        }
         return .init(
             envelopeId: envelopeId, clientRequestId: clientRequestId, serverTagB64: serverTag,
-            serverTimeMs: serverTimeMs, keyId: keyId
+            serverTimeMs: serverTimeMs, keyId: keyId, request: request
         )
+    }
+}
+
+/// Le bloc `request` d'un reçu v2 (DM-REQ-1, §7) : `{role: "sender", status: "pending", remaining: 0 | 1}`.
+/// C'est une information d'affichage, jamais une condition de validité du reçu : une clé `request` dont
+/// le contenu n'a pas cette forme se lit comme « rien à dire », alors que le message est bien accepté.
+/// Une valeur qui n'est pas un objet reste refusée, comme toute autre clé hors contrat.
+struct E2EEV2MessageRequestBlock: Codable, Equatable, Sendable {
+    /// 1 : le premier message n'est pas parti ; 0 : « Demande envoyée ».
+    let remaining: Int
+
+    /// Clés dont le serveur écrit la valeur en nombre (le reste du JSON v2 n'a aucun nombre).
+    static let numberKeys: Set<String> = ["remaining"]
+
+    static func parse(_ object: [String: E2EEV2JSON]) -> E2EEV2MessageRequestBlock? {
+        guard Set(object.keys) == ["role", "status", "remaining"],
+              object["role"]?.stringValue == "sender", object["status"]?.stringValue == "pending",
+              let remaining = object["remaining"]?.stringValue, ["0", "1"].contains(remaining) else { return nil }
+        return .init(remaining: remaining == "1" ? 1 : 0)
     }
 }
 
