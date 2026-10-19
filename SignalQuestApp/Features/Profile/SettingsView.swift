@@ -2316,6 +2316,7 @@ struct SettingsView: View {
                 .accessibilityHint("Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
                 .accessibilityIdentifier("settings.oled")
                 SQUnitsSettingRow(service: services.privacy)
+                SQAddressFormRow()
                 SQSettingsMenuRow("Fond de carte", systemImage: "map", selection: Binding(
                     get: { MapBackdrop.resolve(mapBackdropRaw) },
                     set: { option in
@@ -2877,6 +2878,122 @@ struct SQUnitsSettingRow: View {
             model.unitsStore = unitsStore
             if !model.preferencesLoaded { await model.loadPreferences() }
         }
+    }
+}
+
+/// Tutoiement ou vouvoiement : un menu natif, comme les unités. Le choix suit le
+/// compte ; la ligne n'existe qu'en français et seulement si le serveur expose le
+/// réglage (`addressFormChosen` présent), sinon elle promettrait un choix que rien
+/// ne retiendrait.
+struct SQAddressFormRow: View {
+    @EnvironmentObject private var addressStore: SQAddressStore
+    @EnvironmentObject private var services: AppServices
+
+    var body: some View {
+        if SQAddress.appIsFrench, addressStore.chosen != nil {
+            SQSettingsMenuRow("Tutoiement / Vouvoiement", systemImage: "text.bubble", subtitle: addressStore.saveError,
+                              selection: Binding(
+                                  get: { addressStore.form },
+                                  set: { form in Task { await addressStore.choose(form, using: services.privacy) } }
+                              ), valueLabel: addressStore.form.label) {
+                ForEach(SQAddressForm.allCases, id: \.self) { form in
+                    Text(form.label).tag(form)
+                }
+            }
+            .disabled(addressStore.isSaving)
+            .accessibilityHint("Choisit comment l’app s’adresse à toi : « tu » ou « vous ». Le réglage suit ton compte.")
+            .accessibilityIdentifier("settings.addressForm")
+        }
+    }
+}
+
+extension SQAddressForm {
+    /// Nom du ton. Identique dans les deux tons : il désigne le choix, pas l'adresse.
+    var label: String {
+        switch self {
+        case .informal: return String(localized: "Tutoiement")
+        case .formal: return String(localized: "Vouvoiement")
+        }
+    }
+}
+
+/// La question du ton, posée au plus une fois par jour et par appareil au membre
+/// dont le compte n'a encore rien choisi. Un calque plein écran comme l'activation
+/// du chiffrement : une feuille pourrait masquer ou être masquée par l'écran
+/// d'appel. « Plus tard » n'écrit rien ; seul un choix part au serveur.
+struct SQAddressFormPrompt: View {
+    @EnvironmentObject private var addressStore: SQAddressStore
+    @EnvironmentObject private var services: AppServices
+    let onClose: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                Image(systemName: "text.bubble.fill")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .accessibilityHidden(true)
+                Text("Tu préfères qu’on te tutoie ou qu’on vous vouvoie ?")
+                    .font(SQType.display)
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Ton choix suit ton compte, sur tous tes appareils. Tu pourras le changer dans Réglages.")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Les exemples montrent chacun leur ton : ils restent tels quels, quel
+                // que soit le ton en cours.
+                choice(.informal, example: "« Ton test est terminé : voici tes résultats. »")
+                choice(.formal, example: "« Votre test est terminé : voici vos résultats. »")
+
+                if let message = addressStore.saveError {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose() }
+                    .disabled(addressStore.isSaving)
+                    .accessibilityIdentifier("address-form-later")
+            }
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.vertical, SQSpace.lg)
+            .sqReadableWidth()
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+    }
+
+    private func choice(_ form: SQAddressForm, example: String) -> some View {
+        Button {
+            Task {
+                if await addressStore.choose(form, using: services.privacy) { onClose() }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(form.label)
+                    .font(SQFont.body(17, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                Text(verbatim: example)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(SQSpace.lg)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(addressStore.isSaving)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(form.label))
+        .accessibilityValue(Text(verbatim: example))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("address-form-\(form.rawValue)")
     }
 }
 

@@ -20,6 +20,8 @@ struct SignalQuestApp: App {
         // Avant toute vue : les clés observées par @AppStorage perdent leur
         // point, sans quoi toute écriture recalculait l'arbre entier (TRX-39).
         SQObservedDefaultsKeys.migrate()
+        // Avant toute vue : le premier rendu est déjà dans le ton du compte (ADDR-1).
+        SQAddress.install()
         MapBackdrop.migrateLegacyPreference()
         if AppEnvironment.resetsAuthOnLaunch {
             UserDefaults.standard.set(false, forKey: RootView.guestPreferenceKey)
@@ -124,6 +126,8 @@ struct AppRootView: View {
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
     /// les formateurs purs (`SQUnits`) lisent le `UserDefaults` derrière.
     @StateObject private var unitsStore = SQUnitsStore()
+    /// Ton en français (tutoiement ou vouvoiement), porté par le compte.
+    @StateObject private var addressStore = SQAddressStore()
     @StateObject private var inAppNotifications = SQInAppNotificationCenter()
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
 
@@ -176,6 +180,7 @@ struct AppRootView: View {
             .environmentObject(services.callManager)
             .environmentObject(services.networkPath)
             .environmentObject(unitsStore)
+            .environmentObject(addressStore)
             // Injecté SÉPARÉMENT, comme networkPath et callManager : un
             // ObservableObject imbriqué dans AppServices n'est pas observé
             // de façon transitive, donc `RootView` ne se reconstruirait pas
@@ -236,6 +241,10 @@ struct AppRootView: View {
                         appLock.lockOnActivationIfNeeded()
                     }
                 }
+                if case .authenticated = session.state {
+                    await addressStore.refresh(using: services.privacy)
+                    addressStore.applyTone()
+                }
                 // La présence est indépendante des coordonnées : le mode local
                 // pilote seulement l'ajout de la position au heartbeat.
                 if case .authenticated = session.state {
@@ -250,6 +259,7 @@ struct AppRootView: View {
                 // l'app à froid. Les deux appels sont idempotents.
                 if authenticatedUserID(in: oldState) != authenticatedUserID(in: newState) {
                     services.resetAccountPresentationState()
+                    addressStore.restart()
                 }
                 Task {
                     await registerPushIfAuthenticated(newState)
@@ -261,6 +271,10 @@ struct AppRootView: View {
                     refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
+                    Task {
+                        await addressStore.refresh(using: services.privacy)
+                        addressStore.applyTone()
+                    }
                     Task {
                         await services.livePresence.refreshSharingSettings()
                         if case .authenticated(let user) = newState {
@@ -321,6 +335,13 @@ struct AppRootView: View {
                     if case .authenticated = session.state, appLock.willEnterForeground() {
                         locksOut = true
                         Task { await session.logout() }
+                    }
+                    // Le ton a pu changer depuis un autre appareil.
+                    if case .authenticated = session.state {
+                        Task {
+                            await addressStore.refresh(using: services.privacy)
+                            addressStore.applyTone()
+                        }
                     }
                     // CALL-INCOMING-03 / CALL-VOIP-04 : ré-enregistrer le token VoIP
                     // et rattraper un appel entrant que le push VoIP aurait manqué.
@@ -450,6 +471,9 @@ struct RootView: View {
     @State private var mainApplicationAppeared = false
     /// Activation guidée du chiffrement au lancement (1.0 (164)).
     @State private var showsV2Activation = false
+    /// Question du ton (tutoiement ou vouvoiement), au plus une fois par jour.
+    @State private var showsAddressPrompt = false
+    @EnvironmentObject private var addressStore: SQAddressStore
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -463,8 +487,19 @@ struct RootView: View {
     /// cet appareil n'est pas entré en v2 sans « Plus tard » en cours.
     private func refreshV2ActivationPrompt() {
         guard isAuthenticated, !callManager.showCallScreen, callManager.activeCall == nil, !showsV2Activation,
-              !AppEnvironment.usesDemoData else { return }
+              !showsAddressPrompt, !AppEnvironment.usesDemoData else { return }
         if E2EEV2ActivationPrompt.shouldPrompt(messaging: services.e2eeV2Messaging) { showsV2Activation = true }
+    }
+
+    /// Jamais pendant un appel ni par-dessus l'activation du chiffrement ; jamais
+    /// avant la fin de l'onboarding (RootView n'existe pas avant) ni pour un invité.
+    private func refreshAddressPrompt() {
+        guard !showsAddressPrompt, !showsV2Activation, !callManager.showCallScreen, callManager.activeCall == nil,
+              SQAddress.shouldAsk(isAuthenticated: isAuthenticated, chosen: addressStore.chosen,
+                                  appIsFrench: SQAddress.appIsFrench, lastAsked: SQAddress.lastAsked)
+        else { return }
+        SQAddress.markAsked()
+        showsAddressPrompt = true
     }
 
     var body: some View {
@@ -496,25 +531,42 @@ struct RootView: View {
                     .onAppear { services.stopMeasurementSessions() }
             } else if isAuthenticated || isGuestApplicationAllowed {
                 MainTabView(user: authenticatedUser)
+                    .id(addressStore.treeRevision)
                     .onAppear {
                         mainApplicationAppeared = true
                         acknowledgeGuestPresentation()
                         refreshV2ActivationPrompt()
+                        refreshAddressPrompt()
                     }
                     .onDisappear { mainApplicationAppeared = false }
+                    .onChangeCompat(of: addressStore.chosen) { _, _ in refreshAddressPrompt() }
+                    // Un ton choisi dans Réglages s'applique au changement d'onglet : l'écran
+                    // qu'on quitte n'a plus rien à perdre.
+                    .onChangeCompat(of: router.selectedTab) { _, _ in addressStore.applyTone() }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
                         refreshV2ActivationPrompt()
                     }
                     .onChangeCompat(of: scenePhase) { _, phase in
-                        if phase == .active { refreshV2ActivationPrompt() }
+                        if phase == .active { refreshV2ActivationPrompt(); refreshAddressPrompt() }
                     }
                     .onChangeCompat(of: callManager.showCallScreen) { _, shown in
-                        if !shown { refreshV2ActivationPrompt() }
+                        if !shown { refreshV2ActivationPrompt(); refreshAddressPrompt() }
                     }
                     // Calque plutôt que `fullScreenCover` : l'écran d'appel, présenté
                     // plus haut, doit pouvoir passer devant. Deux présentations
                     // modales concurrentes, et l'appel entrant restait invisible.
-                    .accessibilityHidden(showsV2Activation)
+                    .accessibilityHidden(showsV2Activation || showsAddressPrompt)
+                    .overlay {
+                        if showsAddressPrompt {
+                            SQAddressFormPrompt(onClose: {
+                                showsAddressPrompt = false
+                                addressStore.applyTone()
+                                refreshV2ActivationPrompt()
+                            })
+                            .accessibilityAddTraits(.isModal)
+                            .transition(.move(edge: .bottom))
+                        }
+                    }
                     .overlay {
                         if showsV2Activation {
                             E2EEV2ActivationScreen(
@@ -530,6 +582,7 @@ struct RootView: View {
                         }
                     }
                     .sqAnimation(SQMotion.smooth, value: showsV2Activation)
+                    .sqAnimation(SQMotion.smooth, value: showsAddressPrompt)
             } else {
                 switch session.state {
                 case .checking:
