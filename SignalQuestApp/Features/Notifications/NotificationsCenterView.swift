@@ -420,7 +420,8 @@ struct NotificationsCenterView: View {
             // rend plus.
             outageId: metaString(meta, "outageId", "outage_id"),
             bugId: metaString(meta, "bugId", "bug_id"),
-            anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil
+            anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil,
+            market: metaString(meta, "market")
         )
     }
 
@@ -479,6 +480,7 @@ struct NotificationsCenterView: View {
         case "friend_request": return String(localized: "Demande d’ami")
         case "friend_accepted": return String(localized: "Demande d’ami acceptée")
         case "community_outage": return String(localized: "Panne signalée")
+        case "site_follow": return String(localized: "Site suivi")
         default: return String(localized: "Notification")
         }
     }
@@ -496,6 +498,8 @@ struct NotificationsCenterView: View {
         if k.contains("antenna_report") || k.contains("site_report") {
             return "exclamationmark.bubble.fill"
         }
+        // Avant la règle « follow », qui donnerait l'icône d'un nouvel abonné.
+        if k == "site_follow" { return "antenna.radiowaves.left.and.right" }
         if k.contains("like") || k.contains("reaction") || k.contains("favorite") {
             return "heart.fill"
         }

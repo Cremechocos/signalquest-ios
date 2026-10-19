@@ -262,7 +262,8 @@ final class AppRouter: ObservableObject {
         outageId: String? = nil,
         e2eeDeviceApprovalId: String? = nil,
         bugId: String? = nil,
-        anfrFocus: ANFRFocus? = nil
+        anfrFocus: ANFRFocus? = nil,
+        market: String? = nil
     ) {
         switch rawType?.lowercased() {
         // Types réellement émis par le serveur : préfixés `message_*` et
@@ -303,6 +304,10 @@ final class AppRouter: ObservableObject {
         // ou `antennaId` (push) et `codeSiteOp` (centre de notifications).
         case "site", "antenna", "validation", "favorite_antenna_issue", "zone_antenna_issue":
             route(toSite: siteId)
+        // Site suivi (message, activation, nouvelle bande, panne confirmée) : la charge porte
+        // son marché, sans lequel un site hors de France ne se retrouve pas.
+        case "site_follow":
+            route(toSite: siteId, market: market)
         case "anfr_update":
             selectedTab = .map
             // Sans relevé ni zone dans la charge, l'écran s'ouvre comme avant.

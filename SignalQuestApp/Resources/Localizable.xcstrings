@@ -14598,6 +14598,22 @@
         }
       }
     },
+    "Site suivi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Followed site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site suivi"
+          }
+        }
+      }
+    },
     "Sites en service dans %lld km" : {
       "localizations" : {
         "en" : {

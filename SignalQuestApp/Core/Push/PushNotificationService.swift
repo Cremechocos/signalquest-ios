@@ -388,7 +388,7 @@ enum PushRecipientPolicy {
                 "zone_new_antenna", "zone_antenna_upgrade", "coverage_session_auto_closed",
                 "antenna_report_reply", "photo_comment", "photo_like", "photo_mention",
                 "photo_reply", "test_push", "new_bug", "e2ee_v2_device_approval",
-                "e2ee_v2_envelope", "e2ee_v2_identity_reset"
+                "e2ee_v2_envelope", "e2ee_v2_identity_reset", "site_follow"
             ].contains(type)
     }
 
@@ -898,6 +898,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // cette extraction, le tap ouvrait la fiche du SITE — la panne, elle, restait à retrouver.
         let outageId = Self.string(info, "outageId", "outage_id")
         let bugId = Self.string(info, "bugId", "bug_id")
+        // Site suivi : son marché, pour retrouver un site hors de France.
+        let market = Self.string(info, "market")
         // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
         let anfrFocus = ANFRFocus.parse(
             date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),
@@ -937,7 +939,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     outageId: outageId,
                     e2eeDeviceApprovalId: e2eeDeviceApprovalId,
                     bugId: bugId,
-                    anfrFocus: anfrFocus
+                    anfrFocus: anfrFocus,
+                    market: market
                 )
                 AppServicesHolder.services.syncIconBadge()
             }
