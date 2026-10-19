@@ -247,3 +247,18 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
         )
     }
 }
+
+/// Fichiers du journal radio d'un compte (lignes synchronisées et statuts des
+/// sites) : retirés avec le compte à la déconnexion volontaire.
+enum RadioLogLocalFiles {
+    static func erase(ownerScopeId: String, fileManager: FileManager = .default, baseDirectory: URL? = nil) {
+        let base = baseDirectory
+            ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let directory = base.appendingPathComponent("SignalQuest", isDirectory: true)
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        for name in ["RadioLogJournal-\(namespace).json", "RadioLogSiteStatuses-\(namespace).json"] {
+            try? fileManager.removeItem(at: directory.appendingPathComponent(name, isDirectory: false))
+        }
+    }
+}

@@ -127,6 +127,28 @@ final class SpeedtestPublicationDefaultsTests: XCTestCase {
         XCTAssertEqual(body["shareExactLocation"] as? Bool, false)
     }
 
+    func testEraseLocalDataRemovesOnlyTheLeavingAccountHistoryAndQueue() async throws {
+        let f = try fixture(user: "erase-owner-a")
+        let owner = "user:erase-owner-a"
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        await requireQueuedFailure { try await f.service.save(result()) }
+        let other = result()
+        try await f.store.upsert(PendingSpeedtestSave(id: other.id.uuidString, result: other, streams: 4,
+            deviceModel: "Synthetic", createdAt: Date(), isVisibleOnMap: false, shareExactLocation: false,
+            guestDeleteToken: nil, driveSessionId: nil, ownerScopeId: "user:erase-owner-b"))
+        try await f.cache.write([result()], for: "history-\(namespace)")
+        try await f.cache.write("server-id", for: "serverIds-\(namespace)-abc")
+
+        await f.service.eraseLocalData(ownerScopeId: owner)
+
+        let remaining = await f.store.loadAll()
+        XCTAssertEqual(remaining.map(\.ownerScopeId), ["user:erase-owner-b"])
+        let history = try await f.cache.read([SpeedtestRunResult].self, for: "history-\(namespace)")
+        XCTAssertNil(history)
+        let serverId = try await f.cache.read(String.self, for: "serverIds-\(namespace)-abc")
+        XCTAssertNil(serverId)
+    }
+
     func testResultFromPreviousAccountNeverReachesPublicationTransport() async throws {
         let f = try fixture(user: "publication-owner-a")
         let value = result()

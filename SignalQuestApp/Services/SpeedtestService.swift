@@ -2768,6 +2768,22 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
     }
 
+    /// Déconnexion volontaire : l'historique, les correspondances serveur, les
+    /// mesures en attente d'envoi (positions comprises) et le délai d'attente du
+    /// compte quittent l'appareil. Les mesures des autres propriétaires restent.
+    func eraseLocalData(ownerScopeId: String) async {
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        for prefix in ["history-", "serverIds-", "physicalSiteAssociation-", "visibilityPending-"] {
+            await historyCache.removeAll(withPrefix: prefix + namespace)
+        }
+        await pendingCache.remove(Self.retryAfterKey(for: ownerScopeId))
+        for store in [pendingStore, rescueStore] {
+            guard let saves = try? await store.loadAllValidated() else { continue }
+            let kept = saves.filter { $0.ownerScopeId != ownerScopeId }
+            if kept.count != saves.count { try? await store.replaceAll(kept) }
+        }
+    }
+
     private func rememberServerId(_ serverId: String, forClientId clientId: String, ownerScopeId: String) async throws {
         let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
         let key = "serverIds-\(namespace)"

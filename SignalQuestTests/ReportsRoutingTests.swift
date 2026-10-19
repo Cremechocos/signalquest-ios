@@ -312,6 +312,47 @@ final class BugReportsServiceTests: XCTestCase {
         XCTAssertEqual(BugReportsSeenStore.unseenCount(in: [newOne], ownerScopeId: "guest", defaults: defaults), 0)
     }
 
+    func testBugOutboxEraseRemovesTheAccountQueueAndItsKey() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bug-outbox-erase-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let keys = InMemoryTokenStore()
+        let outbox = BugReportOutboxStore(rootURL: root, keyStore: keys)
+        let submission = BugReportSubmission(
+            category: .network, title: "Pas de 5G", description: "Seulement de la 4G ici.", severity: .medium,
+            steps: nil, expectedResult: nil, images: [], device: device, speedtest: nil, location: nil
+        )
+        try await outbox.stage(userId: "leaving", submission: submission, submissionID: UUID())
+        try await outbox.stage(userId: "staying", submission: submission, submissionID: UUID())
+
+        BugReportOutboxStore.erase(ownerScopeId: "user:leaving", rootURL: root, keyStore: keys)
+
+        let leaving = try await outbox.pending(userId: "leaving")
+        let staying = try await outbox.pending(userId: "staying")
+        XCTAssertTrue(leaving.isEmpty)
+        XCTAssertEqual(staying.count, 1)
+        XCTAssertNil(try keys.string(for: "key:\(CustomSiteOutboxOwner.scope(for: "leaving"))"))
+    }
+
+    func testBugOutboxRestoredWithoutItsKeyStartsEmpty() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bug-outbox-restore-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let submission = BugReportSubmission(
+            category: .network, title: "Pas de 5G", description: "Seulement de la 4G ici.", severity: .medium,
+            steps: nil, expectedResult: nil, images: [], device: device, speedtest: nil, location: nil
+        )
+        try await BugReportOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+            .stage(userId: "restored", submission: submission, submissionID: UUID())
+
+        let restored = BugReportOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+        let pending = try await restored.pending(userId: "restored")
+        XCTAssertTrue(pending.isEmpty)
+        try await restored.stage(userId: "restored", submission: submission, submissionID: UUID())
+        let again = try await restored.pending(userId: "restored")
+        XCTAssertEqual(again.count, 1)
+    }
+
     func testOfflineReportIsSealedPerAccountAndSentOnceTheNetworkIsBack() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("bug-outbox-\(UUID().uuidString)", isDirectory: true)

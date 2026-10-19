@@ -220,18 +220,39 @@ extension AuthServicing {
     func wipeE2EEIfIdentityChanged(to userId: String) async {}
 }
 
+/// Passerelle d'effacement des données qu'un service garde pour un compte
+/// (historique et files de speedtest). `AppServices` y branche les services une
+/// fois construits ; la déconnexion volontaire et le changement de compte la
+/// déclenchent.
+final class AccountDataEraser: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable (String) async -> Void)?
+
+    func install(_ handler: @escaping @Sendable (String) async -> Void) {
+        lock.withLock { self.handler = handler }
+    }
+
+    func erase(ownerScopeId: String) async {
+        let handler = lock.withLock { self.handler }
+        await handler?(ownerScopeId)
+    }
+}
+
 final class AuthService: AuthServicing {
     private let api: APIClient
     private let e2ee: E2EEServicing?
+    private let accountDataEraser: AccountDataEraser
     /// Keychain AUTH (`fr.signalquest.ios`, `afterFirstUnlock`) : même service que le
     /// token, donc lisible au cold start dans les mêmes conditions.
     private let sessionStore: TokenStore
     private static let cachedUserKey = "cachedAuthUser"
 
-    init(api: APIClient, e2ee: E2EEServicing? = nil, sessionStore: TokenStore = KeychainStore()) {
+    init(api: APIClient, e2ee: E2EEServicing? = nil, sessionStore: TokenStore = KeychainStore(),
+         accountDataEraser: AccountDataEraser = AccountDataEraser()) {
         self.api = api
         self.e2ee = e2ee
         self.sessionStore = sessionStore
+        self.accountDataEraser = accountDataEraser
     }
 
     // MARK: Login / signup
@@ -377,13 +398,11 @@ final class AuthService: AuthServicing {
               LocalAccountScope.currentOwnerScopeId == (closing?.ownerScopeId ?? "guest"),
               api.credentials.accessToken() == token else { return }
         if let ownerScopeId = closing?.ownerScopeId {
-            OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+            Self.purgeScopedStores(ownerScopeId: ownerScopeId)
+            // Déconnexion volontaire : les masquages de stories (préférences) et
+            // tout ce que l'appareil gardait pour ce compte partent avec elle.
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
-            E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
-            RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
-            PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
-            CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
-            ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
+            Self.eraseLocalAccountData(ownerScopeId: ownerScopeId)
         }
         // Un partage reçu attend sans compte : il part avec la session qui s'en va.
         ShareInbox.appGroup()?.purgeAll()
@@ -392,10 +411,41 @@ final class AuthService: AuthServicing {
         Self.clearDeviceSurfaces()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
+        // Le prochain compte repart d'une page blanche : ni identité précédente
+        // ni dernière région vue.
+        try? KeychainStore().remove("lastUserId")
+        MapRegionStore.reset()
         // En dernier : aucune suspension au milieu de la fermeture de session.
         if let ownerScopeId = closing?.ownerScopeId {
             await MessageDraftStore.shared.purge(ownerScopeId: ownerScopeId)
+            await accountDataEraser.erase(ownerScopeId: ownerScopeId)
         }
+    }
+
+    /// Magasins locaux rattachés au compte que toute fermeture de session vide.
+    private static func purgeScopedStores(ownerScopeId: String) {
+        OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+        E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
+        RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
+        PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
+        CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
+        ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
+    }
+
+    /// Ce que l'appareil garde pour un compte quand il le quitte pour de bon
+    /// (déconnexion volontaire, suppression du compte, autre compte connecté) :
+    /// journal radio, files d'envoi, brouillons, notes vocales téléchargées et
+    /// archives de couverture, qui ne sont rattachées à aucun compte.
+    static func eraseLocalAccountData(ownerScopeId: String) {
+        RadioLogLocalFiles.erase(ownerScopeId: ownerScopeId)
+        MessageTextOutboxStore.erase(ownerScopeId: ownerScopeId)
+        MessageAttachmentOutboxStore.erase(ownerScopeId: ownerScopeId)
+        SocialPostOutboxStore.erase(ownerScopeId: ownerScopeId)
+        VoiceNoteCache.erase(ownerScopeId: ownerScopeId)
+        CustomSiteOutboxStore.erase(ownerScopeId: ownerScopeId)
+        BugReportOutboxStore.erase(ownerScopeId: ownerScopeId)
+        ComposerViewModel.eraseDrafts(ownerScopeId: ownerScopeId)
+        LocalCoverageArchiveReader.eraseAll()
     }
 
     /// Ce que l'app expose HORS de l'app (widgets, Spotlight, destinations
@@ -417,13 +467,9 @@ final class AuthService: AuthServicing {
         guard LocalAccountScope.currentOwnerScopeId == (closing?.ownerScopeId ?? "guest"),
               api.credentials.accessToken() == token else { return }
         if let ownerScopeId = closing?.ownerScopeId {
-            OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
-            HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
-            E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
-            RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
-            PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
-            CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
-            ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
+            // Session expirée : les masquages de stories, les envois en attente et
+            // l'historique restent pour la reconnexion au même compte.
+            Self.purgeScopedStores(ownerScopeId: ownerScopeId)
         }
         // Un partage reçu attend sans compte : il part avec la session qui s'en va.
         ShareInbox.appGroup()?.purgeAll()
@@ -452,11 +498,7 @@ final class AuthService: AuthServicing {
         let previousUserId = LocalAccountScope.currentUserId
         if let previousUserId, previousUserId != user.id {
             let previousScope = "user:\(previousUserId)"
-            OutageReportDraftStore.purge(ownerScopeId: previousScope)
-            HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
-            E2EEV2HiddenMessagesStore.purge(ownerScopeId: previousScope)
-            RecentlyViewedStore.purge(ownerScopeId: previousScope)
-            PrivateImageDiskCache.purge(ownerScopeId: previousScope)
+            Self.purgeScopedStores(ownerScopeId: previousScope)
             CarPlayDestinationStore.reset()
             // Le partage en attente a été fait pour l'ancien compte, pas pour celui-ci.
             ShareInbox.appGroup()?.purgeAll()
@@ -495,6 +537,12 @@ final class AuthService: AuthServicing {
         let last = try? store.string(for: "lastUserId")
         if let last, last != userId {
             await e2ee?.lockLocalKeys(expectedSession: LocalAccountScope.sessionSnapshot())
+            // Un autre compte prend la place : ce que l'appareil gardait pour le
+            // précédent (session expirée) n'a plus de destinataire.
+            let previousScope = "user:\(last)"
+            HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
+            Self.eraseLocalAccountData(ownerScopeId: previousScope)
+            await accountDataEraser.erase(ownerScopeId: previousScope)
         }
         guard LocalAccountScope.sessionSnapshot() == account, api.credentials.isCurrent(credentials) else { return }
         try? store.set(userId, for: "lastUserId")

@@ -613,6 +613,25 @@ actor BugReportOutboxStore {
         }
     }
 
+    /// Déconnexion volontaire : la file chiffrée de ce compte et sa clé partent avec lui.
+    nonisolated static func erase(
+        ownerScopeId: String,
+        rootURL: URL? = nil,
+        keyStore: TokenStore = KeychainStore(service: BugReportOutboxStore.keyService)
+    ) {
+        guard ownerScopeId.hasPrefix("user:") else { return }
+        let owner = CustomSiteOutboxOwner.scope(for: String(ownerScopeId.dropFirst("user:".count)))
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let root = rootURL ?? support
+            .appendingPathComponent("SignalQuest", isDirectory: true)
+            .appendingPathComponent(Self.folderName, isDirectory: true)
+        try? FileManager.default.removeItem(
+            at: root.appendingPathComponent(String(owner.dropFirst("user:".count)), isDirectory: true)
+        )
+        try? keyStore.remove("key:\(owner)")
+    }
+
     /// Un second appui sur « Envoyer » garde un seul signalement.
     func stage(userId: String, submission: BugReportSubmission, submissionID: UUID) throws {
         let owner = CustomSiteOutboxOwner.scope(for: userId)
@@ -642,8 +661,19 @@ actor BugReportOutboxStore {
     private func read(_ owner: String) throws -> File {
         let url = fileURL(owner)
         guard fileManager.fileExists(atPath: url.path) else { return File() }
-        let box = try AES.GCM.SealedBox(combined: try Data(contentsOf: url, options: [.mappedIfSafe]))
-        let file = try JSONDecoder.signalQuest.decode(File.self, from: try AES.GCM.open(box, using: try key(owner)))
+        let combined = try Data(contentsOf: url, options: [.mappedIfSafe])
+        let symmetricKey = try key(owner)
+        let cleartext: Data
+        do {
+            cleartext = try AES.GCM.open(try AES.GCM.SealedBox(combined: combined), using: symmetricKey)
+        } catch {
+            // Fichier revenu d'une sauvegarde sans la clé de cet appareil : il est
+            // mis de côté et la file repart vide, au lieu de bloquer les envois.
+            try? fileManager.removeItem(at: url.appendingPathExtension("unreadable"))
+            try? fileManager.moveItem(at: url, to: url.appendingPathExtension("unreadable"))
+            return File()
+        }
+        let file = try JSONDecoder.signalQuest.decode(File.self, from: cleartext)
         guard file.version == 1, file.records.allSatisfy({ $0.ownerScopeId == owner }) else {
             throw CocoaError(.fileReadCorruptFile)
         }
@@ -657,6 +687,11 @@ actor BugReportOutboxStore {
             return
         }
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Hors des sauvegardes : la clé, propre à l'appareil, n'y serait pas.
+        var excluded = URLResourceValues()
+        excluded.isExcludedFromBackup = true
+        var root = rootURL
+        try? root.setResourceValues(excluded)
         let box = try AES.GCM.seal(try JSONEncoder.signalQuest.encode(file), using: try key(owner))
         guard let combined = box.combined else { throw CocoaError(.fileWriteUnknown) }
         try combined.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])

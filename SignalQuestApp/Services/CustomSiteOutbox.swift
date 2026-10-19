@@ -57,6 +57,25 @@ actor CustomSiteOutboxStore {
         }
     }
 
+    /// Déconnexion volontaire : la file chiffrée de ce compte et sa clé partent avec lui.
+    nonisolated static func erase(
+        ownerScopeId: String,
+        rootURL: URL? = nil,
+        keyStore: TokenStore = KeychainStore(service: CustomSiteOutboxStore.keyService)
+    ) {
+        guard ownerScopeId.hasPrefix("user:") else { return }
+        let owner = CustomSiteOutboxOwner.scope(for: String(ownerScopeId.dropFirst("user:".count)))
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let root = rootURL ?? support
+            .appendingPathComponent("SignalQuest", isDirectory: true)
+            .appendingPathComponent(Self.folderName, isDirectory: true)
+        try? FileManager.default.removeItem(
+            at: root.appendingPathComponent(String(owner.dropFirst("user:".count)), isDirectory: true)
+        )
+        try? keyStore.remove("key:\(owner)")
+    }
+
     /// Retourne le brouillon équivalent déjà présent afin qu'un double-tap ou une
     /// réouverture de l'écran ne fabrique pas une seconde proposition logique.
     func stage(userId: String, draft: CustomSiteDraft) throws -> PendingCustomSiteCreation {
@@ -98,8 +117,17 @@ actor CustomSiteOutboxStore {
         let fileURL = encryptedFileURL(ownerScopeId: ownerScopeId)
         guard fileManager.fileExists(atPath: fileURL.path) else { return CustomSiteOutboxFile() }
         let combined = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
-        let box = try AES.GCM.SealedBox(combined: combined)
-        let cleartext = try AES.GCM.open(box, using: try key(ownerScopeId: ownerScopeId))
+        let symmetricKey = try key(ownerScopeId: ownerScopeId)
+        let cleartext: Data
+        do {
+            cleartext = try AES.GCM.open(try AES.GCM.SealedBox(combined: combined), using: symmetricKey)
+        } catch {
+            // Fichier revenu d'une sauvegarde sans la clé de cet appareil : il est
+            // mis de côté et la file repart vide, au lieu de bloquer les envois.
+            try? fileManager.removeItem(at: fileURL.appendingPathExtension("unreadable"))
+            try? fileManager.moveItem(at: fileURL, to: fileURL.appendingPathExtension("unreadable"))
+            return CustomSiteOutboxFile()
+        }
         let snapshot = try decoder.decode(CustomSiteOutboxFile.self, from: cleartext)
         guard snapshot.version == 1 else { throw CocoaError(.fileReadUnknown) }
         try snapshot.records.forEach(validate)
@@ -120,6 +148,11 @@ actor CustomSiteOutboxStore {
         try snapshot.records.forEach(validate)
         let directory = fileURL.deletingLastPathComponent()
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Hors des sauvegardes : la clé, propre à l'appareil, n'y serait pas.
+        var excluded = URLResourceValues()
+        excluded.isExcludedFromBackup = true
+        var root = rootURL
+        try? root.setResourceValues(excluded)
         let cleartext = try encoder.encode(snapshot)
         let box = try AES.GCM.seal(cleartext, using: try key(ownerScopeId: ownerScopeId))
         guard let combined = box.combined else { throw CocoaError(.fileWriteUnknown) }

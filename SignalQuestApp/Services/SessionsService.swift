@@ -792,6 +792,23 @@ struct LocalCoverageArchiveSnapshot: Sendable {
 }
 
 enum LocalCoverageArchiveReader {
+    /// Supprime toutes les archives locales : la base SwiftData (avec ses fichiers
+    /// annexes) et les anciennes files JSON, copies migrées comprises. Renvoie
+    /// `false` si un fichier n'a pas pu partir.
+    @discardableResult
+    static func eraseAll(directory: URL? = nil) -> Bool {
+        let fileManager = FileManager.default
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let archiveDirectory = directory ?? appSupport.appendingPathComponent("SignalQuest", isDirectory: true)
+        let filenames = (try? fileManager.contentsOfDirectory(atPath: archiveDirectory.path)) ?? []
+        var erased = true
+        for filename in filenames where filename.hasPrefix("CoverageSessions.store") || filename.hasPrefix("PendingCoverageSessions.json") {
+            do { try fileManager.removeItem(at: archiveDirectory.appendingPathComponent(filename)) } catch { erased = false }
+        }
+        return erased
+    }
+
     static func load(directory: URL? = nil, storeURL: URL? = nil) -> LocalCoverageArchiveSnapshot {
         let fileManager = FileManager.default
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first

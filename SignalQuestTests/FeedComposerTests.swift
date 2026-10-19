@@ -55,6 +55,23 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(reopened.text, "Brouillon en cours")
     }
 
+    /// La déconnexion volontaire emporte le brouillon de publication du compte.
+    func testEraseDraftsRemovesTheLeavingAccountDraft() {
+        let defaults = UserDefaults(suiteName: "composer-erase-\(UUID().uuidString)")!
+        let namespace = LocalAccountScope.storageNamespace(for: "user:leaving")
+        let other = LocalAccountScope.storageNamespace(for: "user:staying")
+        for ns in [namespace, other] {
+            defaults.set("brouillon", forKey: "ComposerSheet.draftText.\(ns)")
+            defaults.set("friends", forKey: "ComposerSheet.draftVisibility.\(ns)")
+        }
+
+        ComposerViewModel.eraseDrafts(ownerScopeId: "user:leaving", defaults: defaults)
+
+        XCTAssertNil(defaults.string(forKey: "ComposerSheet.draftText.\(namespace)"))
+        XCTAssertNil(defaults.string(forKey: "ComposerSheet.draftVisibility.\(namespace)"))
+        XCTAssertEqual(defaults.string(forKey: "ComposerSheet.draftText.\(other)"), "brouillon")
+    }
+
     /// Rouvrir le composer avec un brouillon n'écrit rien dans `UserDefaults` :
     /// chaque écriture notifiait SwiftUI, et la vue parente, qui recrée le
     /// composer à chaque rendu, tournait en boucle (l'éditeur ne s'ouvrait plus).

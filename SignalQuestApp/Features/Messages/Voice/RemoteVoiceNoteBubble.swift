@@ -110,6 +110,18 @@ actor VoiceNoteCache {
     /// ouvertes partent (elles se retéléchargent à la demande).
     static let maxDirectoryBytes = 200 * 1024 * 1024
 
+    /// Déconnexion volontaire : les notes téléchargées partent avec le compte.
+    nonisolated static func erase(ownerScopeId: String, cachesDirectory: URL? = nil) {
+        let caches = cachesDirectory
+            ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        try? FileManager.default.removeItem(
+            at: caches
+                .appendingPathComponent("VoiceNotes", isDirectory: true)
+                .appendingPathComponent(LocalAccountScope.storageNamespace(for: ownerScopeId), isDirectory: true)
+        )
+    }
+
     /// L'analyse lit le fichier : elle tourne hors de l'acteur, sans quoi les notes
     /// d'un fil se traiteraient l'une après l'autre (P04).
     private nonisolated static func analyzeOffActor(_ url: URL) async throws -> VoiceNoteFile {

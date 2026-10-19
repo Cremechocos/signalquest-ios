@@ -138,7 +138,11 @@ actor CustomSitesService: CustomSitesServicing {
         } catch {
             if error.isCancellation { throw error }
             if CustomSiteOutboxRetryPolicy.isRetryable(error) { return .pending }
-            // Même sur 4xx, ne pas jeter silencieusement le brouillon non acquitté.
+            // Refus définitif : l'erreur est montrée à l'utilisateur, le site ne
+            // reste pas en file pour être rejoué à chaque lancement.
+            if error.isPermanentRequestFailure {
+                try? await outbox.remove(userId: userId, requestId: pending.requestId)
+            }
             throw error
         }
     }
@@ -158,6 +162,9 @@ actor CustomSitesService: CustomSitesServicing {
                 // Une panne réseau commune rendrait les tentatives suivantes
                 // inutiles. Les erreurs terminales restent, elles, isolées.
                 if CustomSiteOutboxRetryPolicy.isRetryable(error) { return }
+                if error.isPermanentRequestFailure {
+                    try? await outbox.remove(userId: userId, requestId: record.requestId)
+                }
             }
         }
     }

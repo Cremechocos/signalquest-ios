@@ -35,6 +35,8 @@ protocol MessagesServicing: Sendable {
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
     func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
     func retryPendingTextMessages() async
+    /// Nombre de messages (textes et pièces jointes) que la file garde sans accusé du serveur.
+    func pendingOutgoingCount() async -> Int
     /// Messages texte encore en file pour une conversation (en attente ou « non envoyés »).
     func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord]
     func discardPendingText(clientRequestId: String) async
@@ -185,6 +187,7 @@ extension MessagesServicing {
 
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
     func retryPendingTextMessages() async {}
+    func pendingOutgoingCount() async -> Int { 0 }
     func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord] { [] }
     func discardPendingText(clientRequestId: String) async {}
     func resendPendingText(clientRequestId: String) async throws -> MessageItem { throw CancellationError() }
@@ -674,6 +677,13 @@ final class MessagesService: MessagesServicing {
             await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
         }
         return try await submitPreparedText(record, session: accountSession)
+    }
+
+    func pendingOutgoingCount() async -> Int {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return 0 }
+        let texts = (try? await textOutbox.pending(session: session))?.count ?? 0
+        let attachments = (try? await attachmentOutbox.pending(session: session))?.count ?? 0
+        return texts + attachments
     }
 
     func retryPendingTextMessages() async {
@@ -2000,6 +2010,15 @@ struct MessageTextOutboxRecord: Codable, Equatable, Sendable {
     /// de disparaître ou de bloquer les envois suivants (SOC-04). Optionnel :
     /// les files écrites avant ce champ se relisent sans lui.
     var failureReason: String? = nil
+
+    /// Même envoi (même identifiant, même contenu), repris par la session suivante du compte.
+    func adopted(by sessionId: String) -> MessageTextOutboxRecord {
+        MessageTextOutboxRecord(
+            ownerScopeId: ownerScopeId, sessionId: sessionId, conversationId: conversationId,
+            clientRequestId: clientRequestId, request: request, createdAt: createdAt,
+            failureReason: failureReason
+        )
+    }
 }
 
 /// File texte durable, exacte et liee a la session. Une reconnexion cree une nouvelle session et
@@ -2024,12 +2043,24 @@ actor MessageTextOutboxStore {
             try LocalAccountScope.publish(for: session, write)
         }
     ) {
+        root = Self.rootDirectory(baseDirectory: baseDirectory)
+        self.currentSession = currentSession
+        self.publisher = publisher
+    }
+
+    private static func rootDirectory(baseDirectory: URL?) -> URL {
         let base = baseDirectory
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        root = base.appendingPathComponent("SignalQuestMessageOutbox", isDirectory: true)
-        self.currentSession = currentSession
-        self.publisher = publisher
+        return base.appendingPathComponent("SignalQuestMessageOutbox", isDirectory: true)
+    }
+
+    /// Déconnexion volontaire : la file de ce compte part avec lui.
+    nonisolated static func erase(ownerScopeId: String, baseDirectory: URL? = nil) {
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        try? FileManager.default.removeItem(
+            at: rootDirectory(baseDirectory: baseDirectory).appendingPathComponent("\(namespace).json", isDirectory: false)
+        )
     }
 
     func stage(_ record: MessageTextOutboxRecord, session: LocalAccountSession) throws {
@@ -2086,10 +2117,13 @@ actor MessageTextOutboxStore {
     private func activeRecords(session: LocalAccountSession) throws -> [MessageTextOutboxRecord] {
         guard currentSession(session) else { throw MessageTextOutboxError.sessionChanged }
         let all = try load(ownerNamespace: session.ownerNamespace)
-        let active = all.filter {
-            $0.ownerScopeId == session.ownerScopeId && $0.sessionId == session.sessionId
-        }
-        if active.count != all.count { try persist(active, session: session) }
+        // Une nouvelle session du même compte (cookie expiré, nouvelle connexion)
+        // reprend les envois en attente sous le même identifiant : ils repartent,
+        // sans jamais être attribués à un autre compte.
+        let active = all
+            .filter { $0.ownerScopeId == session.ownerScopeId }
+            .map { $0.sessionId == session.sessionId ? $0 : $0.adopted(by: session.sessionId) }
+        if active != all { try persist(active, session: session) }
         return active
     }
 
@@ -2170,6 +2204,17 @@ struct MessageAttachmentOutboxRecord: Codable, Equatable, Sendable {
     /// Refus définitif (ou source disparue) : la reprise automatique l'ignore et
     /// la conversation l'affiche « non envoyé ». Absent des fichiers plus anciens.
     var failureReason: String? = nil
+
+    /// Même envoi (même identifiant, même source), repris par la session suivante du compte.
+    func adopted(by sessionId: String) -> MessageAttachmentOutboxRecord {
+        MessageAttachmentOutboxRecord(
+            ownerScopeId: ownerScopeId, sessionId: sessionId, conversationId: conversationId,
+            clientRequestId: clientRequestId, filename: filename, mimeType: mimeType, kind: kind,
+            caption: caption, replyToId: replyToId, width: width, height: height,
+            contentSha256: contentSha256, uploadedAttachment: uploadedAttachment, createdAt: createdAt,
+            ttlSeconds: ttlSeconds, failureReason: failureReason
+        )
+    }
 }
 
 actor MessageAttachmentOutboxStore {
@@ -2193,12 +2238,24 @@ actor MessageAttachmentOutboxStore {
             try LocalAccountScope.publish(for: session, write)
         }
     ) {
+        root = Self.rootDirectory(baseDirectory: baseDirectory)
+        self.currentSession = currentSession
+        self.publisher = publisher
+    }
+
+    private static func rootDirectory(baseDirectory: URL?) -> URL {
         let base = baseDirectory
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        root = base.appendingPathComponent("SignalQuestMessageAttachmentOutbox", isDirectory: true)
-        self.currentSession = currentSession
-        self.publisher = publisher
+        return base.appendingPathComponent("SignalQuestMessageAttachmentOutbox", isDirectory: true)
+    }
+
+    /// Déconnexion volontaire : les pièces jointes en attente de ce compte partent avec lui.
+    nonisolated static func erase(ownerScopeId: String, baseDirectory: URL? = nil) {
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        try? FileManager.default.removeItem(
+            at: rootDirectory(baseDirectory: baseDirectory).appendingPathComponent(namespace, isDirectory: true)
+        )
     }
 
     func stage(
@@ -2261,10 +2318,19 @@ actor MessageAttachmentOutboxStore {
                 MessageAttachmentOutboxRecord.self,
                 from: Data(contentsOf: metadataURL)
             )
-            if value.ownerScopeId == session.ownerScopeId && value.sessionId == session.sessionId {
+            if value.ownerScopeId != session.ownerScopeId {
+                try remove(value, session: session)
+            } else if value.sessionId == session.sessionId {
                 active.append(value)
             } else {
-                try remove(value, session: session)
+                // Nouvelle session du même compte : l'envoi en attente est repris tel quel.
+                let adopted = value.adopted(by: session.sessionId)
+                let data = try encoder.encode(adopted)
+                try publisher(session) {
+                    try data.write(to: metadataURL, options: [.atomic])
+                    Self.protect(metadataURL)
+                }
+                active.append(adopted)
             }
         }
         return active.sorted {

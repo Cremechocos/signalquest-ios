@@ -13,6 +13,15 @@ final class LocalCoverageArchiveViewModel: ObservableObject {
         snapshot = loaded
         isLoading = false
     }
+
+    /// « Supprimer les archives locales » : efface tout, puis relit l'état réel.
+    func eraseAll() async {
+        isLoading = true
+        _ = await Task.detached(priority: .utility) {
+            LocalCoverageArchiveReader.eraseAll()
+        }.value
+        await reload()
+    }
 }
 
 @MainActor
@@ -346,6 +355,7 @@ private extension LocalCoverageArchiveViewModel {
 private struct LocalCoverageArchivesView: View {
     @ObservedObject var model: LocalCoverageArchiveViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmErase = false
 
     var body: some View {
         List {
@@ -390,6 +400,32 @@ private struct LocalCoverageArchivesView: View {
                     .listRowBackground(Color.clear)
                     .accessibilityIdentifier("sessions.localArchives.error")
             }
+
+            if model.hasContent {
+                Section {
+                    Button(role: .destructive) {
+                        confirmErase = true
+                    } label: {
+                        Label("Supprimer les archives locales", systemImage: "trash")
+                            .font(SQFont.body(16, .semibold, relativeTo: .body))
+                            .foregroundStyle(SQColor.dangerInk)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .listRowBackground(SQColor.surface)
+                    .accessibilityIdentifier("sessions.localArchives.erase")
+                }
+            }
+        }
+        .confirmationDialog("Supprimer les archives locales ?", isPresented: $confirmErase, titleVisibility: .visible) {
+            Button("Supprimer", role: .destructive) {
+                Task {
+                    await model.eraseAll()
+                    dismiss()
+                }
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Les anciennes captures de couverture seront effacées de cet iPhone. Cette action est définitive.")
         }
         .listStyle(.insetGrouped)
         .modifier(CompactListMargins())

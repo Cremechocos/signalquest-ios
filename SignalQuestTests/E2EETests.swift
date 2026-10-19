@@ -6122,7 +6122,7 @@ final class MessageTextOutboxTests: XCTestCase {
         XCTAssertTrue(afterAck.isEmpty)
     }
 
-    func testNewSessionPurgesAbandonedPrivateRecords() async throws {
+    func testNewSessionOfTheSameAccountAdoptsPendingRecords() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("message-text-outbox-session-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -6148,10 +6148,46 @@ final class MessageTextOutboxTests: XCTestCase {
             session: old
         )
 
+        // Cookie expiré puis reconnexion au même compte : l'envoi en attente est repris.
         let nextPending = try await store.pending(session: next)
-        let oldRecord = try await store.record(session: next, clientRequestId: "local-old-session-request")
-        XCTAssertTrue(nextPending.isEmpty)
-        XCTAssertNil(oldRecord)
+        XCTAssertEqual(nextPending.map(\.clientRequestId), ["local-old-session-request"])
+        XCTAssertEqual(nextPending.first?.sessionId, next.sessionId)
+        XCTAssertEqual(nextPending.first?.request.content, "old")
+        let adopted = try await store.record(session: next, clientRequestId: "local-old-session-request")
+        XCTAssertNotNil(adopted)
+
+        // Le propriétaire d'un autre compte ne voit rien de cette file.
+        let stranger = LocalAccountSession(ownerScopeId: "user:message-outbox-stranger", sessionId: "stranger-session")
+        let strangerPending = try await store.pending(session: stranger)
+        XCTAssertTrue(strangerPending.isEmpty)
+    }
+
+    func testEraseRemovesTheLeavingAccountQueueOnly() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("message-text-outbox-erase-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let current: MessageTextOutboxStore.CurrentSession = { _ in true }
+        let publish: MessageTextOutboxStore.Publisher = { _, write in try write() }
+        let store = MessageTextOutboxStore(baseDirectory: root, currentSession: current, publisher: publish)
+        var sessions: [LocalAccountSession] = []
+        for name in ["leaving", "staying"] {
+            let session = LocalAccountSession(ownerScopeId: "user:message-outbox-\(name)", sessionId: "\(name)-session")
+            sessions.append(session)
+            let request = SendMessageRequest(kind: "TEXT", content: name, e2ee: nil, replyToId: nil, attachments: nil,
+                                             ttlSeconds: nil, clientRequestId: "request-\(name)")
+            try await store.stage(
+                MessageTextOutboxRecord(ownerScopeId: session.ownerScopeId, sessionId: session.sessionId,
+                                        conversationId: "conversation", clientRequestId: "request-\(name)",
+                                        request: request, createdAt: Date()),
+                session: session)
+        }
+
+        MessageTextOutboxStore.erase(ownerScopeId: sessions[0].ownerScopeId, baseDirectory: root)
+
+        let leaving = try await store.pending(session: sessions[0])
+        let staying = try await store.pending(session: sessions[1])
+        XCTAssertTrue(leaving.isEmpty)
+        XCTAssertEqual(staying.count, 1)
     }
 
     private static func requestBody(_ request: URLRequest) -> Data {
@@ -6241,6 +6277,36 @@ final class MessageAttachmentOutboxTests: XCTestCase {
             options: [.skipsHiddenFiles]
         )
         XCTAssertTrue(files.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }.isEmpty)
+    }
+
+    func testNewSessionOfTheSameAccountAdoptsPendingAttachmentAndItsSource() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("message-attachment-adopt-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let owner = "user:message-attachment-adopt"
+        let old = LocalAccountSession(ownerScopeId: owner, sessionId: "old-session")
+        let next = LocalAccountSession(ownerScopeId: owner, sessionId: "next-session")
+        let source = Data("synthetic-image-bytes".utf8)
+        let sha = SHA256.hash(data: source).map { String(format: "%02x", $0) }.joined()
+        let record = MessageAttachmentOutboxRecord(
+            ownerScopeId: owner, sessionId: old.sessionId, conversationId: "conversation-attachment",
+            clientRequestId: "attachment-adopt-request-0123456789", filename: "photo.jpg", mimeType: "image/jpeg",
+            kind: "IMAGE", caption: "caption", replyToId: nil, width: 10, height: 20, contentSha256: sha,
+            uploadedAttachment: nil, createdAt: Date(timeIntervalSince1970: 1_000))
+        let store = MessageAttachmentOutboxStore(
+            baseDirectory: root, currentSession: { _ in true }, publisher: { _, write in try write() })
+        try await store.stage(record, source: source, session: old)
+
+        let pending = try await store.pending(session: next)
+
+        XCTAssertEqual(pending.map(\.clientRequestId), [record.clientRequestId])
+        XCTAssertEqual(pending.first?.sessionId, next.sessionId)
+        let restored = try await store.sourceData(try XCTUnwrap(pending.first), session: next)
+        XCTAssertEqual(restored, source)
+
+        MessageAttachmentOutboxStore.erase(ownerScopeId: owner, baseDirectory: root)
+        let afterErase = try await store.pending(session: next)
+        XCTAssertTrue(afterErase.isEmpty)
     }
 
     func testServiceStagesBeforeUploadFailureThenReplaysUploadAndMessage() async throws {
@@ -6358,6 +6424,31 @@ final class MessageAttachmentOutboxTests: XCTestCase {
 }
 
 final class SocialPostOutboxTests: XCTestCase {
+    func testEraseRemovesThePostQueueAndTheVoiceNoteCacheOfTheLeavingAccount() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("post-outbox-erase-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let leaving = LocalAccountScope.storageNamespace(for: "user:leaving")
+        let staying = LocalAccountScope.storageNamespace(for: "user:staying")
+        let fileManager = FileManager.default
+        for ns in [leaving, staying] {
+            let posts = base.appendingPathComponent("SignalQuestSocialPostOutbox/\(ns)", isDirectory: true)
+            let notes = base.appendingPathComponent("VoiceNotes/\(ns)", isDirectory: true)
+            for directory in [posts, notes] {
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+                try Data("x".utf8).write(to: directory.appendingPathComponent("a.json"))
+            }
+        }
+
+        SocialPostOutboxStore.erase(ownerScopeId: "user:leaving", baseDirectory: base)
+        VoiceNoteCache.erase(ownerScopeId: "user:leaving", cachesDirectory: base)
+
+        XCTAssertFalse(fileManager.fileExists(atPath: base.appendingPathComponent("SignalQuestSocialPostOutbox/\(leaving)").path))
+        XCTAssertFalse(fileManager.fileExists(atPath: base.appendingPathComponent("VoiceNotes/\(leaving)").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: base.appendingPathComponent("SignalQuestSocialPostOutbox/\(staying)").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: base.appendingPathComponent("VoiceNotes/\(staying)").path))
+    }
+
     @MainActor
     func testEmailVerification403KeepsComposerDraftWithoutAutomaticReplay() async throws {
         let root = FileManager.default.temporaryDirectory

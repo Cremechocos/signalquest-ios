@@ -69,6 +69,8 @@ struct ProfileView: View {
     @State private var showNotificationSettings = false
     /// La déconnexion se confirme : un appui accidentel coupait la session (TRX-31).
     @State private var confirmLogout = false
+    /// Messages que la déconnexion supprimerait de l'appareil, relevés à l'ouverture de la confirmation.
+    @State private var unsentMessages = 0
     /// `logout()` enchaîne plusieurs appels réseau : sans état d'attente, l'action semblait ignorée et pouvait être relancée.
     @State private var isLoggingOut = false
 
@@ -637,7 +639,10 @@ struct ProfileView: View {
     /// « Se déconnecter » : une ligne rouge dans sa carte, toujours confirmée.
     private var logoutCard: some View {
         Button {
-            confirmLogout = true
+            Task {
+                unsentMessages = await services.unsentMessageCount()
+                confirmLogout = true
+            }
         } label: {
             HStack(spacing: SQSpace.md) {
                 if !dynamicTypeSize.isAccessibilitySize {
@@ -671,7 +676,11 @@ struct ProfileView: View {
             }
             Button("Annuler", role: .cancel) {}
         } message: {
-            Text("Tu pourras te reconnecter à tout moment avec ton compte.")
+            if unsentMessages > 0 {
+                Text("Il reste \(unsentMessages) messages non envoyés : ils seront supprimés de cet iPhone si tu te déconnectes. Annule pour leur laisser le temps de partir.")
+            } else {
+                Text("Tu pourras te reconnecter à tout moment avec ton compte.")
+            }
         }
     }
 

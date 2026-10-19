@@ -7,6 +7,24 @@ import XCTest
 /// d'`identify/direct` — celle-là même qui envoyait un PLMN sous des noms que le
 /// serveur ignore.
 final class RadioLogsTests: XCTestCase {
+    func testEraseRemovesOnlyTheLeavingAccountJournalFiles() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("radio-log-erase-\(UUID().uuidString)", isDirectory: true)
+        let folder = base.appendingPathComponent("SignalQuest", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: base) }
+        let leaving = LocalAccountScope.storageNamespace(for: "user:leaving")
+        let staying = LocalAccountScope.storageNamespace(for: "user:staying")
+        let names = ["RadioLogJournal-\(leaving).json", "RadioLogSiteStatuses-\(leaving).json",
+                     "RadioLogJournal-\(staying).json", "RadioLogSiteStatuses-\(staying).json"]
+        for name in names { try Data("x".utf8).write(to: folder.appendingPathComponent(name)) }
+
+        RadioLogLocalFiles.erase(ownerScopeId: "user:leaving", baseDirectory: base)
+
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: folder.path)),
+                       ["RadioLogJournal-\(staying).json", "RadioLogSiteStatuses-\(staying).json"])
+    }
+
 
     func testLegacyOperatorAliasNeedsExplicitFrenchEvidence() {
         XCTAssertNil(RadioLogOperatorResolver.operatorKey(forOperator: "ByTel"))

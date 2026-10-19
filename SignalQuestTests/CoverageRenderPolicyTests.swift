@@ -395,6 +395,26 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.appendingPathExtension("migrated").path))
     }
 
+    func testEraseAllRemovesEveryLocalArchiveFileAndNothingElse() throws {
+        let directory = try makeTemporaryQueueURL().deletingLastPathComponent()
+        let archives = [
+            "PendingCoverageSessions.json", "PendingCoverageSessions.json.migrated",
+            "PendingCoverageSessions.json.migrated.1", "CoverageSessions.store",
+            "CoverageSessions.store-wal", "CoverageSessions.store-shm",
+        ]
+        for name in archives + ["RadioLogJournal-x.json"] {
+            try Data("x".utf8).write(to: directory.appendingPathComponent(name))
+        }
+
+        XCTAssertTrue(LocalCoverageArchiveReader.eraseAll(directory: directory))
+
+        let left = Set(try FileManager.default.contentsOfDirectory(atPath: directory.path))
+        XCTAssertEqual(left, ["RadioLogJournal-x.json"])
+        let snapshot = LocalCoverageArchiveReader.load(directory: directory)
+        XCTAssertTrue(snapshot.entries.isEmpty)
+        XCTAssertEqual(snapshot.unreadableSources, 0)
+    }
+
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {
         let fileURL = try makeTemporaryQueueURL()
         let id = UUID()

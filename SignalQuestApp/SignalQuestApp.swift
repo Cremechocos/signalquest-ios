@@ -722,7 +722,9 @@ struct OfflineBanner: View {
 /// so a transient network outage doesn't force a logged-in user back to login.
 struct OfflineRetryView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
     @State private var confirmLogout = false
+    @State private var unsentMessages = 0
 
     var body: some View {
         ZStack {
@@ -754,7 +756,12 @@ struct OfflineRetryView: View {
             GradientButton("Réessayer", systemImage: "arrow.clockwise") {
                 Task { await session.retryBootstrap() }
             }
-            Button("Se déconnecter") { confirmLogout = true }
+            Button("Se déconnecter") {
+                Task {
+                    unsentMessages = await services.unsentMessageCount()
+                    confirmLogout = true
+                }
+            }
                 .font(SQType.body)
                 .tint(SQColor.labelSecondary)
                 .frame(minHeight: 44)
@@ -765,6 +772,10 @@ struct OfflineRetryView: View {
                         Task { await session.logout() }
                     }
                     Button("Annuler", role: .cancel) {}
+                } message: {
+                    if unsentMessages > 0 {
+                        Text("Il reste \(unsentMessages) messages non envoyés : ils seront supprimés de cet iPhone si tu te déconnectes. Annule pour leur laisser le temps de partir.")
+                    }
                 }
         }
         .padding(SQSpace.xxl)

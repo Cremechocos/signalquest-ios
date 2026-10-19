@@ -96,6 +96,68 @@ final class CustomSiteOutboxTests: XCTestCase {
         XCTAssertEqual(capture.bodyRequestIds, capture.headerRequestIds)
     }
 
+    func testEraseRemovesTheAccountQueueAndItsKeyOnly() async throws {
+        let root = temporaryRoot()
+        let keys = InMemoryTokenStore()
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let store = CustomSiteOutboxStore(rootURL: root, keyStore: keys)
+        _ = try await store.stage(userId: "leaving-owner", draft: fixture())
+        _ = try await store.stage(userId: "staying-owner", draft: fixture())
+
+        CustomSiteOutboxStore.erase(ownerScopeId: "user:leaving-owner", rootURL: root, keyStore: keys)
+
+        let leaving = try await store.pending(userId: "leaving-owner")
+        let staying = try await store.pending(userId: "staying-owner")
+        XCTAssertTrue(leaving.isEmpty)
+        XCTAssertEqual(staying.count, 1)
+        XCTAssertNil(try keys.string(for: "key:\(CustomSiteOutboxOwner.scope(for: "leaving-owner"))"))
+    }
+
+    func testQueueRestoredWithoutItsKeyIsSetAsideInsteadOfBlockingTheAccount() async throws {
+        let root = temporaryRoot()
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let original = CustomSiteOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+        _ = try await original.stage(userId: "restored-owner", draft: fixture())
+
+        // Même fichier, autre appareil : la clé n'a pas suivi.
+        let restored = CustomSiteOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+        let pending = try await restored.pending(userId: "restored-owner")
+        XCTAssertTrue(pending.isEmpty)
+        let staged = try await restored.stage(userId: "restored-owner", draft: fixture())
+        let again = try await restored.pending(userId: "restored-owner")
+        XCTAssertEqual(again, [staged])
+        let setAside = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "unreadable" }
+        XCTAssertEqual(setAside.count, 1)
+    }
+
+    func testSiteRefusedForGoodLeavesTheQueue() async throws {
+        let root = temporaryRoot()
+        let store = CustomSiteOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("test-token")
+        let client = APIClient(config: .test, credentials: credentials, session: mockSession())
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 422, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"invalid"}"#.utf8))
+        }
+        let service = CustomSitesService(api: client, currentUserId: { "refused-owner" }, outbox: store)
+
+        do {
+            _ = try await service.create(fixture())
+            XCTFail("Le refus doit remonter à l'utilisateur")
+        } catch {}
+        let afterCreate = try await store.pending(userId: "refused-owner")
+        XCTAssertTrue(afterCreate.isEmpty)
+
+        // Un enregistrement refusé pendant une reprise quitte aussi la file.
+        _ = try await store.stage(userId: "refused-owner", draft: fixture())
+        await service.retryPending()
+        let afterReplay = try await store.pending(userId: "refused-owner")
+        XCTAssertTrue(afterReplay.isEmpty)
+    }
+
     func testRetryPolicyKeepsOnlyUncertainFailures() {
         XCTAssertTrue(CustomSiteOutboxRetryPolicy.isRetryable(APIError.transport("offline")))
         XCTAssertTrue(CustomSiteOutboxRetryPolicy.isRetryable(APIError.decoding("lost acknowledgement")))

@@ -828,6 +828,18 @@ actor SocialPostOutboxStore {
         self.publisher = publisher
     }
 
+    /// Déconnexion volontaire : les publications en attente de ce compte partent avec lui.
+    nonisolated static func erase(ownerScopeId: String, baseDirectory: URL? = nil) {
+        let base = baseDirectory
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        try? FileManager.default.removeItem(
+            at: base
+                .appendingPathComponent("SignalQuestSocialPostOutbox", isDirectory: true)
+                .appendingPathComponent(LocalAccountScope.storageNamespace(for: ownerScopeId), isDirectory: true)
+        )
+    }
+
     func stage(
         _ record: SocialPostOutboxRecord,
         imageData: Data?,

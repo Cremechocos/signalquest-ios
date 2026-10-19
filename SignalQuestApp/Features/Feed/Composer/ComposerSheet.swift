@@ -189,11 +189,26 @@ final class ComposerViewModel: ObservableObject {
     }
 
     private var draftTextKey: String {
-        "ComposerSheet.draftText.\(LocalAccountScope.storageNamespace)"
+        Self.draftTextKey(namespace: LocalAccountScope.storageNamespace)
     }
 
     private var draftVisibilityKey: String {
-        "ComposerSheet.draftVisibility.\(LocalAccountScope.storageNamespace)"
+        Self.draftVisibilityKey(namespace: LocalAccountScope.storageNamespace)
+    }
+
+    nonisolated private static func draftTextKey(namespace: String) -> String {
+        "ComposerSheet.draftText.\(namespace)"
+    }
+
+    nonisolated private static func draftVisibilityKey(namespace: String) -> String {
+        "ComposerSheet.draftVisibility.\(namespace)"
+    }
+
+    /// Déconnexion volontaire : le brouillon de publication part avec le compte.
+    nonisolated static func eraseDrafts(ownerScopeId: String, defaults: UserDefaults = .standard) {
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        defaults.removeObject(forKey: draftTextKey(namespace: namespace))
+        defaults.removeObject(forKey: draftVisibilityKey(namespace: namespace))
     }
 
     var characterCount: Int {

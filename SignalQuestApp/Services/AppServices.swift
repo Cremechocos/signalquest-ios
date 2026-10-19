@@ -182,7 +182,8 @@ final class AppServices: ObservableObject {
         epochRotations = E2EEV2EpochRotationRuntime(api: api, messaging: e2eeV2Messaging)
         let sseClient = SSEClient(api: api)
         sse = sseClient
-        let authService = AuthService(api: api, e2ee: e2eeService)
+        let accountDataEraser = AccountDataEraser()
+        let authService = AuthService(api: api, e2ee: e2eeService, accountDataEraser: accountDataEraser)
         auth = authService
         feed = SocialFeedService(api: api)
         // Nourrit le classement « Pour toi ». Livrer l'onglet sans émettre ces
@@ -215,10 +216,12 @@ final class AppServices: ObservableObject {
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
         nearbyQuality = NearbyNetworkQualityService(map: mapService, markets: marketsService, networkOperator: networkOperatorService)
-        speedtest = SpeedtestService(
+        let speedtestService = SpeedtestService(
             api: api, markets: marketsService, networkOperator: networkOperatorService,
             invalidatePublicMap: { await mapService.invalidateTiles() }
         )
+        speedtest = speedtestService
+        accountDataEraser.install { await speedtestService.eraseLocalData(ownerScopeId: $0) }
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService
@@ -304,6 +307,15 @@ final class AppServices: ObservableObject {
         guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
         unreadConversations = inboxBadgeState.unreadCount
         syncIconBadge()
+    }
+
+    /// Messages que le compte connecté n'a pas encore envoyés pour de bon : files
+    /// texte et pièces jointes, textes chiffrés v2. Ils partent avec la session
+    /// à la déconnexion, d'où l'avertissement qui précède.
+    func unsentMessageCount() async -> Int {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return 0 }
+        let v2 = await MessageDraftStore.shared.pendingV2Sends(ownerScopeId: session.ownerScopeId).count
+        return await messages.pendingOutgoingCount() + v2
     }
 
     /// Au-delà, l'enveloppe signée gardée par la messagerie v2 a expiré : le texte n'est plus rejoué.
