@@ -3,20 +3,33 @@ import Foundation
 struct GamificationProfile: Decodable, Equatable {
     let level: Int?
     let points: Int?
+    /// Ancien champ « taille du palier » : lu seulement s'il est présent.
     let xpToNextLevel: Int?
     let consecutiveDays: Int?
     let badges: [GamificationBadge]
+    /// Points RESTANT à gagner avant le prochain niveau (`pointsToNextLevel`).
+    let pointsToNextLevel: Int?
+    /// Total de points qui ouvre le prochain niveau.
+    let nextLevelAt: Int?
+    /// Avancement dans le niveau courant, de 0 à 100.
+    let levelProgress: Double?
 
     enum CodingKeys: String, CodingKey {
-        case profile, level, points, xpToNextLevel, pointsToNextLevel, nextLevelAt, consecutiveDays, badges
+        case profile, level, points, xpToNextLevel, pointsToNextLevel, nextLevelAt, levelProgress, consecutiveDays, badges
     }
 
-    init(level: Int?, points: Int?, xpToNextLevel: Int?, consecutiveDays: Int?, badges: [GamificationBadge]) {
+    init(
+        level: Int?, points: Int?, xpToNextLevel: Int?, consecutiveDays: Int?, badges: [GamificationBadge],
+        pointsToNextLevel: Int? = nil, nextLevelAt: Int? = nil, levelProgress: Double? = nil
+    ) {
         self.level = level
         self.points = points
         self.xpToNextLevel = xpToNextLevel
         self.consecutiveDays = consecutiveDays
         self.badges = badges
+        self.pointsToNextLevel = pointsToNextLevel
+        self.nextLevelAt = nextLevelAt
+        self.levelProgress = levelProgress
     }
 
     init(from decoder: Decoder) throws {
@@ -28,20 +41,40 @@ struct GamificationProfile: Decodable, Equatable {
                 points: nested.points,
                 xpToNextLevel: nested.xpToNextLevel,
                 consecutiveDays: nested.consecutiveDays,
-                badges: nested.badges.isEmpty ? rootBadges : nested.badges
+                badges: nested.badges.isEmpty ? rootBadges : nested.badges,
+                pointsToNextLevel: nested.pointsToNextLevel,
+                nextLevelAt: nested.nextLevelAt,
+                levelProgress: nested.levelProgress
             )
             return
         }
         level = try root.decodeIfPresent(Int.self, forKey: .level)
         points = try root.decodeIfPresent(Int.self, forKey: .points)
-        xpToNextLevel = (try? root.decodeIfPresent(Int.self, forKey: .xpToNextLevel))
-            ?? (try? root.decodeIfPresent(Int.self, forKey: .pointsToNextLevel))
-            ?? (try? root.decodeIfPresent(Int.self, forKey: .nextLevelAt)).flatMap { target in
-                guard let current = try? root.decodeIfPresent(Int.self, forKey: .points) else { return nil }
-                return max(0, target - current)
-            }
+        xpToNextLevel = try? root.decodeIfPresent(Int.self, forKey: .xpToNextLevel)
+        pointsToNextLevel = try? root.decodeIfPresent(Int.self, forKey: .pointsToNextLevel)
+        nextLevelAt = try? root.decodeIfPresent(Int.self, forKey: .nextLevelAt)
+        levelProgress = try? root.decodeIfPresent(Double.self, forKey: .levelProgress)
         consecutiveDays = try root.decodeIfPresent(Int.self, forKey: .consecutiveDays)
         badges = root.decodeLossyArray([GamificationBadge].self, forKey: .badges)
+    }
+
+    /// Points restant à gagner : la valeur du serveur, sinon `nextLevelAt - points`,
+    /// sinon (ancien champ) le complément de `points` dans le palier.
+    var pointsRemaining: Int? {
+        if let pointsToNextLevel { return max(0, pointsToNextLevel) }
+        if let nextLevelAt, let points { return max(0, nextLevelAt - points) }
+        if let xpToNextLevel, xpToNextLevel > 0, let points { return xpToNextLevel - (points % xpToNextLevel) }
+        return nil
+    }
+
+    /// Avancement dans le niveau, de 0 à 1 : `levelProgress / 100` du serveur ;
+    /// l'ancien champ `xpToNextLevel` ne sert que s'il est seul présent.
+    var levelFraction: Double? {
+        if let levelProgress { return min(1, max(0, levelProgress / 100)) }
+        if let xpToNextLevel, xpToNextLevel > 0, let points {
+            return min(1, Double(points % xpToNextLevel) / Double(xpToNextLevel))
+        }
+        return nil
     }
 }
 

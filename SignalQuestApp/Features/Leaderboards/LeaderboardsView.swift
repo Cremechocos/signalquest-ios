@@ -600,17 +600,11 @@ private struct LeaderboardHeroCard: View {
     private var streak: Int { profile.consecutiveDays ?? 0 }
     private var unlockedBadges: [GamificationBadge] { profile.badges.filter { $0.unlockedAt != nil } }
 
-    /// Même lecture de la progression que l'écran Récompenses : `xpToNextLevel`
-    /// est la taille du palier courant.
-    private var xpProgress: Double {
-        guard let next = profile.xpToNextLevel, next > 0 else { return 0 }
-        return min(1, Double(points % next) / Double(next))
-    }
+    /// Même lecture de la progression que l'écran Récompenses : l'avancement
+    /// (`levelProgress`) et le restant (`pointsToNextLevel`) viennent du serveur.
+    private var xpProgress: Double { profile.levelFraction ?? 0 }
 
-    private var remainingXP: Int? {
-        guard let next = profile.xpToNextLevel, next > 0 else { return nil }
-        return next - (points % next)
-    }
+    private var remainingXP: Int? { profile.pointsRemaining }
 
     private var streakText: String {
         streak > 0 ? String(localized: "\(streak) jours de suite") : String(localized: "Pas de série en cours")

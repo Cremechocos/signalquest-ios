@@ -269,8 +269,8 @@ struct GamificationView: View {
 
     @ViewBuilder
     private var levelProgressText: some View {
-        if let next = model.profile?.xpToNextLevel, next > 0 {
-            Text("\((points % next).formatted()) / \(next.formatted()) pts vers le niveau \(level + 1)")
+        if let remaining = model.profile?.pointsRemaining {
+            Text("Encore \(remaining.formatted()) pts avant le niveau \(level + 1)")
                 .font(SQType.caption)
                 .monospacedDigit()
                 .foregroundStyle(SQColor.ink2)
@@ -676,11 +676,7 @@ struct GamificationView: View {
         return amount
     }
 
-    private var xpProgress: Double {
-        guard let points = model.profile?.points, let next = model.profile?.xpToNextLevel, next > 0 else { return 0 }
-        let inLevel = Double(points % next)
-        return min(1, inLevel / Double(next))
-    }
+    private var xpProgress: Double { model.profile?.levelFraction ?? 0 }
 
     /// « 1 jour de suite » / « 3 jours de suite », « Pas de série en cours » à zéro.
     private var streakLabel: String {

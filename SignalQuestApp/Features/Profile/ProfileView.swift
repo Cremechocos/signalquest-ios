@@ -396,15 +396,16 @@ struct ProfileView: View {
     // MARK: - Stats et niveau
 
     /// Niveau et avancement dans le palier courant, quand le serveur les donne.
-    private var levelProgress: (level: Int, inLevel: Int, goal: Int)? {
+    private var levelProgress: (level: Int, fraction: Double, remaining: Int)? {
         guard let progression, let level = progression.level,
-              let goal = progression.xpToNextLevel, goal > 0 else { return nil }
-        // Même sémantique que la jauge de GamificationView : progression
-        // dans le niveau courant = points % palier.
-        return (level, (progression.points ?? 0) % goal, goal)
+              let fraction = progression.levelFraction,
+              let remaining = progression.pointsRemaining else { return nil }
+        // Même lecture que la jauge de GamificationView : avancement et restant
+        // viennent du serveur.
+        return (level, fraction, remaining)
     }
 
-    private func statsCard(_ stats: UserStats?, progress: (level: Int, inLevel: Int, goal: Int)?) -> some View {
+    private func statsCard(_ stats: UserStats?, progress: (level: Int, fraction: Double, remaining: Int)?) -> some View {
         VStack(spacing: SQSpace.md) {
             if let stats {
                 Group {
@@ -435,7 +436,7 @@ struct ProfileView: View {
                 if stats != nil {
                     Rectangle().fill(SQColor.separator).frame(height: 1).accessibilityHidden(true)
                 }
-                progressionRows(level: progress.level, inLevel: progress.inLevel, goal: progress.goal)
+                progressionRows(level: progress.level, fraction: progress.fraction, remaining: progress.remaining)
             }
         }
         .frame(maxWidth: .infinity)
@@ -469,12 +470,12 @@ struct ProfileView: View {
             .frame(width: 1, height: 34)
     }
 
-    private func progressionRows(level: Int, inLevel: Int, goal: Int) -> some View {
-        let progress = min(1, Double(inLevel) / Double(goal))
+    private func progressionRows(level: Int, fraction: Double, remaining: Int) -> some View {
+        let progress = fraction
         let levelText = Text("Niveau \(level)")
             .font(SQType.callout(.bold))
             .foregroundStyle(SQColor.label)
-        let pointsText = Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
+        let pointsText = Text("Encore \(remaining.formatted()) pts")
             .font(SQType.callout)
             .monospacedDigit()
             .foregroundStyle(SQColor.label)
@@ -507,7 +508,7 @@ struct ProfileView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Progression · Niveau \(level)")
-        .accessibilityValue("\(inLevel) sur \(goal) points · \(Int(progress * 100)) %")
+        .accessibilityValue("Encore \(remaining) points · \(Int(progress * 100)) %")
     }
 
     // MARK: - Menu

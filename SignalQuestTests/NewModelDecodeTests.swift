@@ -82,6 +82,10 @@ final class NewModelDecodeTests: XCTestCase {
         """
         let profile = try JSONDecoder.signalQuest.decode(GamificationProfile.self, from: Data(json.utf8))
         XCTAssertEqual(profile.level, 5)
+        // Ancien champ « taille du palier » : repli conservé s'il est seul présent.
+        XCTAssertEqual(profile.xpToNextLevel, 500)
+        XCTAssertEqual(profile.pointsRemaining, 500 - 1240 % 500)
+        XCTAssertEqual(try XCTUnwrap(profile.levelFraction), Double(1240 % 500) / 500, accuracy: 0.0001)
         XCTAssertEqual(profile.badges.count, 1)
         XCTAssertEqual(profile.badges.first?.tier, "bronze")
     }
@@ -93,6 +97,8 @@ final class NewModelDecodeTests: XCTestCase {
                 "points": 10099,
                 "level": 32,
                 "pointsToNextLevel": 141,
+                "nextLevelAt": 10240,
+                "levelProgress": 38.7,
                 "consecutiveDays": 4,
                 "badges": [
                     {"id": "speedtester_bronze", "name": "Testeur Débutant", "icon": "📊", "tier": "bronze"}
@@ -105,7 +111,14 @@ final class NewModelDecodeTests: XCTestCase {
         """
         let profile = try JSONDecoder.signalQuest.decode(GamificationProfile.self, from: Data(json.utf8))
         XCTAssertEqual(profile.level, 32)
-        XCTAssertEqual(profile.xpToNextLevel, 141)
+        // Le restant, le palier visé et l'avancement restent trois valeurs
+        // distinctes : le restant n'est pas la taille du palier.
+        XCTAssertNil(profile.xpToNextLevel)
+        XCTAssertEqual(profile.pointsToNextLevel, 141)
+        XCTAssertEqual(profile.nextLevelAt, 10240)
+        XCTAssertEqual(profile.levelProgress, 38.7)
+        XCTAssertEqual(profile.pointsRemaining, 141)
+        XCTAssertEqual(try XCTUnwrap(profile.levelFraction), 0.387, accuracy: 0.0001)
         XCTAssertEqual(profile.badges.first?.title, "Testeur Débutant")
         XCTAssertEqual(profile.badges.first?.icon, "📊")
     }
