@@ -86,3 +86,29 @@ enum DriveTestCadence {
         mutating func reset() { location = nil }
     }
 }
+
+/// Plafond de données STRICT du Drive Test : un test dont le volume attendu ne
+/// tient plus dans ce qui reste n'est pas lancé, et un test en cours est coupé
+/// dès que le plafond est atteint. Décisions pures, indépendantes du moteur.
+enum DriveTestDataCap {
+    /// Volume attendu du prochain test : la moyenne des tests déjà mesurés dans
+    /// la session. 0 avant le premier test — seule la coupure en cours de test
+    /// protège alors le plafond.
+    static func estimatedTestBytes(previousTests: [Int]) -> Int {
+        let measured = previousTests.filter { $0 > 0 }
+        guard !measured.isEmpty else { return 0 }
+        return Int((Double(measured.reduce(0, +)) / Double(measured.count)).rounded(.up))
+    }
+
+    /// Peut-on lancer un test de plus ? `capBytes == nil` = illimité.
+    static func canStartTest(sessionBytes: Int, estimatedTestBytes: Int, capBytes: Int?) -> Bool {
+        guard let capBytes else { return true }
+        return sessionBytes < capBytes && sessionBytes + max(0, estimatedTestBytes) <= capBytes
+    }
+
+    /// Faut-il couper le test en cours ?
+    static func mustStopRunningTest(sessionBytes: Int, capBytes: Int?) -> Bool {
+        guard let capBytes else { return false }
+        return sessionBytes >= capBytes
+    }
+}

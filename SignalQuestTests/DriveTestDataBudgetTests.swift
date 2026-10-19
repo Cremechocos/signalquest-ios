@@ -133,6 +133,29 @@ final class DriveTestDataBudgetTests: XCTestCase {
         XCTAssertNil(DriveSpeedtestPoint(result: result))
     }
 
+    /// Plafond strict : un test dont le volume attendu dépasse le reste n'est pas
+    /// lancé, un test en cours est coupé à l'atteinte du plafond.
+    func testStrictDataCapDecidesLaunchAndStop() {
+        let cap = 500_000_000
+        // Sans historique : rien n'est estimé, seul le reste compte.
+        XCTAssertEqual(DriveTestDataCap.estimatedTestBytes(previousTests: []), 0)
+        XCTAssertTrue(DriveTestDataCap.canStartTest(sessionBytes: 0, estimatedTestBytes: 0, capBytes: cap))
+        // Moyenne des tests mesurés ; un essai raté sans octet ne la tire pas vers le bas.
+        XCTAssertEqual(DriveTestDataCap.estimatedTestBytes(previousTests: [100_000_000, 0, 200_000_000]), 150_000_000)
+        // 350 Mo consommés + 150 Mo attendus = 500 Mo : tient pile dans le plafond.
+        XCTAssertTrue(DriveTestDataCap.canStartTest(sessionBytes: 350_000_000, estimatedTestBytes: 150_000_000, capBytes: cap))
+        // 360 Mo + 150 Mo dépasse : le test n'est pas lancé, même sous le plafond.
+        XCTAssertFalse(DriveTestDataCap.canStartTest(sessionBytes: 360_000_000, estimatedTestBytes: 150_000_000, capBytes: cap))
+        XCTAssertFalse(DriveTestDataCap.canStartTest(sessionBytes: cap, estimatedTestBytes: 0, capBytes: cap))
+        // Sans limite : toujours possible, jamais coupé.
+        XCTAssertTrue(DriveTestDataCap.canStartTest(sessionBytes: 90_000_000_000, estimatedTestBytes: 1_000_000_000, capBytes: nil))
+        XCTAssertFalse(DriveTestDataCap.mustStopRunningTest(sessionBytes: 90_000_000_000, capBytes: nil))
+        // En cours de test : coupé dès que le plafond est atteint, pas avant.
+        XCTAssertFalse(DriveTestDataCap.mustStopRunningTest(sessionBytes: cap - 1, capBytes: cap))
+        XCTAssertTrue(DriveTestDataCap.mustStopRunningTest(sessionBytes: cap, capBytes: cap))
+        XCTAssertTrue(DriveTestDataCap.mustStopRunningTest(sessionBytes: cap + 80_000_000, capBytes: cap))
+    }
+
     func testLostGpsDoesNotStartUnlimitedSpeedtests() {
         func decide(count: Int, seconds: Int) -> DriveTestCadence.Decision {
             DriveTestCadence.decide(testCount: count, secondsSinceLastTest: seconds, metersMoved: nil,

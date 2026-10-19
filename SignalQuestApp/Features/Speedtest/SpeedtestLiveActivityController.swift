@@ -85,12 +85,15 @@ final class SpeedtestLiveActivityController {
     }
 
     /// Termine la Live Activity en affichant le résultat final un court instant.
-    func end(downloadMbps: Double = 0, uploadMbps: Double = 0, pingMs: Double = 0, runIndex: Int = 1, runTotal: Int = 1) {
+    /// `phaseLabel` remplace le libellé de fin ; `keepsVisible` laisse l'état final
+    /// sur l'écran verrouillé (arrêt qu'il faut pouvoir lire plus tard).
+    func end(downloadMbps: Double = 0, uploadMbps: Double = 0, pingMs: Double = 0, runIndex: Int = 1, runTotal: Int = 1,
+             phaseLabel: String? = nil, keepsVisible: Bool = false) {
         guard #available(iOS 16.2, *) else { return }
         lastPushDate = nil; lastPhaseLabel = nil
         let content = ActivityContent(
             state: SpeedtestActivityAttributes.ContentState(
-                phaseLabel: runTotal > 1 ? String(localized: "Rafale terminée") : String(localized: "Terminé"),
+                phaseLabel: phaseLabel ?? (runTotal > 1 ? String(localized: "Rafale terminée") : String(localized: "Terminé")),
                 downloadMbps: downloadMbps, uploadMbps: uploadMbps, pingMs: pingMs,
                 progress: 1, runIndex: runIndex, runTotal: runTotal, finished: true
             ),
@@ -98,7 +101,7 @@ final class SpeedtestLiveActivityController {
         )
         Task {
             for activity in Activity<SpeedtestActivityAttributes>.activities {
-                await activity.end(content, dismissalPolicy: .after(.now + 4))
+                await activity.end(content, dismissalPolicy: keepsVisible ? .default : .after(.now + 4))
             }
         }
     }

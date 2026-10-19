@@ -2,6 +2,7 @@ import SwiftUI
 import CoreLocation
 import Combine
 import os
+import UserNotifications
 
 /// Point speedtest géolocalisé affiché sur la mini-carte Drive Test : coloré par
 /// débit, tappable → ouvre la feuille de détails. Porte le résultat complet.
@@ -80,6 +81,8 @@ final class DriveTestViewModel: ObservableObject {
     /// Valeur du compteur global au démarrage de la session. `sessionBytes` en est
     /// l'écart, ce qui évite de remettre à zéro un compteur partagé par tous les modes.
     private var dataMeterBaseline: Int = 0
+    /// Volume de chaque test de la session, pour estimer le suivant (plafond strict).
+    private var testByteSamples: [Int] = []
     /// Session arrêtée parce que le plafond de données a été atteint — état
     /// distinct d'un arrêt manuel, pour l'expliquer plutôt que de s'interrompre.
     @Published private(set) var stoppedByDataCap = false
@@ -425,6 +428,7 @@ final class DriveTestViewModel: ObservableObject {
         // trajet, sans rien écraser chez les autres.
         dataMeterBaseline = SpeedtestDataMeter.shared.bytes
         sessionBytes = 0
+        testByteSamples = []
         stoppedByDataCap = false
         lastSessionRecap = nil
         lastSessionTrace = nil
@@ -468,7 +472,12 @@ final class DriveTestViewModel: ObservableObject {
         if isRunning {
             services.location.stopTracking()
             UIApplication.shared.isIdleTimerDisabled = false
-            liveActivity.cancel()
+            if stoppedByDataCap {
+                // L'arrêt au plafond reste lisible sur l'écran verrouillé.
+                liveActivity.end(phaseLabel: String(localized: "Plafond de données atteint"), keepsVisible: true)
+            } else {
+                liveActivity.cancel()
+            }
             background.end()
             statusLabel = String(localized: "Arrêté")
             let recap = makeSessionRecap()
@@ -883,9 +892,10 @@ final class DriveTestViewModel: ObservableObject {
     private func runLoop() async {
         while !Task.isCancelled {
             guard await waitUntilNextTestIsDue() else { break }
-            if dataCapExceeded() { stopForDataCap(); return }
+            if !canStartNextTest() { stopForDataCap(); return }
 
             testCount += 1
+            let bytesBeforeTest = sessionBytes
             errorMessage = nil
             statusLabel = String(localized: "Test \(testCount) en cours…")
             lastTestCoordinate = services.location.cachedLocation()?.coordinate
@@ -907,17 +917,21 @@ final class DriveTestViewModel: ObservableObject {
             } catch is CancellationError {
                 break
             } catch {
+                // Session arrêtée pendant le test (plafond) : l'erreur d'annulation
+                // ne doit pas remplacer l'explication de l'arrêt.
+                guard isRunning else { break }
                 // Un test raté n'interrompt pas la session : on note et on continue.
                 errorMessage = error.userFacingMessage
             }
             refreshSessionBytes()
+            testByteSamples.append(max(0, sessionBytes - bytesBeforeTest))
             // Les valeurs (ping/DL/UL) RESTENT affichées ; elles ne se réinitialisent
             // qu'au démarrage du test suivant (dans runOneTest).
             liveMbps = 0
             if Task.isCancelled { break }
             // Renouvelle l'assertion d'arrière-plan entre deux tests (écran verrouillé).
             background.renew(name: "drivetest")
-            if dataCapExceeded() { stopForDataCap(); return }
+            if !canStartNextTest() { stopForDataCap(); return }
         }
     }
 
@@ -1028,10 +1042,15 @@ final class DriveTestViewModel: ObservableObject {
         sessionBytes = max(0, SpeedtestDataMeter.shared.bytes - dataMeterBaseline)
     }
 
-    private func dataCapExceeded() -> Bool {
+    /// Plafond strict : un test dont le volume attendu dépasse le reste n'est pas
+    /// lancé (`DriveTestDataCap`).
+    private func canStartNextTest() -> Bool {
         refreshSessionBytes()
-        guard let cap = dataCapBytes else { return false }
-        return sessionBytes >= cap
+        return DriveTestDataCap.canStartTest(
+            sessionBytes: sessionBytes,
+            estimatedTestBytes: DriveTestDataCap.estimatedTestBytes(previousTests: testByteSamples),
+            capBytes: dataCapBytes
+        )
     }
 
     /// Arrêt au plafond : la session se termine comme un arrêt manuel et les
@@ -1043,6 +1062,22 @@ final class DriveTestViewModel: ObservableObject {
         errorMessage = String(
             localized: "Le Drive Test s'est arrêté à \(Self.formattedBytes(sessionBytes)) de données. Tu peux relever le plafond dans les réglages du test."
         )
+        notifyStoppedByDataCap()
+    }
+
+    /// App en poche ou écran verrouillé : sans notification, le conducteur ne sait
+    /// pas que la session est arrêtée. Au premier plan, l'écran le dit déjà.
+    private func notifyStoppedByDataCap() {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Drive Test arrêté")
+        content.body = String(localized: "Plafond de données atteint : les mesures sont arrêtées.")
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "drivetest.dataCap", content: content, trigger: nil)
+        ) { error in
+            guard let error else { return }
+            Self.log.error("notification plafond ÉCHEC : \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Volume lisible. `ByteCountFormatter` plutôt qu'une division maison : il suit
@@ -1155,6 +1190,15 @@ final class DriveTestViewModel: ObservableObject {
         // suffisent à l'œil ; un changement de phase passe toujours, et le résultat
         // final est appliqué à part.
         let now = Date()
+        // Plafond strict : coupé dès qu'il est atteint, sans attendre la fin du test.
+        // Lecture sans publication, pour ne pas redessiner l'écran à chaque émission.
+        if DriveTestDataCap.mustStopRunningTest(
+            sessionBytes: max(0, SpeedtestDataMeter.shared.bytes - dataMeterBaseline), capBytes: dataCapBytes
+        ) {
+            refreshSessionBytes()
+            stopForDataCap()
+            return
+        }
         guard live.phase != livePhase || now.timeIntervalSince(lastLiveReadoutAt) >= 0.5 else { return }
         lastLiveReadoutAt = now
         livePhase = live.phase
@@ -1730,7 +1774,8 @@ struct DriveTestView: View {
                 settingTile(
                     "Un test tous les",
                     selection: $driveIntervalMeters,
-                    options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
+                    // Libellés dans l'unité choisie ; les valeurs stockées restent en mètres.
+                    options: [250, 500, 1_000, 2_000].map { ($0, LocalizedStringKey(SQUnits.distanceCompact(meters: Double($0)))) },
                     identifier: "drivetest.interval"
                 )
                 settingTile(
@@ -1926,7 +1971,8 @@ struct DriveTestView: View {
     private var sessionTiles: some View {
         tileRow([
             ("Distance", distanceText),
-            ("Tests", "\(model.testCount)"),
+            // Mesures terminées, comme le bilan : `testCount` compte aussi les essais ratés.
+            ("Tests", "\(model.summary?.count ?? 0)"),
             ("Données", DriveTestViewModel.formattedBytes(model.sessionBytes))
         ])
         .accessibilityElement(children: .ignore)
