@@ -809,6 +809,29 @@ final class MapOutageFilterTests: XCTestCase {
         XCTAssertEqual(capture.state, "unknown")
     }
 
+    // MARK: - Le fil : pages de réponses
+
+    private func replies(_ ids: [String]) throws -> [SocialComment] {
+        try ids.map { id in
+            try JSONDecoder.signalQuest.decode(SocialComment.self, from: Data("""
+            { "id": "\(id)", "parentId": "parent", "author": { "id": "a", "name": "Camille" }, "text": "\(id)" }
+            """.utf8))
+        }
+    }
+
+    /// Au-delà de 20 réponses, la page suivante s'ajoute sous les premières sans doublon, et la
+    /// première page relue (flux direct) ne fait pas disparaître les pages déjà descendues.
+    func testReplyPagesAppendWithoutDuplicatesAndSurviveARefresh() throws {
+        let first = try replies((0..<20).map { "r\($0)" })
+        let second = try replies(["r19", "r20", "r21"])
+        let appended = OutageThreadSection.appendingReplies(second, to: first)
+        XCTAssertEqual(appended.map(\.id), (0...21).map { "r\($0)" })
+
+        let refreshedFirst = try replies((0..<20).map { "r\($0)" })
+        let refreshed = OutageThreadSection.refreshedReplies(firstPage: refreshedFirst, existing: appended)
+        XCTAssertEqual(refreshed.map(\.id), (0...21).map { "r\($0)" })
+    }
+
     // MARK: - Le fil, rendu pour de vrai
 
     /**

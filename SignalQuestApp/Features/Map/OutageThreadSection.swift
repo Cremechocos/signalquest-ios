@@ -54,6 +54,21 @@ struct OutageThreadSection: View {
     @State private var likeError: String?
     /// `nil` quand on écrit au fil, sinon le commentaire auquel on répond.
     @State private var replyTarget: SocialComment?
+    /// Curseur de la page suivante des réponses, par commentaire parent. Une clé absente veut dire
+    /// « plus rien à descendre » ; `laterReplyPages` garde les pages déjà ajoutées lors d'une relecture.
+    @State private var replyCursors: [String: String] = [:]
+    @State private var laterReplyPages: Set<String> = []
+    @State private var loadingMoreReplies: Set<String> = []
+    @State private var moreRepliesFailed: Set<String> = []
+    /// Suppression de son propre commentaire (après confirmation) et signalement de ceux des autres.
+    @State private var pendingDelete: SocialComment?
+    @State private var deletingId: String?
+    @State private var reportTarget: SocialComment?
+    @State private var actionError: String?
+
+    private var isSignedIn: Bool {
+        AppEnvironment.usesDemoData || LocalAccountScope.sessionSnapshot() != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -70,6 +85,10 @@ struct OutageThreadSection: View {
                 SQInlineError(message: likeError)
             }
 
+            if let actionError {
+                SQInlineError(message: actionError)
+            }
+
             if loading {
                 SQSpinner()
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -77,9 +96,21 @@ struct OutageThreadSection: View {
             } else if failed {
                 // On DIT l'échec plutôt que d'afficher un fil vide : un bloc muet se lit comme
                 // « personne n'a rien dit », ce qui est une autre information.
-                Text("Impossible de charger la conversation.")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Impossible de charger la conversation.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Button {
+                        Task { await load() }
+                    } label: {
+                        Text("Réessayer")
+                            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                }
             } else if comments.isEmpty {
                 Text("Personne n'a encore commenté.")
                     .font(SQType.caption)
@@ -109,6 +140,25 @@ struct OutageThreadSection: View {
             }
         }
         .task(id: postId) { await load() }
+        .alert(
+            "Supprimer ce commentaire ?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { comment in
+            Button("Supprimer", role: .destructive) {
+                pendingDelete = nil
+                Task { await delete(comment) }
+            }
+            Button("Annuler", role: .cancel) { pendingDelete = nil }
+        } message: { _ in
+            Text("Il disparaîtra pour tout le monde.")
+        }
+        .sheet(item: $reportTarget) { comment in
+            ReportSheet(target: .comment(comment.id), service: services.reports)
+        }
         /* Le fil vit EN DIRECT, comme sur Android.
            Sans cela, un cœur posé depuis l'Android restait invisible sur l'iPhone ouvert sur la
            même panne jusqu'à ce qu'on referme la fiche — constaté par Alexandre sur ses deux
@@ -186,7 +236,7 @@ struct OutageThreadSection: View {
                     .font(SQType.button)
                     .padding(.horizontal, SQSpace.xl)
                     .frame(minHeight: 44)
-                    .foregroundStyle(canPost ? SQColor.surface : SQColor.labelSecondary)
+                    .foregroundStyle(canPost ? SQColor.onAccent : SQColor.labelSecondary)
                     .background(
                         RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
                             .fill(canPost ? SQColor.brandRed : SQColor.fill)
@@ -293,12 +343,67 @@ struct OutageThreadSection: View {
                             ForEach(loaded) { reply in
                                 replyRow(reply)
                             }
+                            if replyCursors[comment.id] != nil {
+                                Button {
+                                    Task { await loadMoreReplies(comment.id) }
+                                } label: {
+                                    HStack(spacing: SQSpace.sm) {
+                                        Text(moreRepliesFailed.contains(comment.id)
+                                             ? "Réessayer de charger la suite"
+                                             : "Voir plus de réponses")
+                                        if loadingMoreReplies.contains(comment.id) { SQSpinner() }
+                                    }
+                                    .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                                    .foregroundStyle(SQColor.accentInk)
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(SQPressButtonStyle())
+                                .disabled(loadingMoreReplies.contains(comment.id))
+                            }
                         }
                     }
                     .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isSignedIn { rowMenu(comment) }
         }
+    }
+
+    /// Supprimer le sien, signaler celui des autres : même geste que la discussion du site, sur la
+    /// route des commentaires sociaux (le fil d'une panne EST un post).
+    private func rowMenu(_ comment: SocialComment) -> some View {
+        Menu {
+            if comment.author.id == LocalAccountScope.currentUserId {
+                Button(role: .destructive) {
+                    pendingDelete = comment
+                } label: {
+                    Label("Supprimer le commentaire", systemImage: "trash")
+                }
+            } else {
+                Button {
+                    reportTarget = comment
+                } label: {
+                    Label("Signaler le commentaire", systemImage: "flag")
+                }
+            }
+        } label: {
+            Group {
+                if deletingId == comment.id {
+                    SQSpinner()
+                } else {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .disabled(deletingId != nil)
+        .accessibilityLabel(String(localized: "Actions sur le message"))
     }
 
     /// « Chargement… », « Masquer les réponses », ou « Voir N réponses ».
@@ -336,6 +441,9 @@ struct OutageThreadSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                 likeButton(reply, parentId: reply.parentId, compact: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isSignedIn { rowMenu(reply) }
         }
     }
 
@@ -494,7 +602,15 @@ struct OutageThreadSection: View {
                 commentId: commentId,
                 cursor: nil
             )
-            repliesByComment[commentId] = page.comments
+            if laterReplyPages.contains(commentId) {
+                // Les pages suivantes déjà lues restent sous la première, relue.
+                repliesByComment[commentId] = Self.refreshedReplies(
+                    firstPage: page.comments, existing: repliesByComment[commentId] ?? []
+                )
+            } else {
+                repliesByComment[commentId] = page.comments
+                replyCursors[commentId] = page.nextCursor
+            }
             repliesErrors[commentId] = nil
             return true
         } catch {
@@ -502,6 +618,53 @@ struct OutageThreadSection: View {
                 repliesErrors[commentId] = error.userFacingMessage
             }
             return false
+        }
+    }
+
+    /// La page suivante des réponses d'un commentaire, à la suite de celles déjà affichées.
+    private func loadMoreReplies(_ commentId: String) async {
+        guard let cursor = replyCursors[commentId], !loadingMoreReplies.contains(commentId) else { return }
+        loadingMoreReplies.insert(commentId)
+        defer { loadingMoreReplies.remove(commentId) }
+        do {
+            let page = try await services.comments.replies(postId: postId, commentId: commentId, cursor: cursor)
+            repliesByComment[commentId] = Self.appendingReplies(page.comments, to: repliesByComment[commentId] ?? [])
+            replyCursors[commentId] = page.nextCursor
+            laterReplyPages.insert(commentId)
+            moreRepliesFailed.remove(commentId)
+        } catch {
+            if !error.isCancellation { moreRepliesFailed.insert(commentId) }
+        }
+    }
+
+    /// Une page de plus sous les réponses déjà lues, sans doublon.
+    static func appendingReplies(_ page: [SocialComment], to existing: [SocialComment]) -> [SocialComment] {
+        let ids = Set(existing.map(\.id))
+        return existing + page.filter { !ids.contains($0.id) }
+    }
+
+    /// La première page relue (flux direct) passe devant les pages suivantes déjà descendues.
+    static func refreshedReplies(firstPage: [SocialComment], existing: [SocialComment]) -> [SocialComment] {
+        let ids = Set(firstPage.map(\.id))
+        return firstPage + existing.filter { !ids.contains($0.id) }
+    }
+
+    /// Supprime son propre commentaire ou sa réponse, après l'accord du serveur : un message qui
+    /// disparaît puis revient serait pire qu'une seconde d'attente.
+    private func delete(_ comment: SocialComment) async {
+        deletingId = comment.id
+        actionError = nil
+        defer { deletingId = nil }
+        do {
+            try await services.comments.delete(postId: postId, commentId: comment.id)
+            if let parentId = comment.parentId {
+                repliesByComment[parentId]?.removeAll { $0.id == comment.id }
+            } else {
+                comments.removeAll { $0.id == comment.id }
+            }
+            Haptics.success()
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -724,7 +887,7 @@ struct SiteThreadSection: View {
                         .font(SQType.button)
                         .padding(.horizontal, SQSpace.xl)
                         .frame(minHeight: 44)
-                        .foregroundStyle(canPost ? SQColor.surface : SQColor.labelSecondary)
+                        .foregroundStyle(canPost ? SQColor.onAccent : SQColor.labelSecondary)
                         .background(
                             RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
                                 .fill(canPost ? SQColor.brandRed : SQColor.fill)
