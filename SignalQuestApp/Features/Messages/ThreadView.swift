@@ -26,6 +26,8 @@ struct ThreadView: View {
     /// Échec d'envoi d'une réponse : dit près du champ, le brouillon reste.
     @State private var sendError: String?
     @State private var decrypted: [String: String] = [:]
+    /// Échecs de déchiffrement par message : au deuxième, le texte le dit au lieu de rester sur le cadenas.
+    @State private var decryptFailures: [String: Int] = [:]
     /// Réponses envoyées depuis cet écran : gardées jusqu'à ce que le serveur les rende.
     @State private var sentHere: Set<String> = []
 
@@ -40,6 +42,7 @@ struct ThreadView: View {
                     .accessibilityAddTraits(.isHeader)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "thread.close") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.lg)
@@ -54,7 +57,7 @@ struct ThreadView: View {
                         } else if replies.isEmpty {
                             // L'erreur de chargement, plus bas, dit déjà pourquoi c'est vide.
                             if errorMessage == nil {
-                                Text("Aucune réponse pour l'instant. Lance le fil.")
+                                Text("Aucune réponse pour l’instant. Lance le fil.")
                                     .font(SQType.caption)
                                     .foregroundStyle(SQColor.labelSecondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,6 +83,7 @@ struct ThreadView: View {
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm)
             }
+            .scrollDismissesKeyboard(.interactively)
             composer
         }
         .sqSheet(background: SQColor.bg)
@@ -114,9 +118,10 @@ struct ThreadView: View {
                 if let date = source.createdAt {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
                 }
-                if !replies.isEmpty {
+                let replyTotal = max(replies.count, source.threadReplyCount ?? 0)
+                if replyTotal > 0 {
                     if source.createdAt != nil { Text(verbatim: "·") }
-                    Text("\(replies.count) réponse")
+                    Text("\(replyTotal) réponse")
                 }
             }
             .font(SQType.caption)
@@ -131,7 +136,7 @@ struct ThreadView: View {
         let mine = reply.senderId == currentUserId
         return HStack {
             if mine { Spacer(minLength: 40) }
-            VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
+            VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xxs) {
                 if !mine, let name = reply.sender?.displayName {
                     Text(name)
                         .font(SQType.micro.weight(.semibold))
@@ -146,8 +151,8 @@ struct ThreadView: View {
                             .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                     }
                 }
-                .padding(.vertical, 11)
-                .padding(.horizontal, 15)
+                .padding(.vertical, MessageBubbleMetrics.verticalPadding)
+                .padding(.horizontal, MessageBubbleMetrics.horizontalPadding)
                 .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
                 .sqShadowSoft()
                 if let date = reply.createdAt {
@@ -188,8 +193,9 @@ struct ThreadView: View {
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, SQSpace.sm)
                     .frame(minHeight: 44)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(SQColor.separator))
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous).strokeBorder(SQColor.separator))
+                    .onChangeCompat(of: draft) { _, _ in sendError = nil }
                 Button {
                     Task { await sendReply() }
                 } label: {
@@ -259,7 +265,12 @@ struct ThreadView: View {
         var targets = replies
         if let parent { targets.append(parent) }
         for message in targets where message.isEncrypted && decrypted[message.id] == nil {
-            decrypted[message.id] = try? await e2ee.decryptText(conversationId: conversation.id, message: message)
+            do {
+                decrypted[message.id] = try await e2ee.decryptText(conversationId: conversation.id, message: message)
+            } catch {
+                // Retenté à la prochaine relecture du fil.
+                decryptFailures[message.id, default: 0] += 1
+            }
         }
     }
 
@@ -274,7 +285,12 @@ struct ThreadView: View {
 
     private func displayedContent(for message: MessageItem) -> String {
         if message.deletedAt != nil { return String(localized: "Message supprimé") }
-        if message.isEncrypted { return decrypted[message.id] ?? String(localized: "🔒 Message chiffré") }
+        if message.isEncrypted {
+            if let text = decrypted[message.id] { return text }
+            return (decryptFailures[message.id] ?? 0) >= 2
+                ? String(localized: "Impossible de déchiffrer — réessaie")
+                : String(localized: "🔒 Message chiffré")
+        }
         return message.content ?? ""
     }
 

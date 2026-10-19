@@ -43,6 +43,9 @@ struct ShareHandoff: Equatable, Identifiable {
     let id = UUID()
     let conversationId: String
     let attachments: [ShareHandoffAttachment]
+    /// Dépôt de la boîte de partage dont vient la remise : la conversation le
+    /// supprime une fois le partage repris, pas avant.
+    var inboxEntryId: String? = nil
     let createdAt = Date()
 
     var isFresh: Bool { Date().timeIntervalSince(createdAt) < 60 }

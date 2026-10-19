@@ -175,11 +175,11 @@ struct ConversationDetailView: View {
     /// pose `expiresAt`).
     @State private var ephemeralEnabled = false
     /// 24 h par défaut ; la durée choisie dans les réglages « protégée » quand il y en a une.
-    private var ephemeralTTL: Int {
-        guard ephemeralEnabled else { return 0 }
+    private var ephemeralSeconds: Int {
         let chosen = secretPolicy?.outgoingTTLSeconds ?? 0
-        return chosen > 0 ? chosen : 86_400
+        return chosen > 0 ? chosen : ConversationSecretPolicy.defaultEphemeralSeconds
     }
+    private var ephemeralTTL: Int { ephemeralEnabled ? ephemeralSeconds : 0 }
     @State private var isSharingLocation = false
     @State private var showLiveShare = false
     @State private var showSchedulePicker = false
@@ -1275,6 +1275,7 @@ struct ConversationDetailView: View {
                 seedText: composerSeed,
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
+                ephemeralSeconds: ephemeralSeconds,
                 onTyping: { newValue in
                     // Le texte d'un message qu'on modifie n'est pas un brouillon.
                     if editTarget == nil { draftAutosaver?.textChanged(newValue) }
@@ -1725,8 +1726,8 @@ struct ConversationDetailView: View {
                     sendStatusIndicator(for: message)
                 }
             }
-            .padding(.vertical, 11)
-            .padding(.horizontal, 15)
+            .padding(.vertical, MessageBubbleMetrics.verticalPadding)
+            .padding(.horizontal, MessageBubbleMetrics.horizontalPadding)
             .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine, first: isGroupStart, last: isGroupEnd))
             // En OLED, bulle reçue et fond sont noirs : le liseré des cartes
             // la détache (SOC-26). Transparent hors OLED.
@@ -1832,7 +1833,8 @@ struct ConversationDetailView: View {
                             if reaction.count > 1 {
                                 Text("\(reaction.count)")
                                     .font(SQType.micro)
-                                    .foregroundStyle(reaction.mine ? SQColor.brandRed : SQColor.labelSecondary)
+                                    // 12 pt : l'encre carmin, pas la brique (contraste sous 13 pt).
+                                    .foregroundStyle(reaction.mine ? SQColor.accentInk : SQColor.labelSecondary)
                             }
                         }
                         .padding(.horizontal, SQSpace.sm)
@@ -4059,6 +4061,8 @@ struct ConversationDetailView: View {
         for attachment in handoff.attachments {
             await stage(data: attachment.data, fileName: attachment.fileName, uti: attachment.uti)
         }
+        // Repris par la conversation : le dépôt peut quitter la boîte de partage.
+        if let entryId = handoff.inboxEntryId { ShareInbox.appGroup()?.remove(id: entryId) }
     }
 
     /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
@@ -5306,26 +5310,29 @@ private struct StagedAttachmentsTray: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
                 ForEach(items) { item in
-                    ZStack(alignment: .topTrailing) {
-                        content(of: item)
-                            .frame(width: tile, height: tile)
-                            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                            .padding(.top, 8)
-                            .padding(.trailing, 8)
-                        Button { onRemove(item.id) } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(SQColor.onInk)
-                                .frame(width: 22, height: 22)
-                                .background(SQColor.label, in: Circle())
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
+                    content(of: item)
+                        .frame(width: tile, height: tile)
+                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .padding(.top, 8)
+                        .padding(.trailing, 8)
+                        // Le bouton de 44 pt est posé par la mise en page (marges négatives) et non
+                        // par un `.offset` : sa zone VoiceOver reste celle qu'on voit.
+                        .overlay(alignment: .topTrailing) {
+                            Button { onRemove(item.id) } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(SQColor.onInk)
+                                    .frame(width: 22, height: 22)
+                                    .background(SQColor.label, in: Circle())
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text("Retirer la pièce jointe"))
+                            .padding(.top, -14)
+                            .padding(.trailing, -14)
                         }
-                        .buttonStyle(.plain)
-                        .offset(x: 14, y: -14)
-                        .accessibilityLabel(Text("Retirer la pièce jointe"))
-                    }
-                    .accessibilityElement(children: .contain)
+                        .accessibilityElement(children: .contain)
                 }
             }
             .padding(.horizontal, SQSpace.md)

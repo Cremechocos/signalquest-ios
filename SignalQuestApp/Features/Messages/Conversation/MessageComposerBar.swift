@@ -23,6 +23,8 @@ struct MessageComposerBar: View {
     let seedText: String
     let seedToken: Int
     @Binding var ephemeralEnabled: Bool
+    /// Durée des messages éphémères de la conversation, annoncée dans le menu « + ».
+    var ephemeralSeconds = ConversationSecretPolicy.defaultEphemeralSeconds
     let onTyping: (String) -> Void
     let onSend: (String) -> Void
     let onPoll: () -> Void
@@ -58,6 +60,8 @@ struct MessageComposerBar: View {
     @State private var showsCamera = false
     @State private var showsFileImporter = false
     @StateObject private var recorder = VoiceNoteRecorder()
+    /// Un appel en cours garde le micro : pas de note vocale tant qu'il dure.
+    @EnvironmentObject private var callManager: CallManager
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -132,8 +136,21 @@ struct MessageComposerBar: View {
     private var standardBar: some View {
         VStack(spacing: 0) {
             if !mentionCandidates.isEmpty { mentionStrip }
+            if showsMic && callManager.activeCall != nil {
+                Text("Indisponible pendant un appel")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, SQSpace.md)
+                    .accessibilityIdentifier("voiceNote.unavailable")
+            }
             inputRow
         }
+    }
+
+    /// Le micro prend la place du bouton d'envoi tant qu'il n'y a rien à envoyer.
+    private var showsMic: Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasStagedAttachments && !isSending && !isE2EE
     }
 
     /// « + » rond, champ blanc avec le trombone dedans, puis micro rond ou
@@ -173,7 +190,7 @@ struct MessageComposerBar: View {
                 .disabled(isEditing)
                 Divider()
                 Toggle(isOn: $ephemeralEnabled) {
-                    Label("Messages éphémères (24 h)", systemImage: "timer")
+                    Label("Messages éphémères (\(ProtectedConversationSheet.durationLabel(ephemeralSeconds)))", systemImage: "timer")
                 }
             } label: {
                 Image(systemName: "plus")
@@ -244,20 +261,21 @@ struct MessageComposerBar: View {
             // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
             // toutes les messageries, et ça évite un bouton de plus dans une
             // barre déjà dense.
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasStagedAttachments && !isSending && !isE2EE {
+            if showsMic {
+                let inCall = callManager.activeCall != nil
                 Button {
                     Haptics.selection()
                     Task { await recorder.start() }
                 } label: {
                     Image(systemName: "mic")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(SQColor.label)
+                        .foregroundStyle(inCall ? SQColor.labelTertiary : SQColor.label)
                         .frame(width: 44, height: 44)
                         .sqSurface(SQColor.chip, in: Circle())
                         .contentShape(Circle())
                 }
-                .disabled(!canSend)
-                .accessibilityLabel("Enregistrer une note vocale")
+                .disabled(!canSend || inCall)
+                .accessibilityLabel(inCall ? "Indisponible pendant un appel" : "Enregistrer une note vocale")
             } else {
             let sendable = (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasStagedAttachments)
                 && !isSending && canSend

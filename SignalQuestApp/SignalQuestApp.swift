@@ -1083,13 +1083,14 @@ struct MainTabView: View {
         receivedShare = entry
     }
 
-    /// Le partage est remis à la conversation (brouillon et pièces jointes) : il
-    /// quitte la boîte, et la conversation s'ouvre.
+    /// Le partage est remis à la conversation (brouillon et pièces jointes) et la
+    /// conversation s'ouvre. Le dépôt ne quitte la boîte que lorsqu'elle l'a repris :
+    /// si elle ne s'ouvre pas, le partage est reproposé au prochain lancement.
     private func deliverShare(_ entry: ShareInbox.Entry, to conversation: MessageConversation, attachments: [ShareHandoffAttachment]) {
-        finishShare(entry)
+        receivedShare = nil
         // Toujours posé, même sans pièce jointe : la conversation déjà ouverte y lit
         // qu'un texte l'attend dans son brouillon.
-        router.pendingShare = ShareHandoff(conversationId: conversation.id, attachments: attachments)
+        router.pendingShare = ShareHandoff(conversationId: conversation.id, attachments: attachments, inboxEntryId: entry.id)
         router.route(toConversation: conversation.id)
     }
 

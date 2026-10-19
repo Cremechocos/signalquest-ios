@@ -9,6 +9,13 @@ struct MessageReactionSummary: Identifiable {
     var id: String { emoji }
 }
 
+/// Marges internes d'une bulle de message : la conversation et le fil les
+/// partagent pour que leurs bulles restent alignées.
+enum MessageBubbleMetrics {
+    static let verticalPadding: CGFloat = 11
+    static let horizontalPadding: CGFloat = 15
+}
+
 /// Statut d'une bulle envoyée de façon optimiste (MSG-API-01).
 enum MessageSendStatus: Equatable { case sending, failed }
 
