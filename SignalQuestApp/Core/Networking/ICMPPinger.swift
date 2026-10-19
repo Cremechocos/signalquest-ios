@@ -69,18 +69,18 @@ struct ICMPPinger: Sendable {
         intervalMs: Double,
         onSample: (@Sendable ([Sample]) -> Void)? = nil
     ) async throws -> [Sample] {
-        let resolved = try Self.resolve(host: host)
+        let host = self.host
+        let timeout = self.timeout
+        let resolved = try await Self.onProbeQueue { try Self.resolve(host: host) }
         let handle = try ICMPSocketHandle(family: resolved.family)
         defer { handle.close() }
 
         var samples: [Sample] = []
         for sequence in 0..<UInt16(max(0, min(count, Int(UInt16.max)))) {
             if Task.isCancelled { break }
-            if let sample = handle.roundTrip(
-                to: resolved,
-                sequence: sequence,
-                timeout: timeout
-            ) {
+            if let sample = try await Self.onProbeQueue({
+                handle.roundTrip(to: resolved, sequence: sequence, timeout: timeout)
+            }) {
                 samples.append(sample)
                 onSample?(samples)
             }
@@ -89,6 +89,16 @@ struct ICMPPinger: Sendable {
             }
         }
         return samples
+    }
+
+    /// Les appels bloquants (résolution, `recvfrom`) tournent sur leur propre file
+    /// et non sur le pool coopératif de Swift, qu'ils priveraient de threads.
+    private static let probeQueue = DispatchQueue(label: "fr.signalquest.icmp-probe", qos: .utility, attributes: .concurrent)
+
+    private static func onProbeQueue<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            probeQueue.async { continuation.resume(with: Result { try work() }) }
+        }
     }
 
     // MARK: Résolution

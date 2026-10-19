@@ -35,7 +35,7 @@ final class OutageNotificationReceiptTests: XCTestCase {
     /// L'identifiant entre dans le chemin d'API du reçu : un séparateur ou un point-point ne passe pas.
     func testReceiptRejectsAnIdentifierThatCouldChangeThePath() {
         let token = String(repeating: "a", count: 43)
-        for id in ["../../x", "a/b", "id?x=1", "id%2F", " id", "id ", "", "-id", String(repeating: "a", count: 129)] {
+        for id in ["../../x", "a/b", "id?x=1", "id%2F", " id", "id ", "", "-id", "%2e%2e", ".hidden", String(repeating: "a", count: 129)] {
             XCTAssertNil(OutageNotificationReceiptPayload.parse([
                 "type": "community_outage",
                 "outageNotificationId": id,

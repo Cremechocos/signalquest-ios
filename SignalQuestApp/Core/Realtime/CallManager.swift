@@ -519,7 +519,7 @@ final class CallManager: NSObject, ObservableObject {
         isEncryptedConversation: Bool = false,
         isGroup: Bool? = nil
     ) {
-        guard activeCall == nil else { return }
+        guard SQFeatures.callsEnabled, activeCall == nil else { return }
         // §10.0 : une conversation que cet appareil sait v2 n'appelle que
         // chiffré, quoi que dise le serveur ou l'écran qui relance l'appel.
         let requiresE2EE = requiresE2EE || (LocalAccountScope.currentUserId != nil && IncomingCallE2EEExpectation.knownV2(

@@ -165,27 +165,4 @@ struct AppConfig: Equatable {
     var contactEmail: String { "legal@signalquest.fr" }
     /// Lien `mailto:` prêt à l'emploi pour le contact modération/RGPD.
     var contactMailtoURL: URL? { URL(string: "mailto:\(contactEmail)") }
-
-    /// Lien `mailto:` pré-rempli pour exercer le droit d'accès / portabilité
-    /// (RGPD art. 15 & 20). Solution intérimaire tant qu'un endpoint d'export
-    /// automatisé n'est pas en place côté backend.
-    var dataRequestMailtoURL: URL? {
-        var components = URLComponents(string: "mailto:\(contactEmail)")
-        components?.queryItems = [
-            URLQueryItem(name: "subject", value: "Demande d’accès et d’export de mes données (RGPD)"),
-            URLQueryItem(
-                name: "body",
-                value: """
-                Bonjour,
-
-                Je souhaite exercer mon droit d’accès et de portabilité (RGPD art. 15 et 20) et recevoir une copie de mes données personnelles SignalQuest.
-
-                E-mail du compte concerné :
-
-                Merci.
-                """
-            ),
-        ]
-        return components?.url
-    }
 }
