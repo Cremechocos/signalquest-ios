@@ -39,10 +39,12 @@ enum SQObservedDefaultsKeys {
 
 /// Le ton de l'app en français, choisi par le membre et porté par son compte.
 ///
-/// POURQUOI UNE LANGUE PRIVÉE. Les 5000 clés du catalogue sont déjà tutoyées ; le
-/// vouvoiement vit dans le MÊME `Localizable.xcstrings`, sous la localisation
-/// `fr-x-formal`. Xcode en tire `fr-x-formal.lproj` dans l'app, que le système ne
-/// choisit jamais pour un utilisateur : seule la surcharge ci-dessous y puise.
+/// POURQUOI DES CLÉS PRÉFIXÉES. Les 5000 clés du catalogue sont déjà tutoyées ; le
+/// vouvoiement vit dans le MÊME `Localizable.xcstrings`, en français, sous la clé
+/// d'origine précédée de `SQFormal|`. Aucune vue ne demande ces clés : seule la
+/// surcharge ci-dessous y puise. Une langue privée (`fr-x-formal.lproj`) faisait
+/// le même travail, mais App Store Connect la signale comme langue inconnue
+/// (ITMS-90176).
 ///
 /// POURQUOI UN `Bundle` SURCHARGÉ. Les ~5000 chaînes sont lues par SwiftUI
 /// (`Text`, `Button`, titres), par `NSLocalizedString` et par UIKit : deux entrées
@@ -54,8 +56,8 @@ enum SQObservedDefaultsKeys {
 /// pas de variante, la recherche retombe sur l'implémentation d'origine : le
 /// tutoiement (ou l'anglais) reste le comportement de base.
 enum SQAddress {
-    /// Localisation privée du vouvoiement dans le catalogue.
-    static let formalLocalization = "fr-x-formal"
+    /// Préfixe des clés du vouvoiement dans le catalogue.
+    static let formalKeyPrefix = "SQFormal|"
     private static let cachePrefix = "fr.signalquest.ios.addressForm."
     /// Garde « une fois par jour » de la question : locale à l'appareil.
     static let lastAskedKey = "fr.signalquest.ios.addressForm.lastAsked"
@@ -66,18 +68,12 @@ enum SQAddress {
     static func setFormal(_ formal: Bool) { formalFlag.withLock { $0 = formal } }
 
     /// L'app tourne-t-elle en français ? La question et le réglage n'existent que là.
-    /// Lu AVANT la surcharge de `Bundle.main` (qui annonce `fr-x-formal` en tête) ;
-    /// la langue de l'app ne change pas tant que le processus vit.
+    /// Lu AVANT la surcharge de `Bundle.main` ; la langue de l'app ne change pas
+    /// tant que le processus vit.
     static let appIsFrench: Bool = Bundle.main.preferredLocalizations.first == "fr"
 
-    /// `fr-x-formal.lproj` de l'app, résolu une fois ; `nil` hors français ou si le
-    /// dossier est absent.
-    fileprivate static let formalBundle: Bundle? = {
-        guard appIsFrench,
-              let path = Bundle.main.path(forResource: formalLocalization, ofType: "lproj")
-        else { return nil }
-        return Bundle(path: path)
-    }()
+    /// Le vouvoiement s'applique-t-il à cette recherche ? Seulement en français.
+    fileprivate static var usesFormalKeys: Bool { appIsFrench && isFormal }
 
     /// Pose la surcharge sur `Bundle.main` (une fois) et recharge le ton en cache.
     /// À appeler avant toute vue : le premier rendu doit déjà être dans le bon ton.
@@ -258,7 +254,7 @@ final class SQAddressStore: ObservableObject {
     }
 }
 
-/// Redirige la lecture des chaînes vers `fr-x-formal.lproj` quand le vouvoiement
+/// Redirige la lecture des chaînes vers les clés `SQFormal|` quand le vouvoiement
 /// est actif et que l'app est en français. Aucune propriété stockée : la classe
 /// remplace celle de `Bundle.main` en place (`object_setClass`).
 ///
@@ -268,18 +264,18 @@ final class SQAddressStore: ObservableObject {
 /// attribuée. `String(localized:)` lit le tutoiement.
 private final class SQAddressBundle: Bundle, @unchecked Sendable {
     override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
-        if SQAddress.isFormal, let formal = SQAddress.formalBundle {
+        if SQAddress.usesFormalKeys {
             let marker = SQAddress.missingMarker
-            let text = formal.localizedString(forKey: key, value: marker, table: tableName)
+            let text = super.localizedString(forKey: SQAddress.formalKeyPrefix + key, value: marker, table: tableName)
             if text != marker { return text }
         }
         return super.localizedString(forKey: key, value: value, table: tableName)
     }
 
     override func __localizedAttributedString(forKey key: String, value: String?, table tableName: String?) -> NSAttributedString {
-        if SQAddress.isFormal, let formal = SQAddress.formalBundle {
+        if SQAddress.usesFormalKeys {
             let marker = SQAddress.missingMarker
-            let text = formal.__localizedAttributedString(forKey: key, value: marker, table: tableName)
+            let text = super.__localizedAttributedString(forKey: SQAddress.formalKeyPrefix + key, value: marker, table: tableName)
             if text.string != marker { return text }
         }
         return super.__localizedAttributedString(forKey: key, value: value, table: tableName)

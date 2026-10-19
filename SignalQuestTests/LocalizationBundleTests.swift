@@ -37,16 +37,14 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(widgetFrench["Très bon"], "Très bon")
     }
 
-    /// Chaque variante `fr-x-formal` garde exactement les mêmes substitutions que la
-    /// chaîne française d'origine : sinon un `String(format:)` lirait un argument de
-    /// travers dès que le vouvoiement est actif.
+    /// Chaque variante au vous (`SQFormal|<clé>`) garde exactement les mêmes
+    /// substitutions que la chaîne française d'origine : sinon un `String(format:)`
+    /// lirait un argument de travers dès que le vouvoiement est actif.
     func testFormalVariantsKeepTheFrenchPlaceholders() throws {
-        func strings(_ localization: String) throws -> [String: String] {
-            let url = try XCTUnwrap(Bundle.main.url(forResource: "Localizable", withExtension: "strings",
-                subdirectory: "\(localization).lproj"))
-            return try XCTUnwrap(PropertyListSerialization.propertyList(
-                from: Data(contentsOf: url), options: [], format: nil) as? [String: String])
-        }
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "Localizable", withExtension: "strings",
+            subdirectory: "fr.lproj"))
+        let french = try XCTUnwrap(PropertyListSerialization.propertyList(
+            from: Data(contentsOf: url), options: [], format: nil) as? [String: String])
         let pattern = try NSRegularExpression(
             pattern: "%(?:\\d+\\$)?[-+ 0#]*\\d*(?:\\.\\d+)?(?:ll|l|h)?[@dDuUxXfFeEgGcCsSp]")
         func placeholders(_ text: String) -> [String] {
@@ -58,16 +56,29 @@ final class LocalizationBundleTests: XCTestCase {
                 .map { $0.replacingOccurrences(of: "\\d+\\$", with: "", options: .regularExpression) }
                 .sorted()
         }
-        let formal = try strings(SQAddress.formalLocalization)
-        let french = try strings("fr")
+        let prefix = SQAddress.formalKeyPrefix
+        let formal = french.filter { $0.key.hasPrefix(prefix) }
         XCTAssertGreaterThan(formal.count, 500)
-        for (key, value) in formal {
+        for (formalKey, value) in formal {
+            let key = String(formalKey.dropFirst(prefix.count))
             XCTAssertEqual(placeholders(value), placeholders(french[key] ?? key), "Substitutions : \(key)")
         }
     }
 
-    /// En français, le vouvoiement actif redirige `NSLocalizedString` vers
-    /// `fr-x-formal` ; une clé sans variante reste en tutoiement.
+    /// App Store Connect refuse de reconnaître une langue privée (ITMS-90176) :
+    /// l'app et ses extensions n'embarquent que le français, l'anglais et Base.
+    func testBundlesShipOnlyRecognisedLanguages() throws {
+        let app = Bundle.main
+        let plugIns = try FileManager.default.contentsOfDirectory(
+            at: app.bundleURL.appendingPathComponent("PlugIns"), includingPropertiesForKeys: nil)
+        for bundle in [app] + plugIns.compactMap(Bundle.init(url:)) {
+            XCTAssertTrue(Set(bundle.localizations).isSubset(of: ["fr", "en", "Base"]),
+                "\(bundle.bundleURL.lastPathComponent) : \(bundle.localizations.sorted())")
+        }
+    }
+
+    /// En français, le vouvoiement actif redirige `NSLocalizedString` vers les clés
+    /// `SQFormal|` ; une clé sans variante reste en tutoiement.
     func testFormalToneRoutesBundleLookups() throws {
         try XCTSkipUnless(SQAddress.appIsFrench, "Test à lancer avec -testLanguage fr")
         SQAddress.install()
