@@ -609,7 +609,10 @@ struct AuthOrDivider: View {
             Text("ou avec ton e-mail")
                 .font(SQType.caption(.semibold))
                 .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize()
+                // Aux grandes tailles, le libellé passe à la ligne au lieu de dépasser l'écran.
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
             Rectangle().fill(SQColor.separator).frame(height: 1)
         }
         .accessibilityElement(children: .combine)

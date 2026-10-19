@@ -727,38 +727,48 @@ struct OfflineRetryView: View {
     var body: some View {
         ZStack {
             SQColor.bg.ignoresSafeArea()
-            VStack(spacing: SQSpace.lg) {
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 52))
-                    .foregroundStyle(SQColor.brandOrange)
-                Text("Connexion indisponible")
-                    .font(SQType.title)
-                    .sqHeader()
-                    .foregroundStyle(SQColor.label)
-                Text("Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie.")
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-                // Système typographique + bouton DA (capsule 56 pt) comme le reste de
-                // l'app, au lieu d'un .borderedProminent système détonnant (UI-13).
-                GradientButton("Réessayer", systemImage: "arrow.clockwise") {
-                    Task { await session.retryBootstrap() }
-                }
-                Button("Se déconnecter") { confirmLogout = true }
-                    .font(SQType.body)
-                    .tint(SQColor.labelSecondary)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                    // Même confirmation qu'au Profil (TRX-31).
-                    .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
-                        Button("Se déconnecter", role: .destructive) {
-                            Task { await session.logout() }
-                        }
-                        Button("Annuler", role: .cancel) {}
-                    }
+            // Aux grandes tailles de texte ou en paysage, le contenu défile au lieu d'être coupé.
+            ViewThatFits(in: .vertical) {
+                content
+                ScrollView { content }
             }
-            .padding(SQSpace.xxl)
         }
+    }
+
+    private var content: some View {
+        VStack(spacing: SQSpace.lg) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 52))
+                .foregroundStyle(SQColor.brandOrange)
+                .accessibilityHidden(true)
+            Text("Connexion indisponible")
+                .font(SQType.title)
+                .sqHeader()
+                .foregroundStyle(SQColor.label)
+            Text("Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+            // Système typographique + bouton DA (capsule 56 pt) comme le reste de
+            // l'app, au lieu d'un .borderedProminent système détonnant (UI-13).
+            GradientButton("Réessayer", systemImage: "arrow.clockwise") {
+                Task { await session.retryBootstrap() }
+            }
+            Button("Se déconnecter") { confirmLogout = true }
+                .font(SQType.body)
+                .tint(SQColor.labelSecondary)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                // Même confirmation qu'au Profil (TRX-31).
+                .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
+                    Button("Se déconnecter", role: .destructive) {
+                        Task { await session.logout() }
+                    }
+                    Button("Annuler", role: .cancel) {}
+                }
+        }
+        .padding(SQSpace.xxl)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -1135,7 +1145,8 @@ struct MainTabView: View {
         case "speedtest": router.requestSpeedtestStart()
         case "speed": router.selectedTab = .speed
         case "map", "carte": router.selectedTab = .map
-        case "messages", "community", "communaute": router.route(toConversation: nil)
+        case "messages": router.route(toConversation: nil)
+        case "community", "communaute": router.selectedTab = .community
         default: break
         }
     }

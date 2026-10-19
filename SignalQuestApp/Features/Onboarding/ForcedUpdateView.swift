@@ -40,33 +40,43 @@ struct ForcedUpdateView: View {
     var body: some View {
         ZStack {
             SQColor.bg.ignoresSafeArea()
-            VStack(spacing: SQSpace.lg) {
-                Image(systemName: "arrow.down.circle")
-                    .font(.system(size: 52))
-                    .foregroundStyle(SQColor.brandRed)
-                    .accessibilityHidden(true)
-                Text("Mise à jour requise")
-                    .font(SQType.title)
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityAddTraits(.isHeader)
-                Group {
-                    if let serverMessage {
-                        Text(serverMessage)
-                    } else {
-                        Text("Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.")
-                    }
-                }
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-                if let updateURL {
-                    GradientButton("Mettre à jour", systemImage: "arrow.up.forward.app") {
-                        openURL(updateURL)
-                    }
-                }
+            // Aux grandes tailles de texte ou en paysage, le contenu défile au lieu d'être coupé :
+            // cet écran n'offre aucune autre sortie.
+            ViewThatFits(in: .vertical) {
+                content
+                ScrollView { content }
             }
-            .padding(SQSpace.xxl)
         }
         .accessibilityIdentifier("forcedUpdate.screen")
+    }
+
+    private var content: some View {
+        VStack(spacing: SQSpace.lg) {
+            Image(systemName: "arrow.down.circle")
+                .font(.system(size: 52))
+                .foregroundStyle(SQColor.brandRed)
+                .accessibilityHidden(true)
+            Text("Mise à jour requise")
+                .font(SQType.title)
+                .foregroundStyle(SQColor.label)
+                .accessibilityAddTraits(.isHeader)
+            Group {
+                if let serverMessage {
+                    Text(serverMessage)
+                } else {
+                    Text("Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.")
+                }
+            }
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+            if let updateURL {
+                GradientButton("Mettre à jour", systemImage: "arrow.up.forward.app") {
+                    openURL(updateURL)
+                }
+            }
+        }
+        .padding(SQSpace.xxl)
+        .frame(maxWidth: .infinity)
     }
 }
