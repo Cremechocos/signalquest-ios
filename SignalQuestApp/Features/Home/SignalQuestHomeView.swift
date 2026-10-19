@@ -93,6 +93,9 @@ struct SignalQuestHomeView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
+            // Jamais plus large que l'écran : un texte renvoyé à la ligne peut déborder
+            // d'une fraction de point à l'arrondi, et le défilement deviendrait horizontal.
+            .frame(minWidth: 0, maxWidth: .infinity)
         }
         // Directement sur le ScrollView : signalQuestBackground() enveloppe
         // dans un ZStack, et onScrollGeometryChange n'observe que la vue à
