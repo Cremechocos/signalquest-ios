@@ -165,8 +165,8 @@ protocol IdentifyServicing: Sendable {
         reason: String?
     ) async throws -> EditSiteResult
 
-    /// Corrige le(s) secteur(s) d'une cellule (PCI/CellID). En France le secteur est
-    /// auto-déduit → réponse `applied=false, reason="AUTO_DERIVED"`.
+    /// Corrige le(s) secteur(s) d'une cellule (PCI/CellID). Le secteur saisi est écrit ;
+    /// la réponse porte, en France, le secteur déduit du PCI comme référence (`derived`).
     func editSectors(
         siteId: String,
         enb: String?,

@@ -1069,4 +1069,29 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(a.id, b.id)
         XCTAssertFalse(a.id.isEmpty)
     }
+
+    /// Édition du secteur : le serveur écrit le secteur saisi et renvoie le secteur déduit du PCI
+    /// comme référence, absente (ou nulle) hors France.
+    func testEditSectorsAnswerCarriesTheDerivedSectorAsAReference() throws {
+        let withDerived = try JSONDecoder().decode(
+            EditSectorsResult.self,
+            from: Data(#"{"applied":true,"updated":1,"sectors":[2],"derived":[3]}"#.utf8)
+        )
+        XCTAssertTrue(withDerived.applied)
+        XCTAssertEqual(withDerived.sectors, [2])
+        XCTAssertEqual(withDerived.derived, [3])
+
+        let withoutDerived = try JSONDecoder().decode(
+            EditSectorsResult.self,
+            from: Data(#"{"applied":true,"updated":1,"sectors":[2],"derived":null}"#.utf8)
+        )
+        XCTAssertEqual(withoutDerived.derived, [])
+
+        let refused = try JSONDecoder().decode(
+            EditSectorsResult.self,
+            from: Data(#"{"applied":false,"updated":0,"sectors":[],"message":"Secteur invalide"}"#.utf8)
+        )
+        XCTAssertFalse(refused.applied)
+        XCTAssertEqual(refused.message, "Secteur invalide")
+    }
 }

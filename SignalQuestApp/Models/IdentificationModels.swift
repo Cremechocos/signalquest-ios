@@ -276,25 +276,29 @@ struct EditSiteResult: Decodable, Equatable {
     }
 }
 
-/// Réponse de `POST /api/android/map/identify/edit-sectors`. En France le secteur
-/// est auto-déduit du PCI → `applied=false, reason="AUTO_DERIVED"` + le secteur réel.
+/// Réponse de `POST /api/android/map/identify/edit-sectors`. Le secteur saisi est écrit ;
+/// pour les opérateurs français le serveur renvoie en plus le secteur déduit du PCI
+/// (`derived`) comme référence.
 struct EditSectorsResult: Decodable, Equatable {
     let applied: Bool
     let updated: Int
     let sectors: [Int]
+    /// Secteur(s) déduit(s) du PCI, vide quand le serveur n'en déduit pas.
+    let derived: [Int]
     let reason: String?
+    let message: String?
 
-    enum CodingKeys: String, CodingKey { case applied, updated, sectors, reason }
+    enum CodingKeys: String, CodingKey { case applied, updated, sectors, derived, reason, message }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         applied = (try? c.decodeIfPresent(Bool.self, forKey: .applied)) ?? false
         updated = (try? c.decodeIfPresent(Int.self, forKey: .updated)) ?? 0
         sectors = c.decodeLossyArray([Int].self, forKey: .sectors)
+        derived = c.decodeLossyArray([Int].self, forKey: .derived)
         reason = c.decodeFlexibleString(forKey: .reason)
+        message = c.decodeFlexibleString(forKey: .message)
     }
-
-    var isAutoDerived: Bool { reason?.uppercased() == "AUTO_DERIVED" }
 }
 
 /// Réponse de `POST /api/android/map/identify/withdraw`.
