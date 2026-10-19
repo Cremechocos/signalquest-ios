@@ -543,6 +543,10 @@ final class MessagesService: MessagesServicing {
     /// notification d'un appel chiffré n'en porte plus (spec §10.5).
     private func rememberForCalls(_ conversations: [MessageConversation], session: LocalAccountSession?) {
         guard let session, session.isCurrent else { return }
+        // Les conversations protégées déjà connues passent à l'extension de notification.
+        ProtectedConversationList.update(
+            adding: ConversationSecretPolicyCache.protectedConversationIds(ownerScopeId: session.ownerScopeId)
+        )
         CallConversationDirectory.shared.record(
             conversations,
             currentUserId: String(session.ownerScopeId.dropFirst("user:".count)),
@@ -2430,17 +2434,54 @@ enum ConversationSecretPolicyCache {
         _ policy: ConversationSecretPolicy,
         conversationId: String,
         ownerScopeId: String = LocalAccountScope.currentOwnerScopeId,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        protectedList: UserDefaults? = ProtectedConversationList.appGroupDefaults()
     ) {
         var all = defaults.data(forKey: key(ownerScopeId))
             .flatMap { try? JSONDecoder().decode([String: ConversationSecretPolicy].self, from: $0) } ?? [:]
+        // Liste lue par l'extension de notification : à jour même si le cache l'est déjà.
+        if policy.isProtectedFromOutsideApp {
+            ProtectedConversationList.update(adding: [conversationId], defaults: protectedList)
+        } else {
+            ProtectedConversationList.update(adding: [], removing: [conversationId], defaults: protectedList)
+        }
         guard all[conversationId] != policy else { return }
         all[conversationId] = policy
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: key(ownerScopeId)) }
     }
 
+    /// Réglage à jour quand le réseau répond, sinon le dernier connu : de quoi
+    /// décider hors de la conversation (Siri, réponse de notification).
+    static func resolved(
+        conversationId: String,
+        service: MessagesServicing,
+        ownerScopeId: String = LocalAccountScope.currentOwnerScopeId
+    ) async -> ConversationSecretPolicy? {
+        if let fresh = try? await service.secretPolicy(conversationId: conversationId) {
+            store(fresh, conversationId: conversationId, ownerScopeId: ownerScopeId)
+            return fresh
+        }
+        return policy(conversationId: conversationId, ownerScopeId: ownerScopeId)
+    }
+
+    /// Conversations protégées de ce compte connues de l'appareil.
+    static func protectedConversationIds(
+        ownerScopeId: String = LocalAccountScope.currentOwnerScopeId,
+        defaults: UserDefaults = .standard
+    ) -> Set<String> {
+        guard let data = defaults.data(forKey: key(ownerScopeId)),
+              let all = try? JSONDecoder().decode([String: ConversationSecretPolicy].self, from: data) else { return [] }
+        return Set(all.filter { $0.value.isProtectedFromOutsideApp }.keys)
+    }
+
     /// À la déconnexion ou au retrait d'un compte.
-    static func purge(ownerScopeId: String, defaults: UserDefaults = .standard) {
+    static func purge(
+        ownerScopeId: String,
+        defaults: UserDefaults = .standard,
+        protectedList: UserDefaults? = ProtectedConversationList.appGroupDefaults()
+    ) {
+        let known = protectedConversationIds(ownerScopeId: ownerScopeId, defaults: defaults)
+        ProtectedConversationList.update(adding: [], removing: known, defaults: protectedList)
         defaults.removeObject(forKey: key(ownerScopeId))
     }
 }

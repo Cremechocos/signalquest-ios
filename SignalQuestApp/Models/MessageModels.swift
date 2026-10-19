@@ -1497,6 +1497,22 @@ struct ConversationSecretPolicy: Codable, Equatable, Sendable {
     /// Durée de vie des messages envoyés, en secondes ; 0 = sans limite.
     var outgoingTTLSeconds: Int { max(0, autoDeleteSeconds ?? 0) }
 
+    /// Durée de vie par défaut d'un message de cette conversation quand les
+    /// messages éphémères sont actifs : celle du réglage, sinon 24 h.
+    static let defaultEphemeralSeconds = 86_400
+
+    /// Durée de vie d'un message envoyé hors de la conversation (Siri,
+    /// réponse de notification) : celle de la conversation si elle est
+    /// éphémère par défaut, 0 sinon.
+    var backgroundSendTTLSeconds: Int {
+        guard ephemeralDefault else { return 0 }
+        return outgoingTTLSeconds > 0 ? outgoingTTLSeconds : Self.defaultEphemeralSeconds
+    }
+
+    /// Verrou ou capture bloquée : la conversation n'apparaît ni dans Siri ni
+    /// dans l'aperçu de ses notifications.
+    var isProtectedFromOutsideApp: Bool { requireBiometric || blockScreenshots }
+
     init(requireBiometric: Bool = false, blockScreenshots: Bool = false, autoDeleteSeconds: Int? = nil, ephemeralDefault: Bool = false) {
         self.requireBiometric = requireBiometric
         self.blockScreenshots = blockScreenshots

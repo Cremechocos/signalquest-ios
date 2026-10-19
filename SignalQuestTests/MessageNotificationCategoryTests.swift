@@ -58,6 +58,35 @@ final class MessageNotificationCategoryTests: XCTestCase {
         XCTAssertEqual(MessageNotificationCategory.categorized(other).categoryIdentifier, "")
     }
 
+    /// Conversation protégée : ni aperçu ni réponse rapide, mais l'ouverture mène toujours au fil.
+    func testProtectedConversationsHaveNoPreviewAndNoQuickReply() {
+        let content = UNMutableNotificationContent()
+        content.title = "Équipe secrète 🎉"
+        content.subtitle = "Léa"
+        content.body = "Léa : le code de la porte est 4521"
+        content.userInfo = ["type": "message_new", "conversationId": "c-protected"]
+        let hidden = MessageNotificationCategory.categorized(content, isProtected: { $0 == "c-protected" })
+        XCTAssertEqual(hidden.categoryIdentifier, MessageNotificationCategory.encrypted, "Marquer comme lu seulement")
+        XCTAssertEqual(hidden.title, "SignalQuest")
+        XCTAssertEqual(hidden.subtitle, "")
+        XCTAssertEqual(hidden.body, String(localized: "Nouveau message"))
+        for leaked in ["Équipe", "Léa", "4521", "🎉"] {
+            XCTAssertFalse([hidden.title, hidden.subtitle, hidden.body].joined().contains(leaked), leaked)
+        }
+        XCTAssertEqual(hidden.userInfo["conversationId"] as? String, "c-protected")
+
+        content.userInfo = ["type": "message_new", "conversation_id": "c-protected"]
+        XCTAssertEqual(
+            MessageNotificationCategory.categorized(content, isProtected: { $0 == "c-protected" }).categoryIdentifier,
+            MessageNotificationCategory.encrypted
+        )
+
+        content.userInfo = ["type": "message_new", "conversationId": "c-open"]
+        let open = MessageNotificationCategory.categorized(content, isProtected: { $0 == "c-protected" })
+        XCTAssertEqual(open.categoryIdentifier, MessageNotificationCategory.plain)
+        XCTAssertEqual(open.body, content.body)
+    }
+
     func testReplyIsOfferedOnlyOutsideEncryptedConversationsAndNeedsUnlocking() throws {
         let categories = MessageNotificationCategory.declared()
         let plain = try XCTUnwrap(categories.first { $0.identifier == MessageNotificationCategory.plain })

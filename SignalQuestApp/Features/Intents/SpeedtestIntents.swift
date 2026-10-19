@@ -54,13 +54,19 @@ enum SQConversationIntentDirectory {
         let isEncrypted: Bool
     }
 
-    /// Les plus récemment vues d'abord ; vide hors d'un compte connecté.
+    /// Les plus récemment vues d'abord ; vide hors d'un compte connecté. Une
+    /// conversation protégée n'y figure pas : ni son nom ni sa présence ne sortent de l'app.
     static func items() -> [Item] {
         let owner = LocalAccountScope.currentOwnerScopeId
         guard owner.hasPrefix("user:") else { return [] }
-        return CallConversationDirectory.shared.allEntries(ownerScopeId: owner).map {
+        let all = CallConversationDirectory.shared.allEntries(ownerScopeId: owner).map {
             Item(id: $0.id, name: $0.entry.title, isEncrypted: $0.entry.isEncrypted)
         }
+        return excluding(ConversationSecretPolicyCache.protectedConversationIds(ownerScopeId: owner), from: all)
+    }
+
+    static func excluding(_ hidden: Set<String>, from items: [Item]) -> [Item] {
+        items.filter { !hidden.contains($0.id) }
     }
 
     static func matching(_ items: [Item], name: String) -> [Item] {
@@ -163,6 +169,7 @@ enum SendMessageIntentError: Error, CustomLocalizedStringResourceConvertible {
     case emptyText
     case signedOut
     case encryptedConversation
+    case protectedConversation
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -172,6 +179,8 @@ enum SendMessageIntentError: Error, CustomLocalizedStringResourceConvertible {
             return "Connecte-toi à SignalQuest pour envoyer un message."
         case .encryptedConversation:
             return "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis."
+        case .protectedConversation:
+            return "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire."
         }
     }
 }
@@ -202,8 +211,12 @@ struct SendMessageIntent: AppIntent {
         // L'état réel de la conversation, pas celui de l'annuaire local.
         let target = try await service.conversation(id: conversation.id)
         guard target.e2eeEnabled != true else { throw SendMessageIntentError.encryptedConversation }
+        // Une conversation protégée ne s'écrit que dans l'app ; une éphémère garde sa durée.
+        let policy = await ConversationSecretPolicyCache.resolved(conversationId: target.id, service: service)
+        guard policy?.isProtectedFromOutsideApp != true else { throw SendMessageIntentError.protectedConversation }
         _ = try await service.sendText(
-            trimmed, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: 0
+            trimmed, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString,
+            ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0
         )
         return .result(dialog: IntentDialog(stringLiteral: String(localized: "Message envoyé à \(conversation.name).")))
     }

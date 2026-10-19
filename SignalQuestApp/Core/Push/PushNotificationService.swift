@@ -960,8 +960,18 @@ extension PushNotificationService {
             let conversation = (try? await messages.conversation(id: conversationId))
                 ?? MessageConversation.replyTarget(id: conversationId)
             guard conversation.e2eeEnabled != true else { return }
+            // Une conversation protégée ne reçoit pas de réponse rapide : le rappel
+            // (sans nom) mène au fil. Une éphémère garde la durée de ses messages.
+            let policy = await ConversationSecretPolicyCache.resolved(conversationId: conversationId, service: messages)
+            guard policy?.isProtectedFromOutsideApp != true else {
+                await Self.postReplyFailureNotice(conversationId: conversationId, conversationTitle: nil)
+                return
+            }
             do {
-                _ = try await messages.sendText(text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil, ttlSeconds: 0)
+                _ = try await messages.sendText(
+                    text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil,
+                    ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0
+                )
             } catch where error.isPermanentRequestFailure {
                 // Refus définitif (exclu du groupe, conversation supprimée) : rien ne repartira,
                 // et l'écran verrouillé ne dit pas que la réponse est perdue (U04).

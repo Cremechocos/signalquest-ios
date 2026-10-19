@@ -440,6 +440,62 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(Set(Mirror(reflecting: ConversationEntity(items[0])).children.compactMap(\.label)), ["id", "name"])
     }
 
+    /// Une conversation protégée n'est ni proposée ni résolue par Siri.
+    func testConversationIntentDirectoryHidesProtectedConversations() {
+        typealias Item = SQConversationIntentDirectory.Item
+        let items = [Item(id: "1", name: "Équipe terrain", isEncrypted: false), Item(id: "2", name: "Camille", isEncrypted: false)]
+        XCTAssertEqual(SQConversationIntentDirectory.excluding(["2"], from: items).map(\.id), ["1"])
+        XCTAssertEqual(SQConversationIntentDirectory.excluding([], from: items).count, 2)
+    }
+
+    /// Siri et la réponse de notification : la durée de la conversation éphémère, jamais « sans limite » par défaut.
+    func testBackgroundSendTTLFollowsTheConversationPolicy() {
+        XCTAssertEqual(ConversationSecretPolicy().backgroundSendTTLSeconds, 0)
+        XCTAssertEqual(ConversationSecretPolicy(ephemeralDefault: true).backgroundSendTTLSeconds, 86_400)
+        XCTAssertEqual(ConversationSecretPolicy(autoDeleteSeconds: 3_600, ephemeralDefault: true).backgroundSendTTLSeconds, 3_600)
+        XCTAssertEqual(ConversationSecretPolicy(autoDeleteSeconds: 3_600).backgroundSendTTLSeconds, 0, "Sans éphémère par défaut, rien n'expire")
+        XCTAssertTrue(ConversationSecretPolicy(requireBiometric: true).isProtectedFromOutsideApp)
+        XCTAssertTrue(ConversationSecretPolicy(blockScreenshots: true).isProtectedFromOutsideApp)
+        XCTAssertFalse(ConversationSecretPolicy(autoDeleteSeconds: 3_600, ephemeralDefault: true).isProtectedFromOutsideApp,
+                       "Une conversation éphémère n'est pas pour autant masquée")
+    }
+
+    /// La liste lue par l'extension de notification suit le cache des réglages, et part avec le compte.
+    func testProtectedConversationListFollowsThePolicyCache() throws {
+        let suite = "sq.tests.protected.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let shared = try XCTUnwrap(UserDefaults(suiteName: suite + ".shared"))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            shared.removePersistentDomain(forName: suite + ".shared")
+        }
+        ConversationSecretPolicyCache.store(
+            ConversationSecretPolicy(requireBiometric: true), conversationId: "c1", ownerScopeId: "user:a",
+            defaults: defaults, protectedList: shared
+        )
+        ConversationSecretPolicyCache.store(
+            ConversationSecretPolicy(ephemeralDefault: true), conversationId: "c2", ownerScopeId: "user:a",
+            defaults: defaults, protectedList: shared
+        )
+        XCTAssertTrue(ProtectedConversationList.contains("c1", defaults: shared))
+        XCTAssertFalse(ProtectedConversationList.contains("c2", defaults: shared))
+        XCTAssertEqual(ConversationSecretPolicyCache.protectedConversationIds(ownerScopeId: "user:a", defaults: defaults), ["c1"])
+
+        // Réglage retiré : la conversation redevient visible.
+        ConversationSecretPolicyCache.store(
+            ConversationSecretPolicy(), conversationId: "c1", ownerScopeId: "user:a", defaults: defaults, protectedList: shared
+        )
+        XCTAssertFalse(ProtectedConversationList.contains("c1", defaults: shared))
+
+        ConversationSecretPolicyCache.store(
+            ConversationSecretPolicy(blockScreenshots: true), conversationId: "c3", ownerScopeId: "user:a",
+            defaults: defaults, protectedList: shared
+        )
+        ConversationSecretPolicyCache.purge(ownerScopeId: "user:a", defaults: defaults, protectedList: shared)
+        XCTAssertFalse(ProtectedConversationList.contains("c3", defaults: shared))
+        XCTAssertNil(ConversationSecretPolicyCache.policy(conversationId: "c3", ownerScopeId: "user:a", defaults: defaults))
+    }
+
     // MARK: Partager vers SignalQuest (boîte de dépôt, destinations)
 
     private func makeInbox() throws -> ShareInbox {
