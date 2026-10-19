@@ -319,10 +319,15 @@ enum SQShareCardBuilder {
     }
 
     private static func dateText(_ date: Date, locale: Locale) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.dateFormat = "d MMM yyyy · HH:mm"
-        return formatter.string(from: date)
+        // Ordre jour/mois et 12 h / 24 h de la langue : « 19 oct. 2026 · 14:30 »,
+        // « Oct 19, 2026 · 2:30 PM ».
+        let day = DateFormatter()
+        day.locale = locale
+        day.setLocalizedDateFormatFromTemplate("d MMM yyyy")
+        let time = DateFormatter()
+        time.locale = locale
+        time.setLocalizedDateFormatFromTemplate("jmm")
+        return "\(day.string(from: date)) · \(time.string(from: date))"
     }
 }
 

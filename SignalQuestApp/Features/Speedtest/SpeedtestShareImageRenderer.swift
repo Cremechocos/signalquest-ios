@@ -29,7 +29,7 @@ enum SpeedtestShareImageRenderer {
         }
         if options.includeServerDetails,
            let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty {
-            context += " via \(server)"
+            context += String(localized: " via \(server)")
         }
         // Dans la langue de l'app : l'app anglaise partageait un texte en
         // français (TRX-06).

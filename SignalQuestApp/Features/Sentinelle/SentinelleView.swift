@@ -800,7 +800,7 @@ struct SentinelleDeadFamilyNote: View {
     var body: some View {
         let dead = target.addresses.filter { points.inFamily($0.family).addressState == .down }
         if !dead.isEmpty, target.status != "down" {
-            Text("\(dead.map(\.familyLabel).joined(separator: " et ")) ne répond plus, l’autre famille tient la connexion.")
+            Text("\(ListFormatter.localizedString(byJoining: dead.map(\.familyLabel))) ne répond plus, l’autre famille tient la connexion.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.dangerInk)
                 .fixedSize(horizontal: false, vertical: true)

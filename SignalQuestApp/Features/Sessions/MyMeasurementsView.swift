@@ -100,9 +100,13 @@ struct MyMeasurementsView: View {
         _model = StateObject(wrappedValue: MyMeasurementsViewModel(service: service))
     }
 
+    /// Avant le premier chargement, ni vide ni erreur : le spinner tient la place
+    /// pour que « Aucune mesure » ne clignote pas pendant l'animation d'arrivée.
+    private var isWaitingForFirstLoad: Bool { !model.hasLoaded && model.errorMessage == nil }
+
     var body: some View {
         ZStack {
-            if model.points.isEmpty && !model.isLoading {
+            if model.points.isEmpty && !model.isLoading && !isWaitingForFirstLoad {
                 emptyState
             } else {
                 SessionTraceMapView(points: model.points, antennas: [], drawPath: false,
@@ -119,7 +123,7 @@ struct MyMeasurementsView: View {
                         }
                     }
             }
-            if model.isLoading {
+            if model.isLoading || isWaitingForFirstLoad {
                 SQSpinner().controlSize(.large).tint(SQColor.brandRed)
             }
         }
