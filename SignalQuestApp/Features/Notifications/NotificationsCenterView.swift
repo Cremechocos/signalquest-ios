@@ -517,6 +517,7 @@ struct NotificationsCenterView: View {
     static func title(for kind: String?) -> String {
         switch kind?.lowercased() {
         case "message_new": return String(localized: "Nouveau message")
+        case "message_request": return String(localized: "Demande de message")
         case "message_reaction", "social_reaction": return String(localized: "Nouvelle réaction")
         case "message_mention", "social_mention": return String(localized: "On t’a mentionné")
         case "social_comment": return String(localized: "Nouveau commentaire")
@@ -545,6 +546,8 @@ struct NotificationsCenterView: View {
         }
         // Avant la règle « follow », qui donnerait l'icône d'un nouvel abonné.
         if k == "site_follow" { return "antenna.radiowaves.left.and.right" }
+        // Demande de message (DM-REQ-1) : avant la règle « message », qui donnerait celle d'un message reçu.
+        if k == "message_request" { return "tray" }
         if k.contains("like") || k.contains("reaction") || k.contains("favorite") {
             return "heart.fill"
         }

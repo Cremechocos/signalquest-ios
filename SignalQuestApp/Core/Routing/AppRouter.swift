@@ -160,6 +160,8 @@ final class AppRouter: ObservableObject {
     /// Demandes du clavier de l'iPad (⌘N, ⌘⇧N, ⌘F, ⌘K), consommées par
     /// l'écran concerné quand il s'affiche.
     @Published var openNewConversation = false
+    /// Demandes de message (DM-REQ-1) : la messagerie s'ouvre sur l'écran des demandes, jamais sur une conversation.
+    @Published var openMessageRequests = false
     @Published var openPostComposer = false
     @Published var focusMapSearch = false
     @Published var showsCommandPalette = false
@@ -190,7 +192,7 @@ final class AppRouter: ObservableObject {
     /// Une destination reçue de l'extérieur garde la priorité sur le choix
     /// générique de fin d'introduction, notamment après une connexion.
     var hasPendingContentRoute: Bool {
-        openConversationId != nil || openMessagesInbox || openPostId != nil
+        openConversationId != nil || openMessagesInbox || openMessageRequests || openPostId != nil
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil || openBugId != nil
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
@@ -278,6 +280,10 @@ final class AppRouter: ObservableObject {
         case "message", "conversation", "call", "dm", "e2ee_v2_envelope",
              "message_new", "message_reaction", "message_mention":
             route(toConversation: conversationId)
+        // Demande de message (DM-REQ-1) : l'écran des demandes. La charge ne porte pas de
+        // `conversationId` et, s'il y en avait un, il ne doit pas ouvrir le fil : répondre vaudrait acceptation.
+        case "message_request":
+            routeToMessageRequests()
         // Réaction ou mention sur un MESSAGE : elle porte sa conversation, pas
         // un post ; elle ouvrait le fil sur rien (SOC-25).
         case "reaction" where conversationId != nil && postId == nil:
@@ -408,6 +414,13 @@ final class AppRouter: ObservableObject {
     func route(toSentinelleShare slug: String) {
         selectedTab = .profile
         openSentinelleShareSlug = slug
+    }
+
+    /// Notification d'une demande de message : l'écran « Demandes de message ».
+    func routeToMessageRequests() {
+        selectedTab = .community
+        openMessagesInbox = true
+        openMessageRequests = true
     }
 
     func route(toConversation id: String?) {

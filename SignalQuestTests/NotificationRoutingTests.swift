@@ -42,6 +42,21 @@ final class NotificationRoutingTests: XCTestCase {
         }
     }
 
+    /// DM-REQ-1 : une demande de message ouvre l'écran des demandes, jamais une conversation (répondre
+    /// vaudrait acceptation), même si une charge portait un `conversationId`.
+    func testMessageRequestOpensTheRequestsScreenAndNeverAConversation() {
+        for conversationId in [nil, "conv-1"] as [String?] {
+            let router = AppRouter()
+            router.handle(type: "message_request", conversationId: conversationId, postId: nil, userId: "sender-1")
+            XCTAssertTrue(router.openMessageRequests)
+            XCTAssertTrue(router.openMessagesInbox)
+            XCTAssertEqual(router.selectedTab, .community)
+            XCTAssertNil(router.openConversationId)
+            XCTAssertNil(router.openUserProfileId)
+            XCTAssertTrue(router.hasPendingContentRoute, "Une destination reçue prime sur le choix de fin d'introduction")
+        }
+    }
+
     func testServerSocialTypesOpenThePost() {
         for type in ["social_reaction", "social_comment", "social_repost", "social_mention"] {
             let router = AppRouter()
