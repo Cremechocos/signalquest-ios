@@ -232,8 +232,8 @@ struct SharedPostEmbedBubble: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Publication de \(item.author.displayName)")
-                .accessibilityHint("Toucher pour ouvrir la publication")
+                .accessibilityLabel(accessibilityLabel(item))
+                .accessibilityHint("Ouvre la publication")
 
                 Rectangle()
                     .fill(SQColor.separator)
@@ -241,6 +241,16 @@ struct SharedPostEmbedBubble: View {
                 actionsBar(item)
             }
         }
+    }
+
+    /// Auteur et début du texte : le libellé remplace le contenu du bouton pour
+    /// VoiceOver, qui n'annoncerait sinon que le nom.
+    private func accessibilityLabel(_ item: UnifiedSocialFeedItem) -> String {
+        let text = String(bodyText(item).trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
+        let author = item.author.displayName
+        return text.isEmpty
+            ? String(localized: "Publication de \(author)")
+            : String(localized: "Publication de \(author) : \(text)")
     }
 
     private func header(_ item: UnifiedSocialFeedItem) -> some View {

@@ -107,6 +107,8 @@ struct GradientButton: View {
     let style: Style
     let allowsMultiline: Bool
     let action: () -> Void
+    /// Titre composé à l'exécution (nom de conversation, numéro) : affiché tel quel.
+    private var isVerbatim = false
 
     init(
         _ title: String,
@@ -122,6 +124,19 @@ struct GradientButton: View {
         self.style = style
         self.allowsMultiline = allowsMultiline
         self.action = action
+    }
+
+    /// Titre dynamique : jamais cherché dans le catalogue ni interprété (Markdown, `%`).
+    init(
+        verbatim title: String,
+        systemImage: String? = nil,
+        isBusy: Bool = false,
+        style: Style = .primary,
+        allowsMultiline: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.init(title, systemImage: systemImage, isBusy: isBusy, style: style, allowsMultiline: allowsMultiline, action: action)
+        isVerbatim = true
     }
 
     /// Backwards-compatible initializer accepting the previous `isProminent` flag.
@@ -147,7 +162,7 @@ struct GradientButton: View {
                     Image(systemName: systemImage)
                         .font(SQFont.body(15, .semibold, relativeTo: .body))
                 }
-                Text(LocalizedStringKey(title))
+                (isVerbatim ? Text(verbatim: title) : Text(LocalizedStringKey(title)))
                     .font(SQType.button)
                     .lineLimit(allowsMultiline || dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .multilineTextAlignment(.center)

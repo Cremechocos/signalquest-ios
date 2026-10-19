@@ -65,7 +65,8 @@ final class ShareModel: ObservableObject {
     }
 
     func cancel() {
-        removeStaging()
+        // Comme `tearDown` : pendant le dépôt, les copies de travail servent encore.
+        if phase != .saving { removeStaging() }
         onCancel()
     }
 
@@ -135,10 +136,12 @@ struct ShareView: View {
         .frame(minHeight: 56)
     }
 
+    /// Pas d'« Annuler » pendant le dépôt : l'écriture lit encore les copies de
+    /// travail, qu'une annulation effacerait en route.
     private var showsCancel: Bool {
         switch model.phase {
-        case .loading, .ready, .saving: return true
-        case .done, .failed: return false
+        case .loading, .ready: return true
+        case .saving, .done, .failed: return false
         }
     }
 

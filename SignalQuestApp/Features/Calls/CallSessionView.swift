@@ -12,11 +12,17 @@ import UIKit
 struct CallScreen: View {
     @ObservedObject var callManager: CallManager
     @ObservedObject var liveKit: LiveKitClient
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     init(callManager: CallManager) {
         _callManager = ObservedObject(wrappedValue: callManager)
         _liveKit = ObservedObject(wrappedValue: callManager.liveKit)
     }
+
+    /// Très grand texte ou écran en paysage : le haut de l'écran défile, les
+    /// commandes (raccrocher compris) restent épinglées en bas.
+    private var scrollsStage: Bool { dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact }
 
     var body: some View {
         ZStack {
@@ -33,9 +39,28 @@ struct CallScreen: View {
     private var callStage: some View {
         VStack(spacing: SQSpace.lg) {
             topBar
+            if scrollsStage {
+                ScrollView {
+                    stageContent
+                        .padding(.vertical, SQSpace.xs)
+                }
+            } else {
+                stageContent
+            }
+            controls
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.xl)
+    }
+
+    @ViewBuilder
+    private var stageContent: some View {
+        VStack(spacing: SQSpace.lg) {
             if callManager.activeCall?.hasVideo == true {
                 callHeader
+                // Dans le défilement, la vidéo n'a plus de hauteur imposée : un minimum la garde visible.
                 videoStage
+                    .frame(minHeight: scrollsStage ? 240 : nil)
             } else {
                 Spacer(minLength: SQSpace.lg)
                 // Le visage d'abord, puis le nom et la durée, comme sur le web.
@@ -57,10 +82,7 @@ struct CallScreen: View {
                     PeerNetworkCard(name: callManager.peerNetworkName(for: identity), packet: network.packet)
                 }
             }
-            controls
         }
-        .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.xl)
     }
 
     /// Ronds translucents de l'écran d'appel, toujours sombre.
@@ -209,6 +231,9 @@ struct CallScreen: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
+                // Légende redondante avec le libellé du bouton : elle ne grandit pas
+                // au point de pousser les commandes hors de l'écran.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .accessibilityHidden(true)
         }
         .frame(width: 76)

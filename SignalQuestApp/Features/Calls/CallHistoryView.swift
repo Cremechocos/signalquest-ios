@@ -296,11 +296,11 @@ struct CallHistoryView: View {
     private func directionStyle(_ call: CallSession) -> (icon: String, color: Color, soft: Color, isMissed: Bool) {
         switch call.status {
         case "missed", "rejected":
-            return ("phone.down.fill", SQColor.danger, SQColor.dangerSoft, true)
+            return ("phone.down.fill", SQColor.dangerInk, SQColor.dangerSoft, true)
         case "ended", "accepted":
             return ("phone.fill", SQColor.success, SQColor.successSoft, false)
         default:
-            return ("phone.fill", SQColor.brandRed, SQColor.accentSoft, false)
+            return ("phone.fill", SQColor.accentInk, SQColor.accentSoft, false)
         }
     }
 

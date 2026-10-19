@@ -243,7 +243,7 @@ struct SharedPostCardBubble: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.accentInk)
                     .frame(minHeight: 28)
                     // Zone tactile de 44 pt sans agrandir la rangée.
                     .padding(.vertical, 8)
@@ -518,7 +518,7 @@ private struct ShareCardOpenButton: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.accentInk)
                 .frame(minHeight: 28)
                 // Zone tactile de 44 pt sans agrandir la rangée.
                 .padding(.vertical, 8)
