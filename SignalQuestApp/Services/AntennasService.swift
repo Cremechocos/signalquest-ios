@@ -95,7 +95,7 @@ final class AntennasService: AntennasServicing {
 
         var seen = Set<String>()
         return batches.flatMap { $0 }.filter { site in
-            let key = site.siteId ?? site.id
+            let key = site.writeSiteId
             return seen.insert(key).inserted
         }
     }

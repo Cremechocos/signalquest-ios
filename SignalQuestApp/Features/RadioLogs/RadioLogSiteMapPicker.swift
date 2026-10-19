@@ -667,7 +667,7 @@ struct RadioLogSiteMapPicker: View {
                     bbox: bbox, market: market, operatorName: operatorKey, technologies: []
                 )
                 for antenna in batch where antenna.hasValidCoordinate {
-                    if seen.insert(antenna.siteId ?? antenna.id).inserted { merged.append(antenna) }
+                    if seen.insert(antenna.writeSiteId).inserted { merged.append(antenna) }
                 }
             }
             // REPLI COMMUNAUTAIRE. Dans les 40+ pays sans référentiel officiel, la boucle
@@ -684,7 +684,7 @@ struct RadioLogSiteMapPicker: View {
                     bbox: bbox, market: market, operatorName: queriedOperatorKeys.first
                 )
                 for site in community where site.hasValidCoordinate {
-                    if seen.insert(site.siteId ?? site.id).inserted { merged.append(site) }
+                    if seen.insert(site.writeSiteId).inserted { merged.append(site) }
                 }
                 isCommunityFallback = !merged.isEmpty
             } else {

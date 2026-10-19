@@ -322,7 +322,7 @@ struct AntennaDetailSheet: View {
         }
         .sheet(isPresented: $showReportSheet) {
             AntennaReportSheet(
-                siteId: site.siteId ?? site.id,
+                siteId: site.writeSiteId,
                 siteLabel: site.siteId ?? site.id,
                 availableSectors: reportSectors,
                 service: services.antennaReports,
@@ -433,7 +433,7 @@ struct AntennaDetailSheet: View {
             raw: raw,
             blurRegions: blurRegions,
             photos: services.photos,
-            siteId: site.siteId ?? site.id,
+            siteId: site.writeSiteId,
             anfrCode: site.anfrCode,
             operatorName: operatorName,
             market: market

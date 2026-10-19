@@ -1366,7 +1366,7 @@ struct PhotoUploadView: View {
                             // pas. Le serveur conserve alors l'attribution vide ;
                             // seul un support réellement mutualisé impose le choix.
                             let networkOperator = selectedOperator ?? availableOperators.first
-                            let failure = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, networkOperator, prepared.exifJSON)
+                            let failure = await onUpload(prepared.jpeg, site.writeSiteId, description, networkOperator, prepared.exifJSON)
                             isUploading = false
                             if let failure { uploadError = failure } else { dismiss() }
                         }
@@ -1762,7 +1762,7 @@ struct AntennaSitePickerSheet: View {
                     technologies: []
                 )
                 for site in batch {
-                    let key = site.siteId ?? site.id
+                    let key = site.writeSiteId
                     if seen.insert(key).inserted { merged.append(site) }
                 }
             }
@@ -1773,7 +1773,7 @@ struct AntennaSitePickerSheet: View {
                     operatorName: nil
                 )
                 for site in community {
-                    let key = site.siteId ?? site.id
+                    let key = site.writeSiteId
                     if seen.insert(key).inserted { merged.append(site) }
                 }
                 isCommunityFallback = !merged.isEmpty

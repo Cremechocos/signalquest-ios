@@ -78,7 +78,7 @@ final class SiteRemapViewModel: ObservableObject {
 
     func confirm() async {
         guard let selected else { return }
-        let toSiteId = selected.siteId ?? selected.id
+        let toSiteId = selected.writeSiteId
         isSubmitting = true
         defer { isSubmitting = false }
         do {

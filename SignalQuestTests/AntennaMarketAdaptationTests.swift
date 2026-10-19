@@ -217,6 +217,39 @@ final class ServingAntennaSiteIdTests: XCTestCase {
         XCTAssertEqual(site(id: "cmpo873aw0jnx2fll7pthh8ii", siteId: nil).writeSiteId, "cmpo873aw0jnx2fll7pthh8ii")
     }
 
+    /// Deux sites canadiens de titulaires différents peuvent partager un `sup_id` : la liste de la
+    /// carte les garde tous les deux (la déduplication suit la clé d'écriture), et un même site
+    /// français rendu par plusieurs opérateurs ne compte qu'une fois.
+    func testListKeepsTwoCanadianSitesSharingASupId() async throws {
+        let first = "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567"
+        let second = "9a8b7c6d5e4f30211203f4e5d6c7b8a998877665"
+        func list(market: String, operatorName: String, body: String) async throws -> [AntennaSite] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [MockURLProtocol.self]
+            let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                                session: URLSession(configuration: config))
+            MockURLProtocol.requestHandler = { request in
+                (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                 Data(body.utf8))
+            }
+            defer { MockURLProtocol.requestHandler = nil }
+            return try await AntennasService(api: api).list(
+                bbox: BoundingBox(north: 46, south: 45, east: -73, west: -74),
+                market: market, operatorName: operatorName, technologies: []
+            )
+        }
+        let canadian = try await list(market: "CA", operatorName: "BELL", body: """
+        { "antennas": [
+          { "id": "\(first)", "sup_id": "M1229", "latitude": 45.5, "longitude": -73.6 },
+          { "id": "\(second)", "sup_id": "M1229", "latitude": 45.6, "longitude": -73.7 } ] }
+        """)
+        XCTAssertEqual(canadian.map(\.writeSiteId), [first, second])
+        let french = try await list(market: "FR", operatorName: "ALL", body: """
+        { "antennas": [ { "id": "anfr-1", "sup_id": "37199", "latitude": 44.06, "longitude": 5.9 } ] }
+        """)
+        XCTAssertEqual(french.map(\.writeSiteId), ["37199"], "Même site rendu pour SFR, Bouygues et ALL : une seule fois")
+    }
+
     func testSearchResultIsWrittenUnderItsSiteKeyToo() throws {
         let hex = "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567"
         let canadian = try JSONDecoder().decode(AntennaSite.self, from: Data("""
