@@ -672,16 +672,24 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.value(String.self, .id, UUID().uuidString)
-        supId = c.optional(String.self, .sup_id)
-        operatorRaw = c.value(String.self, .adm_lb_nom, "")
-        system = c.value(String.self, .emr_lb_systeme, "")
+        let decodedSupId = c.optional(String.self, .sup_id)
+        let decodedOperator = c.value(String.self, .adm_lb_nom, "")
+        let decodedSystem = c.value(String.self, .emr_lb_systeme, "")
+        supId = decodedSupId
+        operatorRaw = decodedOperator
+        system = decodedSystem
         generationRaw = c.value(String.self, .generation, "")
         modTypeRaw = c.value(String.self, .type, "")
         statut = c.value(String.self, .statut, "")
         dateMaj = c.value(String.self, .date_maj, "")
-        latitude = Double(c.optional(String.self, .lat) ?? "")
-        longitude = Double(c.optional(String.self, .lon) ?? "")
+        // Position en chaîne (format complet) ou en nombre : les deux se lisent.
+        latitude = c.optional(ANFRLooseNumber.self, .lat)?.value
+        longitude = c.optional(ANFRLooseNumber.self, .lon)?.value
+        // Sans `id` serveur, l'identifiant se déduit de la ligne : le même à chaque décodage,
+        // pour que SwiftUI et MapKit reconnaissent l'antenne d'un affichage à l'autre.
+        id = c.optional(String.self, .id)
+            ?? [decodedSupId ?? "", decodedOperator, decodedSystem, c.optional(String.self, .adr_lb_add1) ?? ""]
+                .joined(separator: "|")
         city = c.optional(String.self, .city)
         changeDate = c.optional(String.self, .changeDate)
         catchUp = c.value(Bool.self, .catchUp, false)
@@ -1097,6 +1105,11 @@ struct ANFRZoneRadius: Hashable, Identifiable, Sendable {
     /// Pas de la grille sur laquelle le serveur arrondit le centre (`radiusKm` × 0,001°) :
     /// deux points de la même case reçoivent la même réponse, donc le même cache mémoire.
     var gridDegrees: Double { Double(kilometers) * 0.001 }
+
+    /// Coordonnée ramenée à la case de grille (arrondi à la demie supérieure, comme le serveur).
+    func snapped(_ degrees: Double) -> Double {
+        ((degrees / gridDegrees) + 0.5).rounded(.down) * gridDegrees
+    }
 }
 
 /// Marchés dont l'ANFR publie les antennes : seuls ceux-là sont interrogés.

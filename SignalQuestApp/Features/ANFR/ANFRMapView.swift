@@ -938,6 +938,10 @@ struct ANFRMapView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dismiss) private var dismiss
+    /// Largeur et hauteur d'une barre de semaine, qui suivent la taille du texte de sa date.
+    @ScaledMetric(relativeTo: .caption2) private var weekBarWidth: CGFloat = 46
+    @ScaledMetric(relativeTo: .caption2) private var weekBarHeight: CGFloat = 62
 
     @State private var selectedSite: ANFRMapSite?
     @State private var showFilters = false
@@ -952,8 +956,15 @@ struct ANFRMapView: View {
     @State private var pendingSite: ANFRMapSite?
     @State private var showsUserLocation = false
     @State private var locationNotice: String?
+    /// Identifie le dernier message de position : la minuterie d'un message plus ancien
+    /// n'efface pas le suivant.
+    @State private var locationNoticeID = UUID()
 
-    init(service: ANFRServicing) {
+    /// Vrai quand l'écran a été ouvert depuis les statistiques : leur bouton revient en arrière.
+    private let cameFromStats: Bool
+
+    init(service: ANFRServicing, cameFromStats: Bool = false) {
+        self.cameFromStats = cameFromStats
         _model = StateObject(wrappedValue: ANFRMapViewModel(service: service))
     }
 
@@ -1001,7 +1012,7 @@ struct ANFRMapView: View {
                 .accessibilityIdentifier("anfr.map.list")
                 Button {
                     Haptics.light()
-                    showsStats = true
+                    if cameFromStats { dismiss() } else { showsStats = true }
                 } label: {
                     Image(systemName: "chart.bar.xaxis")
                 }
@@ -1010,7 +1021,7 @@ struct ANFRMapView: View {
             }
         }
         .navigationDestination(isPresented: $showsStats) {
-            ANFRStatsView(service: services.anfr)
+            ANFRStatsView(service: services.anfr, cameFromMap: true)
         }
         .sheet(item: $selectedSite) { site in
             ANFRSiteDetailSheet(
@@ -1112,9 +1123,11 @@ struct ANFRMapView: View {
                 showsUserLocation = true
                 model.requestCamera(.region(center: location.coordinate, radiusMeters: 4_000))
             } else {
+                let noticeID = UUID()
+                locationNoticeID = noticeID
                 locationNotice = String(localized: "Position indisponible. Vérifie l’autorisation de localisation dans les Réglages.")
                 try? await Task.sleep(nanoseconds: 6_000_000_000)
-                locationNotice = nil
+                if locationNoticeID == noticeID { locationNotice = nil }
             }
         }
     }
@@ -1454,7 +1467,7 @@ struct ANFRMapView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(width: 46, height: 62)
+            .frame(width: weekBarWidth, height: weekBarHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1695,6 +1708,8 @@ struct ANFRSiteListView: View {
     @State private var query = ""
     @State private var sort: ANFRSiteListSort = .type
     @State private var rows: [ANFRSiteRow] = []
+    /// Recalcul différé de la recherche : le filtre et le tri ne repartent pas à chaque touche.
+    @State private var searchTask: Task<Void, Never>?
 
     init(title: LocalizedStringKey, sites: [ANFRMapSite], revision: Int, origin: CLLocationCoordinate2D?,
          showsSearch: Bool, layer: ANFRMapLayer = .changes, onClose: (() -> Void)?, onSelect: @escaping (ANFRMapSite) -> Void) {
@@ -1767,7 +1782,7 @@ struct ANFRSiteListView: View {
         }
         .signalQuestBackground()
         .onAppear(perform: recompute)
-        .onChangeCompat(of: query) { _, _ in recompute() }
+        .onChangeCompat(of: query) { _, _ in recomputeSoon() }
         .onChangeCompat(of: sort) { _, _ in recompute() }
         .onChangeCompat(of: revision) { _, _ in recompute() }
         .onChangeCompat(of: sites.count) { _, _ in recompute() }
@@ -1842,7 +1857,17 @@ struct ANFRSiteListView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func recomputeSoon() {
+        searchTask?.cancel()
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            recompute()
+        }
+    }
+
     private func recompute() {
+        searchTask?.cancel()
         if sort == .distance && origin == nil { sort = .type }
         rows = ANFRSiteList.rows(from: sites, query: query, sort: sort, origin: origin, layer: layer)
     }
@@ -2049,7 +2074,7 @@ struct ANFRDatePickerSheet: View {
                     }
 
                     if model.hidesFullStateDates {
-                        Text("Les relevés complets de 2022 arriveront avec une prochaine version.")
+                        Text("Les relevés complets de 2022 ne sont pas disponibles sur mobile.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -2295,7 +2320,20 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(count: Int, tint: UIColor, ink: UIColor) {
+    /// Dernier contenu appliqué, pour redessiner le disque quand le thème bascule
+    /// carte ouverte : l'image est rendue une fois, ses couleurs seraient sinon figées.
+    private var applied: (count: Int, tint: UIColor, ink: UIColor)?
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard let applied, traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        configure(count: applied.count, tint: applied.tint, ink: applied.ink)
+    }
+
+    func configure(count: Int, tint rawTint: UIColor, ink rawInk: UIColor) {
+        applied = (count, rawTint, rawInk)
+        let tint = rawTint.resolvedColor(with: traitCollection)
+        let ink = rawInk.resolvedColor(with: traitCollection)
         let text = count >= 1000
             ? (Double(count) / 1000).formatted(.number.precision(.fractionLength(0...1))) + "k"
             : String(count)

@@ -1044,4 +1044,29 @@ final class ModelDecodeTests: XCTestCase {
     private static let messagesJSON = """
     {"hasMore":false,"nextCursor":null,"messages":[{"id":"m1","conversationId":"c1","senderId":"u1","kind":"TEXT","content":"Salut","createdAt":"2026-05-11T10:00:00.000Z","attachments":[],"reactions":[]}],"readReceipts":[]}
     """
+
+    /// ANFR-16 : « LTE »/« NR » (Android, serveur) se lisent comme « 4G »/« 5G » (iOS).
+    func testIdentificationTechVocabulariesCollapseToTheGeneration() {
+        XCTAssertEqual(MyIdentification.normalizedTech("NR"), "5G")
+        XCTAssertEqual(MyIdentification.normalizedTech("5g"), "5G")
+        XCTAssertEqual(MyIdentification.normalizedTech("NR NSA"), "5G")
+        XCTAssertEqual(MyIdentification.normalizedTech("LTE"), "4G")
+        XCTAssertEqual(MyIdentification.normalizedTech(" 4G "), "4G")
+        XCTAssertEqual(MyIdentification.normalizedTech("3G"), "3G")
+    }
+
+    /// ANFR-25 : la position d'une antenne se lit en nombre comme en chaîne, et sans `id` serveur
+    /// l'identifiant reste le même d'un décodage à l'autre.
+    func testAnAntennaReadsNumericOrTextPositionsAndKeepsAStableFallbackId() throws {
+        let numeric = #"{"sup_id":"42","adm_lb_nom":"ORANGE","emr_lb_systeme":"LTE 1800","lat":44.5,"lon":-0.18}"#
+        let text = #"{"sup_id":"42","adm_lb_nom":"ORANGE","emr_lb_systeme":"LTE 1800","lat":"44.5","lon":"-0,18"}"#
+        let a = try JSONDecoder().decode(ANFRMapAntenna.self, from: Data(numeric.utf8))
+        let b = try JSONDecoder().decode(ANFRMapAntenna.self, from: Data(text.utf8))
+        XCTAssertEqual(a.latitude, 44.5)
+        XCTAssertEqual(a.longitude, -0.18)
+        XCTAssertEqual(b.latitude, 44.5)
+        XCTAssertEqual(b.longitude, -0.18)
+        XCTAssertEqual(a.id, b.id)
+        XCTAssertFalse(a.id.isEmpty)
+    }
 }

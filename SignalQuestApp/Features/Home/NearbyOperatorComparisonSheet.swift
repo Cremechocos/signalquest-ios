@@ -327,8 +327,6 @@ final class ZoneCompareModel: ObservableObject {
     enum Phase: Equatable {
         case loading
         case loaded(ANFRZoneCompare)
-        /// Route pas encore servie (404) : un état neutre, pas une erreur.
-        case comingSoon
         case noAntennaData
         case outOfMarket
         case failed
@@ -381,7 +379,6 @@ final class ZoneCompareModel: ObservableObject {
         if error.isCancellation { return nil }
         guard let api = error as? APIError, case .http(let status, let code, _, _, _) = api else { return .failed }
         switch (status, code?.uppercased()) {
-        case (404, _): return .comingSoon
         case (422, "MARKET_NO_ANTENNA_DATA"): return .noAntennaData
         case (422, "OUT_OF_MARKET"): return .outOfMarket
         default: return .failed
@@ -505,17 +502,12 @@ private struct ZoneAntennasSection: View {
         case .loaded(let data):
             loadedContent(data)
                 .onAppear { reveal() }
-        case .comingSoon:
-            EmptyStateView(
-                title: "Bientôt disponible",
-                message: "Le comparatif des antennes d’une zone arrive prochainement.",
-                systemImage: "clock"
-            )
-            .padding(.top, SQSpace.lg)
         case .noAntennaData:
+            // Canada, Belgique, Suisse et collectivités : des antennes existent ailleurs dans
+            // l'app, mais le comparatif de zone ne les lit pas encore.
             EmptyStateView(
-                title: "Pays non couvert",
-                message: "Pas de données d’antennes officielles pour ce pays.",
+                title: "Pas encore disponible ici",
+                message: "Le comparatif des antennes n’est pas encore disponible dans cette zone.",
                 systemImage: "antenna.radiowaves.left.and.right.slash"
             )
             .padding(.top, SQSpace.lg)

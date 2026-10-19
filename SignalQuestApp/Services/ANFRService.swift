@@ -219,7 +219,8 @@ final class ANFRService: ANFRServicing {
     }
 
     func siteHistory(supId: String) async throws -> ANFRSiteHistory {
-        try await api.request(APIEndpoint(path: "/api/anfr/site-history/\(supId)"), as: ANFRSiteHistory.self)
+        let encoded = supId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? supId
+        return try await api.request(APIEndpoint(path: "/api/anfr/site-history/\(encoded)"), as: ANFRSiteHistory.self)
     }
 
     func stats() async throws -> ANFRStats {
@@ -302,13 +303,14 @@ final class ANFRService: ANFRServicing {
         try await api.request(APIEndpoint(path: "/api/anfr/archives"), as: ANFRArchiveDates.self)
     }
 
-    /// Lecture ANFR de l'app (session, comme les autres routes `anfr`). Le centre part à
-    /// trois décimales (environ 110 m) ; le serveur l'arrondit à sa propre grille.
+    /// Lecture ANFR de l'app (session, comme les autres routes `anfr`). Le centre part déjà
+    /// ramené à la case de grille du serveur : la requête ne porte pas plus de précision
+    /// que celle qu'il utilise, et la réponse est la même.
     static func zoneCompareEndpoint(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
                                     market: String, includeBands: Bool) -> APIEndpoint {
         var query = [
-            URLQueryItem(name: "lat", value: String(format: "%.3f", latitude)),
-            URLQueryItem(name: "lon", value: String(format: "%.3f", longitude)),
+            URLQueryItem(name: "lat", value: String(format: "%.4f", radius.snapped(latitude))),
+            URLQueryItem(name: "lon", value: String(format: "%.4f", radius.snapped(longitude))),
             URLQueryItem(name: "radiusKm", value: String(radius.kilometers)),
             URLQueryItem(name: "market", value: market)
         ]
@@ -348,7 +350,7 @@ final class ANFRService: ANFRServicing {
 /// avec un compte : un dossier du système, que iOS peut purger quand la place manque.
 struct ANFRSnapshotDiskCache: Sendable {
     let directory: URL
-    /// Nombre de relevés gardés ; les plus anciens (par date de modification) partent.
+    /// Nombre de relevés gardés ; les moins récemment utilisés (écrits ou relus) partent.
     let maxFiles: Int
 
     init(directory: URL? = nil, maxFiles: Int = 12) {
@@ -364,7 +366,12 @@ struct ANFRSnapshotDiskCache: Sendable {
     }
 
     func read(key: String) -> Data? {
-        try? Data(contentsOf: url(for: key))
+        let file = url(for: key)
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        // Un relevé relu est un relevé utile : sa date de modification passe à maintenant,
+        // pour que `trim` retire d'abord ceux qu'on ne consulte plus.
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
+        return data
     }
 
     func write(_ data: Data, key: String) {

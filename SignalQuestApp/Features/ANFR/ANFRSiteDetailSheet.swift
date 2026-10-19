@@ -171,7 +171,8 @@ struct ANFRSiteDetailSheet: View {
             }
             .buttonStyle(.plain)
 
-            ShareLink(item: Self.shareText(for: site, baseURL: AppConfig.current.appBaseURL)) {
+            // Même texte que « Envoyer dans une conversation » : le format commun au web, à iOS et à Android.
+            ShareLink(item: Self.conversationShareText(for: site, baseURL: AppConfig.current.appBaseURL)) {
                 actionLabel("Partager", systemImage: "square.and.arrow.up")
             }
 
@@ -529,21 +530,6 @@ struct ANFRSiteDetailSheet: View {
 
     static func cartoradioURL(_ site: ANFRMapSite) -> URL? {
         URL(string: "https://cartoradio.fr/index.html#/cartographie/lonlat/\(posix(site.longitude))/\(posix(site.latitude))")
-    }
-
-    /// Texte partagé : libellés français d'échange (comme les autres partages de site),
-    /// une ligne absente pour une donnée inconnue.
-    static func shareText(for site: ANFRMapSite, baseURL: URL) -> String {
-        var lines = ["Support ANFR \(site.supId)" + (site.city.isEmpty ? "" : " (\(ANFRText.city(site.city)))")]
-        let operators = site.operators
-        if operators.count == 1, let only = operators.first { lines.append("Opérateur: \(only.label)") }
-        lines.append("Support: \(site.supId)")
-        lines.append("Marché: FR")
-        lines.append("Position: \(posixCoordinates(site))")
-        let base = baseURL.absoluteString.hasSuffix("/") ? String(baseURL.absoluteString.dropLast()) : baseURL.absoluteString
-        let id = site.supId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site.supId
-        lines.append("Lien: \(base)/carte?lat=\(posix(site.latitude))&lng=\(posix(site.longitude))&siteId=\(id)&market=FR&open=antenna")
-        return lines.joined(separator: "\n")
     }
 
     /// Le support tel qu'on l'écrit dans une conversation (P2-47, format commun au web, à iOS

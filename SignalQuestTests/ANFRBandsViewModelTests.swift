@@ -610,19 +610,22 @@ final class ANFRMapViewModelTests: XCTestCase {
 
     // MARK: Fiche
 
-    func testSharedTextUsesTheCommonLinePrefixesAndAPointDecimal() {
-        let shared = ANFRSiteDetailSheet.shareText(
+    /// Le bouton Partager et l'envoi en conversation écrivent le même texte : le format commun
+    /// au web, à iOS et à Android (P2-47).
+    func testSharedTextUsesTheCommonFormatAndAPointDecimal() {
+        let shared = ANFRSiteDetailSheet.conversationShareText(
             for: ANFRMapSite(supId: "29847", latitude: 44.5297, longitude: -0.1806, city: "BRANNENS",
                              antennas: [antenna("a", "ORANGE", "new")]),
             baseURL: URL(string: "https://signalquest.fr/")!
         )
         let lines = shared.components(separatedBy: "\n")
-        XCTAssertEqual(lines.first, "Support ANFR 29847 (Brannens)")
+        XCTAssertEqual(lines.first, "Antenne Orange")
         XCTAssertTrue(lines.contains("Opérateur: Orange"))
         XCTAssertTrue(lines.contains("Support: 29847"))
         XCTAssertTrue(lines.contains("Marché: FR"))
         XCTAssertTrue(lines.contains("Position: 44.52970, -0.18060"))
-        XCTAssertTrue(lines.contains("Lien: https://signalquest.fr/carte?lat=44.52970&lng=-0.18060&siteId=29847&market=FR&open=antenna"))
+        XCTAssertTrue(lines.contains("Lien: https://signalquest.fr/carte?lat=44.52970&lng=-0.18060&siteId=29847&market=FR&operator=ORANGE&open=antenna"))
+        XCTAssertFalse(shared.contains("Support ANFR"), "plus de second format")
         XCTAssertEqual(ANFRSiteDetailSheet.cartoradioURL(ANFRMapSite(supId: "1", latitude: 44.5297, longitude: -0.1806, city: "", antennas: []))?.absoluteString,
                        "https://cartoradio.fr/index.html#/cartographie/lonlat/-0.18060/44.52970")
     }
@@ -640,6 +643,23 @@ final class ANFRMapViewModelTests: XCTestCase {
         XCTAssertNil(cache.read(key: "2026-10-01"))
         XCTAssertEqual(cache.read(key: "2026-10-15"), Data("2026-10-15".utf8))
         XCTAssertEqual(cache.read(key: "2026-10-08"), Data("2026-10-08".utf8))
+    }
+
+    /// Un relevé relu récemment survit à un relevé écrit plus tard mais jamais consulté.
+    func testTheDiskCacheEvictsTheLeastRecentlyUsedRelevé() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("anfr-cache-lru-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = ANFRSnapshotDiskCache(directory: directory, maxFiles: 2)
+        cache.write(Data("a".utf8), key: "2026-10-01")
+        Thread.sleep(forTimeInterval: 0.05)
+        cache.write(Data("b".utf8), key: "2026-10-08")
+        Thread.sleep(forTimeInterval: 0.05)
+        XCTAssertNotNil(cache.read(key: "2026-10-01"), "relu : devient le plus récent")
+        Thread.sleep(forTimeInterval: 0.05)
+        cache.write(Data("c".utf8), key: "2026-10-15")
+        XCTAssertNotNil(cache.read(key: "2026-10-01"))
+        XCTAssertNil(cache.read(key: "2026-10-08"), "le moins récemment utilisé part")
+        XCTAssertNotNil(cache.read(key: "2026-10-15"))
     }
 
     func testServiceReadsADatedRelevéFromDiskAndFallsBackToTheCopyOfTheLatest() async throws {
@@ -1158,7 +1178,9 @@ final class ANFRZoneCompareTests: XCTestCase {
             XCTAssertEqual(endpoint.path, "/api/anfr/zone-compare")
             XCTAssertTrue(endpoint.authenticated, "lecture ANFR de l'app : avec la session")
             let query = Dictionary(uniqueKeysWithValues: endpoint.query.map { ($0.name, $0.value ?? "") })
-            XCTAssertEqual(query, ["lat": "45.764", "lon": "4.836", "radiusKm": String(tier.kilometers), "market": "FR"])
+            // Le centre part sur la case de grille du serveur (pas = rayon × 0,001°), à quatre décimales.
+            let expected = [20: ("45.7600", "4.8400"), 50: ("45.7500", "4.8500"), 100: ("45.8000", "4.8000")][tier.kilometers]
+            XCTAssertEqual(query, ["lat": expected?.0 ?? "", "lon": expected?.1 ?? "", "radiusKm": String(tier.kilometers), "market": "FR"])
         }
         XCTAssertEqual(ANFRZoneRadius.presets.map(\.kilometers), [20, 50, 100])
         XCTAssertEqual(ANFRZoneRadius.default, .km50)
@@ -1172,7 +1194,11 @@ final class ANFRZoneCompareTests: XCTestCase {
         let names = bands.query.map(\.name)
         XCTAssertEqual(names, ["lat", "lon", "radiusKm", "market", "bands"])
         XCTAssertEqual(bands.query.first { $0.name == "bands" }?.value, "1")
-        XCTAssertEqual(bands.query.first { $0.name == "lat" }?.value, "-21.100", "Séparateur décimal fixe, quelle que soit la langue")
+        XCTAssertEqual(bands.query.first { $0.name == "lat" }?.value, "-21.1000", "Séparateur décimal fixe, quelle que soit la langue")
+        // Un point déjà sur la grille ne bouge pas, et un point proche rejoint le même centre que côté serveur.
+        XCTAssertEqual(ANFRZoneRadius.km20.snapped(45.76401), 45.76, accuracy: 1e-9)
+        XCTAssertEqual(ANFRZoneRadius.km20.snapped(ANFRZoneRadius.km20.snapped(45.76401)), 45.76, accuracy: 1e-9)
+        XCTAssertEqual(ANFRZoneRadius(kilometers: 1).snapped(4.83569), 4.836, accuracy: 1e-9)
         XCTAssertEqual(bands.query.first { $0.name == "market" }?.value, "DROM")
     }
 
@@ -1197,7 +1223,7 @@ final class ANFRZoneCompareTests: XCTestCase {
         XCTAssertEqual(url.path, "/api/anfr/zone-compare")
         let query = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
             .map { ($0.name, $0.value ?? "") })
-        XCTAssertEqual(query, ["lat": "45.700", "lon": "4.800", "radiusKm": "20", "market": "FR", "bands": "1"])
+        XCTAssertEqual(query, ["lat": "45.7000", "lon": "4.8000", "radiusKm": "20", "market": "FR", "bands": "1"])
         XCTAssertNotNil(seen.first?.0.value(forHTTPHeaderField: "Cookie"), "la session part avec la demande")
     }
 
@@ -1226,8 +1252,8 @@ final class ANFRZoneCompareTests: XCTestCase {
     // MARK: Erreurs
 
     func testServerErrorsMapToTheirStates() async throws {
-        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, nil)), .comingSoon, "Route pas encore servie : neutre")
-        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, "NOT_FOUND")), .comingSoon)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, nil)), .failed, "Une route absente est une panne : avec « Réessayer »")
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, "NOT_FOUND")), .failed)
         XCTAssertEqual(ZoneCompareModel.phase(for: httpError(422, "MARKET_NO_ANTENNA_DATA")), .noAntennaData)
         XCTAssertEqual(ZoneCompareModel.phase(for: httpError(422, "OUT_OF_MARKET")), .outOfMarket)
         XCTAssertEqual(ZoneCompareModel.phase(for: httpError(400, "INVALID_PARAMS")), .failed)
@@ -1255,14 +1281,14 @@ final class ANFRZoneCompareTests: XCTestCase {
             } catch { return error }
         }
         let missing = await fail(status: 404, body: "<html>404</html>")
-        XCTAssertEqual(missing.flatMap { ZoneCompareModel.phase(for: $0) }, .comingSoon)
+        XCTAssertEqual(missing.flatMap { ZoneCompareModel.phase(for: $0) }, .failed)
         let noData = await fail(status: 422, body: #"{"code":"MARKET_NO_ANTENNA_DATA","message":"x","requestId":"r"}"#)
         XCTAssertEqual(noData.flatMap { ZoneCompareModel.phase(for: $0) }, .noAntennaData)
         let outside = await fail(status: 422, body: #"{"code":"OUT_OF_MARKET","message":"x","requestId":"r"}"#)
         XCTAssertEqual(outside.flatMap { ZoneCompareModel.phase(for: $0) }, .outOfMarket)
     }
 
-    func testTheDefaultImplementationOfAFakeReadsAsComingSoon() async {
+    func testTheDefaultImplementationOfAFakeReadsAsAFailure() async {
         final class Bare: ANFRServicing, @unchecked Sendable {
             func current() async throws -> ANFRDataset { throw URLError(.unsupportedURL) }
             func archives() async throws -> [ANFRDataset] { throw URLError(.unsupportedURL) }
@@ -1279,7 +1305,7 @@ final class ANFRZoneCompareTests: XCTestCase {
             _ = try await Bare().zoneCompare(latitude: 0, longitude: 0, radius: .km50, market: "FR", includeBands: false)
             XCTFail("L'implémentation par défaut ne sert rien")
         } catch {
-            XCTAssertEqual(ZoneCompareModel.phase(for: error), .comingSoon)
+            XCTAssertEqual(ZoneCompareModel.phase(for: error), .failed)
         }
     }
 
@@ -1351,7 +1377,7 @@ final class ANFRZoneCompareTests: XCTestCase {
 
     func testEachServerErrorLandsOnItsState() async {
         let cases: [(Error, ZoneCompareModel.Phase)] = [
-            (httpError(404, nil), .comingSoon),
+            (httpError(404, nil), .failed),
             (httpError(422, "MARKET_NO_ANTENNA_DATA"), .noAntennaData),
             (httpError(422, "OUT_OF_MARKET"), .outOfMarket),
             (APIError.transport("offline"), .failed),
