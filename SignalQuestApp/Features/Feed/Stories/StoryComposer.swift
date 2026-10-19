@@ -48,6 +48,11 @@ final class StoryComposerViewModel: ObservableObject {
     /// cas d'usage, partager sa couverture.
     @Published var attachRadio = false
     @Published var closeFriendIds: Set<String> = []
+    /// La liste d'amis proches est-elle bien revenue du serveur, et dans quel état ?
+    /// Sans cela, une liste vide (chargement raté) serait enregistrée à la fermeture
+    /// de l'éditeur et effacerait la vraie.
+    private(set) var closeFriendsLoaded = false
+    private var savedCloseFriendIds: Set<String> = []
     @Published var friends: [Friend] = []
     @Published var showHideEditor = false
     @Published var showCloseFriendsEditor = false
@@ -84,7 +89,11 @@ final class StoryComposerViewModel: ObservableObject {
         async let friendsResult = try? friendsService.list()
         async let closeResult = try? service.closeFriends()
         friends = (await friendsResult) ?? []
-        closeFriendIds = Set((await closeResult)?.map(\.id) ?? [])
+        if let close = await closeResult {
+            closeFriendIds = Set(close.map(\.id))
+            savedCloseFriendIds = closeFriendIds
+            closeFriendsLoaded = true
+        }
     }
 
     func loadPickerImage() async {
@@ -111,10 +120,15 @@ final class StoryComposerViewModel: ObservableObject {
         pickedImageData = data
     }
 
-    /// Persiste la liste d'amis proches (PUT). Appelé à la fermeture de l'éditeur.
+    /// Persiste la liste d'amis proches (PUT). Appelé à la fermeture de l'éditeur,
+    /// seulement si la liste du serveur a été lue ET que tu l'as modifiée.
     func saveCloseFriends() async {
-        do { _ = try await service.setCloseFriends(userIds: Array(closeFriendIds)) }
-        catch { if !error.isCancellation { errorMessage = error.userFacingMessage } }
+        guard closeFriendsLoaded, closeFriendIds != savedCloseFriendIds else { return }
+        let ids = closeFriendIds
+        do {
+            _ = try await service.setCloseFriends(userIds: Array(ids))
+            savedCloseFriendIds = ids
+        } catch { if !error.isCancellation { errorMessage = error.userFacingMessage } }
     }
 
     /// Un texte, une photo ou un relevé réseau suffit à faire une story, comme côté serveur.
@@ -383,7 +397,7 @@ struct StoryComposer: View {
         VStack(spacing: 0) {
             SQListRow(
                 String(localized: "Joindre mon relevé réseau"),
-                subtitle: String(localized: "Techno, opérateur et qualité au moment du partage."),
+                subtitle: String(localized: "Opérateur et technologie du dernier relevé connu, sans mesure radio détaillée."),
                 systemImage: "antenna.radiowaves.left.and.right"
             ) {
                 Toggle("Joindre mon relevé réseau", isOn: $model.attachRadio)
@@ -403,6 +417,8 @@ struct StoryComposer: View {
                 Divider().padding(.leading, 62)
                 optionRow(systemImage: "star", title: String(localized: "Amis proches"),
                           value: String(localized: "\(model.closeFriendIds.count)")) {
+                    // Liste du serveur non lue (échec réseau) : nouvel essai avant d'éditer.
+                    if !model.closeFriendsLoaded { Task { await model.loadAudience() } }
                     model.showCloseFriendsEditor = true
                 }
             }

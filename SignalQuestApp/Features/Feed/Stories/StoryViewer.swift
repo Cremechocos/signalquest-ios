@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 struct PendingUnencryptedStoryReply: Equatable {
@@ -184,7 +185,7 @@ struct StoryViewer: View {
         .accessibilityAction(named: Text("Story précédente")) { back() }
         .onAppear { startStory() }
         .task(id: currentStory?.id) { await loadViewersCount() }
-        .onChange(of: index) { _ in
+        .onChangeCompat(of: index) { _, _ in
             channelConsent.cancelPending()
             showUnencryptedConfirm = false
             replySubmission.clearFeedback()
@@ -192,7 +193,7 @@ struct StoryViewer: View {
         }
         // Pause/reprise du minuteur : saisie clavier, feuille « Vu par… », dialogue
         // de suppression, ou VoiceOver actif (auto-avancement suspendu, cf. A11Y-04).
-        .onChange(of: shouldPause) { paused in
+        .onChangeCompat(of: shouldPause) { _, paused in
             if paused { pause() } else { resume() }
         }
         // Auto-avancement : un unique sleep jusqu'à `deadline` (aucun polling 20 Hz).
@@ -211,28 +212,14 @@ struct StoryViewer: View {
     private func content(for story: SocialStory) -> some View {
         if let url = story.mediaUrl {
             if story.mediaKind?.lowercased().contains("video") == true {
-                // Pas de lecteur vidéo ici : la vignette, avec une pastille qui
-                // dit qu'il s'agit d'une vidéo, plutôt qu'un chargeur d'image
-                // qui échouerait sur le fichier vidéo.
-                ZStack {
-                    Color.black
-                    if let thumbnail = story.thumbnailUrl {
-                        RemoteImage(url: thumbnail, maxDimension: 1400, contentMode: .fill, showsFailureUI: true) {
-                            Color.black
-                        }
-                    }
-                    Label("Vidéo", systemImage: "play.fill")
-                        .font(SQType.subhead(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, SQSpace.lg)
-                        .frame(minHeight: 44)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .accessibilityHidden(true)
-                }
+                StoryVideoPlayer(
+                    url: url,
+                    thumbnail: story.thumbnailUrl,
+                    isPaused: contentPaused,
+                    autoplays: !voiceOverOn,
+                    label: mediaLabel(for: story)
+                )
                 .ignoresSafeArea()
-                .accessibilityElement()
-                .accessibilityLabel(mediaLabel(for: story))
-                .accessibilityValue(Text("Vidéo"))
             } else {
                 RemoteImage(url: url, maxDimension: 1400, contentMode: .fill, showsFailureUI: true) {
                     Color.black
@@ -592,10 +579,14 @@ struct StoryViewer: View {
 
     /// Conditions qui suspendent le minuteur : saisie clavier, feuilles/dialogues
     /// ouverts, ou VoiceOver actif (l'utilisateur avance manuellement, cf. A11Y-04).
-    private var shouldPause: Bool {
+    private var shouldPause: Bool { contentPaused || voiceOverOn }
+
+    /// Mêmes conditions sans VoiceOver : c'est aussi ce qui suspend la lecture
+    /// d'une story vidéo (VoiceOver demande, lui, un lancement manuel).
+    private var contentPaused: Bool {
         replyFocused || replySubmission.isSending
             || replySubmission.failedStoryID == currentStory?.id
-            || showViewers || showUnencryptedConfirm || voiceOverOn
+            || showViewers || showUnencryptedConfirm
             || isHolding || reportedStory != nil || showStoryActions
     }
 
@@ -659,6 +650,131 @@ struct StoryViewer: View {
     }
     private func back() {
         if index > 0 { index -= 1 }
+    }
+}
+
+/// Lecteur d'une story vidéo : plein cadre, sans contrôles (le viewer garde ses
+/// gestes). La lecture démarre seule, sauf avec Réduire les animations ou
+/// VoiceOver, où un bouton la lance ; elle suit les pauses du viewer.
+private struct StoryVideoPlayer: View {
+    let url: URL
+    let thumbnail: URL?
+    let isPaused: Bool
+    /// Faux sous VoiceOver : la lecture attend un geste.
+    let autoplays: Bool
+    let label: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var model: StoryVideoModel
+    @State private var userStarted = false
+
+    init(url: URL, thumbnail: URL?, isPaused: Bool, autoplays: Bool, label: String) {
+        self.url = url
+        self.thumbnail = thumbnail
+        self.isPaused = isPaused
+        self.autoplays = autoplays
+        self.label = label
+        _model = StateObject(wrappedValue: StoryVideoModel(url: url))
+    }
+
+    private var needsStart: Bool { (reduceMotion || !autoplays) && !userStarted }
+    private var shouldPlay: Bool { !needsStart && !isPaused && !model.failed }
+
+    var body: some View {
+        ZStack {
+            Color.black
+            // La vignette reste dessous jusqu'à la première image de la vidéo.
+            if let thumbnail {
+                RemoteImage(url: thumbnail, maxDimension: 1400, contentMode: .fill, showsFailureUI: false) {
+                    Color.black
+                }
+            }
+            if !model.failed {
+                StoryPlayerLayerView(player: model.player)
+                    .allowsHitTesting(false)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(label)
+        .accessibilityValue(Text("Vidéo"))
+        .overlay {
+            if model.failed {
+                Label("Vidéo indisponible", systemImage: "exclamationmark.triangle.fill")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SQSpace.lg)
+                    .frame(minHeight: 44)
+                    .background(.ultraThinMaterial, in: Capsule())
+            } else if needsStart {
+                Button {
+                    userStarted = true
+                } label: {
+                    Label("Lire la vidéo", systemImage: "play.fill")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, SQSpace.lg)
+                        .frame(minHeight: 44)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onAppear { model.setPlaying(shouldPlay) }
+        .onChangeCompat(of: shouldPlay) { _, playing in model.setPlaying(playing) }
+        .onDisappear { model.setPlaying(false) }
+    }
+}
+
+@MainActor
+private final class StoryVideoModel: ObservableObject {
+    @Published private(set) var failed = false
+    let player: AVPlayer
+    private var statusObservation: NSKeyValueObservation?
+
+    init(url: URL) {
+        let item = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: item)
+        statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+            guard item.status == .failed else { return }
+            Task { @MainActor in self?.failed = true }
+        }
+    }
+
+    func setPlaying(_ playing: Bool) {
+        if playing { player.play() } else { player.pause() }
+    }
+}
+
+/// Couche AVPlayerLayer plein cadre, hors des gestes du viewer.
+private struct StoryPlayerLayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> StoryPlayerContainer {
+        let view = StoryPlayerContainer()
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ view: StoryPlayerContainer, context: Context) {
+        if view.playerLayer.player !== player { view.playerLayer.player = player }
+    }
+}
+
+private final class StoryPlayerContainer: UIView {
+    let playerLayer = AVPlayerLayer()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
     }
 }
 

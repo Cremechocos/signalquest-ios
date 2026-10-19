@@ -7,6 +7,8 @@ struct StoriesBar: View {
     var onSelect: (SocialStory) -> Void
     /// Masquer les stories d'un membre, sans le bloquer (appui long sur sa bulle).
     var onHide: ((SocialStory) -> Void)? = nil
+    /// Stories ouvertes depuis le chargement du rail (anneau gris sans recharger).
+    var viewedIds: Set<String> = []
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -20,11 +22,11 @@ struct StoriesBar: View {
                         Haptics.light()
                         onSelect(story)
                     } label: {
-                        StoryBubble(story: story)
+                        StoryBubble(story: story, viewed: isViewed(story))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Story de \(story.author.displayName)")
-                    .accessibilityValue(story.viewedByMe == true ? "Déjà vue" : "Pas encore vue")
+                    .accessibilityValue(isViewed(story) ? "Déjà vue" : "Pas encore vue")
                     .contextMenu {
                         if story.isMine != true, let onHide {
                             Button {
@@ -42,6 +44,10 @@ struct StoriesBar: View {
         // Le rail garde des cercles et des prénoms lisibles : au-delà de cette
         // taille, les prénoms ne tenaient plus sous leur cercle (UI-15).
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    private func isViewed(_ story: SocialStory) -> Bool {
+        story.viewedByMe == true || viewedIds.contains(story.id)
     }
 
     /// « Ta story » : anneau pointillé et « + » encre, comme une place libre
