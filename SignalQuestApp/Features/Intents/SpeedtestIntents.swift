@@ -222,11 +222,12 @@ struct SendMessageIntent: AppIntent {
     }
 }
 
-/// Raccourci « Lancer un Drive Test » (F4). Ouvre l'app sur l'onglet Speed et
-/// présente le mode Drive Test (speedtests successifs le long du trajet).
+/// Raccourci « Ouvrir le Drive Test » (F4). Ouvre l'app sur l'onglet Speed et
+/// présente le mode Drive Test, prêt à démarrer : le préflight, la localisation
+/// et l'information de collecte passent par l'écran, la mesure ne part pas seule.
 struct RunDriveTestIntent: AppIntent {
-    static let title: LocalizedStringResource = "Lancer un Drive Test"
-    static let description = IntentDescription("Ouvre SignalQuest et démarre le mode Drive Test (mesure en continu).")
+    static let title: LocalizedStringResource = "Ouvrir le Drive Test"
+    static let description = IntentDescription("Ouvre SignalQuest sur le Drive Test, prêt à démarrer.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -301,8 +302,8 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: RunDriveTestIntent(),
             phrases: [
-                "Lance un drive test avec \(.applicationName)",
-                "Démarre un drive test \(.applicationName)"
+                "Ouvre le drive test avec \(.applicationName)",
+                "Prépare un drive test \(.applicationName)"
             ],
             shortTitle: "Drive Test",
             systemImageName: "location.north.line.fill"

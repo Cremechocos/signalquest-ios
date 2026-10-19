@@ -5,8 +5,8 @@
 "Montre les antennes avec ${applicationName}" = "Montre les antennes avec ${applicationName}";
 "Ouvre la messagerie ${applicationName}" = "Ouvre la messagerie ${applicationName}";
 "Ouvre mes messages ${applicationName}" = "Ouvre mes messages ${applicationName}";
-"Lance un drive test avec ${applicationName}" = "Lance un drive test avec ${applicationName}";
-"Démarre un drive test ${applicationName}" = "Démarre un drive test ${applicationName}";
+"Ouvre le drive test avec ${applicationName}" = "Ouvre le drive test avec ${applicationName}";
+"Prépare un drive test ${applicationName}" = "Prépare un drive test ${applicationName}";
 "Quel est mon dernier débit ${applicationName}" = "Quel est mon dernier débit ${applicationName}";
 "Mon dernier speedtest ${applicationName}" = "Mon dernier speedtest ${applicationName}";
 "Ouvre une antenne suivie avec ${applicationName}" = "Ouvre une antenne suivie avec ${applicationName}";
