@@ -51,8 +51,12 @@ final class LocalizationBundleTests: XCTestCase {
             pattern: "%(?:\\d+\\$)?[-+ 0#]*\\d*(?:\\.\\d+)?(?:ll|l|h)?[@dDuUxXfFeEgGcCsSp]")
         func placeholders(_ text: String) -> [String] {
             let range = NSRange(text.startIndex..., in: text)
+            // Xcode numérote parfois les substitutions à la génération (`%1$@`) : la
+            // position ne compte pas ici, seulement le genre et le nombre.
             return pattern.matches(in: text, range: range)
-                .compactMap { Range($0.range, in: text).map { String(text[$0]) } }.sorted()
+                .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+                .map { $0.replacingOccurrences(of: "\\d+\\$", with: "", options: .regularExpression) }
+                .sorted()
         }
         let formal = try strings(SQAddress.formalLocalization)
         let french = try strings("fr")
