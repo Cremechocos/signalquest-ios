@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    " via %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " via %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " via %@"
+          }
+        }
+      }
+    },
     "%@ / %@ pts vers le niveau %lld" : {
       "localizations" : {
         "en" : {
@@ -620,6 +636,88 @@
         }
       }
     },
+    "%lld abonnements" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld following"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld following"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonnement"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonnements"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld abonnés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld follower"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld followers"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonné"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonnés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld actifs" : {
       "localizations" : {
         "en" : {
@@ -1228,6 +1326,22 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld mesures · %lld contributeurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld measurements · %lld contributors"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mesures · %lld contributeurs"
           }
         }
       }
@@ -2637,6 +2751,22 @@
         }
       }
     },
+    "Accepter %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter %@"
+          }
+        }
+      }
+    },
     "Actions sur le message" : {
       "localizations" : {
         "en" : {
@@ -2697,6 +2827,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activité des antennes suivies"
+          }
+        }
+      }
+    },
+    "Actualisation impossible. Dernières données conservées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't refresh. Showing the latest data we have."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualisation impossible. Dernières données conservées."
           }
         }
       }
@@ -3571,6 +3717,22 @@
         }
       }
     },
+    "Au centre de la zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the centre of the area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au centre de la zone"
+          }
+        }
+      }
+    },
     "Au relevé" : {
       "localizations" : {
         "en" : {
@@ -3663,6 +3825,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer »."
+          }
+        }
+      }
+    },
+    "Aucun carré à afficher" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No squares to show"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun carré à afficher"
           }
         }
       }
@@ -4613,6 +4791,22 @@
         }
       }
     },
+    "Carrés de la zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Squares in this area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carrés de la zone"
+          }
+        }
+      }
+    },
     "Cartoradio" : {
       "localizations" : {
         "en" : {
@@ -4705,6 +4899,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce mois-ci"
+          }
+        }
+      }
+    },
+    "Ce nœud est déjà sur ce site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is already on this site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est déjà sur ce site."
           }
         }
       }
@@ -4869,6 +5079,22 @@
         }
       }
     },
+    "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site is only the closest to your logs; the server didn't recognise it. Check it before you confirm."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer."
+          }
+        }
+      }
+    },
     "Ce soir %@" : {
       "localizations" : {
         "en" : {
@@ -4897,6 +5123,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce texte est trop long : 4 000 caractères au plus."
+          }
+        }
+      }
+    },
+    "Cellule %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cell %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cellule %@"
           }
         }
       }
@@ -5043,6 +5285,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette image dépasse 20 Mo."
+          }
+        }
+      }
+    },
+    "Cette mesure n'est pas récente. Lance un nouveau speedtest si tu veux partager l'état actuel de ton réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This reading isn't recent. Run a new speed test if you want to share how your network is doing now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette mesure n'est pas récente. Lance un nouveau speedtest si tu veux partager l'état actuel de ton réseau."
           }
         }
       }
@@ -6690,6 +6948,22 @@
         }
       }
     },
+    "Dernière mesure %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last measurement %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière mesure %@"
+          }
+        }
+      }
+    },
     "Dernière mesure : %@. Ouvre le Speedtest." : {
       "localizations" : {
         "en" : {
@@ -6815,6 +7089,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dossiers"
+          }
+        }
+      }
+    },
+    "Drive Test arrêté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive Test stopped"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive Test arrêté"
           }
         }
       }
@@ -7348,6 +7638,54 @@
         }
       }
     },
+    "Encore %@ pts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pts to go"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encore %@ pts"
+          }
+        }
+      }
+    },
+    "Encore %lld points · %lld %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld points to go · %2$lld%%"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encore %lld points · %lld %%"
+          }
+        }
+      }
+    },
+    "Enregistre une publication pour la retrouver ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save a post to find it here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistre une publication pour la retrouver ici."
+          }
+        }
+      }
+    },
     "Enregistrement d’écran en cours" : {
       "localizations" : {
         "en" : {
@@ -7360,6 +7698,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enregistrement d’écran en cours"
+          }
+        }
+      }
+    },
+    "Enregistrer la publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer la publication"
           }
         }
       }
@@ -8358,6 +8712,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il ne verra plus l’état de cette connexion."
+          }
+        }
+      }
+    },
+    "Il reste %lld messages non envoyés : ils seront supprimés de cet iPhone si tu te déconnectes. Annule pour leur laisser le temps de partir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld message hasn’t been sent yet: it will be deleted from this iPhone if you sign out. Cancel to give it time to go through."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld messages haven’t been sent yet: they will be deleted from this iPhone if you sign out. Cancel to give them time to go through."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il reste %lld message non envoyé : il sera supprimé de cet iPhone si tu te déconnectes. Annule pour lui laisser le temps de partir."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il reste %lld messages non envoyés : ils seront supprimés de cet iPhone si tu te déconnectes. Annule pour leur laisser le temps de partir."
+                }
+              }
+            }
           }
         }
       }
@@ -9624,6 +10019,22 @@
         }
       }
     },
+    "Le comparatif des antennes n’est pas encore disponible dans cette zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The antenna comparison isn't available in this area yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le comparatif des antennes n’est pas encore disponible dans cette zone."
+          }
+        }
+      }
+    },
     "Le dernier état connu reste affiché." : {
       "localizations" : {
         "en" : {
@@ -9929,6 +10340,22 @@
         }
       }
     },
+    "Le réseau est absent ou trop lent. Réessaie quand tu as du réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The network is unavailable or too slow. Try again when you have a connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le réseau est absent ou trop lent. Réessaie quand tu as du réseau."
+          }
+        }
+      }
+    },
     "Le réseau mobile français, d’après l’Agence nationale des fréquences." : {
       "localizations" : {
         "en" : {
@@ -10042,6 +10469,22 @@
         }
       }
     },
+    "Le texte que tu as écrit sera effacé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text you wrote will be erased."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le texte que tu as écrit sera effacé."
+          }
+        }
+      }
+    },
     "Le transfert ne vise que les conversations non chiffrées." : {
       "localizations" : {
         "en" : {
@@ -10102,6 +10545,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les abonnés de ce membre apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Les anciennes captures de couverture seront effacées de cet iPhone. Cette action est définitive." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The old coverage captures will be erased from this iPhone. This can’t be undone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anciennes captures de couverture seront effacées de cet iPhone. Cette action est définitive."
           }
         }
       }
@@ -10538,6 +10997,22 @@
         }
       }
     },
+    "Les relevés complets de 2022 ne sont pas disponibles sur mobile." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The full 2022 surveys are not available on mobile."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les relevés complets de 2022 ne sont pas disponibles sur mobile."
+          }
+        }
+      }
+    },
     "Les réorientations se filtrent par opérateur. Les autres filtres s’appliquent aux changements du relevé." : {
       "localizations" : {
         "en" : {
@@ -10599,6 +11074,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lieu recherché"
+          }
+        }
+      }
+    },
+    "Lire la vidéo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play video"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire la vidéo"
+          }
+        }
+      }
+    },
+    "Liste des carrés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List of squares"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste des carrés"
           }
         }
       }
@@ -11132,6 +11639,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes parents"
+          }
+        }
+      }
+    },
+    "Mes zones seulement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My areas only"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes zones seulement"
           }
         }
       }
@@ -11907,6 +12430,22 @@
         }
       }
     },
+    "Opérateur et technologie du dernier relevé connu, sans mesure radio détaillée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator and technology from your last known reading, with no detailed radio measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur et technologie du dernier relevé connu, sans mesure radio détaillée."
+          }
+        }
+      }
+    },
     "Orientation des secteurs" : {
       "localizations" : {
         "en" : {
@@ -11987,6 +12526,22 @@
         }
       }
     },
+    "Ouvre SignalQuest sur le Drive Test, prêt à démarrer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens SignalQuest on Drive Test, ready to start."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre SignalQuest sur le Drive Test, prêt à démarrer."
+          }
+        }
+      }
+    },
     "Ouvre Trier et afficher" : {
       "localizations" : {
         "en" : {
@@ -11999,6 +12554,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre Trier et afficher"
+          }
+        }
+      }
+    },
+    "Ouvre la fiche d'une antenne sur la carte et touche « Signaler une erreur sur ce site » pour aider à corriger les données." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open an antenna's details on the map and tap “Report an error on this site” to help correct the data."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la fiche d'une antenne sur la carte et touche « Signaler une erreur sur ce site » pour aider à corriger les données."
           }
         }
       }
@@ -12111,6 +12682,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre le profil"
+          }
+        }
+      }
+    },
+    "Ouvre les Réglages pour autoriser la position" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens Settings so you can allow location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les Réglages pour autoriser la position"
           }
         }
       }
@@ -12470,6 +13057,22 @@
         }
       }
     },
+    "Pas encore disponible ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available here yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore disponible ici"
+          }
+        }
+      }
+    },
     "Pas encore vue" : {
       "localizations" : {
         "en" : {
@@ -12678,6 +13281,22 @@
         }
       }
     },
+    "Photo trop lourde. Choisis-en une plus légère." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This photo is too large. Pick a lighter one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo trop lourde. Choisis-en une plus légère."
+          }
+        }
+      }
+    },
     "Photo. %@" : {
       "localizations" : {
         "en" : {
@@ -12738,6 +13357,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pire"
+          }
+        }
+      }
+    },
+    "Piste du serveur indisponible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server suggestion unavailable."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piste du serveur indisponible."
+          }
+        }
+      }
+    },
+    "Plafond de données atteint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data cap reached"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plafond de données atteint"
+          }
+        }
+      }
+    },
+    "Plafond de données atteint : les mesures sont arrêtées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data cap reached: measurements have stopped."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plafond de données atteint : les mesures sont arrêtées."
           }
         }
       }
@@ -13079,6 +13746,22 @@
         }
       }
     },
+    "Proximité, à vérifier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby, to be checked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proximité, à vérifier"
+          }
+        }
+      }
+    },
     "Précision GPS médiane" : {
       "localizations" : {
         "en" : {
@@ -13171,6 +13854,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Publication introuvable ou supprimée."
+          }
+        }
+      }
+    },
+    "Publications récentes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent posts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publications récentes"
           }
         }
       }
@@ -13540,6 +14239,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recommandé · le plus proche à chaque test"
+          }
+        }
+      }
+    },
+    "Refuser %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decline %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser %@"
           }
         }
       }
@@ -14428,6 +15143,22 @@
         }
       }
     },
+    "Secteur déduit du PCI : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sector derived from the PCI: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secteur déduit du PCI : %@"
+          }
+        }
+      }
+    },
     "Semaine du %@" : {
       "localizations" : {
         "en" : {
@@ -15014,6 +15745,22 @@
         }
       }
     },
+    "Speedtest du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed test from %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest du %@"
+          }
+        }
+      }
+    },
     "Speedtests · %lld" : {
       "localizations" : {
         "en" : {
@@ -15303,6 +16050,22 @@
         }
       }
     },
+    "Supprimer le brouillon ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this draft?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le brouillon ?"
+          }
+        }
+      }
+    },
     "Supprimer le journal…" : {
       "localizations" : {
         "en" : {
@@ -15363,6 +16126,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le signalement"
+          }
+        }
+      }
+    },
+    "Supprimer les archives locales" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete local archives"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer les archives locales"
+          }
+        }
+      }
+    },
+    "Supprimer les archives locales ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete local archives?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer les archives locales ?"
           }
         }
       }
@@ -17081,6 +17876,22 @@
         }
       }
     },
+    "Vidéo indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo indisponible"
+          }
+        }
+      }
+    },
     "Vidéo indisponible. Réessaie avec du réseau." : {
       "localizations" : {
         "en" : {
@@ -17177,6 +17988,22 @@
         }
       }
     },
+    "Voir plus de réponses" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show more replies"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir plus de réponses"
+          }
+        }
+      }
+    },
     "Voir tous les commentaires (%lld)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17206,6 +18033,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir tout le monde"
+          }
+        }
+      }
+    },
+    "Voix 2G" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice 2G"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voix 2G"
+          }
+        }
+      }
+    },
+    "Voix 3G" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice 3G"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voix 3G"
+          }
+        }
+      }
+    },
+    "Voix 4G" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice 4G"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voix 4G"
           }
         }
       }
@@ -17242,6 +18117,22 @@
         }
       }
     },
+    "Vérifier ce site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check this site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier ce site"
+          }
+        }
+      }
+    },
     "Vérifier en données mobiles" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17255,6 +18146,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérifier en données mobiles"
+          }
+        }
+      }
+    },
+    "Vérifier le site %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check site %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier le site %@"
           }
         }
       }
@@ -17700,6 +18607,22 @@
         }
       }
     },
+    "environ %lld km de côté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "about %lld km per side"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "environ %lld km de côté"
+          }
+        }
+      }
+    },
     "envoyé le %@" : {
       "localizations" : {
         "en" : {
@@ -17991,6 +18914,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "moyenne récente"
+          }
+        }
+      }
+    },
+    "ouverture %lld°" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "beam %lld°"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ouverture %lld°"
           }
         }
       }
@@ -18408,6 +19347,22 @@
         }
       }
     },
+    "À %1$@ au %2$@ du centre de la zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ of the centre of the area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %1$@ au %2$@ du centre de la zone"
+          }
+        }
+      }
+    },
     "À %@" : {
       "localizations" : {
         "en" : {
@@ -18645,6 +19600,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrire à %@"
+          }
+        }
+      }
+    },
+    "Élevée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Élevée"
           }
         }
       }
