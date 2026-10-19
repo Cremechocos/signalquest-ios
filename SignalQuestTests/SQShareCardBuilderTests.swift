@@ -18,12 +18,16 @@ final class SQShareCardBuilderTests: XCTestCase {
         pingMedian: Double? = 18,
         pingAverage: Double? = 24,
         loadedPings: Bool = true,
+        pingDl: Double? = 42,
+        pingUl: Double? = 57,
         connection: NetworkConnectionKind = .cellular,
         ssid: String? = nil,
         /// En Wi-Fi, ce champ porte le FAI résolu par IP/ASN — pas l'opérateur SIM.
         operatorName: String? = nil,
+        technology: CellularRadioTechnology? = .fiveGSA,
         city: String? = "Lyon",
-        address: String? = nil
+        address: String? = nil,
+        pingHost: String? = "paris.bbr.test"
     ) -> SpeedtestRunResult {
         SpeedtestRunResult(
             id: UUID(),
@@ -39,25 +43,27 @@ final class SQShareCardBuilderTests: XCTestCase {
             pingMinMs: pingMin,
             pingMaxMs: 30,
             jitterMs: 1.44,
-            pingDlMs: loadedPings ? 42 : nil,
+            pingDlMs: loadedPings ? pingDl : nil,
             jitterDlMs: loadedPings ? 6.2 : nil,
-            pingUlMs: loadedPings ? 57 : nil,
+            pingUlMs: loadedPings ? pingUl : nil,
             jitterUlMs: loadedPings ? 9.4 : nil,
             pingProtocol: "ICMP",
             durationSeconds: 14,
             connectionType: connection,
-            cellularTechnology: connection == .cellular ? .fiveGSA : nil,
+            cellularTechnology: connection == .wifi || connection == .wired ? nil : technology,
             networkOperatorName: operatorName ?? (connection == .cellular ? "Orange" : nil),
             wifiSSID: ssid,
             city: city,
             address: address,
             serverName: "Paris BBR (Bouygues)",
             downloadServerName: "Paris BBR (Bouygues)",
+            downloadServerHost: "paris.bbr.test",
             createdAt: Date(timeIntervalSince1970: 1_780_000_000),
             downloadSeriesMbps: downloadSeries,
             uploadSeriesMbps: uploadSeries,
             deviceModel: "iPhone 17 Pro (iPhone18,1)",
-            osVersion: "iOS 27"
+            osVersion: "iOS 27",
+            pingServerHost: pingHost
         )
     }
 
@@ -73,99 +79,180 @@ final class SQShareCardBuilderTests: XCTestCase {
         )
     }
 
+    /// Couleur en hexadécimal : une `Color` SwiftUI convertie n'est pas `==` à
+    /// la même teinte construite en `UIColor`.
+    private func hex(_ color: UIColor?) -> UInt32? {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard let color, color.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        return UInt32((r * 255).rounded()) << 16 | UInt32((g * 255).rounded()) << 8 | UInt32((b * 255).rounded())
+    }
+
     // MARK: Nombres
 
     func testDisplayedNumbersMatchTheResult() {
         let card = model(result())
-        XCTAssertEqual(card.download.value, "770,2")
-        XCTAssertEqual(card.download.maxValue, "812,4")
-        XCTAssertEqual(card.upload.value, "126,4")
-        XCTAssertEqual(card.upload.maxValue, "131,0")
-        // Même unité que le reste de l’app (« Mbit/s » en français).
-        XCTAssertEqual(card.download.unit, SQUnits.throughputUnit(mbps: 770.2))
+        XCTAssertEqual(card.download, .init(number: "770", unit: "Mb/s"))
+        XCTAssertEqual(card.downloadPeakText, "Pic à 812 Mb/s")
+        XCTAssertEqual(card.upload, .init(number: "126", unit: "Mb/s"))
+        XCTAssertEqual(card.uploadPeakText, "Pic à 131 Mb/s")
+        XCTAssertEqual(card.latencyLabel, "Latence min.")
+        XCTAssertEqual(card.latency, .init(number: "14", unit: "ms"))
+        XCTAssertEqual(card.latencyAverageText, "Moyenne 24 ms")
     }
 
-    /// Latence héros : min ?: médiane ?: moyenne — convention partagée avec
-    /// Android. Un affichage qui glisserait vers la moyenne gonflerait la valeur
-    /// mise en avant sur toutes les cartes.
-    func testLegacyLatencyHeroPreservesHistoricalAverage() {
-        XCTAssertEqual(model(result()).latencyValueText, "24")
-        XCTAssertEqual(model(result(pingMin: nil)).latencyValueText, "24")
-        XCTAssertEqual(model(result(pingMin: nil, pingMedian: nil)).latencyValueText, "24")
-        XCTAssertEqual(
-            model(result(pingMin: nil, pingMedian: nil, pingAverage: nil)).latencyValueText, "—"
-        )
+    /// Un pic qui s'écrit comme le débit n'apporte rien : pas de ligne.
+    func testPeakEqualToTheAverageIsOmitted() {
+        let sample = SpeedtestRunResult(label: "flat", downloadMbps: 84.21, downloadAverageMbps: 84.21,
+            downloadMaxMbps: 84.24, uploadAverageMbps: 20, uploadMaxMbps: 20, durationSeconds: 10, connectionType: .wifi)
+        let card = model(sample)
+        XCTAssertNil(card.downloadPeakText)
+        XCTAssertNil(card.uploadPeakText)
     }
 
-    func testUnderLoadRowsAreOmittedWithoutLoadedLatency() {
-        XCTAssertEqual(model(result()).underLoadRows.count, 2)
-        // Bloc entièrement masqué par le renderer quand la liste est vide.
-        XCTAssertTrue(model(result(loadedPings: false)).underLoadRows.isEmpty)
+    /// Règle de A : une décimale sous 100, entier de 100 à 999, Gb/s à deux
+    /// décimales dès 1 000 — les bascules jugées sur la valeur arrondie.
+    func testThroughputFollowsTheSharedNumberRule() {
+        func text(_ mbps: Double) -> String? {
+            SQShareCardBuilder.throughput(mbps, locale: locale).map { "\($0.number) \($0.unit)" }
+        }
+        XCTAssertEqual(text(84.24), "84,2 Mb/s")
+        XCTAssertEqual(text(99.96), "100 Mb/s")
+        XCTAssertEqual(text(214.4), "214 Mb/s")
+        XCTAssertEqual(text(999.6), "1,00 Gb/s")
+        XCTAssertEqual(text(1_240), "1,24 Gb/s")
+        XCTAssertEqual(text(12_408.6), "12,41 Gb/s")
+        XCTAssertNil(text(0), "Jamais de zéro : la ligne disparaît")
+        XCTAssertNil(text(.nan))
+    }
+
+    /// Une valeur absente retire sa ligne : jamais de zéro ni de tiret.
+    func testMissingValuesRemoveTheirLine() {
+        XCTAssertNil(model(result(pingMin: nil, pingMedian: nil, pingAverage: nil)).latency)
+        let noLoad = model(result(loadedPings: false))
+        XCTAssertEqual(noLoad.rows.map(\.label), ["Gigue", "Serveur"])
+        XCTAssertNil(model(result(downloadSeries: nil)).downloadGraph)
+    }
+
+    /// Sans minimum : la médiane puis la moyenne, sous « Latence », sans ligne Moyenne.
+    func testLatencyFallsBackToMedianThenAverage() {
+        let median = model(result(pingMin: nil))
+        XCTAssertEqual(median.latencyLabel, "Latence")
+        XCTAssertEqual(median.latency?.number, "18")
+        XCTAssertNil(median.latencyAverageText)
+        XCTAssertEqual(model(result(pingMin: nil, pingMedian: nil)).latency?.number, "24")
+    }
+
+    /// Note sous charge : pire latence chargée moins la latence affichée, barème
+    /// Cloudflare du serveur et d'Android (57 − 14 = 43 ms → C).
+    func testUnderLoadRowCarriesTheGradeThenTheDelta() {
+        let rows = model(result()).rows
+        XCTAssertEqual(rows.map(\.label), ["Sous charge", "Gigue", "Serveur"])
+        XCTAssertEqual(rows[0].value, "+43 ms")
+        XCTAssertEqual(rows[0].grade?.letter, "C")
+        XCTAssertEqual(rows[1].value, "1,4 ms")
+        XCTAssertEqual(rows[2].value, "Paris BBR (Bouygues)")
+    }
+
+    func testLoadedLatencyGradeThresholds() {
+        func grade(_ loaded: Double) -> String? {
+            SQShareCardBuilder.loadedLatency(for: result(pingMin: 20, loadedPings: true, pingDl: loaded, pingUl: nil))?.grade.letter
+        }
+        XCTAssertEqual(grade(25), "A")
+        XCTAssertEqual(grade(50), "B")
+        XCTAssertEqual(grade(80), "C")
+        XCTAssertEqual(grade(220), "D")
+        XCTAssertEqual(grade(221), "F")
+        XCTAssertEqual(grade(10), "A", "Une latence chargée plus basse n'est pas une hausse négative")
+    }
+
+    /// Latence au repos mesurée ailleurs que sur le serveur du test (ou inconnue) :
+    /// l'écart ne mesure pas la charge, la ligne disparaît.
+    func testUnderLoadNeedsTheIdleLatencyOnTheTestServer() {
+        XCTAssertNil(SQShareCardBuilder.loadedLatency(for: result(pingHost: "1.1.1.1")))
+        XCTAssertNil(SQShareCardBuilder.loadedLatency(for: result(pingHost: nil)))
+        XCTAssertNotNil(SQShareCardBuilder.loadedLatency(for: result(pingHost: "PARIS.bbr.test")))
     }
 
     // MARK: Séries
 
-    /// Sous deux points mesurés, la carte trace une ligne PLATE plutôt qu'un
-    /// graphe inventé : le trait dit « pas de détail », pas « débit instable ».
-    func testEmptySeriesRemainsUnavailable() {
-        let graph = model(result(downloadSeries: nil)).download.graph
-        XCTAssertTrue(graph.points.isEmpty, "Missing historical samples must not become a flat curve")
-    }
-
     func testLongSeriesIsDownsampled() {
         let series = (0..<200).map { Double($0) }
-        let graph = model(result(downloadSeries: series)).download.graph
-        XCTAssertEqual(graph.points.count, 32)
-        // Moyennage par buckets : les extrêmes restent encadrés par la série.
-        XCTAssertGreaterThan(graph.points.first ?? 0, 0)
-        XCTAssertLessThan(graph.points.last ?? 0, 200)
+        let graph = model(result(downloadSeries: series)).downloadGraph
+        XCTAssertEqual(graph?.points.count, 32)
+        XCTAssertGreaterThan(graph?.points.first ?? 0, 0)
+        XCTAssertLessThan(graph?.points.last ?? 0, 200)
     }
 
-    /// Sans marge de tête, une série quasi constante colle au bord supérieur du
-    /// graphe — le pic doit culminer à 75 % de la hauteur.
-    func testGraphScaleLeavesHeadroom() {
-        let graph = model(result(downloadSeries: [100, 200, 300])).download.graph
-        XCTAssertEqual(graph.localMax, 300 * 4 / 3, accuracy: 0.001)
+    /// Le haut du tracé est le maximum mesuré : la marge vient du gabarit (4 pt).
+    func testGraphScaleIsTheMeasuredMaximum() {
+        let graph = model(result(downloadSeries: [100, 200, 300])).downloadGraph
+        XCTAssertEqual(graph?.localMax ?? 0, 300, accuracy: 0.001)
     }
 
     /// Un échantillon aberrant est un artefact de mesure : il est borné, sinon il
     /// écrase l'échelle et aplatit toute la courbe.
     func testAbsurdSamplesAreClamped() {
-        let graph = model(result(downloadSeries: [100, 999_999, 200])).download.graph
-        XCTAssertEqual(graph.points.max() ?? 0, 20_000, accuracy: 0.001)
+        let graph = model(result(downloadSeries: [100, 999_999, 200])).downloadGraph
+        XCTAssertEqual(graph?.points.max() ?? 0, 20_000, accuracy: 0.001)
     }
 
     func testNonFiniteSamplesAreDropped() {
-        let graph = model(result(downloadSeries: [100, .nan, .infinity, -5, 300])).download.graph
-        XCTAssertEqual(graph.points, [100, 300])
+        let graph = model(result(downloadSeries: [100, .nan, .infinity, -5, 300])).downloadGraph
+        XCTAssertEqual(graph?.points, [100, 300])
+    }
+
+    func testCurvesUseInkForDownloadAndBrandForUpload() {
+        let card = model(result())
+        XCTAssertEqual(card.downloadGraph?.accentColor, UIColor(hex: 0x1C201E))
+        XCTAssertEqual(card.uploadGraph?.accentColor, UIColor(hex: 0xA8123A))
     }
 
     // MARK: En-tête et pied
 
-    func testHeaderCarriesGenerationThenOperator() {
-        XCTAssertEqual(model(result()).headerNetworkText, "5G SA · Orange")
+    func testHeaderCarriesOperatorThenGeneration() {
+        let network = model(result()).network
+        XCTAssertEqual(network?.name, "Orange")
+        XCTAssertEqual(network?.detail, "5G")
+        XCTAssertEqual(hex(network?.barColor), 0xFF7900)
     }
 
-    /// Le SSID identifie un foyer et la carte est faite pour être publiée : il n'y
-    /// figure jamais, sur aucune des deux plateformes.
+    /// Le SSID identifie un foyer et l'image est faite pour être publiée : il n'y
+    /// figure jamais, sur aucune plateforme.
     func testSsidNeverReachesTheCard() {
         let card = model(result(connection: .wifi, ssid: "Maison-Germain", operatorName: "Free"))
-        let rendered = [card.headerNetworkText, card.deviceCityText, card.serverText ?? ""]
+        let rendered = [card.network?.name ?? "", card.network?.detail ?? "", card.deviceCityText]
+            + card.rows.map(\.value)
         XCTAssertFalse(rendered.contains { $0.contains("Maison") })
     }
 
     /// C'est le FAI — résolu par IP/ASN, donc muet sur le réseau local — qui
-    /// prend la place du SSID.
+    /// prend la place du SSID : « Free · Wi-Fi », barre à sa couleur.
     func testWifiHeaderCarriesTheIspInsteadOfTheSsid() {
-        let card = model(result(connection: .wifi, ssid: "Maison-Germain", operatorName: "Free"))
-        XCTAssertEqual(card.headerNetworkText, "Wi-Fi · Free")
+        let network = model(result(connection: .wifi, ssid: "Maison-Germain", operatorName: "Free")).network
+        XCTAssertEqual(network?.name, "Free")
+        XCTAssertEqual(network?.detail, "Wi-Fi")
+        XCTAssertEqual(hex(network?.barColor), 0x6B7280)
     }
 
-    /// FAI inconnu : « Wi-Fi » tout court plutôt qu'un opérateur inventé.
+    /// FAI inconnu : « Wi-Fi » seul et sans barre plutôt qu'un opérateur inventé.
     func testWifiHeaderFallsBackToWifiAlone() {
-        XCTAssertEqual(
-            model(result(connection: .wifi, ssid: "Maison-Germain")).headerNetworkText, "Wi-Fi"
-        )
+        let network = model(result(connection: .wifi, ssid: "Maison-Germain")).network
+        XCTAssertEqual(network?.name, "Wi-Fi")
+        XCTAssertNil(network?.detail)
+        XCTAssertNil(network?.barColor)
+    }
+
+    /// Sous VPN, l'adresse vue est celle du tunnel : la techno seule, sans barre.
+    func testVpnHeaderKeepsTheTechnologyAlone() {
+        let network = model(result(connection: .other, operatorName: "M247", technology: .fourG)).network
+        XCTAssertEqual(network?.name, "4G")
+        XCTAssertNil(network?.detail)
+        XCTAssertNil(network?.barColor)
+        XCTAssertNil(model(result(connection: .other, technology: nil)).network)
+    }
+
+    func testDateReadsAsASentence() {
+        XCTAssertTrue(model(result()).dateText?.contains("mai 2026 à") == true, model(result()).dateText ?? "nil")
     }
 
     /// L'identifiant machine relève du diagnostic : la carte n'affiche que le nom
@@ -187,12 +274,6 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(card.deviceCityText, "iPhone 17 Pro")
     }
 
-    /// L'identité radio est vide sur iOS — limite de plateforme assumée, le pied
-    /// doit se replier au lieu d'afficher un espace réservé.
-    func testRadioLinesStayEmptyOnIOS() {
-        XCTAssertTrue(model(result()).radioLines.isEmpty)
-    }
-
     func testPrivacyOptionsHideOnlyContextualMetadata() {
         let sample = result()
         let full = model(sample)
@@ -208,19 +289,18 @@ final class SQShareCardBuilderTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(privateCard.headerNetworkText, "")
-        XCTAssertNil(privateCard.dateTimeText)
-        XCTAssertNil(privateCard.serverText)
+        XCTAssertNil(privateCard.network)
+        XCTAssertNil(privateCard.dateText)
+        XCTAssertFalse(privateCard.rows.contains { $0.label == "Serveur" })
         XCTAssertEqual(privateCard.deviceCityText, "")
-        XCTAssertTrue(privateCard.radioLines.isEmpty)
 
         // Le résultat lui-même reste partageable et ne change jamais avec les
         // options de confidentialité.
-        XCTAssertEqual(privateCard.download.value, full.download.value)
-        XCTAssertEqual(privateCard.upload.value, full.upload.value)
-        XCTAssertEqual(privateCard.latencyValueText, full.latencyValueText)
-        XCTAssertEqual(privateCard.download.graph.points, full.download.graph.points)
-        XCTAssertEqual(privateCard.upload.graph.points, full.upload.graph.points)
+        XCTAssertEqual(privateCard.download, full.download)
+        XCTAssertEqual(privateCard.upload, full.upload)
+        XCTAssertEqual(privateCard.latency, full.latency)
+        XCTAssertEqual(privateCard.downloadGraph?.points, full.downloadGraph?.points)
+        XCTAssertEqual(privateCard.uploadGraph?.points, full.uploadGraph?.points)
     }
 
     func testDeviceAndApproximateLocationCanBeHiddenIndependently() {
@@ -269,13 +349,10 @@ final class SQShareCardBuilderTests: XCTestCase {
 
     // MARK: Couleurs
 
-    /// La teinte suit le débit rapporté au maximum ATTEIGNABLE sur ce réseau :
-    /// 300 Mb/s est excellent en 4G et médiocre en 5G. Deux réseaux différents ne
-    /// peuvent donc pas produire la même couleur pour le même débit.
-    func testAccentFollowsTheNetworkCeiling() {
-        let fiveG = model(result()).download.graph.accentColor
+    /// L'échelle de qualité (Drive Test, cadran) reste saturée au-delà de 1 —
+    /// l'image A ne l'emploie plus, mais le thème est partagé.
+    func testQualityScaleSaturatesAboveOne() {
         let theme = SQShareCardTheme.dark
-        XCTAssertNotEqual(fiveG, theme.qualityColor(ratio: 1))
         XCTAssertEqual(theme.qualityColor(ratio: 2), theme.speedPalette.last, "saturé au-delà de 1")
     }
 
@@ -288,32 +365,23 @@ final class SQShareCardBuilderTests: XCTestCase {
 
     // MARK: Bout en bout
 
-    /// La carte telle qu'un partage la produit — depuis un résultat, et non
-    /// depuis un modèle écrit à la main comme dans `SQShareCardRenderTests`. Les
-    /// pièces jointes sont à REGARDER : c'est la comparaison avec la carte
-    /// Android qui valide le port, pas une assertion.
+    /// L'image telle qu'un partage la produit, en pièces jointes à REGARDER à côté
+    /// des références A-ios.png et A-sans-courbe-ni-radio.png.
     func testRendersFromAnActualResult() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded, "Polices absentes — carte en Helvetica")
         let sample = result(
             downloadSeries: (0..<40).map { 120 + Double($0) * 18 },
             uploadSeries: (0..<40).map { 20 + Double($0) * 2.6 }
         )
-        for (theme, name) in [(SQShareCardTheme.light, "clair"),
-                              (SQShareCardTheme.dark, "sombre"),
-                              (SQShareCardTheme.oled, "oled")] {
-            let image = SQShareCardRenderer.render(
-                SQShareCardBuilder.model(for: sample, theme: theme, locale: locale)
-            )
-            XCTAssertEqual(image.size.width, 2_160, accuracy: 1)
-            let attachment = XCTAttachment(image: image)
-            attachment.name = "carte-partage-\(name)"
-            attachment.lifetime = .keepAlways
-            add(attachment)
-        }
+        let image = SQShareCardRenderer.render(SQShareCardBuilder.model(for: sample, theme: .dark, locale: locale))
+        XCTAssertEqual(image.size.width, 2_400, accuracy: 1)
+        XCTAssertEqual(image.size.height, 1_260, accuracy: 1)
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "partage-a-cellulaire"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
-    /// La même carte en Wi-Fi : l'en-tête doit porter le FAI, et le SSID rester
-    /// invisible. À regarder autant qu'à asserter.
     func testRendersAWifiCardCarryingTheIspNotTheSsid() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded, "Polices absentes — carte en Helvetica")
         let sample = result(
@@ -323,20 +391,14 @@ final class SQShareCardBuilderTests: XCTestCase {
             ssid: "Maison-Germain",
             operatorName: "Free"
         )
-        let card = SQShareCardBuilder.model(for: sample, theme: .light, locale: locale)
-        XCTAssertEqual(card.headerNetworkText, "Wi-Fi · Free")
-        let attachment = XCTAttachment(image: SQShareCardRenderer.render(card))
-        attachment.name = "carte-partage-wifi"
+        let attachment = XCTAttachment(image: SQShareCardBuilder.renderImage(for: sample, theme: .light))
+        attachment.name = "partage-a-wifi"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
 
     func testRendersPrivacyReducedPreview() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded, "Polices absentes — carte en Helvetica")
-        let sample = result(
-            downloadSeries: (0..<40).map { 120 + Double($0) * 18 },
-            uploadSeries: (0..<40).map { 20 + Double($0) * 2.6 }
-        )
         let options = SpeedtestShareOptions(
             includeNetworkContext: false,
             includeApproximateLocation: false,
@@ -345,16 +407,12 @@ final class SQShareCardBuilderTests: XCTestCase {
             includeServerDetails: false,
             includeTimestamp: false
         )
-        let image = SQShareCardBuilder.renderImage(
-            for: sample,
-            theme: .light,
-            options: options
-        )
+        let image = SQShareCardBuilder.renderImage(for: result(downloadSeries: nil, uploadSeries: nil), theme: .light, options: options)
         let attachment = XCTAttachment(image: image)
-        attachment.name = "carte-partage-confidentialite-maximale"
+        attachment.name = "partage-a-confidentialite-maximale"
         attachment.lifetime = .keepAlways
         add(attachment)
-        XCTAssertEqual(image.size.width, 2_160, accuracy: 1)
-        XCTAssertEqual(image.size.height, 1_300, accuracy: 1)
+        XCTAssertEqual(image.size.width, 2_400, accuracy: 1)
+        XCTAssertEqual(image.size.height, 1_260, accuracy: 1)
     }
 }

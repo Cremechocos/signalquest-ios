@@ -170,12 +170,12 @@ extension SpeedtestV6ContractTests {
             downloadMaxMbps: 1000, downloadP90Mbps: 1000, pingMs: 20, pingMinMs: 12, durationSeconds: 4,
             connectionType: .wifi, uploadMeasurementSource: "client-written", measurementTrace: trace, methodologyVersion: 6)
         let card = SQShareCardBuilder.model(for: result, theme: .light, locale: Locale(identifier: "fr_FR"))
-        XCTAssertEqual(card.download.unit, SQUnits.throughputUnit(mbps: 1000))
-        XCTAssertEqual(card.download.value, "1,00")
-        XCTAssertEqual(card.download.graph.normalizedTimes, [0.65, 1.0])
-        XCTAssertEqual(card.latencyValueText, "12")
-        XCTAssertEqual(card.upload.value, "—")
-        XCTAssertEqual(card.upload.maxValue, "—")
+        XCTAssertEqual(card.download, .init(number: "1,00", unit: "Gb/s"))
+        XCTAssertEqual(card.downloadGraph?.normalizedTimes, [0.65, 1.0])
+        XCTAssertEqual(card.latency?.number, "12")
+        // Upload absent: its line disappears instead of showing a dash.
+        XCTAssertNil(card.upload)
+        XCTAssertNil(card.uploadGraph)
         let share = SQShareCardRenderer.render(card)
         try XCTUnwrap(share.pngData()).write(to: URL(fileURLWithPath: "/tmp/sq-ios-v6-active-share.png"))
         for (name, width, size, theme) in [("phone", 320.0, DynamicTypeSize.accessibility3, ColorScheme.light),
@@ -862,7 +862,7 @@ extension SpeedtestV6ContractTests {
         let result = SpeedtestRunResult(label: "received", downloadMbps: 100, downloadAverageMbps: 100,
             downloadMaxMbps: 100, uploadAverageMbps: 100, uploadMaxMbps: 100, durationSeconds: 14,
             connectionType: .wifi, measurementTrace: trace, methodologyVersion: 6)
-        let graph = SQShareCardBuilder.model(for: result, theme: .light).upload.graph
+        let graph = try XCTUnwrap(SQShareCardBuilder.model(for: result, theme: .light).uploadGraph)
         XCTAssertEqual(graph.durationSeconds, 10)
         XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.first), 0.1, accuracy: 0.00001)
         XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.last), 1, accuracy: 0.00001)

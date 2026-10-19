@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 /// Groupes de métadonnées que l'utilisateur peut retirer avant publication.
@@ -33,11 +34,6 @@ enum SQShareCardBuilder {
 
     /// Au-delà, les points sont moyennés par buckets.
     private static let maxPoints = 32
-
-    /// L'échelle Y vaut le max de la série × 4/3 : le pic culmine ainsi à 75 % de
-    /// la hauteur. Sans cette marge, une série quasi constante (upload lissé par
-    /// l'edge) dessine une ligne COLLÉE au bord supérieur du graphe.
-    private static let graphHeadroomFactor: Double = 4.0 / 3.0
 
     // MARK: - Rendu
 
@@ -77,6 +73,9 @@ enum SQShareCardBuilder {
 
     // MARK: - Modèle
 
+    /// `theme` reste accepté pour ne pas toucher aux appelants, mais l'image A
+    /// n'a qu'une palette claire (décision du 19/10) : une image publiée ne suit
+    /// pas le thème de l'app de celui qui la partage.
     static func model(
         for result: SpeedtestRunResult,
         theme: SQShareCardTheme,
@@ -85,89 +84,70 @@ enum SQShareCardBuilder {
     ) -> SQShareCardModel {
         let downloadGraph = graph(
             samples: result.downloadSeriesMbps ?? [],
-            average: result.downloadAverageMbps,
-            peak: result.downloadMaxMbps,
-            gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: false),
-            theme: theme,
+            accentColor: UIColor(hex: 0x1C201E),
             trace: result.measurementTrace?.phases.first { $0.phase == "download" }
         )
-        let uploadAverage = result.uploadAverageMbps ?? 0
         let uploadGraph = graph(
             samples: result.uploadSeriesMbps ?? [],
-            average: uploadAverage,
-            peak: result.uploadMaxMbps ?? uploadAverage,
-            gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: true),
-            theme: theme,
+            accentColor: UIColor(hex: 0xA8123A),
             trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
         )
 
-        // v6 uses the measured minimum; archives preserve their historical value.
-        let latency = result.primaryPingMs ?? 0
-
+        let latency = displayedLatency(for: result)
         return SQShareCardModel(
-            theme: theme,
-            brand: "SIGNALQUEST",
-            headerNetworkText: options.includeNetworkContext ? headerNetworkText(for: result) : "",
-            dateTimeText: options.includeTimestamp ? dateText(result.createdAt, locale: locale) : nil,
-            download: .init(
-                label: String(localized: "Download"),
-                value: formatMbps(result.downloadAverageMbps, locale: locale),
-                unit: SQUnits.throughputUnit(mbps: result.downloadAverageMbps),
-                maxValue: formatMbps(result.downloadMaxMbps, locale: locale),
-                labelColor: downloadGraph.accentColor,
-                graph: downloadGraph,
-                maxUnit: SQUnits.throughputUnit(mbps: result.downloadMaxMbps)
-            ),
-            upload: .init(
-                label: String(localized: "Upload"),
-                value: result.uploadAverageMbps.map { formatMbps($0, locale: locale) } ?? "—",
-                unit: SQUnits.throughputUnit(mbps: uploadAverage),
-                maxValue: result.uploadMaxMbps.map { formatMbps($0, locale: locale) } ?? "—",
-                labelColor: uploadGraph.accentColor,
-                graph: uploadGraph,
-                maxUnit: SQUnits.throughputUnit(mbps: result.uploadMaxMbps ?? uploadAverage)
-            ),
-            latencyLabel: String(localized: "Latence"),
-            latencyValueText: result.primaryPingMs.map { "\(Int($0.rounded()))" } ?? "—",
-            latencyUnit: "ms",
-            latencySubText: latencySubText(for: result, locale: locale),
-            latencyColor: result.primaryPingMs == nil ? theme.textSecondary : theme.latencyColor(ms: latency),
-            underLoadLabel: String(localized: "Sous charge"),
-            underLoadRows: underLoadRows(
-                for: result, download: downloadGraph, upload: uploadGraph, locale: locale
-            ),
-            serverLabel: String(localized: "Serveur"),
-            serverText: options.includeServerDetails
-                ? (result.serverName ?? result.downloadServerName)?.shareTrimmed
-                : nil,
+            dateText: options.includeTimestamp ? dateText(result.createdAt, locale: locale) : nil,
+            network: options.includeNetworkContext ? networkLine(for: result) : nil,
+            download: throughput(result.downloadAverageMbps, locale: locale)
+                ?? .init(number: "0", unit: "Mb/s"),
+            downloadPeakText: peakText(result.downloadMaxMbps, average: result.downloadAverageMbps, locale: locale),
+            downloadGraph: downloadGraph,
+            upload: result.uploadAverageMbps.flatMap { throughput($0, locale: locale) },
+            uploadPeakText: result.uploadAverageMbps.flatMap { average in
+                result.uploadMaxMbps.flatMap { peakText($0, average: average, locale: locale) }
+            },
+            uploadGraph: uploadGraph,
+            latencyLabel: latency.isMinimum ? String(localized: "Latence min.") : String(localized: "Latence"),
+            latency: latency.value.map { .init(number: "\(Int($0.rounded()))", unit: "ms") },
+            latencyAverageText: latency.average.map { String(localized: "Moyenne \(Int($0.rounded())) ms") },
+            rows: detailRows(for: result, locale: locale, includeServer: options.includeServerDetails),
             deviceCityText: deviceCityText(
                 for: result,
                 includeDevice: options.includeDevice,
                 includeLocation: options.includeApproximateLocation
-            ),
-            // VIDE, et ce n'est pas un trou à combler : ces lignes portent
-            // l'identité radio (porteuses agrégées, MCC/MNC, bande) qu'Android lit
-            // sur son modem et qu'iOS n'expose pas. Le pied se replie tout seul.
-            // Le flag reste dans le contrat commun Android/iOS, mais iOS ne
-            // fournit aucune preuve RF du réseau servant à rendre ici.
-            radioLines: []
+            )
         )
+    }
+
+    /// « Pic à 96,8 Mb/s » — absent si le pic manque ou s'écrit comme le débit.
+    private static func peakText(_ peak: Double, average: Double, locale: Locale) -> String? {
+        guard let value = throughput(peak, locale: locale), value != throughput(average, locale: locale) else { return nil }
+        let text = "\(value.number) \(value.unit)"
+        return String(localized: "Pic à \(text)")
+    }
+
+    /// Le minimum en grand, la moyenne dessous ; sans minimum, la médiane puis la
+    /// moyenne, seules (spécification v11).
+    static func displayedLatency(for result: SpeedtestRunResult) -> (value: Double?, isMinimum: Bool, average: Double?) {
+        func usable(_ value: Double?) -> Double? { value.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } }
+        if let minimum = usable(result.pingMinMs) {
+            return (minimum, true, usable(result.pingMs))
+        }
+        return (usable(result.pingMedianMs) ?? usable(result.pingMs), false, nil)
     }
 
     // MARK: - Graphes
 
+    /// `nil` sous deux points : pas de courbe plutôt qu'une ligne inventée.
     private static func graph(
-        samples: [Double], average: Double, peak: Double,
-        gaugeMax: Double, theme: SQShareCardTheme, trace: SpeedtestPhaseTrace? = nil
-    ) -> SQShareCardModel.Graph {
+        samples: [Double], accentColor: UIColor, trace: SpeedtestPhaseTrace? = nil
+    ) -> SQShareCardModel.Graph? {
         let timed = trace?.recentSeries
-        let points = timed?.map(\.mbps) ?? downsample(prepareSeries(samples, average: average, peak: peak))
+        let points = timed?.map(\.mbps) ?? downsample(prepareSeries(samples))
+        guard points.count >= 2 else { return nil }
         return .init(
             points: points,
-            localMax: Swift.max(points.max() ?? 1, 1) * graphHeadroomFactor,
-            // La teinte suit le débit MOYEN rapporté au maximum atteignable sur ce
-            // réseau : 300 Mb/s est excellent en 4G et médiocre en 5G.
-            accentColor: theme.qualityColor(ratio: average / Swift.max(gaugeMax, 1)),
+            localMax: Swift.max(points.max() ?? 1, 1),
+            accentColor: accentColor,
             normalizedTimes: trace.map { phase in
                 (timed ?? []).map { Double($0.elapsedMs - phase.sampleStartMs) / Double(max(1, phase.sampleDurationMs)) }
             },
@@ -176,7 +156,7 @@ enum SQShareCardBuilder {
     }
 
     /// Historical samples keep their existing scale; missing samples stay missing.
-    private static func prepareSeries(_ samples: [Double], average: Double, peak: Double) -> [Double] {
+    private static func prepareSeries(_ samples: [Double]) -> [Double] {
         let clean = samples
             .filter { $0.isFinite && $0 >= 0 }
             .map { Swift.min($0, seriesClampMbps) }
@@ -200,71 +180,79 @@ enum SQShareCardBuilder {
 
     // MARK: - Textes
 
-    /// « 5G SA · Orange », « Wi-Fi · Free » — le lien puis qui le fournit.
+    /// « SFR · 5G », « Free · Wi-Fi » : qui fournit, puis le lien.
     ///
     /// Le SSID n'y figure JAMAIS : le nom d'un réseau domestique identifie un
-    /// foyer, et cette carte est faite pour être publiée. C'est le FAI qui prend
+    /// foyer, et cette image est faite pour être publiée. C'est le FAI qui prend
     /// sa place — `networkOperatorName` le porte en Wi-Fi, résolu par IP/ASN,
-    /// donc sans rien révéler du réseau local. Même arbitrage que
-    /// `networkShareDisplayName`, et Android suit la même règle.
-    private static func headerNetworkText(for result: SpeedtestRunResult) -> String {
-        var parts: [String] = []
+    /// donc sans rien révéler du réseau local.
+    ///
+    /// Opérateur inconnu, ou lien `.other` (VPN : l'adresse vue est celle du
+    /// tunnel) : la techno seule, sans barre de couleur — on n'attribue pas un
+    /// réseau qu'on ne connaît pas.
+    static func networkLine(for result: SpeedtestRunResult) -> SQShareCardModel.NetworkLine? {
+        let link: String?
         switch result.connectionType {
-        case .wifi:
-            parts.append("Wi-Fi")
-        case .wired:
-            parts.append("Ethernet")
-        case .cellular:
-            parts.append(result.cellularTechnology?.displayName ?? String(localized: "Cellulaire"))
-        case .other:
-            // VPN ou lien inconnu : on ne revendique aucune génération.
-            break
+        case .wifi: link = "Wi-Fi"
+        case .wired: link = "Ethernet"
+        case .cellular, .other: link = result.cellularTechnology.map(generation)
         }
-        if let operatorName = result.networkOperatorName?.shareTrimmed {
-            parts.append(operatorName)
+        let operatorName = result.connectionType == .other ? nil : result.networkOperatorName?.shareTrimmed
+        if let operatorName {
+            return .init(name: operatorName, detail: link, barColor: UIColor(SQBrand.operatorColor(operatorName)))
         }
-        if parts.isEmpty, let fallback = result.networkShareDisplayName.shareTrimmed {
-            parts.append(fallback)
-        }
-        return parts.joined(separator: " · ")
+        return link.map { .init(name: $0, detail: nil, barColor: nil) }
     }
 
-    /// « moy. 24 ms · gigue 3,2 ms » — la gigue est omise si elle n'est pas
-    /// exploitable, jamais rendue en « NaN ».
-    private static func latencySubText(for result: SpeedtestRunResult, locale: Locale) -> String {
-        var pieces: [String] = []
-        if let average = result.pingMs, average.isFinite, average >= 0 {
-            pieces.append("\(String(localized: "moy.")) \(Int(average.rounded())) ms")
+    /// La génération seule (« 5G ») : SA/NSA relève du détail, pas de l'image.
+    private static func generation(_ technology: CellularRadioTechnology) -> String {
+        switch technology {
+        case .twoG: "2G"
+        case .threeG: "3G"
+        case .fourG: "4G"
+        case .fiveGNSA, .fiveGSA: "5G"
+        }
+    }
+
+    /// Sous charge, gigue, serveur — chaque ligne disparaît avec sa valeur.
+    private static func detailRows(
+        for result: SpeedtestRunResult, locale: Locale, includeServer: Bool
+    ) -> [SQShareCardModel.Row] {
+        var rows: [SQShareCardModel.Row] = []
+        if let loaded = loadedLatency(for: result) {
+            rows.append(.init(label: String(localized: "Sous charge"), value: "+\(loaded.deltaMs) ms", grade: loaded.grade))
         }
         if let jitter = result.jitterMs, jitter.isFinite, jitter >= 0 {
-            pieces.append("\(String(localized: "gigue")) \(decimal(jitter, locale: locale)) ms")
+            rows.append(.init(label: String(localized: "Gigue"), value: SQUnits.jitter(jitter, locale: locale)))
         }
-        return pieces.joined(separator: " · ")
+        if includeServer, let server = (result.serverName ?? result.downloadServerName)?.shareTrimmed {
+            rows.append(.init(label: String(localized: "Serveur"), value: server))
+        }
+        return rows
     }
 
-    private static func underLoadRows(
-        for result: SpeedtestRunResult,
-        download: SQShareCardModel.Graph,
-        upload: SQShareCardModel.Graph,
-        locale: Locale
-    ) -> [SQShareCardModel.UnderLoadRow] {
-        func row(
-            _ prefix: String, ping: Double?, jitter: Double?, dotColor: UIColor
-        ) -> SQShareCardModel.UnderLoadRow? {
-            guard let ping, ping.isFinite, ping >= 0 else { return nil }
-            let usableJitter = jitter.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
-            return .init(
-                prefix: prefix,
-                valueText: "\(Int(ping.rounded())) ms",
-                jitText: usableJitter.map { "· jit \(decimal($0, locale: locale))" },
-                dotColor: dotColor
-            )
+    /// Hausse de latence sous charge et sa note — même dérivation que le serveur
+    /// (`deriveBufferbloat`) et même barème que le client Android (seuils
+    /// Cloudflare : A ≤ 5, B ≤ 30, C ≤ 60, D ≤ 200 ms, F au-delà). La référence
+    /// au repos est la latence affichée en grand, pour que les deux nombres se
+    /// lisent ensemble. Sans preuve qu'elle a visé le serveur du test, pas de ligne :
+    /// l'écart entre deux machines différentes ne dit rien de la charge.
+    static func loadedLatency(for result: SpeedtestRunResult) -> (deltaMs: Int, grade: SQShareCardModel.Grade)? {
+        guard let pingHost = result.pingServerHost?.shareTrimmed,
+              result.downloadServerHost.map({ $0.caseInsensitiveCompare(pingHost) == .orderedSame }) ?? true,
+              let idle = displayedLatency(for: result).value else { return nil }
+        let loaded = [result.pingDlMs, result.pingUlMs].compactMap { $0 }.filter { $0.isFinite && $0 > 0 }
+        guard let worst = loaded.max() else { return nil }
+        let delta = Int(Swift.max(0, worst - idle).rounded())
+        // Texte en teinte -700, fond en teinte vive translucide (spécification v10).
+        let (letter, color, background): (String, UInt32, UIColor) = switch delta {
+        case ...5: ("A", 0x187B38, UIColor(hex: 0x1B8A3F, alpha: 0.12))
+        case ...30: ("B", 0x477818, UIColor(hex: 0x7DB834, alpha: 0.16))
+        case ...60: ("C", 0x8C6313, UIColor(hex: 0xD08F1D, alpha: 0.16))
+        case ...200: ("D", 0xAC4F17, UIColor(hex: 0xE66A1F, alpha: 0.14))
+        default: ("F", 0xAC4F17, UIColor(hex: 0xE66A1F, alpha: 0.14))
         }
-        // Codes universels, non traduits — comme sur Android.
-        return [
-            row("↓ DL", ping: result.pingDlMs, jitter: result.jitterDlMs, dotColor: download.accentColor),
-            row("↑ UL", ping: result.pingUlMs, jitter: result.jitterUlMs, dotColor: upload.accentColor)
-        ].compactMap { $0 }
+        return (delta, .init(letter: letter, color: UIColor(hex: color), background: background))
     }
 
     private static func deviceCityText(
@@ -308,26 +296,32 @@ enum SQShareCardBuilder {
 
     // MARK: - Formats
 
-    /// Localized Mbps below 1000, Gbps above; persisted measurements remain Mbps.
-    private static func formatMbps(_ value: Double, locale: Locale) -> String {
-        let safe = value.isFinite && value >= 0 ? value : 0
-        return safe >= 1000 ? String(format: "%.2f", locale: locale, safe / 1000) : decimal(safe, locale: locale)
+    /// Règle commune de A : sous 100 Mb/s une décimale (« 84,2 »), de 100 à 999
+    /// un entier (« 214 »), dès 1 000 des Gb/s à deux décimales (« 1,24 »). Les
+    /// bascules se font sur la valeur ARRONDIE : 99,96 s'écrit « 100 », jamais
+    /// « 100,0 ». `nil` pour une valeur nulle ou non finie : la ligne disparaît.
+    static func throughput(_ mbps: Double, locale: Locale) -> SQShareCardModel.Value? {
+        guard mbps.isFinite, mbps > 0 else { return nil }
+        if mbps >= 999.5 {
+            return .init(number: number(mbps / 1000, fractionDigits: 2, locale: locale), unit: "Gb/s")
+        }
+        if mbps >= 99.95 {
+            return .init(number: number(mbps, fractionDigits: 0, locale: locale), unit: "Mb/s")
+        }
+        return .init(number: number(mbps, fractionDigits: 1, locale: locale), unit: "Mb/s")
     }
 
-    private static func decimal(_ value: Double, locale: Locale) -> String {
-        String(format: "%.1f", locale: locale, value)
+    private static func number(_ value: Double, fractionDigits: Int, locale: Locale) -> String {
+        value.formatted(.number.precision(.fractionLength(fractionDigits)).grouping(.never).locale(locale))
     }
 
+    /// « 19 octobre 2026 à 14:32 », « October 19, 2026 at 2:32 PM » — heure locale.
     private static func dateText(_ date: Date, locale: Locale) -> String {
-        // Ordre jour/mois et 12 h / 24 h de la langue : « 19 oct. 2026 · 14:30 »,
-        // « Oct 19, 2026 · 2:30 PM ».
-        let day = DateFormatter()
-        day.locale = locale
-        day.setLocalizedDateFormatFromTemplate("d MMM yyyy")
-        let time = DateFormatter()
-        time.locale = locale
-        time.setLocalizedDateFormatFromTemplate("jmm")
-        return "\(day.string(from: date)) · \(time.string(from: date))"
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateStyle = .long
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 

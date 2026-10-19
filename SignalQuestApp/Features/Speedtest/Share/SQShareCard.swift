@@ -119,96 +119,120 @@ struct SQShareCardTheme {
 
 // MARK: - Modèle
 
-/// Données de la carte. Miroir de `ShareCardModel` (Android), réduit à ce que la
-/// carte dessine réellement — tout le calcul (formatage, échelles, agrégats) se
-/// fait en amont, le rendu ne décide de rien.
+/// Données de l'image de partage « A — Fiche » (validée le 19/10, commune au web
+/// et à Android). Tout est déjà formaté : le rendu ne décide de rien, et chaque
+/// valeur optionnelle absente RETIRE sa ligne — jamais de zéro ni de tiret.
 struct SQShareCardModel {
     struct Graph {
-        /// Real samples; empty means the historical curve is unavailable.
+        /// Real samples; fewer than two means no curve is drawn.
         let points: [Double]
+        /// Valeur qui touche le haut du tracé.
         let localMax: Double
+        /// Teinte du trait et de son dégradé : encre pour le descendant, marque
+        /// pour le montant. Jamais l'échelle de qualité.
         let accentColor: UIColor
         var normalizedTimes: [Double]? = nil
         var durationSeconds: Double? = nil
     }
 
-    struct StatBlock {
+    /// Un nombre et son unité, composés séparément (« 1,24 » + « Gb/s »).
+    struct Value: Equatable {
+        let number: String
+        let unit: String
+    }
+
+    /// « SFR · 5G », « Free · Wi-Fi », ou la techno seule et sans barre quand
+    /// l'opérateur est inconnu (VPN).
+    struct NetworkLine {
+        let name: String
+        let detail: String?
+        let barColor: UIColor?
+    }
+
+    struct Grade {
+        let letter: String
+        let color: UIColor
+        let background: UIColor
+    }
+
+    /// Ligne de la colonne de droite : libellé, pointillés, valeur.
+    struct Row {
         let label: String
         let value: String
-        let unit: String
-        let maxValue: String
-        let labelColor: UIColor
-        let graph: Graph
-        var maxUnit: String? = nil
+        var grade: Grade? = nil
     }
 
-    struct UnderLoadRow {
-        let prefix: String
-        let valueText: String
-        let jitText: String?
-        let dotColor: UIColor
-    }
+    var width: CGFloat = 1_200
+    var height: CGFloat = 630
 
-    var width: CGFloat = 1_080
-    /// 690 sur Android ; 650 ici, la remontée de 40 unités libérant autant de
-    /// hauteur. Réduire la carte plutôt que la laisser respirer dans le vide.
-    var height: CGFloat = 650
-    let theme: SQShareCardTheme
+    /// `nil` : l'en-tête ne garde que « Speedtest ».
+    let dateText: String?
+    let network: NetworkLine?
 
-    let brand: String
-    let headerNetworkText: String
-    let dateTimeText: String?
+    let download: Value
+    /// « Pic à 1,41 Gb/s ».
+    let downloadPeakText: String?
+    let downloadGraph: Graph?
 
-    let download: StatBlock
-    let upload: StatBlock
+    let upload: Value?
+    /// « Pic à 96,8 Mb/s » ; absent si égal au débit.
+    let uploadPeakText: String?
+    let uploadGraph: Graph?
 
+    /// « Latence min. » au-dessus du minimum, « Latence » au-dessus d'un repli.
     let latencyLabel: String
-    let latencyValueText: String
-    let latencyUnit: String
-    let latencySubText: String
-    let latencyColor: UIColor
+    let latency: Value?
+    /// « Moyenne 18 ms », seulement sous un minimum.
+    let latencyAverageText: String?
 
-    let underLoadLabel: String
-    let underLoadRows: [UnderLoadRow]
+    let rows: [Row]
 
-    let serverLabel: String
-    let serverText: String?
-
+    /// « iPhone 17 Pro · Grenoble » ; vide si l'utilisateur a retiré les deux.
     let deviceCityText: String
-    let radioLines: [String]
+
+    var hasCurves: Bool { downloadGraph != nil || uploadGraph != nil }
 }
 
 // MARK: - Rendu
 
-/// Rendu Core Graphics de la carte de partage — port fidèle du Canvas Android
-/// (`SpeedtestShareCardRenderer.kt`, composition « Halo v3.1 »).
+/// Rendu Core Graphics de l'image A, au point près de la référence HTML
+/// (1200×630, exportée ×2).
 ///
-/// **Pourquoi Core Graphics et non SwiftUI.** Android dessine en impératif, avec
-/// des coordonnées en dur dans un espace logique 1080×690 (colonnes centrées à 297
-/// et 783, filet séparateur à 540…). Reproduire cela avec un `ImageRenderer` sur
-/// une hiérarchie SwiftUI reviendrait à réinventer la mise en page à partir de
-/// contraintes, et elle dériverait au premier ajustement. Le même modèle impératif
-/// préserve la géométrie exactement.
+/// **Pourquoi Core Graphics et non SwiftUI.** La référence est une grille CSS
+/// figée ; ses cotes se calculent une fois pour toutes (en-tête 28, cartouche
+/// 90…552, colonnes 1,1fr | 1 | 1fr…). Les poser en dur reproduit l'image à
+/// l'identique, là où une hiérarchie SwiftUI dériverait au premier ajustement de
+/// police ou d'interligne.
 ///
-/// **Différence d'origine des coordonnées de texte.** `Canvas.drawText` place la
-/// LIGNE DE BASE ; `NSAttributedString.draw(at:)` place le coin haut-gauche. Toutes
-/// les positions verticales d'Android sont donc converties via l'ascendante de la
-/// police — c'est le piège numéro un d'un tel port, et il décale tout le texte de
-/// la hauteur d'une capitale s'il est manqué.
+/// **Lignes de texte.** Le HTML compose chaque texte dans une boîte
+/// `line-height` ; la ligne de base s'y trouve à mi-hauteur de l'œil de la
+/// police, pas en haut. `baseline(top:height:font:)` refait ce calcul — sans lui
+/// tout le texte remonte de plusieurs points.
 enum SQShareCardRenderer {
 
     private static let exportScale: CGFloat = 2
-    private static let padX: CGFloat = 54
-    private static let colSepX: CGFloat = 540
 
-    /// **Seule divergence assumée avec Android.** Sa mise en page réserve de la
-    /// place à un pied garni de deux lignes d'identité radio, qu'iOS ne peut pas
-    /// produire. À géométrie strictement identique, la carte iOS se retrouvait donc
-    /// creuse en haut ET en bas. TOUT ce qui suit l'en-tête remonte donc de 40
-    /// unités logiques, et la hauteur totale diminue d'autant — sinon on ne
-    /// déplacerait le vide qu'au milieu de la carte. Largeurs, centres de colonnes
-    /// et tailles de texte restent ceux d'Android.
-    private static let columnShift: CGFloat = 40
+    // Palette unique de A : une image publiée n'a pas à suivre le thème de l'app.
+    private static let paper = UIColor(hex: 0xF4F2EC)
+    private static let ink = UIColor(hex: 0x1C201E)
+    private static let ink2 = UIColor(hex: 0x3C443F)
+    private static let muted = UIColor(hex: 0x636B66)
+    private static let brand = UIColor(hex: 0xA8123A)
+    private static let rule = UIColor(hex: 0x1C201E, alpha: 0.09)
+    private static let leaderDot = UIColor(hex: 0x1C201E, alpha: 0.34)
+
+    // Cotes logiques de la référence.
+    private static let pagePadX: CGFloat = 48
+    private static let pagePadY: CGFloat = 40
+    private static let sectionGap: CGFloat = 22
+    private static let headerHeight: CGFloat = 28
+    private static let footerHeight: CGFloat = 16
+    private static let cardPadX: CGFloat = 40
+    private static let cardPadY: CGFloat = 32
+    private static let columnGap: CGFloat = 40
+    private static let rowGap: CGFloat = 22
+    /// 80 sans bloc radio (spécification v11) ; 92 auparavant.
+    private static let graphHeight: CGFloat = 80
 
     static func render(_ model: SQShareCardModel) -> UIImage {
         let s = exportScale
@@ -219,365 +243,397 @@ enum SQShareCardRenderer {
 
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             let cg = context.cgContext
-            let t = model.theme
-            let w = size.width
+            // Tout est ensuite posé en unités logiques, comme dans la référence.
+            cg.scaleBy(x: s, y: s)
+            paper.setFill()
+            cg.fill(CGRect(x: 0, y: 0, width: model.width, height: model.height))
 
-            // Fond UNI — crème en clair, noir OLED ou gris très foncé en sombre.
-            t.background.setFill()
-            cg.fill(CGRect(origin: .zero, size: size))
-
-            drawMasthead(cg, s: s, w: w, model: model)
-            drawLumLine(cg, t: t, rect: CGRect(x: padX * s, y: 99 * s, width: w - 2 * padX * s, height: 1.5 * s), horizontal: true)
-
-            drawLumLine(cg, t: t, rect: CGRect(x: colSepX * s, y: 125 * s, width: 1.5 * s, height: (486 - columnShift - 125) * s), horizontal: false)
-            drawSpeedColumn(cg, s: s, t: t, block: model.download, arrow: "↓", centerX: 297)
-            drawSpeedColumn(cg, s: s, t: t, block: model.upload, arrow: "↑", centerX: 783)
-
-            drawBottomStrip(cg, s: s, w: w, model: model)
-            drawFooter(cg, s: s, w: w, model: model)
+            drawHeader(cg, model: model)
+            drawCard(cg, model: model)
+            drawFooter(model: model)
         }
     }
 
-    // MARK: Colonnes de débit
+    // MARK: En-tête et pied
 
-    private static func drawSpeedColumn(
-        _ cg: CGContext, s: CGFloat, t: SQShareCardTheme,
-        block: SQShareCardModel.StatBlock, arrow: String, centerX: CGFloat
-    ) {
-        let cx = centerX * s
-        let colW: CGFloat = 486 * s
+    private static func drawHeader(_ cg: CGContext, model: SQShareCardModel) {
+        let top = pagePadY
+        // « signal◆quest » : le losange est une boîte de 11 tournée de 45°.
+        let logoFont = SQShareFonts.display(size: 28, weight: 800)
+        let logoAttrs = attributes(logoFont, ink, kernEm: -0.03)
+        let logoBaseline = baseline(top: top, height: headerHeight, font: logoFont)
+        var x = pagePadX
+        x += draw("signal", attrs: logoAttrs, x: x, baseline: logoBaseline)
+        let diamondCenter = CGPoint(x: x + 7 + 5.5, y: top + headerHeight / 2)
+        cg.saveGState()
+        cg.translateBy(x: diamondCenter.x, y: diamondCenter.y)
+        cg.rotate(by: .pi / 4)
+        brand.setFill()
+        cg.fill(CGRect(x: -5.5, y: -5.5, width: 11, height: 11))
+        cg.restoreGState()
+        x += 7 + 11 + 7
+        draw("quest", attrs: logoAttrs, x: x, baseline: logoBaseline)
 
-        // Kicker « ● ↓ DOWNLOAD » : pastille lumineuse + mono espacé, centrés ensemble.
-        let kickFont = SQShareFonts.mono(size: 12 * s, weight: 700)
-        let kickText = "\(arrow) \(block.label.uppercased())"
-        let kickAttrs = attributes(kickFont, t.textSecondary, kernEm: 0.22)
-        let kickW = kickText.size(withAttributes: kickAttrs).width
-        let dotR = 4 * s
-        let dotGap = 9 * s
-        let kickTotal = dotR * 2 + dotGap + kickW
-        let kickY = (208 - columnShift) * s
-        drawGlowDot(cg, cx: cx - kickTotal / 2 + dotR, cy: kickY - 4 * s, r: dotR, color: block.labelColor, isDark: t.isDark, s: s)
-        draw(kickText, attrs: kickAttrs, x: cx - kickTotal / 2 + dotR * 2 + dotGap, baseline: kickY)
-
-        // Chiffre + unité, centrés ensemble. RÉTRÉCI plutôt que tronqué quand la
-        // valeur est large (« 1240,6 » sur une colonne de 486) : un débit coupé
-        // serait un mensonge, un débit plus petit reste lisible.
-        var numFont = SQShareFonts.display(size: 116 * s, weight: 800)
-        let unitFont = SQShareFonts.mono(size: 19 * s, weight: 400)
-        let unitAttrs = attributes(unitFont, t.textSecondary)
-        let unitGap = 12 * s
-        var numAttrs = attributes(numFont, t.textPrimary, kernEm: -0.025)
-        var numW = block.value.size(withAttributes: numAttrs).width
-        let unitW = block.unit.size(withAttributes: unitAttrs).width
-        let maxTotal = colW - 32 * s
-        if numW + unitGap + unitW > maxTotal {
-            let shrink = min(max((maxTotal - unitGap - unitW) / numW, 0.5), 1)
-            numFont = SQShareFonts.display(size: 116 * s * shrink, weight: 800)
-            numAttrs = attributes(numFont, t.textPrimary, kernEm: -0.025)
-            numW = block.value.size(withAttributes: numAttrs).width
-        }
-        let numY = (330 - columnShift) * s
-        let numX = cx - (numW + unitGap + unitW) / 2
-        draw(block.value, attrs: numAttrs, x: numX, baseline: numY)
-        draw(block.unit, attrs: unitAttrs, x: numX + numW + unitGap, baseline: numY)
-
-        // « MAX 22,0 Mbps » — trois segments centrés.
-        let mutedAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 400), t.textSecondary)
-        let valueAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 700), t.textPrimary)
-        let segLabel = "MAX "
-        let segUnit = " \(block.maxUnit ?? block.unit)"
-        let totalW = segLabel.size(withAttributes: mutedAttrs).width
-            + block.maxValue.size(withAttributes: valueAttrs).width
-            + segUnit.size(withAttributes: mutedAttrs).width
-        var mx = cx - totalW / 2
-        let maxY = (372 - columnShift) * s
-        draw(segLabel, attrs: mutedAttrs, x: mx, baseline: maxY)
-        mx += segLabel.size(withAttributes: mutedAttrs).width
-        draw(block.maxValue, attrs: valueAttrs, x: mx, baseline: maxY)
-        mx += block.maxValue.size(withAttributes: valueAttrs).width
-        draw(segUnit, attrs: mutedAttrs, x: mx, baseline: maxY)
-
-        drawTrail(cg, s: s, t: t, graph: block.graph,
-                  rect: CGRect(x: cx - 220 * s, y: (388 - columnShift) * s, width: 440 * s, height: 80 * s))
+        let titleAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 700)), ink)
+        let dateAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 600)), muted)
+        let lineTop = top + (headerHeight - 16) / 2
+        let base = baseline(top: lineTop, height: 16, font: titleAttrs.font)
+        let title = String(localized: "Speedtest")
+        let date = model.dateText.map { " · \($0)" } ?? ""
+        let right = model.width - pagePadX
+        let dateX = right - width(date, dateAttrs)
+        draw(date, attrs: dateAttrs, x: dateX, baseline: base)
+        draw(title, attrs: titleAttrs, x: dateX - width(title, titleAttrs), baseline: base)
     }
 
-    /// Traînée : grille fine, puis halo et trait net. **Aucun remplissage** sous la
-    /// courbe — c'est ce qui distingue la composition Halo d'un graphe classique.
-    private static func drawTrail(
-        _ cg: CGContext, s: CGFloat, t: SQShareCardTheme,
-        graph: SQShareCardModel.Graph, rect: CGRect
-    ) {
-        cg.saveGState()
-        cg.setStrokeColor(t.track.cgColor)
-        cg.setLineWidth(1 * s)
-        for fraction in [0.26, 0.50, 0.74] as [CGFloat] {
-            let y = rect.minY + rect.height * fraction
-            cg.move(to: CGPoint(x: rect.minX, y: y))
-            cg.addLine(to: CGPoint(x: rect.maxX, y: y))
+    private static func drawFooter(model: SQShareCardModel) {
+        let top = model.height - pagePadY - footerHeight
+        let leftAttrs = attributes(SQShareFonts.display(size: 16, weight: 500), ink2)
+        let rightAttrs = attributes(SQShareFonts.display(size: 16, weight: 700), ink)
+        let base = baseline(top: top, height: footerHeight, font: leftAttrs.font)
+        let site = "signalquest.fr"
+        let right = model.width - pagePadX
+        let siteW = width(site, rightAttrs)
+        draw(site, attrs: rightAttrs, x: right - siteW, baseline: base)
+        if !model.deviceCityText.isEmpty {
+            let maxW = right - siteW - 24 - pagePadX
+            draw(ellipsize(model.deviceCityText, attrs: leftAttrs, maxWidth: maxW),
+                 attrs: leftAttrs, x: pagePadX, baseline: base)
         }
-        cg.strokePath()
-        cg.restoreGState()
-
-        let points = graph.points
-        let captionAttrs = attributes(SQShareFonts.mono(size: 10 * s, weight: 400), t.textSecondary)
-        guard points.count >= 2, graph.localMax > 0 else {
-            draw(String(localized: "Courbe indisponible"), attrs: captionAttrs, x: rect.minX + 8 * s, baseline: rect.midY)
-            return
-        }
-        let caption: String
-        if let duration = graph.durationSeconds {
-            caption = String(localized: "Débit récent") + " · 0–" + String(format: "%.1f", locale: Locale.autoupdatingCurrent, duration) + " s"
-        } else {
-            caption = String(localized: "Courbe historique sans horodatage")
-        }
-        draw(caption, attrs: captionAttrs, x: rect.minX + 8 * s, baseline: rect.maxY + 16 * s)
-        let padXInner = 8 * s
-        let padY = 5 * s
-        let innerW = rect.width - 2 * padXInner
-        let innerH = rect.height - 2 * padY
-        let stepX = innerW / CGFloat(points.count - 1)
-
-        let path = CGMutablePath()
-        for (index, value) in points.enumerated() {
-            let fraction = graph.normalizedTimes.flatMap { index < $0.count ? $0[index] : nil }
-            let x = rect.minX + padXInner + (fraction.map { CGFloat($0) * innerW } ?? CGFloat(index) * stepX)
-            let ratio = CGFloat((value / graph.localMax).clampedUnit)
-            let y = rect.minY + padY + innerH - ratio * innerH
-            index == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
-        }
-
-        // Halo : une ombre colorée sans décalage tient lieu du `BlurMaskFilter`
-        // d'Android — même intention, même rayon.
-        cg.saveGState()
-        cg.setLineCap(.round)
-        cg.setLineJoin(.round)
-        cg.setLineWidth(5 * s)
-        cg.setStrokeColor(graph.accentColor.withAlphaComponent(t.isDark ? 128 / 255 : 64 / 255).cgColor)
-        cg.setShadow(offset: .zero, blur: 6 * s, color: graph.accentColor.withAlphaComponent(t.isDark ? 0.5 : 0.25).cgColor)
-        cg.addPath(path)
-        cg.strokePath()
-        cg.restoreGState()
-
-        cg.saveGState()
-        cg.setLineCap(.round)
-        cg.setLineJoin(.round)
-        cg.setLineWidth(2.6 * s)
-        cg.setStrokeColor(graph.accentColor.cgColor)
-        cg.addPath(path)
-        cg.strokePath()
-        cg.restoreGState()
     }
 
-    // MARK: Bande basse
+    // MARK: Cartouche
 
-    private static func drawBottomStrip(_ cg: CGContext, s: CGFloat, w: CGFloat, model: SQShareCardModel) {
-        let t = model.theme
-        let kickAttrs = attributes(SQShareFonts.mono(size: 10.5 * s, weight: 700), t.textSecondary, kernEm: 0.22)
-        let kickY = (520 - columnShift) * s
+    private static func drawCard(_ cg: CGContext, model: SQShareCardModel) {
+        let cardTop = pagePadY + headerHeight + sectionGap
+        let cardBottom = model.height - pagePadY - footerHeight - sectionGap
+        let card = CGRect(x: pagePadX, y: cardTop, width: model.width - 2 * pagePadX, height: cardBottom - cardTop)
+        let cardPath = UIBezierPath(roundedRect: card, cornerRadius: 28).cgPath
+        cg.saveGState()
+        cg.setShadow(offset: CGSize(width: 0, height: 4), blur: 20, color: UIColor(hex: 0x1C201E, alpha: 0.08).cgColor)
+        UIColor.white.setFill()
+        cg.addPath(cardPath)
+        cg.fillPath()
+        cg.restoreGState()
 
-        // LATENCE — héros coloré par la qualité, sous-ligne mono.
-        let latX = padX * s
-        draw(model.latencyLabel.uppercased(), attrs: kickAttrs, x: latX, baseline: kickY)
-        let latFont = SQShareFonts.display(size: 40 * s, weight: 800)
-        let latAttrs = attributes(latFont, model.latencyColor, kernEm: -0.01)
-        let latY = (566 - columnShift) * s
-        draw(model.latencyValueText, attrs: latAttrs, x: latX, baseline: latY)
-        let latUnitAttrs = attributes(SQShareFonts.mono(size: 16 * s, weight: 400), model.latencyColor)
-        draw(" \(model.latencyUnit)", attrs: latUnitAttrs,
-             x: latX + model.latencyValueText.size(withAttributes: latAttrs).width, baseline: latY)
-        draw(model.latencySubText,
-             attrs: attributes(SQShareFonts.mono(size: 11.5 * s, weight: 400), t.textSecondary),
-             x: latX, baseline: (590 - columnShift) * s)
+        let content = card.insetBy(dx: cardPadX, dy: cardPadY)
+        // Grille 1,1fr | 1 | 1fr, écart 40 — la colonne de droite fait 449 de large,
+        // la largeur exacte des courbes de la référence.
+        let leftWidth = (content.width - 2 * columnGap - 1) * 1.1 / 2.1
+        let ruleX = content.minX + leftWidth + columnGap
+        let rightX = ruleX + 1 + columnGap
+        let rightWidth = content.maxX - rightX
 
-        // SOUS CHARGE — masqué s'il n'y a aucune rangée, filet vertical sinon.
-        if !model.underLoadRows.isEmpty {
-            drawLumLine(cg, t: t, rect: CGRect(x: 270 * s, y: (505 - columnShift) * s, width: 1.5 * s, height: 90 * s), horizontal: false)
-            let blockX = 300 * s
-            draw(model.underLoadLabel.uppercased(), attrs: kickAttrs, x: blockX, baseline: kickY)
-            let emAttrs = attributes(SQShareFonts.mono(size: 10.5 * s, weight: 700), t.textSecondary)
-            let valAttrs = attributes(SQShareFonts.mono(size: 14 * s, weight: 700), t.textPrimary)
-            let jitAttrs = attributes(SQShareFonts.mono(size: 11 * s, weight: 400), t.textSecondary)
-            for (index, row) in model.underLoadRows.enumerated() {
-                let rowY = (545 - columnShift + CGFloat(index) * 25) * s
-                drawGlowDot(cg, cx: blockX + 3.5 * s, cy: rowY - 4 * s, r: 3.5 * s, color: row.dotColor, isDark: t.isDark, s: s)
-                draw(row.prefix, attrs: emAttrs, x: blockX + 16 * s, baseline: rowY)
-                let valX = blockX + 56 * s
-                draw(row.valueText, attrs: valAttrs, x: valX, baseline: rowY)
-                if let jit = row.jitText {
-                    draw(jit, attrs: jitAttrs,
-                         x: valX + row.valueText.size(withAttributes: valAttrs).width + 8 * s, baseline: rowY)
-                }
+        // Rangée basse : hauteur de son contenu le plus haut (70 pour les chiffres,
+        // 96 quand l'un porte une sous-ligne ; 22 par ligne de détail plus 6 entre
+        // deux), comme `grid-template-rows: auto`.
+        let figures = bottomFigures(model)
+        let leftHeight: CGFloat = figures.isEmpty ? 0 : (figures.contains { $0.subText != nil } ? 96 : 70)
+        let rightHeight: CGFloat = model.rows.isEmpty ? 0 : CGFloat(model.rows.count) * 28 - 6
+        let bottomHeight = max(leftHeight, rightHeight)
+        let topBottom = bottomHeight > 0 ? content.maxY - bottomHeight - 2 * rowGap - 1 : content.maxY
+
+        if bottomHeight > 0 {
+            fillRule(cg, CGRect(x: content.minX, y: topBottom + rowGap, width: content.width, height: 1))
+        }
+        // Le filet vertical court sur toute la hauteur quand il sépare les courbes ;
+        // sans elles, il ne sépare plus que la rangée basse.
+        if model.hasCurves {
+            fillRule(cg, CGRect(x: ruleX, y: content.minY, width: 1, height: content.height))
+        } else if leftHeight > 0, rightHeight > 0 {
+            fillRule(cg, CGRect(x: ruleX, y: content.maxY - bottomHeight, width: 1, height: bottomHeight))
+        }
+
+        let heroWidth = model.hasCurves ? leftWidth : content.width
+        drawHero(model: model, rect: CGRect(x: content.minX, y: content.minY, width: heroWidth, height: topBottom - content.minY))
+        if model.hasCurves {
+            drawGraphs(cg, model: model, rect: CGRect(x: rightX, y: content.minY, width: rightWidth, height: topBottom - content.minY))
+        }
+        if !figures.isEmpty {
+            drawFigures(cg, figures, rect: CGRect(x: content.minX, y: content.maxY - leftHeight, width: leftWidth, height: leftHeight))
+        }
+        if !model.rows.isEmpty {
+            drawRows(cg, model.rows, rect: CGRect(x: rightX, y: content.maxY - rightHeight, width: rightWidth, height: rightHeight))
+        }
+    }
+
+    // MARK: Descendant
+
+    private static func drawHero(model: SQShareCardModel, rect: CGRect) {
+        if let network = model.network {
+            var x = rect.minX
+            if let bar = network.barColor {
+                bar.setFill()
+                UIBezierPath(roundedRect: CGRect(x: x, y: rect.minY, width: 4, height: 22), cornerRadius: 2).fill()
+                x += 4 + 10
+            }
+            let nameAttrs = attributes(SQShareFonts.display(size: 22, weight: 700), ink)
+            let detailAttrs = attributes(SQShareFonts.display(size: 22, weight: 600), ink2)
+            let base = baseline(top: rect.minY, height: 22, font: nameAttrs.font)
+            x += draw(network.name, attrs: nameAttrs, x: x, baseline: base)
+            if let detail = network.detail {
+                draw(" · \(detail)", attrs: detailAttrs, x: x, baseline: base)
             }
         }
 
-        // SERVEUR — aligné à droite, valeur en display. Quand « Sous charge »
-        // existe, sa colonne est réservée jusqu'à x=600 : les noms longs ne
-        // peuvent plus passer dessous ni le recouvrir.
-        if let server = model.serverText {
-            let rightX = w - padX * s
-            drawRightAligned(model.serverLabel.uppercased(), attrs: kickAttrs, rightX: rightX, baseline: kickY)
-            let srvAttrs = attributes(SQShareFonts.display(size: 17 * s, weight: 700), t.textPrimary)
-            let serverColumnLeft = (model.underLoadRows.isEmpty ? 470 : 600) * s
-            let maxW = rightX - serverColumnLeft
-            drawRightAligned(ellipsize(server, attrs: srvAttrs, maxWidth: maxW), attrs: srvAttrs, rightX: rightX, baseline: (552 - columnShift) * s)
+        // Sans courbes, le chiffre a toute la largeur : il grossit (172 au lieu de 148).
+        let heroSize: CGFloat = model.hasCurves ? 148 : 172
+        let unitSize: CGFloat = model.hasCurves ? 34 : 40
+        let peakHeight: CGFloat = model.downloadPeakText == nil ? 0 : 14 + 16
+        // Pile calée en bas : rubrique 12, écart 14, chiffre (marges −6 et −4), écart 14, pic 16.
+        let stackHeight = 12 + 14 + (heroSize - 10) + peakHeight
+        let kickerTop = rect.maxY - stackHeight
+        drawKicker(String(localized: "Débit descendant"), arrow: .down, x: rect.minX, top: kickerTop)
+
+        var numberFont = tabular(SQShareFonts.display(size: heroSize, weight: 800))
+        let unitAttrs = attributes(SQShareFonts.display(size: unitSize, weight: 700), muted)
+        var numberAttrs = attributes(numberFont, ink, kernEm: -0.045)
+        let unitW = width(model.download.unit, unitAttrs)
+        // Rétréci plutôt que coupé : un débit tronqué serait faux.
+        let numberW = width(model.download.number, numberAttrs)
+        if numberW + 12 + unitW > rect.width {
+            let shrink = max((rect.width - 12 - unitW) / numberW, 0.4)
+            numberFont = tabular(SQShareFonts.display(size: heroSize * shrink, weight: 800))
+            numberAttrs = attributes(numberFont, ink, kernEm: -0.045)
+        }
+        let numberTop = kickerTop + 12 + 14 - 6
+        let base = baseline(top: numberTop, height: heroSize, font: SQShareFonts.display(size: heroSize, weight: 800))
+        let advance = draw(model.download.number, attrs: numberAttrs, x: rect.minX, baseline: base)
+        draw(model.download.unit, attrs: unitAttrs, x: rect.minX + advance + 12, baseline: base)
+
+        if let peak = model.downloadPeakText {
+            let peakAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 600)), ink2)
+            let peakTop = rect.maxY - 16
+            draw(peak, attrs: peakAttrs, x: rect.minX, baseline: baseline(top: peakTop, height: 16, font: peakAttrs.font))
         }
     }
 
-    // MARK: Pied
+    // MARK: Courbes
 
-    private static func drawFooter(_ cg: CGContext, s: CGFloat, w: CGFloat, model: SQShareCardModel) {
-        let t = model.theme
+    private static func drawGraphs(_ cg: CGContext, model: SQShareCardModel, rect: CGRect) {
+        // Deux blocs (en-tête 22, écart 8, tracé) répartis aux extrémités.
+        let blockHeight: CGFloat = 22 + 8 + graphHeight
+        var blocks: [(SQShareCardModel.Graph, String, Arrow, CGFloat)] = []
+        if let graph = model.downloadGraph { blocks.append((graph, String(localized: "Descendant"), .down, 0.1)) }
+        if let graph = model.uploadGraph { blocks.append((graph, String(localized: "Montant"), .up, 0.14)) }
+        for (index, block) in blocks.enumerated() {
+            let top = index == 0 ? rect.minY : rect.maxY - blockHeight
+            drawKicker(block.1, arrow: block.2, x: rect.minX, top: top + 5)
+            if let duration = block.0.durationSeconds, duration.isFinite, duration > 0 {
+                let attrs = attributes(SQShareFonts.display(size: 12, weight: 600), muted)
+                let text = "\(Int(duration.rounded())) s"
+                draw(text, attrs: attrs, x: rect.maxX - width(text, attrs),
+                     baseline: baseline(top: top + 5, height: 12, font: attrs.font))
+            }
+            drawCurve(cg, graph: block.0, fillOpacity: block.3,
+                      rect: CGRect(x: rect.minX, y: top + 30, width: rect.width, height: graphHeight))
+        }
+    }
+
+    /// Tracé de la référence : la valeur max touche y = 4, zéro tombe 1,5 au-dessus
+    /// du bas ; dégradé vertical sous la courbe, filet de base, trait de 2,5. Chaque
+    /// point est placé au temps de sa fenêtre, sans point (0, 0) ajouté ; tous sont
+    /// tracés, montée en charge comprise.
+    private static func drawCurve(_ cg: CGContext, graph: SQShareCardModel.Graph, fillOpacity: CGFloat, rect: CGRect) {
+        fillRule(cg, CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
+        let points = graph.points
+        guard points.count >= 2, graph.localMax > 0 else { return }
+        let plotted: [CGPoint] = points.enumerated().map { index, value in
+            let fraction = graph.normalizedTimes.flatMap { index < $0.count ? $0[index] : nil }
+                ?? Double(index) / Double(points.count - 1)
+            let ratio = CGFloat((value / graph.localMax).clampedUnit)
+            return CGPoint(x: rect.minX + CGFloat(fraction.clampedUnit) * rect.width,
+                           y: rect.minY + 4 + (1 - ratio) * (rect.height - 5.5))
+        }
+        let line = CGMutablePath()
+        line.addLines(between: plotted)
+
+        let fill = CGMutablePath()
+        fill.move(to: CGPoint(x: plotted[0].x, y: rect.maxY))
+        fill.addLines(between: plotted)
+        fill.addLine(to: CGPoint(x: plotted[plotted.count - 1].x, y: rect.maxY))
+        fill.closeSubpath()
+        let colors = [graph.accentColor.withAlphaComponent(fillOpacity).cgColor,
+                      graph.accentColor.withAlphaComponent(0).cgColor] as CFArray
+        if let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1]) {
+            cg.saveGState()
+            cg.addPath(fill)
+            cg.clip()
+            cg.drawLinearGradient(gradient, start: CGPoint(x: 0, y: rect.minY), end: CGPoint(x: 0, y: rect.maxY), options: [])
+            cg.restoreGState()
+        }
+
         cg.saveGState()
-        cg.setStrokeColor(t.separator.cgColor)
-        cg.setLineWidth(1 * s)
-        cg.move(to: CGPoint(x: padX * s, y: (622 - columnShift) * s))
-        cg.addLine(to: CGPoint(x: w - padX * s, y: (622 - columnShift) * s))
+        cg.setLineCap(.round)
+        cg.setLineJoin(.round)
+        cg.setLineWidth(2.5)
+        cg.setStrokeColor(graph.accentColor.cgColor)
+        cg.addPath(line)
         cg.strokePath()
         cg.restoreGState()
+    }
 
-        let baseY = (652 - columnShift) * s
-        let lineStep = 20 * s
-        let monoAttrs = attributes(SQShareFonts.mono(size: 12 * s, weight: 400), t.textSecondary)
+    // MARK: Rangée basse
 
-        // Gauche : appareil et ville lorsqu'ils sont autorisés. Si les deux sont
-        // masqués, la signature produit garde le pied visuellement utile sans
-        // réintroduire une donnée personnelle.
-        let footerText = model.deviceCityText.isEmpty ? "signalquest.fr" : model.deviceCityText
-        draw(ellipsize(footerText, attrs: monoAttrs, maxWidth: w * 0.5),
-             attrs: monoAttrs, x: padX * s, baseline: baseY)
+    private struct Figure {
+        let label: String
+        let arrow: Arrow?
+        let value: SQShareCardModel.Value
+        let subText: String?
+    }
 
-        // Droite : jusqu'à deux lignes d'identité radio.
-        var ry = baseY
-        for line in model.radioLines.reversed() {
-            drawRightAligned(ellipsize(line, attrs: monoAttrs, maxWidth: w * 0.55), attrs: monoAttrs, rightX: w - padX * s, baseline: ry)
-            ry -= lineStep
+    private static func bottomFigures(_ model: SQShareCardModel) -> [Figure] {
+        [
+            model.upload.map { Figure(label: String(localized: "Montant"), arrow: .up, value: $0, subText: model.uploadPeakText) },
+            model.latency.map { Figure(label: model.latencyLabel, arrow: nil, value: $0, subText: model.latencyAverageText) },
+        ].compactMap { $0 }
+    }
+
+    /// Montant et latence, deux colonnes égales (écart 24) : rubrique, chiffre de
+    /// 48, puis la sous-ligne éventuelle, chacune à 10 de la précédente.
+    private static func drawFigures(_ cg: CGContext, _ figures: [Figure], rect: CGRect) {
+        let columnWidth = (rect.width - 24) / 2
+        for (index, figure) in figures.enumerated() {
+            let x = rect.minX + CGFloat(index) * (columnWidth + 24)
+            drawKicker(figure.label, arrow: figure.arrow, x: x, top: rect.minY)
+            var numberAttrs = attributes(tabular(SQShareFonts.display(size: 48, weight: 800)), ink, kernEm: -0.04)
+            let unitAttrs = attributes(SQShareFonts.display(size: 17, weight: 700), muted)
+            let unitW = width(figure.value.unit, unitAttrs)
+            let numberW = width(figure.value.number, numberAttrs)
+            if numberW + 8 + unitW > columnWidth {
+                let shrink = max((columnWidth - 8 - unitW) / numberW, 0.4)
+                numberAttrs = attributes(tabular(SQShareFonts.display(size: 48 * shrink, weight: 800)), ink, kernEm: -0.04)
+            }
+            let base = baseline(top: rect.minY + 22, height: 48, font: SQShareFonts.display(size: 48, weight: 800))
+            let advance = draw(figure.value.number, attrs: numberAttrs, x: x, baseline: base)
+            draw(figure.value.unit, attrs: unitAttrs, x: x + advance + 8, baseline: base)
+            if let sub = figure.subText {
+                let subAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 600)), ink2)
+                draw(ellipsize(sub, attrs: subAttrs, maxWidth: columnWidth), attrs: subAttrs, x: x,
+                     baseline: baseline(top: rect.minY + 80, height: 16, font: subAttrs.font))
+            }
         }
     }
 
-    // MARK: En-tête
+    /// Lignes « libellé ····· valeur » de 22, espacées de 6.
+    private static func drawRows(_ cg: CGContext, _ rows: [SQShareCardModel.Row], rect: CGRect) {
+        let labelAttrs = attributes(SQShareFonts.display(size: 16, weight: 400), ink2)
+        let valueAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 700)), ink)
+        for (index, row) in rows.enumerated() {
+            let top = rect.minY + CGFloat(index) * 28
+            let base = baseline(top: top, height: 22, font: labelAttrs.font)
+            let labelEnd = rect.minX + draw(row.label, attrs: labelAttrs, x: rect.minX, baseline: base)
 
-    private static func drawMasthead(_ cg: CGContext, s: CGFloat, w: CGFloat, model: SQShareCardModel) {
-        let t = model.theme
-        let logoRect = CGRect(x: padX * s, y: 42 * s, width: 42 * s, height: 42 * s)
-        drawAppLogo(cg, rect: logoRect, s: s)
+            let badgeWidth: CGFloat = row.grade == nil ? 0 : 22 + 8
+            let available = rect.maxX - labelEnd - 10 - 10 - badgeWidth
+            let value = ellipsize(row.value, attrs: valueAttrs, maxWidth: available)
+            let valueX = rect.maxX - width(value, valueAttrs)
+            draw(value, attrs: valueAttrs, x: valueX, baseline: base)
 
-        let brandFont = SQShareFonts.display(size: 21 * s, weight: 800)
-        let brandAttrs = attributes(brandFont, t.textPrimary, kernEm: 0.26)
-        let brandY = logoRect.midY + brandFont.pointSize * 0.35
-        draw(model.brand, attrs: brandAttrs, x: logoRect.maxX + 13 * s, baseline: brandY)
-
-        let rightX = w - padX * s
-        let hasNetwork = !model.headerNetworkText.isEmpty
-        if hasNetwork {
-            let netAttrs = attributes(SQShareFonts.mono(size: 14 * s, weight: 700), t.textPrimary, kernEm: 0.03)
-            drawRightAligned(
-                ellipsize(model.headerNetworkText.uppercased(), attrs: netAttrs, maxWidth: w * 0.5),
-                attrs: netAttrs, rightX: rightX,
-                baseline: model.dateTimeText != nil ? 58 * s : logoRect.midY + 5 * s
-            )
-        }
-        if let date = model.dateTimeText {
-            let dateAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 400), t.textSecondary)
-            drawRightAligned(
-                date,
-                attrs: dateAttrs,
-                rightX: rightX,
-                baseline: hasNetwork ? 78 * s : logoRect.midY + 5 * s
-            )
+            var leaderEnd = valueX - 10
+            if let grade = row.grade {
+                let badge = CGRect(x: valueX - 8 - 22, y: top, width: 22, height: 22)
+                grade.background.setFill()
+                UIBezierPath(roundedRect: badge, cornerRadius: 6).fill()
+                let gradeAttrs = attributes(SQShareFonts.display(size: 13, weight: 800), grade.color)
+                draw(grade.letter, attrs: gradeAttrs, x: badge.midX - width(grade.letter, gradeAttrs) / 2,
+                     baseline: baseline(top: top, height: 22, font: gradeAttrs.font))
+                leaderEnd = badge.minX - 10
+            }
+            drawLeader(cg, from: labelEnd + 10, to: leaderEnd, centerY: top + 22 - 6 - 1.5)
         }
     }
 
-    /// Logo de l'app clippé en carré arrondi, cerclé d'un liseré discret — sans
-    /// halo, conformément à la v3.1.
-    private static func drawAppLogo(_ cg: CGContext, rect: CGRect, s: CGFloat) {
-        let radius = 12 * s
+    /// Pointillés : un point de rayon ~1,2 tous les 6, comme le motif CSS
+    /// `radial-gradient` 6×3 de la référence ; la dernière tuile est coupée.
+    private static func drawLeader(_ cg: CGContext, from start: CGFloat, to end: CGFloat, centerY: CGFloat) {
+        guard end > start else { return }
         cg.saveGState()
-        UIBezierPath(roundedRect: rect, cornerRadius: radius).addClip()
-        UIColor(hex: 0xF4E9DF).setFill()
+        cg.clip(to: CGRect(x: start, y: centerY - 1.5, width: end - start, height: 3))
+        leaderDot.setFill()
+        var x = start + 3
+        while x - 1.2 < end {
+            cg.fillEllipse(in: CGRect(x: x - 1.2, y: centerY - 1.2, width: 2.4, height: 2.4))
+            x += 6
+        }
+        cg.restoreGState()
+    }
+
+    // MARK: Rubriques
+
+    private enum Arrow { case down, up }
+
+    /// Rubrique « ↓ DÉBIT DESCENDANT » : flèche de 12 tracée (et non un glyphe,
+    /// absent de Sora), 7 d'écart, capitales espacées de 0,18 em.
+    private static func drawKicker(_ text: String, arrow: Arrow?, x: CGFloat, top: CGFloat) {
+        var textX = x
+        if let arrow {
+            let path = UIBezierPath()
+            switch arrow {
+            case .down:
+                path.move(to: CGPoint(x: x + 6, y: top + 1.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
+                path.move(to: CGPoint(x: x + 2.5, y: top + 7)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
+                path.addLine(to: CGPoint(x: x + 9.5, y: top + 7))
+            case .up:
+                path.move(to: CGPoint(x: x + 6, y: top + 10.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
+                path.move(to: CGPoint(x: x + 2.5, y: top + 5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
+                path.addLine(to: CGPoint(x: x + 9.5, y: top + 5))
+            }
+            path.lineWidth = 1.8
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            muted.setStroke()
+            path.stroke()
+            textX += 12 + 7
+        }
+        let attrs = attributes(SQShareFonts.display(size: 12, weight: 700), muted, kernEm: 0.18)
+        draw(text.uppercased(), attrs: attrs, x: textX, baseline: baseline(top: top, height: 12, font: attrs.font))
+    }
+
+    private static func fillRule(_ cg: CGContext, _ rect: CGRect) {
+        rule.setFill()
         cg.fill(rect)
-        if let icon = appIcon() {
-            // Contrairement au foreground adaptatif d'Android, l'icône iOS est déjà
-            // cadrée : pas de débord à compenser, sous peine de rogner le logo.
-            icon.draw(in: rect)
-        }
-        cg.restoreGState()
-
-        cg.saveGState()
-        cg.setStrokeColor(UIColor(hex: 0x000000, alpha: 0x1F / 255).cgColor)
-        cg.setLineWidth(1 * s)
-        UIBezierPath(roundedRect: rect, cornerRadius: radius).stroke()
-        cg.restoreGState()
-    }
-
-    /// Icône de l'app pour la carte.
-    ///
-    /// `UIImage(named: "AppIcon")` ne fonctionne PAS : une icône d'app n'est pas une
-    /// ressource image adressable du catalogue. Il faut passer par `Info.plist`, qui
-    /// liste les fichiers réellement produits par le build. Sans cela le logo
-    /// restait un carré beige vide — un défaut invisible en compilation, et qui ne
-    /// se voit que sur l'image exportée.
-    static func appIcon() -> UIImage? {
-        guard let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
-              let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
-              let files = primary["CFBundleIconFiles"] as? [String],
-              let lastName = files.last
-        else { return nil }
-        return UIImage(named: lastName)
-    }
-
-    // MARK: Primitives
-
-    /// Filet qui s'évanouit aux extrémités — dégradé neutre, jamais teinté.
-    private static func drawLumLine(_ cg: CGContext, t: SQShareCardTheme, rect: CGRect, horizontal: Bool) {
-        let strong = t.separator.cgColor
-        let faint = t.separator.withAlphaComponent(0).cgColor
-        guard let space = strong.colorSpace,
-              let gradient = CGGradient(colorsSpace: space, colors: [faint, strong, faint] as CFArray, locations: [0, 0.5, 1])
-        else { return }
-        cg.saveGState()
-        cg.clip(to: rect)
-        cg.drawLinearGradient(
-            gradient,
-            start: horizontal ? CGPoint(x: rect.minX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.minY),
-            end: horizontal ? CGPoint(x: rect.maxX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.maxY),
-            options: []
-        )
-        cg.restoreGState()
-    }
-
-    private static func drawGlowDot(_ cg: CGContext, cx: CGFloat, cy: CGFloat, r: CGFloat, color: UIColor, isDark: Bool, s: CGFloat) {
-        let rect = CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)
-        cg.saveGState()
-        cg.setShadow(offset: .zero, blur: 4 * s, color: color.withAlphaComponent(isDark ? 120 / 255 : 70 / 255).cgColor)
-        color.setFill()
-        cg.fillEllipse(in: rect)
-        cg.restoreGState()
-        color.setFill()
-        cg.fillEllipse(in: rect)
     }
 
     // MARK: Texte
 
     private static func attributes(_ font: UIFont, _ color: UIColor, kernEm: CGFloat = 0) -> [NSAttributedString.Key: Any] {
         var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-        // Android exprime l'espacement en EM ; `kern` l'attend en points.
+        // La référence exprime l'espacement en em ; `kern` l'attend en points.
         if kernEm != 0 { attrs[.kern] = kernEm * font.pointSize }
         return attrs
     }
 
-    /// Dessine à partir de la LIGNE DE BASE, comme `Canvas.drawText`.
-    private static func draw(_ text: String, attrs: [NSAttributedString.Key: Any], x: CGFloat, baseline: CGFloat) {
-        guard let font = attrs[.font] as? UIFont else { return }
+    /// Chiffres à chasse fixe (`tnum`), comme `font-variant-numeric: tabular-nums`.
+    private static func tabular(_ font: UIFont) -> UIFont {
+        let descriptor = font.fontDescriptor.addingAttributes([
+            .featureSettings: [[
+                UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector,
+            ]],
+        ])
+        return UIFont(descriptor: descriptor, size: font.pointSize)
+    }
+
+    /// Ligne de base d'un texte centré dans une boîte `line-height` de `height`.
+    private static func baseline(top: CGFloat, height: CGFloat, font: UIFont) -> CGFloat {
+        top + (height - (font.ascender - font.descender)) / 2 + font.ascender
+    }
+
+    private static func width(_ text: String, _ attrs: [NSAttributedString.Key: Any]) -> CGFloat {
+        (text as NSString).size(withAttributes: attrs).width
+    }
+
+    /// Dessine à partir de la LIGNE DE BASE et renvoie l'avance horizontale.
+    @discardableResult
+    private static func draw(_ text: String, attrs: [NSAttributedString.Key: Any], x: CGFloat, baseline: CGFloat) -> CGFloat {
+        guard let font = attrs[.font] as? UIFont else { return 0 }
         (text as NSString).draw(at: CGPoint(x: x, y: baseline - font.ascender), withAttributes: attrs)
+        return width(text, attrs)
     }
 
-    private static func drawRightAligned(_ text: String, attrs: [NSAttributedString.Key: Any], rightX: CGFloat, baseline: CGFloat) {
-        let width = (text as NSString).size(withAttributes: attrs).width
-        draw(text, attrs: attrs, x: rightX - width, baseline: baseline)
-    }
-
-    /// Coupe au caractère près, comme Android : on préfère une fin en « … » à un
-    /// débordement hors carte, qui passerait inaperçu à la génération.
+    /// Coupe au caractère près : une fin en « … » plutôt qu'un débordement hors
+    /// cartouche, qui passerait inaperçu à la génération.
     static func ellipsize(_ text: String, attrs: [NSAttributedString.Key: Any], maxWidth: CGFloat) -> String {
         guard (text as NSString).size(withAttributes: attrs).width > maxWidth else { return text }
         var end = text.count
@@ -588,6 +644,10 @@ enum SQShareCardRenderer {
         }
         return String(text.prefix(end)).trimmingCharacters(in: .whitespaces) + "…"
     }
+}
+
+private extension Dictionary where Key == NSAttributedString.Key, Value == Any {
+    var font: UIFont { self[.font] as? UIFont ?? .systemFont(ofSize: 12) }
 }
 
 // MARK: - Utilitaires

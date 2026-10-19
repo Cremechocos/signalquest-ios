@@ -142,7 +142,7 @@ struct SpeedtestSharePreviewSheet: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
         }
-        .aspectRatio(1_080.0 / 650.0, contentMode: .fit)
+        .aspectRatio(1_200.0 / 630.0, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .accessibilityIdentifier("speedtest.share.preview")
     }

@@ -2,55 +2,59 @@ import UIKit
 import XCTest
 @testable import SignalQuest
 
-/// Rendu de la carte de partage.
+/// Rendu de l'image de partage A.
 ///
 /// Un rendu ne se prouve pas par des assertions : il se regarde. Ces tests
-/// produisent donc les trois variantes en pièces jointes, et vérifient par
-/// ailleurs les invariants qu'un coup d'œil rate — dimensions exactes, fond
-/// réellement noir en OLED, absence de repli de police.
+/// reproduisent donc les deux références validées le 19/10 (A-ios.png et
+/// A-sans-courbe-ni-radio.png, mêmes valeurs et mêmes courbes) en pièces jointes,
+/// et vérifient ce qu'un coup d'œil rate — dimensions exactes, fond papier,
+/// absence de repli de police.
 final class SQShareCardRenderTests: XCTestCase {
 
-    private func sample(theme: SQShareCardTheme) -> SQShareCardModel {
-        let series: [Double] = [
-            12, 48, 180, 420, 610, 705, 742, 738, 751, 760,
-            755, 762, 758, 764, 759, 766, 761, 768, 763, 770
-        ]
-        let uploadSeries: [Double] = [
-            4, 22, 68, 96, 112, 118, 121, 119, 123, 120,
-            124, 122, 125, 123, 126, 124, 127, 125, 128, 126
-        ]
-        return SQShareCardModel(
-            theme: theme,
-            brand: "SIGNALQUEST",
-            // PAS de bande radio : iOS n'expose ni RSRP, ni PCI, ni bande — c'est
-            // une limite assumée de la plateforme, pas un oubli. L'en-tête se
-            // limite donc à la génération et à l'opérateur.
-            headerNetworkText: "5G · Orange",
-            dateTimeText: "28 juil. 2026 · 14:32",
-            download: .init(
-                label: "Download", value: "770,2", unit: "Mbps", maxValue: "812,4",
-                labelColor: theme.qualityColor(ratio: 0.9),
-                graph: .init(points: series, localMax: 812, accentColor: theme.qualityColor(ratio: 0.9))
-            ),
-            upload: .init(
-                label: "Upload", value: "126,4", unit: "Mbps", maxValue: "131,0",
-                labelColor: theme.qualityColor(ratio: 0.55),
-                graph: .init(points: uploadSeries, localMax: 131, accentColor: theme.qualityColor(ratio: 0.55))
-            ),
-            latencyLabel: "Latence", latencyValueText: "18", latencyUnit: "ms",
-            latencySubText: "min · ICMP · gigue 1,4 ms",
-            latencyColor: theme.qualityColor(ratio: 0.85),
-            underLoadLabel: "Sous charge",
-            underLoadRows: [
-                .init(prefix: "DL", valueText: "42 ms", jitText: "± 6", dotColor: theme.qualityColor(ratio: 0.6)),
-                .init(prefix: "UL", valueText: "57 ms", jitText: "± 9", dotColor: theme.qualityColor(ratio: 0.4))
+    /// Courbes de la référence v11, normalisées sur leur maximum : 50 fenêtres de
+    /// 0,2 s, la première placée à son temps et non à zéro.
+    private static let downloadShape: [Double] = [
+        0.297, 0.494, 0.638, 0.718, 0.784, 0.863, 0.851, 0.834, 0.831, 0.823, 0.885, 0.899, 0.878,
+        0.909, 0.918, 0.968, 1.0, 0.944, 0.929, 0.914, 0.903, 0.928, 0.872, 0.842, 0.87, 0.883,
+        0.941, 0.948, 0.915, 0.952, 0.962, 0.973, 0.97, 0.891, 0.878, 0.889, 0.881, 0.902, 0.866,
+        0.862, 0.926, 0.948, 0.977, 0.966, 0.921, 0.952, 0.952, 0.925, 0.906, 0.842,
+    ]
+    private static let uploadShape: [Double] = [
+        0.215, 0.37, 0.507, 0.599, 0.679, 0.717, 0.706, 0.756, 0.8, 0.836, 0.881, 0.862, 0.895,
+        0.954, 0.962, 0.977, 0.933, 0.894, 0.925, 0.91, 0.898, 0.882, 0.846, 0.902, 0.945, 0.949,
+        0.968, 0.94, 0.958, 1.0, 0.962, 0.937, 0.894, 0.866, 0.914, 0.905, 0.887, 0.901, 0.898,
+        0.964, 0.999, 0.966, 0.966, 0.94, 0.944, 0.966, 0.906, 0.875, 0.87, 0.872,
+    ]
+    private static let windowTimes: [Double] = (1...50).map { Double($0) / 50 }
+
+    private func sample(curves: Bool = true) -> SQShareCardModel {
+        SQShareCardModel(
+            dateText: "19 octobre 2026 à 14:32",
+            network: .init(name: "SFR", detail: "5G", barColor: UIColor(hex: 0xE60012)),
+            download: .init(number: "1,24", unit: "Gb/s"),
+            downloadPeakText: "Pic à 1,41 Gb/s",
+            downloadGraph: curves
+                ? .init(points: Self.downloadShape.map { $0 * 1_410 }, localMax: 1_410,
+                        accentColor: UIColor(hex: 0x1C201E), normalizedTimes: Self.windowTimes, durationSeconds: 10)
+                : nil,
+            upload: .init(number: "84,2", unit: "Mb/s"),
+            uploadPeakText: "Pic à 96,8 Mb/s",
+            uploadGraph: curves
+                ? .init(points: Self.uploadShape.map { $0 * 96.8 }, localMax: 96.8,
+                        accentColor: UIColor(hex: 0xA8123A), normalizedTimes: Self.windowTimes, durationSeconds: 10)
+                : nil,
+            latencyLabel: "Latence min.",
+            latency: .init(number: "14", unit: "ms"),
+            latencyAverageText: "Moyenne 18 ms",
+            rows: [
+                .init(label: "Sous charge", value: "+24 ms", grade: .init(
+                    letter: "B", color: UIColor(hex: 0x477818),
+                    background: UIColor(hex: 0x7DB834, alpha: 0.16)
+                )),
+                .init(label: "Gigue", value: "3,2 ms"),
+                .init(label: "Serveur", value: "Roubaix (OVH RBX)"),
             ],
-            serverLabel: "Serveur", serverText: "Paris BBR (Bouygues)",
-            deviceCityText: "iPhone 17 Pro · Lyon",
-            // VIDE sur iOS, et ce n'est pas un trou à combler : ces lignes portent
-            // l'identité radio (porteuses agrégées, MCC/MNC, bande) qu'Android lit
-            // sur son modem et qu'iOS n'expose pas. Le pied se replie tout seul.
-            radioLines: []
+            deviceCityText: "iPhone 17 Pro · Grenoble"
         )
     }
 
@@ -61,39 +65,30 @@ final class SQShareCardRenderTests: XCTestCase {
         add(attachment)
     }
 
-    /// Produit les trois variantes. Elles sont à REGARDER : c'est la comparaison
-    /// avec la carte Android qui valide le port, pas une assertion.
-    func testRendersTheThreeVariants() throws {
+    /// Les deux références. Elles sont à REGARDER côte à côte avec les PNG validés.
+    func testRendersTheTwoReferences() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded, "Polices absentes — la carte serait composée en Helvetica")
-        for (theme, name) in [(SQShareCardTheme.light, "clair"),
-                              (SQShareCardTheme.dark, "sombre"),
-                              (SQShareCardTheme.oled, "oled")] {
-            let image = SQShareCardRenderer.render(sample(theme: theme))
-            attach(image, "carte-\(name)")
-            XCTAssertEqual(image.size.width, 2_160, accuracy: 0.5, "Largeur d'export inattendue (\(name))")
-            XCTAssertEqual(image.size.height, 1_300, accuracy: 0.5, "Hauteur d'export inattendue (\(name))")
+        for (curves, name) in [(true, "A-ios"), (false, "A-sans-courbe-ni-radio")] {
+            let image = SQShareCardRenderer.render(sample(curves: curves))
+            attach(image, name)
+            XCTAssertEqual(image.size.width, 2_400, accuracy: 0.5, "Largeur d'export inattendue (\(name))")
+            XCTAssertEqual(image.size.height, 1_260, accuracy: 0.5, "Hauteur d'export inattendue (\(name))")
+            // Hors bac à sable, l'hôte récupère l'image pour la comparer au pixel.
+            try? image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/sq-share-\(name).png"))
         }
     }
 
-    /// En OLED, le fond doit être NOIR PUR — c'est toute la raison d'être du mode
-    /// sur un écran à pixels éteints. Un gris très foncé passerait inaperçu à l'œil
-    /// mais annulerait le bénéfice.
-    func testOledBackgroundIsPureBlack() throws {
+    /// Fond papier #F4F2EC et cartouche blanche, quel que soit le thème de l'app.
+    func testPaperAndCardColors() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded)
-        let image = SQShareCardRenderer.render(sample(theme: .oled))
+        let image = SQShareCardRenderer.render(sample())
         let corner = try XCTUnwrap(image.pixelColor(at: CGPoint(x: 4, y: 4)))
-        XCTAssertEqual(corner.red, 0, accuracy: 0.01)
-        XCTAssertEqual(corner.green, 0, accuracy: 0.01)
-        XCTAssertEqual(corner.blue, 0, accuracy: 0.01)
-    }
-
-    /// …et le mode sombre classique ne doit PAS l'être, sinon les deux réglages
-    /// seraient indiscernables et l'option n'aurait aucun sens.
-    func testDarkBackgroundIsNotPureBlack() throws {
-        try XCTSkipUnless(SQShareFonts.areEmbedded)
-        let image = SQShareCardRenderer.render(sample(theme: .dark))
-        let corner = try XCTUnwrap(image.pixelColor(at: CGPoint(x: 4, y: 4)))
-        XCTAssertGreaterThan(corner.red + corner.green + corner.blue, 0.02, "Le sombre classique est devenu noir pur")
+        XCTAssertEqual(corner.red, 0xF4 / 255, accuracy: 0.01)
+        XCTAssertEqual(corner.green, 0xF2 / 255, accuracy: 0.01)
+        XCTAssertEqual(corner.blue, 0xEC / 255, accuracy: 0.01)
+        // Intérieur de la cartouche, entre l'opérateur et la rubrique.
+        let card = try XCTUnwrap(image.pixelColor(at: CGPoint(x: 1_000, y: 330)))
+        XCTAssertEqual(card.red + card.green + card.blue, 3, accuracy: 0.02)
     }
 
     /// L'échelle de qualité doit rester monotone : un débit plus élevé ne peut pas
@@ -108,49 +103,35 @@ final class SQShareCardRenderTests: XCTestCase {
     }
 
     /// Une valeur très large doit rétrécir, jamais déborder de sa colonne.
-    func testOversizedValueStillRenders() throws {
+    func testOversizedValuesStillRender() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded)
-        var model = sample(theme: .light)
-        model = SQShareCardModel(
-            theme: model.theme, brand: model.brand,
-            headerNetworkText: model.headerNetworkText, dateTimeText: model.dateTimeText,
-            download: .init(label: "Download", value: "12408,6", unit: "Mbps", maxValue: "12999,9",
-                            labelColor: model.download.labelColor, graph: model.download.graph),
-            upload: model.upload,
-            latencyLabel: model.latencyLabel, latencyValueText: model.latencyValueText,
-            latencyUnit: model.latencyUnit, latencySubText: model.latencySubText,
-            latencyColor: model.latencyColor,
-            underLoadLabel: model.underLoadLabel, underLoadRows: model.underLoadRows,
-            serverLabel: model.serverLabel, serverText: model.serverText,
-            deviceCityText: model.deviceCityText, radioLines: model.radioLines
+        let base = sample()
+        let model = SQShareCardModel(
+            dateText: base.dateText, network: .init(name: "Bouygues Telecom", detail: "5G", barColor: UIColor(hex: 0x009DDC)),
+            download: .init(number: "12,41", unit: "Gb/s"), downloadPeakText: base.downloadPeakText,
+            downloadGraph: base.downloadGraph, upload: .init(number: "2,48", unit: "Gb/s"),
+            uploadPeakText: "Pic à 2,51 Gb/s", uploadGraph: base.uploadGraph, latencyLabel: base.latencyLabel,
+            latency: .init(number: "1234", unit: "ms"), latencyAverageText: "Moyenne 1456 ms",
+            rows: base.rows + [.init(label: "Serveur", value: "Un nom de serveur beaucoup trop long pour la colonne")],
+            deviceCityText: base.deviceCityText
         )
         let image = SQShareCardRenderer.render(model)
-        attach(image, "carte-valeur-large")
-        XCTAssertEqual(image.size.width, 2_160, accuracy: 0.5)
+        attach(image, "A-valeurs-larges")
+        XCTAssertEqual(image.size.width, 2_400, accuracy: 0.5)
     }
 
-    /// Une série vide ou un maximum nul ne doivent pas empêcher la génération :
-    /// un test partiellement raté reste partageable.
-    func testDegenerateGraphStillRenders() throws {
+    /// Tout ce qui est facultatif absent : la carte reste dessinable, sans tiret.
+    func testMinimalCardStillRenders() throws {
         try XCTSkipUnless(SQShareFonts.areEmbedded)
-        var model = sample(theme: .dark)
-        model = SQShareCardModel(
-            theme: model.theme, brand: model.brand,
-            headerNetworkText: model.headerNetworkText, dateTimeText: nil,
-            download: .init(label: "Download", value: "—", unit: "Mbps", maxValue: "—",
-                            labelColor: model.download.labelColor,
-                            graph: .init(points: [], localMax: 0, accentColor: model.download.labelColor)),
-            upload: model.upload,
-            latencyLabel: model.latencyLabel, latencyValueText: model.latencyValueText,
-            latencyUnit: model.latencyUnit, latencySubText: model.latencySubText,
-            latencyColor: model.latencyColor,
-            underLoadLabel: model.underLoadLabel, underLoadRows: [],
-            serverLabel: model.serverLabel, serverText: nil,
-            deviceCityText: model.deviceCityText, radioLines: []
+        let model = SQShareCardModel(
+            dateText: nil, network: nil, download: .init(number: "8,4", unit: "Mb/s"),
+            downloadPeakText: nil, downloadGraph: .init(points: [], localMax: 0, accentColor: .black),
+            upload: nil, uploadPeakText: nil, uploadGraph: nil, latencyLabel: "Latence", latency: nil,
+            latencyAverageText: nil, rows: [], deviceCityText: ""
         )
         let image = SQShareCardRenderer.render(model)
-        attach(image, "carte-degradee")
-        XCTAssertEqual(image.size.height, 1_300, accuracy: 0.5)
+        attach(image, "A-minimale")
+        XCTAssertEqual(image.size.height, 1_260, accuracy: 0.5)
     }
 }
 

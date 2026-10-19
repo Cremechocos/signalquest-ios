@@ -7790,6 +7790,22 @@
         }
       }
     },
+    "Débit descendant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit descendant"
+          }
+        }
+      }
+    },
     "Débits mesurés" : {
       "localizations" : {
         "en" : {
@@ -10808,6 +10824,22 @@
         }
       }
     },
+    "Latence min." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min. latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence min."
+          }
+        }
+      }
+    },
     "Latence minimale" : {
       "localizations" : {
         "en" : {
@@ -13323,6 +13355,22 @@
         }
       }
     },
+    "Moyenne %lld ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average %lld ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne %lld ms"
+          }
+        }
+      }
+    },
     "Nom du dossier" : {
       "localizations" : {
         "en" : {
@@ -14730,6 +14778,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos en vérification"
+          }
+        }
+      }
+    },
+    "Pic à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peak %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pic à %@"
           }
         }
       }
