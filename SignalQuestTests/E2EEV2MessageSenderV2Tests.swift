@@ -389,6 +389,86 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         ))
     }
 
+    // MARK: Demandes de message (DM-REQ-1)
+
+    /// L'envoi déclare `message_requests_v1` dans l'en-tête v2, lit le bloc `request` du reçu (`remaining`
+    /// y est un nombre JSON) et garde toute autre clé hors contrat refusée.
+    func testTheSendDeclaresRequestsAndReadsTheSenderRequestBlock() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let requests = LockedRequests()
+        let tag = Data(repeating: 9, count: 32).base64EncodedString()
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request, body: [:])
+            let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(E2EEV2AccountFixture.rawBody(request)))
+            let id = signed.envelope.clientRequestId
+            let body = #"{"envelopeId":"envelope_01J7ABCD23456789","clientRequestId":"\#(id)","serverTagB64":"\#(tag)","serverTimeMs":"1790000000250","keyId":"server_tag_key_01J7ABCD","request":{"role":"sender","status":"pending","remaining":0}}"#
+            return E2EEV2AccountFixture.response(request, Data(body.utf8))
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let result = await sender.send(
+            draft("Bonjour"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001",
+            membership: seeded.membership, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .sent(let receipt, _) = result else { return XCTFail("Envoi refusé : \(result)") }
+        XCTAssertEqual(receipt.request?.messageRequest, MessageRequest.senderSent)
+        let header = try XCTUnwrap(requests.first?.0.value(forHTTPHeaderField: ClientProtocolContract.capabilitiesHeaderName))
+        XCTAssertTrue(header.split(separator: ",").contains("message_requests_v1"), "La capacité part avec l'envoi v2")
+        XCTAssertTrue(header.contains(E2EEV2ActivationPolicy.messageEnvelopeCapability))
+        XCTAssertFalse(E2EEV2RequestCapabilitySet.media.values.contains(ClientProtocolContract.messageRequestsCapability),
+                       "Seuls les envois dont le reçu lit `request` la déclarent")
+    }
+
+    /// 403 `MESSAGE_REQUEST_PENDING` : terminal. Rien n'est gardé pour être rejoué, un second essai ne
+    /// repart pas seul, et l'erreur se reconnaît pour retourner « Demande envoyée ».
+    func testAPendingRequestRefusalIsTerminalAndKeepsNothingToReplay() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let requests = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request, body: [:])
+            let body = #"{"error":"Ta demande de message n'a pas encore été acceptée.","code":"MESSAGE_REQUEST_PENDING","details":{"conversationId":"\#(seeded.conversationId)"}}"#
+            return E2EEV2AccountFixture.response(request, Data(body.utf8), status: 403)
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let result = await sender.send(
+            draft("Bonjour"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001",
+            membership: seeded.membership, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure(let failure) = result else { return XCTFail("Un 403 n'est pas un envoi : \(result)") }
+        XCTAssertEqual(failure.kind, .permanent)
+        XCTAssertTrue(MessageRequestLimitError.isPending(failure))
+        XCTAssertNil(try fixture.states.pendingSend(
+            conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001", ownerNamespace: fixture.session.ownerNamespace
+        ), "Le refus est terminal : l'enveloppe signée n'est pas gardée pour un rejeu")
+        XCTAssertEqual(requests.all.count, 1)
+        XCTAssertEqual(EncryptedConversationSurfaces.v2SendFailureMessage(result), String(localized: "Ta demande de message n’a pas encore été acceptée."))
+    }
+
+    /// 429 `MESSAGE_REQUEST_LIMIT` : une décision, jamais une panne passagère rejouée.
+    func testTheDailyRequestLimitIsPermanentAndCarriesItsDate() {
+        let failure = E2EEV2TransportFailure(
+            kind: E2EEV2TransportFailurePolicy.classify(statusCode: 429, code: "MESSAGE_REQUEST_LIMIT"),
+            statusCode: 429, code: "MESSAGE_REQUEST_LIMIT", message: "limit",
+            details: ["until": .string("2026-10-20T00:00:00.000Z")]
+        )
+        XCTAssertEqual(failure.kind, .permanent)
+        XCTAssertTrue(MessageRequestLimitError.isLimit(failure))
+        XCTAssertNotNil(MessageRequestLimitError(failure: failure).until)
+        XCTAssertEqual(E2EEV2TransportFailurePolicy.classify(statusCode: 429, code: "RATE_LIMITED"), .retryable,
+                       "Les autres 429 restent passagers")
+    }
+
     // MARK: Compteur
 
     func testCountersOnlyMoveForwardAndRestartForANewIdentity() throws {

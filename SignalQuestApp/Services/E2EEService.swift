@@ -1858,6 +1858,8 @@ enum E2EEV2RequestCapabilitySet: Sendable {
                 E2EEV2ActivationPolicy.contractPreviewCapability,
                 E2EEV2ActivationPolicy.deviceIdentityCapability,
                 E2EEV2ActivationPolicy.messageEnvelopeCapability,
+                // DM-REQ-1 : création et envoi lisent le bloc `request` du reçu (E2EEV2MessageRequestBlock).
+                ClientProtocolContract.messageRequestsCapability,
             ]
         case .media:
             return [
@@ -1899,6 +1901,8 @@ enum E2EEV2TransportFailurePolicy {
         if statusCode == 426 || code.map(activationCodes.contains) == true { return .activationBlocked }
         if statusCode == 401 { return .authentication }
         if code.map(retryableConflictCodes.contains) == true { return .retryable }
+        // DM-REQ-1 : le plafond quotidien de demandes est une décision, pas une panne : jamais rejoué seul.
+        if statusCode == 429, code == MessageRequestLimitError.code { return .permanent }
         if [408, 425, 429].contains(statusCode) || (500...599).contains(statusCode) {
             return .retryable
         }

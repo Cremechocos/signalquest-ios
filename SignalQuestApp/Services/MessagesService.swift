@@ -13,6 +13,13 @@ protocol MessagesServicing: Sendable {
     func shelvedConversations() async throws -> [MessageConversation]
     /// Archive ou désarchive pour soi, sans quitter la conversation.
     func setConversationShelved(_ shelved: Bool, conversationId: String) async throws
+    // MARK: - Demandes de message (DM-REQ-1)
+    /// Demandes en attente (`?requests=only`), page par page jusqu'à la borne.
+    func requestConversations() async throws -> [MessageConversation]
+    /// Accepte une demande : la conversation rejoint la liste ordinaire.
+    func acceptMessageRequest(conversationId: String) async throws
+    /// Refuse une demande : la conversation quitte la liste, sans rien dire à l'expéditeur.
+    func declineMessageRequest(conversationId: String) async throws
     // Dossiers de conversations
     func conversationFolders() async throws -> [ConversationFolder]
     func createConversationFolder(name: String) async throws -> ConversationFolder
@@ -270,6 +277,8 @@ actor DeliveryAcknowledger {
         guard currentUserId != nil else { return [] }
         return conversations.compactMap { conversation in
             guard conversation.isUnread(currentUserId: currentUserId) else { return nil }
+            // DM-REQ-1 : ni accusé « Distribué » ni lecture avant l'acceptation d'une demande.
+            guard conversation.request?.isIncomingPending != true else { return nil }
             if let last = conversation.e2eeV2?.lastMessage { return (conversation.id, last.envelopeId) }
             guard let id = conversation.lastMessage?.id, !id.hasPrefix("local-") else { return nil }
             return (conversation.id, id)
@@ -387,11 +396,14 @@ final class MessagesService: MessagesServicing {
         )
         rememberForCalls(response.conversations, session: session)
         return ConversationList(
-            conversations: response.conversations,
+            // DM-REQ-1 : une demande reçue en attente n'est pas une conversation (liste, badge, cibles
+            // de transfert) ; le serveur l'écarte déjà, ce filtre le garantit pour chaque appelant.
+            conversations: response.conversations.filter { $0.request?.isIncomingPending != true },
             pinLimit: response.pinLimit,
             hasMore: response.hasMore ?? false,
             nextCursor: response.nextCursor,
-            shelvedSummary: response.shelvedSummary
+            shelvedSummary: response.shelvedSummary,
+            requestsSummary: response.requestsSummary
         )
     }
 
@@ -424,6 +436,56 @@ final class MessagesService: MessagesServicing {
         }
         rememberForCalls(all, session: session)
         return all
+    }
+
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    func requestConversations() async throws -> [MessageConversation] {
+        if AppEnvironment.usesDemoData { return [] }
+        var all: [MessageConversation] = []
+        var seen = Set<String>()
+        var cursor: String?
+        for _ in 0..<Self.conversationMaxPages {
+            var query = [
+                URLQueryItem(name: "take", value: String(Self.conversationPageSize)),
+                URLQueryItem(name: "requests", value: "only")
+            ]
+            if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+            let page: ConversationsResponse
+            do {
+                page = try await api.request(
+                    APIEndpoint(path: "/api/messages/conversations", query: query), as: ConversationsResponse.self
+                )
+            } catch {
+                if all.isEmpty || error.isCancellation { throw error }
+                break
+            }
+            for conversation in page.conversations where seen.insert(conversation.id).inserted {
+                all.append(conversation)
+            }
+            guard page.hasMore ?? false, let next = page.nextCursor, next != cursor else { break }
+            cursor = next
+        }
+        // Pas de `rememberForCalls` : une demande en attente n'est pas une conversation d'appel.
+        return all
+    }
+
+    func acceptMessageRequest(conversationId: String) async throws {
+        try await decideMessageRequest(conversationId: conversationId, decision: "accept")
+    }
+
+    func declineMessageRequest(conversationId: String) async throws {
+        try await decideMessageRequest(conversationId: conversationId, decision: "decline")
+    }
+
+    /// 200 `{ok, conversationId, status}`. Un 404 (`MESSAGE_REQUEST_NOT_FOUND`) ou un 409
+    /// (`MESSAGE_REQUEST_ALREADY_ACCEPTED`) remontent tels quels : l'écran relit alors la liste.
+    private func decideMessageRequest(conversationId: String, decision: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/requests/\(conversationId)/\(decision)",
+            body: [String: String]()
+        )
     }
 
     func setConversationShelved(_ shelved: Bool, conversationId: String) async throws {
@@ -753,6 +815,17 @@ final class MessagesService: MessagesServicing {
                 body: record.request,
                 idempotencyKey: record.clientRequestId
             )
+        } catch where error.isMessageRequestPending {
+            // DM-REQ-1 : la demande n'est pas encore acceptée. Terminal (un 403 n'est jamais rejoué par la
+            // file) : le texte reste gardé « non envoyé » avec la raison, et la conversation passe à
+            // « Demande envoyée ».
+            try? await textOutbox.setFailure(
+                error.localizedDescription,
+                session: session,
+                clientRequestId: record.clientRequestId
+            )
+            MessageRequestEvents.post(conversationId: record.conversationId, request: .senderSent)
+            throw error
         } catch where error.isPermanentRequestFailure {
             // Refus définitif : le message reste stocké, marqué « non envoyé »,
             // au lieu de bloquer la file ou de disparaître (SOC-04).
@@ -768,6 +841,10 @@ final class MessagesService: MessagesServicing {
             session: session,
             clientRequestId: record.clientRequestId
         )
+        // DM-REQ-1 : le premier message d'une demande ferme le compositeur de l'expéditeur.
+        if let request = response.request {
+            MessageRequestEvents.post(conversationId: record.conversationId, request: request)
+        }
         return response.message
     }
 

@@ -71,6 +71,23 @@ final class MessageDraftStoreTests: XCTestCase {
         XCTAssertTrue(draftFiles(in: root).isEmpty, "Plus rien à garder : le fichier disparaît")
     }
 
+    /// DM-REQ-1 : un texte refusé pour de bon reste affiché mais marqué, et un nouvel essai explicite l'efface.
+    func testARefusedV2SendKeepsItsReasonUntilItIsStagedAgain() async throws {
+        let store = MessageDraftStore(rootURL: temporaryRoot(), keyStore: InMemoryTokenStore())
+        try await store.stageV2Send(pendingV2("req-1"), ownerScopeId: alice)
+        try await store.stageV2Send(pendingV2("req-2", conversation: "c2"), ownerScopeId: alice)
+        await store.markV2SendFailed(clientRequestId: "req-1", reason: "Pas encore acceptée", ownerScopeId: alice)
+        await store.markV2SendFailed(clientRequestId: "inconnu", reason: "x", ownerScopeId: alice)
+        let marked = await store.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertEqual(marked.first { $0.clientRequestId == "req-1" }?.failureReason, "Pas encore acceptée")
+        XCTAssertNil(marked.first { $0.clientRequestId == "req-2" }?.failureReason)
+        XCTAssertEqual(marked.filter { $0.failureReason == nil }.map(\.clientRequestId), ["req-2"],
+                       "La reprise en arrière-plan ne rejoue que ce qui n'est pas marqué")
+        try await store.stageV2Send(pendingV2("req-1"), ownerScopeId: alice)
+        let restaged = await store.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertNil(restaged.first { $0.clientRequestId == "req-1" }?.failureReason)
+    }
+
     func testPendingV2SendsKeepTheMostRecentOnesAndDieWithTheAccountPurge() async throws {
         let store = MessageDraftStore(rootURL: temporaryRoot(), keyStore: InMemoryTokenStore())
         for index in 0..<(MessageDraftStore.maxPendingV2Sends + 3) {

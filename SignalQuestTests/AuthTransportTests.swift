@@ -329,6 +329,9 @@ final class AuthTransportTests: XCTestCase {
             headers[ClientProtocolContract.capabilitiesHeaderName],
             ClientProtocolContract.capabilitiesHeader
         )
+        // DM-REQ-1 : les demandes de message se déclarent sur toute requête v1.
+        let declared = try XCTUnwrap(headers[ClientProtocolContract.capabilitiesHeaderName])
+        XCTAssertTrue(declared.split(separator: ",").contains("message_requests_v1"))
     }
 
     /// Mode invité : `authenticated: true` sans token ne doit pas inventer

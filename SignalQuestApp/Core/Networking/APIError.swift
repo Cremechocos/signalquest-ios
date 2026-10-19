@@ -141,6 +141,11 @@ enum APIError: Error, LocalizedError, Equatable {
         "INVALID_2FA_CODE": String(localized: "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."),
         "EMAIL_ALREADY_USED": String(localized: "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."),
         "ACCOUNT_SUSPENDED": String(localized: "Ton compte est suspendu. Contacte le support SignalQuest pour en savoir plus."),
+        // Demandes de message (DM-REQ-1).
+        "MESSAGE_REQUEST_PENDING": String(localized: "Ta demande de message n’a pas encore été acceptée."),
+        "MESSAGE_REQUEST_LIMIT": String(localized: "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire demain, ou dès maintenant si la personne t’ajoute en ami."),
+        "MESSAGE_REQUEST_NOT_FOUND": String(localized: "Cette demande n’existe plus."),
+        "MESSAGE_REQUEST_ALREADY_ACCEPTED": String(localized: "Cette demande a déjà été acceptée."),
         "EMAIL_NOT_VERIFIED": String(localized: "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil."),
 
         // Identification d'un site (`/api/android/map/identify/direct`). Le serveur
@@ -213,7 +218,9 @@ extension Error {
     /// Restent temporaires : 401 (session à renouveler), 408 (délai), 425 et
     /// 429 (trop tôt, trop de requêtes), et toute erreur réseau ou 5xx.
     var isPermanentRequestFailure: Bool {
-        guard let api = self as? APIError, case .http(let status, _, _, _, _) = api else { return false }
+        guard let api = self as? APIError, case .http(let status, let code, _, _, _) = api else { return false }
+        // DM-REQ-1 : le plafond quotidien de demandes est une décision du serveur, pas une panne passagère.
+        if status == 429, code == MessageRequestLimitError.code { return true }
         return (400..<500).contains(status) && ![401, 408, 425, 429].contains(status)
     }
 

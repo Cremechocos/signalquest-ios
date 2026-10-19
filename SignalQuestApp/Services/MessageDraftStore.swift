@@ -33,6 +33,9 @@ actor MessageDraftStore {
         let replyToRef: String?
         let ttlSeconds: Int
         let createdAtMs: Int64
+        /// Refus définitif du serveur (DM-REQ-1 : demande pas encore acceptée) : le texte reste affiché
+        /// « Non envoyé » avec cette raison, mais la reprise en arrière-plan ne le rejoue plus.
+        var failureReason: String? = nil
     }
 
     private struct DraftFile: Codable {
@@ -118,6 +121,16 @@ actor MessageDraftStore {
         return outbox
             .filter { conversationId == nil || $0.conversationId == conversationId }
             .sorted { $0.createdAtMs < $1.createdAtMs }
+    }
+
+    /// Refus définitif (DM-REQ-1) : l'entrée reste, sans être rejouée par la reprise en arrière-plan.
+    func markV2SendFailed(clientRequestId: String, reason: String, ownerScopeId: String) {
+        guard var file = try? read(ownerScopeId: ownerScopeId),
+              var outbox = file.v2Outbox,
+              let index = outbox.firstIndex(where: { $0.clientRequestId == clientRequestId }) else { return }
+        outbox[index].failureReason = reason
+        file.v2Outbox = outbox
+        try? write(file, ownerScopeId: ownerScopeId)
     }
 
     /// Accepté par le serveur, ou abandonné par l'utilisateur.

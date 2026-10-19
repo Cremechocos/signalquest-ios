@@ -6028,6 +6028,146 @@ final class MessageTextOutboxTests: XCTestCase {
         XCTAssertTrue(afterDiscard.isEmpty)
     }
 
+    // MARK: Demandes de message (DM-REQ-1)
+
+    private func requestFixture(userId: String) throws -> (service: MessagesService, outbox: MessageTextOutboxStore, session: LocalAccountSession, root: URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("message-request-\(UUID().uuidString)", isDirectory: true)
+        LocalAccountScope.activate(userId: userId)
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-message-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let outbox = MessageTextOutboxStore(baseDirectory: root)
+        return (MessagesService(api: api, textOutbox: outbox), outbox, session, root)
+    }
+
+    private func plainConversation(_ id: String) -> MessageConversation {
+        MessageConversation(id: id, title: "Fixture", isGroup: false, e2eeEnabled: false,
+                            groupPhotoUrl: nil, createdAt: nil, updatedAt: nil, lastMessageAt: nil,
+                            lastReadAt: nil, pinnedAt: nil, participants: [], lastMessage: nil)
+    }
+
+    /// 403 `MESSAGE_REQUEST_PENDING` en v1 : terminal. Le texte reste « non envoyé » avec sa raison, la file
+    /// ne le rejoue jamais seule, et la conversation apprend qu'elle attend l'acceptation.
+    func testMessageRequestPendingIsTerminalAndNeverReplayed() async throws {
+        let fixture = try requestFixture(userId: "message-request-pending-user")
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        var posts = 0
+        MockURLProtocol.requestHandler = { request in
+            posts += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 403, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"Ta demande de message n'a pas encore été acceptée.","code":"MESSAGE_REQUEST_PENDING"}"#.utf8))
+        }
+        do {
+            _ = try await fixture.service.sendText("Salut", in: plainConversation("conversation-pending"), e2ee: nil,
+                                                   idempotencyKey: "local-conversation-pending-0123456789abcdef")
+            XCTFail("Un 403 n'est pas un envoi")
+        } catch {
+            XCTAssertTrue(error.isMessageRequestPending)
+            XCTAssertTrue(error.isPermanentRequestFailure)
+        }
+        let kept = try await fixture.outbox.pending(session: fixture.session)
+        XCTAssertEqual(kept.count, 1, "Le texte reste visible, non envoyé")
+        XCTAssertEqual(kept.first?.failureReason, String(localized: "Ta demande de message n’a pas encore été acceptée."))
+        XCTAssertEqual(MessageRequestEvents.recentRequest(conversationId: "conversation-pending"), MessageRequest.senderSent)
+
+        await fixture.service.retryPendingTextMessages()
+        XCTAssertEqual(posts, 1, "Un refus de demande n'est jamais rejoué par la file")
+    }
+
+    /// Le reçu d'un premier message porte `request` : la conversation ferme son compositeur.
+    func testTheFirstMessageReceiptAnnouncesTheSentRequest() async throws {
+        let fixture = try requestFixture(userId: "message-request-receipt-user")
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let json = #"{"message":{"id":"server-first","conversationId":"conversation-first","senderId":"message-request-receipt-user","kind":"TEXT","content":"Salut","attachments":[],"reactions":[]},"request":{"role":"sender","status":"pending","remaining":0}}"#
+            return (response, Data(json.utf8))
+        }
+        let sent = try await fixture.service.sendText("Salut", in: plainConversation("conversation-first"), e2ee: nil,
+                                                      idempotencyKey: "local-conversation-first-0123456789abcdef")
+        XCTAssertEqual(sent.id, "server-first")
+        XCTAssertEqual(MessageRequestEvents.recentRequest(conversationId: "conversation-first"), MessageRequest.senderSent)
+        let left = try await fixture.outbox.pending(session: fixture.session)
+        XCTAssertTrue(left.isEmpty)
+    }
+
+    /// 429 `MESSAGE_REQUEST_LIMIT` en v1 : une seule requête, aucun rejeu, et la date (`Retry-After`) en main.
+    func testMessageRequestLimitIsNotReplayedAndCarriesItsDate() async throws {
+        let fixture = try requestFixture(userId: "message-request-limit-user")
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        var posts = 0
+        MockURLProtocol.requestHandler = { request in
+            posts += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 429, httpVersion: nil,
+                                           headerFields: ["Retry-After": "3600"])!
+            return (response, Data(#"{"error":"Tu as atteint le nombre de demandes de message pour aujourd'hui.","code":"MESSAGE_REQUEST_LIMIT","details":{"until":"2026-10-20T00:00:00.000Z"}}"#.utf8))
+        }
+        do {
+            _ = try await fixture.service.createConversation(participantIds: ["stranger"], title: nil, e2ee: false)
+            XCTFail("Un 429 n'est pas une création")
+        } catch {
+            let limit = try XCTUnwrap(error.messageRequestLimit)
+            let until = try XCTUnwrap(limit.until)
+            XCTAssertGreaterThan(until.timeIntervalSinceNow, 3_000)
+            XCTAssertTrue(error.isPermanentRequestFailure, "Les files ne rejouent pas un plafond atteint")
+            XCTAssertEqual(error.userFacingMessage, String(localized: "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire demain, ou dès maintenant si la personne t’ajoute en ami."))
+        }
+        XCTAssertEqual(posts, 1, "Aucun rejeu automatique")
+    }
+
+    /// Sans `requestsSummary` ni `request`, la messagerie est celle d'aujourd'hui : pas de ligne
+    /// « Demandes », liste inchangée.
+    func testAServerWithoutRequestsServesTheSameConversationList() async throws {
+        let fixture = try requestFixture(userId: "message-request-legacy-user")
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"conversations":[{"id":"c1","participants":[]}],"hasMore":false}"#.utf8))
+        }
+        let page = try await fixture.service.conversationPage(cursor: nil, take: 50)
+        XCTAssertNil(page.requestsSummary, "Pas de ligne « Demandes de message » sans le résumé du serveur")
+        XCTAssertEqual(page.conversations.map(\.id), ["c1"])
+        XCTAssertNil(page.conversations.first?.request)
+    }
+
+    /// Une demande reçue en attente ne se glisse jamais dans la liste ordinaire (badge, cibles de transfert).
+    func testAnIncomingPendingRequestNeverJoinsTheOrdinaryList() async throws {
+        let fixture = try requestFixture(userId: "message-request-incoming-user")
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let json = #"{"conversations":[{"id":"ordinary","participants":[]},{"id":"asked","participants":[],"request":{"role":"recipient","status":"pending","id":"r1"}},{"id":"mine","participants":[],"request":{"role":"sender","status":"pending","remaining":0}}],"hasMore":false,"requestsSummary":{"count":1,"unreadCount":1}}"#
+            return (response, Data(json.utf8))
+        }
+        let page = try await fixture.service.conversationPage(cursor: nil, take: 50)
+        XCTAssertEqual(page.conversations.map(\.id), ["ordinary", "mine"])
+        XCTAssertEqual(page.requestsSummary, MessageRequestsSummary(count: 1, unreadCount: 1))
+    }
+
     func testExactCiphertextReplyTtlAndRequestIdSurviveStoreRecreation() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("message-text-outbox-\(UUID().uuidString)", isDirectory: true)

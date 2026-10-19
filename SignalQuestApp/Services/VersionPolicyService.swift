@@ -42,9 +42,14 @@ enum ClientProtocolContract {
     static let currentProtocolVersion = 1
     static let protocolVersionHeader = E2EEV2ProtocolWire.protocolVersionHeader
     static let capabilitiesHeaderName = E2EEV2ProtocolWire.capabilitiesHeader
+    /// Demandes de message (DM-REQ-1) : le serveur ajoute `request` aux conversations, à leur liste
+    /// et aux reçus de création et d'envoi pour qui la déclare. Elle ne se déclare qu'avec l'écran
+    /// des demandes, la barre de décision et les reçus v2 qui lisent ce champ.
+    static let messageRequestsCapability = "message_requests_v1"
     static let capabilities: Set<String> = [
         "exact_schedules_v2",
         "message_reminder_idempotency_v1",
+        messageRequestsCapability,
         "network_identity_v2",
         "push_recipient_scope_v2",
     ]

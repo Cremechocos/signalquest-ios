@@ -304,6 +304,9 @@ final class AppServices: ObservableObject {
     private func applyInbox(_ conversations: [MessageConversation], ticket: InboxBadgePresentationState.RefreshTicket) {
         // Même règle que la liste : son propre dernier message ne compte pas.
         let userId = LocalAccountScope.currentUserId
+        // Une demande reçue en attente ne compte pas au badge et n'est jamais accusée « Distribuée »
+        // (DM-REQ-1) : l'expéditeur ne doit rien apprendre avant l'acceptation.
+        let conversations = conversations.filter { $0.request?.isIncomingPending != true }
         let unread = conversations.filter { $0.isUnread(currentUserId: userId) }.count
         // Messages reçus : l'expéditeur les voit « Distribués » sans attendre l'ouverture de la conversation.
         Task { await deliveryAcks.acknowledgeLatest(of: conversations, currentUserId: userId, using: messages) }
@@ -337,6 +340,8 @@ final class AppServices: ObservableObject {
                 await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
                 continue
             }
+            // Refus définitif déjà connu (demande de message pas encore acceptée) : jamais rejoué seul.
+            if pending.failureReason != nil { continue }
             let result = await e2eeV2Messaging.send(
                 .init(body: .text(pending.text), replyToRef: pending.replyToRef, mentions: [], ttlSeconds: pending.ttlSeconds),
                 clientRequestId: pending.clientRequestId, conversationId: pending.conversationId,
@@ -345,6 +350,13 @@ final class AppServices: ObservableObject {
             switch result {
             case .sent, .alreadyAccepted:
                 await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
+            case .failure(let failure) where MessageRequestLimitError.isPending(failure):
+                // DM-REQ-1 : 403 `MESSAGE_REQUEST_PENDING`, terminal. Le texte reste affiché « Non envoyé ».
+                await store.markV2SendFailed(
+                    clientRequestId: pending.clientRequestId,
+                    reason: String(localized: "Ta demande de message n’a pas encore été acceptée."),
+                    ownerScopeId: session.ownerScopeId
+                )
             default:
                 break
             }
@@ -1057,6 +1069,9 @@ extension AppServices {
             case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
                 if case .string(let existing)? = failure.details?["conversationId"] { return existing }
                 throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
+            case .failure(let failure) where MessageRequestLimitError.isLimit(failure):
+                // DM-REQ-1 : plafond quotidien de demandes. Jamais rejoué seul ; l'appelant le dit.
+                throw MessageRequestLimitError(failure: failure)
             case .failure(let failure):
                 throw E2EEV2MessagingError(failure.kind == .retryable
                     ? String(localized: "Connexion instable. Réessaie.")
