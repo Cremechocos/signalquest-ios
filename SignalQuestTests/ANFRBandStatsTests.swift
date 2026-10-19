@@ -80,4 +80,24 @@ final class ANFRBandStatsTests: XCTestCase {
     func testAResponseWithoutMetaIsRefused() {
         XCTAssertThrowsError(try decode(#"{"bands":[],"series":[],"summary":[]}"#))
     }
+
+    /// ANFR-26 : une `meta` sans première date ni drapeau `partial` ne fait pas échouer la réponse.
+    func testAMetaWithOnlyItsLatestDateStillDecodes() throws {
+        let stats = try decode(#"{"meta":{"latestDate":"2026-09-24"},"bands":[],"series":[],"summary":[]}"#)
+        XCTAssertEqual(stats.meta.latestDate, "2026-09-24")
+        XCTAssertEqual(stats.meta.firstDate, "2026-09-24")
+        XCTAssertFalse(stats.meta.partial)
+    }
+
+    /// ANFR-04 : un relevé est un jour calendaire (minuit UTC) ; à l'ouest de l'UTC, le fuseau
+    /// de l'appareil le ferait reculer d'un jour, le style des relevés non.
+    func testASurveyDayKeepsItsCalendarDateWestOfUTC() throws {
+        let day = try XCTUnwrap(ANFRDateParser.date(from: "2026-10-01"))
+        let english = Locale(identifier: "en_US")
+        let deviceInGuadeloupe = Date.FormatStyle(locale: english, timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: -4 * 3600)))
+        XCTAssertEqual(day.formatted(deviceInGuadeloupe.day().month(.wide).year()), "September 30, 2026",
+                       "Le piège : le fuseau de l'appareil recule la date")
+        XCTAssertEqual(day.formatted(ANFRDateParser.style(locale: english).day().month(.wide).year()), "October 1, 2026")
+        XCTAssertEqual(day.formatted(ANFRDateParser.style(locale: english).month(.wide).year()), "October 2026")
+    }
 }

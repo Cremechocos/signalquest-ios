@@ -136,7 +136,7 @@ final class ANFRBandsViewModel: ObservableObject {
 
     var latestDateLabel: String? {
         (detail ?? overview).flatMap { ANFRDateParser.date(from: $0.meta.latestDate) }
-            .map { $0.formatted(.dateTime.day().month(.wide).year()) }
+            .map { $0.formatted(ANFRDateParser.style().day().month(.wide).year()) }
     }
 
     var isPartial: Bool { overview?.meta.partial == true || detail?.meta.partial == true }
@@ -164,7 +164,7 @@ enum ANFRBandsFormat {
     }
 
     static func monthYear(_ isoDate: String) -> String {
-        ANFRDateParser.date(from: isoDate).map { $0.formatted(.dateTime.month(.wide).year()) } ?? isoDate
+        ANFRDateParser.date(from: isoDate).map { $0.formatted(ANFRDateParser.style().month(.wide).year()) } ?? isoDate
     }
 
     static func yearChange(_ summary: ANFRBandStats.Summary) -> String? {
@@ -242,6 +242,14 @@ struct ANFRBandsView: View {
                     ErrorStateView(title: "Statistiques indisponibles", message: error) {
                         Task { await model.refresh() }
                     }
+                } else if model.overview != nil, !model.isLoading {
+                    // Réponse reçue, mais aucune génération résumée pour cet opérateur :
+                    // un état vide, pas un chargement sans fin.
+                    EmptyStateView(
+                        title: "Aucune statistique disponible",
+                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
+                        systemImage: "chart.bar"
+                    )
                 } else {
                     loadingState
                 }

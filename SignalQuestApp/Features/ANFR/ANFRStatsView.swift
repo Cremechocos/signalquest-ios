@@ -182,7 +182,7 @@ final class ANFRStatsViewModel: ObservableObject {
 
     var latestDateLabel: String {
         guard let raw = stats?.latestDate, let date = ANFRDateParser.date(from: raw) else { return "—" }
-        return date.formatted(.dateTime.day().month(.wide).year())
+        return date.formatted(ANFRDateParser.style().day().month(.wide).year())
     }
 }
 
@@ -217,10 +217,14 @@ struct ANFRStatsView: View {
     @Environment(\.locale) private var locale
     @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.controlSize) private var controlSize
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let service: ANFRServicing
+    /// Vrai quand l'écran a été ouvert depuis la carte ANFR : le lien vers la carte revient en arrière.
+    private let cameFromMap: Bool
 
-    init(service: ANFRServicing) {
+    init(service: ANFRServicing, cameFromMap: Bool = false) {
         self.service = service
+        self.cameFromMap = cameFromMap
         _model = StateObject(wrappedValue: ANFRStatsViewModel(service: service))
     }
 
@@ -228,6 +232,11 @@ struct ANFRStatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header
+                // Des chiffres sont affichés, mais l'actualisation a échoué : on ne laisse pas
+                // croire qu'ils sont à jour.
+                if model.stats != nil, model.errorMessage != nil {
+                    SQInlineError(message: String(localized: "Actualisation impossible. Dernières données conservées."))
+                }
                 if let stats = model.stats, !stats.latest.isEmpty {
                     VStack(spacing: SQSpace.sm) {
                         metricToggle
@@ -452,33 +461,43 @@ struct ANFRStatsView: View {
     }
 
     /// Les chiffres de la semaine, vus sur la carte : les supports qui ont changé.
+    /// Arrivé depuis la carte, on y retourne au lieu d'empiler un second écran.
+    @ViewBuilder
     private var changesMapLink: some View {
-        NavigationLink {
-            ANFRMapView(service: service)
-        } label: {
-            HStack(spacing: SQSpace.md) {
-                SQIconPastille(systemImage: "map.fill", size: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Changements de la semaine")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text("Les supports modifiés par l’ANFR, sur la carte")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .accessibilityHidden(true)
-            }
-            .padding(SQSpace.lg)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .sqCardBackground()
+        if cameFromMap {
+            Button { dismiss() } label: { changesMapRow }
+                .buttonStyle(SQPressButtonStyle(scale: 0.98))
+                .accessibilityIdentifier("anfr.stats.changes")
+        } else {
+            NavigationLink {
+                ANFRMapView(service: service, cameFromStats: true)
+            } label: { changesMapRow }
+                .buttonStyle(SQPressButtonStyle(scale: 0.98))
+                .accessibilityIdentifier("anfr.stats.changes")
         }
-        .buttonStyle(SQPressButtonStyle(scale: 0.98))
-        .accessibilityIdentifier("anfr.stats.changes")
+    }
+
+    private var changesMapRow: some View {
+        HStack(spacing: SQSpace.md) {
+            SQIconPastille(systemImage: "map.fill", size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Changements de la semaine")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                Text("Les supports modifiés par l’ANFR, sur la carte")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .sqCardBackground()
     }
 
     /// Variation sur 7 jours dite en mots : « +3 en 7 j », « −3 en 7 j », « stable ».
@@ -495,7 +514,8 @@ struct ANFRStatsView: View {
                 .padding(.vertical, SQSpace.xs)
                 .background(positive ? SQColor.successSoft : SQColor.dangerSoft, in: Capsule(style: .continuous))
                 .sqSingleLine()
-                .fixedSize()
+                // En très grand texte, la pastille peut passer sur plusieurs lignes.
+                .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
                 .accessibilityLabel(positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine")
         } else {
             // Delta nul MAIS donnée présente (la pastille n'est rendue que pour un
@@ -508,7 +528,8 @@ struct ANFRStatsView: View {
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, SQSpace.xs)
                 .background(SQColor.chip, in: Capsule(style: .continuous))
-                .fixedSize()
+                .sqSingleLine()
+                .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
                 .accessibilityLabel("stable cette semaine")
         }
     }
@@ -860,7 +881,7 @@ private struct ANFRTrendChart: View {
 
     /// « Semaine du 3 mars 2025 » : les relevés ANFR sont hebdomadaires.
     static func weekLabel(_ date: Date) -> String {
-        String(localized: "Semaine du \(date.formatted(.dateTime.day().month(.wide).year()))")
+        String(localized: "Semaine du \(date.formatted(ANFRDateParser.style().day().month(.wide).year()))")
     }
 
     static func nearest(in points: [ANFRTrendPoint], to date: Date) -> ANFRTrendPoint? {
@@ -954,26 +975,38 @@ private struct ANFRTrendChart: View {
             .chartOverlay { proxy in
                 GeometryReader { geo in
                     let plot = geo[proxy.plotAreaFrame]
+                    let scrub: (CGFloat) -> Void = { x in
+                        guard let date: Date = proxy.value(atX: x - plot.origin.x),
+                              let point = Self.nearest(in: series.flatMap { visible($0.points) }, to: date)
+                        else { return }
+                        if lastHapticDate != point.date {
+                            lastHapticDate = point.date
+                            Haptics.selection()
+                        }
+                        selection = point.date
+                    }
                     ZStack(alignment: .topLeading) {
                         Rectangle()
                             .fill(Color.clear)
                             .contentShape(Rectangle())
                             .onTapGesture { onTap?() }
+                            // Plein écran : le doigt lit une valeur dès qu'il se pose.
                             .gesture(
-                                DragGesture(minimumDistance: isExpanded ? 0 : 8)
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in scrub(value.location.x) },
+                                including: isExpanded ? .all : .none
+                            )
+                            // Dans la page : un appui long d'abord, sinon le doigt qui passe
+                            // sur le graphique fait défiler la page au lieu de lire une valeur.
+                            .gesture(
+                                LongPressGesture(minimumDuration: 0.25)
+                                    .sequenced(before: DragGesture(minimumDistance: 0))
                                     .onChanged { value in
-                                        guard let date: Date = proxy.value(atX: value.location.x - plot.origin.x),
-                                              let point = Self.nearest(in: series.flatMap { visible($0.points) }, to: date)
-                                        else { return }
-                                        if lastHapticDate != point.date {
-                                            lastHapticDate = point.date
-                                            Haptics.selection()
-                                        }
-                                        selection = point.date
+                                        guard case .second(true, let drag?) = value else { return }
+                                        scrub(drag.location.x)
                                     }
-                                    .onEnded { _ in
-                                        if !isExpanded { selection = nil }
-                                    }
+                                    .onEnded { _ in selection = nil },
+                                including: isExpanded ? .none : .all
                             )
                         if isExpanded, let selection, let x = proxy.position(forX: selection) {
                             tooltip(at: selection)
@@ -1022,8 +1055,8 @@ private struct ANFRTrendChart: View {
     private func seriesSummary(_ series: ANFRTrendSeries) -> String? {
         let points = visible(series.points)
         guard let first = points.first, let last = points.last else { return nil }
-        let start = first.date.formatted(.dateTime.month().year())
-        let end = last.date.formatted(.dateTime.month().year())
+        let start = first.date.formatted(ANFRDateParser.style().month().year())
+        let end = last.date.formatted(ANFRDateParser.style().month().year())
         return String(localized: "\(series.op.label) : \(first.value.formatted()) supports en \(start), \(last.value.formatted()) en \(end)")
     }
 
@@ -1119,7 +1152,7 @@ private struct ANFRTrendChart: View {
               let last = points.max(by: { $0.date < $1.date }) else {
             return String(localized: "Évolution ANFR : aucune donnée")
         }
-        return String(localized: "Évolution ANFR \(names), de \(first.date.formatted(.dateTime.month().year())) à \(last.date.formatted(.dateTime.month().year())).")
+        return String(localized: "Évolution ANFR \(names), de \(first.date.formatted(ANFRDateParser.style().month().year())) à \(last.date.formatted(ANFRDateParser.style().month().year())).")
     }
 }
 
@@ -1413,5 +1446,12 @@ enum ANFRDateParser {
 
     static func date(from string: String) -> Date? {
         formatter.date(from: string)
+    }
+
+    /// Style de date d'un relevé : un jour calendaire (minuit UTC), dit dans l'UTC.
+    /// Dans le fuseau d'un téléphone des Antilles ou de Guyane, le 19 s'afficherait le 18
+    /// et le 1ᵉʳ du mois tomberait sur le mois précédent. À enchaîner avec `.day().month()…`.
+    static func style(locale: Locale = .autoupdatingCurrent) -> Date.FormatStyle {
+        Date.FormatStyle(locale: locale, timeZone: TimeZone(identifier: "UTC") ?? .gmt)
     }
 }
