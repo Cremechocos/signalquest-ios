@@ -4,14 +4,14 @@ import Foundation
 #if DEBUG
 /// Données de démonstration ANFR pour le mode `--mock-auth`
 /// (`AppEnvironment.usesDemoData`) : permet aux vues de s'afficher sans réseau.
-/// Les chiffres sont représentatifs des ordres de grandeur réels (juin 2026).
+/// Les chiffres sont représentatifs des ordres de grandeur réels (octobre 2026).
 enum ANFRDemoData {
 
     // MARK: Stats
 
     static let stats: ANFRStats = {
         ANFRStats(
-            latestDate: "2026-06-11",
+            latestDate: "2026-10-15",
             series: demoSeries,
             latest: demoLatest,
             regions: demoRegions
@@ -50,7 +50,7 @@ enum ANFRDemoData {
         return table.flatMap { op, label, bands in
             bands.map { band, bandLabel, techno, opCount, proj, dOp, dTotal in
                 ANFRStatsLatest(
-                    date: "2026-06-11",
+                    date: "2026-10-15",
                     operatorKey: op,
                     operatorLabel: label,
                     band: band,
@@ -80,8 +80,10 @@ enum ANFRDemoData {
         let final5g_n28: [String: Int] = ["orange": 3469, "sfr": 2364, "bytel": 3641, "free": 19340]
         let months = 24
         for monthIndex in 0...months {
-            let year = 2024 + (monthIndex / 12)
-            let month = (monthIndex % 12) + 1
+            // De octobre 2024 à octobre 2026 : la courbe finit sur le mois courant.
+            let absoluteMonth = 2024 * 12 + 9 + monthIndex
+            let year = absoluteMonth / 12
+            let month = (absoluteMonth % 12) + 1
             let date = String(format: "%04d-%02d-01", year, month)
             let t = Double(monthIndex) / Double(months)
             for (key, label) in operators {
@@ -125,15 +127,15 @@ enum ANFRDemoData {
         ANFRMapSnapshot(
             source: "demo",
             snapshotDate: nil,
-            lastUpdate: "11 juin 2026",
+            lastUpdate: "15 octobre 2026",
             sites: demoSites
         )
     }()
 
     /// Réorientations du dernier relevé : un support partagé (deux opérateurs) et un seul.
     static let reorientations = ANFRReorientationsWeek(
-        date: "2026-06-11",
-        previousDate: "2026-06-04",
+        date: "2026-10-15",
+        previousDate: "2026-10-08",
         reorientations: [
             ANFRReorientation(supId: "120044", latitude: 48.8566, longitude: 2.3522, city: "PARIS", operatorRaw: "FREE MOBILE",
                               systems: ["5G NR 700", "LTE 700"], before: [10, 130, 250], after: [0, 120, 240]),
@@ -144,7 +146,7 @@ enum ANFRDemoData {
         ]
     )
 
-    /// Comparaison du 21 mai au dernier relevé : supports au format léger.
+    /// Comparaison du 24 septembre au dernier relevé : supports au format léger.
     static let mapDiff: ANFRMapDiff = {
         func site(_ supId: String, _ lat: Double, _ lon: Double, _ city: String, _ operators: [ANFROperator],
                   _ counts: [ANFRModType: Int], catchUp: Int = 0, last: String) -> ANFRMapSite {
@@ -152,28 +154,28 @@ enum ANFRDemoData {
                 operators: operators, hasOtherOperator: false, counts: counts, catchUp: catchUp, lastChangeDate: last
             ))
         }
-        return ANFRMapDiff(from: "2026-05-21", to: "current", weeks: ["2026-05-28", "2026-06-04", "2026-06-11"], sites: [
-            site("29847", 44.5297, -0.1806, "BRANNENS", [.bouygues], [.new: 1], last: "2026-06-11"),
-            site("120044", 48.8566, 2.3522, "PARIS", [.sfr, .free], [.activated: 3, .added: 2], last: "2026-06-11"),
-            site("130088", 45.7640, 4.8357, "LYON", [.bouygues], [.new: 1], last: "2026-06-04"),
-            site("140122", 43.2965, 5.3698, "MARSEILLE", [.orange, .free], [.activated: 4, .deleted: 1], catchUp: 1, last: "2026-06-04"),
-            site("150301", 47.2184, -1.5536, "NANTES", [.sfr], [.modified: 2], last: "2026-05-28"),
-            site("160455", 43.6047, 1.4442, "TOULOUSE", [.orange], [.deleted: 3], last: "2026-05-28"),
-            site("170612", 50.6292, 3.0573, "LILLE", [.free], [.activated: 2], catchUp: 2, last: "2026-05-28")
+        return ANFRMapDiff(from: "2026-09-24", to: "current", weeks: ["2026-10-01", "2026-10-08", "2026-10-15"], sites: [
+            site("29847", 44.5297, -0.1806, "BRANNENS", [.bouygues], [.new: 1], last: "2026-10-15"),
+            site("120044", 48.8566, 2.3522, "PARIS", [.sfr, .free], [.activated: 3, .added: 2], last: "2026-10-15"),
+            site("130088", 45.7640, 4.8357, "LYON", [.bouygues], [.new: 1], last: "2026-10-08"),
+            site("140122", 43.2965, 5.3698, "MARSEILLE", [.orange, .free], [.activated: 4, .deleted: 1], catchUp: 1, last: "2026-10-08"),
+            site("150301", 47.2184, -1.5536, "NANTES", [.sfr], [.modified: 2], last: "2026-10-01"),
+            site("160455", 43.6047, 1.4442, "TOULOUSE", [.orange], [.deleted: 3], last: "2026-10-01"),
+            site("170612", 50.6292, 3.0573, "LILLE", [.free], [.activated: 2], catchUp: 2, last: "2026-10-01")
         ])
     }()
 
     static let archiveDates = ANFRArchiveDates(
-        dates: ["2026-06-04", "2026-05-28", "2026-05-21", "2026-05-14", "2026-05-07"],
-        current: "2026-06-11"
+        dates: ["2026-10-08", "2026-10-01", "2026-09-24", "2026-09-17", "2026-09-10"],
+        current: "2026-10-15"
     )
 
     static let siteHistory = ANFRSiteHistory(
         supId: "29847",
-        currentSnapshotDate: "2026-06-11",
+        currentSnapshotDate: "2026-10-15",
         entries: [
             ANFRSiteHistoryEntry(
-                archiveDate: "2026-06-11",
+                archiveDate: "2026-10-15",
                 isCurrentSnapshot: true,
                 city: "BRANNENS",
                 address: "Lulugran, Centrale solaire de Brannens, 33124",
@@ -181,7 +183,7 @@ enum ANFRDemoData {
                 modTypes: ["new"],
                 changeCount: 1,
                 changes: [
-                    ANFRSiteHistoryChange(id: "163", operatorRaw: "BOUYGUES TELECOM", technology: "LTE 2100", generation: "4G", modTypeRaw: "new", statut: "En service", effectiveDate: "2026-06-11")
+                    ANFRSiteHistoryChange(id: "163", operatorRaw: "BOUYGUES TELECOM", technology: "LTE 2100", generation: "4G", modTypeRaw: "new", statut: "En service", effectiveDate: "2026-10-15")
                 ]
             ),
             ANFRSiteHistoryEntry(
@@ -213,7 +215,7 @@ enum ANFRDemoData {
 
     private static let demoSites: [ANFRMapSite] = {
         func antenna(_ id: String, _ op: String, _ sys: String, _ gen: String, _ type: String, _ statut: String, _ azimuths: [Int] = []) -> ANFRMapAntenna {
-            ANFRMapAntenna(id: id, supId: nil, operatorRaw: op, system: sys, generationRaw: gen, modTypeRaw: type, statut: statut, dateMaj: "2026-06-11", latitude: nil, longitude: nil, city: nil, address: "Le bourg",
+            ANFRMapAntenna(id: id, supId: nil, operatorRaw: op, system: sys, generationRaw: gen, modTypeRaw: type, statut: statut, dateMaj: "2026-10-15", latitude: nil, longitude: nil, city: nil, address: "Le bourg",
                            azimuths: azimuths)
         }
         return [
