@@ -4115,6 +4115,22 @@
         }
       }
     },
+    "Aucune réponse pour l’instant. Lance le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No replies yet. Start the thread."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune réponse pour l’instant. Lance le fil."
+          }
+        }
+      }
+    },
     "Aucune statistique disponible" : {
       "localizations" : {
         "en" : {
@@ -4978,6 +4994,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis."
+          }
+        }
+      }
+    },
+    "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation is protected: open it in SignalQuest to write in it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire."
           }
         }
       }
@@ -8468,6 +8500,22 @@
         }
       }
     },
+    "Impossible de charger la suite" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t load more"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger la suite"
+          }
+        }
+      }
+    },
     "Impossible de charger le registre E2EE v2." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8563,6 +8611,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de créer la clé de récupération."
+          }
+        }
+      }
+    },
+    "Impossible de déchiffrer — réessaie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t decrypt this message — try again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de déchiffrer — réessaie"
           }
         }
       }
@@ -8762,6 +8826,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Indisponibilité"
+          }
+        }
+      }
+    },
+    "Indisponible pendant un appel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable during a call"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible pendant un appel"
           }
         }
       }
@@ -11152,6 +11232,22 @@
         }
       }
     },
+    "Messages éphémères (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disappearing messages (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages éphémères (%@)"
+          }
+        }
+      }
+    },
     "Messages éphémères · disparaissent après %@" : {
       "localizations" : {
         "en" : {
@@ -11951,6 +12047,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre la liste des abonnés"
+          }
+        }
+      }
+    },
+    "Ouvre la publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la publication"
           }
         }
       }
@@ -13027,6 +13139,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Présentation"
+          }
+        }
+      }
+    },
+    "Publication de %@ : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post by %@: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication de %@ : %@"
           }
         }
       }
