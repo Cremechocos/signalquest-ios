@@ -10,6 +10,8 @@ struct TerritoriesView: View {
     let service: GamificationServicing
     var marketCode: String?
     var operatorKey: String?
+    /// Registre des marchés : sert à ouvrir la carte sur le marché quand la position manque.
+    var markets: MarketRegistryServicing?
 
     @StateObject private var model: TerritoriesViewModel
     @Environment(\.dismiss) private var dismiss
@@ -18,16 +20,22 @@ struct TerritoriesView: View {
     @State private var selectedCellKey: String?
     /// Suivi de position de la carte, piloté par le bouton de l'en-tête.
     @State private var trackingMode: MKUserTrackingMode = .none
+    /// Centre du marché, utilisé tant que la position de l'utilisateur n'est pas connue.
+    @State private var fallbackCenter: CLLocationCoordinate2D?
+    @State private var locationDenied = false
+    @State private var showsCellList = false
 
     private var selectedCell: TerritoryCell? {
         guard let selectedCellKey else { return nil }
         return model.grid?.cells.first { $0.cellKey == selectedCellKey }
     }
 
-    init(service: GamificationServicing, marketCode: String? = nil, operatorKey: String? = nil) {
+    init(service: GamificationServicing, marketCode: String? = nil, operatorKey: String? = nil,
+         markets: MarketRegistryServicing? = nil) {
         self.service = service
         self.marketCode = marketCode
         self.operatorKey = operatorKey
+        self.markets = markets
         _model = StateObject(wrappedValue: TerritoriesViewModel(
             service: service, marketCode: marketCode, operatorKey: operatorKey
         ))
@@ -37,6 +45,7 @@ struct TerritoriesView: View {
         TerritoryMapView(
             cells: model.grid?.cells ?? [],
             selectedCellKey: model.isZoomedOut ? nil : selectedCellKey,
+            fallbackCenter: fallbackCenter,
             trackingMode: $trackingMode,
             onRegionChange: { region, span in model.regionChanged(region, span: span) },
             onSelectCell: { key in selectedCellKey = key }
@@ -64,6 +73,35 @@ struct TerritoriesView: View {
         // Barre masquée : UIKit coupe le balayage retour, rétabli ici.
         .sqKeepsSwipeBack()
         .navigationTitle("Territoires")
+        .task { await loadFallbackCenter() }
+        .onAppear { refreshLocationAuthorization() }
+        .sheet(isPresented: $showsCellList) {
+            TerritoryCellListSheet(
+                cells: model.grid?.cells ?? [],
+                reference: model.referenceCenter,
+                selectedKey: selectedCellKey
+            ) { key in
+                selectedCellKey = key
+                showsCellList = false
+            }
+        }
+    }
+
+    /// Sans position, la carte s'ouvre sur le centre du marché (France par défaut)
+    /// plutôt que sur le monde entier.
+    private func loadFallbackCenter() async {
+        guard let markets else { return }
+        let code = (marketCode?.isEmpty == false ? marketCode : nil) ?? "FR"
+        if let entry = await markets.market(forCode: code),
+           let latitude = entry.defaultCenterLatitude, let longitude = entry.defaultCenterLongitude,
+           CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude)) {
+            fallbackCenter = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+    }
+
+    private func refreshLocationAuthorization() {
+        let status = CLLocationManager().authorizationStatus
+        locationDenied = status == .denied || status == .restricted
     }
 
     // MARK: En-tête et avis sur la carte
@@ -107,6 +145,9 @@ struct TerritoriesView: View {
 
     @ViewBuilder
     private var notices: some View {
+        if locationDenied, model.isZoomedOut || model.grid?.cells.isEmpty != false {
+            locationSettingsButton
+        }
         if model.isZoomedOut {
             // Message HONNÊTE : on ne prétend pas afficher une grille
             // complète, on explique pourquoi elle ne l'est pas.
@@ -125,6 +166,31 @@ struct TerritoriesView: View {
         } else if selectedCell == nil, model.grid?.cells.isEmpty == false {
             notice("Touche un carré pour voir son détail", icon: "info.circle", tint: SQColor.label)
         }
+    }
+
+    /// Localisation refusée : la carte reste sur le marché, et un lien mène aux Réglages.
+    private var locationSettingsButton: some View {
+        Button {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        } label: {
+            HStack(spacing: SQSpace.xs + 1) {
+                Image(systemName: "location.slash")
+                    .font(.system(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text("Activer la localisation")
+                    .font(SQFont.body(13, .semibold))
+                    .lineLimit(2)
+            }
+            .foregroundStyle(SQColor.accentInk)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 44)
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityHint(Text("Ouvre les Réglages pour autoriser la position"))
+        .accessibilityIdentifier("territories.enableLocation")
     }
 
     private func notice(_ text: LocalizedStringKey, icon: String, tint: Color) -> some View {
@@ -195,7 +261,8 @@ struct TerritoriesView: View {
         .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
     }
 
-    /// Côté d'un carré, arrondi au kilomètre : la grille est en degrés.
+    /// Côté d'un carré, arrondi au kilomètre : la grille est en degrés, donc exact sur la
+    /// latitude seulement. Le résumé le dit avec « environ ».
     private var cellSideKm: Int {
         max(1, Int(((model.grid?.cellSize ?? 0.02) * 111).rounded()))
     }
@@ -211,7 +278,7 @@ struct TerritoriesView: View {
                         Text("Zoome pour compter les carrés")
                     } else if let cells = model.grid?.cells {
                         Text("\(cells.count) carrés") + Text(verbatim: " · ")
-                            + Text("\(cellSideKm) km de côté") + Text(verbatim: " · ")
+                            + Text("environ \(cellSideKm) km de côté") + Text(verbatim: " · ")
                             + Text("\(cells.filter(\.mine).count) à toi")
                     }
                 }
@@ -221,6 +288,20 @@ struct TerritoriesView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
+            if !model.isZoomedOut, model.grid?.cells.isEmpty == false {
+                Button {
+                    showsCellList = true
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel(Text("Liste des carrés"))
+                .accessibilityIdentifier("territories.cellList")
+            }
             legendToggle
         }
         .accessibilityIdentifier("territories.summary")
@@ -405,6 +486,9 @@ final class TerritoriesViewModel: ObservableObject {
     private var requestedRegion: (region: MKCoordinateRegion, span: MKCoordinateSpan)?
     private var requestGeneration = UUID()
 
+    /// Centre de la zone chargée, repère des distances de la liste des carrés.
+    var referenceCenter: CLLocationCoordinate2D? { requestedRegion?.region.center }
+
     init(service: GamificationServicing, marketCode: String?, operatorKey: String?) {
         fetch = { region, span in
             try await service.territories(
@@ -477,6 +561,8 @@ struct TerritoryMapView: UIViewRepresentable {
     let cells: [TerritoryCell]
     /// Carré touché : entouré à l'encre sur la carte.
     var selectedCellKey: String?
+    /// Centre du marché : la carte s'y ouvre tant que la position manque.
+    var fallbackCenter: CLLocationCoordinate2D?
     @Binding var trackingMode: MKUserTrackingMode
     let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
     var onSelectCell: (String?) -> Void = { _ in }
@@ -484,6 +570,12 @@ struct TerritoryMapView: UIViewRepresentable {
     /// Span d'ouverture sur la position : un quartier, bien sous le plafond
     /// `TerritoriesViewModel.maxSpanDegrees`.
     static let initialSpanDegrees: Double = 0.05
+    /// Span d'ouverture sur le marché : large assez pour contenir des carrés, sous le plafond.
+    static let fallbackSpanDegrees: Double = 0.5
+
+    /// Le mode terrain change les encres de la grille sans changer clair/sombre : la lecture
+    /// du réglage ici relance `updateUIView` quand il bascule.
+    @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
@@ -501,6 +593,9 @@ struct TerritoryMapView: UIViewRepresentable {
         if let location = map.userLocation.location {
             context.coordinator.centerOnce(on: location.coordinate, in: map)
         }
+        if let fallbackCenter {
+            context.coordinator.centerOnFallback(fallbackCenter, in: map)
+        }
 
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tap.delegate = context.coordinator
@@ -510,6 +605,9 @@ struct TerritoryMapView: UIViewRepresentable {
 
     func updateUIView(_ map: MKMapView, context: Context) {
         context.coordinator.trackingMode = $trackingMode
+        if let fallbackCenter {
+            context.coordinator.centerOnFallback(fallbackCenter, in: map)
+        }
         // Le bouton de suivi est dans l'en-tête SwiftUI : la carte suit son mode.
         if map.userTrackingMode != trackingMode {
             map.setUserTrackingMode(trackingMode, animated: true)
@@ -521,7 +619,8 @@ struct TerritoryMapView: UIViewRepresentable {
             cells: cells,
             selectedKey: selectedCellKey,
             colorScheme: context.environment.colorScheme,
-            contrast: context.environment.colorSchemeContrast
+            contrast: context.environment.colorSchemeContrast,
+            fieldMode: fieldMode
         )
         context.coordinator.render(cells: cells, identity: identity, on: map)
     }
@@ -535,6 +634,12 @@ struct TerritoryMapView: UIViewRepresentable {
         var lastIdentity: TerritoryRenderIdentity?
         private var cells: [TerritoryCell] = []
         private var hasCentered = false
+        private var hasCenteredOnFallback = false
+        /// Le geste de l'utilisateur sur la carte : on ne la déplace plus d'office ensuite.
+        private var userMovedMap = false
+        private var gridOverlay: TerritoryOverlay?
+        private var selectionOverlay: TerritorySelectionOverlay?
+        private var appliedSelection: (key: String, scheme: ColorScheme, contrast: ColorSchemeContrast)?
 
         init(onRegionChange: @escaping (MKCoordinateRegion, MKCoordinateSpan) -> Void,
              onSelectCell: @escaping (String?) -> Void = { _ in }) {
@@ -544,8 +649,25 @@ struct TerritoryMapView: UIViewRepresentable {
 
         /// Premier affichage seulement : ensuite, la carte reste où
         /// l'utilisateur l'a menée.
+        /// Sans position : le centre du marché, une seule fois, tant que la carte n'a pas bougé.
+        func centerOnFallback(_ coordinate: CLLocationCoordinate2D, in map: MKMapView) {
+            guard !hasCentered, !hasCenteredOnFallback, !userMovedMap,
+                  map.userLocation.location == nil, CLLocationCoordinate2DIsValid(coordinate) else { return }
+            hasCenteredOnFallback = true
+            let span = MKCoordinateSpan(
+                latitudeDelta: TerritoryMapView.fallbackSpanDegrees,
+                longitudeDelta: TerritoryMapView.fallbackSpanDegrees
+            )
+            map.setRegion(MKCoordinateRegion(center: coordinate, span: span), animated: false)
+        }
+
+        func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
+            let gestures = mapView.subviews.first?.gestureRecognizers ?? []
+            if gestures.contains(where: { $0.state == .began || $0.state == .changed }) { userMovedMap = true }
+        }
+
         func centerOnce(on coordinate: CLLocationCoordinate2D, in map: MKMapView) {
-            guard !hasCentered, CLLocationCoordinate2DIsValid(coordinate) else { return }
+            guard !hasCentered, !userMovedMap, CLLocationCoordinate2DIsValid(coordinate) else { return }
             hasCentered = true
             let span = MKCoordinateSpan(
                 latitudeDelta: TerritoryMapView.initialSpanDegrees,
@@ -579,21 +701,54 @@ struct TerritoryMapView: UIViewRepresentable {
         }
 
         func render(cells: [TerritoryCell], identity: TerritoryRenderIdentity, on map: MKMapView) {
-            guard identity != lastIdentity else { return }
-            lastIdentity = identity
-            self.cells = cells
-            map.removeOverlays(map.overlays)
-            guard !cells.isEmpty else { return }
-            let overlay = TerritoryOverlay(cells: cells.map {
-                TerritoryOverlay.Cell(
-                    rect: $0.mapRect,
-                    fill: $0.fillColor.cgColor,
-                    stroke: $0.strokeColor.cgColor,
-                    mine: $0.mine,
-                    hatch: $0.status == .virgin ? TerritoryCell.hatchColor.cgColor : nil,
-                    selection: $0.cellKey == identity.selectedKey ? UIColor(SQColor.label).cgColor : nil
-                )
-            })
+            // Le carré touché a son propre overlay : l'identité de la grille l'ignore.
+            var gridIdentity = identity
+            gridIdentity.selectedKey = nil
+            if gridIdentity != lastIdentity {
+                lastIdentity = gridIdentity
+                self.cells = cells
+                if let gridOverlay { map.removeOverlay(gridOverlay) }
+                gridOverlay = nil
+                if !cells.isEmpty {
+                    let overlay = TerritoryOverlay(cells: cells.map {
+                        TerritoryOverlay.Cell(
+                            rect: $0.mapRect,
+                            fill: $0.fillColor.cgColor,
+                            stroke: $0.strokeColor.cgColor,
+                            mine: $0.mine,
+                            hatch: $0.status == .virgin ? TerritoryCell.hatchColor.cgColor : nil
+                        )
+                    })
+                    gridOverlay = overlay
+                    map.addOverlay(overlay, level: .aboveRoads)
+                }
+                // La grille a été reposée : le liseré doit repasser au-dessus.
+                clearSelection(on: map)
+            }
+            updateSelection(key: identity.selectedKey, identity: identity, on: map)
+        }
+
+        private func clearSelection(on map: MKMapView) {
+            if let selectionOverlay { map.removeOverlay(selectionOverlay) }
+            selectionOverlay = nil
+            appliedSelection = nil
+        }
+
+        private func updateSelection(key: String?, identity: TerritoryRenderIdentity, on map: MKMapView) {
+            guard let key, let cell = cells.first(where: { $0.cellKey == key }) else {
+                clearSelection(on: map)
+                return
+            }
+            if let appliedSelection, appliedSelection.key == key,
+               appliedSelection.scheme == identity.colorScheme, appliedSelection.contrast == identity.contrast {
+                return
+            }
+            clearSelection(on: map)
+            let overlay = TerritorySelectionOverlay(
+                cellKey: key, rect: cell.mapRect, ink: UIColor(SQColor.label).cgColor
+            )
+            selectionOverlay = overlay
+            appliedSelection = (key, identity.colorScheme, identity.contrast)
             map.addOverlay(overlay, level: .aboveRoads)
         }
 
@@ -602,6 +757,9 @@ struct TerritoryMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let selection = overlay as? TerritorySelectionOverlay {
+                return TerritorySelectionRenderer(overlay: selection)
+            }
             guard let territory = overlay as? TerritoryOverlay else {
                 return MKOverlayRenderer(overlay: overlay)
             }
@@ -622,11 +780,139 @@ struct TerritoryRenderIdentity: Equatable {
     var selectedKey: String?
     let colorScheme: ColorScheme
     let contrast: ColorSchemeContrast
+    /// Mode terrain : il change les encres sans changer clair/sombre.
+    let fieldMode: Bool
 
-    init(cells: [TerritoryCell], selectedKey: String? = nil, colorScheme: ColorScheme, contrast: ColorSchemeContrast) {
+    init(cells: [TerritoryCell], selectedKey: String? = nil, colorScheme: ColorScheme, contrast: ColorSchemeContrast,
+         fieldMode: Bool = false) {
         self.cells = cells.map { Cell(key: $0.cellKey, status: $0.status, bounds: $0.bounds, mine: $0.mine) }
         self.selectedKey = selectedKey
         self.colorScheme = colorScheme
         self.contrast = contrast
+        self.fieldMode = fieldMode
+    }
+}
+
+// MARK: - Liste des carrés (alternative à la grille dessinée)
+
+/// Les carrés de la zone affichée en liste : statut, mesures, dernière mesure, et leur position
+/// par rapport au centre de la carte. La grille est un seul overlay muet pour VoiceOver ; cette
+/// liste donne accès à chaque carré sans passer par un tap sur la carte.
+struct TerritoryCellListSheet: View {
+    let cells: [TerritoryCell]
+    let reference: CLLocationCoordinate2D?
+    let selectedKey: String?
+    let onSelect: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var onlyMine = false
+
+    /// Mes zones d'abord, puis du plus avancé au moins avancé, puis du plus proche du centre.
+    static func ordered(_ cells: [TerritoryCell], reference: CLLocationCoordinate2D?, onlyMine: Bool) -> [TerritoryCell] {
+        let rank: [TerritoryCell.Status: Int] = [.complete: 0, .reliable: 1, .observed: 2, .stale: 3, .virgin: 4]
+        let filtered = onlyMine ? cells.filter(\.mine) : cells
+        return filtered.sorted { lhs, rhs in
+            if lhs.mine != rhs.mine { return lhs.mine }
+            let l = rank[lhs.status] ?? 5, r = rank[rhs.status] ?? 5
+            if l != r { return l < r }
+            let ld = distanceMeters(lhs, from: reference), rd = distanceMeters(rhs, from: reference)
+            if ld != rd { return ld < rd }
+            return lhs.cellKey < rhs.cellKey
+        }
+    }
+
+    static func distanceMeters(_ cell: TerritoryCell, from reference: CLLocationCoordinate2D?) -> Double {
+        guard let reference else { return 0 }
+        let center = CLLocation(
+            latitude: (cell.bounds.north + cell.bounds.south) / 2,
+            longitude: (cell.bounds.east + cell.bounds.west) / 2
+        )
+        return center.distance(from: CLLocation(latitude: reference.latitude, longitude: reference.longitude))
+    }
+
+    /// Huit points cardinaux, du carré vu depuis le centre de la zone.
+    static func direction(of cell: TerritoryCell, from reference: CLLocationCoordinate2D) -> String {
+        let dLat = (cell.bounds.north + cell.bounds.south) / 2 - reference.latitude
+        let dLon = ((cell.bounds.east + cell.bounds.west) / 2 - reference.longitude) * cos(reference.latitude * .pi / 180)
+        let degrees = (atan2(dLon, dLat) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
+        let names = [
+            String(localized: "nord"), String(localized: "nord-est"), String(localized: "est"),
+            String(localized: "sud-est"), String(localized: "sud"), String(localized: "sud-ouest"),
+            String(localized: "ouest"), String(localized: "nord-ouest"),
+        ]
+        return names[Int(((degrees + 22.5) / 45).rounded(.down)) % 8]
+    }
+
+    private func position(of cell: TerritoryCell) -> String? {
+        guard let reference else { return nil }
+        let meters = Self.distanceMeters(cell, from: reference)
+        guard meters >= 100 else { return String(localized: "Au centre de la zone") }
+        let distance = Measurement(value: meters, unit: UnitLength.meters)
+            .formatted(.measurement(width: .abbreviated, usage: .road))
+        return String(format: String(localized: "À %1$@ au %2$@ du centre de la zone"),
+                      distance, Self.direction(of: cell, from: reference))
+    }
+
+    var body: some View {
+        let rows = Self.ordered(cells, reference: reference, onlyMine: onlyMine)
+        NavigationStack {
+            List {
+                Section {
+                    Toggle("Mes zones seulement", isOn: $onlyMine)
+                        .accessibilityIdentifier("territories.cellList.onlyMine")
+                }
+                Section {
+                    if rows.isEmpty {
+                        Text("Aucun carré à afficher")
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    ForEach(rows) { cell in
+                        Button { onSelect(cell.cellKey) } label: { row(cell) }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(cell.cellKey == selectedKey ? .isSelected : [])
+                    }
+                }
+            }
+            .navigationTitle("Carrés de la zone")
+            .toolbarTitleInlineCompat()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("territories.cellList.sheet")
+    }
+
+    private func row(_ cell: TerritoryCell) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            HStack(spacing: SQSpace.xs) {
+                Text(cell.statusLabel)
+                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                if cell.mine {
+                    Text("Ma zone")
+                        .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+            }
+            Text("\(cell.pointsCount) mesures · \(cell.userCount) contributeurs")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            if let position = position(of: cell) {
+                Text(position)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if let last = cell.lastObservedAt {
+                Text("Dernière mesure \(last.formatted(.relative(presentation: .named)))")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

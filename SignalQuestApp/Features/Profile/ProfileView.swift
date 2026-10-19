@@ -851,7 +851,7 @@ struct ProfileView: View {
         case .pendingPhotos: PhotosView(service: services.photos, initialFilter: .pending)
         case .antennaReports: AntennaReportsListView(service: services.antennaReports)
         case .outages: CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
-        case .territories: TerritoriesView(service: services.gamification)
+        case .territories: TerritoriesView(service: services.gamification, markets: services.markets)
         case .sessions: SessionsListView(service: services.sessions)
         case .radioLogs:
             RadioLogsView(service: services.radioLogs, antennas: services.antennas, networkPath: services.networkPath)

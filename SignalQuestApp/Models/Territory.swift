@@ -52,7 +52,8 @@ struct TerritoryGrid: Decodable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        cells = (try? c.decode([TerritoryCell].self, forKey: .cells)) ?? []
+        // Carré par carré : une cellule mal formée est écartée, les autres restent affichées.
+        cells = c.decodeLossyArray([TerritoryCell].self, forKey: .cells)
         truncated = (try? c.decode(Bool.self, forKey: .truncated)) ?? false
         cellSize = (try? c.decode(Double.self, forKey: .cellSize)) ?? 0.02
     }

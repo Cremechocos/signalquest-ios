@@ -16,8 +16,6 @@ final class TerritoryOverlay: NSObject, MKOverlay {
         let mine: Bool
         /// Hachures d'une zone inexplorée : un aplat à 6 % ne se voyait pas.
         var hatch: CGColor?
-        /// Carré touché : entouré de cette encre.
-        var selection: CGColor?
     }
 
     let cells: [Cell]
@@ -59,14 +57,6 @@ final class TerritoryOverlayRenderer: MKOverlayRenderer {
             context.setLineWidth(cell.mine ? lineWidth * 2.5 : lineWidth)
             context.stroke(rect)
         }
-        // Le carré touché en dernier, pour que ses voisins ne recouvrent pas son contour.
-        if let selected = overlay.cells.first(where: { $0.selection != nil }), let ink = selected.selection,
-           visible.intersects(selected.rect) {
-            context.setShouldAntialias(true)
-            context.setStrokeColor(ink)
-            context.setLineWidth(lineWidth * 3)
-            context.stroke(self.rect(for: selected.rect).insetBy(dx: lineWidth * 1.5, dy: lineWidth * 1.5))
-        }
     }
 
     /// Diagonales espacées de 7 pt à l'écran, quelle que soit l'échelle.
@@ -84,6 +74,34 @@ final class TerritoryOverlayRenderer: MKOverlayRenderer {
         }
         context.strokePath()
         context.restoreGState()
+    }
+}
+
+/// Contour du carré touché, dans un overlay à part : toucher un autre carré ne redessine
+/// que ce liseré, pas la grille entière (jusqu'à environ 1 500 carrés).
+final class TerritorySelectionOverlay: NSObject, MKOverlay {
+    let cellKey: String
+    let rect: MKMapRect
+    let ink: CGColor
+    var boundingMapRect: MKMapRect { rect }
+    var coordinate: CLLocationCoordinate2D { MKMapPoint(x: rect.midX, y: rect.midY).coordinate }
+
+    init(cellKey: String, rect: MKMapRect, ink: CGColor) {
+        self.cellKey = cellKey
+        self.rect = rect
+        self.ink = ink
+        super.init()
+    }
+}
+
+final class TerritorySelectionRenderer: MKOverlayRenderer {
+    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+        guard let overlay = overlay as? TerritorySelectionOverlay else { return }
+        let lineWidth = 1.0 / zoomScale
+        context.setShouldAntialias(true)
+        context.setStrokeColor(overlay.ink)
+        context.setLineWidth(lineWidth * 3)
+        context.stroke(rect(for: overlay.rect).insetBy(dx: lineWidth * 1.5, dy: lineWidth * 1.5))
     }
 }
 

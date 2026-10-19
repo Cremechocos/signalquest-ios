@@ -99,4 +99,69 @@ final class TerritoriesRefreshTests: XCTestCase {
         XCTAssertTrue(model.isZoomedOut)
         XCTAssertNil(model.grid, "Cells outside the supported viewport must not remain on the map")
     }
+
+    /// ANFR-15 : une cellule mal formée est écartée, les autres restent sur la carte.
+    func testOneMalformedCellDoesNotEmptyTheWholeGrid() throws {
+        let json = """
+        {"cells":[
+          {"cellKey":"ok","status":"reliable","bounds":{"north":48.87,"south":48.85,"east":2.36,"west":2.34},
+           "pointsCount":3,"userCount":1,"trustScore":0.5,"mine":false},
+          {"cellKey":"broken","status":"observed","bounds":{"north":48.87},"pointsCount":1,"userCount":1,"trustScore":0.1,"mine":false}
+        ],"truncated":false,"cellSize":0.02}
+        """
+        let decoded = try JSONDecoder().decode(TerritoryGrid.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.cells.map(\.cellKey), ["ok"])
+    }
+
+    /// ANFR-33 : toucher un autre carré ne reconstruit pas la grille, seul le liseré change.
+    func testSelectingACellKeepsTheGridOverlayAndMovesOnlyTheSelectionOverlay() throws {
+        let map = MKMapView()
+        let coordinator = TerritoryMapView.Coordinator(onRegionChange: { _, _ in })
+        let observed = try grid()
+        func identity(_ key: String?) -> TerritoryRenderIdentity {
+            TerritoryRenderIdentity(cells: observed.cells, selectedKey: key, colorScheme: .light, contrast: .standard)
+        }
+
+        coordinator.render(cells: observed.cells, identity: identity(nil), on: map)
+        let gridOverlay = try XCTUnwrap(map.overlays.first as? TerritoryOverlay)
+        XCTAssertEqual(map.overlays.count, 1)
+
+        coordinator.render(cells: observed.cells, identity: identity("same-cell"), on: map)
+        XCTAssertTrue(map.overlays.first === gridOverlay, "La grille n'est pas reconstruite par une sélection")
+        XCTAssertEqual(map.overlays.count, 2)
+        XCTAssertEqual((map.overlays.last as? TerritorySelectionOverlay)?.cellKey, "same-cell")
+
+        coordinator.render(cells: observed.cells, identity: identity(nil), on: map)
+        XCTAssertEqual(map.overlays.count, 1, "Le liseré disparaît avec la sélection")
+        XCTAssertTrue(map.overlays.first === gridOverlay)
+    }
+
+    func testTheFieldModeRepaintsTheGrid() throws {
+        let observed = try grid()
+        XCTAssertNotEqual(
+            TerritoryRenderIdentity(cells: observed.cells, colorScheme: .light, contrast: .standard, fieldMode: false),
+            TerritoryRenderIdentity(cells: observed.cells, colorScheme: .light, contrast: .standard, fieldMode: true)
+        )
+    }
+
+    /// ANFR-14 : la liste des carrés met mes zones d'abord, puis les plus avancées, et se filtre.
+    func testTheCellListPutsMyZonesFirstAndCanKeepOnlyThem() throws {
+        func cell(_ key: String, _ status: String, mine: Bool, north: Double) -> [String: Any] {
+            ["cellKey": key, "status": status, "bounds": ["north": north, "south": north - 0.02, "east": 2.36, "west": 2.34],
+             "pointsCount": 1, "userCount": 1, "trustScore": 0.5, "mine": mine]
+        }
+        let json: [String: Any] = ["cells": [
+            cell("a", "observed", mine: false, north: 48.87),
+            cell("b", "complete", mine: false, north: 48.89),
+            cell("c", "virgin", mine: true, north: 48.91),
+        ], "truncated": false]
+        let decoded = try JSONDecoder().decode(TerritoryGrid.self, from: JSONSerialization.data(withJSONObject: json))
+        let reference = CLLocationCoordinate2D(latitude: 48.86, longitude: 2.35)
+
+        XCTAssertEqual(TerritoryCellListSheet.ordered(decoded.cells, reference: reference, onlyMine: false).map(\.cellKey),
+                       ["c", "b", "a"])
+        XCTAssertEqual(TerritoryCellListSheet.ordered(decoded.cells, reference: reference, onlyMine: true).map(\.cellKey), ["c"])
+        let north = try XCTUnwrap(decoded.cells.first { $0.cellKey == "c" })
+        XCTAssertEqual(TerritoryCellListSheet.direction(of: north, from: reference), String(localized: "nord"))
+    }
 }
