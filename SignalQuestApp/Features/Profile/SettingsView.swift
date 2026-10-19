@@ -614,6 +614,28 @@ struct E2EEV2ActivationScreen: View {
     }
 }
 
+/// Écrans ouverts depuis Appareils, poussés par valeur. Déclarés par la pile
+/// qui ouvre Appareils (Réglages ou les feuilles du Profil), comme Mes lieux
+/// l'est par Notifications plutôt que par Pannes près de mes lieux.
+enum TrustedDevicesDestination: Hashable {
+    case accountKey(ownUserId: String, ownerNamespace: String)
+    case recovery
+}
+
+extension View {
+    /// Destinations des liens d'Appareils, pour la pile qui l'affiche.
+    func trustedDevicesDestinations(api: APIClient) -> some View {
+        navigationDestination(for: TrustedDevicesDestination.self) { destination in
+            switch destination {
+            case let .accountKey(ownUserId, ownerNamespace):
+                E2EEV2AccountKeyView(ownUserId: ownUserId, ownerNamespace: ownerNamespace)
+            case .recovery:
+                E2EEV2RecoveryResetView(api: api)
+            }
+        }
+    }
+}
+
 struct E2EEV2TrustedDevicesView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: E2EEV2TrustedDevicesViewModel
@@ -679,12 +701,10 @@ struct E2EEV2TrustedDevicesView: View {
             if model.currentDevice?.status == .approved, !model.accountKeyMissing,
                let session = LocalAccountScope.sessionSnapshot() {
                 Section {
-                    NavigationLink {
-                        E2EEV2AccountKeyView(
-                            ownUserId: String(session.ownerScopeId.dropFirst("user:".count)),
-                            ownerNamespace: session.ownerNamespace
-                        )
-                    } label: {
+                    NavigationLink(value: TrustedDevicesDestination.accountKey(
+                        ownUserId: String(session.ownerScopeId.dropFirst("user:".count)),
+                        ownerNamespace: session.ownerNamespace
+                    )) {
                         Label("Clé de ton compte", systemImage: "key.horizontal")
                     }
                     .accessibilityIdentifier("e2ee.accountKey")
@@ -855,9 +875,7 @@ struct E2EEV2TrustedDevicesView: View {
 
             if model.hasLocalIdentity {
                 Section {
-                    NavigationLink {
-                        E2EEV2RecoveryResetView(api: api)
-                    } label: {
+                    NavigationLink(value: TrustedDevicesDestination.recovery) {
                         Label("Récupération et perte d’accès", systemImage: "key.viewfinder")
                             .frame(minHeight: 48)
                     }
@@ -2402,6 +2420,7 @@ struct SettingsView: View {
         .navigationTitle("Réglages")
         // Par valeur, comme le Profil : la destination n'est plus recréée à chaque rendu (iOS 16).
         .navigationDestination(for: SettingsDestination.self) { destination(for: $0) }
+        .trustedDevicesDestinations(api: services.api)
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()

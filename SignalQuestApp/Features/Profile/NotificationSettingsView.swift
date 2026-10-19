@@ -100,6 +100,11 @@ private struct FavoriteCountSettingsRow: View {
     }
 }
 
+/// Écrans ouverts depuis Notifications et ses sous-écrans, poussés par valeur.
+enum NotificationSettingsDestination: Hashable {
+    case zoneAlerts, favoriteAntennas, places
+}
+
 /// Écran « Notifications » : l'autorisation iOS d'abord, puis ce que l'app
 /// peut envoyer, groupé par usage. Ouvert depuis Réglages et par le lien
 /// « Réglages de notifications » d'iOS, qui renvoyait vers iOS (TRX-21).
@@ -194,16 +199,12 @@ struct NotificationSettingsView: View {
                                  \.notifyCommunityOutagesPush)
                 // Plan 3, vague 2 : ce qui déclenche l'alerte près de ses lieux.
                 if model.prefs.notifyCommunityOutagesPush == true {
-                    NavigationLink {
-                        ZoneAlertSettingsView(service: ZoneAlertService(api: services.api))
-                    } label: {
+                    NavigationLink(value: NotificationSettingsDestination.zoneAlerts) {
                         SQSettingsRowLabel("Pannes près de mes lieux", systemImage: "mappin.and.ellipse")
                     }
                     .accessibilityIdentifier("notifications.zoneAlerts")
                 }
-                NavigationLink {
-                    FavoriteAntennasView(favorites: services.favoriteAntennas)
-                } label: {
+                NavigationLink(value: NotificationSettingsDestination.favoriteAntennas) {
                     FavoriteCountSettingsRow(favorites: services.favoriteAntennas)
                 }
                 preferenceToggle("Activité des antennes suivies", systemImage: "star.bubble", \.notifySiteFollowsPush,
@@ -233,6 +234,15 @@ struct NotificationSettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Notifications")
+        // Par valeur, comme le reste de la pile du Profil : iOS 16 ne mélange
+        // pas sans risque liens à fermeture et destinations par valeur.
+        .navigationDestination(for: NotificationSettingsDestination.self) { destination in
+            switch destination {
+            case .zoneAlerts: ZoneAlertSettingsView(service: ZoneAlertService(api: services.api))
+            case .favoriteAntennas: FavoriteAntennasView(favorites: services.favoriteAntennas)
+            case .places: PrivacySettingsView(service: services.privacy)
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()

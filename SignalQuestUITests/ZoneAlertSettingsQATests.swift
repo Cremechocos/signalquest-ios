@@ -60,5 +60,12 @@ final class ZoneAlertSettingsQATests: XCTestCase {
         quiet.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         XCTAssertTrue(from.waitForNonExistence(timeout: 5), "Sans heures calmes, plus d'horaires")
         XCTAssertEqual(quiet.value as? String, "0")
+
+        // Troisième niveau de la pile, poussé par valeur comme les autres.
+        let places = app.descendants(matching: .any)["zoneAlerts.places"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(places, in: app), "« Mes lieux » absent")
+        places.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["privacy.back"].firstMatch.waitForExistence(timeout: 10),
+                      "« Mes lieux » n'ouvre pas Confidentialité")
     }
 }

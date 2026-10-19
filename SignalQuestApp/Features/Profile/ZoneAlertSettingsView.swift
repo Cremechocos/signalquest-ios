@@ -151,9 +151,8 @@ struct ZoneAlertSettingsView: View {
                 }
             }
             .accessibilityIdentifier("zoneAlerts.radius")
-            NavigationLink {
-                PrivacySettingsView(service: services.privacy)
-            } label: {
+            // Destination déclarée par Notifications, l'écran parent.
+            NavigationLink(value: NotificationSettingsDestination.places) {
                 Label("Mes lieux", systemImage: "mappin.and.ellipse")
             }
             .accessibilityIdentifier("zoneAlerts.places")

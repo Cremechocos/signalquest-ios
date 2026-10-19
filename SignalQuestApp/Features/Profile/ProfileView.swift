@@ -199,6 +199,7 @@ struct ProfileView: View {
         .sheet(item: $deepLinkE2EEApproval) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
+                    .trustedDevicesDestinations(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {
@@ -211,6 +212,7 @@ struct ProfileView: View {
         .sheet(item: $deepLinkE2EEApprovalQR) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalQR: link.id)
+                    .trustedDevicesDestinations(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {
