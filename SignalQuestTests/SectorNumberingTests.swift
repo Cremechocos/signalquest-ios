@@ -57,7 +57,7 @@ final class SectorNumberingTests: XCTestCase {
         XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 1, operatorName: "ALL"), 0)
     }
 
-    /// ANFR-29 : le PLMN d'une identification garde deux chiffres de MNC.
+    /// ANFR-38 : le PLMN d'une identification garde deux chiffres de MNC.
     func testPlmnKeepsTwoDigitsOfTheMnc() {
         XCTAssertEqual(SectorNumbering.plmn(mcc: 208, mnc: 1), "20801")
         XCTAssertEqual(SectorNumbering.plmn(mcc: 208, mnc: 15), "20815")
