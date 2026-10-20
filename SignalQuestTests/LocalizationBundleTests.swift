@@ -7,21 +7,28 @@ final class LocalizationBundleTests: XCTestCase {
         let app = Bundle.main
         let widgetURL = app.bundleURL.appendingPathComponent("PlugIns/SignalQuestWidget.appex")
         let widget = try XCTUnwrap(Bundle(url: widgetURL))
+        // `locale:` ne choisit pas la langue de la table : celle-ci suit la langue
+        // de l'app. On lit donc directement le dossier anglais de chaque paquet.
+        func englishBundle(_ bundle: Bundle) throws -> Bundle {
+            try XCTUnwrap(bundle.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        }
+        let appEnglish = try englishBundle(app)
+        let widgetEnglish = try englishBundle(widget)
         let english = Locale(identifier: "en")
         let face = "Face ID"
         let biometricTitle: String.LocalizationValue = "Messagerie chiffrée via \(face)"
-        XCTAssertEqual(String(localized: biometricTitle, bundle: app, locale: english),
+        XCTAssertEqual(String(localized: biometricTitle, bundle: appEnglish, locale: english),
             "Encrypted messages with Face ID")
 
         for (key, value) in ["Alerte zone mal couverte": "Poor coverage alert",
                              "Mode terrain": "Field mode",
                              "Noir intense (OLED)": "Pure black (OLED)"] {
-            XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: app,
+            XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: appEnglish,
                 locale: english), value)
         }
         for (key, value) in ["Très bon": "Very good", "Bon": "Good",
                              "Moyen": "Fair", "Lent": "Slow", "Très lent": "Very slow"] {
-            XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: widget,
+            XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: widgetEnglish,
                 locale: english), value)
         }
 
@@ -92,5 +99,35 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(Bundle.main.localizedString(forKey: key, value: nil, table: nil), formalText)
         XCTAssertEqual(NSLocalizedString(key, comment: ""), formalText)
         XCTAssertEqual(Bundle.main.localizedString(forKey: "Tutoiement", value: nil, table: nil), "Tutoiement")
+    }
+
+    /// Le paquet au vous reprend chaque table française et y pose les variantes
+    /// `SQFormal|`, singulier comme pluriel, sans dépendre de la langue du test.
+    func testFormalBundleSwapsInTheFormalVariants() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SQFormalTest-\(UUID().uuidString).bundle", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let formal = try XCTUnwrap(SQAddress.makeFormalBundle(from: .main, at: root))
+        let name = "Alex"
+        XCTAssertEqual(String(localized: "\(name) partage avec toi", bundle: formal), "Alex partage avec vous")
+        XCTAssertEqual(String(localized: "Reconnecte-toi pour modifier le verrouillage de SignalQuest.", bundle: formal),
+                       "Reconnectez-vous pour modifier le verrouillage de SignalQuest.")
+        let count = 3
+        XCTAssertEqual(String(localized: "Autour de toi · \(count) jours", bundle: formal), "Autour de vous · 3 jours")
+        // Sans variante, la chaîne française d'origine.
+        XCTAssertEqual(String(localized: "Tutoiement", bundle: formal), "Tutoiement")
+    }
+
+    /// En français, le vouvoiement actif s'applique aussi aux phrases construites
+    /// par `String(localized:)`, que `SQAddressBundle` ne voit pas.
+    func testFormalToneRoutesStringLocalized() throws {
+        try XCTSkipUnless(SQAddress.appIsFrench, "Test à lancer avec -testLanguage fr")
+        SQAddress.install()
+        defer { SQAddress.setFormal(false) }
+        let name = "Alex"
+        SQAddress.setFormal(false)
+        XCTAssertEqual(String(localized: "\(name) partage avec toi"), "Alex partage avec toi")
+        SQAddress.setFormal(true)
+        XCTAssertEqual(String(localized: "\(name) partage avec toi"), "Alex partage avec vous")
     }
 }

@@ -281,3 +281,63 @@ private final class SQAddressBundle: Bundle, @unchecked Sendable {
         return super.__localizedAttributedString(forKey: key, value: value, table: tableName)
     }
 }
+
+// MARK: - `String(localized:)` au vouvoiement (PF-ADDR-01)
+
+/// `String(localized:)` lit ses chaînes par une méthode privée de `Bundle`, que
+/// `SQAddressBundle` ne peut pas surcharger sans API privée (décision du 19/10).
+/// Ce même nom, déclaré dans l'app, prend le pas sur celui de Foundation pour
+/// tout appel sans `table:`, `bundle:` ni `comment:` — soit la quasi-totalité —
+/// et lit le paquet au vous quand le vouvoiement s'applique. Les extensions, qui
+/// ne voient pas cette déclaration, gardent l'appel d'origine.
+extension String {
+    init(localized value: String.LocalizationValue) {
+        self.init(localized: value, bundle: SQAddress.lookupBundle)
+    }
+}
+
+extension SQAddress {
+    /// Paquet où chercher une chaîne : celui du vouvoiement s'il s'applique.
+    static var lookupBundle: Bundle {
+        usesFormalKeys ? (formalBundle.bundle ?? .main) : .main
+    }
+
+    /// Construit une seule fois, au premier besoin.
+    private static let formalBundle = SQFormalBundle(
+        bundle: makeFormalBundle(from: .main, at: FileManager.default.temporaryDirectory
+            .appendingPathComponent("SQFormal.bundle", isDirectory: true)))
+
+    /// Écrit un paquet qui ne contient que le français : chaque table de l'app,
+    /// avec la variante `SQFormal|` à la place de la chaîne d'origine quand elle
+    /// existe. Récrit à chaque lancement, il suit toujours le catalogue de la
+    /// build ; `nil` si l'écriture échoue, et l'app reste au tutoiement.
+    static func makeFormalBundle(from source: Bundle, at root: URL) -> Bundle? {
+        let fileManager = FileManager.default
+        let lproj = root.appendingPathComponent("fr.lproj", isDirectory: true)
+        do {
+            try? fileManager.removeItem(at: root)
+            try fileManager.createDirectory(at: lproj, withIntermediateDirectories: true)
+            for ext in ["strings", "stringsdict"] {
+                guard let url = source.url(forResource: "Localizable", withExtension: ext, subdirectory: "fr.lproj"),
+                      let table = try PropertyListSerialization.propertyList(
+                        from: Data(contentsOf: url), options: [], format: nil) as? [String: Any]
+                else { continue }
+                var formal = table.filter { !$0.key.hasPrefix(formalKeyPrefix) }
+                for (key, value) in table where key.hasPrefix(formalKeyPrefix) {
+                    formal[String(key.dropFirst(formalKeyPrefix.count))] = value
+                }
+                try PropertyListSerialization.data(fromPropertyList: formal, format: .binary, options: 0)
+                    .write(to: lproj.appendingPathComponent("Localizable.\(ext)"), options: .atomic)
+            }
+        } catch {
+            return nil
+        }
+        return Bundle(url: root)
+    }
+}
+
+/// `Bundle` n'est pas déclaré `Sendable` ; celui-ci n'est jamais modifié après sa
+/// création.
+private struct SQFormalBundle: @unchecked Sendable {
+    let bundle: Bundle?
+}
