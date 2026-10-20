@@ -137,18 +137,22 @@ final class NotificationMutationTests: XCTestCase {
         XCTAssertNil(model.failedAction)
     }
 
-    /// Suppression unitaire : la ligne et le compteur de non-lues suivent le serveur ;
-    /// un échec garde la ligne et se rejoue.
+    /// Suppression unitaire : la ligne part tout de suite (animation de la liste), puis revient
+    /// à sa place avec son compteur si le serveur refuse, et l'action se rejoue.
     func testSingleDeleteRemovesTheRowAndKeepsItWhenTheServerFails() async {
         let service = NotificationMutationMock(items: [item("a"), item("b", read: true)], failDeleteOnce: true)
         let model = NotificationsCenterViewModel(service: service)
         await model.load()
         XCTAssertEqual(model.unreadCount, 1)
 
-        await model.delete("a")
+        let pending = try? XCTUnwrap(model.beginDelete("a"))
+        XCTAssertEqual(model.items.map(\.id), ["b"], "Retirée avant la réponse du serveur")
+        XCTAssertEqual(model.unreadCount, 0)
+        if let pending { await model.commitDelete(pending) }
         XCTAssertEqual(model.items.map(\.id), ["a", "b"])
         XCTAssertEqual(model.failedAction, .delete("a"))
         XCTAssertNotNil(model.actionErrorMessage)
+        XCTAssertEqual(model.unreadCount, 1, "Le refus rend la non-lue")
 
         await model.retryFailedAction()
         XCTAssertEqual(model.items.map(\.id), ["b"])

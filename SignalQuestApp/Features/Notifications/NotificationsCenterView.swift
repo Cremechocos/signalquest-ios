@@ -112,28 +112,58 @@ final class NotificationsCenterViewModel: ObservableObject {
         }
     }
 
-    /// Supprime une notification (définitif côté serveur) ; la ligne reste tant que le serveur n'a pas répondu.
+    /// Ligne retirée en attendant la réponse du serveur, avec de quoi la remettre à sa place.
+    struct PendingDeletion {
+        let item: AppNotification
+        let index: Int
+        let generation: UUID
+    }
+
+    /// Supprime une notification (définitif côté serveur).
     func delete(_ id: String) async {
+        guard let pending = beginDelete(id) else { return }
+        await commitDelete(pending)
+    }
+
+    /// Retire la ligne tout de suite : appelé dans l'action de balayage, le retrait laisse la
+    /// liste jouer son animation de suppression. Attendre le serveur figeait les boutons du
+    /// balayage pendant que les lignes suivantes remontaient par-dessus.
+    func beginDelete(_ id: String) -> PendingDeletion? {
         guard isCurrentAccount, !isMutating, !pendingReadIDs.contains(id),
-              items.contains(where: { $0.id == id }) else { return }
-        let generation = actionGeneration
+              let index = items.firstIndex(where: { $0.id == id }) else { return nil }
+        let pending = PendingDeletion(item: items[index], index: index, generation: actionGeneration)
         pendingReadIDs.insert(id)
         actionErrorMessage = nil
         failedAction = nil
+        items.remove(at: index)
+        if pending.item.read != true { unreadCount = max(0, unreadCount - 1) }
+        if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
+        return pending
+    }
+
+    /// Confirme auprès du serveur ; s'il refuse, la ligne revient à sa place et l'action se rejoue.
+    func commitDelete(_ pending: PendingDeletion) async {
+        let id = pending.item.id
         defer { pendingReadIDs.remove(id) }
         do {
             if !AppEnvironment.usesDemoData { try await service.delete(id: id) }
-            guard actionGeneration == generation, isCurrentAccount else { return }
+            guard actionGeneration == pending.generation, isCurrentAccount else { return }
             loadGeneration = UUID()
             isLoading = false
             isLoadingMore = false
+            // Un chargement fini entre-temps a pu la ramener.
             if let index = items.firstIndex(where: { $0.id == id }) {
                 if items[index].read != true { unreadCount = max(0, unreadCount - 1) }
                 items.remove(at: index)
+                if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
             }
-            if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
         } catch {
-            guard actionGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
+            guard actionGeneration == pending.generation, isCurrentAccount, !error.isCancellation else { return }
+            if !items.contains(where: { $0.id == id }) {
+                items.insert(pending.item, at: min(pending.index, items.count))
+                if pending.item.read != true { unreadCount += 1 }
+                if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
+            }
             actionErrorMessage = String(localized: "Action impossible")
             failedAction = .delete(id)
         }
@@ -303,7 +333,11 @@ struct NotificationsCenterView: View {
                             .listRowSeparatorTint(SQColor.separator)
                             // Sans balayage complet : la suppression est définitive.
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button("Supprimer", role: .destructive) { Task { await model.delete(item.id) } }
+                                Button("Supprimer", role: .destructive) {
+                                    if let pending = model.beginDelete(item.id) {
+                                        Task { await model.commitDelete(pending) }
+                                    }
+                                }
                                 if item.read != true {
                                     Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
                                 }
