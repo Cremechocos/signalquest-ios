@@ -116,7 +116,7 @@ targets:
         # SignalQuestWidget et SignalQuestShare — Apple rejette une extension dont la version diffère
         # de l'app hôte.
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "175"
+        CURRENT_PROJECT_VERSION: "176"
       configs:
         DebugBeta:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta
@@ -209,7 +209,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: SignalQuestNotificationService/SignalQuestNotificationService.entitlements
         APPLICATION_EXTENSION_API_ONLY: YES
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "175"
+        CURRENT_PROJECT_VERSION: "176"
       configs:
         DebugBeta:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.notification-service
@@ -258,7 +258,7 @@ targets:
         PRODUCT_NAME: SignalQuestWidget
         CODE_SIGN_ENTITLEMENTS: SignalQuestWidget/SignalQuestWidget.entitlements
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "175"
+        CURRENT_PROJECT_VERSION: "176"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
       configs:
         DebugBeta:
@@ -318,7 +318,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: SignalQuestShare/SignalQuestShare.entitlements
         APPLICATION_EXTENSION_API_ONLY: YES
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "175"
+        CURRENT_PROJECT_VERSION: "176"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
       configs:
         DebugBeta:
