@@ -82,6 +82,36 @@ final class Lot1ReliabilityTests: XCTestCase {
         XCTAssertTrue(MetricKitReporter.hasMeasurements(["build": "161", "hours": "24.0", "cpu_s": "17.0"]))
     }
 
+    /// Arrêts 0x8BADF00D sous iOS 16.7 (174) : le relais n'envoyait pas la pile.
+    /// Il suit le fil désigné, regroupe les frames d'iOS et garde le décalage
+    /// des frames de l'app, sans aucun symbole.
+    func testMetricKitStackKeepsTheAttributedThreadAndTheAppOffsets() throws {
+        func frame(_ binary: String, _ offset: Int, _ sub: [[String: Any]] = []) -> [String: Any] {
+            ["binaryName": binary, "binaryUUID": "UUID", "offsetIntoBinaryTextSegment": offset,
+             "address": 0, "sampleCount": 1, "subFrames": sub]
+        }
+        let attributed = frame("libsystem_kernel.dylib", 1, [frame("SwiftUI", 2, [frame("SwiftUI", 3, [
+            frame("SwiftUI", 4, [frame("SignalQuest", 0x1a2b3c, [frame("UIKitCore", 5)])]),
+        ])])])
+        let tree: [String: Any] = ["callStackPerThread": true, "callStacks": [
+            ["threadAttributed": false, "callStackRootFrames": [frame("Foundation", 9)]],
+            ["threadAttributed": true, "callStackRootFrames": [attributed]],
+        ]]
+        let json = try JSONSerialization.data(withJSONObject: tree)
+        XCTAssertEqual(
+            MetricKitReporter.stackSummary(json: json, ownBinary: "SignalQuest"),
+            "libsystem_kernel.dylib > SwiftUI×3 > SignalQuest+0x1a2b3c > UIKitCore"
+        )
+        XCTAssertNil(MetricKitReporter.stackSummary(json: Data("{}".utf8), ownBinary: "SignalQuest"))
+
+        var deep = frame("SignalQuest", 0)
+        for offset in 1...200 { deep = frame("SignalQuest", offset * 0x1000, [deep]) }
+        let long = try JSONSerialization.data(withJSONObject: ["callStacks": [["callStackRootFrames": [deep]]]])
+        let summary = try XCTUnwrap(MetricKitReporter.stackSummary(json: long, ownBinary: "SignalQuest"))
+        XCTAssertLessThanOrEqual(summary.count, 1_004, "Sous la limite d'une clé Crashlytics")
+        XCTAssertTrue(summary.hasSuffix(" > …"))
+    }
+
     /// Un gel est signalé une fois, au seuil de 5 s ; une suspension de l'app
     /// n'en est pas un ; le gel suivant, après une réponse, l'est de nouveau.
     func testHangProbeReportsEachMainThreadFreezeOnceAndIgnoresSuspension() {

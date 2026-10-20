@@ -1276,6 +1276,54 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
     }
 
+    /// Les POPs Bouygues annoncent 9200-9240 mais n'ouvrent que quelques ports (pas
+    /// 9240 à Lyon le 20/10) : les candidats partent des ports vus ouverts, du plus
+    /// haut au plus bas, puis des ports jamais sondés, sans port de données ni port
+    /// vu fermé.
+    func testLoadedLatencyProbeCandidatesPreferPortsSeenOpen() {
+        let seenOpen = iperfLoadedLatencyProbeCandidates(
+            avoiding: [9_210, 9_216], knownOpen: [9_210, 9_216, 9_225, 9_219],
+            sampled: [9_200, 9_210, 9_216, 9_219, 9_225, 9_240], min: 9_200, max: 9_240
+        )
+        XCTAssertEqual(seenOpen.verified, [9_225, 9_219])
+        XCTAssertEqual(seenOpen.unverified, [9_239, 9_238, 9_237, 9_236, 9_235, 9_234, 9_233, 9_232])
+
+        let mono = iperfLoadedLatencyProbeCandidates(
+            avoiding: [5_201], knownOpen: [5_201], sampled: [5_201], min: 5_201, max: 5_201
+        )
+        XCTAssertTrue(mono.verified.isEmpty)
+        XCTAssertTrue(mono.unverified.isEmpty)
+    }
+
+    /// Sans port vu ouvert en dehors des ports de données, la sonde vérifie les ports
+    /// jamais sondés et garde le plus haut qui répond ; aucun ne répond : pas de port.
+    func testLoadedLatencyProbePortIsConfirmedOpen() async {
+        let server = IPerfPublicServer(
+            id: "lyon", hostname: "lyo.example.net", name: "Lyon", latitude: 0, longitude: 0,
+            code: "LYO", countryCode: "FR", provider: .community,
+            portMin: 9_200, portMax: 9_240, portPreferred: 9_210
+        )
+        let endpoint = IPerfEndpoint(port: 9_210, openPorts: [9_210])
+        let open = Set<UInt16>(9_220...9_239).union([9_210])
+        let unverified = iperfLoadedLatencyProbeCandidates(
+            avoiding: [9_210, 9_211], knownOpen: [9_210],
+            sampled: Set(iperfDiscoveryPorts(min: 9_200, max: 9_240, preferred: 9_210)),
+            min: 9_200, max: 9_240
+        ).unverified
+        let expected = unverified.filter(open.contains).max()
+        XCTAssertNotNil(expected)
+        let lyon = await SpeedtestService.resolveIPerfLoadedProbePort(
+            server: server, endpoint: endpoint, avoiding: [9_210, 9_211],
+            tcpProbe: OpenPortsProbe(open: open)
+        )
+        XCTAssertEqual(lyon, expected)
+        let closed = await SpeedtestService.resolveIPerfLoadedProbePort(
+            server: server, endpoint: endpoint, avoiding: [9_210, 9_211],
+            tcpProbe: OpenPortsProbe(open: [9_210])
+        )
+        XCTAssertNil(closed)
+    }
+
     // MARK: Catalogue iPerf3 servi par l'API
 
     private func catalogServer(
@@ -1838,5 +1886,15 @@ final class SpeedtestTests: XCTestCase {
             }
             listener.start(queue: .global())
         }
+    }
+}
+
+/// Sonde TCP factice : connexion réussie sur les seuls ports donnés.
+private struct OpenPortsProbe: SpeedtestTCPProbing {
+    let open: Set<UInt16>
+
+    func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double {
+        guard open.contains(port) else { throw URLError(.cannotConnectToHost) }
+        return 20
     }
 }

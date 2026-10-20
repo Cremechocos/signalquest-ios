@@ -850,19 +850,25 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // Ping / jitter en charge pendant le DL — sur un port voisin (pas le port
         // de mesure) pour ne pas RST le démon iPerf3 en cours de test.
         let dlLoadedHost = iperfServer.hostname
-        // `nil` = la plage ne permet pas d'éviter le port de données (POP mono-port) :
-        // on renonce à l'échantillon plutôt que de faire tomber le démon en pleine mesure.
-        let dlLoadedPort = iperfLoadedLatencyProbePort(
-            avoiding: [port],
-            min: iperfServer.portMin,
-            max: iperfServer.portMax
-        )
+        // Port confirmé ouvert, cherché pendant la montée en charge, puis réutilisé
+        // par l'upload : il évite le port du DL et celui que l'upload prendra.
+        // `nil` = aucun port libre ne répond (POP mono-port compris) : on renonce à
+        // l'échantillon plutôt que de faire tomber le démon en pleine mesure.
+        let ulPlannedPort = endpoint.openPorts.first(where: { $0 != port })
+            ?? iperfSiblingPort(preferred: port, min: iperfServer.portMin, max: iperfServer.portMax)
+        let loadedProbePortTask = Task.detached(priority: .utility) { [tcpProbe, port] in
+            await SpeedtestService.resolveIPerfLoadedProbePort(
+                server: iperfServer, endpoint: endpoint, avoiding: [port, ulPlannedPort], tcpProbe: tcpProbe
+            )
+        }
         let dlLoadedOmit = omitSeconds
-        let dlLoadedDeadline = speedtestMonotonicSeconds() + (Double(omitSeconds + durationSeconds) + 2)
+        let dlLoadedStart = speedtestMonotonicSeconds()
+        let dlLoadedDeadline = dlLoadedStart + (Double(omitSeconds + durationSeconds) + 2)
         let dlLoadedProbe = tcpProbe
         let dlLoadedPingsTask = Task.detached(priority: .utility) {
-            guard let dlLoadedPort else { return [Double]() }
-            try? await Task.sleep(nanoseconds: UInt64(dlLoadedOmit) * 1_000_000_000)
+            guard let dlLoadedPort = await loadedProbePortTask.value else { return [Double]() }
+            let wait = Double(dlLoadedOmit) - (speedtestMonotonicSeconds() - dlLoadedStart)
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
             guard !Task.isCancelled else { return [Double]() }
             return await SpeedtestService.collectIPerfLoadedPings(
                 host: dlLoadedHost,
@@ -1056,7 +1062,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let ulLoadedHost = iperfServer.hostname
         // Deux ports de données sont occupés à ce stade (celui du DL et celui de l'UL) :
         // la sonde doit les éviter tous les deux, et renoncer si la plage ne le permet pas.
-        let ulLoadedPort = endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
+        let resolvedLoadedPort = await loadedProbePortTask.value
+        let ulLoadedPort = resolvedLoadedPort.flatMap { $0 != port && $0 != ulPreferredPort ? $0 : nil }
+            ?? endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
             ?? iperfLoadedLatencyProbePort(
                 avoiding: [port, ulPreferredPort],
                 min: iperfServer.portMin,
@@ -3062,6 +3070,40 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         return values
     }
 
+    /// Port de sonde sous charge confirmé ouvert (`iperfLoadedLatencyProbeCandidates`) :
+    /// un port vu ouvert au sondage initial, sinon le plus haut des ports jamais
+    /// sondés qui accepte une connexion, essayés ensemble avec la sonde du test.
+    /// `nil` quand aucun ne répond : pas d'échantillon plutôt qu'un port fermé.
+    static func resolveIPerfLoadedProbePort(
+        server: IPerfPublicServer,
+        endpoint: IPerfEndpoint,
+        avoiding busyPorts: Set<UInt16>,
+        tcpProbe: SpeedtestTCPProbing
+    ) async -> UInt16? {
+        let candidates = iperfLoadedLatencyProbeCandidates(
+            avoiding: busyPorts,
+            knownOpen: endpoint.openPorts,
+            sampled: Set(iperfDiscoveryPorts(min: server.portMin, max: server.portMax, preferred: server.portPreferred)),
+            min: server.portMin,
+            max: server.portMax
+        )
+        if let verified = candidates.verified.first { return verified }
+        guard !candidates.unverified.isEmpty else { return nil }
+        let host = server.hostname
+        let open = await withTaskGroup(of: UInt16?.self) { group in
+            for port in candidates.unverified {
+                group.addTask {
+                    let ms = try? await tcpProbe.connectLatencyMs(host: host, port: port, timeoutSeconds: 1.0)
+                    return ms != nil ? port : nil
+                }
+            }
+            var open: [UInt16] = []
+            for await port in group { if let port { open.append(port) } }
+            return open
+        }
+        return open.max()
+    }
+
     private func measureTcpPings(
         host: String,
         port: UInt16,
@@ -4111,6 +4153,37 @@ func iperfLoadedLatencyProbePort(
         candidate -= 1
     }
     return nil
+}
+
+/// Ports à essayer pour la sonde de latence sous charge, du plus sûr au moins sûr.
+///
+/// Le haut de la plage n'est pas forcément ouvert : les POPs Bouygues annoncent
+/// 9200-9240 mais n'y font tourner que quelques démons (9 à 11 à Lyon le 20/10,
+/// pas 9240), et la sonde y échouait à chaque échantillon, sans ligne « Sous
+/// charge » à la fin. D'abord les ports déjà vus ouverts au sondage initial, du
+/// plus haut au plus bas (l'upload prend le plus bas) ; puis, à vérifier, les
+/// ports jamais sondés en partant du haut. Jamais un port de données ni un port
+/// déjà vu fermé ; vide sur un POP à port unique.
+func iperfLoadedLatencyProbeCandidates(
+    avoiding busyPorts: Set<UInt16>,
+    knownOpen: [UInt16],
+    sampled: Set<UInt16>,
+    min portMin: UInt16,
+    max portMax: UInt16,
+    limit: Int = 8
+) -> (verified: [UInt16], unverified: [UInt16]) {
+    let lo = min(portMin, portMax)
+    let hi = max(portMin, portMax)
+    let verified = knownOpen.filter { !busyPorts.contains($0) && (lo...hi).contains($0) }
+        .sorted(by: >)
+    var unverified: [UInt16] = []
+    var candidate = hi
+    while candidate >= lo, unverified.count < limit {
+        if !busyPorts.contains(candidate), !sampled.contains(candidate) { unverified.append(candidate) }
+        if candidate == lo { break }
+        candidate -= 1
+    }
+    return (verified, unverified)
 }
 
 private func connectNW(_ connection: NWConnection, queue: DispatchQueue, timeoutSeconds: TimeInterval) async throws {

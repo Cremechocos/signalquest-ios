@@ -90,11 +90,16 @@ final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked S
                 if let signal = first.signal { info["crash_signal"] = signal.stringValue }
                 if let type = first.exceptionType { info["crash_exception"] = type.stringValue }
                 if let reason = first.terminationReason { info["crash_reason"] = String(reason.prefix(120)) }
+                if let stack = stackSummary(json: first.callStackTree.jsonRepresentation()) { info["crash_stack"] = stack }
             }
         }
         if let hangs = payload.hangDiagnostics, !hangs.isEmpty {
             info["hangs"] = String(hangs.count)
             info["hang_max_s"] = format(hangs.map { $0.hangDuration.converted(to: .seconds).value }.max() ?? 0)
+            let longest = hangs.max { $0.hangDuration < $1.hangDuration }
+            if let longest, let stack = stackSummary(json: longest.callStackTree.jsonRepresentation()) {
+                info["hang_stack"] = stack
+            }
         }
         if let cpu = payload.cpuExceptionDiagnostics, !cpu.isEmpty {
             info["cpu_exceptions"] = String(cpu.count)
@@ -103,6 +108,50 @@ final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked S
             info["disk_write_exceptions"] = String(writes.count)
         }
         return info
+    }
+
+    /// Pile du fil en cause (celui que MetricKit désigne, sinon le premier), du
+    /// haut vers l'appelant : « SwiftUI×12 > SignalQuest+0x1a2b3c > … ». Un arrêt
+    /// par le chien de garde (0x8BADF00D) montre ainsi où le fil principal était
+    /// figé. Les frames d'iOS sont regroupées par bibliothèque (leurs adresses ne
+    /// se décodent pas ici) ; celles de l'app gardent leur décalage, décodé avec
+    /// le dSYM du build (`atos -l 0x100000000`). Ni symbole ni contenu ; tronquée
+    /// sous la limite d'une clé Crashlytics.
+    static func stackSummary(json: Data, ownBinary: String? = Bundle.main.executableURL?.lastPathComponent) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+              let stacks = root["callStacks"] as? [[String: Any]], !stacks.isEmpty else { return nil }
+        let stack = stacks.first { $0["threadAttributed"] as? Bool == true } ?? stacks[0]
+        var frame = (stack["callStackRootFrames"] as? [[String: Any]])?.first
+        var parts: [String] = []
+        var run: (name: String, count: Int)?
+        func flush() {
+            if let run { parts.append(run.count > 1 ? "\(run.name)×\(run.count)" : run.name) }
+            run = nil
+        }
+        var depth = 0
+        while let current = frame, depth < 256 {
+            let name = current["binaryName"] as? String ?? "?"
+            if name == ownBinary, let offset = (current["offsetIntoBinaryTextSegment"] as? NSNumber)?.uint64Value {
+                flush()
+                parts.append("\(name)+0x\(String(offset, radix: 16))")
+            } else if run?.name == name {
+                run?.count += 1
+            } else {
+                flush()
+                run = (name, 1)
+            }
+            frame = (current["subFrames"] as? [[String: Any]])?.first
+            depth += 1
+        }
+        flush()
+        guard !parts.isEmpty else { return nil }
+        var summary = ""
+        for part in parts {
+            let next = summary.isEmpty ? part : summary + " > " + part
+            guard next.count <= 1_000 else { return summary + " > …" }
+            summary = next
+        }
+        return summary
     }
 
     private static func seconds(_ value: Measurement<UnitDuration>) -> String {

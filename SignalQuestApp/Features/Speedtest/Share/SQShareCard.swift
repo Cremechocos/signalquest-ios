@@ -482,9 +482,11 @@ enum SQShareCardRenderer {
         let line = CGMutablePath()
         line.addLines(between: plotted)
 
+        // `addLines(between:)` ouvrirait un nouveau sous-chemin au premier point et
+        // laisserait le coin bas-gauche seul : la zone se fermerait en diagonale.
         let fill = CGMutablePath()
         fill.move(to: CGPoint(x: plotted[0].x, y: rect.maxY))
-        fill.addLines(between: plotted)
+        plotted.forEach { fill.addLine(to: $0) }
         fill.addLine(to: CGPoint(x: plotted[plotted.count - 1].x, y: rect.maxY))
         fill.closeSubpath()
         let colors = [graph.accentColor.withAlphaComponent(fillOpacity).cgColor,
