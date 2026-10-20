@@ -1430,22 +1430,42 @@ final class ANFRZoneCompareTests: XCTestCase {
         }
     }
 
-    func testOnlyFranceAndOverseasAreQueriedTheOtherMarketsStopLocally() async {
+    func testEveryMarketIsQueriedAndOnlyTheOpenSeaStopsLocally() async {
         let service = ZoneService()
         let canada = makeModel(service, market: "CA")
         await canada.load()
-        XCTAssertEqual(canada.phase, .noAntennaData)
+        if case .loaded = canada.phase {} else { XCTFail("le Canada part au serveur, qui a son registre") }
         let sea = makeModel(service, market: nil)
         await sea.load()
         XCTAssertEqual(sea.phase, .outOfMarket)
-        XCTAssertTrue(service.calls.isEmpty, "Ni le Canada ni le large ne partent au serveur")
 
         let overseas = makeModel(service, market: "DROM", latitude: 16.24, longitude: -61.53)
         await overseas.load()
-        XCTAssertEqual(service.calls.map(\.market), ["DROM"])
+        XCTAssertEqual(service.calls.map(\.market), ["CA", "DROM"], "Le large ne part jamais au serveur")
         XCTAssertEqual(ANFRZoneMarket.apiCode(forMarket: " fr "), "FR")
-        XCTAssertNil(ANFRZoneMarket.apiCode(forMarket: "BE"))
+        XCTAssertEqual(ANFRZoneMarket.apiCode(forMarket: "be"), "BE")
+        XCTAssertNil(ANFRZoneMarket.apiCode(forMarket: " "))
         XCTAssertNil(ANFRZoneMarket.apiCode(forMarket: nil))
+
+        // Un pays sans registre : c'est le serveur qui le dit, l'onglet reste avec son message.
+        service.failure = httpError(422, "MARKET_NO_ANTENNA_DATA")
+        let italy = makeModel(service, market: "IT")
+        await italy.load()
+        XCTAssertEqual(italy.phase, .noAntennaData)
+        let code = await italy.marketCode()
+        XCTAssertEqual(code, "IT", "Signal et Débit comparent quand même ce pays")
+    }
+
+    func testCapabilitiesSayWhatTheCountryRegistryCountsAndDefaultToEverything() throws {
+        let france = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(#"{"market":"FR","operators":[]}"#.utf8))
+        XCTAssertEqual(france.capabilities, .all, "Une réponse sans capabilities est celle de la France")
+        let belgium = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(
+            #"{"market":"BE","snapshot":{"date":"2026-10-01","source":"be-regions"},"capabilities":{"generations":false,"bands":true,"planned":true},"operators":[{"key":"PROXIMUS","active":12}]}"#.utf8))
+        XCTAssertEqual(belgium.capabilities, ANFRZoneCapabilities(generations: false, bands: true, planned: true))
+        XCTAssertEqual(belgium.snapshotSource, "be-regions")
+        let canada = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(
+            #"{"market":"CA","capabilities":{"bands":false,"planned":false},"operators":[]}"#.utf8))
+        XCTAssertEqual(canada.capabilities, ANFRZoneCapabilities(generations: true, bands: false, planned: false))
     }
 
     /// Le registre réel (embarqué) et ses aires : Lyon et Pointe-à-Pitre sont interrogeables, Montréal et l'Atlantique non.
@@ -1469,5 +1489,144 @@ final class ANFRZoneCompareTests: XCTestCase {
         XCTAssertEqual(reunion, "DROM")
         XCTAssertEqual(montreal, "CA")
         XCTAssertNil(atlantic)
+    }
+}
+
+/// Mesures de zone par opérateur (ZM-1) : décodage du contrat, classement, erreurs et repli.
+@MainActor
+final class ZoneMetricsTests: XCTestCase {
+    private final class MetricsService: ANFRServicing, @unchecked Sendable {
+        private let lock = NSLock()
+        private var recorded: [String] = []
+        var failure: Error?
+        var calls: [String] { lock.withLock { recorded } }
+
+        func zoneMetrics(latitude: Double, longitude: Double, radius: ANFRZoneRadius, market: String,
+                         metric: NearbyOperatorMetric, period: ZoneMetricsPeriod) async throws -> ZoneMetrics {
+            lock.withLock { recorded.append("\(market)|\(radius.kilometers)|\(period.rawValue)") }
+            if let failure { throw failure }
+            return ZoneMetrics(market: market, metric: metric == .signal ? "signal" : "download", period: period.rawValue,
+                               radiusKm: radius.kilometers, weighting: "test",
+                               operators: [ZoneMetricsOperator(key: "ORANGE", label: "Orange", sampleCount: 5, median: 120)])
+        }
+
+        func current() async throws -> ANFRDataset { throw URLError(.unsupportedURL) }
+        func archives() async throws -> [ANFRDataset] { throw URLError(.unsupportedURL) }
+        func search(query: String) async throws -> [AntennaSite] { throw URLError(.unsupportedURL) }
+        func siteHistory(supId: String) async throws -> ANFRSiteHistory { throw URLError(.unsupportedURL) }
+        func stats() async throws -> ANFRStats { throw URLError(.unsupportedURL) }
+        func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
+            throw URLError(.unsupportedURL)
+        }
+        func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot { throw URLError(.unsupportedURL) }
+        func archiveDates() async throws -> ANFRArchiveDates { throw URLError(.unsupportedURL) }
+    }
+
+    private struct Ranking: NearbyNetworkQualityServicing {
+        func verdict(latitude: Double, longitude: Double, isCellular: Bool, simPlmn: String?,
+                     maxAge: TimeInterval?) async -> NearbyNetworkQuality? { nil }
+        func operatorRanking(metric: NearbyOperatorMetric, latitude: Double, longitude: Double,
+                             maxAge: TimeInterval?) async -> [OperatorMetricStat] {
+            [OperatorMetricStat(operatorName: "SFR", value: 80, sampleCount: 4, detail: nil)]
+        }
+    }
+
+    private func httpError(_ status: Int, _ code: String?) -> APIError {
+        .http(status: status, code: code, message: "", requestId: "req", retryAfter: nil)
+    }
+
+    /// Réponse au format du contrat ZM-1 v1.0 (20/10), en débit : un opérateur sans mesure reste listé.
+    func testDecodesTheContractAndRanksMeasuredOperatorsFirst() throws {
+        let json = #"""
+        {"market":"FR","metric":"download","period":"12m","radiusKm":20,"center":{"lat":45.76,"lon":4.84},"unit":"Mbps","weighting":"test","totalSamples":9,"totalRawPoints":9,"generatedAt":"2026-10-20T00:10:00.000Z","operators":[
+         {"key":"BOUYGUES","label":"Bouygues Telecom","sampleCount":0,"rawCount":0,"contributors":0,"median":null,"p25":null,"p75":null,"distribution":[{"tier":"very-slow","count":0}],"byTechnology":[],"share5G":null,"secondary":{"uploadMedianMbps":null,"pingMedianMs":null},"latestAt":null,"samples30d":0},
+         {"key":"FREE","label":"Free Mobile","sampleCount":2,"rawCount":2,"contributors":2,"median":96.4,"p25":null,"p75":null,"distribution":[{"tier":"fair","count":2}],"byTechnology":[{"tech":"4G","sampleCount":2,"median":96.4}],"share5G":0,"secondary":{"uploadMedianMbps":12.5,"pingMedianMs":31},"latestAt":"2026-10-19T18:00:00.000Z","samples30d":1},
+         {"key":"ORANGE","label":"Orange","sampleCount":7,"rawCount":7,"contributors":5,"median":214,"p25":118,"p75":402,"distribution":[{"tier":"good","count":4},{"tier":"very-good","count":3}],"byTechnology":[{"tech":"5G","sampleCount":4,"median":388},{"tech":"4G","sampleCount":3,"median":132}],"share5G":0.571,"secondary":{"uploadMedianMbps":36,"pingMedianMs":24},"latestAt":"2026-10-19T21:00:00.000Z","samples30d":3},
+         {"key":"SFR","label":"SFR","sampleCount":0,"rawCount":0,"contributors":0,"median":null,"p25":null,"p75":null,"distribution":[],"byTechnology":[],"share5G":null,"secondary":{"uploadMedianMbps":null,"pingMedianMs":null},"latestAt":null,"samples30d":0}
+        ],"requestId":"r"}
+        """#
+        let zone = try JSONDecoder.signalQuest.decode(ZoneMetrics.self, from: Data(json.utf8))
+        XCTAssertEqual(zone.totalSamples, 9)
+        XCTAssertEqual(zone.weighting, "test")
+        XCTAssertEqual(zone.ranked.map(\.key), ["ORANGE", "FREE", "BOUYGUES", "SFR"],
+                       "Les mesurés d'abord, du meilleur au moins bon ; puis les autres dans l'ordre du registre")
+        let orange = try XCTUnwrap(zone.operators.first { $0.key == "ORANGE" })
+        XCTAssertEqual(orange.p25, 118)
+        XCTAssertEqual(orange.byTechnology.map(\.tech), ["5G", "4G"])
+        XCTAssertEqual(orange.share5G ?? 0, 0.571, accuracy: 1e-9)
+        XCTAssertEqual(orange.uploadMedianMbps, 36)
+        XCTAssertEqual(orange.pingMedianMs, 24)
+        XCTAssertNil(orange.rsrqMedian)
+        XCTAssertNotNil(orange.latestAt)
+        XCTAssertEqual(orange.distribution.map(\.label), ["Bon", "Très bon"])
+        let free = try XCTUnwrap(zone.operators.first { $0.key == "FREE" })
+        XCTAssertNil(free.p25, "Sous 3 échantillons, pas d'écart")
+        XCTAssertTrue(free.hasMeasurements)
+        XCTAssertFalse(try XCTUnwrap(zone.operators.first { $0.key == "SFR" }).hasMeasurements)
+    }
+
+    func testTheSignalAnswerCarriesRsrqAndSinr() throws {
+        let json = #"{"metric":"signal","weighting":"place_day","operators":[{"key":"ORANGE","label":"Orange","sampleCount":3,"rawCount":40,"median":-84,"secondary":{"rsrqMedian":-10.5,"sinrMedian":14}}]}"#
+        let zone = try JSONDecoder.signalQuest.decode(ZoneMetrics.self, from: Data(json.utf8))
+        let orange = try XCTUnwrap(zone.operators.first)
+        XCTAssertEqual(orange.rsrqMedian, -10.5)
+        XCTAssertEqual(orange.sinrMedian, 14)
+        XCTAssertEqual(orange.rawCount, 40)
+        XCTAssertNil(orange.uploadMedianMbps)
+        XCTAssertEqual(zone.totalSamples, 3, "Sans totalSamples, la somme des opérateurs")
+    }
+
+    func testTheRequestSharesTheGridCenterOfTheAntennaComparator() throws {
+        let endpoint = ANFRService.zoneMetricsEndpoint(latitude: 45.76401, longitude: 4.83569, radius: .km20,
+                                                       market: "FR", metric: .signal, period: .threeMonths)
+        let antennas = ANFRService.zoneCompareEndpoint(latitude: 45.76401, longitude: 4.83569, radius: .km20,
+                                                       market: "FR", includeBands: false)
+        XCTAssertEqual(endpoint.path, "/api/operators/zone-metrics")
+        let query = Dictionary(uniqueKeysWithValues: endpoint.query.map { ($0.name, $0.value ?? "") })
+        XCTAssertEqual(query, ["lat": "45.7600", "lon": "4.8400", "radiusKm": "20", "market": "FR",
+                               "metric": "signal", "period": "3m"])
+        XCTAssertEqual(antennas.query.first { $0.name == "lat" }?.value, query["lat"], "Même zone que l'onglet Antennes")
+        XCTAssertEqual(ZoneMetricsPeriod.default, .twelveMonths)
+    }
+
+    func testEachServerErrorLandsOnItsState() {
+        XCTAssertEqual(ZoneMetricsModel.failure(for: httpError(404, nil)), .routeMissing)
+        XCTAssertEqual(ZoneMetricsModel.failure(for: httpError(422, "OUT_OF_MARKET")), .outOfMarket)
+        XCTAssertEqual(ZoneMetricsModel.failure(for: httpError(400, "INVALID_MARKET")), .outOfMarket)
+        XCTAssertEqual(ZoneMetricsModel.failure(for: httpError(400, "INVALID_PARAMS")), .failed)
+        XCTAssertEqual(ZoneMetricsModel.failure(for: httpError(500, "ZONE_METRICS_FAILED")), .failed)
+        XCTAssertEqual(ZoneMetricsModel.failure(for: APIError.transport("offline")), .failed)
+        XCTAssertNil(ZoneMetricsModel.failure(for: CancellationError()))
+    }
+
+    func testAZoneAlreadySeenComesFromMemoryAndThePeriodIsPartOfTheZone() async {
+        let service = MetricsService()
+        let model = ZoneMetricsModel()
+        func load() async {
+            await model.load(metric: .download, radius: .km20, latitude: 45.7640, longitude: 4.8357,
+                             market: "FR", service: service, ranking: Ranking())
+        }
+        await load()
+        await load()
+        XCTAssertEqual(service.calls, ["FR|20|12m"])
+        model.period = .all
+        await load()
+        XCTAssertEqual(service.calls, ["FR|20|12m", "FR|20|all"])
+        if case .loaded(let zone) = model.phase { XCTAssertEqual(zone.period, "all") } else { XCTFail("chargé") }
+    }
+
+    func testWithoutTheRouteTheTileRankingTakesOverAndOutsideAnyMarketNothingIsAsked() async {
+        let service = MetricsService()
+        service.failure = httpError(404, nil)
+        let model = ZoneMetricsModel()
+        await model.load(metric: .signal, radius: .km50, latitude: 45.7640, longitude: 4.8357,
+                         market: "FR", service: service, ranking: Ranking())
+        XCTAssertEqual(model.phase, .legacy([OperatorMetricStat(operatorName: "SFR", value: 80, sampleCount: 4, detail: nil)], .signal))
+
+        let sea = ZoneMetricsModel()
+        await sea.load(metric: .download, radius: .km50, latitude: 30, longitude: -40,
+                       market: nil, service: service, ranking: Ranking())
+        XCTAssertEqual(sea.phase, .outOfMarket)
+        XCTAssertEqual(service.calls.count, 1, "Le large ne part pas au serveur")
     }
 }

@@ -94061,6 +94061,678 @@
           }
         }
       }
+    },
+    "3 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 months"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 mois"
+          }
+        }
+      }
+    },
+    "12 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "12 months"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "12 mois"
+          }
+        }
+      }
+    },
+    "sur les 3 derniers mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over the last 3 months"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur les 3 derniers mois"
+          }
+        }
+      }
+    },
+    "sur les 12 derniers mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over the last 12 months"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur les 12 derniers mois"
+          }
+        }
+      }
+    },
+    "sur tout l’historique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over all time"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur tout l’historique"
+          }
+        }
+      }
+    },
+    "Cette position n’est dans aucun pays suivi par SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This location isn’t in any country SignalQuest covers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette position n’est dans aucun pays suivi par SignalQuest."
+          }
+        }
+      }
+    },
+    "Aucune mesure d’opérateur partagée dans ce rayon sur cette période. Élargis le rayon ou la période." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No operator measurements shared within this radius for this period. Try a wider radius or period."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure d’opérateur partagée dans ce rayon sur cette période. Élargis le rayon ou la période."
+          }
+        }
+      }
+    },
+    "Débit médian en réception, mesuré par la communauté à moins de %lld km, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median download speed, measured by the community within %lld km, %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit médian en réception, mesuré par la communauté à moins de %lld km, %@."
+          }
+        }
+      }
+    },
+    "Signal 4G et 5G médian capté, mesuré par la communauté à moins de %lld km, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median 4G and 5G signal, measured by the community within %lld km, %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal 4G et 5G médian capté, mesuré par la communauté à moins de %lld km, %@."
+          }
+        }
+      }
+    },
+    "Une mesure de signal = la médiane d’un membre sur environ 100 m pour une journée : un trajet répété ne compte qu’une fois par jour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One signal measurement = one member’s median over about 100 m for one day: a repeated trip counts once a day."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une mesure de signal = la médiane d’un membre sur environ 100 m pour une journée : un trajet répété ne compte qu’une fois par jour."
+          }
+        }
+      }
+    },
+    "Une mesure de débit = un test." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One speed measurement = one test."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une mesure de débit = un test."
+          }
+        }
+      }
+    },
+    "Touche un opérateur pour le détail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap an operator for details."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche un opérateur pour le détail."
+          }
+        }
+      }
+    },
+    "Pas de mesure dans ce rayon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No measurements within this radius"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de mesure dans ce rayon"
+          }
+        }
+      }
+    },
+    "%@ des mesures en 5G." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ of measurements on 5G."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ des mesures en 5G."
+          }
+        }
+      }
+    },
+    "%@, pas de mesure dans ce rayon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, no measurements within this radius."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, pas de mesure dans ce rayon."
+          }
+        }
+      }
+    },
+    "Ouvre le détail de l’opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the operator’s details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le détail de l’opérateur"
+          }
+        }
+      }
+    },
+    "Débit médian en réception, mesuré par la communauté à moins de 1 km, sur tout l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median download speed, measured by the community within 1 km, over all time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit médian en réception, mesuré par la communauté à moins de 1 km, sur tout l’historique."
+          }
+        }
+      }
+    },
+    "Signal médian capté, mesuré par la communauté à moins de 1 km, sur tout l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median signal, measured by the community within 1 km, over all time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal médian capté, mesuré par la communauté à moins de 1 km, sur tout l’historique."
+          }
+        }
+      }
+    },
+    "Médiane" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médiane"
+          }
+        }
+      }
+    },
+    "La moitié des mesures entre %@ et %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Half of the measurements are between %@ and %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La moitié des mesures entre %@ et %@."
+          }
+        }
+      }
+    },
+    "Moins de 3 mesures : pas encore d’écart à montrer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fewer than 3 measurements: no spread to show yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moins de 3 mesures : pas encore d’écart à montrer."
+          }
+        }
+      }
+    },
+    "Par technologie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By technology"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par technologie"
+          }
+        }
+      }
+    },
+    "Trop peu de mesures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too few measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop peu de mesures"
+          }
+        }
+      }
+    },
+    "Envoi médian" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi médian"
+          }
+        }
+      }
+    },
+    "RSRQ médian" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median RSRQ"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RSRQ médian"
+          }
+        }
+      }
+    },
+    "SINR médian" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median SINR"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SINR médian"
+          }
+        }
+      }
+    },
+    "Autres mesures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres mesures"
+          }
+        }
+      }
+    },
+    "Sur les 30 derniers jours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last 30 days"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur les 30 derniers jours"
+          }
+        }
+      }
+    },
+    "Membres contributeurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributing members"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membres contributeurs"
+          }
+        }
+      }
+    },
+    "Relevés bruts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raw readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevés bruts"
+          }
+        }
+      }
+    },
+    "Fraîcheur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freshness"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fraîcheur"
+          }
+        }
+      }
+    },
+    "Répartition" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distribution"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répartition"
+          }
+        }
+      }
+    },
+    "Pas de registre d’antennes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No antenna registry"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de registre d’antennes"
+          }
+        }
+      }
+    },
+    "Ce pays ne publie pas de registre officiel des antennes. Signal et Débit restent comparables dans cette zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This country doesn’t publish an official antenna registry. Signal and Speed can still be compared in this area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce pays ne publie pas de registre officiel des antennes. Signal et Débit restent comparables dans cette zone."
+          }
+        }
+      }
+    },
+    "%@ : en service %lld, en projet %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %lld in service, %lld planned."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : en service %lld, en projet %lld."
+          }
+        }
+      }
+    },
+    "%@ : en service %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %lld in service."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : en service %lld."
+          }
+        }
+      }
+    },
+    "Sites présents dans le registre officiel du pays." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites listed in the country’s official registry."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites présents dans le registre officiel du pays."
+          }
+        }
+      }
+    },
+    "Sites présents dans les registres officiels de Flandre et de Bruxelles ; la Wallonie n’en publie pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites listed in the official registries of Flanders and Brussels; Wallonia doesn’t publish one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites présents dans les registres officiels de Flandre et de Bruxelles ; la Wallonie n’en publie pas."
+          }
+        }
+      }
+    },
+    "%lld mesure au total" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurement in total"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurements in total"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesure au total"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesures au total"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "SQFormal|Aucune mesure d’opérateur partagée dans ce rayon sur cette période. Élargis le rayon ou la période." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure d’opérateur partagée dans ce rayon sur cette période. Élargissez le rayon ou la période."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Touche un opérateur pour le détail." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez un opérateur pour le détail."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

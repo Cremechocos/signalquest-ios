@@ -165,6 +165,9 @@ protocol ANFRServicing: Sendable {
     /// (`market` : `FR` ou `DROM`). `includeBands` ajoute le détail par bande.
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
                      market: String, includeBands: Bool) async throws -> ANFRZoneCompare
+    /// Débit ou signal médian de chaque opérateur du marché dans le même rayon (ZM-1).
+    func zoneMetrics(latitude: Double, longitude: Double, radius: ANFRZoneRadius, market: String,
+                     metric: NearbyOperatorMetric, period: ZoneMetricsPeriod) async throws -> ZoneMetrics
 }
 
 extension ANFRServicing {
@@ -181,6 +184,11 @@ extension ANFRServicing {
     /// Les services qui ne comparent pas les opérateurs d'une zone n'ont rien à fournir.
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
                      market: String, includeBands: Bool) async throws -> ANFRZoneCompare {
+        throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+    }
+
+    func zoneMetrics(latitude: Double, longitude: Double, radius: ANFRZoneRadius, market: String,
+                     metric: NearbyOperatorMetric, period: ZoneMetricsPeriod) async throws -> ZoneMetrics {
         throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
     }
 }
@@ -324,6 +332,29 @@ final class ANFRService: ANFRServicing {
             Self.zoneCompareEndpoint(latitude: latitude, longitude: longitude, radius: radius,
                                      market: market, includeBands: includeBands),
             as: ANFRZoneCompare.self
+        )
+    }
+
+    /// Même centre ramené à la grille que le comparateur des antennes : les deux onglets
+    /// parlent de la même zone.
+    static func zoneMetricsEndpoint(latitude: Double, longitude: Double, radius: ANFRZoneRadius, market: String,
+                                    metric: NearbyOperatorMetric, period: ZoneMetricsPeriod) -> APIEndpoint {
+        APIEndpoint(path: "/api/operators/zone-metrics", query: [
+            URLQueryItem(name: "lat", value: String(format: "%.4f", radius.snapped(latitude))),
+            URLQueryItem(name: "lon", value: String(format: "%.4f", radius.snapped(longitude))),
+            URLQueryItem(name: "radiusKm", value: String(radius.kilometers)),
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "metric", value: metric == .signal ? "signal" : "download"),
+            URLQueryItem(name: "period", value: period.rawValue)
+        ])
+    }
+
+    func zoneMetrics(latitude: Double, longitude: Double, radius: ANFRZoneRadius, market: String,
+                     metric: NearbyOperatorMetric, period: ZoneMetricsPeriod) async throws -> ZoneMetrics {
+        try await api.request(
+            Self.zoneMetricsEndpoint(latitude: latitude, longitude: longitude, radius: radius, market: market,
+                                     metric: metric, period: period),
+            as: ZoneMetrics.self
         )
     }
 

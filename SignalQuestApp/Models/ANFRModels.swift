@@ -1112,15 +1112,40 @@ struct ANFRZoneRadius: Hashable, Identifiable, Sendable {
     }
 }
 
-/// Marchés dont l'ANFR publie les antennes : seuls ceux-là sont interrogés.
+/// Code de marché envoyé au comparateur. Tous les marchés du registre sont interrogés : le
+/// serveur dit lui-même où il n'a pas de registre d'antennes (`MARKET_NO_ANTENNA_DATA`).
 enum ANFRZoneMarket {
-    static let supported: Set<String> = ["FR", "DROM"]
-
-    /// `FR` ou `DROM` pour un code de marché du registre, `nil` sinon.
+    /// Code du registre normalisé ; `nil` sans marché.
     static func apiCode(forMarket code: String?) -> String? {
         guard let normalized = code?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
-              supported.contains(normalized) else { return nil }
+              !normalized.isEmpty else { return nil }
         return normalized
+    }
+}
+
+/// Ce que le registre d'un pays permet de compter (`capabilities` de zone-compare). Absent :
+/// tout, comme la France. La Belgique ne publie pas les générations ; le Canada et la Suisse
+/// ni les bandes ni les projets.
+struct ANFRZoneCapabilities: Decodable, Equatable, Sendable {
+    let generations: Bool
+    let bands: Bool
+    let planned: Bool
+
+    static let all = ANFRZoneCapabilities(generations: true, bands: true, planned: true)
+
+    enum CodingKeys: String, CodingKey { case generations, bands, planned }
+
+    init(generations: Bool, bands: Bool, planned: Bool) {
+        self.generations = generations
+        self.bands = bands
+        self.planned = planned
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        generations = c.value(Bool.self, .generations, true)
+        bands = c.value(Bool.self, .bands, true)
+        planned = c.value(Bool.self, .planned, true)
     }
 }
 
@@ -1282,10 +1307,11 @@ struct ANFRZoneCompare: Decodable, Equatable, Sendable {
     let totalPlanned: Int
     let totalByGeneration: ANFRZoneGenerations
     let operators: [ANFRZoneOperator]
+    let capabilities: ANFRZoneCapabilities
     let requestId: String?
 
     enum CodingKeys: String, CodingKey {
-        case market, unit, activeDefinition, snapshot, radiusKm, total, totalByGeneration, operators, requestId
+        case market, unit, activeDefinition, snapshot, radiusKm, total, totalByGeneration, operators, capabilities, requestId
     }
 
     private struct Snapshot: Decodable {
@@ -1325,12 +1351,13 @@ struct ANFRZoneCompare: Decodable, Equatable, Sendable {
         totalPlanned = total.planned
         totalByGeneration = c.value(ANFRZoneGenerations.self, .totalByGeneration, .zero)
         operators = c.decodeLossyArray([ANFRZoneOperator].self, forKey: .operators)
+        capabilities = c.value(ANFRZoneCapabilities.self, .capabilities, .all)
         requestId = c.optional(String.self, .requestId)
     }
 
     init(market: String, unit: String = "site", activeDefinition: String, snapshotDate: String?, snapshotSource: String?,
          radiusKm: Int, totalActive: Int, totalPlanned: Int, totalByGeneration: ANFRZoneGenerations,
-         operators: [ANFRZoneOperator], requestId: String? = nil) {
+         operators: [ANFRZoneOperator], capabilities: ANFRZoneCapabilities = .all, requestId: String? = nil) {
         self.market = market
         self.unit = unit
         self.activeDefinition = activeDefinition
@@ -1341,6 +1368,7 @@ struct ANFRZoneCompare: Decodable, Equatable, Sendable {
         self.totalPlanned = totalPlanned
         self.totalByGeneration = totalByGeneration
         self.operators = operators
+        self.capabilities = capabilities
         self.requestId = requestId
     }
 
@@ -1401,5 +1429,243 @@ struct ANFRZoneCompare: Decodable, Equatable, Sendable {
         return item.generations.ordered.map {
             BarSegment(generation: $0.label, count: $0.count, fraction: min(max(Double($0.count) / Double(scale), 0), 1))
         }
+    }
+}
+
+// MARK: - Mesures de zone par opérateur (ZM-1)
+
+/// Période des mesures comparées (`period` de `GET /api/operators/zone-metrics`).
+enum ZoneMetricsPeriod: String, CaseIterable, Identifiable, Sendable {
+    case threeMonths = "3m"
+    case twelveMonths = "12m"
+    case all
+
+    static let `default`: ZoneMetricsPeriod = .twelveMonths
+
+    var id: String { rawValue }
+
+    /// Libellé court du sélecteur.
+    var label: String {
+        switch self {
+        case .threeMonths: return String(localized: "3 mois")
+        case .twelveMonths: return String(localized: "12 mois")
+        case .all: return String(localized: "Tout")
+        }
+    }
+
+    /// Fin de phrase : « … sur les 12 derniers mois ».
+    var phrase: String {
+        switch self {
+        case .threeMonths: return String(localized: "sur les 3 derniers mois")
+        case .twelveMonths: return String(localized: "sur les 12 derniers mois")
+        case .all: return String(localized: "sur tout l’historique")
+        }
+    }
+}
+
+/// Un palier de la répartition (clés du contrat quality-scale v1.1).
+struct ZoneMetricsTier: Decodable, Equatable, Sendable {
+    let tier: String
+    let count: Int
+
+    enum CodingKeys: String, CodingKey { case tier, count }
+
+    init(tier: String, count: Int) {
+        self.tier = tier
+        self.count = count
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tier = try c.decode(String.self, forKey: .tier)
+        count = max(c.value(Int.self, .count, 0), 0)
+    }
+
+    /// Libellé du palier, celui des trois plateformes ; la clé brute pour un palier inconnu.
+    var label: String {
+        switch tier {
+        case "very-slow": return String(localized: "Très lent")
+        case "slow": return String(localized: "Lent")
+        case "fair": return String(localized: "Moyen")
+        case "good": return String(localized: "Bon")
+        case "very-good": return String(localized: "Très bon")
+        case "excellent": return String(localized: "Excellent")
+        case "exceptional": return String(localized: "Exceptionnel")
+        case "poor": return String(localized: "Faible")
+        case "critical": return String(localized: "Critique")
+        default: return tier
+        }
+    }
+}
+
+/// Médiane d'une technologie (4G, 5G… ; `median` nul sous 3 échantillons).
+struct ZoneMetricsTechnology: Decodable, Equatable, Identifiable, Sendable {
+    let tech: String
+    let sampleCount: Int
+    let median: Double?
+
+    var id: String { tech }
+
+    enum CodingKeys: String, CodingKey { case tech, sampleCount, median }
+
+    init(tech: String, sampleCount: Int, median: Double?) {
+        self.tech = tech
+        self.sampleCount = sampleCount
+        self.median = median
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tech = try c.decode(String.self, forKey: .tech)
+        sampleCount = max(c.value(Int.self, .sampleCount, 0), 0)
+        median = c.optional(Double.self, .median)
+    }
+}
+
+/// Un opérateur du registre et ses mesures dans la zone. Tous les opérateurs du marché sont
+/// présents, même à 0 ; `p25`/`p75` sont nuls sous 3 échantillons.
+struct ZoneMetricsOperator: Decodable, Equatable, Identifiable, Sendable {
+    let key: String
+    let label: String
+    let sampleCount: Int
+    let rawCount: Int
+    let contributors: Int
+    let median: Double?
+    let p25: Double?
+    let p75: Double?
+    let distribution: [ZoneMetricsTier]
+    let byTechnology: [ZoneMetricsTechnology]
+    let share5G: Double?
+    /// Débit : envoi (Mbit/s) et latence (ms). Signal : RSRQ (dB) et SINR (dB).
+    let uploadMedianMbps: Double?
+    let pingMedianMs: Double?
+    let rsrqMedian: Double?
+    let sinrMedian: Double?
+    let latestAt: Date?
+    let samples30d: Int
+
+    var id: String { key }
+
+    enum CodingKeys: String, CodingKey {
+        case key, label, sampleCount, rawCount, contributors, median, p25, p75, distribution, byTechnology
+        case share5G, secondary, latestAt, samples30d
+    }
+
+    private struct Secondary: Decodable {
+        let uploadMedianMbps: Double?
+        let pingMedianMs: Double?
+        let rsrqMedian: Double?
+        let sinrMedian: Double?
+    }
+
+    init(key: String, label: String, sampleCount: Int, rawCount: Int? = nil, contributors: Int = 0,
+         median: Double?, p25: Double? = nil, p75: Double? = nil, distribution: [ZoneMetricsTier] = [],
+         byTechnology: [ZoneMetricsTechnology] = [], share5G: Double? = nil,
+         uploadMedianMbps: Double? = nil, pingMedianMs: Double? = nil, rsrqMedian: Double? = nil, sinrMedian: Double? = nil,
+         latestAt: Date? = nil, samples30d: Int = 0) {
+        self.key = key
+        self.label = label
+        self.sampleCount = sampleCount
+        self.rawCount = rawCount ?? sampleCount
+        self.contributors = contributors
+        self.median = median
+        self.p25 = p25
+        self.p75 = p75
+        self.distribution = distribution
+        self.byTechnology = byTechnology
+        self.share5G = share5G
+        self.uploadMedianMbps = uploadMedianMbps
+        self.pingMedianMs = pingMedianMs
+        self.rsrqMedian = rsrqMedian
+        self.sinrMedian = sinrMedian
+        self.latestAt = latestAt
+        self.samples30d = samples30d
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rawKey = try c.decode(String.self, forKey: .key).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawKey.isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .key, in: c, debugDescription: "empty operator key")
+        }
+        key = rawKey
+        label = c.value(String.self, .label, rawKey)
+        sampleCount = max(c.value(Int.self, .sampleCount, 0), 0)
+        rawCount = max(c.value(Int.self, .rawCount, 0), 0)
+        contributors = max(c.value(Int.self, .contributors, 0), 0)
+        median = sampleCount > 0 ? c.optional(Double.self, .median) : nil
+        p25 = c.optional(Double.self, .p25)
+        p75 = c.optional(Double.self, .p75)
+        distribution = c.decodeLossyArray([ZoneMetricsTier].self, forKey: .distribution)
+        byTechnology = c.decodeLossyArray([ZoneMetricsTechnology].self, forKey: .byTechnology)
+        share5G = c.optional(Double.self, .share5G).map { min(max($0, 0), 1) }
+        let secondary = c.optional(Secondary.self, .secondary)
+        uploadMedianMbps = secondary?.uploadMedianMbps
+        pingMedianMs = secondary?.pingMedianMs
+        rsrqMedian = secondary?.rsrqMedian
+        sinrMedian = secondary?.sinrMedian
+        latestAt = c.optional(Date.self, .latestAt)
+        samples30d = max(c.value(Int.self, .samples30d, 0), 0)
+    }
+
+    var hasMeasurements: Bool { sampleCount > 0 && median != nil }
+}
+
+/// `GET /api/operators/zone-metrics` : débit ou signal de chaque opérateur dans un rayon.
+struct ZoneMetrics: Decodable, Equatable, Sendable {
+    let market: String
+    let metric: String
+    let period: String
+    let radiusKm: Int
+    /// `test` : un speedtest = un échantillon ; `place_day` : la médiane d'un contributeur
+    /// dans une case d'environ 100 m pour un jour.
+    let weighting: String
+    let totalSamples: Int
+    let operators: [ZoneMetricsOperator]
+    let generatedAt: Date?
+    let requestId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case market, metric, period, radiusKm, weighting, totalSamples, operators, generatedAt, requestId
+    }
+
+    init(market: String, metric: String, period: String, radiusKm: Int, weighting: String,
+         operators: [ZoneMetricsOperator], generatedAt: Date? = nil, requestId: String? = nil) {
+        self.market = market
+        self.metric = metric
+        self.period = period
+        self.radiusKm = radiusKm
+        self.weighting = weighting
+        self.totalSamples = operators.reduce(0) { $0 + $1.sampleCount }
+        self.operators = operators
+        self.generatedAt = generatedAt
+        self.requestId = requestId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        market = c.value(String.self, .market, "")
+        metric = c.value(String.self, .metric, "download")
+        period = c.value(String.self, .period, ZoneMetricsPeriod.default.rawValue)
+        radiusKm = c.value(Int.self, .radiusKm, 0)
+        weighting = c.value(String.self, .weighting, "test")
+        operators = c.decodeLossyArray([ZoneMetricsOperator].self, forKey: .operators)
+        totalSamples = max(c.value(Int.self, .totalSamples, operators.reduce(0) { $0 + $1.sampleCount }), 0)
+        generatedAt = c.optional(Date.self, .generatedAt)
+        requestId = c.optional(String.self, .requestId)
+    }
+
+    /// Classement : les opérateurs mesurés, de la meilleure médiane à la moins bonne (en débit
+    /// comme en signal, plus haut = mieux ; à égalité, le plus d'échantillons), puis ceux sans
+    /// mesure, dans l'ordre du registre.
+    var ranked: [ZoneMetricsOperator] {
+        let measured = operators.enumerated().filter { $0.element.hasMeasurements }
+        let sorted = measured.sorted { a, b in
+            let ma = a.element.median ?? 0, mb = b.element.median ?? 0
+            if ma != mb { return ma > mb }
+            if a.element.sampleCount != b.element.sampleCount { return a.element.sampleCount > b.element.sampleCount }
+            return a.offset < b.offset
+        }.map(\.element)
+        return sorted + operators.filter { !$0.hasMeasurements }
     }
 }

@@ -361,5 +361,52 @@ enum ANFRDemoData {
             operators: operators
         )
     }
+
+    /// Mesures de la même zone, en débit ou en signal : plus le rayon et la période sont grands,
+    /// plus il y a d'échantillons ; les médianes, elles, restent celles d'une grande ville.
+    static func zoneMetrics(metric: NearbyOperatorMetric, radius: ANFRZoneRadius, period: ZoneMetricsPeriod) -> ZoneMetrics {
+        let periodScale: Double = period == .threeMonths ? 0.3 : (period == .all ? 1.6 : 1)
+        let scale = pow(Double(radius.kilometers) / 50, 0.8) * periodScale
+        func n(_ value: Int) -> Int { max(Int((Double(value) * scale).rounded()), 0) }
+        let now = Date()
+        // (clé, libellé, échantillons, médiane, p25, p75, part 5G, médiane 4G, médiane 5G, contributeurs)
+        let rows: [(String, String, Int, Double, Double, Double, Double, Double, Double, Int)] = metric == .download
+            ? [("BOUYGUES", "Bouygues Telecom", 148, 186, 92, 341, 0.46, 121, 352, 61),
+               ("ORANGE", "Orange", 212, 214, 118, 402, 0.52, 132, 388, 84),
+               ("FREE", "Free Mobile", 131, 96, 41, 233, 0.38, 64, 251, 57),
+               ("SFR", "SFR", 103, 132, 58, 276, 0.41, 88, 301, 43)]
+            : [("BOUYGUES", "Bouygues Telecom", 420, -91, -99, -83, 0.33, -92, -88, 52),
+               ("ORANGE", "Orange", 611, -84, -93, -77, 0.4, -85, -82, 77),
+               ("FREE", "Free Mobile", 388, -103, -111, -94, 0.29, -103, -101, 49),
+               ("SFR", "SFR", 297, -95, -104, -87, 0.31, -96, -92, 38)]
+        let tiers = metric == .download
+            ? ["very-slow", "slow", "fair", "good", "very-good", "excellent", "exceptional"]
+            : ["excellent", "good", "fair", "poor", "critical"]
+        let operators = rows.enumerated().map { index, row -> ZoneMetricsOperator in
+            let samples = n(row.2)
+            let weights: [Double] = metric == .download
+                ? [0.05, 0.1, 0.2, 0.3, 0.2, 0.1, 0.05]
+                : [0.25, 0.3, 0.25, 0.15, 0.05]
+            let fiveG = Int((Double(samples) * row.6).rounded())
+            return ZoneMetricsOperator(
+                key: row.0, label: row.1, sampleCount: samples,
+                rawCount: metric == .signal ? samples * 9 : samples, contributors: n(row.9),
+                median: samples > 0 ? row.3 : nil, p25: samples >= 3 ? row.4 : nil, p75: samples >= 3 ? row.5 : nil,
+                distribution: zip(tiers, weights).map { ZoneMetricsTier(tier: $0.0, count: Int((Double(samples) * $0.1).rounded())) },
+                byTechnology: [ZoneMetricsTechnology(tech: "5G", sampleCount: fiveG, median: row.8),
+                               ZoneMetricsTechnology(tech: "4G", sampleCount: samples - fiveG, median: row.7)],
+                share5G: samples > 0 ? row.6 : nil,
+                uploadMedianMbps: metric == .download ? (row.3 / 6).rounded() : nil,
+                pingMedianMs: metric == .download ? Double(24 + index * 5) : nil,
+                rsrqMedian: metric == .signal ? Double(-10 - index) : nil,
+                sinrMedian: metric == .signal ? Double(14 - index * 2) : nil,
+                latestAt: now.addingTimeInterval(-Double(3_600 * (index * 7 + 2))),
+                samples30d: Int((Double(samples) * 0.12).rounded())
+            )
+        }
+        return ZoneMetrics(market: "FR", metric: metric == .signal ? "signal" : "download", period: period.rawValue,
+                           radiusKm: radius.kilometers, weighting: metric == .signal ? "place_day" : "test",
+                           operators: operators, generatedAt: now)
+    }
 }
 #endif

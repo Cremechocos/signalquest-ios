@@ -2530,8 +2530,8 @@ struct MapExplorerView: View {
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsZoneCompareTip)
     }
 
-    /// Rien ne signale l'appui long sur la carte : une astuce, une seule fois, là où le
-    /// comparatif des antennes répond (France et outre-mer), jamais dans les tests UI.
+    /// Rien ne signale l'appui long sur la carte : une astuce, une seule fois, dans tout pays
+    /// suivi (le comparatif y répond), jamais dans les tests UI.
     private var showsZoneCompareTip: Bool {
         #if DEBUG
         if ProcessInfo.processInfo.environment["SQ_QA_ZONE_COMPARE_TIP"] == "1" { return !zoneCompareTipDone }
