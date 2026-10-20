@@ -93997,6 +93997,70 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Infos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Info"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Infos"
+          }
+        }
+      }
+    },
+    "Pas encore reçu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not received yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore reçu"
+          }
+        }
+      }
+    },
+    "Envoyé le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyé le %@"
+          }
+        }
+      }
+    },
+    "L’heure est celle de la dernière lecture ou réception de la conversation par chaque membre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each time is when that member last read or received the conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’heure est celle de la dernière lecture ou réception de la conversation par chaque membre."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

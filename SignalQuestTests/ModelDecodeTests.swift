@@ -119,6 +119,40 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(ownOnly, .sent)
     }
 
+    func testMessageInfoSplitsMembersIntoReadDeliveredAndPending() {
+        let sent = Date(timeIntervalSince1970: 1_000)
+        let info = MessageReadInfo.resolve(
+            messageDate: sent, currentUserId: "me",
+            participants: [("me", "Moi"), ("a", "Alice"), ("b", nil), ("c", "Chloé"), ("d", "Bruno")],
+            readReceipts: [
+                ReadReceipt(userId: "c", name: nil, lastReadAt: sent.addingTimeInterval(30)),
+                ReadReceipt(userId: "a", name: nil, lastReadAt: sent.addingTimeInterval(10)),
+                ReadReceipt(userId: "d", name: nil, lastReadAt: sent.addingTimeInterval(-5)),
+                ReadReceipt(userId: "me", name: nil, lastReadAt: sent.addingTimeInterval(60))
+            ],
+            deliveryReceipts: [
+                DeliveryReceipt(userId: "b", name: "Benoît", lastDeliveredAt: sent),
+                DeliveryReceipt(userId: "a", name: nil, lastDeliveredAt: sent.addingTimeInterval(5))
+            ]
+        )
+        // Lu : du plus ancien au plus récent, avec l'heure de la dernière lecture.
+        XCTAssertEqual(info.read.map(\.id), ["a", "c"])
+        XCTAssertEqual(info.read.first?.at, sent.addingTimeInterval(10))
+        // Distribué à l'heure exacte de l'envoi : couvert ; le nom vient de l'accusé.
+        XCTAssertEqual(info.delivered, [.init(id: "b", name: "Benoît", at: sent)])
+        // Une lecture antérieure au message ne le couvre pas ; jamais soi-même.
+        XCTAssertEqual(info.pending, [.init(id: "d", name: "Bruno", at: nil)])
+
+        // Sans liste de membres, les accusés tiennent lieu de membres.
+        let fromReceipts = MessageReadInfo.resolve(
+            messageDate: sent, currentUserId: "me", participants: [],
+            readReceipts: [ReadReceipt(userId: "u2", name: "Léa", lastReadAt: sent.addingTimeInterval(1))],
+            deliveryReceipts: [DeliveryReceipt(userId: "u2", name: "Léa", lastDeliveredAt: sent)]
+        )
+        XCTAssertEqual(fromReceipts.read.map(\.name), ["Léa"])
+        XCTAssertTrue(fromReceipts.delivered.isEmpty && fromReceipts.pending.isEmpty)
+    }
+
     func testOwnMessageStatusInAGroupNeedsEveryoneForDeliveredAndRead() {
         let sent = Date(timeIntervalSince1970: 1_000)
         let members = ["me", "a", "b", "c"]

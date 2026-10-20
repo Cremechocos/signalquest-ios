@@ -193,6 +193,8 @@ struct ConversationDetailView: View {
     @State private var showSchedulePicker = false
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
+    /// Mon message dont on montre qui l'a lu ou reçu.
+    @State private var messageInfoTarget: MessageItem?
     /// Texte ouvert dans une feuille où il se sélectionne librement.
     @State private var selectableText: SelectableText?
     /// Message auquel on réagit avec un emoji hors de la palette rapide.
@@ -819,6 +821,9 @@ struct ConversationDetailView: View {
             ) { reason, comment in
                 try await report(message, reason: reason, comment: comment)
             }
+        }
+        .sheet(item: $messageInfoTarget) { message in
+            MessageInfoSheet(info: messageReadInfo(for: message), sentAt: message.createdAt)
         }
     }
 
@@ -1548,6 +1553,16 @@ struct ConversationDetailView: View {
             }
         }
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
+        // Double tap : ❤️, ou le retire s'il est déjà de moi. Simultané pour ne pas retarder
+        // les appuis simples des liens, photos et sondages ; pas en conversation chiffrée,
+        // où les réactions ne sont pas encore chiffrées (SOC-07).
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                Haptics.light()
+                Task { await toggleReaction(message: message, emoji: "❤️") }
+            },
+            including: !isE2EE && message.deletedAt == nil && !message.id.hasPrefix("local-") ? .all : .subviews
+        )
         .contextMenu { contextMenu(for: message, mine: mine) }
         .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
             reactionChips(for: message, summaries: reactions)
@@ -2149,6 +2164,15 @@ struct ConversationDetailView: View {
                 }
             }
         }
+        // Qui l'a lu ou reçu : les accusés ne sont pas du contenu, aussi en conversation chiffrée.
+        if mine && message.deletedAt == nil && !isLocal {
+            Button {
+                messageInfoTarget = message
+                Task { await refreshReceipts() }
+            } label: {
+                Label("Infos", systemImage: "info.circle")
+            }
+        }
         if mine && message.deletedAt == nil && !isLocal {
             Button {
                 replyTarget = nil
@@ -2485,6 +2509,17 @@ struct ConversationDetailView: View {
         if !receiptsKnown { return nil }
         let pendingMineAfter = messages.last(where: { $0.senderId == currentUserId })?.id.hasPrefix("local-") == true
         return pendingMineAfter ? nil : status
+    }
+
+    /// Lecteurs et destinataires de mon message, pour la feuille « Infos ».
+    private func messageReadInfo(for message: MessageItem) -> MessageReadInfo {
+        MessageReadInfo.resolve(
+            messageDate: message.createdAt ?? .distantFuture,
+            currentUserId: currentUserId,
+            participants: conversation.participants.map { (id: $0.userId, name: $0.user.displayName.isEmpty ? nil : $0.user.displayName) },
+            readReceipts: readReceipts,
+            deliveryReceipts: deliveryReceipts
+        )
     }
 
     /// Change quand le pied « Envoyé / Distribué / Lu » apparaît ou se modifie : sert à rester en bas de la liste.
@@ -5476,6 +5511,66 @@ private struct SelectableTextSheet: View {
         }
         .sqSheet(background: SQColor.bg)
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// « Infos » d'un de mes messages : qui l'a lu, qui l'a seulement reçu, qui ne l'a pas encore.
+private struct MessageInfoSheet: View {
+    let info: MessageReadInfo
+    let sentAt: Date?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                MessageSheetHeader(
+                    title: "Infos",
+                    subtitle: sentAt.map { String(localized: "Envoyé le \($0.formatted(date: .abbreviated, time: .shortened))") },
+                    closeIdentifier: "message.info.close"
+                ) { dismiss() }
+                group("Lu", members: info.read, systemImage: "checkmark.circle.fill", tint: SQColor.accentInk)
+                group("Distribué", members: info.delivered, systemImage: "checkmark.circle", tint: SQColor.labelSecondary)
+                group("Pas encore reçu", members: info.pending, systemImage: "circle.dashed", tint: SQColor.labelSecondary)
+                if !(info.read + info.delivered).isEmpty {
+                    Text("L’heure est celle de la dernière lecture ou réception de la conversation par chaque membre.")
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("message.info")
+    }
+
+    @ViewBuilder
+    private func group(_ title: LocalizedStringKey, members: [MessageReadInfo.Member], systemImage: String, tint: Color) -> some View {
+        if !members.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Label(title, systemImage: systemImage)
+                    .font(SQType.callout.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(members) { member in
+                    HStack(spacing: SQSpace.md) {
+                        SQAvatar(url: nil, name: member.name ?? "?", size: 32)
+                            .accessibilityHidden(true)
+                        Text(verbatim: member.name ?? String(localized: "Un membre"))
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                        Spacer(minLength: SQSpace.sm)
+                        if let at = member.at {
+                            Text(at.formatted(.relative(presentation: .named)))
+                                .font(SQType.micro)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
     }
 }
 

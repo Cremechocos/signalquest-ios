@@ -795,6 +795,60 @@ enum OwnMessageReceiptStatus: Equatable {
     }
 }
 
+/// « Infos » d'un de mes messages : qui l'a lu, qui l'a seulement reçu, qui ne l'a pas
+/// encore. L'heure d'un membre est celle de sa dernière lecture (ou réception) de la
+/// conversation : le serveur ne garde pas l'heure de lecture de chaque message.
+struct MessageReadInfo: Equatable {
+    struct Member: Equatable, Identifiable {
+        let id: String
+        let name: String?
+        let at: Date?
+    }
+
+    var read: [Member] = []
+    var delivered: [Member] = []
+    var pending: [Member] = []
+
+    /// Calcul pur. `participants` donne les autres membres et leur nom ; sans eux,
+    /// les identifiants des accusés tiennent lieu de membres. Mêmes règles que
+    /// `OwnMessageReceiptStatus` : un accusé daté du message ou après le couvre.
+    static func resolve(
+        messageDate: Date,
+        currentUserId: String?,
+        participants: [(id: String, name: String?)],
+        readReceipts: [ReadReceipt],
+        deliveryReceipts: [DeliveryReceipt]
+    ) -> MessageReadInfo {
+        var names: [String: String] = [:]
+        for receipt in readReceipts { if let name = receipt.name { names[receipt.userId] = name } }
+        for receipt in deliveryReceipts where names[receipt.userId] == nil {
+            if let name = receipt.name { names[receipt.userId] = name }
+        }
+        for participant in participants { if let name = participant.name { names[participant.id] = name } }
+        var ids = participants.map(\.id)
+        if ids.isEmpty { ids = readReceipts.map(\.userId) + deliveryReceipts.map(\.userId) }
+        var seen = Set<String>()
+        ids = ids.filter { $0 != currentUserId && seen.insert($0).inserted }
+
+        let readAt = Dictionary(readReceipts.compactMap { r in r.lastReadAt.map { (r.userId, $0) } }, uniquingKeysWith: max)
+        let deliveredAt = Dictionary(deliveryReceipts.compactMap { r in r.lastDeliveredAt.map { (r.userId, $0) } }, uniquingKeysWith: max)
+        var info = MessageReadInfo()
+        for id in ids {
+            if let at = readAt[id], at >= messageDate {
+                info.read.append(Member(id: id, name: names[id], at: at))
+            } else if let at = deliveredAt[id], at >= messageDate {
+                info.delivered.append(Member(id: id, name: names[id], at: at))
+            } else {
+                info.pending.append(Member(id: id, name: names[id], at: nil))
+            }
+        }
+        info.read.sort { ($0.at ?? .distantPast) < ($1.at ?? .distantPast) }
+        info.delivered.sort { ($0.at ?? .distantPast) < ($1.at ?? .distantPast) }
+        info.pending.sort { ($0.name ?? "").localizedStandardCompare($1.name ?? "") == .orderedAscending }
+        return info
+    }
+}
+
 struct MessageAttachment: Decodable, Identifiable, Equatable {
     let id: String?
     let kind: String
