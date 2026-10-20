@@ -456,7 +456,7 @@ private struct ZoneMetricsSection: View {
     @ViewBuilder
     private func loadedContent(_ data: ZoneMetrics) -> some View {
         let rows = data.ranked
-        let best = rows.compactMap(\.median).max() ?? 1
+        let best = rows.filter(\.isRanked).compactMap(\.median).max() ?? 1
         Text(verbatim: intro(data))
             .font(SQType.callout)
             .foregroundStyle(SQColor.ink2)
@@ -472,7 +472,7 @@ private struct ZoneMetricsSection: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { Divider().overlay(SQColor.separator) }
                     ZoneMetricsRow(
-                        item: item, rank: item.hasMeasurements ? index + 1 : nil, metric: metric,
+                        item: item, rank: item.isRanked ? index + 1 : nil, metric: metric,
                         fraction: item.median.map { ZoneMetricFormat.fraction($0, best: best, metric: metric) } ?? 0,
                         color: marketEntry?.operatorColor(forKey: item.key) ?? SQBrand.operatorColor(item.label),
                         animate: animate
@@ -509,8 +509,8 @@ private struct ZoneMetricsSection: View {
     }
 }
 
-/// Rangée d'opérateur : rang, nom, médiane et barre. Un opérateur sans mesure reste listé,
-/// estompé, sans fiche.
+/// Rangée d'opérateur : rang, nom, médiane et barre. À 1 ou 2 mesures, ni rang ni barre, mais
+/// la fiche s'ouvre ; sans mesure, la rangée reste listée, estompée, sans fiche.
 private struct ZoneMetricsRow: View {
     let item: ZoneMetricsOperator
     let rank: Int?
@@ -542,7 +542,7 @@ private struct ZoneMetricsRow: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     Spacer(minLength: SQSpace.sm)
-                    if let median = item.median, item.hasMeasurements {
+                    if let median = item.median, rank != nil {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(verbatim: ZoneMetricFormat.value(median, metric: metric))
                                 .font(SQFont.display(20, .bold))
@@ -552,13 +552,15 @@ private struct ZoneMetricsRow: View {
                                 .font(SQType.caption(.semibold))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
+                    }
+                    if item.hasMeasurements {
                         Image(systemName: "chevron.right")
                             .font(SQType.caption(.semibold))
                             .foregroundStyle(SQColor.labelSecondary)
                             .accessibilityHidden(true)
                     }
                 }
-                if item.hasMeasurements {
+                if rank != nil {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule().fill(SQColor.chip)
@@ -586,6 +588,7 @@ private struct ZoneMetricsRow: View {
 
     private var detailText: String {
         guard item.hasMeasurements else { return String(localized: "Pas de mesure dans ce rayon") }
+        guard rank != nil else { return String(localized: "\(item.sampleCount) mesure · trop peu pour une médiane") }
         var parts = [ZoneMetricFormat.count(item.sampleCount)]
         if let share = item.share5G, share > 0 {
             parts.append("5G " + ZoneMetricFormat.percent(share))
@@ -594,9 +597,10 @@ private struct ZoneMetricsRow: View {
     }
 
     private var accessibilityText: String {
-        guard let median = item.median, item.hasMeasurements else {
+        guard item.hasMeasurements else {
             return String(localized: "\(item.label), pas de mesure dans ce rayon.")
         }
+        guard let median = item.median, rank != nil else { return "\(item.label), \(detailText)." }
         let position = rank.map { "\($0). " } ?? ""
         return position + "\(item.label), \(ZoneMetricFormat.text(median, metric: metric)), \(detailText)."
     }
@@ -703,7 +707,7 @@ private struct ZoneOperatorDetailSheet: View {
 
     @ViewBuilder
     private var headline: some View {
-        if let median = item.median {
+        if let median = item.median, item.isRanked {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Médiane")
                     .font(SQType.caption(.semibold))
@@ -727,6 +731,17 @@ private struct ZoneOperatorDetailSheet: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Médiane")
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Text("Moins de 3 mesures : pas encore d’écart à montrer.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
         }
@@ -1472,7 +1487,8 @@ private struct ZoneAntennasSection: View {
 
     private func definition(market: String) -> LocalizedStringKey {
         switch market.uppercased() {
-        case "CA", "CH": return "Sites présents dans le registre officiel du pays."
+        case "CA": return "Sites mobiles présents dans le registre officiel du pays."
+        case "CH": return "Sites présents dans le registre officiel du pays."
         case "BE": return "Sites présents dans les registres officiels de Flandre et de Bruxelles ; la Wallonie n’en publie pas."
         default: return "Sites au statut « En service » ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet."
         }

@@ -1545,7 +1545,7 @@ final class ZoneMetricsTests: XCTestCase {
         let json = #"""
         {"market":"FR","metric":"download","period":"12m","radiusKm":20,"center":{"lat":45.76,"lon":4.84},"unit":"Mbps","weighting":"test","totalSamples":9,"totalRawPoints":9,"generatedAt":"2026-10-20T00:10:00.000Z","operators":[
          {"key":"BOUYGUES","label":"Bouygues Telecom","sampleCount":0,"rawCount":0,"contributors":0,"median":null,"p25":null,"p75":null,"distribution":[{"tier":"very-slow","count":0}],"byTechnology":[],"share5G":null,"secondary":{"uploadMedianMbps":null,"pingMedianMs":null},"latestAt":null,"samples30d":0},
-         {"key":"FREE","label":"Free Mobile","sampleCount":2,"rawCount":2,"contributors":2,"median":96.4,"p25":null,"p75":null,"distribution":[{"tier":"fair","count":2}],"byTechnology":[{"tech":"4G","sampleCount":2,"median":96.4}],"share5G":0,"secondary":{"uploadMedianMbps":12.5,"pingMedianMs":31},"latestAt":"2026-10-19T18:00:00.000Z","samples30d":1},
+         {"key":"FREE","label":"Free Mobile","sampleCount":2,"rawCount":2,"contributors":2,"median":null,"p25":null,"p75":null,"distribution":[{"tier":"fair","count":2}],"byTechnology":[{"tech":"4G","sampleCount":2,"median":null}],"share5G":0,"secondary":{"uploadMedianMbps":12.5,"pingMedianMs":31},"latestAt":"2026-10-19T18:00:00.000Z","samples30d":1},
          {"key":"ORANGE","label":"Orange","sampleCount":7,"rawCount":7,"contributors":5,"median":214,"p25":118,"p75":402,"distribution":[{"tier":"good","count":4},{"tier":"very-good","count":3}],"byTechnology":[{"tech":"5G","sampleCount":4,"median":388},{"tech":"4G","sampleCount":3,"median":132}],"share5G":0.571,"secondary":{"uploadMedianMbps":36,"pingMedianMs":24},"latestAt":"2026-10-19T21:00:00.000Z","samples30d":3},
          {"key":"SFR","label":"SFR","sampleCount":0,"rawCount":0,"contributors":0,"median":null,"p25":null,"p75":null,"distribution":[],"byTechnology":[],"share5G":null,"secondary":{"uploadMedianMbps":null,"pingMedianMs":null},"latestAt":null,"samples30d":0}
         ],"requestId":"r"}
@@ -1554,7 +1554,7 @@ final class ZoneMetricsTests: XCTestCase {
         XCTAssertEqual(zone.totalSamples, 9)
         XCTAssertEqual(zone.weighting, "test")
         XCTAssertEqual(zone.ranked.map(\.key), ["ORANGE", "FREE", "BOUYGUES", "SFR"],
-                       "Les mesurés d'abord, du meilleur au moins bon ; puis les autres dans l'ordre du registre")
+                       "3 mesures et plus d'abord, du meilleur au moins bon ; puis 1 ou 2 mesures (médiane null) ; puis les autres dans l'ordre du registre")
         let orange = try XCTUnwrap(zone.operators.first { $0.key == "ORANGE" })
         XCTAssertEqual(orange.p25, 118)
         XCTAssertEqual(orange.byTechnology.map(\.tech), ["5G", "4G"])
@@ -1565,8 +1565,10 @@ final class ZoneMetricsTests: XCTestCase {
         XCTAssertNotNil(orange.latestAt)
         XCTAssertEqual(orange.distribution.map(\.label), ["Bon", "Très bon"])
         let free = try XCTUnwrap(zone.operators.first { $0.key == "FREE" })
-        XCTAssertNil(free.p25, "Sous 3 échantillons, pas d'écart")
-        XCTAssertTrue(free.hasMeasurements)
+        XCTAssertNil(free.median, "Sous 3 échantillons, ni médiane ni écart")
+        XCTAssertTrue(free.hasMeasurements, "Sa fiche s'ouvre")
+        XCTAssertFalse(free.isRanked, "Mais 2 mesures ne suffisent pas pour un rang")
+        XCTAssertTrue(orange.isRanked)
         XCTAssertFalse(try XCTUnwrap(zone.operators.first { $0.key == "SFR" }).hasMeasurements)
     }
 

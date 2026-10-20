@@ -1612,7 +1612,12 @@ struct ZoneMetricsOperator: Decodable, Equatable, Identifiable, Sendable {
         samples30d = max(c.value(Int.self, .samples30d, 0), 0)
     }
 
-    var hasMeasurements: Bool { sampleCount > 0 && median != nil }
+    /// Au moins une mesure : la fiche s'ouvre.
+    var hasMeasurements: Bool { sampleCount > 0 }
+
+    /// Assez de mesures (3 et plus) pour entrer au classement. Le serveur donne une médiane dès
+    /// la 1re mesure, mais un test seul ne départage pas les opérateurs (décision du 20/10).
+    var isRanked: Bool { sampleCount >= 3 && median != nil }
 }
 
 /// `GET /api/operators/zone-metrics` : débit ou signal de chaque opérateur dans un rayon.
@@ -1659,17 +1664,17 @@ struct ZoneMetrics: Decodable, Equatable, Sendable {
         requestId = c.optional(String.self, .requestId)
     }
 
-    /// Classement : les opérateurs mesurés, de la meilleure médiane à la moins bonne (en débit
-    /// comme en signal, plus haut = mieux ; à égalité, le plus d'échantillons), puis ceux sans
-    /// mesure, dans l'ordre du registre.
+    /// Classement : les opérateurs à 3 mesures et plus, de la meilleure médiane à la moins bonne
+    /// (en débit comme en signal, plus haut = mieux ; à égalité, le plus d'échantillons), puis
+    /// ceux à 1 ou 2 mesures, puis ceux sans mesure, chacun de ces deux groupes dans l'ordre du registre.
     var ranked: [ZoneMetricsOperator] {
-        let measured = operators.enumerated().filter { $0.element.hasMeasurements }
+        let measured = operators.enumerated().filter { $0.element.isRanked }
         let sorted = measured.sorted { a, b in
             let ma = a.element.median ?? 0, mb = b.element.median ?? 0
             if ma != mb { return ma > mb }
             if a.element.sampleCount != b.element.sampleCount { return a.element.sampleCount > b.element.sampleCount }
             return a.offset < b.offset
         }.map(\.element)
-        return sorted + operators.filter { !$0.hasMeasurements }
+        return sorted + operators.filter { $0.hasMeasurements && !$0.isRanked } + operators.filter { !$0.hasMeasurements }
     }
 }

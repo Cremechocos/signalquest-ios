@@ -29325,6 +29325,46 @@
         }
       }
     },
+    "%lld mesure · trop peu pour une médiane" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurement · too few for a median"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurements · too few for a median"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesure · trop peu pour une médiane"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesures · trop peu pour une médiane"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld mesure au total · rayon %@" : {
       "localizations" : {
         "en" : {
@@ -94634,6 +94674,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ : en service %lld."
+          }
+        }
+      }
+    },
+    "Sites mobiles présents dans le registre officiel du pays." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile sites listed in the country’s official registry."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites mobiles présents dans le registre officiel du pays."
           }
         }
       }

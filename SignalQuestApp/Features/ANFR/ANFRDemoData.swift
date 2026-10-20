@@ -391,10 +391,10 @@ enum ANFRDemoData {
             return ZoneMetricsOperator(
                 key: row.0, label: row.1, sampleCount: samples,
                 rawCount: metric == .signal ? samples * 9 : samples, contributors: n(row.9),
-                median: samples > 0 ? row.3 : nil, p25: samples >= 3 ? row.4 : nil, p75: samples >= 3 ? row.5 : nil,
+                median: samples >= 3 ? row.3 : nil, p25: samples >= 3 ? row.4 : nil, p75: samples >= 3 ? row.5 : nil,
                 distribution: zip(tiers, weights).map { ZoneMetricsTier(tier: $0.0, count: Int((Double(samples) * $0.1).rounded())) },
-                byTechnology: [ZoneMetricsTechnology(tech: "5G", sampleCount: fiveG, median: row.8),
-                               ZoneMetricsTechnology(tech: "4G", sampleCount: samples - fiveG, median: row.7)],
+                byTechnology: [ZoneMetricsTechnology(tech: "5G", sampleCount: fiveG, median: fiveG >= 3 ? row.8 : nil),
+                               ZoneMetricsTechnology(tech: "4G", sampleCount: samples - fiveG, median: samples - fiveG >= 3 ? row.7 : nil)],
                 share5G: samples > 0 ? row.6 : nil,
                 uploadMedianMbps: metric == .download ? (row.3 / 6).rounded() : nil,
                 pingMedianMs: metric == .download ? Double(24 + index * 5) : nil,
