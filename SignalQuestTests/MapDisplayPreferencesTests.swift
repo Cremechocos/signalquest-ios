@@ -105,6 +105,23 @@ final class MapDisplayPreferencesTests: XCTestCase {
         XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
     }
 
+    /// « Aucun » ne s'enregistrait que par un choix : le testeur retrouve
+    /// l'interrupteur éteint, et Secteurs au rallumage.
+    func testLegacyHiddenTurnsTheSwitchOffWithSectorsBehindIt() {
+        UserDefaults.standard.set("hidden", forKey: MapAzimuthStyleStore.legacyKey)
+        defer { UserDefaults.standard.removeObject(forKey: MapAzimuthStyleStore.legacyKey) }
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .hidden)
+        XCTAssertEqual(MapAzimuthStyleStore.lastDrawing(), .lobes)
+    }
+
+    /// Éteindre puis rallumer rend le dernier dessin choisi.
+    func testSwitchingBackOnRestoresTheLastDrawing() {
+        MapAzimuthStyleStore.save(.lines)
+        MapAzimuthStyleStore.save(.hidden)
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .hidden)
+        XCTAssertEqual(MapAzimuthStyleStore.lastDrawing(), .lines)
+    }
+
     func testAzimuthStyleRoundTrips() {
         for style in AzimuthStyle.allCases {
             MapAzimuthStyleStore.save(style)
@@ -117,8 +134,8 @@ final class MapDisplayPreferencesTests: XCTestCase {
         XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
     }
 
-    /// Trois styles proposés, dont « aucun » : le quatrième (flèches) a été
-    /// écarté, ce test évite qu'il revienne par inadvertance.
+    /// Deux dessins plus l'interrupteur éteint (`hidden`) : le quatrième
+    /// style (flèches) a été écarté, ce test évite qu'il revienne par inadvertance.
     func testThreeAzimuthStylesAreOffered() {
         XCTAssertEqual(AzimuthStyle.allCases, [.lobes, .lines, .hidden])
     }

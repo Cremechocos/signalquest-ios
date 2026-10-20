@@ -242,14 +242,28 @@ struct MapLayersSheet: View {
     }
 
     /// Rendu des azimuts, appliqué tout de suite et gardé sur l'appareil, comme
-    /// la section « Antennes » des calques web et Android.
+    /// la section « Antennes » des calques web et Android : un interrupteur, puis
+    /// le dessin, proposé seulement quand il est allumé.
     private var antennaSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Antennes").sqKicker().accessibilityAddTraits(.isHeader)
-            MapSegmented(selection: $azimuthStyle,
-                         options: AzimuthStyle.allCases.map { ($0, $0.label) },
-                         identifier: "map.layers.azimuth")
+            Toggle("Azimuts", isOn: azimuthsShown)
+                .font(SQType.callout(.semibold))
+                .foregroundStyle(SQColor.label)
+                .tint(SQColor.accent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("map.layers.azimuth.toggle")
+            if azimuthStyle != .hidden {
+                MapSegmented(selection: $azimuthStyle,
+                             options: [AzimuthStyle.lobes, .lines].map { ($0, $0.label) },
+                             identifier: "map.layers.azimuth")
+            }
         }
+    }
+
+    private var azimuthsShown: Binding<Bool> {
+        Binding(get: { azimuthStyle != .hidden },
+                set: { azimuthStyle = $0 ? MapAzimuthStyleStore.lastDrawing() : .hidden })
     }
 
     private var layerColumns: [GridItem] {

@@ -209,17 +209,21 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertTrue(technology.isSelected, "Swiping away the sheet must not commit its pending choice")
         try tap(app.buttons["map.filters.done"], in: app)
 
-        // Secteurs / Directions se choisit dans la feuille Carte et s'applique
-        // aussitôt, sans recharger la vue : c'est un réglage d'affichage.
+        // L'interrupteur « Azimuts » et le dessin Secteurs / Directions se
+        // règlent dans la feuille Carte et s'appliquent aussitôt, sans recharger
+        // la vue : ce sont des réglages d'affichage.
         try openLayers(in: app)
         let sectors = app.buttons["map.layers.azimuth.lobes"]
         try reveal(sectors, in: app, sheet: Self.layersSheet)
         XCTAssertTrue(sectors.isSelected, "Sectors is the default, as on the web and Android")
         capture(app, name: "map-azimuth-sectors-before-edit")
         let renderRevision = try await configure("baseline")
-        let hidden = app.buttons["map.layers.azimuth.hidden"]
-        try reveal(hidden, in: app, sheet: Self.layersSheet); hidden.tap()
-        XCTAssertTrue(hidden.isSelected)
+        let azimuths = app.switches["map.layers.azimuth.toggle"]
+        try reveal(azimuths, in: app, sheet: Self.layersSheet)
+        XCTAssertEqual(azimuths.value as? String, "1", "Azimuths are shown by default")
+        azimuths.tap()
+        XCTAssertEqual(azimuths.value as? String, "0")
+        XCTAssertFalse(sectors.exists, "The drawing choice only shows while azimuths are on")
         try closeLayers(in: app)
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         repeat {

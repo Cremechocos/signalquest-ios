@@ -94,7 +94,7 @@ enum AzimuthStyle: String, CaseIterable, Sendable {
     case lobes
     /// Directions : un trait par opérateur, sans recouvrement en zone dense.
     case lines
-    /// Rien du tout.
+    /// Interrupteur « Azimuts » éteint (décision du 20/10, comme Android).
     case hidden
 
     var label: String {
@@ -119,17 +119,35 @@ enum MapAzimuthStyleStore {
     /// enregistrait l'ancien défaut, Traits, comme s'il avait été choisi — la v1
     /// ne distingue donc pas un choix d'un défaut hérité.
     static let key = "map.azimuthStyle.v2"
+    /// « Aucun » ne pouvait s'enregistrer que par un choix : il reste lu dans la v1.
+    static let legacyKey = "map.azimuthStyle.v1"
+    /// Dernier dessin choisi, rendu quand l'interrupteur « Azimuts » se rallume.
+    static let drawingKey = "map.azimuthDrawing.v1"
 
     static func save(_ style: AzimuthStyle) {
         UserDefaults.standard.set(style.rawValue, forKey: key)
+        if style != .hidden { UserDefaults.standard.set(style.rawValue, forKey: drawingKey) }
     }
 
     static func last() -> AzimuthStyle {
-        UserDefaults.standard.string(forKey: key)
-            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lobes
+        let defaults = UserDefaults.standard
+        if let stored = defaults.string(forKey: key) {
+            return AzimuthStyle(rawValue: stored) ?? .lobes
+        }
+        return defaults.string(forKey: legacyKey) == AzimuthStyle.hidden.rawValue ? .hidden : .lobes
     }
 
-    static func reset() { UserDefaults.standard.removeObject(forKey: key) }
+    /// Secteurs tant qu'aucun dessin n'a été choisi.
+    static func lastDrawing() -> AzimuthStyle {
+        UserDefaults.standard.string(forKey: drawingKey)
+            .flatMap(AzimuthStyle.init(rawValue:))
+            .flatMap { $0 == .hidden ? nil : $0 } ?? .lobes
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: key)
+        UserDefaults.standard.removeObject(forKey: drawingKey)
+    }
 }
 
 /// Persiste le dernier marché + opérateur sélectionnés sur la carte, pour rouvrir
