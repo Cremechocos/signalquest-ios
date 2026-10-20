@@ -95222,34 +95222,34 @@
         }
       }
     },
-    "en envoi" : {
+    "en envoi %lld ms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "while uploading"
+            "value" : "while uploading %lld ms"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "en envoi"
+            "value" : "en envoi %lld ms"
           }
         }
       }
     },
-    "en réception" : {
+    "en réception %lld ms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "while downloading"
+            "value" : "while downloading %lld ms"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "en réception"
+            "value" : "en réception %lld ms"
           }
         }
       }
@@ -95282,6 +95282,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS ne donne pas accès au signal radio (puissance, bandes, cellule) : seuls l'opérateur et le type de réseau sont connus."
+          }
+        }
+      }
+    },
+    "note %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "grade %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "note %@"
           }
         }
       }

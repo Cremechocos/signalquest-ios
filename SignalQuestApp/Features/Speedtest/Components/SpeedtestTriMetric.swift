@@ -175,13 +175,14 @@ struct SpeedtestResultFigures {
     var latencyMs: Double? { valid(result.primaryPingMs) }
     var latencyIsMinimum: Bool { (result.methodologyVersion ?? 0) >= 6 && result.pingMinMs != nil }
 
-    /// Ce que la latence prend quand la ligne est pleine : latence en réception (en
-    /// envoi à défaut) moins la latence affichée, jamais négatif. Nil sans mesure.
-    var underLoad: (deltaMs: Double, whileReceiving: Bool)? {
-        guard let base = latencyMs else { return nil }
-        if let loaded = valid(result.pingDlMs) { return (max(0, loaded - base), true) }
-        if let loaded = valid(result.pingUlMs) { return (max(0, loaded - base), false) }
-        return nil
+    /// Latence mesurée pendant la réception et pendant l'envoi, en valeurs totales
+    /// comme sur l'image de partage (règle commune du 20/10) : la latence au repos
+    /// est affichée à côté, et la note A–F dit la hausse sur le pire sens. Nil
+    /// sans aucune mesure chargée.
+    var underLoad: (receivingMs: Double?, sendingMs: Double?, grade: SQShareCardModel.Grade?)? {
+        let receiving = valid(result.pingDlMs), sending = valid(result.pingUlMs)
+        guard receiving != nil || sending != nil else { return nil }
+        return (receiving, sending, SQShareCardBuilder.loadedLatency(for: result)?.grade)
     }
 
     /// Octets échangés par le test : ceux de la trace (réception + envoi), sinon
@@ -355,11 +356,16 @@ struct SpeedtestResultSummary: View {
                 )
             }
             if let load = figures.underLoad {
+                let readings = [load.receivingMs.map { "↓ \(Int($0.rounded()))" }, load.sendingMs.map { "↑ \(Int($0.rounded()))" }]
+                let spoken = [load.receivingMs.map { String(localized: "en réception \(Int($0.rounded())) ms") },
+                              load.sendingMs.map { String(localized: "en envoi \(Int($0.rounded())) ms") }]
                 tile(
-                    title: String(localized: "Sous charge"),
-                    value: "+\(Int(load.deltaMs.rounded()))", unit: "ms",
-                    detail: load.whileReceiving ? String(localized: "en réception") : String(localized: "en envoi"),
-                    tab: .latency, delay: 0.32, identifier: "speedtest.result.underLoad"
+                    title: String(localized: "Sous charge"), grade: load.grade,
+                    value: readings.compactMap { $0 }.joined(separator: " · "), unit: "ms",
+                    detail: nil,
+                    tab: .latency, delay: 0.32, identifier: "speedtest.result.underLoad",
+                    spoken: ([String(localized: "Sous charge")] + [load.grade.map { String(localized: "note \($0.letter)") }] + spoken)
+                        .compactMap { $0 }.joined(separator: ", ")
                 )
             }
             if let bytes = figures.transferredBytes(deviceCount: deviceBytes) {
@@ -375,20 +381,31 @@ struct SpeedtestResultSummary: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func tile(title: String, value: String, unit: String?, detail: String?, tab: SpeedtestDetailsTab,
-                      delay: Double, identifier: String) -> some View {
+    private func tile(title: String, grade: SQShareCardModel.Grade? = nil, value: String, unit: String?, detail: String?,
+                      tab: SpeedtestDetailsTab, delay: Double, identifier: String, spoken: String? = nil) -> some View {
         Button {
             Haptics.selection()
             onDetails(tab)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
-                Text(verbatim: title)
-                    .font(SQFont.body(9.5, .bold, relativeTo: .caption2))
-                    .tracking(9.5 * 0.08)
-                    .textCase(.uppercase)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                HStack(spacing: 5) {
+                    Text(verbatim: title)
+                        .font(SQFont.body(9.5, .bold, relativeTo: .caption2))
+                        .tracking(9.5 * 0.08)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let grade {
+                        // Fond de la note comme sur l'image ; lettre en couleur de texte
+                        // pour rester lisible en sombre et en OLED.
+                        Text(verbatim: grade.letter)
+                            .font(SQFont.body(9.5, .heavy, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.label)
+                            .padding(.horizontal, 4)
+                            .background(Color(uiColor: grade.background), in: RoundedRectangle(cornerRadius: 3))
+                    }
+                }
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(verbatim: value)
                         .font(SQFont.display(17, .heavy, relativeTo: .headline))
@@ -416,7 +433,9 @@ struct SpeedtestResultSummary: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        // Les flèches ↓ ↑ se liraient « flèche » : la tuile Sous charge dicte son texte.
+        .accessibilityLabel(Text(verbatim: spoken ?? [title, value, unit, detail].compactMap { $0 }.joined(separator: " ")))
         .accessibilityHint(Text("Ouvre les détails du test"))
         .accessibilityIdentifier(identifier)
         .modifier(SpeedtestRise(shown: shown, delay: delay))

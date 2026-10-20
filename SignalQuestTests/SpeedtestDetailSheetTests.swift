@@ -144,20 +144,19 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         XCTAssertEqual(glide.step(toward: 40, key: "1-3", at: start.addingTimeInterval(11)), 0)
     }
 
-    /// « Sous charge » = latence en réception moins la latence affichée, jamais
-    /// négatif ; repli sur l'envoi ; rien sans mesure chargée.
-    func testUnderLoadDeltaFallsBackAndNeverGoesNegative() {
+    /// « Sous charge » = latences totales mesurées pendant chaque phase (règle du
+    /// 20/10, plus d'écart « +N ms ») ; un seul sens si l'autre manque ; rien sans
+    /// mesure chargée ; pas de note sans preuve que le ping visait le serveur du test.
+    func testUnderLoadShowsTotalLatencyPerDirection() {
         let loaded = SpeedtestResultFigures(result: sample())
         XCTAssertEqual(loaded.latencyMs, 18)
-        XCTAssertEqual(loaded.underLoad?.deltaMs, 10)
-        XCTAssertEqual(loaded.underLoad?.whileReceiving, true)
+        XCTAssertEqual(loaded.underLoad?.receivingMs, 28)
+        XCTAssertEqual(loaded.underLoad?.sendingMs, 36)
+        XCTAssertNil(loaded.underLoad?.grade)
 
-        let uploadOnly = sample(loadedDownloadPing: nil)
-        XCTAssertEqual(SpeedtestResultFigures(result: uploadOnly).underLoad?.deltaMs, 18)
-        XCTAssertEqual(SpeedtestResultFigures(result: uploadOnly).underLoad?.whileReceiving, false)
-
-        let faster = sample(loadedDownloadPing: 12)
-        XCTAssertEqual(SpeedtestResultFigures(result: faster).underLoad?.deltaMs, 0)
+        let uploadOnly = SpeedtestResultFigures(result: sample(loadedDownloadPing: nil))
+        XCTAssertNil(uploadOnly.underLoad?.receivingMs)
+        XCTAssertEqual(uploadOnly.underLoad?.sendingMs, 36)
 
         XCTAssertNil(SpeedtestResultFigures(result: sample(hasLoadedPings: false)).underLoad)
     }

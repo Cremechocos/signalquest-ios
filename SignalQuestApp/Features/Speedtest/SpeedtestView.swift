@@ -1718,6 +1718,8 @@ struct SpeedtestView: View {
             city: "Lyon",
             serverName: "Paris BBR — serveur au nom volontairement long",
             downloadServerName: "Paris BBR — serveur au nom volontairement long",
+            // Ping et débit sur la même machine : la note A–F sous charge s'affiche.
+            downloadServerHost: "paris.qa.invalid",
             createdAt: Date(timeIntervalSince1970: 1_780_000_000),
             downloadSeriesMbps: [120, 280, 510, 720, 770, 748, 734],
             uploadSeriesMbps: [22, 54, 91, 122, 126, 124],
@@ -1725,7 +1727,8 @@ struct SpeedtestView: View {
             uploadGraceWindowCount: 1,
             uploadMeasurementSource: "iperf3",
             deviceModel: "iPhone 17 Pro",
-            osVersion: "iOS 27"
+            osVersion: "iOS 27",
+            pingServerHost: "paris.qa.invalid"
         )
         result = fixture
         await Task.yield()
