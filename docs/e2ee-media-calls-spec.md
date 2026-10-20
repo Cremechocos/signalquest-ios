@@ -2874,6 +2874,9 @@ puisse ni les retirer ni les changer.
   dans l'extension de notification.
 - Éphémère : la réaction ne porte pas d'expiration propre. Elle suit sa
   cible.
+- Migration (§14) : les réactions en clair d'une conversation v1 ne sont ni
+  recopiées ni converties. Elles restent sur les messages v1, en lecture seule ;
+  une copie importée (§14.3) n'en porte aucune.
 
 **Notification (décision produit du 20/10 : l'auteur seul).**
 
@@ -2881,6 +2884,11 @@ puisse ni les retirer ni les changer.
   cible, connu localement par la cible déchiffrée.
 - `REMOVE`, ou réaction à son propre message : `notifyUserId` vide, aucune
   notification.
+- Les récepteurs n'utilisent jamais `notifyUserId` pour accepter ou rejeter
+  une réaction : certains n'ont pas encore la cible, et l'agrégation
+  divergerait d'un appareil à l'autre. Seule l'extension en tient compte : elle
+  ne précise le texte (« X a réagi à ton message ») que si la cible déchiffrée
+  est un message du destinataire. Sinon l'alerte reste générique.
 - Le serveur envoie au seul `notifyUserId` une alerte générique, sans emoji
   ni texte : le même push `e2ee_v2_envelope` qu'un message (`envelopeId`,
   `epochNumber`), que l'extension sait déjà traiter. Il respecte les réglages
