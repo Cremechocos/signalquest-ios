@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.38**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.39**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,14 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.39 (20/10/2026), proposition : réactions chiffrées, avancées du
+>   jalon B à la demande d'Alexandre (D.16). Enveloppe v3, avec deux champs
+>   signés, `delivery` (`message` ou `annotation`) et `notifyUserId`. Une
+>   annotation n'est ni un dernier message, ni un non-lu ; une réaction ne
+>   notifie que l'auteur du message visé (décision produit du 20/10). Kind
+>   `REACTION` en charge v2, emoji contrôlé par la liste d'Unicode 15.1, dont
+>   l'empreinte est publiée. Nouveaux vecteurs `message-envelope-v3`,
+>   `content-payload-v2-reaction` et `emoji-rgi-15.1`.
 > - v0.4.38 (12/10/2026), proposition : confirmation des clés d'époque
 >   restaurées par le manifeste signé de leur époque (`GET …/epochs/{n}/manifest`),
 >   époque alors acceptée comme à la découverte, fenêtre de 24 heures partant
@@ -1158,15 +1166,18 @@ affichage**, et dans l'outil de modération.
 ## 8. Réactions
 
 - `REACTION` : cible, emoji, `ADD` ou `REMOVE`.
+- Format à l'octet, envoi, agrégation et notification : D.16 (v0.4.39), qui
+  prime sur cette section.
 - Emoji : **un seul** emoji RGI, pleinement qualifié (avec `FE0F`), en NFC, de
-  32 octets UTF-8 au plus. La référence est la liste `emoji-test.txt`
+  64 octets UTF-8 au plus (32 en v1 ; 95 séquences RGI de 15.1 dépassent 32). La référence est la liste `emoji-test.txt`
   d'**Unicode 15.1** (statut `fully-qualified`), embarquée par chaque client,
   puisque Android n'offre pas d'API avant l'API 33. Tout autre emoji est
   rejeté.
 - Agrégation par `(utilisateur, cible, emoji)`. `ADD` et `REMOVE` sont
   idempotents, et le dernier événement de cet utilisateur l'emporte.
-- Notification : une notification générique, sans emoji, que l'extension
-  précise après déchiffrement (§13).
+- Notification : l'auteur du message visé seulement, par une alerte
+  générique que l'extension précise après déchiffrement (D.16, décision
+  produit du 20/10).
 
 ---
 
@@ -2522,8 +2533,9 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
   - `TEXT` : `text` (1 à 65 536 octets UTF-8) ;
   - `EDIT` : `targetRef`, `text` ;
   - `DELETE` : `targetRef`.
-- Les autres `kind` (médias, vocal, réactions, sondages, positions, cartes)
-  arrivent au jalon B, chacun avec son vecteur.
+- `REACTION` : D.16 (v0.4.39).
+- Les autres `kind` (médias, vocal, sondages, positions, cartes) arrivent au
+  jalon B, chacun avec son vecteur.
 - `messageRef` : §4.2.
 - **Message éphémère** (`ttlSeconds` > 0 dans l'enveloppe) : il expire à
   `sentAtMs + ttlSeconds × 1 000`, l'heure signée de son émetteur. L'heure du
@@ -2757,6 +2769,132 @@ Le générateur de référence est côté iOS (COM-0) ; chaque plateforme rejoue
 vecteurs dans les deux sens. L'ECDSA étant aléatoire, une signature produite
 par une autre plateforme n'est pas identique à l'octet. On vérifie sa
 validité et sa forme low-S, jamais son égalité.
+
+### D.16 Réactions chiffrées (v0.4.39)
+
+Avancées du jalon B : demande d'Alexandre du 20/10, une réaction ou un double
+tap ❤️ doit marcher dans une conversation chiffrée. Jamais de réaction en clair
+dans une conversation v2 : la route v1 y reste refusée (§13).
+
+**Enveloppe v3 (`message-envelope-v3`).** L'enveloppe v2 (D.7) avec deux
+champs de plus, tous deux sous l'AAD et la signature, pour qu'un relais ne
+puisse ni les retirer ni les changer.
+
+- `envelopeVersion` = `"3"`. Sel, clé, bourrage, `fk`, `frankTag`, compteur et
+  ordre de réception : ceux de D.7, inchangés (le `2` du sel et de l'info
+  HKDF reste `2`).
+- `delivery` : `message` ou `annotation`.
+  - `message` : un message affiché, traité comme en v2.
+  - `annotation` : un événement qui modifie un message existant sans en être
+    un. Le serveur le stocke et le séquence comme un message (les clients le
+    lisent au curseur). Il met à jour l'activité de la conversation, mais
+    jamais son dernier message, son heure de dernier message ni le non-lu ; il
+    ne la sort pas de l'étagère ; il émet `e2ee_v2:message` avec `delivery`,
+    sans `conversation:message`.
+- `notifyUserId` : identifiant opaque (A.1) ou chaîne vide.
+  - Non vide seulement avec `annotation`. Le serveur envoie alors une alerte
+    générique à ce seul membre, et à personne d'autre. Il refuse (422
+    `E2EE_NOTIFY_TARGET_INVALID`) un identifiant qui n'est pas un membre
+    actuel, ou qui est l'émetteur.
+  - Vide : aucune notification push, pour personne.
+  - Il dit en clair au serveur qui est visé : c'est le prix, accepté par
+    Alexandre le 20/10, d'une notification à l'auteur seul.
+- **AAD** : `SQ-E2EE-V2-MESSAGE-ENVELOPE\n3\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>\n<counter>\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\n<engagementB64>\n<ttlSeconds>\n<condensatBlobs>\n<frankTagB64>\n<delivery>\n<notifyUserId>`.
+- **Signature** : `SQ-E2EE-V2-MESSAGE-SIGNATURE\n3\n` suivi des mêmes champs
+  que l'AAD, de `<conv>` à `<notifyUserId>`, puis
+  `\n<nonceB64>\n<aadB64>\n<ciphertextB64>`.
+- Enveloppe transportée : celle de D.7, plus `delivery` et `notifyUserId`,
+  avec les mêmes règles (JCS à l'envoi, analyseur strict, clés exactes).
+- Réception : D.7, puis deux contrôles après l'étape 6. `delivery` doit
+  convenir au `kind` : `TEXT` exige `message` (un texte caché en annotation
+  est rejeté) ; `REACTION` exige `annotation` ; `EDIT` et `DELETE` acceptent
+  les deux. Un `notifyUserId` non vide hors `REACTION` `ADD` est rejeté.
+- Envoi : une enveloppe v3 ne part que si l'intersection (§12) contient
+  `envelopeVersions` `"3"`. Le serveur le vérifie déjà, puisqu'il voit la
+  version d'enveloppe (`409 E2EE_CAPABILITY_MISSING`). Sinon l'émetteur
+  reste en v2 pour `TEXT`, `EDIT` et `DELETE`, et n'envoie pas de réaction.
+  Avec `"3"` disponible, `EDIT` et `DELETE` partent de préférence en
+  `annotation`.
+
+**Charge (`content-payload-v2-reaction`).** Charge v2 (D.8), `kind` =
+`REACTION`, toujours dans une enveloppe v3 en `annotation`.
+
+- `body`, clés exactes : `targetRef` (`messageRef`, §4.2), `emoji`, `action`
+  (`ADD` ou `REMOVE`).
+- `replyToRef` = `null` et `mentions` = `[]`, sinon rejet.
+- `emoji` : une seule séquence de la liste de référence ci-dessous, en NFC,
+  de 1 à 64 octets UTF-8. Toute autre chaîne est rejetée (`MALFORMED`).
+
+**Liste de référence des emojis (`emoji-rgi-15.1`).**
+
+- Source : `https://unicode.org/Public/emoji/15.1/emoji-test.txt`,
+  639 405 octets, SHA-256
+  `d876ee249aa28eaa76cfa6dfaa702847a8d13b062aa488d465d0395ee8137ed9`.
+- Extraction : chaque ligne hors commentaire dont le statut, entre `;` et
+  `#`, vaut `fully-qualified`. On garde ses points de code en hexadécimal
+  majuscule, séparés par une espace, dans l'ordre du fichier, une séquence par
+  ligne, avec un saut de ligne final.
+- Résultat : 3 773 séquences, 63 896 octets, SHA-256
+  `4418f1a71f5faa41c350fc6dd4039078a63a1881a4bda11788266a39fb535151`. Chaque
+  séquence est stable en NFC ; la plus longue fait 35 octets UTF-8.
+- Chaque client embarque cette liste, ou une forme dérivée, avec un test qui
+  la recalcule et compare l'empreinte. Le fichier brut n'a pas à être
+  embarqué.
+
+**Agrégation.**
+
+- Clé : (utilisateur émetteur, `targetRef`, `emoji`). L'utilisateur vient du
+  certificat de l'appareil émetteur : les appareils d'un même membre partagent
+  ses réactions.
+- Ordre : la séquence serveur du message remis, qui est un ordre total. Pour
+  une clé donnée, le dernier événement l'emporte. `ADD` et `REMOVE` sont
+  idempotents. `sentAtMs` ne départage jamais, puisque deux appareils n'ont
+  pas la même horloge.
+- Plafond : 20 emojis actifs au plus par (utilisateur, cible). Un `ADD` qui
+  en ferait un 21e est ignoré par les récepteurs ; l'émetteur ne le propose
+  pas.
+- Cibles : un message `TEXT` affiché. Les autres `kind` affichés s'y
+  ajouteront avec leur propre D.x.
+  - Cible modifiée (`EDIT`) : les réactions restent.
+  - Cible supprimée (`DELETE`) ou expirée : ses réactions disparaissent avec
+    elle.
+  - Cible inconnue : la réaction est gardée en attente, sans rien afficher,
+    puis appliquée si la cible arrive ; jamais de notice « version plus
+    récente ».
+- Une réaction ne s'affiche jamais en bulle, ne devient pas l'aperçu de la
+  conversation et ne compte pas dans le non-lu, y compris hors ligne et
+  dans l'extension de notification.
+- Éphémère : la réaction ne porte pas d'expiration propre. Elle suit sa
+  cible.
+
+**Notification (décision produit du 20/10 : l'auteur seul).**
+
+- `ADD` sur le message d'un autre membre : `notifyUserId` = auteur de la
+  cible, connu localement par la cible déchiffrée.
+- `REMOVE`, ou réaction à son propre message : `notifyUserId` vide, aucune
+  notification.
+- Le serveur envoie au seul `notifyUserId` une alerte générique, sans emoji
+  ni texte. L'extension la déchiffre et la précise (« Camille a réagi ❤️ à ton
+  message »). Si elle n'y arrive pas, l'alerte reste générique : jamais
+  d'emoji ni d'extrait côté serveur.
+
+**Capacités.** Un appareil annonce, ensemble et seulement quand il sait
+tout lire, afficher et envoyer ci-dessus : `envelopeVersions` `"3"`, `kinds`
+`REACTION`, `features` `reactions`. L'émetteur exige les trois dans
+l'intersection. Sinon le bouton de réaction et le double tap sont masqués
+dans la conversation, sans repli en clair.
+
+**Vecteurs** (générateur iOS, D.15) :
+
+- `message-envelope-v3` : une annotation avec `notifyUserId` et une sans,
+  plus les refus (champ absent ou inconnu, `delivery` hors liste,
+  `notifyUserId` avec `message`, AAD ou signature au format v2) ;
+- `content-payload-v2-reaction` : `ADD` et `REMOVE`, plus les refus (emoji
+  hors liste, non NFC, deux emojis, plus de 64 octets, `replyToRef` ou
+  `mentions` non vides, clé en trop) ;
+- `emoji-rgi-15.1` : l'empreinte du fichier, l'algorithme d'extraction,
+  l'empreinte de la liste et quelques séquences témoins (la plus longue, un
+  drapeau, une séquence avec teinte de peau).
 
 ---
 
