@@ -908,17 +908,17 @@ final class SpeedtestTests: XCTestCase {
             "Ashburn OVH timeout sur toute sa plage (vérifié 2026-08-10) — ne pas le réintroduire"
         )
 
-        // New York → Ashburn (Clouvider), ~330 km, le POP US du catalogue.
+        // New York → Leaseweb New York, un POP dans la ville même.
         let nyc = Coordinates(latitude: 40.7128, longitude: -74.0060)
         let us = findClosestIPerfServer(to: nyc)
-        XCTAssertEqual(us.hostname, "ash.speedtest.clouvider.net")
+        XCTAssertEqual(us.hostname, "speedtest.nyc1.us.leaseweb.net")
 
-        // Mumbai : YNM reste sélectionnable manuellement mais le catalogue de
-        // production l'exclut de l'Auto ; Cloudflare sera comparé aux POPs éligibles.
+        // Mumbai : YNM reste au catalogue pour l'historique, mais le serveur l'a
+        // retiré des choix ; un ancien choix `.bom` retombe sur le POP le plus proche.
         let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
         let ynm = findClosestIPerfServer(to: mumbai)
         XCTAssertNotEqual(ynm.hostname, "bom.proof.ovh.net")
-        XCTAssertEqual(selectIPerfServer(for: .bom, location: mumbai).hostname, "bom.proof.ovh.net")
+        XCTAssertNotEqual(selectIPerfServer(for: .bom, location: mumbai).hostname, "bom.proof.ovh.net")
     }
 
     func testAutoShortlistUsesEligibilityWhileManualChoiceRemainsExact() {
@@ -939,7 +939,7 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(selectIPerfServer(for: .clouviderFra, location: paris).hostname, "fra.speedtest.clouvider.net")
         XCTAssertEqual(selectIPerfServer(for: .clouviderAms, location: paris).hostname, "ams.speedtest.clouvider.net")
         XCTAssertEqual(selectIPerfServer(for: .leasewebFra, location: paris).hostname, "speedtest.fra1.de.leaseweb.net")
-        XCTAssertNil(selectableIPerfServer(for: .init7, location: paris))
+        XCTAssertEqual(selectableIPerfServer(for: .init7, location: paris)?.hostname, "speedtest.init7.net")
         // Moji : gros pool de ports (mono-slot → anti-collision) + provider dédié.
         let moji = iperfPublicServers.first { $0.hostname == "iperf3.moji.fr" }
         XCTAssertEqual(moji?.portMin, 5_200)
@@ -956,11 +956,14 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(findClosestIPerfServer(to: paris).provider != .ovh, true)
     }
 
-    func testMuteInit7ServerIsKeptForHistoryButQuarantined() throws {
+    /// Init7, muet sur 5201–5204 le 26/08, répond de nouveau : le catalogue servi
+    /// l'a remis en service, sur 5202 (audit réel du 19/10).
+    func testInit7ServerIsBackOnItsVerifiedPort() throws {
         let init7 = try XCTUnwrap(iperfPublicServers.first { $0.id == "init7_ch" })
-        XCTAssertFalse(init7.selectable)
-        XCTAssertFalse(init7.autoEligible)
-        XCTAssertFalse(iperfServersSortedByDistance(from: nil).contains { $0.id == init7.id })
+        XCTAssertTrue(init7.selectable)
+        XCTAssertTrue(init7.autoEligible)
+        XCTAssertEqual(init7.portPreferred, 5_202)
+        XCTAssertTrue(iperfServersSortedByDistance(from: nil).contains { $0.id == init7.id })
     }
 
     func testLibreSpeedCatalogNearestAndURLs() {
@@ -1190,9 +1193,9 @@ final class SpeedtestTests: XCTestCase {
 
     func testScalewayServersAreInCatalogWithPortRange() {
         let servers = iperfPublicServers.filter { $0.provider == .scaleway }
-        XCTAssertEqual(servers.count, 4)
+        XCTAssertEqual(servers.count, 6)
         for server in servers {
-            XCTAssertEqual(server.portMin, 5_200)
+            XCTAssertTrue((5_200...5_201).contains(server.portMin), server.hostname)
             XCTAssertEqual(server.portMax, 5_209)
         }
         XCTAssertEqual(selectIPerfServer(for: .onlineNet, location: nil).hostname, "ping.online.net")
