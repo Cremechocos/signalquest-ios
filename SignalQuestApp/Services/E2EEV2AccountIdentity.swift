@@ -673,10 +673,12 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
     /// Ce qu'iOS sait lire en v2 : texte, modification, suppression ; « appels
     /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
     /// médias chiffrés au jalon B. Les réactions (D.16) s'annoncent ensemble,
-    /// enveloppe v3, `REACTION` et `reactions`, derrière leur verrou.
-    static var envelopeVersions: [String] { SQFeatures.e2eeReactionsEnabled ? ["2", "3"] : ["2"] }
+    /// enveloppe v3, `REACTION` et `reactions`, derrière leur verrou et la
+    /// porte du serveur : le document est republié quand elle s'ouvre.
+    static var announcesReactions: Bool { SQFeatures.e2eeReactionsEnabled && E2EEV2ServerGate.reactionsOpen }
+    static var envelopeVersions: [String] { announcesReactions ? ["2", "3"] : ["2"] }
     static var kinds: [String] {
-        SQFeatures.e2eeReactionsEnabled ? ["DELETE", "EDIT", "REACTION", "TEXT"] : ["DELETE", "EDIT", "TEXT"]
+        announcesReactions ? ["DELETE", "EDIT", "REACTION", "TEXT"] : ["DELETE", "EDIT", "TEXT"]
     }
     static var features: [String] {
         var features: [String] = []
@@ -684,7 +686,7 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
         if announcesCallsForLocalQA { features = ["calls"] }
         #endif
         if features.isEmpty, E2EEV2CallRuntimeGate.allowsControlPlane() { features = ["calls"] }
-        if SQFeatures.e2eeReactionsEnabled { features.append("reactions") }
+        if announcesReactions { features.append("reactions") }
         return features
     }
     #if DEBUG
@@ -735,7 +737,7 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
         guard state.deviceId == deviceId, state.appBuild == appBuild, state.publishedAtMs != nil,
               let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document),
               (0..<republishAfterMs).contains(nowMs - document.issuedAtMs) else { return false }
-        return document.kinds == kinds && document.features == features
+        return document.envelopeVersions == envelopeVersions && document.kinds == kinds && document.features == features
     }
 
     /// Un document envoyé sans réponse ne repart tel quel que s'il est récent.

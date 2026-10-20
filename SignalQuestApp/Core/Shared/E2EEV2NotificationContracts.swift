@@ -1290,6 +1290,8 @@ enum E2EEV2ServerGate {
         E2EEV2ProtocolWire.deviceIdentityCapability, E2EEV2ProtocolWire.messageEnvelopeCapability,
     ]
     static let callCapabilities = messagingCapabilities.union(["e2ee_verified_calls_v2"])
+    /// Réactions chiffrées (D.16) : publiée quand le serveur accepte l'enveloppe v3.
+    static let reactionsCapability = "e2ee_message_envelope_v3"
 
     /// Posté quand la porte s'ouvre ou se referme : l'app relance ce qui en dépend.
     static let didChange = Notification.Name("SignalQuest.E2EEV2ServerGate.didChange")
@@ -1302,6 +1304,7 @@ enum E2EEV2ServerGate {
 
     static var messagingOpen: Bool { messagingCapabilities.isSubset(of: published) }
     static var callsOpen: Bool { callCapabilities.isSubset(of: published) }
+    static var reactionsOpen: Bool { messagingCapabilities.union([reactionsCapability]).isSubset(of: published) }
     /// Une fois la lecture ouverte, les conversations déjà v2 restent lisibles
     /// même si le serveur referme sa porte : elles ne repassent jamais en v1.
     static var readsOpen: Bool {
@@ -1311,14 +1314,14 @@ enum E2EEV2ServerGate {
     }
 
     /// Liste publiée par le serveur `host`, telle quelle ; remplacée à chaque
-    /// lecture. Vrai si l'ouverture des messages ou des appels a changé.
+    /// lecture. Vrai si l'ouverture des messages, des appels ou des réactions a changé.
     @discardableResult
     static func record(serverCapabilities: Set<String>, host: String?) -> Bool {
         guard let store = Store.current, let host, host.lowercased() == store.host else { return false }
-        let before = (messagingOpen, callsOpen)
+        let before = (messagingOpen, callsOpen, reactionsOpen)
         store.defaults.set(serverCapabilities.sorted(), forKey: store.publishedKey)
         if messagingCapabilities.isSubset(of: serverCapabilities) { store.defaults.set(true, forKey: store.readsOpenedKey) }
-        return before != (messagingOpen, callsOpen)
+        return before != (messagingOpen, callsOpen, reactionsOpen)
     }
 
     private static var published: Set<String> {

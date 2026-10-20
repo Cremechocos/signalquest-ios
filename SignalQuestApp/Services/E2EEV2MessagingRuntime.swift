@@ -427,7 +427,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 body: .reaction(targetRef: String(repeating: "A", count: 43), emoji: "❤️", action: .add),
                 replyToRef: nil, mentions: [], ttlSeconds: 0
             )
-            presentation.reactionsAvailable = writesEnabled && SQFeatures.e2eeReactionsEnabled
+            presentation.reactionsAvailable = writesEnabled && E2EEV2CapabilitiesPublicationStore.announcesReactions
                 && E2EEV2MessageSenderV2.missingCapabilities(
                     probe, devices: used, members: Set(participantIds), excludesWeb: false,
                     nowMs: Int64(Date().timeIntervalSince1970 * 1_000)

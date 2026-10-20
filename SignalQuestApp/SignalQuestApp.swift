@@ -305,6 +305,16 @@ struct AppRootView: View {
                 if case .authenticated = session.state {
                     Task { await services.callManager.registerVoIPTokenForSession() }
                 }
+                // Capacités (appels, réactions D.16) republiées selon la nouvelle porte.
+                if case .authenticated = session.state, services.e2eeV2Messaging.writesEnabled,
+                   let account = LocalAccountScope.sessionSnapshot(),
+                   !services.e2eeV2Messaging.lacksV2Readiness(account) {
+                    let api = services.api
+                    Task {
+                        _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: E2EEV2DeviceIdentityStore())
+                            .publishCapabilitiesIfNeeded()
+                    }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: E2EEV2NotificationContextEvents.refresh).receive(on: RunLoop.main)) { note in
                 guard let reason = note.userInfo?["reason"] as? String,
