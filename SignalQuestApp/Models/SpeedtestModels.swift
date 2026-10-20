@@ -628,7 +628,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let pingServerPort: Int?
     let uploadServerHost: String?
     let uploadServerPort: Int?
-    var primaryPingMs: Double? { methodologyVersion == 6 ? pingMinMs : pingMs }
+    // « >= 6 » et jamais « == 6 » : la v7 ne change que la gigue.
+    var primaryPingMs: Double? { (methodologyVersion ?? 0) >= 6 ? pingMinMs : pingMs }
 
     init(
         id: UUID = UUID(),
@@ -1003,7 +1004,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
     /// iOS ne l'envoyait pas du tout : filtrer les agrégats dessus aurait donc
     /// exclu 100 % du corpus iOS, ce qui explique que le champ n'ait jamais été
     /// exploité côté serveur. À partir de 4, le même numéro garantit la MÊME
-    /// méthodologie ici et sur Android (gigue en écart-type de part et d'autre) —
+    /// méthodologie ici et sur Android (même définition de la gigue de part et d'autre) —
     /// c'est ce qui rend un agrégat tous téléphones confondus légitime.
     /// Contrat lu par `apps/web/lib/speedtest-comparability.ts`.
     ///
@@ -1015,7 +1016,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
     /// numéro, la rupture dans la série historique serait inexplicable et se
     /// lirait comme une dégradation du réseau. Moyenne, p90 et p95 sont
     /// INCHANGÉES : seul le max est concerné.
-    static let currentMethodologyVersion = 6
+    ///
+    /// **7** — la gigue (au repos et sous charge) devient la moyenne des écarts
+    /// absolus entre pings successifs (RFC 3550), au lieu de l'écart-type : voir
+    /// `SpeedMetricCalculator.jitter`. Les lectures testent `>= 6`, jamais `== 6`.
+    static let currentMethodologyVersion = SpeedtestMethodology.current
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
@@ -1064,7 +1069,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             // pic réel : c'est un « max robuste » qui écrête les rafales aberrantes
             // pour l'affichage. Le vrai maximum instantané est transmis à part dans
             // `downloadMax`/`downloadPeakMbps` (TEL-14).
-            maxSpeed: result.methodologyVersion == 6 ? result.downloadP90Mbps : (result.downloadP90Mbps ?? result.downloadAverageMbps),
+            maxSpeed: (result.methodologyVersion ?? 0) >= 6 ? result.downloadP90Mbps : (result.downloadP90Mbps ?? result.downloadAverageMbps),
             uploadSpeed: result.uploadAverageMbps,
             uploadAvg: result.uploadAverageMbps,
             uploadMax: result.uploadMaxMbps,
@@ -1421,36 +1426,23 @@ struct SpeedMetricCalculator {
         return sorted[mid]
     }
 
-    /// Gigue = ÉCART-TYPE des RTT, méthodologie Ookla — identique à Android
-    /// (`SpeedtestMetricsCalculator.kt`). Les deux implémentations doivent rester
-    /// alignées, sinon les gigues des deux plateformes cessent d'être comparables
-    /// et aucun agrégat ne veut plus rien dire.
+    /// Gigue = moyenne des écarts absolus entre pings SUCCESSIFS (IPDV, famille
+    /// RFC 3550, comme Cloudflare), arrondie à 0,1 ms ; nil sous 2 valeurs. Règle
+    /// commune web, iOS et Android depuis le 20/10, pour la gigue au repos comme
+    /// sous charge (`jitterDl`, `jitterUl`).
     ///
-    /// Cette fonction calculait auparavant la moyenne des écarts consécutifs
-    /// (IPDV, famille RFC 3550). Deux raisons de l'abandonner :
+    /// Elle remplace l'écart-type : sous charge, la latence MONTE pendant la phase,
+    /// et l'écart-type comptait cette montée comme de la gigue. L'IPDV ne retient que
+    /// la variation d'un ping au suivant. Les tests antérieurs gardent l'ancienne
+    /// valeur : rupture de série acceptée.
     ///
-    /// 1. L'IPDV suppose une série RÉGULIÈRE : il mesure |RTT(i) − RTT(i−1)|. Dès
-    ///    qu'un échantillon expire, il faut soit sauter — et comparer alors deux
-    ///    mesures espacées de deux intervalles, ce qui gonfle la gigue — soit
-    ///    interpoler, ce qui la sous-estime. En 4G/5G, 10 à 30 % des échantillons
-    ///    expirent : ce n'est pas un cas limite, c'est le régime normal.
-    ///    L'écart-type, lui, ne dépend ni de l'ordre ni de la cadence.
-    /// 2. L'utilisateur qui compare SignalQuest à Speedtest.net compare à un
-    ///    écart-type. Une gigue systématiquement différente de la référence du
-    ///    marché passe pour un bug, pas pour une méthodologie.
-    ///
-    /// ⚠️ Effet attendu : pour un bruit gaussien, E[|Xᵢ − Xᵢ₋₁|] ≈ 1,13 σ. La gigue
-    /// iOS baisse donc d'environ 13 % en régime calme, davantage en présence de
-    /// pics isolés (un pic compte deux fois dans l'IPDV, une seule dans l'écart-type).
-    /// C'est le correctif, pas une régression.
-    ///
-    /// Écart-type de POPULATION (division par n), comme Android : on décrit la
-    /// série mesurée, on n'estime pas une population plus large.
+    /// Les échantillons expirés sont absents de la série : deux pings qui encadrent
+    /// un trou se comparent directement. Les autres plateformes font de même.
     static func jitter(_ pings: [Double]) -> Double? {
         guard pings.count > 1 else { return nil }
-        let mean = pings.reduce(0, +) / Double(pings.count)
-        let variance = pings.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(pings.count)
-        return variance.squareRoot()
+        let deltas = zip(pings.dropFirst(), pings).map { abs($0 - $1) }
+        let mean = deltas.reduce(0, +) / Double(deltas.count)
+        return (mean * 10).rounded() / 10
     }
 
     static func percentile(_ values: [Double], percentile: Double) -> Double? {

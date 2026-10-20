@@ -130,7 +130,7 @@ final class SQShareCardBuilderTests: XCTestCase {
     func testMissingValuesRemoveTheirLine() {
         XCTAssertNil(model(result(pingMin: nil, pingMedian: nil, pingAverage: nil)).latency)
         let noLoad = model(result(loadedPings: false))
-        XCTAssertEqual(noLoad.rows.map(\.label), ["Gigue", "Serveur"])
+        XCTAssertEqual(noLoad.rows.map(\.label), ["Gigue au repos", "Serveur"])
         XCTAssertNil(model(result(downloadSeries: nil)).downloadGraph)
     }
 
@@ -143,15 +143,24 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(model(result(pingMin: nil, pingMedian: nil)).latency?.number, "24")
     }
 
-    /// Note sous charge : pire latence chargée moins la latence affichée, barème
-    /// Cloudflare du serveur et d'Android (57 − 14 = 43 ms → C).
-    func testUnderLoadRowCarriesTheGradeThenTheDelta() {
+    /// Sous charge, un sens par ligne : latence · gigue (règle du 20/10). La note
+    /// se pose sur le pire sens : 57 − 14 = 43 ms → C, en envoi ici.
+    func testUnderLoadRowsShowEachDirectionAndGradeTheWorst() {
         let rows = model(result()).rows
-        XCTAssertEqual(rows.map(\.label), ["Sous charge", "Gigue", "Serveur"])
-        XCTAssertEqual(rows[0].value, "+43 ms")
-        XCTAssertEqual(rows[0].grade?.letter, "C")
-        XCTAssertEqual(rows[1].value, "1,4 ms")
-        XCTAssertEqual(rows[2].value, "Paris BBR (Bouygues)")
+        XCTAssertEqual(rows.map(\.label), ["Sous charge ↓", "Sous charge ↑", "Gigue au repos", "Serveur"])
+        XCTAssertEqual(rows[0].value, "42 ms · gigue 6,2 ms")
+        XCTAssertNil(rows[0].grade)
+        XCTAssertEqual(rows[1].value, "57 ms · gigue 9,4 ms")
+        XCTAssertEqual(rows[1].grade?.letter, "C")
+        XCTAssertEqual(rows[2].value, "1,4 ms")
+        XCTAssertEqual(rows[3].value, "Paris BBR (Bouygues)")
+        // Ping visé ailleurs que sur le serveur du test : les valeurs restent, sans note.
+        XCTAssertTrue(model(result(pingHost: "1.1.1.1")).rows.allSatisfy { $0.grade == nil })
+        // Un seul sens mesuré : une seule ligne, qui porte la note.
+        let downloadOnly = model(result(pingUl: nil)).rows
+        XCTAssertEqual(downloadOnly.first?.label, "Sous charge ↓")
+        XCTAssertNotNil(downloadOnly.first?.grade)
+        XCTAssertEqual(downloadOnly[1].label, "Gigue au repos")
     }
 
     func testLoadedLatencyGradeThresholds() {

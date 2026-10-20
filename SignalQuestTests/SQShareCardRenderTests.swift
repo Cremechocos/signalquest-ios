@@ -47,11 +47,12 @@ final class SQShareCardRenderTests: XCTestCase {
             latency: .init(number: "14", unit: "ms"),
             latencyAverageText: "Moyenne 18 ms",
             rows: [
-                .init(label: "Sous charge", value: "+24 ms", grade: .init(
+                .init(label: "Sous charge ↓", value: "38 ms · gigue 6,2 ms", grade: .init(
                     letter: "B", color: UIColor(hex: 0x477818),
                     background: UIColor(hex: 0x7DB834, alpha: 0.16)
                 )),
-                .init(label: "Gigue", value: "3,2 ms"),
+                .init(label: "Sous charge ↑", value: "31 ms · gigue 11 ms"),
+                .init(label: "Gigue au repos", value: "3,2 ms"),
                 .init(label: "Serveur", value: "Roubaix (OVH RBX)"),
             ],
             deviceCityText: "iPhone 17 Pro · Grenoble"
@@ -112,7 +113,7 @@ final class SQShareCardRenderTests: XCTestCase {
             downloadGraph: base.downloadGraph, upload: .init(number: "2,481", unit: "Gb/s"),
             uploadPeakText: "Pic à 2,512 Gb/s", uploadGraph: base.uploadGraph, latencyLabel: base.latencyLabel,
             latency: .init(number: "1234", unit: "ms"), latencyAverageText: "Moyenne 1456 ms",
-            rows: base.rows + [.init(label: "Serveur", value: "Un nom de serveur beaucoup trop long pour la colonne")],
+            rows: base.rows.dropLast() + [.init(label: "Serveur", value: "Un nom de serveur beaucoup trop long pour la colonne")],
             deviceCityText: base.deviceCityText
         )
         let image = SQShareCardRenderer.render(model)

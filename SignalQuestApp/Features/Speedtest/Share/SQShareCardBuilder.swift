@@ -218,21 +218,45 @@ enum SQShareCardBuilder {
         }
     }
 
-    /// Sous charge, gigue, serveur — chaque ligne disparaît avec sa valeur.
+    /// Sous charge ↓ et ↑ (latence · gigue), gigue au repos, serveur — chaque
+    /// ligne disparaît avec sa valeur (règle commune web, iOS et Android du 20/10).
+    /// La note A–F se pose sur le pire des deux sens.
     private static func detailRows(
         for result: SpeedtestRunResult, locale: Locale, includeServer: Bool
     ) -> [SQShareCardModel.Row] {
         var rows: [SQShareCardModel.Row] = []
-        if let loaded = loadedLatency(for: result) {
-            rows.append(.init(label: String(localized: "Sous charge"), value: "+\(loaded.deltaMs) ms", grade: loaded.grade))
+        let grade = loadedLatency(for: result)?.grade
+        let receiving = validMs(result.pingDlMs), sending = validMs(result.pingUlMs)
+        let worstIsReceiving = (receiving ?? -1) >= (sending ?? -1)
+        if let receiving {
+            rows.append(.init(label: String(localized: "Sous charge ↓"),
+                              value: loadedValue(receiving, jitter: result.jitterDlMs, locale: locale),
+                              grade: worstIsReceiving ? grade : nil))
+        }
+        if let sending {
+            rows.append(.init(label: String(localized: "Sous charge ↑"),
+                              value: loadedValue(sending, jitter: result.jitterUlMs, locale: locale),
+                              grade: worstIsReceiving ? nil : grade))
         }
         if let jitter = result.jitterMs, jitter.isFinite, jitter >= 0 {
-            rows.append(.init(label: String(localized: "Gigue"), value: SQUnits.jitter(jitter, locale: locale)))
+            rows.append(.init(label: String(localized: "Gigue au repos"), value: SQUnits.jitter(jitter, locale: locale)))
         }
         if includeServer, let server = (result.serverName ?? result.downloadServerName)?.shareTrimmed {
             rows.append(.init(label: String(localized: "Serveur"), value: server))
         }
         return rows
+    }
+
+    /// « 48 ms · gigue 6,2 ms », ou la latence seule sans gigue mesurée.
+    private static func loadedValue(_ ms: Double, jitter: Double?, locale: Locale) -> String {
+        let latency = "\(Int(ms.rounded())) ms"
+        guard let jitter = validMs(jitter, allowsZero: true) else { return latency }
+        return "\(latency) · " + String(localized: "gigue \(SQUnits.jitterValue(jitter, locale: locale)) ms")
+    }
+
+    private static func validMs(_ value: Double?, allowsZero: Bool = false) -> Double? {
+        guard let value, value.isFinite, allowsZero ? value >= 0 : value > 0 else { return nil }
+        return value
     }
 
     /// Hausse de latence sous charge et sa note — même dérivation que le serveur

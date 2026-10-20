@@ -67,12 +67,22 @@ struct SpeedtestRunTransferredBytes: Codable, Equatable, Sendable {
     var upload: Int64 = 0
 }
 
+/// Numéro de méthodologie, commun à iOS et Android : un même numéro garantit la
+/// même mesure sur les deux apps, et le serveur s'y fie pour comparer les tests.
+/// v6 : latence minimale, P90 et trace de mesure. v7 (20/10) : la v6, avec la
+/// gigue en moyenne des écarts successifs, au repos comme sous charge.
+/// ⚠️ Une build qui envoie la v7 ne part pas en TestFlight tant que le serveur
+/// la compare encore à « === 6 ».
+enum SpeedtestMethodology {
+    static let current = 7
+}
+
 struct SpeedtestMeasurementTrace: Codable, Equatable, Sendable {
     let runId: String
     let phases: [SpeedtestPhaseTrace]
     let abandonedAttempts: [SpeedtestAbandonedAttempt]
     var schemaVersion: Int = 1
-    var methodologyVersion: Int = 6
+    var methodologyVersion: Int = SpeedtestMethodology.current
     var runTransferredBytes: SpeedtestRunTransferredBytes? = nil
 }
 

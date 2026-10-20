@@ -1485,7 +1485,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             deviceModel: AppleDeviceDescriptor.currentShareModelName,
             osVersion: AppleDeviceDescriptor.currentOSVersionLabel,
             measurementTrace: trace,
-            methodologyVersion: 6,
+            methodologyVersion: SpeedtestMethodology.current,
             ownerScopeId: SpeedtestTraceScope.current?.ownerScopeId,
             pingServerHost: m.pingServerHost,
             pingServerPort: m.pingServerPort,
