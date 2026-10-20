@@ -3363,6 +3363,22 @@ enum IPerfServerProvider: String, Sendable {
     /// servi par l'API : le catalogue distant doit pouvoir introduire un
     /// fournisseur que ce binaire ne connaît pas encore sans que le POP disparaisse.
     case community
+
+    /// Nom de l'hébergeur tel qu'on l'écrit (« hébergé par OVH ») ; aucun pour
+    /// un POP communautaire, qu'on ne prête à personne.
+    var label: String? {
+        switch self {
+        case .ovh: "OVH"
+        case .bouygues: "Bouygues"
+        case .scaleway: "Scaleway"
+        case .milkywan: "MilkyWan"
+        case .moji: "Moji"
+        case .clouvider: "Clouvider"
+        case .leaseweb: "Leaseweb"
+        case .init7: "Init7"
+        case .community: nil
+        }
+    }
 }
 
 /// Catalogue ACTIF : celui servi par `/api/speedtest/servers` dès qu'il a été chargé,

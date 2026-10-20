@@ -28373,6 +28373,22 @@
         }
       }
     },
+    "%@ · hébergé par %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · hosted by %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · hébergé par %@"
+          }
+        }
+      }
+    },
     "%@ · la dernière %@" : {
       "localizations" : {
         "en" : {

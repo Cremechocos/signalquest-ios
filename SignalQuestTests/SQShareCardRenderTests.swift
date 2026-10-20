@@ -30,7 +30,7 @@ final class SQShareCardRenderTests: XCTestCase {
     private func sample(curves: Bool = true) -> SQShareCardModel {
         SQShareCardModel(
             dateText: "19 octobre 2026 à 14:32",
-            network: .init(name: "SFR", detail: "5G", barColor: UIColor(hex: 0xE60012)),
+            network: .init(name: "SFR", detail: "5G SA", barColor: UIColor(hex: 0xE60012)),
             download: .init(number: "1,722", unit: "Gb/s"),
             downloadPeakText: curves ? nil : "MAX 1,841 Gb/s",
             downloadGraph: curves
@@ -55,7 +55,7 @@ final class SQShareCardRenderTests: XCTestCase {
                 ), arrow: .down),
                 .init(label: "Sous charge", value: "31 ms · gigue 11 ms", arrow: .up),
                 .init(label: "Gigue au repos", value: "3,2 ms"),
-                .init(label: "Serveur", value: "Roubaix (OVH RBX)"),
+                .init(label: "Serveur", value: "Roubaix · hébergé par OVH"),
             ],
             deviceCityText: "iPhone 17 Pro · Grenoble"
         )

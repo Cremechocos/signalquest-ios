@@ -245,8 +245,33 @@ final class SQShareCardBuilderTests: XCTestCase {
     func testHeaderCarriesOperatorThenGeneration() {
         let network = model(result()).network
         XCTAssertEqual(network?.name, "Orange")
-        XCTAssertEqual(network?.detail, "5G")
+        XCTAssertEqual(network?.detail, "5G SA")
         XCTAssertEqual(hex(network?.barColor), 0xFF7900)
+    }
+
+    /// SA et NSA, comme l'image d'Android : iOS les distingue, l'image aussi.
+    func testHeaderTellsNonStandaloneApart() {
+        XCTAssertEqual(model(result(technology: .fiveGNSA)).network?.detail, "5G NSA")
+        XCTAssertEqual(model(result(technology: .fourG)).network?.detail, "4G")
+    }
+
+    /// « Ville · hébergé par X » pour un POP du catalogue ; la variante de
+    /// congestion, le fournisseur répété et la mire « +90 ms » ne s'y lisent pas.
+    func testServerRowNamesCityThenHost() {
+        func text(_ id: String?, stored: String = "Nom enregistré") -> String? {
+            let run = SpeedtestRunResult(
+                label: "test", downloadMbps: 100, downloadAverageMbps: 100, downloadMaxMbps: 110,
+                durationSeconds: 10, connectionType: .cellular, serverName: stored,
+                downloadServerName: stored, downloadServerId: id, createdAt: Date()
+            )
+            return SQShareCardBuilder.serverText(for: run, catalog: iperfPublicServers)
+        }
+        XCTAssertEqual(text("rbx"), "Roubaix · hébergé par OVH")
+        XCTAssertEqual(text("bytel_paris_bbr"), "Paris · hébergé par Bouygues")
+        XCTAssertEqual(text("online_net6_90ms"), "Paris · hébergé par Scaleway")
+        XCTAssertEqual(text("milkywan_cbo"), "Croissy-Beaubourg · hébergé par MilkyWan")
+        XCTAssertEqual(text(nil, stored: "Cloudflare · Paris"), "Cloudflare · Paris")
+        XCTAssertEqual(text("inconnu", stored: "Cloudflare · Paris"), "Cloudflare · Paris")
     }
 
     /// Le SSID identifie un foyer et l'image est faite pour être publiée : il n'y

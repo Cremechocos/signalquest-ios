@@ -221,13 +221,15 @@ enum SQShareCardBuilder {
         return link.map { .init(name: $0, detail: nil, barColor: nil) }
     }
 
-    /// La génération seule (« 5G ») : SA/NSA relève du détail, pas de l'image.
+    /// « 5G SA » ou « 5G NSA » quand iOS les distingue, comme l'image d'Android
+    /// (planche commune validée le 20/10).
     private static func generation(_ technology: CellularRadioTechnology) -> String {
         switch technology {
         case .twoG: "2G"
         case .threeG: "3G"
         case .fourG: "4G"
-        case .fiveGNSA, .fiveGSA: "5G"
+        case .fiveGNSA: "5G NSA"
+        case .fiveGSA: "5G SA"
         }
     }
 
@@ -254,10 +256,35 @@ enum SQShareCardBuilder {
         if let jitter = result.jitterMs, jitter.isFinite, jitter >= 0 {
             rows.append(.init(label: String(localized: "Gigue au repos"), value: SQUnits.jitter(jitter, locale: locale)))
         }
-        if includeServer, let server = (result.serverName ?? result.downloadServerName)?.shareTrimmed {
+        if includeServer, let server = serverText(for: result) {
             rows.append(.init(label: String(localized: "Serveur"), value: server))
         }
         return rows
+    }
+
+    /// « Roubaix · hébergé par OVH » pour un POP iPerf3 du catalogue, comme
+    /// Android ; sinon le nom enregistré (« Cloudflare · Paris » le dit déjà).
+    static func serverText(
+        for result: SpeedtestRunResult,
+        catalog: [IPerfPublicServer] = activeIPerfServers
+    ) -> String? {
+        let stored = (result.serverName ?? result.downloadServerName)?.shareTrimmed
+        guard let id = result.downloadServerId?.shareTrimmed,
+              let server = catalog.first(where: { $0.id == id }),
+              let host = server.provider.label else { return stored }
+        // Le nom porte la ville en tête : « Roubaix (OVH RBX) », « Paris BBR
+        // (Bouygues) », « Paris Scaleway ». On retire la parenthèse, puis le
+        // fournisseur et la variante de congestion, qui n'apprennent rien au lecteur.
+        let variants: Set<String> = ["BBR", "CUBIC", "IPv6", host.lowercased()]
+        var words = (server.name.components(separatedBy: " (").first ?? server.name)
+            .split(separator: " ").map(String.init)
+        if let plus = words.firstIndex(where: { $0.hasPrefix("+") }) { words.removeSubrange(plus...) }
+        while let last = words.last, variants.contains(last) || variants.contains(last.lowercased()) {
+            words.removeLast()
+        }
+        let city = words.joined(separator: " ")
+        guard !city.isEmpty else { return stored }
+        return String(localized: "\(city) · hébergé par \(host)")
     }
 
     /// « 48 ms · gigue 6,2 ms », ou la latence seule sans gigue mesurée.
