@@ -265,6 +265,9 @@ enum E2EEV2ConversationMigration {
         case notEncrypted
         /// Membres sans appareil certifié à jour : la migration attend.
         case membersWaiting([String])
+        /// Membres sans aucune identité v2 (`E2EE_IDENTITY_NOT_FOUND`) : rien
+        /// ne changera avant qu'ils activent le chiffrement ; on peut le dire.
+        case membersNotActivated([String])
         /// Un appareil compté ne lit pas encore le v2 : la conversation reste
         /// v1 (règle commune, v0.4.17).
         case capabilityWaiting
@@ -283,6 +286,8 @@ enum E2EEV2ConversationMigration {
         let waiting = conversation.migrationMemberIds.filter { user in
             !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }
         }
+        let notActivated = waiting.filter { devices.refusals[$0] == .notFound }
+        guard notActivated.isEmpty else { return .membersNotActivated(notActivated.sorted()) }
         guard waiting.isEmpty else { return .membersWaiting(waiting.sorted()) }
         let members = Set(conversation.migrationMemberIds)
         return E2EEV2ConversationCreation.readsV2(devices, members: members, excludesWeb: false, nowMs: nowMs)
@@ -490,7 +495,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             // Identité d'un membre illisible ou changée (§2.4) : rien n'est créé.
             return .failure(localError("e2ee-v2-members-not-trusted"))
         } catch {
-            return .failure(localError("e2ee-conversation-creation-invalid"))
+            return .failure(preparationFailure(error))
         }
         let result = await submit(prepared, path: "/api/e2ee/v2/conversations", context: context, devices: devices)
         switch result {
@@ -553,7 +558,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                 prepared = Prepared(migration, body: migration.migrationBody)
             }
         } catch {
-            return .failure(localError("e2ee-conversation-creation-invalid"))
+            return .failure(preparationFailure(error))
         }
         let result = await submit(
             prepared, path: "/api/e2ee/v2/conversations/\(conversation.id)/genesis", context: context, devices: devices
@@ -713,5 +718,17 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {
         .init(kind: .localState, message: message)
+    }
+
+    /// Clé stable d'un échec de préparation, lue par la trace de migration ;
+    /// jamais le membre en cause.
+    private func preparationFailure(_ error: Error) -> E2EEV2TransportFailure {
+        switch error {
+        case E2EEV2ConversationCreation.Failure.deviceNotCertified: localError("e2ee-creation-device-not-certified")
+        case E2EEV2ConversationCreation.Failure.invalidMembers: localError("e2ee-creation-invalid-members")
+        case E2EEV2ConversationCreation.Failure.capabilityMissing: localError("e2ee-v2-capability-missing")
+        case E2EEV2ConversationCreation.Failure.membersNotTrusted: localError("e2ee-v2-members-not-trusted")
+        default: localError("e2ee-conversation-creation-invalid")
+        }
     }
 }

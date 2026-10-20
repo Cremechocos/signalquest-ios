@@ -131,6 +131,32 @@ final class Lot1ReliabilityTests: XCTestCase {
         XCTAssertEqual(clock.tick(now: 612 * second), 5, "Nouveau gel après la reprise")
     }
 
+    /// Gel du Profil sous iOS 16 (177) : le fil principal tourne sans fin dans
+    /// SwiftUI. Une vue rendue 60 fois par seconde pendant 3 s est signalée, une fois.
+    func testRenderProbeReportsASustainedRenderLoopOnce() {
+        var window = SQRenderProbe.Window()
+        XCTAssertNil(window.close(["profile": 80, "dock": 3]))
+        XCTAssertNil(window.close(["profile": 80]))
+        XCTAssertNil(window.close(["profile": 12]), "Une seconde calme remet le compte à zéro")
+        XCTAssertNil(window.close(["profile": 70, "main_tab": 70]))
+        XCTAssertNil(window.close(["profile": 70, "main_tab": 70]))
+        XCTAssertEqual(window.close(["profile": 90, "main_tab": 70, "dock": 1]),
+                       ["views": "profile=90 main_tab=70 dock=1", "renders_per_s": "161"])
+        XCTAssertNil(window.close(["profile": 90]), "Une seule fois par lancement")
+    }
+
+    /// Activation à la connexion (20/10) : la preuve ne vit que quelques minutes
+    /// en mémoire, et la déconnexion l'efface.
+    func testLoginActivationProofExpiresAndIsDiscarded() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        E2EEV2LoginActivation.offer(.password("pw"), now: start)
+        XCTAssertTrue(E2EEV2LoginActivation.isPending(now: start.addingTimeInterval(60)))
+        XCTAssertFalse(E2EEV2LoginActivation.isPending(now: start.addingTimeInterval(E2EEV2LoginActivation.lifetime + 1)))
+        E2EEV2LoginActivation.offer(.apple(identityToken: "token"), now: start)
+        E2EEV2LoginActivation.discard()
+        XCTAssertFalse(E2EEV2LoginActivation.isPending(now: start))
+    }
+
     func testDecodingContextNamesTheFieldPathWithoutAnyValue() throws {
         struct Probe: Decodable { struct Item: Decodable { let count: Int }; let items: [Item] }
         let json = Data(#"{"items":[{"count":1},{"count":"secret-value"}]}"#.utf8)

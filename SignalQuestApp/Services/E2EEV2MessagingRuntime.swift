@@ -436,56 +436,103 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
-    /// Migration d'une conversation chiffrée v1 à son ouverture (§14.2), selon
-    /// la règle commune : tous les membres certifiés et lisant le v2. Vrai si
-    /// la conversation est v2 après l'appel.
-    func migrateIfReady(_ conversation: MessageConversation) async -> Bool {
-        guard writesEnabled, conversation.e2eeEnabled == true, let parts = current(),
-              !lacksV2Readiness(parts.session) else { return false }
+    /// Où en est une conversation chiffrée après une tentative de migration.
+    enum MigrationOutcome: Equatable, Sendable {
+        case v2
+        case v1
+        /// Ces membres n'ont pas encore activé le chiffrement v2 : la
+        /// conversation le dit, au lieu d'attendre sans rien montrer.
+        case membersNotActivated([String])
+    }
+
+    /// Migration d'une conversation chiffrée v1, à son ouverture ou au
+    /// lancement (§14.2), selon la règle commune : tous les membres certifiés
+    /// et lisant le v2.
+    func migrateIfReady(_ conversation: MessageConversation) async -> MigrationOutcome {
+        guard writesEnabled, conversation.e2eeEnabled == true else { return .v1 }
+        guard let parts = current(), !lacksV2Readiness(parts.session) else { return .v1 }
         let namespace = parts.session.ownerNamespace
         let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
-        if isV2 == true { return true }
+        if isV2 == true { return .v2 }
         let participantIds = conversation.migrationMemberIds
         // Règle commune iOS et Android : une conversation peut déjà être v2,
         // créée par un autre membre. Elle est d'abord découverte (chaîne et
         // époque vérifiées puis gardées) ; la genèse n'est tentée que si le
         // serveur répond qu'elle est encore v1.
-        guard isV2 == false else { return false }
-        let discovered = try? await withDevices(
-            conversationId: conversation.id, participantIds: participantIds, parts: parts,
-            staleUserIds: { (result: E2EEV2RefreshResultV2) -> [String]? in
-                if case .failure(let failure) = result { return Self.stale(failure) }
-                return nil
-            }, { devices in
-                await parts.messaging.refresh(
-                    conversationId: conversation.id, isGroup: conversation.isGroup, devices: devices,
-                    expectedOwnerScopeId: parts.session.ownerScopeId
-                )
-            }
-        )
-        switch discovered {
-        case .refreshed?:
-            return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true
-        case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_NOT_V2":
-            break
-        default:
-            // Rien de sûr sur son état : jamais de genèse sur un doute.
-            return false
+        guard isV2 == false else { Self.traceV2("migration", "state_unreadable"); return .v1 }
+        let discovered: E2EEV2RefreshResultV2
+        do {
+            discovered = try await withDevices(
+                conversationId: conversation.id, participantIds: participantIds, parts: parts,
+                staleUserIds: { (result: E2EEV2RefreshResultV2) -> [String]? in
+                    if case .failure(let failure) = result { return Self.stale(failure) }
+                    return nil
+                }, { devices in
+                    await parts.messaging.refresh(
+                        conversationId: conversation.id, isGroup: conversation.isGroup, devices: devices,
+                        expectedOwnerScopeId: parts.session.ownerScopeId
+                    )
+                }
+            )
+        } catch {
+            Self.traceV2("migration", "discovery_directory", Self.directoryFailure(error))
+            return .v1
         }
-        guard let result = try? await withDevices(
-            conversationId: conversation.id, participantIds: participantIds, parts: parts,
-            staleUserIds: { (result: E2EEV2ConversationCreationResult?) -> [String]? in
-                if case .failure(let failure)? = result { return Self.stale(failure) }
-                return nil
-            }, { devices -> E2EEV2ConversationCreationResult? in
-                let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
-                guard E2EEV2ConversationMigration.decide(conversation, isV2: isV2, devices: devices, nowMs: nowMs) == .migrate
-                else { return nil }
-                return await parts.creator.migrate(conversation, devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId)
-            }
-        ) else { return false }
-        if case .created = result { return true }
-        return false
+        switch discovered {
+        case .refreshed:
+            return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true ? .v2 : .v1
+        case .failure(let failure) where failure.code == "E2EE_CONVERSATION_NOT_V2":
+            break
+        case .failure(let failure):
+            // Rien de sûr sur son état : jamais de genèse sur un doute.
+            Self.traceV2("migration", "discovery", failure)
+            return .v1
+        }
+        var decision: E2EEV2ConversationMigration.Decision?
+        let result: E2EEV2ConversationCreationResult?
+        do {
+            result = try await withDevices(
+                conversationId: conversation.id, participantIds: participantIds, parts: parts,
+                staleUserIds: { (result: E2EEV2ConversationCreationResult?) -> [String]? in
+                    if case .failure(let failure)? = result { return Self.stale(failure) }
+                    return nil
+                }, { devices -> E2EEV2ConversationCreationResult? in
+                    let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+                    decision = E2EEV2ConversationMigration.decide(conversation, isV2: isV2, devices: devices, nowMs: nowMs)
+                    guard decision == .migrate else { return nil }
+                    return await parts.creator.migrate(conversation, devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId)
+                }
+            )
+        } catch {
+            Self.traceV2("migration", "genesis_directory", Self.directoryFailure(error))
+            return .v1
+        }
+        switch result {
+        case .created?:
+            Self.traceV2("migration", "created")
+            return .v2
+        case .failure(let failure)?:
+            Self.traceV2("migration", "genesis", failure)
+            return .v1
+        case nil:
+            // Attente ordinaire (membre pas encore prêt) : rien n'est signalé,
+            // la tentative revient à chaque lancement et chaque ouverture.
+            if case .membersNotActivated(let ids)? = decision { return .membersNotActivated(ids) }
+            return .v1
+        }
+    }
+
+    /// Raison d'une conversation restée en v1, sans identifiant ni texte du
+    /// serveur : le code et le statut servis, ou la clé d'un échec local.
+    static func traceV2(_ operation: String, _ step: String, _ failure: E2EEV2TransportFailure? = nil) {
+        var info = ["step": step]
+        if let failure {
+            info["kind"] = String(describing: failure.kind)
+            if let code = failure.code { info["code"] = code }
+            if let status = failure.statusCode { info["status"] = String(status) }
+            if failure.kind == .localState { info["local"] = failure.message }
+        }
+        SQDiagnostics.recordReport(operation, area: .e2eeV2, info: info)
     }
 
     /// De quoi montrer le numéro de sécurité d'un membre (§2.4) : l'annuaire de

@@ -2542,6 +2542,92 @@ final class E2EEV2DeviceEnrollmentCoordinator: @unchecked Sendable {
     }
 }
 
+/// Activation à la connexion (décision du 20/10) : la preuve que l'utilisateur
+/// vient de donner (mot de passe, jeton Apple) établit aussitôt le chiffrement
+/// du premier appareil de son compte, sans lui redemander un code par e-mail.
+/// Gardée en mémoire seulement, servie une fois, quelques minutes au plus.
+/// Un compte déjà chiffré ailleurs garde l'approbation par un autre appareil.
+enum E2EEV2LoginActivation {
+    static let lifetime: TimeInterval = 5 * 60
+    /// Fin d'une activation tentée : l'invite reprend la main si elle a échoué.
+    static let didFinish = Notification.Name("SignalQuest.E2EEV2.LoginActivationFinished.v1")
+
+    enum Outcome: String, Equatable, Sendable {
+        case activated
+        case alreadyApproved = "already_approved"
+        /// Le compte a déjà une identité : un appareil approuvé doit scanner le QR.
+        case needsOtherDevice = "needs_other_device"
+        case unavailable
+        case failed
+    }
+
+    private struct Held {
+        var proof: E2EEV2BootstrapReauthentication?
+        var offeredAt = Date.distantPast
+        var running = false
+    }
+
+    private static let held = OSAllocatedUnfairLock(initialState: Held())
+
+    static func offer(_ proof: E2EEV2BootstrapReauthentication, now: Date = Date()) {
+        held.withLock { $0.proof = proof; $0.offeredAt = now }
+    }
+
+    static func discard() {
+        held.withLock { $0.proof = nil }
+    }
+
+    /// Une preuve attend ou sert en ce moment : l'écran guidé ne s'ouvre pas
+    /// par-dessus, il demanderait un code pour rien.
+    static func isPending(now: Date = Date()) -> Bool {
+        held.withLock { $0.running || ($0.proof != nil && now.timeIntervalSince($0.offeredAt) < lifetime) }
+    }
+
+    private static func take(now: Date) -> E2EEV2BootstrapReauthentication? {
+        held.withLock { state -> E2EEV2BootstrapReauthentication? in
+            defer { state.proof = nil }
+            guard let proof = state.proof, now.timeIntervalSince(state.offeredAt) < lifetime else { return nil }
+            state.running = true
+            return proof
+        }
+    }
+
+    /// `nil` sans preuve à servir. Enregistre l'appareil, puis l'établit comme
+    /// premier appareil si le compte n'a pas encore d'identité v2.
+    static func run(api: APIClient, label: String, now: Date = Date()) async -> Outcome? {
+        guard let proof = take(now: now) else { return nil }
+        let outcome = await establish(api: api, label: label, proof: proof)
+        held.withLock { $0.running = false }
+        NotificationCenter.default.post(name: didFinish, object: nil)
+        return outcome
+    }
+
+    private static func establish(api: APIClient, label: String, proof: E2EEV2BootstrapReauthentication) async -> Outcome {
+        let identityStore = E2EEV2DeviceIdentityStore()
+        switch await E2EEV2DeviceEnrollmentCoordinator(api: api, identityStore: identityStore).registerPendingDevice(label: label) {
+        case .registered(_, .approved, _):
+            return .alreadyApproved
+        case .registered:
+            break
+        case .failed:
+            return .failed
+        }
+        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore)
+        guard case .success(let inventory) = await lifecycle.listDeviceInventory() else { return .failed }
+        guard inventory.activationEnabled else { return .unavailable }
+        guard inventory.identity == nil else { return .needsOtherDevice }
+        switch await lifecycle.bootstrapInitialDevice(proof) {
+        case .success:
+            E2EEV2NotificationContextEvents.requestRefresh(.identity)
+            return .activated
+        case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
+            return .needsOtherDevice
+        case .failed:
+            return .failed
+        }
+    }
+}
+
 // MARK: - E2EE v2 approved-device lifecycle (preview, fail-closed)
 
 enum E2EEV2ApprovalMethod: String, Equatable, Sendable {
@@ -4324,6 +4410,11 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         let namespace = LocalAccountScope.storageNamespace(for: owner)
         do {
             guard let device = try identityStore.load(ownerNamespace: namespace) else { return .success(false) }
+            // Sans la clé du compte, l'appareil attend son approbation : le
+            // serveur refuserait le document (403 E2EE_DEVICE_NOT_APPROVED) à
+            // chaque lancement. Il part dès l'approbation (premier appareil, QR).
+            guard try accountIdentityStore.load(ownerNamespace: namespace) != nil,
+                  try !accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace) else { return .success(false) }
             let stored = try capabilities.load(ownerNamespace: namespace)
             if let stored, E2EEV2CapabilitiesPublicationStore.isCurrent(
                 stored, deviceId: device.deviceId, appBuild: appBuild, nowMs: nowMs()

@@ -2191,6 +2191,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        let _ = SQRenderProbe.hit("settings")
         Form {
             Section {
                 SQSettingsHeader(title: "Réglages", backIdentifier: "settings.back")

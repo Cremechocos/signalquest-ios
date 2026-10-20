@@ -414,6 +414,40 @@ final class AppServices: ObservableObject {
         refreshFavoritesForCurrentAccount()
     }
 
+    /// Activation à la connexion (20/10) : la preuve tout juste donnée établit le
+    /// chiffrement du premier appareil, puis les conversations prêtes migrent.
+    func activateE2EEAfterLogin() async {
+        guard e2eeV2Messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot(),
+              e2eeV2Messaging.lacksV2Readiness(session) else {
+            E2EEV2LoginActivation.discard()
+            return
+        }
+        guard let outcome = await E2EEV2LoginActivation.run(api: api, label: UIDevice.current.model) else { return }
+        E2EEV2MessagingRuntime.traceV2("activation", outcome.rawValue)
+        if outcome == .activated { await migrateReadyConversations() }
+    }
+
+    private var migrationSweepRunning = false
+
+    /// §14.2 : les conversations chiffrées v1 passent en v2 au lancement et dès
+    /// l'activation, sans attendre leur ouverture, quand tous leurs membres
+    /// lisent le v2. Une à la fois, une seule tournée à la fois ; une demande
+    /// reçue en attente n'est pas touchée (DM-REQ-1).
+    func migrateReadyConversations() async {
+        guard e2eeV2Messaging.writesEnabled, !migrationSweepRunning,
+              let session = LocalAccountScope.sessionSnapshot(),
+              !e2eeV2Messaging.lacksV2Readiness(session) else { return }
+        migrationSweepRunning = true
+        defer { migrationSweepRunning = false }
+        guard let conversations = try? await messages.conversations() else { return }
+        for conversation in conversations where conversation.e2eeEnabled == true
+            && conversation.request?.isIncomingPending != true
+            && !EncryptedConversationSurfaces.isV2(conversation) {
+            guard LocalAccountScope.sessionSnapshot() == session, !Task.isCancelled else { return }
+            _ = await e2eeV2Messaging.migrateIfReady(conversation)
+        }
+    }
+
     /// Arrête toute mesure en cours : changement de compte, mise à jour
     /// obligatoire. Un trajet appartient au compte qui l'a lancé ; le suivant
     /// repart d'un écran vierge, sans la trace ni le bilan du précédent.
@@ -1065,7 +1099,7 @@ extension AppServices {
                 return conversationId
             case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
                 || failure.kind == .activationBlocked:
-                break
+                E2EEV2MessagingRuntime.traceV2("creation", "fallback_v1", failure)
             case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
                 if case .string(let existing)? = failure.details?["conversationId"] { return existing }
                 throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))

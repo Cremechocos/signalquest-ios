@@ -91,6 +91,11 @@ struct ConversationDetailView: View {
     /// Conversation v2 (§12), lue une fois à l'ouverture : messages programmés
     /// désactivés (§13).
     @State private var conversationIsV2 = false
+    /// Membres sans chiffrement v2 activé : la conversation reste v1 à cause d'eux.
+    @State private var membersNotActivated: [String] = []
+    /// Cet appareil n'a pas encore activé le chiffrement v2.
+    @State private var ownV2ActivationNeeded = false
+    @State private var showV2Activation = false
     /// Nom donné au groupe depuis ses réglages pendant cette ouverture.
     @State private var renamedTitle: String?
     /// Nombre de membres après un ajout ou un retrait depuis les réglages.
@@ -370,6 +375,10 @@ struct ConversationDetailView: View {
                 .padding(.top, SQSpace.sm)
                 .disabled(isResyncingKey)
                 .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if isE2EE, v2Resolved, !conversationIsV2 {
+                v2UpgradeNotice
             }
 
             pinnedBar
@@ -955,10 +964,18 @@ struct ConversationDetailView: View {
             conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
             // §14.2 : une conversation chiffrée v1 passe en v2 à son ouverture,
             // si tous ses membres lisent le v2 (règle commune, v0.4.17).
-            if !conversationIsV2, conversation.e2eeEnabled == true,
-               await services.e2eeV2Messaging.migrateIfReady(conversation) {
-                conversationIsV2 = true
+            if !conversationIsV2, conversation.e2eeEnabled == true {
+                switch await services.e2eeV2Messaging.migrateIfReady(conversation) {
+                case .v2: conversationIsV2 = true
+                case .membersNotActivated(let ids): membersNotActivated = ids
+                case .v1: break
+                }
             }
+            refreshOwnV2Activation()
+            // L'état de déverrouillage v1 est connu avant de lever `v2Resolved` :
+            // sans cela, la carte « Conversation chiffrée » s'affichait une
+            // fraction de seconde à chaque ouverture, le temps du chargement.
+            if !conversationIsV2 { await refreshE2EEState() }
             v2Resolved = true
             await refreshSenderRequestState()
             await restoreDraftIfNeeded()
@@ -1036,6 +1053,15 @@ struct ConversationDetailView: View {
                     dismissContentPresentations()
                 }
             }
+        }
+        .sheet(isPresented: $showV2Activation, onDismiss: refreshOwnV2Activation) {
+            // L'écran guidé de la Messagerie ; la conversation passera au
+            // nouveau chiffrement à sa prochaine ouverture.
+            E2EEV2ActivationScreen(
+                api: services.api,
+                onFinish: { showV2Activation = false },
+                onLater: { showV2Activation = false }
+            )
         }
         .sheet(isPresented: $showUnlockSheet) {
             if case .authenticated(let user) = session.state {
@@ -2450,6 +2476,58 @@ struct ConversationDetailView: View {
             parts.append(ext.uppercased())
         }
         return parts.isEmpty ? String(localized: "Fichier") : parts.joined(separator: " · ")
+    }
+
+    // MARK: Nouveau chiffrement
+
+    /// Conversation restée sur l'ancien chiffrement : une ligne dit pourquoi.
+    /// Cet appareil d'abord, puisqu'il peut agir, puis les membres qui n'ont
+    /// pas encore activé le nouveau.
+    @ViewBuilder
+    private var v2UpgradeNotice: some View {
+        if ownV2ActivationNeeded {
+            Button {
+                Haptics.selection()
+                showV2Activation = true
+            } label: {
+                Label("Activer le nouveau chiffrement sur cet appareil", systemImage: "lock.shield")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.top, SQSpace.sm)
+            .accessibilityIdentifier("conversation.v2-activate")
+        } else if let text = notActivatedText {
+            Label(text, systemImage: "hourglass")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.sm)
+                .accessibilityIdentifier("conversation.v2-waiting")
+        }
+    }
+
+    private var notActivatedText: String? {
+        guard let first = membersNotActivated.first else { return nil }
+        if membersNotActivated.count == 1,
+           let name = conversation.participants.first(where: { $0.userId == first })?.user.displayName {
+            return String(localized: "\(name) n’a pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même.")
+        }
+        return String(localized: "\(membersNotActivated.count) membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même.")
+    }
+
+    private func refreshOwnV2Activation() {
+        guard services.e2eeV2Messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot() else {
+            ownV2ActivationNeeded = false
+            return
+        }
+        ownV2ActivationNeeded = services.e2eeV2Messaging.lacksV2Readiness(session)
     }
 
     // MARK: Barre d'épinglés

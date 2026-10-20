@@ -20,6 +20,7 @@ enum SQDiagnostics {
         case decoding
         case metricKit = "metrickit"
         case mainHang = "main_hang"
+        case e2eeV2 = "e2ee_v2"
         case qa
     }
 

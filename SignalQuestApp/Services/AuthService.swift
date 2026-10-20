@@ -857,6 +857,9 @@ final class AuthSessionViewModel: ObservableObject {
         defer { isBusy = false }
         do {
             let response = try await service.login(email: email, password: password)
+            // Activation à la connexion (20/10) : le mot de passe, en mémoire
+            // quelques minutes, établit le chiffrement du premier appareil.
+            if response.user != nil || response.requires2FA == true { E2EEV2LoginActivation.offer(.password(password)) }
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
             } else if let user = response.user {
@@ -915,6 +918,7 @@ final class AuthSessionViewModel: ObservableObject {
             guard acceptsPublicForm(context, checkCredentials: false),
                   received.credentialSessionID == service.credentialSessionID() else { return }
             let response = received.value
+            if response.user != nil || response.requires2FA == true { E2EEV2LoginActivation.offer(.password(password)) }
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
             } else if let user = response.user {
@@ -944,6 +948,7 @@ final class AuthSessionViewModel: ObservableObject {
         do {
             let response = try await service.signInWithApple(identityToken: identityToken, fullName: fullName,
                                                               acceptedTerms: acceptedTerms)
+            if response.user != nil || response.requires2FA == true { E2EEV2LoginActivation.offer(.apple(identityToken: identityToken)) }
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
                 return .continued
@@ -1031,10 +1036,12 @@ final class AuthSessionViewModel: ObservableObject {
     func cancelTwoFactor() {
         // L'erreur du code refusé ne doit pas rester affichée sur la connexion.
         errorMessage = nil
+        E2EEV2LoginActivation.discard()
         state = .loggedOut
     }
 
     func logout() async {
+        E2EEV2LoginActivation.discard()
         let closing = LocalAccountScope.sessionSnapshot()
         // Révoque le token push (session encore valide) et le token VoIP côté
         // serveur, pour qu'un autre compte sur cet appareil ne reçoive pas les

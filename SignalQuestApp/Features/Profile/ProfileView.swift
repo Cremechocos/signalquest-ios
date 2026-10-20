@@ -88,6 +88,7 @@ struct ProfileView: View {
     }
 
     var body: some View {
+        let _ = SQRenderProbe.hit("profile")
         ScrollView {
             VStack(spacing: SQSpace.md) {
                 profileHeader
@@ -132,7 +133,8 @@ struct ProfileView: View {
         // NavigationLink du Profil (par valeur comme par closure) gelait l'app,
         // alors que les boutons à feuille et les pushes programmatiques des
         // autres onglets répondaient.
-        .navigationDestinationItemCompat($pushed) { shown in
+        .profileDestinationCompat($pushed) { shown in
+            let _ = SQRenderProbe.hit("profile.destination")
             destination(for: shown)
                 .onAppear { MainThreadHangProbe.mark("profile.shown.\(shown)") }
         }
@@ -927,6 +929,42 @@ struct ProfileView: View {
         // Un rang n'a de sens qu'à plusieurs : seul, la tuile reste sans sous-titre.
         if let week = await weekTask, week.entries.count > 1 {
             weekRank = week.currentUserRank ?? week.entries.first { $0.userId == user.id }?.rank
+        }
+    }
+}
+
+private extension View {
+    /// Sous iOS 16, les écrans du Profil s'ouvrent en feuille (décision du
+    /// 20/10). Les y pousser figeait l'app sur un iPhone 8 en 16.7, même après
+    /// le passage au push par état : chien de garde 0x8BADF00D, fil principal
+    /// pris dans une mise à jour de SwiftUI sans aucune de nos frames (pile
+    /// MetricKit de la 177). Les feuilles du Profil, elles, n'ont jamais gelé.
+    /// Le bouton retour des en-têtes (`dismiss`) ferme alors la feuille ; « Fermer »
+    /// sert aux écrans qui gardent la barre de navigation.
+    @ViewBuilder
+    func profileDestinationCompat<Destination: View>(
+        _ item: Binding<ProfileDestination?>,
+        @ViewBuilder destination: @escaping (ProfileDestination) -> Destination
+    ) -> some View {
+        if #available(iOS 17.0, *) {
+            navigationDestinationItemCompat(item, destination: destination)
+        } else {
+            sheet(isPresented: Binding(
+                get: { item.wrappedValue != nil },
+                set: { if !$0 { item.wrappedValue = nil } }
+            )) {
+                if let value = item.wrappedValue {
+                    NavigationStack {
+                        destination(value)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button("Fermer") { item.wrappedValue = nil }
+                                }
+                            }
+                    }
+                    .id(value)
+                }
+            }
         }
     }
 }

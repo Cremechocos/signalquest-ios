@@ -250,6 +250,10 @@ struct AppRootView: View {
                 if case .authenticated = session.state {
                     await services.livePresence.refreshSharingSettings()
                 }
+                // §14.2 : les conversations chiffrées prêtes passent en v2 sans attendre leur ouverture.
+                if case .authenticated = session.state {
+                    await services.migrateReadyConversations()
+                }
             }
             .onChangeCompat(of: session.state) { oldState, newState in
                 // Un login effectué dans une session déjà lancée (cas nominal
@@ -268,6 +272,8 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = newState {
+                    // Activation à la connexion : la preuve tout juste donnée sert une fois.
+                    Task { await services.activateE2EEAfterLogin() }
                     refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
@@ -498,6 +504,8 @@ struct RootView: View {
     private func refreshV2ActivationPrompt() {
         guard isAuthenticated, !callManager.showCallScreen, callManager.activeCall == nil, !showsV2Activation,
               !showsAddressPrompt, !AppEnvironment.usesDemoData else { return }
+        // Une activation à la connexion est en cours : pas de code à demander pour rien.
+        guard !E2EEV2LoginActivation.isPending() else { return }
         if E2EEV2ActivationPrompt.shouldPrompt(messaging: services.e2eeV2Messaging) { showsV2Activation = true }
     }
 
@@ -513,6 +521,7 @@ struct RootView: View {
     }
 
     var body: some View {
+        let _ = SQRenderProbe.hit("root")
         Group {
             if AppEnvironment.showsCommentsQA {
                 CommentsQAScreen()
@@ -554,6 +563,9 @@ struct RootView: View {
                     // qu'on quitte n'a plus rien à perdre.
                     .onChangeCompat(of: router.selectedTab) { _, _ in addressStore.applyTone() }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
+                        refreshV2ActivationPrompt()
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: E2EEV2LoginActivation.didFinish).receive(on: RunLoop.main)) { _ in
                         refreshV2ActivationPrompt()
                     }
                     .onChangeCompat(of: scenePhase) { _, phase in
@@ -890,6 +902,7 @@ struct MainTabView: View {
     }
 
     var body: some View {
+        let _ = SQRenderProbe.hit("main_tab")
         tabContainer
         .focusedSceneObject(router)
         .task(id: user?.id) {

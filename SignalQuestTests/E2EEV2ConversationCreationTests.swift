@@ -288,6 +288,14 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         let all = fixture.deviceSet(adding: [brunoPhone.device, carlaPhone.device])
 
         XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: partial, nowMs: nowMs), .membersWaiting([carla]))
+        // Sans aucune identité v2 (404 E2EE_IDENTITY_NOT_FOUND), le membre n'a pas activé : on peut le dire.
+        // Les autres refus (clé changée…) restent une attente muette.
+        let notActivated = E2EEV2CertifiedDeviceSet(devicesByUser: partial.devicesByUser, refusals: [carla: .notFound])
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: notActivated, nowMs: nowMs),
+                       .membersNotActivated([carla]))
+        let changed = E2EEV2CertifiedDeviceSet(devicesByUser: partial.devicesByUser, refusals: [carla: .uikChanged])
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: changed, nowMs: nowMs),
+                       .membersWaiting([carla]))
         XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: all, nowMs: nowMs), .migrate)
         XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: true, devices: all, nowMs: nowMs), .alreadyV2)
         let plain = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")], encrypted: false)

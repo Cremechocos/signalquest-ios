@@ -240,9 +240,62 @@ final class MainThreadHangProbe: @unchecked Sendable {
                 "stalled_s": String(format: "%.0f", stalled),
             ])
         }
+        if var info = SQRenderProbe.tick() {
+            info["step"] = Self.step.withLock { $0 }
+            SQDiagnostics.recordReport("render_loop", area: .mainHang, info: info)
+        }
         DispatchQueue.main.async { [self] in
             let now = DispatchTime.now().uptimeNanoseconds
             queue.async { [self] in clock.pong(now: now) }
+        }
+    }
+}
+
+/// Sonde de boucle de rendu, sous iOS 16 seulement (décision du 20/10). Le gel
+/// du Profil n'arrête pas le fil principal : il le fait tourner sans fin dans
+/// les mises à jour de SwiftUI (pile MetricKit de la 177), ce que
+/// `MainThreadHangProbe` ne voit pas. Les vues suspectes comptent leurs rendus
+/// (`hit`) ; une vue rendue plus de 60 fois par seconde pendant 3 s envoie un
+/// non-fatal avec les vues les plus rendues, une fois par lancement.
+enum SQRenderProbe {
+    /// Une seconde de rendus, sans minuterie : testable telle quelle.
+    struct Window {
+        static let perSecondThreshold = 60
+        static let sustainedSeconds = 3
+        private var hotSeconds = 0
+        private var reported = false
+
+        mutating func close(_ counts: [String: Int]) -> [String: String]? {
+            hotSeconds = (counts.values.max() ?? 0) >= Self.perSecondThreshold ? hotSeconds + 1 : 0
+            guard hotSeconds >= Self.sustainedSeconds, !reported else { return nil }
+            reported = true
+            let top = counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+                .prefix(6).map { "\($0.key)=\($0.value)" }
+            return ["views": top.joined(separator: " "), "renders_per_s": String(counts.values.reduce(0, +))]
+        }
+    }
+
+    private struct State {
+        var counts: [String: Int] = [:]
+        var window = Window()
+    }
+
+    private static let enabled = ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 17
+    private static let state = OSAllocatedUnfairLock(initialState: State())
+
+    /// Un rendu de la vue `name` (un nom d'écran, jamais de contenu).
+    static func hit(_ name: String) {
+        guard enabled else { return }
+        state.withLock { $0.counts[name, default: 0] += 1 }
+    }
+
+    /// Chaque seconde, depuis la sonde de gel.
+    static func tick() -> [String: String]? {
+        guard enabled else { return nil }
+        return state.withLock { state in
+            let counts = state.counts
+            state.counts = [:]
+            return state.window.close(counts)
         }
     }
 }

@@ -34,6 +34,7 @@ struct SQDock: View {
     ]
 
     var body: some View {
+        let _ = SQRenderProbe.hit("dock")
         HStack(spacing: 0) {
             ForEach(items, id: \.tab) { item in
                 dockItem(item)

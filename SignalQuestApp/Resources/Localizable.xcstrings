@@ -276,6 +276,22 @@
         }
       }
     },
+    "%@ n’a pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hasn’t turned on the new encryption yet. The conversation will switch over on its own."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même."
+          }
+        }
+      }
+    },
     "%@ pour %@ sur la période" : {
       "localizations" : {
         "en" : {
@@ -404,6 +420,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ veut t’écrire"
+          }
+        }
+      }
+    },
+    "%lld membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld members haven’t turned on the new encryption yet. The conversation will switch over on its own."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même."
+          }
+        }
+      }
+    },
+    "Activer le nouveau chiffrement sur cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the new encryption on this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer le nouveau chiffrement sur cet appareil"
           }
         }
       }

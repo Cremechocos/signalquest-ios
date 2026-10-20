@@ -575,7 +575,7 @@ struct MessagesView: View {
             return
         }
         needsV2Activation = services.e2eeV2Messaging.lacksV2Readiness(current)
-            && !E2EEV2ActivationPrompt.isSnoozed(current)
+            && !E2EEV2ActivationPrompt.isSnoozed(current) && !E2EEV2LoginActivation.isPending()
     }
 
     /// « Plus tard » : la carte revient au bout d'une semaine ; l'activation
@@ -1035,6 +1035,9 @@ struct MessagesView: View {
         .task { await CallManager.requestMicrophoneAccessIfUndetermined() }
         .onAppear { refreshV2Activation() }
         .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
+            refreshV2Activation()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: E2EEV2LoginActivation.didFinish).receive(on: RunLoop.main)) { _ in
             refreshV2Activation()
         }
         // L'écran guidé, comme à l'ouverture de l'app, et non la liste technique
@@ -2640,7 +2643,7 @@ private struct NewConversationSheet: View {
                     return
                 case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
                     || failure.kind == .activationBlocked:
-                    break
+                    E2EEV2MessagingRuntime.traceV2("creation", "fallback_v1", failure)
                 // Créé entre-temps ailleurs (autre appareil, autre plateforme) : on l'ouvre.
                 case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
                     if case .string(let existing)? = failure.details?["conversationId"] {
