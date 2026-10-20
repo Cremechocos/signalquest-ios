@@ -31,14 +31,14 @@ final class SQShareCardRenderTests: XCTestCase {
         SQShareCardModel(
             dateText: "19 octobre 2026 à 14:32",
             network: .init(name: "SFR", detail: "5G", barColor: UIColor(hex: 0xE60012)),
-            download: .init(number: "1,24", unit: "Gb/s"),
-            downloadPeakText: "Pic à 1,41 Gb/s",
+            download: .init(number: "1,722", unit: "Gb/s"),
+            downloadPeakText: "Pic à 1,841 Gb/s",
             downloadGraph: curves
                 ? .init(points: Self.downloadShape.map { $0 * 1_410 }, localMax: 1_410,
                         accentColor: UIColor(hex: 0x1C201E), normalizedTimes: Self.windowTimes, durationSeconds: 10)
                 : nil,
-            upload: .init(number: "84,2", unit: "Mb/s"),
-            uploadPeakText: "Pic à 96,8 Mb/s",
+            upload: .init(number: "84", unit: "Mb/s"),
+            uploadPeakText: "Pic à 97 Mb/s",
             uploadGraph: curves
                 ? .init(points: Self.uploadShape.map { $0 * 96.8 }, localMax: 96.8,
                         accentColor: UIColor(hex: 0xA8123A), normalizedTimes: Self.windowTimes, durationSeconds: 10)
@@ -108,9 +108,9 @@ final class SQShareCardRenderTests: XCTestCase {
         let base = sample()
         let model = SQShareCardModel(
             dateText: base.dateText, network: .init(name: "Bouygues Telecom", detail: "5G", barColor: UIColor(hex: 0x009DDC)),
-            download: .init(number: "12,41", unit: "Gb/s"), downloadPeakText: base.downloadPeakText,
-            downloadGraph: base.downloadGraph, upload: .init(number: "2,48", unit: "Gb/s"),
-            uploadPeakText: "Pic à 2,51 Gb/s", uploadGraph: base.uploadGraph, latencyLabel: base.latencyLabel,
+            download: .init(number: "12,409", unit: "Gb/s"), downloadPeakText: base.downloadPeakText,
+            downloadGraph: base.downloadGraph, upload: .init(number: "2,481", unit: "Gb/s"),
+            uploadPeakText: "Pic à 2,512 Gb/s", uploadGraph: base.uploadGraph, latencyLabel: base.latencyLabel,
             latency: .init(number: "1234", unit: "ms"), latencyAverageText: "Moyenne 1456 ms",
             rows: base.rows + [.init(label: "Serveur", value: "Un nom de serveur beaucoup trop long pour la colonne")],
             deviceCityText: base.deviceCityText

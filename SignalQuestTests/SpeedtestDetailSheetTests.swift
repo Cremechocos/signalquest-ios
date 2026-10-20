@@ -61,8 +61,9 @@ final class SpeedtestDetailSheetTests: XCTestCase {
     func testSpeedFormattingMatchesShareCard() {
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(487).value, "487")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(487).unit, "Mbit/s")
-        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(45.3).value, "45,3")
-        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).value, "1,4")
+        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(45.3).value, "45")
+        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(4.53).value, "4,5")
+        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).value, "1,420")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).unit, "Gbit/s")
         // Upload raté : pas de zéro trompeur.
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(nil).value, "—")

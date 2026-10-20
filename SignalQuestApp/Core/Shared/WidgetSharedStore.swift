@@ -196,23 +196,26 @@ enum WidgetSharedStore {
 
 /// Débits et distances des widgets et de la Live Activity. La cible widget ne voit
 /// pas `SQUnits` : ses règles sont recopiées ici (« Mbit/s » puis « Gbit/s » dès
-/// 1 000, une décimale sous 100, km/m ou mi/ft selon la préférence) et un test
+/// 1 000, une décimale sous 10, trois en Gbit/s, km/m ou mi/ft selon la préférence) et un test
 /// vérifie qu'elles restent identiques.
 enum WidgetUnits {
     /// Le nombre seul, pour un grand chiffre dont l'unité est posée à part.
     static func throughputValue(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
-        if mbps >= 1_000 {
-            return (mbps / 1_000).formatted(.number.precision(.fractionLength(1)).locale(locale))
+        if mbps >= 999.5 {
+            // Trois décimales : la précision de l'entier en Mbit/s, sans saut au
+            // passage du gigabit (règle commune web, Android et iOS du 20/10).
+            return (mbps / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
         }
-        return mbps.formatted(.number.precision(.fractionLength(mbps < 100 ? 1 : 0)).locale(locale))
+        // Bascules sur la valeur arrondie : 9,96 s'écrit « 10 », 999,6 « 1,000 Gbit/s ».
+        return mbps.formatted(.number.precision(.fractionLength(mbps < 9.95 ? 1 : 0)).locale(locale))
     }
 
     static func throughputUnit(mbps: Double) -> String {
-        mbps >= 1_000 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
+        mbps >= 999.5 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
     }
 
-    /// « 412 Mbit/s », « 1,2 Gbit/s ».
+    /// « 412 Mbit/s », « 1,722 Gbit/s ».
     static func throughput(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
         return "\(throughputValue(mbps: mbps, locale: locale)) \(throughputUnit(mbps: mbps))"
@@ -221,7 +224,7 @@ enum WidgetUnits {
     /// Sans place pour l'unité (Dynamic Island, jauge d'écran verrouillé) : un « G »
     /// signale les gigabits, aucune lettre sous 1 000 Mbit/s.
     static func compactThroughput(mbps: Double, locale: Locale = .current) -> String {
-        throughputValue(mbps: mbps, locale: locale) + (mbps.isFinite && mbps >= 1_000 ? "G" : "")
+        throughputValue(mbps: mbps, locale: locale) + (mbps.isFinite && mbps >= 999.5 ? "G" : "")
     }
 
     /// Distance depuis des mètres : mêmes seuils que `SQUnits.distance`.

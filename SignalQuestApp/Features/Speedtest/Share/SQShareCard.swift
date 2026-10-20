@@ -135,7 +135,7 @@ struct SQShareCardModel {
         var durationSeconds: Double? = nil
     }
 
-    /// Un nombre et son unité, composés séparément (« 1,24 » + « Gb/s »).
+    /// Un nombre et son unité, composés séparément (« 1,722 » + « Gb/s »).
     struct Value: Equatable {
         let number: String
         let unit: String

@@ -109,18 +109,19 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertNil(card.uploadPeakText)
     }
 
-    /// Règle de A : une décimale sous 100, entier de 100 à 999, Gb/s à deux
+    /// Règle du 20/10 : une décimale sous 10, entier de 10 à 999, Gb/s à trois
     /// décimales dès 1 000 — les bascules jugées sur la valeur arrondie.
     func testThroughputFollowsTheSharedNumberRule() {
         func text(_ mbps: Double) -> String? {
             SQShareCardBuilder.throughput(mbps, locale: locale).map { "\($0.number) \($0.unit)" }
         }
-        XCTAssertEqual(text(84.24), "84,2 Mb/s")
-        XCTAssertEqual(text(99.96), "100 Mb/s")
+        XCTAssertEqual(text(7.54), "7,5 Mb/s")
+        XCTAssertEqual(text(9.96), "10 Mb/s")
+        XCTAssertEqual(text(84.24), "84 Mb/s")
         XCTAssertEqual(text(214.4), "214 Mb/s")
-        XCTAssertEqual(text(999.6), "1,00 Gb/s")
-        XCTAssertEqual(text(1_240), "1,24 Gb/s")
-        XCTAssertEqual(text(12_408.6), "12,41 Gb/s")
+        XCTAssertEqual(text(999.6), "1,000 Gb/s")
+        XCTAssertEqual(text(1_722), "1,722 Gb/s")
+        XCTAssertEqual(text(12_408.6), "12,409 Gb/s")
         XCTAssertNil(text(0), "Jamais de zéro : la ligne disparaît")
         XCTAssertNil(text(.nan))
     }

@@ -300,16 +300,16 @@ enum SQShareCardBuilder {
 
     // MARK: - Formats
 
-    /// Règle commune de A : sous 100 Mb/s une décimale (« 84,2 »), de 100 à 999
-    /// un entier (« 214 »), dès 1 000 des Gb/s à deux décimales (« 1,24 »). Les
-    /// bascules se font sur la valeur ARRONDIE : 99,96 s'écrit « 100 », jamais
-    /// « 100,0 ». `nil` pour une valeur nulle ou non finie : la ligne disparaît.
+    /// Règle commune du 20/10 : sous 10 Mb/s une décimale (« 7,5 »), de 10 à 999
+    /// un entier (« 214 »), dès 1 000 des Gb/s à trois décimales (« 1,722 »). Les
+    /// bascules se font sur la valeur ARRONDIE : 9,96 s'écrit « 10 », jamais
+    /// « 10,0 ». `nil` pour une valeur nulle ou non finie : la ligne disparaît.
     static func throughput(_ mbps: Double, locale: Locale) -> SQShareCardModel.Value? {
         guard mbps.isFinite, mbps > 0 else { return nil }
         if mbps >= 999.5 {
-            return .init(number: number(mbps / 1000, fractionDigits: 2, locale: locale), unit: "Gb/s")
+            return .init(number: number(mbps / 1000, fractionDigits: 3, locale: locale), unit: "Gb/s")
         }
-        if mbps >= 99.95 {
+        if mbps >= 9.95 {
             return .init(number: number(mbps, fractionDigits: 0, locale: locale), unit: "Mb/s")
         }
         return .init(number: number(mbps, fractionDigits: 1, locale: locale), unit: "Mb/s")

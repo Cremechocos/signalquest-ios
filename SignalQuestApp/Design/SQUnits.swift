@@ -123,7 +123,7 @@ enum SQUnits {
 
     // MARK: Débit, latence, bande
 
-    /// « 412 Mbit/s », « 64,3 Mbit/s », « 1,2 Gbit/s » ; « Mbps » en anglais.
+    /// « 412 Mbit/s », « 7,5 Mbit/s », « 1,722 Gbit/s » ; « Mbps » en anglais.
     ///
     /// Trente écrans formataient le débit à la main avec `String(format:)`, donc
     /// avec un point décimal en français (« 64.0 »), et « Mbps » partout (TRX-24,
@@ -134,17 +134,20 @@ enum SQUnits {
     }
 
     /// Le nombre seul, pour un grand chiffre dont l'unité est posée à part. Une
-    /// décimale sous 100 Mbit/s et en Gbit/s, aucune entre les deux.
+    /// décimale sous 10 Mbit/s, aucune de 10 à 999, trois en Gbit/s.
     static func throughputValue(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
-        if mbps >= 1_000 {
-            return (mbps / 1_000).formatted(.number.precision(.fractionLength(1)).locale(locale))
+        if mbps >= 999.5 {
+            // Trois décimales : la précision de l'entier en Mbit/s, sans saut au
+            // passage du gigabit (règle commune web, Android et iOS du 20/10).
+            return (mbps / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
         }
-        return mbps.formatted(.number.precision(.fractionLength(mbps < 100 ? 1 : 0)).locale(locale))
+        // Bascules sur la valeur arrondie : 9,96 s'écrit « 10 », 999,6 « 1,000 Gbit/s ».
+        return mbps.formatted(.number.precision(.fractionLength(mbps < 9.95 ? 1 : 0)).locale(locale))
     }
 
     static func throughputUnit(mbps: Double) -> String {
-        mbps >= 1_000 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
+        mbps >= 999.5 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
     }
 
     /// Latence ou gigue : « 18 ms ».

@@ -57,10 +57,12 @@ final class QualityScaleTests: XCTestCase {
 
     func testThroughputUsesTheLocaleDecimalSeparator() {
         let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
-        XCTAssertEqual(SQUnits.throughputValue(mbps: 64.34, locale: fr), "64,3")
-        XCTAssertEqual(SQUnits.throughputValue(mbps: 64.34, locale: en), "64.3")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 7.54, locale: fr), "7,5")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 7.54, locale: en), "7.5")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 64.34, locale: fr), "64")
         XCTAssertEqual(SQUnits.throughputValue(mbps: 412.4, locale: fr), "412")
-        XCTAssertEqual(SQUnits.throughputValue(mbps: 1_234, locale: fr), "1,2")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 1_722, locale: fr), "1,722")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 2_000, locale: en), "2.000")
         XCTAssertEqual(SQUnits.throughputValue(mbps: .nan, locale: fr), "—")
     }
 
@@ -84,7 +86,7 @@ final class QualityScaleTests: XCTestCase {
             XCTAssertEqual(WidgetUnits.throughput(mbps: mbps, locale: fr), SQUnits.throughput(mbps: mbps, locale: fr), "\(mbps)")
         }
         XCTAssertEqual(WidgetUnits.throughputValue(mbps: 6.4, locale: fr), "6,4", "6,4 ne s'arrondit plus à 6")
-        XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 1_240, locale: fr), "1,2G")
+        XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 1_240, locale: fr), "1,240G")
         XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 412, locale: fr), "412")
         for meters in [30.0, 180, 340, 999, 1_000, 2_414, 12_345, .nan] {
             XCTAssertEqual(WidgetUnits.distance(meters: meters, imperial: false, locale: fr), SQUnits.distance(meters: meters, system: .metric, locale: fr), "\(meters)")
