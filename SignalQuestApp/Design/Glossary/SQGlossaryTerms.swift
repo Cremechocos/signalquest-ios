@@ -186,9 +186,9 @@ enum SQTerm: String, CaseIterable, Identifiable {
                 title: String(localized: "Réception"),
                 definition: String(localized: "Le débit descendant : la vitesse à laquelle ton téléphone reçoit des données (vidéos, pages web, mises à jour)."),
                 scale: [
-                    (String(localized: "100 Mbit/s et plus"), String(localized: "tout est fluide, même la 4K")),
-                    (String(localized: "10 à 30 Mbit/s"), String(localized: "vidéo HD correcte")),
-                    (String(localized: "moins de 3 Mbit/s"), String(localized: "navigation lente")),
+                    (String(localized: "100 Mb/s et plus"), String(localized: "tout est fluide, même la 4K")),
+                    (String(localized: "10 à 30 Mb/s"), String(localized: "vidéo HD correcte")),
+                    (String(localized: "moins de 3 Mb/s"), String(localized: "navigation lente")),
                 ],
                 related: related
             )
@@ -197,9 +197,9 @@ enum SQTerm: String, CaseIterable, Identifiable {
                 title: String(localized: "Envoi"),
                 definition: String(localized: "Le débit montant : la vitesse à laquelle ton téléphone envoie des données (photos, appels vidéo, sauvegardes)."),
                 scale: [
-                    (String(localized: "20 Mbit/s et plus"), String(localized: "envois rapides")),
-                    (String(localized: "3 à 10 Mbit/s"), String(localized: "appel vidéo correct")),
-                    (String(localized: "moins de 1 Mbit/s"), String(localized: "envois très lents")),
+                    (String(localized: "20 Mb/s et plus"), String(localized: "envois rapides")),
+                    (String(localized: "3 à 10 Mb/s"), String(localized: "appel vidéo correct")),
+                    (String(localized: "moins de 1 Mb/s"), String(localized: "envois très lents")),
                 ],
                 related: related
             )

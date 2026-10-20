@@ -78,7 +78,7 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
     func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {
         let speed = LeaderboardsView.valueText(712, unit: "Mbps")
         XCTAssertTrue(speed.hasPrefix("712"), speed)
-        XCTAssertTrue(speed.contains("bit/s") || speed.hasSuffix("Mbps"), speed)
+        XCTAssertTrue(speed.hasSuffix("Mb/s"), speed)
         XCTAssertEqual(LeaderboardsView.valueText(12, unit: "sessions"), "12 sessions")
     }
 

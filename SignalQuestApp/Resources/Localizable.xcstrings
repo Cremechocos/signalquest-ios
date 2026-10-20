@@ -30756,7 +30756,7 @@
         }
       }
     },
-    "10 à 30 Mbit/s" : {
+    "10 à 30 Mb/s" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30788,7 +30788,7 @@
         }
       }
     },
-    "100 Mbit/s et plus" : {
+    "100 Mb/s et plus" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30868,7 +30868,7 @@
         }
       }
     },
-    "20 Mbit/s et plus" : {
+    "20 Mb/s et plus" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30997,7 +30997,7 @@
         }
       }
     },
-    "3 à 10 Mbit/s" : {
+    "3 à 10 Mb/s" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -85905,7 +85905,7 @@
         }
       }
     },
-    "moins de 1 Mbit/s" : {
+    "moins de 1 Mb/s" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -85953,7 +85953,7 @@
         }
       }
     },
-    "moins de 3 Mbit/s" : {
+    "moins de 3 Mb/s" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
