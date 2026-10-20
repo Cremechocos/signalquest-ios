@@ -133,7 +133,14 @@ struct SQShareCardModel {
         let accentColor: UIColor
         var normalizedTimes: [Double]? = nil
         var durationSeconds: Double? = nil
+        /// « MAX 231 Mb/s » à droite de l'intitulé, et la valeur où tombe son
+        /// pointillé (planche commune du 20/10, alignée sur Android).
+        var maxText: String? = nil
+        var maxValue: Double? = nil
     }
+
+    /// Flèche tracée (Sora n'a pas de glyphe ↓ ↑).
+    enum Arrow { case down, up }
 
     /// Un nombre et son unité, composés séparément (« 1,722 » + « Gb/s »).
     struct Value: Equatable {
@@ -160,6 +167,8 @@ struct SQShareCardModel {
         let label: String
         let value: String
         var grade: Grade? = nil
+        /// « Sous charge ↓ » : flèche tracée 6 après l'intitulé.
+        var arrow: Arrow? = nil
     }
 
     var width: CGFloat = 1_200
@@ -170,12 +179,13 @@ struct SQShareCardModel {
     let network: NetworkLine?
 
     let download: Value
-    /// « Pic à 1,41 Gb/s ».
+    /// « MAX 1,841 Gb/s » sous le chiffre, seulement sans courbe : avec elle, le
+    /// MAX s'écrit sur la courbe.
     let downloadPeakText: String?
     let downloadGraph: Graph?
 
     let upload: Value?
-    /// « Pic à 96,8 Mb/s » ; absent si égal au débit.
+    /// « MAX 131 Mb/s », même règle ; absent si égal au débit.
     let uploadPeakText: String?
     let uploadGraph: Graph?
 
@@ -383,7 +393,7 @@ enum SQShareCardRenderer {
         // Pile calée en bas : rubrique 12, écart 14, chiffre (marges −6 et −4), écart 14, pic 16.
         let stackHeight = 12 + 14 + (heroSize - 10) + peakHeight
         let kickerTop = rect.maxY - stackHeight
-        drawKicker(String(localized: "Débit descendant"), arrow: .down, x: rect.minX, top: kickerTop)
+        drawKicker(String(localized: "Descendant"), arrow: .down, x: rect.minX, top: kickerTop)
 
         var numberFont = tabular(SQShareFonts.display(size: heroSize, weight: 800))
         let unitAttrs = attributes(SQShareFonts.display(size: unitSize, weight: 700), muted)
@@ -413,20 +423,32 @@ enum SQShareCardRenderer {
     private static func drawGraphs(_ cg: CGContext, model: SQShareCardModel, rect: CGRect) {
         // Deux blocs (en-tête 22, écart 8, tracé) répartis aux extrémités.
         let blockHeight: CGFloat = 22 + 8 + graphHeight
-        var blocks: [(SQShareCardModel.Graph, String, Arrow, CGFloat)] = []
+        var blocks: [(SQShareCardModel.Graph, String, SQShareCardModel.Arrow, CGFloat)] = []
         if let graph = model.downloadGraph { blocks.append((graph, String(localized: "Descendant"), .down, 0.1)) }
         if let graph = model.uploadGraph { blocks.append((graph, String(localized: "Montant"), .up, 0.14)) }
+        // La durée ne s'écrit qu'une fois, sous la dernière courbe, quand les deux
+        // phases durent autant ; sinon sous chacune.
+        let durations = blocks.map { block in
+            block.0.durationSeconds.flatMap { $0.isFinite && $0 > 0 ? Int($0.rounded()) : nil }
+        }
+        let sameDuration = durations.count == 2 && durations[0] != nil && durations[0] == durations[1]
         for (index, block) in blocks.enumerated() {
             let top = index == 0 ? rect.minY : rect.maxY - blockHeight
             drawKicker(block.1, arrow: block.2, x: rect.minX, top: top + 5)
-            if let duration = block.0.durationSeconds, duration.isFinite, duration > 0 {
-                let attrs = attributes(SQShareFonts.display(size: 12, weight: 600), muted)
-                let text = "\(Int(duration.rounded())) s"
-                draw(text, attrs: attrs, x: rect.maxX - width(text, attrs),
+            if let maxText = block.0.maxText {
+                let attrs = attributes(tabular(SQShareFonts.display(size: 12, weight: 700)), ink2)
+                draw(maxText, attrs: attrs, x: rect.maxX - width(maxText, attrs),
                      baseline: baseline(top: top + 5, height: 12, font: attrs.font))
             }
-            drawCurve(cg, graph: block.0, fillOpacity: block.3,
-                      rect: CGRect(x: rect.minX, y: top + 30, width: rect.width, height: graphHeight))
+            let plot = CGRect(x: rect.minX, y: top + 30, width: rect.width, height: graphHeight)
+            drawCurve(cg, graph: block.0, fillOpacity: block.3, rect: plot)
+            if let seconds = durations[index], !sameDuration || index == blocks.count - 1 {
+                // 3 sous la courbe, dans l'écart existant : aucune hauteur ajoutée.
+                let attrs = attributes(tabular(SQShareFonts.display(size: 11, weight: 600)), muted)
+                let text = "\(seconds) s"
+                draw(text, attrs: attrs, x: rect.maxX - width(text, attrs),
+                     baseline: baseline(top: plot.maxY + 3, height: 11, font: attrs.font))
+            }
         }
     }
 
@@ -438,6 +460,18 @@ enum SQShareCardRenderer {
         fillRule(cg, CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
         let points = graph.points
         guard points.count >= 2, graph.localMax > 0 else { return }
+        if let maxValue = graph.maxValue, maxValue.isFinite, maxValue > 0 {
+            // Pointillé du MAX à sa hauteur : un point de rayon 0,9 tous les 5,
+            // de x + 1 à x + W, encre à 34 %.
+            let ratio = CGFloat((maxValue / graph.localMax).clampedUnit)
+            let y = rect.minY + 4 + (1 - ratio) * (rect.height - 5.5)
+            leaderDot.setFill()
+            var x = rect.minX + 1
+            while x <= rect.maxX {
+                cg.fillEllipse(in: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8))
+                x += 5
+            }
+        }
         let plotted: [CGPoint] = points.enumerated().map { index, value in
             let fraction = graph.normalizedTimes.flatMap { index < $0.count ? $0[index] : nil }
                 ?? Double(index) / Double(points.count - 1)
@@ -477,7 +511,7 @@ enum SQShareCardRenderer {
 
     private struct Figure {
         let label: String
-        let arrow: Arrow?
+        let arrow: SQShareCardModel.Arrow?
         let value: SQShareCardModel.Value
         let subText: String?
     }
@@ -522,7 +556,11 @@ enum SQShareCardRenderer {
         for (index, row) in rows.enumerated() {
             let top = rect.minY + CGFloat(index) * 28
             let base = baseline(top: top, height: 22, font: labelAttrs.font)
-            let labelEnd = rect.minX + draw(row.label, attrs: labelAttrs, x: rect.minX, baseline: base)
+            var labelEnd = rect.minX + draw(row.label, attrs: labelAttrs, x: rect.minX, baseline: base)
+            if let arrow = row.arrow {
+                drawArrow(arrow, x: labelEnd + 6, top: top + 5, color: ink2)
+                labelEnd += 6 + 12
+            }
 
             let badgeWidth: CGFloat = row.grade == nil ? 0 : 22 + 8
             let available = rect.maxX - labelEnd - 10 - 10 - badgeWidth
@@ -561,33 +599,36 @@ enum SQShareCardRenderer {
 
     // MARK: Rubriques
 
-    private enum Arrow { case down, up }
-
-    /// Rubrique « ↓ DÉBIT DESCENDANT » : flèche de 12 tracée (et non un glyphe,
+    /// Rubrique « ↓ DESCENDANT » : flèche de 12 tracée (et non un glyphe,
     /// absent de Sora), 7 d'écart, capitales espacées de 0,18 em.
-    private static func drawKicker(_ text: String, arrow: Arrow?, x: CGFloat, top: CGFloat) {
+    private static func drawKicker(_ text: String, arrow: SQShareCardModel.Arrow?, x: CGFloat, top: CGFloat) {
         var textX = x
         if let arrow {
-            let path = UIBezierPath()
-            switch arrow {
-            case .down:
-                path.move(to: CGPoint(x: x + 6, y: top + 1.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
-                path.move(to: CGPoint(x: x + 2.5, y: top + 7)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
-                path.addLine(to: CGPoint(x: x + 9.5, y: top + 7))
-            case .up:
-                path.move(to: CGPoint(x: x + 6, y: top + 10.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
-                path.move(to: CGPoint(x: x + 2.5, y: top + 5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
-                path.addLine(to: CGPoint(x: x + 9.5, y: top + 5))
-            }
-            path.lineWidth = 1.8
-            path.lineCapStyle = .round
-            path.lineJoinStyle = .round
-            muted.setStroke()
-            path.stroke()
+            drawArrow(arrow, x: x, top: top, color: muted)
             textX += 12 + 7
         }
         let attrs = attributes(SQShareFonts.display(size: 12, weight: 700), muted, kernEm: 0.18)
         draw(text.uppercased(), attrs: attrs, x: textX, baseline: baseline(top: top, height: 12, font: attrs.font))
+    }
+
+    /// Flèche de 12 × 12, trait de 1,8 aux bouts arrondis.
+    private static func drawArrow(_ arrow: SQShareCardModel.Arrow, x: CGFloat, top: CGFloat, color: UIColor) {
+        let path = UIBezierPath()
+        switch arrow {
+        case .down:
+            path.move(to: CGPoint(x: x + 6, y: top + 1.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
+            path.move(to: CGPoint(x: x + 2.5, y: top + 7)); path.addLine(to: CGPoint(x: x + 6, y: top + 10.5))
+            path.addLine(to: CGPoint(x: x + 9.5, y: top + 7))
+        case .up:
+            path.move(to: CGPoint(x: x + 6, y: top + 10.5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
+            path.move(to: CGPoint(x: x + 2.5, y: top + 5)); path.addLine(to: CGPoint(x: x + 6, y: top + 1.5))
+            path.addLine(to: CGPoint(x: x + 9.5, y: top + 5))
+        }
+        path.lineWidth = 1.8
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        color.setStroke()
+        path.stroke()
     }
 
     private static func fillRule(_ cg: CGContext, _ rect: CGRect) {

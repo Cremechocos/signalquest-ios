@@ -92,12 +92,27 @@ final class SQShareCardBuilderTests: XCTestCase {
     func testDisplayedNumbersMatchTheResult() {
         let card = model(result())
         XCTAssertEqual(card.download, .init(number: "770", unit: "Mb/s"))
-        XCTAssertEqual(card.downloadPeakText, "Pic à 812 Mb/s")
+        // Avec courbes, le MAX s'écrit sur elles et pas sous les chiffres.
+        XCTAssertNil(card.downloadPeakText)
+        XCTAssertEqual(card.downloadGraph?.maxText, "MAX 812 Mb/s")
+        XCTAssertEqual(card.downloadGraph?.maxValue, 812.4)
         XCTAssertEqual(card.upload, .init(number: "126", unit: "Mb/s"))
-        XCTAssertEqual(card.uploadPeakText, "Pic à 131 Mb/s")
+        XCTAssertNil(card.uploadPeakText)
+        XCTAssertEqual(card.uploadGraph?.maxText, "MAX 131 Mb/s")
         XCTAssertEqual(card.latencyLabel, "Latence min.")
         XCTAssertEqual(card.latency, .init(number: "14", unit: "ms"))
         XCTAssertEqual(card.latencyAverageText, "Moyenne 24 ms")
+        // Valeur extrême de la planche : milliers séparés par U+202F.
+        let slow = model(result(pingMin: 1_234))
+        XCTAssertEqual(slow.latency, .init(number: "1\u{202F}234", unit: "ms"))
+    }
+
+    /// Sans courbe, le MAX reste sous le chiffre de sa phase.
+    func testMaxStaysUnderTheFigureWithoutCurve() {
+        let card = model(result(downloadSeries: nil, uploadSeries: nil))
+        XCTAssertNil(card.downloadGraph)
+        XCTAssertEqual(card.downloadPeakText, "MAX 812 Mb/s")
+        XCTAssertEqual(card.uploadPeakText, "MAX 131 Mb/s")
     }
 
     /// Un pic qui s'écrit comme le débit n'apporte rien : pas de ligne.
@@ -147,7 +162,9 @@ final class SQShareCardBuilderTests: XCTestCase {
     /// se pose sur le pire sens : 57 − 14 = 43 ms → C, en envoi ici.
     func testUnderLoadRowsShowEachDirectionAndGradeTheWorst() {
         let rows = model(result()).rows
-        XCTAssertEqual(rows.map(\.label), ["Sous charge ↓", "Sous charge ↑", "Gigue au repos", "Serveur"])
+        XCTAssertEqual(rows.map(\.label), ["Sous charge", "Sous charge", "Gigue au repos", "Serveur"])
+        XCTAssertEqual(rows[0].arrow, .down)
+        XCTAssertEqual(rows[1].arrow, .up)
         XCTAssertEqual(rows[0].value, "42 ms · gigue 6,2 ms")
         XCTAssertNil(rows[0].grade)
         XCTAssertEqual(rows[1].value, "57 ms · gigue 9,4 ms")
@@ -158,7 +175,8 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertTrue(model(result(pingHost: "1.1.1.1")).rows.allSatisfy { $0.grade == nil })
         // Un seul sens mesuré : une seule ligne, qui porte la note.
         let downloadOnly = model(result(pingUl: nil)).rows
-        XCTAssertEqual(downloadOnly.first?.label, "Sous charge ↓")
+        XCTAssertEqual(downloadOnly.first?.label, "Sous charge")
+        XCTAssertEqual(downloadOnly.first?.arrow, .down)
         XCTAssertNotNil(downloadOnly.first?.grade)
         XCTAssertEqual(downloadOnly[1].label, "Gigue au repos")
         // Valeur extrême de la spec commune : milliers séparés par U+202F en français.
@@ -195,10 +213,13 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertLessThan(graph?.points.last ?? 0, 200)
     }
 
-    /// Le haut du tracé est le maximum mesuré : la marge vient du gabarit (4 pt).
-    func testGraphScaleIsTheMeasuredMaximum() {
+    /// Le haut du tracé est le plus grand du MAX et des fenêtres tracées : le
+    /// pointillé du MAX ne sort jamais du tracé (planche du 20/10).
+    func testGraphScaleIncludesTheMax() {
         let graph = model(result(downloadSeries: [100, 200, 300])).downloadGraph
-        XCTAssertEqual(graph?.localMax ?? 0, 300, accuracy: 0.001)
+        XCTAssertEqual(graph?.localMax ?? 0, 812.4, accuracy: 0.001)
+        let above = model(result(downloadSeries: [100, 200, 900])).downloadGraph
+        XCTAssertEqual(above?.localMax ?? 0, 900, accuracy: 0.001)
     }
 
     /// Un échantillon aberrant est un artefact de mesure : il est borné, sinon il

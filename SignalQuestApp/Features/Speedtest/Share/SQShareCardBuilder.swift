@@ -82,15 +82,21 @@ enum SQShareCardBuilder {
         locale: Locale = .autoupdatingCurrent,
         options: SpeedtestShareOptions = .init()
     ) -> SQShareCardModel {
+        let downloadPeak = peakText(result.downloadMaxMbps, average: result.downloadAverageMbps, locale: locale)
+        let uploadPeak = result.uploadAverageMbps.flatMap { average in
+            result.uploadMaxMbps.flatMap { peakText($0, average: average, locale: locale) }
+        }
         let downloadGraph = graph(
             samples: result.downloadSeriesMbps ?? [],
             accentColor: UIColor(hex: 0x1C201E),
-            trace: result.measurementTrace?.phases.first { $0.phase == "download" }
+            trace: result.measurementTrace?.phases.first { $0.phase == "download" },
+            max: result.downloadMaxMbps, maxText: downloadPeak
         )
         let uploadGraph = graph(
             samples: result.uploadSeriesMbps ?? [],
             accentColor: UIColor(hex: 0xA8123A),
-            trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
+            trace: result.measurementTrace?.phases.first { $0.phase == "upload" },
+            max: result.uploadMaxMbps, maxText: uploadPeak
         )
 
         let latency = displayedLatency(for: result)
@@ -99,16 +105,17 @@ enum SQShareCardBuilder {
             network: options.includeNetworkContext ? networkLine(for: result) : nil,
             download: throughput(result.downloadAverageMbps, locale: locale)
                 ?? .init(number: "0", unit: "Mb/s"),
-            downloadPeakText: peakText(result.downloadMaxMbps, average: result.downloadAverageMbps, locale: locale),
+            // Avec sa courbe, le MAX s'écrit sur elle et n'est pas redit sous le chiffre.
+            downloadPeakText: downloadGraph == nil ? downloadPeak : nil,
             downloadGraph: downloadGraph,
             upload: result.uploadAverageMbps.flatMap { throughput($0, locale: locale) },
-            uploadPeakText: result.uploadAverageMbps.flatMap { average in
-                result.uploadMaxMbps.flatMap { peakText($0, average: average, locale: locale) }
-            },
+            uploadPeakText: uploadGraph == nil ? uploadPeak : nil,
             uploadGraph: uploadGraph,
             latencyLabel: latency.isMinimum ? String(localized: "Latence min.") : String(localized: "Latence"),
-            latency: latency.value.map { .init(number: "\(Int($0.rounded()))", unit: "ms") },
-            latencyAverageText: latency.average.map { String(localized: "Moyenne \(Int($0.rounded())) ms") },
+            latency: latency.value.map { .init(number: Int($0.rounded()).formatted(.number.locale(locale)), unit: "ms") },
+            latencyAverageText: latency.average.map {
+                String(localized: "Moyenne \(Int($0.rounded()).formatted(.number.locale(locale))) ms")
+            },
             rows: detailRows(for: result, locale: locale, includeServer: options.includeServerDetails),
             deviceCityText: deviceCityText(
                 for: result,
@@ -118,11 +125,11 @@ enum SQShareCardBuilder {
         )
     }
 
-    /// « Pic à 96,8 Mb/s » — absent si le pic manque ou s'écrit comme le débit.
+    /// « MAX 96,8 Mb/s » — absent si le pic manque ou s'écrit comme le débit.
+    /// « MAX » ne se traduit pas, comme dans l'app.
     private static func peakText(_ peak: Double, average: Double, locale: Locale) -> String? {
         guard let value = throughput(peak, locale: locale), value != throughput(average, locale: locale) else { return nil }
-        let text = "\(value.number) \(value.unit)"
-        return String(localized: "Pic à \(text)")
+        return "MAX \(value.number) \(value.unit)"
     }
 
     /// Le minimum en grand, la moyenne dessous ; sans minimum, la médiane puis la
@@ -138,20 +145,26 @@ enum SQShareCardBuilder {
     // MARK: - Graphes
 
     /// `nil` sous deux points : pas de courbe plutôt qu'une ligne inventée.
+    /// Le MAX entre dans l'échelle : quand il dépasse les fenêtres tracées, c'est
+    /// lui qui touche le haut, et son pointillé ne sort jamais du tracé.
     private static func graph(
-        samples: [Double], accentColor: UIColor, trace: SpeedtestPhaseTrace? = nil
+        samples: [Double], accentColor: UIColor, trace: SpeedtestPhaseTrace? = nil,
+        max peak: Double? = nil, maxText: String? = nil
     ) -> SQShareCardModel.Graph? {
         let timed = trace?.recentSeries
         let points = timed?.map(\.mbps) ?? downsample(prepareSeries(samples))
         guard points.count >= 2 else { return nil }
+        let usablePeak = peak.flatMap { $0.isFinite && $0 > 0 ? Swift.min($0, seriesClampMbps) : nil }
         return .init(
             points: points,
-            localMax: Swift.max(points.max() ?? 1, 1),
+            localMax: Swift.max(points.max() ?? 1, usablePeak ?? 0, 1),
             accentColor: accentColor,
             normalizedTimes: trace.map { phase in
                 (timed ?? []).map { Double($0.elapsedMs - phase.sampleStartMs) / Double(max(1, phase.sampleDurationMs)) }
             },
-            durationSeconds: trace.map { Double($0.sampleDurationMs) / 1000 }
+            durationSeconds: trace.map { Double($0.sampleDurationMs) / 1000 },
+            maxText: maxText,
+            maxValue: maxText == nil ? nil : usablePeak
         )
     }
 
@@ -229,14 +242,14 @@ enum SQShareCardBuilder {
         let receiving = validMs(result.pingDlMs), sending = validMs(result.pingUlMs)
         let worstIsReceiving = (receiving ?? -1) >= (sending ?? -1)
         if let receiving {
-            rows.append(.init(label: String(localized: "Sous charge ↓"),
+            rows.append(.init(label: String(localized: "Sous charge"),
                               value: loadedValue(receiving, jitter: result.jitterDlMs, locale: locale),
-                              grade: worstIsReceiving ? grade : nil))
+                              grade: worstIsReceiving ? grade : nil, arrow: .down))
         }
         if let sending {
-            rows.append(.init(label: String(localized: "Sous charge ↑"),
+            rows.append(.init(label: String(localized: "Sous charge"),
                               value: loadedValue(sending, jitter: result.jitterUlMs, locale: locale),
-                              grade: worstIsReceiving ? nil : grade))
+                              grade: worstIsReceiving ? nil : grade, arrow: .up))
         }
         if let jitter = result.jitterMs, jitter.isFinite, jitter >= 0 {
             rows.append(.init(label: String(localized: "Gigue au repos"), value: SQUnits.jitter(jitter, locale: locale)))

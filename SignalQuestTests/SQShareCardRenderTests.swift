@@ -32,26 +32,28 @@ final class SQShareCardRenderTests: XCTestCase {
             dateText: "19 octobre 2026 à 14:32",
             network: .init(name: "SFR", detail: "5G", barColor: UIColor(hex: 0xE60012)),
             download: .init(number: "1,722", unit: "Gb/s"),
-            downloadPeakText: "Pic à 1,841 Gb/s",
+            downloadPeakText: curves ? nil : "MAX 1,841 Gb/s",
             downloadGraph: curves
-                ? .init(points: Self.downloadShape.map { $0 * 1_410 }, localMax: 1_410,
-                        accentColor: UIColor(hex: 0x1C201E), normalizedTimes: Self.windowTimes, durationSeconds: 10)
+                ? .init(points: Self.downloadShape.map { $0 * 1_722 }, localMax: 1_841,
+                        accentColor: UIColor(hex: 0x1C201E), normalizedTimes: Self.windowTimes, durationSeconds: 10,
+                        maxText: "MAX 1,841 Gb/s", maxValue: 1_841)
                 : nil,
             upload: .init(number: "84", unit: "Mb/s"),
-            uploadPeakText: "Pic à 97 Mb/s",
+            uploadPeakText: curves ? nil : "MAX 97 Mb/s",
             uploadGraph: curves
-                ? .init(points: Self.uploadShape.map { $0 * 96.8 }, localMax: 96.8,
-                        accentColor: UIColor(hex: 0xA8123A), normalizedTimes: Self.windowTimes, durationSeconds: 10)
+                ? .init(points: Self.uploadShape.map { $0 * 90 }, localMax: 97,
+                        accentColor: UIColor(hex: 0xA8123A), normalizedTimes: Self.windowTimes, durationSeconds: 10,
+                        maxText: "MAX 97 Mb/s", maxValue: 97)
                 : nil,
             latencyLabel: "Latence min.",
             latency: .init(number: "14", unit: "ms"),
             latencyAverageText: "Moyenne 18 ms",
             rows: [
-                .init(label: "Sous charge ↓", value: "38 ms · gigue 6,2 ms", grade: .init(
+                .init(label: "Sous charge", value: "38 ms · gigue 6,2 ms", grade: .init(
                     letter: "B", color: UIColor(hex: 0x477818),
                     background: UIColor(hex: 0x7DB834, alpha: 0.16)
-                )),
-                .init(label: "Sous charge ↑", value: "31 ms · gigue 11 ms"),
+                ), arrow: .down),
+                .init(label: "Sous charge", value: "31 ms · gigue 11 ms", arrow: .up),
                 .init(label: "Gigue au repos", value: "3,2 ms"),
                 .init(label: "Serveur", value: "Roubaix (OVH RBX)"),
             ],
@@ -111,13 +113,17 @@ final class SQShareCardRenderTests: XCTestCase {
             dateText: base.dateText, network: .init(name: "Bouygues Telecom", detail: "5G", barColor: UIColor(hex: 0x009DDC)),
             download: .init(number: "12,409", unit: "Gb/s"), downloadPeakText: base.downloadPeakText,
             downloadGraph: base.downloadGraph, upload: .init(number: "2,481", unit: "Gb/s"),
-            uploadPeakText: "Pic à 2,512 Gb/s", uploadGraph: base.uploadGraph, latencyLabel: base.latencyLabel,
+            // Durées différentes : une durée sous chaque courbe.
+            uploadPeakText: nil, uploadGraph: base.uploadGraph.map { graph in
+                var graph = graph; graph.durationSeconds = 13; graph.maxText = "MAX 2,512 Gb/s"; return graph
+            }, latencyLabel: base.latencyLabel,
             latency: .init(number: "1234", unit: "ms"), latencyAverageText: "Moyenne 1456 ms",
             rows: base.rows.dropLast() + [.init(label: "Serveur", value: "Un nom de serveur beaucoup trop long pour la colonne")],
             deviceCityText: base.deviceCityText
         )
         let image = SQShareCardRenderer.render(model)
         attach(image, "A-valeurs-larges")
+        try? image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/sq-share-A-valeurs-larges.png"))
         XCTAssertEqual(image.size.width, 2_400, accuracy: 0.5)
     }
 

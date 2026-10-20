@@ -8048,22 +8048,6 @@
         }
       }
     },
-    "Débit descendant" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download speed"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Débit descendant"
-          }
-        }
-      }
-    },
     "Débits mesurés" : {
       "localizations" : {
         "en" : {
@@ -13985,18 +13969,18 @@
         }
       }
     },
-    "Moyenne %lld ms" : {
+    "Moyenne %@ ms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Average %lld ms"
+            "value" : "Average %@ ms"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Moyenne %lld ms"
+            "value" : "Moyenne %@ ms"
           }
         }
       }
@@ -15552,22 +15536,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos en vérification"
-          }
-        }
-      }
-    },
-    "Pic à %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Peak %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pic à %@"
           }
         }
       }
@@ -95186,38 +95154,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sous charge : la latence pendant que la ligne est pleine. Plus elle s'éloigne de la latence au repos, plus la visio ou le jeu en souffrent."
-          }
-        }
-      }
-    },
-    "Sous charge ↑" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Under load ↑"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sous charge ↑"
-          }
-        }
-      }
-    },
-    "Sous charge ↓" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Under load ↓"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sous charge ↓"
           }
         }
       }
