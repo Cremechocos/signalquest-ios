@@ -784,15 +784,17 @@ private struct ZoneOperatorDetailSheet: View {
         }
     }
 
+    /// Sous 3 mesures, pas de médiane affichée ici non plus : le serveur en donne une, mais elle
+    /// ne tiendrait qu'à 1 ou 2 points (même règle que le web).
     @ViewBuilder
     private var secondary: some View {
-        let rows: [(String, String)] = metric == .download
+        let few = item.sampleCount < 3
+        let rows: [(String, String)] = (metric == .download
             ? [(String(localized: "Envoi médian"), item.uploadMedianMbps.map { ZoneMetricFormat.text($0, metric: .download) }),
                (String(localized: "Latence médiane"), item.pingMedianMs.map { "\(Int($0.rounded()))\u{00A0}ms" })]
-                .compactMap { row in row.1.map { (row.0, $0) } }
             : [(String(localized: "RSRQ médian"), item.rsrqMedian.map { "\(Self.decimal($0))\u{00A0}dB" }),
-               (String(localized: "SINR médian"), item.sinrMedian.map { "\(Self.decimal($0))\u{00A0}dB" })]
-                .compactMap { row in row.1.map { (row.0, $0) } }
+               (String(localized: "SINR médian"), item.sinrMedian.map { "\(Self.decimal($0))\u{00A0}dB" })])
+            .compactMap { row in row.1.map { (row.0, few ? String(localized: "Trop peu de mesures") : $0) } }
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Text("Autres mesures").sqKicker()
