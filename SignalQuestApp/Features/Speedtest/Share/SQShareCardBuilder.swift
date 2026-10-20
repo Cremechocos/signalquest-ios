@@ -249,7 +249,8 @@ enum SQShareCardBuilder {
 
     /// « 48 ms · gigue 6,2 ms », ou la latence seule sans gigue mesurée.
     private static func loadedValue(_ ms: Double, jitter: Double?, locale: Locale) -> String {
-        let latency = "\(Int(ms.rounded())) ms"
+        // Milliers séparés comme dans la langue (« 2 876 ms » en français, U+202F).
+        let latency = "\(Int(ms.rounded()).formatted(.number.locale(locale))) ms"
         guard let jitter = validMs(jitter, allowsZero: true) else { return latency }
         return "\(latency) · " + String(localized: "gigue \(SQUnits.jitterValue(jitter, locale: locale)) ms")
     }

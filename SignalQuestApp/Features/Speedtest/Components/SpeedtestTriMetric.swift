@@ -356,7 +356,7 @@ struct SpeedtestResultSummary: View {
                 )
             }
             if let load = figures.underLoad {
-                let readings = [load.receivingMs.map { "↓ \(Int($0.rounded()))" }, load.sendingMs.map { "↑ \(Int($0.rounded()))" }]
+                let readings = [load.receivingMs.map { "↓ \(Int($0.rounded()).formatted())" }, load.sendingMs.map { "↑ \(Int($0.rounded()).formatted())" }]
                 let spoken = [load.receivingMs.map { String(localized: "en réception \(Int($0.rounded())) ms") },
                               load.sendingMs.map { String(localized: "en envoi \(Int($0.rounded())) ms") }]
                 tile(

@@ -161,6 +161,8 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(downloadOnly.first?.label, "Sous charge ↓")
         XCTAssertNotNil(downloadOnly.first?.grade)
         XCTAssertEqual(downloadOnly[1].label, "Gigue au repos")
+        // Valeur extrême de la spec commune : milliers séparés par U+202F en français.
+        XCTAssertEqual(model(result(pingDl: 2_876)).rows.first?.value, "2\u{202F}876 ms · gigue 6,2 ms")
     }
 
     func testLoadedLatencyGradeThresholds() {
