@@ -13,6 +13,7 @@ enum E2EEV2MessageComposerV2 {
         device: E2EEV2DeviceDescriptor,
         fk: Data,
         nonce: Data,
+        notifyUserId: String = "",
         sign: (Data) throws -> Data
     ) throws -> E2EEV2SignedMessageEnvelopeV2 {
         let parsed = try E2EEV2ContentPayloadV2.parse(payload)
@@ -22,10 +23,16 @@ enum E2EEV2MessageComposerV2 {
               let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData) else {
             throw E2EEV2MessageV2Error.invalidContext
         }
-        let context = E2EEV2MessageContextV2(
+        // Une réaction part en v3, en annotation (D.16) ; le reste en v2.
+        var context = E2EEV2MessageContextV2(
             conversationId: conversationId, epochNumber: epoch.epochNumber, senderDeviceId: device.deviceId,
             clientRequestId: clientRequestId, counter: parsed.counter, ttlSeconds: ttlSeconds, encryptedBlobIds: []
         )
+        if case .reaction = parsed.body {
+            context.envelopeVersion = E2EEV2MessageCryptoV2.annotationEnvelopeVersion
+            context.delivery = .annotation
+            context.notifyUserId = notifyUserId
+        }
         let envelope = try E2EEV2MessageCryptoV2.encrypt(
             payload: payload, fk: fk, epochKey: epoch.epochKey, nonce: nonce, context: context
         )
@@ -79,6 +86,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         let replyToRef: String?
         let mentions: [String]
         let ttlSeconds: Int
+        /// Réaction `ADD` au message d'un autre membre : son auteur, seul notifié (D.16).
+        var notifyUserId = ""
     }
 
     private let transport: E2EEV2APITransport
@@ -230,6 +239,11 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         if !intersection.envelopeVersions.contains("2") { missing.append("envelopeVersion") }
         if !intersection.payloadVersions.contains("2") { missing.append("payloadVersion") }
         if !intersection.kinds.contains(draft.body.kind) { missing.append(draft.body.kind) }
+        // D.16 : une réaction exige l'enveloppe v3 et la fonction, sans repli.
+        if case .reaction = draft.body {
+            if !intersection.envelopeVersions.contains("3") { missing.append("envelopeVersions:3") }
+            if !intersection.features.contains("reactions") { missing.append("reactions") }
+        }
         return missing.sorted()
     }
 
@@ -284,7 +298,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
             return .pending(try prepare(
                 payload: payload, fk: fk, counter: known.counter, ttlSeconds: known.ttlSeconds,
                 conversationId: conversationId, clientRequestId: clientRequestId, epochNumber: current.epochNumber,
-                device: device, ownerNamespace: ownerNamespace, createdAtMs: known.createdAtMs
+                device: device, ownerNamespace: ownerNamespace, createdAtMs: known.createdAtMs,
+                notifyUserId: known.notifyUserId ?? ""
             ))
         }
         // La charge canonique doit tenir dans sa borne (D.7), échappements
@@ -313,7 +328,7 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         return .pending(try prepare(
             payload: payload, fk: fk, counter: counter, ttlSeconds: draft.ttlSeconds, conversationId: conversationId,
             clientRequestId: clientRequestId, epochNumber: current.epochNumber, device: device,
-            ownerNamespace: ownerNamespace, createdAtMs: nowMs
+            ownerNamespace: ownerNamespace, createdAtMs: nowMs, notifyUserId: draft.notifyUserId
         ))
     }
 
@@ -328,7 +343,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         epochNumber: Int,
         device: E2EEV2DeviceDescriptor,
         ownerNamespace: String,
-        createdAtMs: Int64
+        createdAtMs: Int64,
+        notifyUserId: String
     ) throws -> E2EEV2ConversationStateStore.PendingSend {
         guard var epoch = try E2EEV2VerifiedEpochKeys.exact(
             conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace,
@@ -337,13 +353,15 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
         let signed = try E2EEV2MessageComposerV2.compose(
             payload: payload, conversationId: conversationId, clientRequestId: clientRequestId, ttlSeconds: ttlSeconds,
-            epoch: epoch, device: device, fk: fk, nonce: E2EEV2MessageComposerV2.randomBytes(12)
+            epoch: epoch, device: device, fk: fk, nonce: E2EEV2MessageComposerV2.randomBytes(12),
+            notifyUserId: notifyUserId
         ) { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) }
         let pending = E2EEV2ConversationStateStore.PendingSend(
             conversationId: conversationId, clientRequestId: clientRequestId, deviceId: device.deviceId,
             counter: counter, ttlSeconds: ttlSeconds, payloadB64: payload.base64EncodedString(),
             fkB64: fk.base64EncodedString(), epochNumber: epochNumber, createdAtMs: createdAtMs,
-            wire: String(decoding: signed.encoded, as: UTF8.self)
+            wire: String(decoding: signed.encoded, as: UTF8.self),
+            notifyUserId: notifyUserId.isEmpty ? nil : notifyUserId
         )
         try stateStore.savePendingSend(pending, ownerNamespace: ownerNamespace)
         return pending

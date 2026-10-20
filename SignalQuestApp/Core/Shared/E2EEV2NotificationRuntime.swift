@@ -53,7 +53,9 @@ enum E2EEV2NotificationPresentationPolicy {
 
     /// Message v2 ouvert par l'extension (§2.6) : le texte seulement en mode
     /// complet, jamais celui d'un message éphémère (la notification lui
-    /// survivrait), d'une édition ou d'une suppression.
+    /// survivrait), d'une édition ou d'une suppression. Une réaction reste
+    /// générique, sans emoji : l'extension ne sait pas si la cible est un
+    /// message du destinataire (D.16).
     static func present(
         _ payload: E2EEV2ContentPayloadV2,
         ephemeral: Bool,
@@ -69,11 +71,12 @@ enum E2EEV2NotificationPresentationPolicy {
             fullText = normalized.isEmpty ? String(localized: "Nouveau message chiffré") : String(normalized.prefix(240))
         case .edit: fullText = String(localized: "Message chiffré modifié")
         case .delete: fullText = String(localized: "Message chiffré supprimé")
+        case .reaction: fullText = String(localized: "Nouvelle réaction chiffrée")
         }
         var result = presentation(fullText: fullText, privacy: privacy, senderName: senderName)
         switch payload.body {
         case .edit, .delete: result.playsSound = false
-        case .text: break
+        case .text, .reaction: break
         }
         return result
     }

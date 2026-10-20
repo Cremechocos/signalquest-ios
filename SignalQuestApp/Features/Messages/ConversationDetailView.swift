@@ -56,6 +56,8 @@ struct ConversationDetailView: View {
     /// Fil v2 : nombre de messages présentés (les plus récents) et existence de plus anciens.
     @State private var v2Limit = E2EEV2ThreadWindow.pageSize
     @State private var v2HasOlder = false
+    /// Tous les appareils des membres lisent les réactions chiffrées (D.16).
+    @State private var v2ReactionsAvailable = false
     @State private var isLoadingOlder = false
     @State private var readReceipts: [ReadReceipt] = []
     /// Accusés « distribué » des autres membres, et vrai dès que `/receipts` a répondu :
@@ -256,6 +258,9 @@ struct ConversationDetailView: View {
     }
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
+    /// Réactions en clair hors chiffrement ; chiffrées en v2 quand tous les
+    /// appareils les lisent (D.16) ; jamais dans une conversation v1 (SOC-07).
+    private var reactionsAllowed: Bool { !isE2EE || (usesV2 && v2ReactionsAvailable) }
     private var canSend: Bool {
         EncryptedConversationSurfaces.canSend(isEncrypted: isE2EE, usesV2: usesV2, legacyUnlocked: isE2EEUnlocked)
     }
@@ -1555,14 +1560,14 @@ struct ConversationDetailView: View {
         }
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
         // Double tap : ❤️, ou le retire s'il est déjà de moi. Simultané pour ne pas retarder
-        // les appuis simples des liens, photos et sondages ; pas en conversation chiffrée,
-        // où les réactions ne sont pas encore chiffrées (SOC-07).
+        // les appuis simples des liens, photos et sondages ; en conversation chiffrée,
+        // seulement si les réactions y sont chiffrées (SOC-07, D.16).
         .simultaneousGesture(
             TapGesture(count: 2).onEnded {
                 Haptics.light()
                 Task { await toggleReaction(message: message, emoji: "❤️") }
             },
-            including: !isE2EE && message.deletedAt == nil && !message.id.hasPrefix("local-") ? .all : .subviews
+            including: reactionsAllowed && message.deletedAt == nil && !message.id.hasPrefix("local-") ? .all : .subviews
         )
         .contextMenu { contextMenu(for: message, mine: mine) }
         .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
@@ -2075,10 +2080,10 @@ struct ConversationDetailView: View {
         // Rangée d'emojis compacte en tête du menu contextuel : palette
         // horizontale native sur iOS 17+ (rendu type iMessage, dim léger, pas de
         // fond plein écran), boutons classiques en repli iOS 16.
-        // Pas de réactions en conversation chiffrée tant qu'elles ne sont pas
+        // Pas de réactions en conversation chiffrée tant qu'elles n'y sont pas
         // chiffrées : la réaction s'affichait puis disparaissait avec une erreur
-        // (SOC-07).
-        if !isE2EE {
+        // (SOC-07). En v2, elles le sont quand tous les appareils les lisent (D.16).
+        if reactionsAllowed {
             if #available(iOS 17.0, *) {
                 ControlGroup { reactionMenuButtons(for: message) }
                     .controlGroupStyle(.palette)
@@ -2859,6 +2864,7 @@ struct ConversationDetailView: View {
         ) {
         case .thread(let presentation):
             v2HasOlder = presentation.hasOlder
+            v2ReactionsAvailable = presentation.reactionsAvailable
             // Un texte local que le serveur a déjà accepté (renvoyé par la reprise en arrière-plan,
             // ou passé juste avant la coupure) n'a plus à rester « non envoyé » (B02).
             let accepted = presentation.clientRequestIds
@@ -2890,9 +2896,12 @@ struct ConversationDetailView: View {
 
     /// Envoi v2 d'un texte, d'une édition ou d'une suppression, sous le même
     /// identifiant à chaque essai : jamais deux signatures pour un message.
-    private func sendV2(_ body: E2EEV2ContentPayloadV2.Body, replyToId: String?, ttlSeconds: Int, clientRequestId: String) async -> Bool {
+    private func sendV2(
+        _ body: E2EEV2ContentPayloadV2.Body, replyToId: String?, ttlSeconds: Int, clientRequestId: String,
+        notifyUserId: String = ""
+    ) async -> Bool {
         let result = await services.e2eeV2Messaging.send(
-            .init(body: body, replyToRef: replyToId, mentions: [], ttlSeconds: ttlSeconds),
+            .init(body: body, replyToRef: replyToId, mentions: [], ttlSeconds: ttlSeconds, notifyUserId: notifyUserId),
             clientRequestId: clientRequestId, conversationId: conversation.id, isGroup: conversation.isGroup,
             participantIds: conversation.participants.map(\.userId)
         )
@@ -4341,7 +4350,12 @@ struct ConversationDetailView: View {
     }
 
     private func toggleReaction(message: MessageItem, emoji: String) async {
+        guard reactionsAllowed else { return }
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
+        if usesV2 {
+            await toggleV2Reaction(message: message, emoji: emoji, alreadyMine: alreadyMine)
+            return
+        }
         // Affichage immédiat : la réaction n'apparaissait qu'au rechargement
         // suivant, car le delta ne renvoie pas les réactions (SOC-05).
         if let uid = currentUserId {
@@ -4374,6 +4388,33 @@ struct ConversationDetailView: View {
             messages = messages.map { $0.id == message.id ? message : $0 }
             showActionError(error.userFacingMessage)
         }
+    }
+
+    /// Réaction chiffrée (D.16) : une annotation v3, jamais une bulle. Seul
+    /// l'auteur d'un autre membre est notifié, et seulement pour un ajout.
+    private func toggleV2Reaction(message: MessageItem, emoji: String, alreadyMine: Bool) async {
+        guard let uid = currentUserId else { return }
+        guard E2EEV2EmojiRGI.isValid(emoji) else {
+            showActionError(String(localized: "Cet emoji ne peut pas être envoyé dans une conversation chiffrée."))
+            return
+        }
+        let mine = Set(message.reactions.filter { $0.userId == uid }.map(\.emoji))
+        // Les récepteurs ignorent un 21e emoji actif : l'émetteur ne le propose pas.
+        guard alreadyMine || mine.count < E2EEV2MessageStoreV2.maxReactionsPerUser else { return }
+        var updated = message
+        if alreadyMine {
+            updated.reactions.removeAll { $0.emoji == emoji && $0.userId == uid }
+        } else {
+            updated.reactions.append(MessageReaction(emoji: emoji, userId: uid))
+        }
+        messages = messages.map { $0.id == message.id ? updated : $0 }
+        let author = message.senderId ?? ""
+        let sent = await sendV2(
+            .reaction(targetRef: message.id, emoji: emoji, action: alreadyMine ? .remove : .add),
+            replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString,
+            notifyUserId: !alreadyMine && author != uid ? author : ""
+        )
+        if !sent { messages = messages.map { $0.id == message.id ? message : $0 } }
     }
 
     /// Réactions, votes et accusés de lecture ne passent pas par le delta, qui ne

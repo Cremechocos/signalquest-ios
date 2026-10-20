@@ -415,12 +415,24 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 used.devicesByUser.flatMap { user, devices in devices.map { ($0.deviceId, user) } },
                 uniquingKeysWith: { first, _ in first }
             )
-            return .thread(E2EEV2ThreadPresenter.present(
+            var presentation = E2EEV2ThreadPresenter.present(
                 result, conversationId: conversationId, members: members, deviceOwners: owners,
                 refusals: used.refusals.filter { participantIds.contains($0.key) },
                 ownUserId: LocalAccountScope.currentUserId,
                 limit: limit
-            ))
+            )
+            // Même règle que l'envoi (§12), sans l'exclusion des navigateurs :
+            // dans le doute, le bouton reste masqué.
+            let probe = E2EEV2MessageSenderV2.Draft(
+                body: .reaction(targetRef: String(repeating: "A", count: 43), emoji: "❤️", action: .add),
+                replyToRef: nil, mentions: [], ttlSeconds: 0
+            )
+            presentation.reactionsAvailable = writesEnabled && SQFeatures.e2eeReactionsEnabled
+                && E2EEV2MessageSenderV2.missingCapabilities(
+                    probe, devices: used, members: Set(participantIds), excludesWeb: false,
+                    nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
+                ).isEmpty
+            return .thread(presentation)
         }
     }
 

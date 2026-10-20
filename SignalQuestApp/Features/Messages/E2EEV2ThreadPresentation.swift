@@ -55,6 +55,9 @@ struct E2EEV2ThreadPresentation: Equatable {
     var clientRequestIds: Set<String> = []
     /// Des messages plus anciens existent dans le magasin local mais ne sont pas présentés.
     var hasOlder: Bool = false
+    /// Tous les appareils des membres lisent les réactions chiffrées (D.16) :
+    /// sinon ni bouton ni double tap, jamais de repli en clair.
+    var reactionsAvailable = false
 }
 
 /// Taille de la fenêtre du fil v2 : les derniers messages d'abord, puis des pages de même taille.
@@ -101,7 +104,9 @@ enum E2EEV2ThreadPresenter {
                 threadReplyCount: nil,
                 sender: members[stored.senderUserId],
                 attachments: [],
-                reactions: []
+                reactions: result.snapshot.reactions[stored.messageRef]?.map {
+                    MessageReaction(emoji: $0.emoji, userId: $0.userId)
+                } ?? []
             )
         }
         var notices: [E2EEV2ThreadPresentation.Notice] = refusals.keys.sorted().map { userId in

@@ -1,0 +1,70 @@
+{
+  "fixtureVersion": "1",
+  "targetRef": "0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY",
+  "valid": [
+    {
+      "action": "ADD",
+      "emojiCodePoints": "2764 FE0F",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "action": "REMOVE",
+      "emojiCodePoints": "1F44D 1F3FD",
+      "payloadUtf8": "{\"body\":{\"action\":\"REMOVE\",\"emoji\":\"👍🏽\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"2\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    }
+  ],
+  "negative": [
+    {
+      "case": "emojiNotInList",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"☺\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "emojiText",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"A\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "emojiNotNFC",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"Å\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "twoEmojis",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"❤️❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "emojiTooLong",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "emojiEmpty",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "actionLowercase",
+      "payloadUtf8": "{\"body\":{\"action\":\"add\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "actionUnknown",
+      "payloadUtf8": "{\"body\":{\"action\":\"TOGGLE\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "replyToRefSet",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mentionsSet",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "extraBodyKey",
+      "payloadUtf8": "{\"body\":{\"a\":\"\",\"action\":\"ADD\",\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "missingAction",
+      "payloadUtf8": "{\"body\":{\"emoji\":\"❤️\",\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "badTargetRef",
+      "payloadUtf8": "{\"body\":{\"action\":\"ADD\",\"emoji\":\"❤️\",\"targetRef\":\"message\"},\"counter\":\"1\",\"kind\":\"REACTION\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    }
+  ]
+}

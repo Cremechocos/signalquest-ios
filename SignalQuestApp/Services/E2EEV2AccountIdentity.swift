@@ -264,7 +264,7 @@ enum E2EEV2InitialTrust {
             deviceId: device.deviceId,
             sequence: 1,
             issuedAtMs: nowMs,
-            envelopeVersions: ["2"],
+            envelopeVersions: E2EEV2CapabilitiesPublicationStore.envelopeVersions,
             payloadVersions: ["2"],
             kinds: sortedUnique(kinds),
             features: sortedUnique(features)
@@ -672,13 +672,20 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
 
     /// Ce qu'iOS sait lire en v2 : texte, modification, suppression ; « appels
     /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
-    /// médias chiffrés au jalon B.
-    static let kinds = ["DELETE", "EDIT", "TEXT"]
+    /// médias chiffrés au jalon B. Les réactions (D.16) s'annoncent ensemble,
+    /// enveloppe v3, `REACTION` et `reactions`, derrière leur verrou.
+    static var envelopeVersions: [String] { SQFeatures.e2eeReactionsEnabled ? ["2", "3"] : ["2"] }
+    static var kinds: [String] {
+        SQFeatures.e2eeReactionsEnabled ? ["DELETE", "EDIT", "REACTION", "TEXT"] : ["DELETE", "EDIT", "TEXT"]
+    }
     static var features: [String] {
+        var features: [String] = []
         #if DEBUG
-        if announcesCallsForLocalQA { return ["calls"] }
+        if announcesCallsForLocalQA { features = ["calls"] }
         #endif
-        return E2EEV2CallRuntimeGate.allowsControlPlane() ? ["calls"] : []
+        if features.isEmpty, E2EEV2CallRuntimeGate.allowsControlPlane() { features = ["calls"] }
+        if SQFeatures.e2eeReactionsEnabled { features.append("reactions") }
+        return features
     }
     #if DEBUG
     /// Essai d'appel local (tests, pile en boucle locale) : « appels » annoncé

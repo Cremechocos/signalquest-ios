@@ -25,7 +25,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let serverTagB64: String
         let keyId: String
         let frankTagB64: String
-        /// `TEXT`, `EDIT` ou `DELETE` ; seuls les `TEXT` s'affichent.
+        /// `TEXT`, `EDIT`, `DELETE` ou `REACTION` ; seuls les `TEXT` s'affichent.
         let kind: String
         let targetRef: String?
         let replyToRef: String?
@@ -39,6 +39,14 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         var text: String?
         var editedAtMs: Int64?
         var deleted: Bool
+        /// Réaction (D.16) : son emoji et `ADD` ou `REMOVE`. Absents des fichiers plus anciens.
+        var emoji: String? = nil
+        var reactionAction: String? = nil
+    }
+
+    struct Reaction: Equatable, Sendable {
+        let userId: String
+        let emoji: String
     }
 
     struct Snapshot: Equatable, Sendable {
@@ -48,7 +56,12 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let messages: [Stored]
         /// Identités en équivoque : jamais affichées, l'utilisateur est prévenu.
         let equivocalRefs: Set<String>
+        /// Réactions actives par message affiché non supprimé, dans l'ordre de leur ajout.
+        var reactions: [String: [Reaction]] = [:]
     }
+
+    /// Plafond d'emojis actifs par (utilisateur, cible) : un 21e `ADD` est ignoré (D.16).
+    static let maxReactionsPerUser = 20
 
     private struct ConversationFile: Codable, Equatable {
         var version = 1
@@ -92,7 +105,41 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let visible = file.messages.values
             .filter { $0.kind == "TEXT" && !file.equivocal.contains($0.messageRef) && ($0.expiresAtMs.map { $0 > nowMs } ?? true) }
             .sorted { $0.sequence < $1.sequence }
-        return Snapshot(cursor: file.cursor, messages: visible, equivocalRefs: file.equivocal)
+        return Snapshot(
+            cursor: file.cursor, messages: visible, equivocalRefs: file.equivocal,
+            reactions: Self.reactions(file, shown: Set(visible.filter { !$0.deleted }.map(\.messageRef)))
+        )
+    }
+
+    /// D.16 : par (utilisateur, cible, emoji), le dernier événement dans
+    /// l'ordre du serveur l'emporte ; jamais `sentAtMs`, propre à chaque
+    /// horloge. Une réaction dont la cible n'est pas encore là attend, sans
+    /// rien afficher ; celle d'une cible supprimée ou expirée disparaît avec elle.
+    private static func reactions(_ file: ConversationFile, shown: Set<String>) -> [String: [Reaction]] {
+        let events = file.messages.values
+            .filter { $0.kind == "REACTION" && !file.equivocal.contains($0.messageRef) }
+            .sorted { $0.sequence < $1.sequence }
+        var active: [String: [String: [String]]] = [:]
+        for event in events {
+            guard let target = event.targetRef, shown.contains(target), let emoji = event.emoji else { continue }
+            var emojis = active[target]?[event.senderUserId] ?? []
+            switch event.reactionAction {
+            case E2EEV2ContentPayloadV2.ReactionAction.add.rawValue?:
+                guard !emojis.contains(emoji), emojis.count < maxReactionsPerUser else { continue }
+                emojis.append(emoji)
+            case E2EEV2ContentPayloadV2.ReactionAction.remove.rawValue?:
+                emojis.removeAll { $0 == emoji }
+            default:
+                continue
+            }
+            active[target, default: [:]][event.senderUserId] = emojis
+        }
+        var result: [String: [Reaction]] = [:]
+        for (target, byUser) in active {
+            let reactions = byUser.keys.sorted().flatMap { user in byUser[user]!.map { Reaction(userId: user, emoji: $0) } }
+            if !reactions.isEmpty { result[target] = reactions }
+        }
+        return result
     }
 
     /// Garde une page reçue, puis avance le curseur. Les éditions et
@@ -119,10 +166,14 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         file.equivocal.formUnion(equivocal)
         for message in received where file.messages[message.messageRef] == nil {
             let target: String?, text: String?
+            var reaction: (emoji: String, action: String)?
             switch message.payload.body {
             case .text(let value): (target, text) = (nil, value)
             case .edit(let ref, let value): (target, text) = (ref, value)
             case .delete(let ref): (target, text) = (ref, nil)
+            case .reaction(let ref, let emoji, let action):
+                (target, text) = (ref, nil)
+                reaction = (emoji, action.rawValue)
             }
             file.messages[message.messageRef] = Stored(
                 messageRef: message.messageRef, envelopeId: message.envelopeId, sequence: message.sequence,
@@ -132,7 +183,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
                 frankTagB64: message.frankTagB64, kind: message.payload.body.kind, targetRef: target,
                 replyToRef: message.payload.replyToRef, sentAtMs: message.payload.sentAtMs,
                 expiresAtMs: message.expiresAtMs, payloadB64: message.payloadBytes.base64EncodedString(),
-                fkB64: message.fk.base64EncodedString(), text: text, editedAtMs: nil, deleted: false
+                fkB64: message.fk.base64EncodedString(), text: text, editedAtMs: nil, deleted: false,
+                emoji: reaction?.emoji, reactionAction: reaction?.action
             )
             touched.insert(target ?? message.messageRef)
         }
@@ -313,7 +365,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     private static func text(of message: E2EEV2ReceivedMessageV2) -> String? {
         switch message.payload.body {
         case .text(let value), .edit(_, let value): return value
-        case .delete: return nil
+        case .delete, .reaction: return nil
         }
     }
 

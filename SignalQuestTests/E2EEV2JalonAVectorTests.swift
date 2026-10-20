@@ -1587,6 +1587,355 @@ private extension E2EEV2JalonAVectorTests {
     }
 }
 
+// MARK: - D.16 Réactions chiffrées
+
+extension E2EEV2JalonAVectorTests {
+    /// Écrit les seuls vecteurs D.16, avec `SQ_E2EE_GENERATE_VECTORS=d16` :
+    /// les autres gardent leurs signatures, déjà importées ailleurs.
+    func testGenerateD16Vectors() throws {
+        guard ProcessInfo.processInfo.environment["SQ_E2EE_GENERATE_VECTORS"] == "d16" else {
+            throw XCTSkip("Génération des vecteurs D.16 : SQ_E2EE_GENERATE_VECTORS=d16")
+        }
+        let vectors: [(String, VJ)] = [
+            ("message-envelope-v3", try buildMessageEnvelopeV3()),
+            ("content-payload-v2-reaction", try buildReactionPayload()),
+            ("emoji-rgi-15.1", buildEmojiRGI()),
+        ]
+        for (name, value) in vectors {
+            try Data((render(value) + "\n").utf8).write(to: d16VectorURL(name))
+        }
+    }
+
+    func testMessageEnvelopeV3Vector() throws {
+        let v = try d16Load("message-envelope-v3")
+        let epochKey = try d16B64(v, "epochKeyB64")
+        let sender = try P256.Signing.PublicKey(x963Representation: d16B64(v, "senderSigningPublicX963B64"))
+        let cases = try XCTUnwrap(v["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 2)
+        for item in cases {
+            let name = try d16Str(item, "case")
+            let wire = Data(try d16Str(item, "wireJsonUtf8").utf8)
+            let parsed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(wire), name)
+            XCTAssertEqual(parsed.encoded, wire, "JSON canonique, à l'octet : \(name)")
+            XCTAssertEqual(parsed.envelope.envelopeVersion, 3)
+            XCTAssertEqual(parsed.envelope.delivery.rawValue, try d16Str(item, "delivery"))
+            XCTAssertEqual(parsed.envelope.notifyUserId, try d16Str(item, "notifyUserId"))
+            let context = parsed.context(conversationId: try d16Str(v, "conversationId"), senderDeviceId: try d16Str(v, "senderDeviceId"))
+            XCTAssertEqual(try XCTUnwrap(Data(base64Encoded: parsed.envelope.aadB64)), Data(try d16Str(item, "aadUtf8").utf8), name)
+            XCTAssertEqual(try E2EEV2MessageCryptoV2.signatureCanonical(context: context, envelope: parsed.envelope), Data(try d16Str(item, "signatureCanonicalUtf8").utf8), name)
+            // Chiffrement rejoué à l'octet avec les mêmes aléas.
+            let payload = Data(try d16Str(item, "payloadUtf8").utf8)
+            let replay = try E2EEV2MessageCryptoV2.encrypt(
+                payload: payload, fk: d16B64(v, "fkB64"), epochKey: epochKey, nonce: d16B64(v, "nonceB64"), context: context
+            )
+            XCTAssertEqual(replay, parsed.envelope, name)
+            try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: parsed.envelope, signatureDerB64: parsed.senderSignatureB64, senderSigningKey: sender)
+            let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: parsed.envelope, epochKey: epochKey, context: context)
+            XCTAssertEqual(opened.payloadBytes, payload, name)
+        }
+        let base = try d16Str(cases[0], "wireJsonUtf8")
+        for neg in try XCTUnwrap(v["wireNegative"] as? [[String: Any]]) {
+            XCTAssertNotEqual(try d16Str(neg, "wireJsonUtf8"), base)
+            XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(Data(try d16Str(neg, "wireJsonUtf8").utf8)), d16Case(neg))
+        }
+        // Relais qui retire ou change un champ, AAD ou signature au format v2 :
+        // la signature ou le déchiffrement échoue.
+        let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(Data(base.utf8)))
+        for neg in try XCTUnwrap(v["negative"] as? [[String: Any]]) {
+            var envelope = signed.envelope
+            if let delivery = neg["delivery"] as? String { envelope.delivery = try XCTUnwrap(E2EEV2Delivery(rawValue: delivery)) }
+            if let notify = neg["notifyUserId"] as? String { envelope.notifyUserId = notify }
+            let candidate = E2EEV2MessageEnvelopeV2(
+                envelopeVersion: envelope.envelopeVersion, epochNumber: envelope.epochNumber, clientRequestId: envelope.clientRequestId,
+                counter: envelope.counter, algorithm: envelope.algorithm, contentType: envelope.contentType,
+                keyCommitmentB64: envelope.keyCommitmentB64, ttlSeconds: envelope.ttlSeconds, encryptedBlobIds: envelope.encryptedBlobIds,
+                frankTagB64: envelope.frankTagB64, nonceB64: envelope.nonceB64,
+                aadB64: neg["aadB64"] as? String ?? envelope.aadB64, ciphertextB64: envelope.ciphertextB64,
+                delivery: envelope.delivery, notifyUserId: envelope.notifyUserId
+            )
+            let context = E2EEV2SignedMessageEnvelopeV2(envelope: candidate, senderSignatureB64: signed.senderSignatureB64)
+                .context(conversationId: try d16Str(v, "conversationId"), senderDeviceId: try d16Str(v, "senderDeviceId"))
+            let signature = neg["signatureDerB64"] as? String ?? signed.senderSignatureB64
+            let refused: Bool
+            do {
+                try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: candidate, signatureDerB64: signature, senderSigningKey: sender)
+                _ = try E2EEV2MessageCryptoV2.decrypt(envelope: candidate, epochKey: epochKey, context: context)
+                refused = false
+            } catch {
+                refused = true
+            }
+            XCTAssertTrue(refused, d16Case(neg))
+        }
+        // Enveloppes bien signées dont `delivery` ne convient pas à la charge.
+        for neg in try XCTUnwrap(v["semanticNegative"] as? [[String: Any]]) {
+            let parsed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(Data(try d16Str(neg, "wireJsonUtf8").utf8)), d16Case(neg))
+            let context = parsed.context(conversationId: try d16Str(v, "conversationId"), senderDeviceId: try d16Str(v, "senderDeviceId"))
+            try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: parsed.envelope, signatureDerB64: parsed.senderSignatureB64, senderSigningKey: sender)
+            XCTAssertThrowsError(try E2EEV2MessageCryptoV2.decrypt(envelope: parsed.envelope, epochKey: epochKey, context: context), d16Case(neg))
+        }
+    }
+
+    func testContentPayloadV2ReactionVector() throws {
+        let v = try d16Load("content-payload-v2-reaction")
+        for positive in try XCTUnwrap(v["valid"] as? [[String: Any]]) {
+            let data = Data(try d16Str(positive, "payloadUtf8").utf8)
+            let payload = try E2EEV2ContentPayloadV2.parse(data)
+            guard case .reaction(_, let emoji, let action) = payload.body else { return XCTFail("REACTION attendu") }
+            XCTAssertEqual(action.rawValue, try d16Str(positive, "action"))
+            XCTAssertEqual(E2EEV2EmojiRGI.key(emoji), try d16Str(positive, "emojiCodePoints"))
+            XCTAssertEqual(try payload.encoded(), data)
+        }
+        for neg in try XCTUnwrap(v["negative"] as? [[String: Any]]) {
+            XCTAssertThrowsError(try E2EEV2ContentPayloadV2.parse(Data(d16Str(neg, "payloadUtf8").utf8)), d16Case(neg))
+        }
+    }
+
+    func testEmojiRGIVector() throws {
+        let v = try d16Load("emoji-rgi-15.1")
+        let list = Data((E2EEV2EmojiRGI.list + "\n").utf8)
+        let digest = SHA256.hash(data: list).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, try d16Str(v, "listSHA256"))
+        XCTAssertEqual(digest, E2EEV2EmojiRGI.listSHA256)
+        XCTAssertEqual(String(list.count), try d16Str(v, "listBytes"))
+        let lines = E2EEV2EmojiRGI.list.split(separator: "\n").map(String.init)
+        XCTAssertEqual(String(lines.count), try d16Str(v, "count"))
+        XCTAssertEqual(E2EEV2EmojiRGI.sequences.count, lines.count, "aucune séquence en double")
+        var longest = 0
+        for line in lines {
+            let scalars = try line.split(separator: " ").map { try XCTUnwrap(UInt32($0, radix: 16).flatMap(Unicode.Scalar.init)) }
+            let emoji = String(String.UnicodeScalarView(scalars))
+            XCTAssertTrue(E2EEV2EmojiRGI.isValid(emoji), line)
+            longest = max(longest, emoji.utf8.count)
+        }
+        XCTAssertEqual(String(longest), try d16Str(v, "maxSequenceBytes"))
+        for witness in try XCTUnwrap(v["witnesses"] as? [[String: Any]]) {
+            let emoji = try d16Str(witness, "emoji")
+            XCTAssertTrue(E2EEV2EmojiRGI.isValid(emoji), d16Case(witness))
+            XCTAssertEqual(E2EEV2EmojiRGI.key(emoji), try d16Str(witness, "codePoints"))
+            XCTAssertEqual(String(emoji.utf8.count), try d16Str(witness, "utf8Bytes"))
+        }
+        for outsider in try XCTUnwrap(v["nonMembers"] as? [[String: Any]]) {
+            XCTAssertFalse(E2EEV2EmojiRGI.isValid(try d16Str(outsider, "value")), d16Case(outsider))
+        }
+    }
+
+    // MARK: Construction
+
+    fileprivate var d16TargetRef: String {
+        E2EEV2MessageRef.make(conversationId: conversationId, senderDeviceId: deviceB1, clientRequestId: "message_01J7ABCD23456789")
+    }
+
+    fileprivate func buildMessageEnvelopeV3() throws -> VJ {
+        let sender = try signingKey(0x31)
+        let epochKey = Data((0..<32).map { UInt8(0x80 + $0) })
+        let fk = Data((0..<32).map { UInt8(0xA0 + $0) })
+        let nonce = Data((0..<12).map { UInt8(0x60 + $0) })
+        func context(_ clientRequestId: String, _ counter: Int64, version: Int = 3, _ delivery: E2EEV2Delivery, _ notify: String) -> E2EEV2MessageContextV2 {
+            E2EEV2MessageContextV2(
+                conversationId: conversationId, epochNumber: 1, senderDeviceId: deviceA1, clientRequestId: clientRequestId,
+                counter: counter, ttlSeconds: 0, encryptedBlobIds: [], envelopeVersion: version, delivery: delivery, notifyUserId: notify
+            )
+        }
+        func payload(_ counter: Int64, _ body: E2EEV2ContentPayloadV2.Body) throws -> Data {
+            try E2EEV2ContentPayloadV2(sentAtMs: createdAtMs, counter: counter, replyToRef: nil, mentions: [], body: body).encoded()
+        }
+        func sealed(_ context: E2EEV2MessageContextV2, _ payload: Data) throws -> (E2EEV2MessageEnvelopeV2, String, Data, String) {
+            let envelope = try E2EEV2MessageCryptoV2.encrypt(payload: payload, fk: fk, epochKey: epochKey, nonce: nonce, context: context)
+            let canonical = try E2EEV2MessageCryptoV2.signatureCanonical(context: context, envelope: envelope)
+            let signature = try E2EEV2LowS.sign(canonical, with: sender).base64EncodedString()
+            let wire = String(decoding: E2EEV2SignedMessageEnvelopeV2(envelope: envelope, senderSignatureB64: signature).encoded, as: UTF8.self)
+            return (envelope, signature, canonical, wire)
+        }
+        func positive(_ name: String, _ context: E2EEV2MessageContextV2, _ payload: Data) throws -> (VJ, String, E2EEV2MessageEnvelopeV2) {
+            let (envelope, signature, canonical, wire) = try sealed(context, payload)
+            return (.o([
+                ("case", .s(name)), ("clientRequestId", .s(context.clientRequestId)), ("counter", .s(String(context.counter))),
+                ("delivery", .s(context.delivery.rawValue)), ("notifyUserId", .s(context.notifyUserId)),
+                ("payloadUtf8", .s(String(decoding: payload, as: UTF8.self))), ("frankTagB64", .s(envelope.frankTagB64)),
+                ("aadUtf8", .s(String(decoding: try XCTUnwrap(Data(base64Encoded: envelope.aadB64)), as: UTF8.self))),
+                ("aadB64", .s(envelope.aadB64)), ("ciphertextB64", .s(envelope.ciphertextB64)),
+                ("signatureCanonicalUtf8", .s(String(decoding: canonical, as: UTF8.self))),
+                ("signatureDerB64", .s(signature)), ("wireJsonUtf8", .s(wire)),
+            ]), wire, envelope)
+        }
+        let addContext = context("reaction_01J7ABCD23456789", 2, .annotation, userB)
+        let (addCase, wire, envelope) = try positive(
+            "reactionAddNotifiesAuthor", addContext, try payload(2, .reaction(targetRef: d16TargetRef, emoji: d16Emoji("2764 FE0F"), action: .add))
+        )
+        let (removeCase, _, _) = try positive(
+            "reactionRemoveNotifiesNobody", context("reaction_01J7ABCD2345678A", 3, .annotation, ""),
+            try payload(3, .reaction(targetRef: d16TargetRef, emoji: d16Emoji("2764 FE0F"), action: .remove))
+        )
+        func wireCase(_ name: String, _ text: String) -> VJ {
+            XCTAssertNotEqual(text, wire, name)
+            return .o([("case", .s(name)), ("wireJsonUtf8", .s(text))])
+        }
+        let deliveryField = #""delivery":"annotation","#
+        let notifyField = #""notifyUserId":"\#(userB)","#
+        XCTAssertTrue(wire.contains(deliveryField) && wire.contains(notifyField))
+        let wireNegative: [VJ] = [
+            wireCase("missingDelivery", wire.replacingOccurrences(of: deliveryField, with: "")),
+            wireCase("missingNotifyUserId", wire.replacingOccurrences(of: notifyField, with: "")),
+            wireCase("unknownKey", wire.replacingOccurrences(of: #"{"aadB64""#, with: #"{"a":"","aadB64""#)),
+            wireCase("deliveryOutOfList", wire.replacingOccurrences(of: deliveryField, with: #""delivery":"reaction","#)),
+            wireCase("deliveryUppercase", wire.replacingOccurrences(of: deliveryField, with: #""delivery":"ANNOTATION","#)),
+            wireCase("notifyUserIdWithMessage", wire.replacingOccurrences(of: deliveryField, with: #""delivery":"message","#)),
+            wireCase("notifyUserIdNotOpaque", wire.replacingOccurrences(of: notifyField, with: #""notifyUserId":"bruno","#)),
+            wireCase("notifyUserIdNull", wire.replacingOccurrences(of: notifyField, with: #""notifyUserId":null,"#)),
+            wireCase("versionTwoWithV3Keys", wire.replacingOccurrences(of: #""envelopeVersion":"3""#, with: #""envelopeVersion":"2""#)),
+            wireCase("versionFour", wire.replacingOccurrences(of: #""envelopeVersion":"3""#, with: #""envelopeVersion":"4""#)),
+        ]
+        // AAD et signature calculées au format v2, sur la même enveloppe.
+        var v2Context = addContext
+        v2Context.envelopeVersion = 2
+        v2Context.delivery = .message
+        v2Context.notifyUserId = ""
+        let v2AAD = try E2EEV2MessageCryptoV2.aad(context: v2Context, keyCommitmentB64: envelope.keyCommitmentB64, frankTagB64: envelope.frankTagB64)
+        var v2Envelope = envelope
+        v2Envelope.delivery = .message
+        v2Envelope.notifyUserId = ""
+        let v2Signature = try E2EEV2LowS.sign(try E2EEV2MessageCryptoV2.signatureCanonical(context: v2Context, envelope: v2Envelope), with: sender)
+        // Bien signées et chiffrées, refusées après l'étape 6.
+        func semantic(_ name: String, _ context: E2EEV2MessageContextV2, _ payload: Data) throws -> VJ {
+            .o([("case", .s(name)), ("payloadUtf8", .s(String(decoding: payload, as: UTF8.self))), ("wireJsonUtf8", .s(try sealed(context, payload).3))])
+        }
+        let semanticNegative: [VJ] = [
+            try semantic("textInAnnotation", context("message_01J7ABCD2345678B", 4, .annotation, ""), payload(4, .text("Caché"))),
+            try semantic("notifyOnRemove", context("reaction_01J7ABCD2345678C", 5, .annotation, userB),
+                         payload(5, .reaction(targetRef: d16TargetRef, emoji: d16Emoji("2764 FE0F"), action: .remove))),
+            try semantic("notifyOnEdit", context("edit_01J7ABCD2345678D", 6, .annotation, userB),
+                         payload(6, .edit(targetRef: d16TargetRef, text: "Modifié"))),
+            try semantic("reactionInV2Envelope", context("reaction_01J7ABCD2345678E", 7, version: 2, .message, ""),
+                         payload(7, .reaction(targetRef: d16TargetRef, emoji: d16Emoji("2764 FE0F"), action: .add))),
+            try semantic("reactionAsMessage", context("reaction_01J7ABCD2345678F", 8, .message, ""),
+                         payload(8, .reaction(targetRef: d16TargetRef, emoji: d16Emoji("2764 FE0F"), action: .add))),
+        ]
+        return .o([
+            ("fixtureVersion", .s("1")), ("conversationId", .s(conversationId)), ("epochNumber", .s("1")),
+            ("senderDeviceId", .s(deviceA1)), ("senderUserId", .s(userA)), ("ttlSeconds", .s("0")), ("encryptedBlobIds", .a([])),
+            ("algorithm", .s(E2EEV2MessageCryptoV2.algorithm)), ("contentType", .s(E2EEV2MessageCryptoV2.contentType)),
+            ("kdfInfo", .s(E2EEV2MessageCryptoV2.kdfInfo)),
+            ("epochKeyB64", .s(epochKey.base64EncodedString())), ("keyCommitmentB64", .s(envelope.keyCommitmentB64)),
+            ("fkB64", .s(fk.base64EncodedString())), ("nonceB64", .s(nonce.base64EncodedString())),
+            ("senderSigningPrivateRawB64", .s(sender.rawRepresentation.base64EncodedString())),
+            ("senderSigningPublicX963B64", .s(sender.publicKey.x963Representation.base64EncodedString())),
+            ("cases", .a([addCase, removeCase])),
+            ("wireNegative", .a(wireNegative)),
+            ("negative", .a([
+                .o([("case", .s("notifyUserIdStripped")), ("notifyUserId", .s(""))]),
+                .o([("case", .s("notifyUserIdChanged")), ("notifyUserId", .s(userA))]),
+                .o([("case", .s("deliveryChangedToMessage")), ("delivery", .s("message")), ("notifyUserId", .s(""))]),
+                .o([("case", .s("aadV2Format")), ("aadB64", .s(v2AAD.base64EncodedString()))]),
+                .o([("case", .s("signatureV2Format")), ("signatureDerB64", .s(v2Signature.base64EncodedString()))]),
+            ])),
+            ("semanticNegative", .a(semanticNegative)),
+        ])
+    }
+
+    fileprivate func buildReactionPayload() throws -> VJ {
+        func payload(_ counter: Int64, _ emoji: String, _ action: E2EEV2ContentPayloadV2.ReactionAction) throws -> String {
+            String(decoding: try E2EEV2ContentPayloadV2(
+                sentAtMs: createdAtMs, counter: counter, replyToRef: nil, mentions: [],
+                body: .reaction(targetRef: d16TargetRef, emoji: emoji, action: action)
+            ).encoded(), as: UTF8.self)
+        }
+        let add = try payload(1, d16Emoji("2764 FE0F"), .add)
+        let remove = try payload(2, d16Emoji("1F44D 1F3FD"), .remove)
+        let emojiField = "\"emoji\":\"\(d16Emoji("2764 FE0F"))\""
+        XCTAssertTrue(add.contains(emojiField))
+        func neg(_ name: String, _ text: String) -> VJ {
+            XCTAssertNotEqual(text, add, name)
+            return .o([("case", .s(name)), ("payloadUtf8", .s(text))])
+        }
+        func emoji(_ value: String) -> String { add.replacingOccurrences(of: emojiField, with: "\"emoji\":\"\(value)\"") }
+        return .o([
+            ("fixtureVersion", .s("1")), ("targetRef", .s(d16TargetRef)),
+            ("valid", .a([
+                .o([("action", .s("ADD")), ("emojiCodePoints", .s("2764 FE0F")), ("payloadUtf8", .s(add))]),
+                .o([("action", .s("REMOVE")), ("emojiCodePoints", .s("1F44D 1F3FD")), ("payloadUtf8", .s(remove))]),
+            ])),
+            ("negative", .a([
+                neg("emojiNotInList", emoji("\u{263A}")),
+                neg("emojiText", emoji("A")),
+                neg("emojiNotNFC", emoji("A\u{030A}")),
+                neg("twoEmojis", emoji(d16Emoji("2764 FE0F 2764 FE0F"))),
+                neg("emojiTooLong", emoji(String(repeating: d16Emoji("1F44D"), count: 17))),
+                neg("emojiEmpty", emoji("")),
+                neg("actionLowercase", add.replacingOccurrences(of: "\"action\":\"ADD\"", with: "\"action\":\"add\"")),
+                neg("actionUnknown", add.replacingOccurrences(of: "\"action\":\"ADD\"", with: "\"action\":\"TOGGLE\"")),
+                neg("replyToRefSet", add.replacingOccurrences(of: "\"replyToRef\":null", with: "\"replyToRef\":\"\(d16TargetRef)\"")),
+                neg("mentionsSet", add.replacingOccurrences(of: "\"mentions\":[]", with: "\"mentions\":[\"\(userB)\"]")),
+                neg("extraBodyKey", add.replacingOccurrences(of: "{\"action\"", with: "{\"a\":\"\",\"action\"")),
+                neg("missingAction", add.replacingOccurrences(of: "\"action\":\"ADD\",", with: "")),
+                neg("badTargetRef", add.replacingOccurrences(of: d16TargetRef, with: "message")),
+            ])),
+        ])
+    }
+
+    fileprivate func buildEmojiRGI() -> VJ {
+        func witness(_ name: String, _ emoji: String) -> VJ {
+            .o([("case", .s(name)), ("emoji", .s(emoji)), ("codePoints", .s(E2EEV2EmojiRGI.key(emoji))), ("utf8Bytes", .s(String(emoji.utf8.count)))])
+        }
+        func outsider(_ name: String, _ value: String) -> VJ {
+            .o([("case", .s(name)), ("value", .s(value)), ("codePoints", .s(E2EEV2EmojiRGI.key(value)))])
+        }
+        let list = Data((E2EEV2EmojiRGI.list + "\n").utf8)
+        return .o([
+            ("fixtureVersion", .s("1")), ("version", .s(E2EEV2EmojiRGI.version)),
+            ("source", .s("https://unicode.org/Public/emoji/15.1/emoji-test.txt")),
+            ("sourceBytes", .s("639405")),
+            ("sourceSHA256", .s("d876ee249aa28eaa76cfa6dfaa702847a8d13b062aa488d465d0395ee8137ed9")),
+            ("extraction", .s("Lignes hors commentaire dont le statut, entre « ; » et « # », vaut fully-qualified ; points de code en hexadécimal majuscule séparés par une espace, dans l'ordre du fichier, une séquence par ligne, saut de ligne final.")),
+            ("count", .s(String(E2EEV2EmojiRGI.sequences.count))),
+            ("listBytes", .s(String(list.count))),
+            ("listSHA256", .s(SHA256.hash(data: list).map { String(format: "%02x", $0) }.joined())),
+            ("maxBytes", .s(String(E2EEV2EmojiRGI.maxBytes))),
+            ("maxSequenceBytes", .s("35")),
+            ("witnesses", .a([
+                witness("heart", d16Emoji("2764 FE0F")),
+                witness("longest", d16Emoji("1F9D1 1F3FB 200D 2764 FE0F 200D 1F48B 200D 1F9D1 1F3FC")),
+                witness("flag", d16Emoji("1F1EB 1F1F7")),
+                witness("skinTone", d16Emoji("1F44D 1F3FD")),
+                witness("keycap", d16Emoji("0023 FE0F 20E3")),
+                witness("subdivisionFlag", d16Emoji("1F3F4 E0067 E0062 E0073 E0063 E0074 E007F")),
+            ])),
+            ("nonMembers", .a([
+                outsider("unqualified", "\u{263A}"),
+                outsider("textDigit", "1"),
+                outsider("twoEmojis", d16Emoji("2764 FE0F 2764 FE0F")),
+                outsider("doubleSkinTone", d16Emoji("1F44D 1F3FD 1F3FD")),
+                outsider("bareSkinToneModifierPair", d16Emoji("1F44D FE0F 1F3FD")),
+            ])),
+        ])
+    }
+
+    // MARK: Lecture
+
+    private func d16VectorURL(_ name: String) -> URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/e2ee-v2/\(name).json")
+    }
+
+    private func d16Load(_ name: String) throws -> [String: Any] {
+        try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: d16VectorURL(name))) as? [String: Any])
+    }
+
+    private func d16Str(_ dictionary: [String: Any], _ key: String) throws -> String {
+        try XCTUnwrap(dictionary[key] as? String, "clé \(key)")
+    }
+
+    private func d16B64(_ dictionary: [String: Any], _ key: String) throws -> Data {
+        try XCTUnwrap(Data(base64Encoded: try d16Str(dictionary, key)), "base64 \(key)")
+    }
+
+    private func d16Case(_ value: [String: Any]) -> String { value["case"] as? String ?? "cas" }
+
+    /// Séquence écrite par ses points de code : aucun doute sur un sélecteur de variante.
+    fileprivate func d16Emoji(_ hex: String) -> String {
+        String(String.UnicodeScalarView(hex.split(separator: " ").compactMap { UInt32($0, radix: 16).flatMap(Unicode.Scalar.init) }))
+    }
+}
+
 // MARK: - Outils
 
 private indirect enum VJ {

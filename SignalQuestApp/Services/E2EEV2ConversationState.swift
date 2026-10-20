@@ -82,6 +82,8 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let createdAtMs: Int64
         /// Enveloppe signée, en JSON canonique, telle qu'envoyée.
         let wire: String
+        /// Réaction (D.16) : le membre à notifier, gardé pour un rechiffrement.
+        var notifyUserId: String? = nil
     }
 
     enum Failure: Error, Equatable {

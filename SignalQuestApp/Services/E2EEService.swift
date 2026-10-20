@@ -4396,7 +4396,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     ) throws -> E2EEV2CapabilitiesPublicationStore.State {
         let document = E2EEV2CapabilitiesDocument(
             userId: userId, deviceId: device.deviceId, sequence: sequence, issuedAtMs: nowMs,
-            envelopeVersions: ["2"], payloadVersions: ["2"],
+            envelopeVersions: E2EEV2CapabilitiesPublicationStore.envelopeVersions, payloadVersions: ["2"],
             kinds: E2EEV2CapabilitiesPublicationStore.kinds, features: E2EEV2CapabilitiesPublicationStore.features
         ).document
         guard (try? E2EEV2CapabilitiesDocument.parse(document: document)) != nil else {

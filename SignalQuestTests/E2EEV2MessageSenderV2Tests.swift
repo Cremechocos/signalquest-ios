@@ -146,6 +146,73 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         XCTAssertEqual(after.payloadBytes, before.payloadBytes, "Même charge, même compteur, même date")
     }
 
+    /// D.16 : une réaction part en enveloppe v3, en annotation, et ne nomme
+    /// que l'auteur visé ; sans les trois capacités chez tous, rien ne part.
+    func testAReactionLeavesAsAnAnnotationOnlyWhenEveryDeviceReadsIt() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let target = E2EEV2MessageRef.make(
+            conversationId: seeded.conversationId, senderDeviceId: phone.device.deviceId, clientRequestId: "message_01J7ABCD00000099"
+        )
+        let heart = String(String.UnicodeScalarView([Unicode.Scalar(0x2764)!, Unicode.Scalar(0xFE0F)!]))
+        let reaction = E2EEV2MessageSenderV2.Draft(
+            body: .reaction(targetRef: target, emoji: heart, action: .add), replyToRef: nil, mentions: [], ttlSeconds: 0,
+            notifyUserId: bruno
+        )
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Rien ne part sans la v3 chez tous")
+            return E2EEV2AccountFixture.response(request, Data("{}".utf8), status: 500)
+        }
+        let refused = await sender.send(
+            reaction, conversationId: seeded.conversationId, clientRequestId: "reaction_01J7ABCD00000001",
+            membership: seeded.membership, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(refused, .capabilityMissing(["REACTION", "envelopeVersions:3", "reactions"]))
+
+        var reading = devices.devicesByUser
+        for (user, list) in reading {
+            reading[user] = list.map {
+                E2EEV2CertifiedDevice(
+                    userId: $0.userId, deviceId: $0.deviceId, keyVersion: $0.keyVersion, platform: $0.platform,
+                    identityKeyB64: $0.identityKeyB64, signingKeyB64: $0.signingKeyB64, fingerprint: $0.fingerprint,
+                    capabilities: E2EEV2CapabilitiesDocument(
+                        userId: $0.userId, deviceId: $0.deviceId, sequence: 2, issuedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+                        envelopeVersions: ["2", "3"], payloadVersions: ["2"], kinds: ["DELETE", "EDIT", "REACTION", "TEXT"],
+                        features: ["reactions"]
+                    )
+                )
+            }
+        }
+        let bodies = Bodies()
+        MockURLProtocol.requestHandler = { [tagKeyId] request in
+            let raw = E2EEV2AccountFixture.rawBody(request)
+            _ = bodies.append(raw)
+            let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(raw))
+            return E2EEV2AccountFixture.response(request, Self.receipt(signed.envelope.clientRequestId, keyId: tagKeyId))
+        }
+        let sent = await sender.send(
+            reaction, conversationId: seeded.conversationId, clientRequestId: "reaction_01J7ABCD00000002",
+            membership: seeded.membership, devices: E2EEV2CertifiedDeviceSet(devicesByUser: reading, refusals: [:]),
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .sent = sent else { return XCTFail("Réaction refusée : \(sent)") }
+        let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(try XCTUnwrap(bodies.all.first)))
+        XCTAssertEqual(signed.envelope.envelopeVersion, 3)
+        XCTAssertEqual(signed.envelope.delivery, .annotation)
+        XCTAssertEqual(signed.envelope.notifyUserId, bruno)
+        let context = signed.context(conversationId: seeded.conversationId, senderDeviceId: fixture.descriptor.deviceId)
+        let ownKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded: fixture.descriptor.publicSigningKeyB64)))
+        try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: signed.envelope, signatureDerB64: signed.senderSignatureB64, senderSigningKey: ownKey)
+        let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: signed.envelope, epochKey: seeded.epochKey, context: context)
+        XCTAssertEqual(opened.payload.body, .reaction(targetRef: target, emoji: heart, action: .add))
+    }
+
     /// §12 : rien ne part vers un membre qui ne lit pas ce contenu, et un refus
     /// du serveur garde le message au lieu de l'effacer.
     func testAMissingCapabilitySendsNothingAndKeepsTheMessage() async throws {

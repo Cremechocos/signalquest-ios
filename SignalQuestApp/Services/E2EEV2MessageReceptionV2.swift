@@ -494,6 +494,10 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
         guard payload.counter == envelope.counter, envelope.encryptedBlobIds.isEmpty else {
             return counted(.rejected("invalid-e2ee-payload"))
         }
+        // D.16 : `delivery` convient au `kind`, `notifyUserId` seulement pour un ADD.
+        guard (try? E2EEV2MessageCryptoV2.checkDelivery(context: signatureContext, payload: payload)) != nil else {
+            return counted(.rejected("invalid-e2ee-payload"))
+        }
         let ttlMs = Int64(envelope.ttlSeconds) * 1_000
         return counted(.received(E2EEV2ReceivedMessageV2(
             envelopeId: message.envelopeId, sequence: message.sequence, messageRef: messageRef,
@@ -514,7 +518,8 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
 enum E2EEV2MessageAuthorization {
     static func allows(_ message: E2EEV2ReceivedMessageV2, targetAuthorUserId: String?) -> Bool {
         switch message.payload.body {
-        case .text: return true
+        // Une réaction vient de n'importe quel membre (D.16).
+        case .text, .reaction: return true
         case .edit, .delete: return targetAuthorUserId == message.senderUserId
         }
     }

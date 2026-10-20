@@ -1,0 +1,78 @@
+{
+  "fixtureVersion": "1",
+  "version": "15.1",
+  "source": "https://unicode.org/Public/emoji/15.1/emoji-test.txt",
+  "sourceBytes": "639405",
+  "sourceSHA256": "d876ee249aa28eaa76cfa6dfaa702847a8d13b062aa488d465d0395ee8137ed9",
+  "extraction": "Lignes hors commentaire dont le statut, entre « ; » et « # », vaut fully-qualified ; points de code en hexadécimal majuscule séparés par une espace, dans l'ordre du fichier, une séquence par ligne, saut de ligne final.",
+  "count": "3773",
+  "listBytes": "63896",
+  "listSHA256": "4418f1a71f5faa41c350fc6dd4039078a63a1881a4bda11788266a39fb535151",
+  "maxBytes": "64",
+  "maxSequenceBytes": "35",
+  "witnesses": [
+    {
+      "case": "heart",
+      "emoji": "❤️",
+      "codePoints": "2764 FE0F",
+      "utf8Bytes": "6"
+    },
+    {
+      "case": "longest",
+      "emoji": "🧑🏻‍❤️‍💋‍🧑🏼",
+      "codePoints": "1F9D1 1F3FB 200D 2764 FE0F 200D 1F48B 200D 1F9D1 1F3FC",
+      "utf8Bytes": "35"
+    },
+    {
+      "case": "flag",
+      "emoji": "🇫🇷",
+      "codePoints": "1F1EB 1F1F7",
+      "utf8Bytes": "8"
+    },
+    {
+      "case": "skinTone",
+      "emoji": "👍🏽",
+      "codePoints": "1F44D 1F3FD",
+      "utf8Bytes": "8"
+    },
+    {
+      "case": "keycap",
+      "emoji": "#️⃣",
+      "codePoints": "0023 FE0F 20E3",
+      "utf8Bytes": "7"
+    },
+    {
+      "case": "subdivisionFlag",
+      "emoji": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+      "codePoints": "1F3F4 E0067 E0062 E0073 E0063 E0074 E007F",
+      "utf8Bytes": "28"
+    }
+  ],
+  "nonMembers": [
+    {
+      "case": "unqualified",
+      "value": "☺",
+      "codePoints": "263A"
+    },
+    {
+      "case": "textDigit",
+      "value": "1",
+      "codePoints": "0031"
+    },
+    {
+      "case": "twoEmojis",
+      "value": "❤️❤️",
+      "codePoints": "2764 FE0F 2764 FE0F"
+    },
+    {
+      "case": "doubleSkinTone",
+      "value": "👍🏽🏽",
+      "codePoints": "1F44D 1F3FD 1F3FD"
+    },
+    {
+      "case": "bareSkinToneModifierPair",
+      "value": "👍️🏽",
+      "codePoints": "1F44D FE0F 1F3FD"
+    }
+  ]
+}

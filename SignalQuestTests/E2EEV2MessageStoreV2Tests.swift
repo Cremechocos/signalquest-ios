@@ -226,6 +226,57 @@ final class E2EEV2MessageStoreV2Tests: XCTestCase {
         XCTAssertTrue(empty.messages.isEmpty)
     }
 
+    /// D.16 : le dernier événement dans l'ordre du serveur l'emporte, jamais
+    /// l'heure de l'émetteur ; une réaction attend sa cible sans rien afficher
+    /// et ne devient jamais une bulle.
+    func testReactionsFollowServerOrderAndWaitForTheirTarget() throws {
+        let store = makeStore()
+        let original = try message(1, from: bruno, .text("Antenne en panne"))
+        let ref = original.messageRef
+        try store.apply([try message(2, from: carol, .reaction(targetRef: ref, emoji: heart, action: .add))],
+                        equivocal: [], cursor: 2, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        var snapshot = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertTrue(snapshot.messages.isEmpty)
+        XCTAssertTrue(snapshot.reactions.isEmpty, "Cible inconnue : rien ne s'affiche")
+        try store.apply([original], equivocal: [], cursor: 3, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        snapshot = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertEqual(snapshot.messages.map(\.messageRef), [ref], "Une réaction n'est jamais une bulle")
+        XCTAssertEqual(snapshot.reactions[ref], [.init(userId: carol, emoji: heart)])
+        // Retrait daté plus tôt par son horloge, mais séquencé après : il l'emporte.
+        try store.apply([try message(3, from: carol, .reaction(targetRef: ref, emoji: heart, action: .remove), sentAtMs: nowMs - 60_000),
+                         try message(4, from: bruno, .reaction(targetRef: ref, emoji: heart, action: .add))],
+                        equivocal: [], cursor: 4, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        snapshot = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertEqual(snapshot.reactions[ref], [.init(userId: bruno, emoji: heart)])
+        // Cible modifiée : les réactions restent ; supprimée : elles partent avec elle.
+        try store.apply([try message(5, from: bruno, .edit(targetRef: ref, text: "Antenne réparée"))],
+                        equivocal: [], cursor: 5, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertEqual(try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs).reactions[ref]?.count, 1)
+        try store.apply([try message(6, from: bruno, .delete(targetRef: ref))],
+                        equivocal: [], cursor: 6, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertTrue(try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs).reactions.isEmpty)
+    }
+
+    /// D.16 : 20 emojis actifs au plus par (utilisateur, cible) ; une cible
+    /// expirée emporte ses réactions.
+    func testReactionCapAndExpiredTarget() throws {
+        let store = makeStore()
+        let original = try message(1, from: bruno, .text("Éphémère"), expiresAtMs: nowMs + 1_000)
+        let ref = original.messageRef
+        let emojis = E2EEV2EmojiRGI.list.split(separator: "\n").prefix(21).map { line in
+            String(String.UnicodeScalarView(line.split(separator: " ").compactMap { UInt32($0, radix: 16).flatMap(Unicode.Scalar.init) }))
+        }
+        let reactions = try emojis.enumerated().map { index, emoji in
+            try message(index + 2, from: carol, .reaction(targetRef: ref, emoji: emoji, action: .add))
+        }
+        try store.apply([original] + reactions, equivocal: [], cursor: 30, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        let active = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs).reactions[ref] ?? []
+        XCTAssertEqual(active.map(\.emoji), Array(emojis.prefix(E2EEV2MessageStoreV2.maxReactionsPerUser)), "Le 21e est ignoré")
+        XCTAssertTrue(try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs + 2_000).reactions.isEmpty)
+    }
+
+    private var heart: String { String(String.UnicodeScalarView([Unicode.Scalar(0x2764)!, Unicode.Scalar(0xFE0F)!])) }
+
     // MARK: Aides
 
     private func makeStore(keys: TokenStore = InMemoryTokenStore()) -> E2EEV2MessageStoreV2 {

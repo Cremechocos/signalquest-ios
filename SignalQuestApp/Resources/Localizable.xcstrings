@@ -408,6 +408,23 @@
         }
       }
     },
+    "Cet emoji ne peut pas être envoyé dans une conversation chiffrée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This emoji can’t be sent in an encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet emoji ne peut pas être envoyé dans une conversation chiffrée."
+          }
+        }
+      }
+    },
     "SQFormal|%@ veut t’écrire" : {
       "extractionState" : "manual",
       "localizations" : {
