@@ -20,7 +20,7 @@ struct MapFilterSelection: Equatable {
 
     static func defaults(market: String, operatorName: String) -> Self {
         Self(market: market, operatorName: operatorName, technologies: [], bands: [],
-             bandMatch: .any, azimuthStyle: .lines, sharing: [], speedtestDays: 0,
+             bandMatch: .any, azimuthStyle: .lobes, sharing: [], speedtestDays: 0,
              coverageDays: 0, layers: MapFilterStore.defaultFilters, includeObserved: true,
              plannedStatuses: Set(PlannedActivationStatus.allCases), photosFriendsOnly: false)
     }

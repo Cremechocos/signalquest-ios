@@ -278,22 +278,23 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
 
     /// Azimuts, dans le style choisi par l'utilisateur.
     ///
-    /// Les lobes disent l'ouverture du faisceau — juste physiquement, mais ils se
-    /// recouvrent en centre-ville. Les traits ne disent que la direction et
+    /// Les secteurs disent l'ouverture du faisceau — juste physiquement, mais ils
+    /// se recouvrent en centre-ville. Les directions ne disent que le cap et
     /// laissent la carte lisible. Aucun des deux n'est « meilleur » : ça dépend du
-    /// terrain, d'où le réglage.
+    /// terrain, d'où le réglage (noms et défaut communs au web et à Android).
     private func applyLobes(_ payload: MapAnnotationPayload, reach: CGFloat, color: UIColor) {
-        guard reach > 0, payload.showsAzimuths, !payload.azimuths.isEmpty,
+        guard reach > 0, payload.showsAzimuths,
+              !payload.azimuths.isEmpty || !payload.azimuthBeams.isEmpty,
               payload.azimuthStyle != .hidden else {
             lobes.path = nil
             hideBeams()
             return
         }
-        // Traits + site partagé : chaque direction prend la ou les couleurs des
+        // Support partagé : chaque direction prend la ou les couleurs des
         // opérateurs qui la pointent, et le calque unique n'a plus rien à tracer.
-        if payload.azimuthStyle == .lines, !payload.azimuthBeams.isEmpty {
+        if !payload.azimuthBeams.isEmpty {
             lobes.path = nil
-            applyColoredBeams(payload.azimuthBeams, reach: reach)
+            applyColoredBeams(payload.azimuthBeams, reach: reach, style: payload.azimuthStyle)
             return
         }
         hideBeams()
@@ -312,11 +313,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
                 path.addArc(withCenter: center, radius: reach, startAngle: start, endAngle: end, clockwise: true)
                 path.close()
             case .lines:
-                path.move(to: center)
-                path.addLine(to: CGPoint(
-                    x: center.x + cos(screenAngle) * reach,
-                    y: center.y + sin(screenAngle) * reach
-                ))
+                Self.addDirection(to: path, from: center, angle: screenAngle, reach: reach, offset: 0)
             case .hidden:
                 break
             }
@@ -329,45 +326,73 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             lobes.lineWidth = 0
         case .lines, .hidden:
             // Un trait part du CENTRE de la pastille : sans opacité il déborderait
-            // visiblement dessus. 0,85 le garde net sans écraser le point.
-            lobes.fillColor = nil
+            // visiblement dessus. 0,85 le garde net sans écraser le point. Le
+            // remplissage ne touche que le point final, seul sous-chemin fermé.
+            lobes.fillColor = color.withAlphaComponent(0.85).cgColor
             lobes.strokeColor = color.withAlphaComponent(0.85).cgColor
             lobes.lineWidth = 2.5
             lobes.lineCap = .round
         }
     }
 
-    /// Traits d'azimut colorés par opérateur.
+    /// Ouverture d'un coin sur un support partagé : 44° au lieu de 65°, sinon la
+    /// rosace d'un pylône à quatre opérateurs couvre tout le quartier.
+    static let sharedSectorDegrees: CGFloat = 44
+    /// Écart entre deux traits d'une même direction, d'axe à axe.
+    static let sideBySideSpacing: CGFloat = 3.5
+    static let directionDotRadius: CGFloat = 2.4
+
+    /// Un trait du centre vers `angle`, décalé de `offset` points sur sa
+    /// perpendiculaire, terminé d'un point.
+    private static func addDirection(to path: UIBezierPath, from center: CGPoint,
+                                     angle: CGFloat, reach: CGFloat, offset: CGFloat) {
+        let shift = CGPoint(x: -sin(angle) * offset, y: cos(angle) * offset)
+        let start = CGPoint(x: center.x + shift.x, y: center.y + shift.y)
+        let end = CGPoint(x: start.x + cos(angle) * reach, y: start.y + sin(angle) * reach)
+        path.move(to: start)
+        path.addLine(to: end)
+        path.move(to: CGPoint(x: end.x + directionDotRadius, y: end.y))
+        path.addArc(withCenter: end, radius: directionDotRadius, startAngle: 0, endAngle: 2 * .pi, clockwise: true)
+    }
+
+    /// Azimuts d'un support partagé, colorés par opérateur.
     ///
-    /// Une direction pointée par plusieurs opérateurs devient UN trait dont les
-    /// tirets alternent leurs couleurs : deux traits superposés n'en laisseraient
-    /// voir qu'un, et les écarter mentirait sur la direction — or c'est
-    /// exactement ce qu'on regarde pour viser une antenne.
+    /// Une direction pointée par plusieurs opérateurs ne se résume jamais à un
+    /// seul : en Secteurs, son coin se découpe en tranches égales, une par
+    /// opérateur ; en Directions, leurs traits se rangent côte à côte. Deux
+    /// éléments superposés n'en laisseraient voir qu'un.
     ///
     /// Un calque par couleur, et non par direction : le nombre de calques reste
     /// borné par le nombre d'opérateurs du site (4 au plus en France), quel que
     /// soit le nombre de secteurs.
-    private func applyColoredBeams(_ beams: [AzimuthBeam], reach: CGFloat) {
+    private func applyColoredBeams(_ beams: [AzimuthBeam], reach: CGFloat, style: AzimuthStyle) {
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
-        // Chaque couleur reçoit son propre chemin, et un décalage de tirets qui
-        // dépend du nombre d'opérateurs SUR SA DIRECTION la plus partagée.
-        var pathsByTint: [(tint: UIColor, path: UIBezierPath, slots: Int, slot: Int)] = []
-        for beam in beams {
+        var pathsByTint: [(tint: UIColor, path: UIBezierPath)] = []
+        func path(for tint: UIColor) -> UIBezierPath {
+            if let entry = pathsByTint.first(where: { $0.tint == tint }) { return entry.path }
+            let path = UIBezierPath()
+            pathsByTint.append((tint, path))
+            return path
+        }
+        for beam in beams.prefix(16) {
             let angle = (beam.azimuth - 90) * .pi / 180
-            let end = CGPoint(x: center.x + cos(angle) * reach, y: center.y + sin(angle) * reach)
+            let count = CGFloat(beam.tints.count)
             for (slot, tint) in beam.tints.enumerated() {
-                let color = UIColor(tint)
-                let index = pathsByTint.firstIndex {
-                    $0.tint == color && $0.slots == beam.tints.count && $0.slot == slot
-                }
-                if let index {
-                    pathsByTint[index].path.move(to: center)
-                    pathsByTint[index].path.addLine(to: end)
-                } else {
-                    let path = UIBezierPath()
-                    path.move(to: center)
-                    path.addLine(to: end)
-                    pathsByTint.append((color, path, beam.tints.count, slot))
+                let target = path(for: UIColor(tint))
+                let index = CGFloat(slot)
+                switch style {
+                case .lobes:
+                    let width = Self.sharedSectorDegrees * .pi / 180
+                    let start = angle - width / 2 + width * index / count
+                    target.move(to: center)
+                    target.addArc(withCenter: center, radius: reach,
+                                  startAngle: start, endAngle: start + width / count, clockwise: true)
+                    target.close()
+                case .lines:
+                    let offset = (index - (count - 1) / 2) * Self.sideBySideSpacing
+                    Self.addDirection(to: target, from: center, angle: angle, reach: reach, offset: offset)
+                case .hidden:
+                    break
                 }
             }
         }
@@ -375,8 +400,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         for index in 0..<max(pathsByTint.count, beamLayers.count) {
             if index >= beamLayers.count {
                 let beamLayer = CAShapeLayer()
-                beamLayer.fillColor = nil
-                beamLayer.lineWidth = 2.8
+                beamLayer.transform = lobes.transform
                 layer.insertSublayer(beamLayer, above: lobes)
                 beamLayers.append(beamLayer)
             }
@@ -387,18 +411,17 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             beamLayer.bounds = CGRect(origin: .zero, size: bounds.size)
             beamLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
             beamLayer.path = entry.path.cgPath
-            beamLayer.strokeColor = entry.tint.withAlphaComponent(0.9).cgColor
-            if entry.slots > 1 {
-                // Un tiret « à moi », puis un vide de la longueur des autres :
-                // les couleurs s'intercalent sans jamais se recouvrir.
-                let dash: CGFloat = 5
-                beamLayer.lineDashPattern = [NSNumber(value: Double(dash)),
-                                             NSNumber(value: Double(dash * CGFloat(entry.slots - 1)))]
-                beamLayer.lineDashPhase = -dash * CGFloat(entry.slot)
+            switch style {
+            case .lobes:
+                beamLayer.fillColor = entry.tint.withAlphaComponent(0.26).cgColor
+                beamLayer.strokeColor = entry.tint.withAlphaComponent(0.9).cgColor
+                beamLayer.lineWidth = 1
+                beamLayer.lineJoin = .round
                 beamLayer.lineCap = .butt
-            } else {
-                beamLayer.lineDashPattern = nil
-                beamLayer.lineDashPhase = 0
+            case .lines, .hidden:
+                beamLayer.fillColor = entry.tint.withAlphaComponent(0.9).cgColor
+                beamLayer.strokeColor = entry.tint.withAlphaComponent(0.9).cgColor
+                beamLayer.lineWidth = 2.2
                 beamLayer.lineCap = .round
             }
         }
@@ -611,6 +634,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         lobes.transform = transform
+        // Les calques d'un support partagé tournent avec les lobes : sans eux,
+        // pivoter la carte faisait pointer les secteurs colorés à côté.
+        for beamLayer in beamLayers { beamLayer.transform = transform }
         CATransaction.commit()
     }
 
@@ -621,6 +647,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     // est réellement dessiné.
 
     var lobePathForTesting: CGPath? { lobes.path }
+    /// Chemins visibles d'un support partagé, un par opérateur.
+    var beamPathsForTesting: [CGPath] { beamLayers.filter { !$0.isHidden }.compactMap(\.path) }
+    var beamTransformsForTesting: [CATransform3D] { beamLayers.map(\.transform) }
     var ringPathForTesting: CGPath? { ring.path }
     var ringColorForTesting: CGColor? { ring.strokeColor }
     var lobeTransformForTesting: CATransform3D { lobes.transform }

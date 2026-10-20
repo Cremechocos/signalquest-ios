@@ -171,7 +171,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertGreaterThanOrEqual(reset.frame.height, 44)
         if reset.isEnabled { try tap(reset, in: app) }
         try tap(app.buttons["map.filters.done"], in: app)
-        capture(app, name: "map-azimuth-lines-before-edit")
+        capture(app, name: "map-filters-after-reset")
         try tap(app.buttons["map.filters"], in: app)
         capture(app, name: "map-filters-initial")
         // Toutes cochées au départ : décocher la 5G restreint aux autres.
@@ -184,9 +184,6 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         try tap(band, in: app)
         XCTAssertTrue(band.isSelected)
         try tap(app.buttons["map.filters.bands.back"], in: app)
-        let hidden = app.buttons["map.filters.azimuth.hidden"]
-        try reveal(hidden, in: app); hidden.tap()
-        XCTAssertTrue(hidden.isSelected)
         try await Task.sleep(for: .milliseconds(250))
         capture(app, name: "map-filters-draft")
         try tap(reset, in: app)
@@ -195,10 +192,8 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         try reveal(bands, in: app); try tap(bands, in: app)
         XCTAssertFalse(band.isSelected)
         try tap(app.buttons["map.filters.bands.back"], in: app)
-        let lines = app.buttons["map.filters.azimuth.lines"]
-        try reveal(lines, in: app)
-        XCTAssertTrue(lines.isSelected)
-        try reveal(hidden, in: app); hidden.tap()
+        try reveal(technology, in: app); technology.tap()
+        XCTAssertFalse(technology.isSelected)
         let close = app.buttons["map.filters.cancel"]
         for _ in 0..<2 where close.exists {
             let origin = app.coordinate(withNormalizedOffset: .zero)
@@ -210,11 +205,22 @@ final class MapHTTPRuntimeQATests: XCTestCase {
             throw RecipeError.missingControl
         }
         try tap(app.buttons["map.filters"], in: app)
-        try reveal(lines, in: app)
-        XCTAssertTrue(lines.isSelected, "Swiping away the sheet must not commit its pending azimuth choice")
-        try reveal(hidden, in: app); hidden.tap()
-        let renderRevision = try await configure("baseline")
+        try reveal(technology, in: app)
+        XCTAssertTrue(technology.isSelected, "Swiping away the sheet must not commit its pending choice")
         try tap(app.buttons["map.filters.done"], in: app)
+
+        // Secteurs / Directions se choisit dans la feuille Carte et s'applique
+        // aussitôt, sans recharger la vue : c'est un réglage d'affichage.
+        try openLayers(in: app)
+        let sectors = app.buttons["map.layers.azimuth.lobes"]
+        try reveal(sectors, in: app, sheet: Self.layersSheet)
+        XCTAssertTrue(sectors.isSelected, "Sectors is the default, as on the web and Android")
+        capture(app, name: "map-azimuth-sectors-before-edit")
+        let renderRevision = try await configure("baseline")
+        let hidden = app.buttons["map.layers.azimuth.hidden"]
+        try reveal(hidden, in: app, sheet: Self.layersSheet); hidden.tap()
+        XCTAssertTrue(hidden.isSelected)
+        try closeLayers(in: app)
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         repeat {
             let requests = try await state().events.filter {

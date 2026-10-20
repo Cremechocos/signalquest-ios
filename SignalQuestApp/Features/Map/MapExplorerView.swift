@@ -1448,10 +1448,14 @@ final class MapExplorerViewModel: ObservableObject {
         azimuthsByOperator: [String: [Double]],
         tint: (String) -> Color
     ) -> [AzimuthBeam] {
-        // Ordre du site, pas celui du dictionnaire : la séquence des couleurs
-        // doit rester stable d'un rendu à l'autre, sinon les tirets sautent.
-        let ordered = operators.filter { azimuthsByOperator[$0] != nil }
-        let keys = ordered.isEmpty ? azimuthsByOperator.keys.sorted() : ordered
+        // Ordre commun au web et à Android — SFR, Bouygues, Orange, Free — puis
+        // celui du site, jamais celui du dictionnaire : une tranche ou un trait
+        // doit rester à sa place d'un rendu à l'autre.
+        let siteOrder = operators.filter { azimuthsByOperator[$0] != nil }
+        let unordered = siteOrder.isEmpty ? azimuthsByOperator.keys.sorted() : siteOrder
+        let keys = unordered.enumerated()
+            .sorted { (sharedOperatorRank($0.element), $0.offset) < (sharedOperatorRank($1.element), $1.offset) }
+            .map(\.element)
 
         var beams: [(azimuth: Double, tints: [Color])] = []
         for key in keys {
@@ -1467,6 +1471,15 @@ final class MapExplorerViewModel: ObservableObject {
         return beams
             .sorted { $0.azimuth < $1.azimuth }
             .map { AzimuthBeam(azimuth: $0.azimuth, tints: $0.tints) }
+    }
+
+    nonisolated static func sharedOperatorRank(_ key: String) -> Int {
+        let key = key.uppercased()
+        if key.hasPrefix("SFR") { return 0 }
+        if key.hasPrefix("BOUYGUES") || key.hasPrefix("BYTEL") { return 1 }
+        if key.hasPrefix("ORANGE") { return 2 }
+        if key.hasPrefix("FREE") { return 3 }
+        return 4
     }
 
     /// Deux azimuts à moins de 6° l'un de l'autre pointent la même direction.
@@ -1823,6 +1836,7 @@ struct MapExplorerView: View {
                 layers: $filters,
                 photosFriendsOnly: $model.photosFriendsOnly,
                 byGeneration: $coverageByGeneration,
+                azimuthStyle: $model.azimuthStyle,
                 allMarkets: model.registryMarkets,
                 showsFriendsLayer: services.auth.hasStoredCredentials(),
                 operatorOptions: model.operatorOptions,
@@ -3570,7 +3584,7 @@ struct MapExplorerView: View {
                     details: nil,
                     antennaId: site.id,
                     clusterCount: nil,
-                    azimuths: site.azimuths,
+                    azimuths: sharedAzimuthsApply(to: site) ? [] : site.azimuths,
                     showsAzimuths: mapZoom >= 13,
                     // Filtré sur un opérateur, un site partagé (ZB, Crozon) prend sa
                     // couleur : son premier opérateur peut être l'autre partenaire.
@@ -4413,15 +4427,22 @@ struct MapExplorerView: View {
     ///
     /// Deux opérateurs déclarant 0° et 1° visent la même chose : les traiter
     /// comme deux directions donnerait deux traits qui se chevauchent et dont un
-    /// seul serait visible. La tolérance les fond en un seul faisceau bicolore.
+    /// seul serait visible. La tolérance les range côte à côte.
+    ///
+    /// Dès qu'il porte `azimuthsByOperator`, même avec un seul opérateur, un
+    /// support partagé ne se lit QUE par lui : `azimuths` n'y donne que le
+    /// premier opérateur fusionné, peut-être celui qui n'a rien publié.
     private func azimuthBeams(for site: AntennaSite) -> [AzimuthBeam] {
-        guard model.operatorFilter.uppercased() == "ALL",
-              site.azimuthsByOperator.count > 1 else { return [] }
+        guard sharedAzimuthsApply(to: site) else { return [] }
         return MapExplorerViewModel.groupAzimuthBeams(
             operators: site.operators,
             azimuthsByOperator: site.azimuthsByOperator,
             tint: { [model] key in model.operatorAccent(key) }
         )
+    }
+
+    private func sharedAzimuthsApply(to site: AntennaSite) -> Bool {
+        model.operatorFilter.uppercased() == "ALL" && !site.azimuthsByOperator.isEmpty
     }
 
     private func matchesSelectedBands(_ bands: [Int]) -> Bool {

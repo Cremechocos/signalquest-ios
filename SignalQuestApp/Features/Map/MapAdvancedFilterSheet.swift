@@ -19,7 +19,6 @@ extension MapFilterSelection {
         if !sharing.isEmpty { count += 1 }
         if speedtestDays != 0 { count += 1 }
         if coverageDays != 0 { count += 1 }
-        if azimuthStyle != .lines { count += 1 }
         if !includeObserved { count += 1 }
         if layers.contains(.planned), plannedStatuses != Set(PlannedActivationStatus.allCases) { count += 1 }
         return count
@@ -62,7 +61,6 @@ struct MapAdvancedFilterSheet: View {
     private var sharingOptions: [MapFilterCatalog.SharingOption] { MapFilterCatalog.sharing(forMarket: catalogMarket) }
     private var showsRadio: Bool { !shownFilterableLayers.isEmpty }
     private var showsSharing: Bool { draft.layers.contains(.antenna) && !sharingOptions.isEmpty }
-    private var showsSectors: Bool { draft.layers.contains(.antenna) }
     private var showsPlanned: Bool { plannedAvailable && draft.layers.contains(.planned) }
     private var showsObserved: Bool {
         communityAvailable && (draft.layers.contains(.antenna) || draft.layers.contains(.communitySite))
@@ -92,7 +90,6 @@ struct MapAdvancedFilterSheet: View {
                         }
                         if showsRadio { technologySection }
                         if showsRadio || showsSharing { refineSection }
-                        if showsSectors { sectorsSection }
                         if draft.layers.contains(.speedtest) || draft.layers.contains(.coverage) { periodSection }
                         if showsPlanned { plannedSection }
                         if showsObserved { observedSection }
@@ -176,15 +173,6 @@ struct MapAdvancedFilterSheet: View {
                     .accessibilityIdentifier("map.filters.sharing")
                 }
             }
-        }
-    }
-
-    private var sectorsSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Secteurs sur la carte").sqKicker().accessibilityAddTraits(.isHeader)
-            MapSegmented(selection: $draft.azimuthStyle,
-                         options: AzimuthStyle.allCases.map { ($0, $0.label) },
-                         identifier: "map.filters.azimuth")
         }
     }
 
@@ -342,6 +330,8 @@ struct MapAdvancedFilterSheet: View {
         var next = MapFilterSelection.defaults(market: draft.market, operatorName: draft.operatorName)
         next.layers = draft.layers
         next.photosFriendsOnly = draft.photosFriendsOnly
+        // Le rendu des azimuts se règle dans la feuille Carte, pas ici.
+        next.azimuthStyle = draft.azimuthStyle
         if let selectedEntry { next = next.normalized(for: selectedEntry, dromRegion: dromRegion) }
         draft = next
     }

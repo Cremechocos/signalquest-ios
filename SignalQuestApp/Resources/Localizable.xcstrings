@@ -45469,6 +45469,22 @@
         }
       }
     },
+    "Directions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Directions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Directions"
+          }
+        }
+      }
+    },
     "Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé." : {
       "localizations" : {
         "en" : {
@@ -57824,22 +57840,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Likes & commentaires (push)"
-          }
-        }
-      }
-    },
-    "Lobes" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lobes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lobes"
           }
         }
       }
@@ -79729,22 +79729,6 @@
         }
       }
     },
-    "Traits" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lines"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Traits"
-          }
-        }
-      }
-    },
     "Trajet" : {
       "localizations" : {
         "en" : {
@@ -88855,23 +88839,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affiner"
-          }
-        }
-      }
-    },
-    "Secteurs sur la carte" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sectors on the map"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secteurs sur la carte"
           }
         }
       }

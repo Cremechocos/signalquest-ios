@@ -69,6 +69,7 @@ struct MapLayersSheet: View {
     @Binding var layers: Set<MapDisplayItem.Kind>
     @Binding var photosFriendsOnly: Bool
     @Binding var byGeneration: Bool
+    @Binding var azimuthStyle: AzimuthStyle
     let allMarkets: [MarketRegistryEntry]
     /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
     let showsFriendsLayer: Bool
@@ -88,6 +89,7 @@ struct MapLayersSheet: View {
          layers: Binding<Set<MapDisplayItem.Kind>>,
          photosFriendsOnly: Binding<Bool> = .constant(false),
          byGeneration: Binding<Bool> = .constant(false),
+         azimuthStyle: Binding<AzimuthStyle> = .constant(.lobes),
          allMarkets: [MarketRegistryEntry], showsFriendsLayer: Bool = true,
          operatorOptions: [String] = ["ALL"],
          operatorLabel: @escaping (String) -> String = { $0 },
@@ -101,6 +103,7 @@ struct MapLayersSheet: View {
         _layers = layers
         _photosFriendsOnly = photosFriendsOnly
         _byGeneration = byGeneration
+        _azimuthStyle = azimuthStyle
         self.allMarkets = allMarkets
         self.showsFriendsLayer = showsFriendsLayer
         self.operatorOptions = operatorOptions
@@ -191,6 +194,7 @@ struct MapLayersSheet: View {
                                    closeIdentifier: "map.layers.close") { dismiss() }
                     operatorSection
                     layerSection
+                    if layers.contains(.antenna) { antennaSection }
                     backdropSection
                     moreRows
                 }
@@ -234,6 +238,17 @@ struct MapLayersSheet: View {
                     .accessibilityIdentifier("map.operator.option.\(key)")
                 }
             }
+        }
+    }
+
+    /// Rendu des azimuts, appliqué tout de suite et gardé sur l'appareil, comme
+    /// la section « Antennes » des calques web et Android.
+    private var antennaSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Antennes").sqKicker().accessibilityAddTraits(.isHeader)
+            MapSegmented(selection: $azimuthStyle,
+                         options: AzimuthStyle.allCases.map { ($0, $0.label) },
+                         identifier: "map.layers.azimuth")
         }
     }
 

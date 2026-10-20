@@ -60,7 +60,7 @@ final class MapFilterSelectionTests: XCTestCase {
 
     func testDefaultsAndRenderOnlyChangesDoNotRequireNetworkReload() {
         let baseline = MapFilterSelection.defaults(market: "FR", operatorName: "SFR")
-        XCTAssertEqual(baseline.azimuthStyle, .lines)
+        XCTAssertEqual(baseline.azimuthStyle, .lobes, "Secteurs par défaut, comme le web et Android")
         var changed = baseline
         changed.azimuthStyle = .hidden
         changed.plannedStatuses = []

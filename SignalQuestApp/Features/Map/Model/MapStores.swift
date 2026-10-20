@@ -86,21 +86,21 @@ enum MapBandMatchStore {
 /// Rendu des azimuts sur la carte. Purement local : aucun aller-retour serveur,
 /// c'est un réglage d'affichage.
 ///
-/// Le défaut est `lines` : les traits restent lisibles en zone dense, là où les
-/// lobes se recouvrent, et ce sont eux qui portent la couleur par opérateur sur
-/// un support partagé.
+/// « Secteurs » (défaut) et « Directions » : noms et défaut communs au web et à
+/// Android (décision du 20/10). Les valeurs brutes `lobes` / `lines` restent,
+/// seules les étiquettes ont changé.
 enum AzimuthStyle: String, CaseIterable, Sendable {
-    /// Secteurs larges : montrent l'ouverture réelle du faisceau.
+    /// Secteurs : montrent l'ouverture réelle du faisceau.
     case lobes
-    /// Traits fins : direction seule, sans recouvrement en zone dense.
+    /// Directions : un trait par opérateur, sans recouvrement en zone dense.
     case lines
     /// Rien du tout.
     case hidden
 
     var label: String {
         switch self {
-        case .lobes: return String(localized: "Lobes")
-        case .lines: return String(localized: "Traits")
+        case .lobes: return String(localized: "Secteurs")
+        case .lines: return String(localized: "Directions")
         case .hidden: return String(localized: "Aucun")
         }
     }
@@ -115,7 +115,10 @@ enum AzimuthStyle: String, CaseIterable, Sendable {
 }
 
 enum MapAzimuthStyleStore {
-    static let key = "map.azimuthStyle.v1"
+    /// v2 depuis le passage du défaut à Secteurs (20/10) : appliquer un filtre
+    /// enregistrait l'ancien défaut, Traits, comme s'il avait été choisi — la v1
+    /// ne distingue donc pas un choix d'un défaut hérité.
+    static let key = "map.azimuthStyle.v2"
 
     static func save(_ style: AzimuthStyle) {
         UserDefaults.standard.set(style.rawValue, forKey: key)
@@ -123,7 +126,7 @@ enum MapAzimuthStyleStore {
 
     static func last() -> AzimuthStyle {
         UserDefaults.standard.string(forKey: key)
-            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lines
+            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lobes
     }
 
     static func reset() { UserDefaults.standard.removeObject(forKey: key) }

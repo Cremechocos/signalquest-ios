@@ -107,14 +107,25 @@ final class AzimuthBeamGroupingTests: XCTestCase {
         XCTAssertEqual(beams[0].tints, [.red, .orange])
     }
 
-    /// L'ordre des couleurs suit celui des opérateurs du site, pas celui du
-    /// dictionnaire : sinon la séquence des tirets sauterait d'un rendu à l'autre.
-    func testTintOrderFollowsSiteOperators() {
+    /// Les tranches d'une direction partagée suivent l'ordre commun au web et à
+    /// Android — SFR, Bouygues, Orange, Free —, ni celui du site ni celui du
+    /// dictionnaire : une tranche ne doit pas changer de place d'un rendu à l'autre.
+    func testTintOrderFollowsTheSharedOperatorOrder() {
         let beams = MapExplorerViewModel.groupAzimuthBeams(
-            operators: ["ORANGE", "SFR"],
-            azimuthsByOperator: ["SFR": [0], "ORANGE": [0]],
-            tint: { $0 == "SFR" ? .red : .orange }
+            operators: ["FREE", "ORANGE", "BOUYGUES", "SFR"],
+            azimuthsByOperator: ["FREE": [270], "ORANGE": [270], "BOUYGUES": [270], "SFR": [270]],
+            tint: { ["SFR": .red, "BOUYGUES": .blue, "ORANGE": .orange, "FREE": .gray][$0] ?? .black }
         )
-        XCTAssertEqual(beams[0].tints, [.orange, .red])
+        XCTAssertEqual(beams[0].tints, [.red, .blue, .orange, .gray])
+    }
+
+    /// Un opérateur hors des quatre se range après eux, dans l'ordre du site.
+    func testUnknownOperatorsComeAfterTheFourInSiteOrder() {
+        let beams = MapExplorerViewModel.groupAzimuthBeams(
+            operators: ["ZEOP", "ORANGE", "SRR"],
+            azimuthsByOperator: ["ZEOP": [0], "ORANGE": [0], "SRR": [0]],
+            tint: { ["ZEOP": .green, "ORANGE": .orange, "SRR": .purple][$0] ?? .black }
+        )
+        XCTAssertEqual(beams[0].tints, [.orange, .green, .purple])
     }
 }

@@ -92,10 +92,17 @@ final class MapDisplayPreferencesTests: XCTestCase {
 
     // MARK: Style d'azimut
 
-    /// Les traits sont le défaut : ils restent lisibles en zone dense, et ce sont
-    /// eux qui portent la couleur par opérateur sur un support partagé.
-    func testAzimuthStyleDefaultsToLines() {
-        XCTAssertEqual(MapAzimuthStyleStore.last(), .lines)
+    /// Secteurs par défaut, comme le web et Android (décision du 20/10).
+    func testAzimuthStyleDefaultsToSectors() {
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
+    }
+
+    /// L'ancienne clé portait « Traits » sans dire s'il avait été choisi :
+    /// elle n'est plus lue.
+    func testLegacyStoredStyleIsIgnored() {
+        UserDefaults.standard.set("lines", forKey: "map.azimuthStyle.v1")
+        defer { UserDefaults.standard.removeObject(forKey: "map.azimuthStyle.v1") }
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
     }
 
     func testAzimuthStyleRoundTrips() {
@@ -107,7 +114,7 @@ final class MapDisplayPreferencesTests: XCTestCase {
 
     func testUnknownStoredAzimuthStyleFallsBackToTheDefault() {
         UserDefaults.standard.set("fleches", forKey: MapAzimuthStyleStore.key)
-        XCTAssertEqual(MapAzimuthStyleStore.last(), .lines)
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
     }
 
     /// Trois styles proposés, dont « aucun » : le quatrième (flèches) a été

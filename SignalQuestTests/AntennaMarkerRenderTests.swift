@@ -28,6 +28,15 @@ final class AntennaMarkerRenderTests: XCTestCase {
         )
     }
 
+    /// Support partagé : azimuts par opérateur seulement, `azimuths` vide comme
+    /// la carte le transmet en vue « Tous ».
+    private func shared(_ beams: [AzimuthBeam], style: AzimuthStyle, reach: CGFloat = 40) -> MapAnnotationPayload {
+        var shared = payload(azimuths: [], reach: reach)
+        shared.azimuthBeams = beams
+        shared.azimuthStyle = style
+        return shared
+    }
+
     private func markerView(_ payload: MapAnnotationPayload) -> SQMapKitMarkerView {
         let annotation = SQMapKitAnnotation(payload: payload)
         let view = SQMapKitMarkerView(annotation: annotation, reuseIdentifier: SQMapKitMarkerView.reuseID)
@@ -146,6 +155,52 @@ final class AntennaMarkerRenderTests: XCTestCase {
         let box = path.boundingBox
         XCTAssertGreaterThan(box.maxX, center.x + 20, "Le lobe est doit s'étendre vers la droite")
         XCTAssertEqual(box.minX, center.x, accuracy: 1)
+    }
+
+    // MARK: Support partagé
+
+    /// Un seul opérateur publié sur un support partagé : ses secteurs se
+    /// dessinent, alors même que `azimuths` (premier opérateur fusionné) est vide.
+    func testSharedSiteDrawsFromPerOperatorAzimuthsAlone() {
+        let view = markerView(shared([AzimuthBeam(azimuth: 0, tints: [.red])], style: .lobes))
+        XCTAssertNil(view.lobePathForTesting)
+        XCTAssertEqual(view.beamPathsForTesting.count, 1)
+    }
+
+    /// Secteurs : une direction pointée par deux opérateurs devient un coin de
+    /// 44° découpé en deux tranches de 22°, une par opérateur, côte à côte.
+    func testSharedDirectionSplitsItsSectorIntoEqualSlices() throws {
+        let view = markerView(shared([AzimuthBeam(azimuth: 0, tints: [.red, .blue])], style: .lobes, reach: 100))
+        let paths = view.beamPathsForTesting
+        XCTAssertEqual(paths.count, 2)
+        let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        let first = try XCTUnwrap(paths.first).boundingBoxOfPath, second = try XCTUnwrap(paths.last).boundingBoxOfPath
+        // Coin nord de 44° : la première tranche à gauche du nord, la seconde à droite.
+        XCTAssertEqual(first.maxX, center.x, accuracy: 0.5)
+        XCTAssertEqual(second.minX, center.x, accuracy: 0.5)
+        XCTAssertEqual(first.minX, center.x - 100 * sin(22 * .pi / 180), accuracy: 0.5)
+        XCTAssertEqual(second.maxX, center.x + 100 * sin(22 * .pi / 180), accuracy: 0.5)
+    }
+
+    /// Directions : deux opérateurs sur la même direction gardent chacun leur
+    /// trait, parallèles et décalés, chacun terminé d'un point.
+    func testSharedDirectionPutsLinesSideBySide() throws {
+        let view = markerView(shared([AzimuthBeam(azimuth: 0, tints: [.red, .blue])], style: .lines, reach: 40))
+        let paths = view.beamPathsForTesting
+        XCTAssertEqual(paths.count, 2)
+        let first = try XCTUnwrap(paths.first).boundingBoxOfPath, second = try XCTUnwrap(paths.last).boundingBoxOfPath
+        XCTAssertEqual(second.midX - first.midX, SQMapKitMarkerView.sideBySideSpacing, accuracy: 0.01)
+        // Le point final dépasse la pointe du trait : la boîte va au-delà de la portée.
+        XCTAssertLessThan(first.minY, view.bounds.midY - 40)
+    }
+
+    /// Pivoter la carte fait tourner les calques colorés avec les lobes.
+    func testSharedLayersCounterRotateWithTheMap() {
+        let view = markerView(shared([AzimuthBeam(azimuth: 0, tints: [.red, .blue])], style: .lobes))
+        view.applyMapHeading(90)
+        for transform in view.beamTransformsForTesting {
+            XCTAssertEqual(atan2(transform.m12, transform.m11) * 180 / .pi, -90, accuracy: 0.01)
+        }
     }
 
     // MARK: Badges et anneau
@@ -434,6 +489,12 @@ final class AntennaMarkerRenderTests: XCTestCase {
             ("z16 · 5G, gNB inconnu", payload(reach: 44, hasEnb: true, has5G: true)),
             ("z16 · 5G identifié + photos", payload(reach: 44, hasEnb: true, hasGnb: true, has5G: true, photos: 3)),
             ("z16 · sans identification", payload(reach: 44, has5G: true)),
+            ("partagé · Secteurs", shared([AzimuthBeam(azimuth: 0, tints: [.red]),
+                                           AzimuthBeam(azimuth: 120, tints: [.blue, .orange]),
+                                           AzimuthBeam(azimuth: 270, tints: [.blue, .orange, .gray])], style: .lobes, reach: 44)),
+            ("partagé · Directions", shared([AzimuthBeam(azimuth: 0, tints: [.red]),
+                                             AzimuthBeam(azimuth: 120, tints: [.blue, .orange]),
+                                             AzimuthBeam(azimuth: 270, tints: [.blue, .orange, .gray])], style: .lines, reach: 44)),
             ("cluster", payload(clusterCount: 128))
         ]
         let cell = CGSize(width: 120, height: 140)
