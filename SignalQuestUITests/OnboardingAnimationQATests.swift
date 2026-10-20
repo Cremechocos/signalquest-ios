@@ -67,7 +67,10 @@ final class OnboardingAnimationQATests: XCTestCase {
         XCTAssertFalse(app.buttons["login.guestMap"].exists)
         XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
         SignalQuestUITestSupport.enterGuestApplication(app, tab: "home", locale: locale)
-        XCTAssertTrue(app.staticTexts[locale == "fr" ? "Bienvenue sur" : "Welcome to"].waitForExistence(timeout: 10))
+        // L'en-tête invité est un seul élément VoiceOver (« Bienvenue sur, SignalQuest »).
+        let greeting = app.descendants(matching: .any)["home.greeting"]
+        XCTAssertTrue(greeting.waitForExistence(timeout: 10))
+        XCTAssertTrue(greeting.label.contains(locale == "fr" ? "Bienvenue sur" : "Welcome to"), greeting.label)
         XCTAssertFalse(app.buttons[locale == "fr" ? "Notifications" : "Notifications"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "guest-application-\(locale)-home"; shot.lifetime = .keepAlways; add(shot)
@@ -232,8 +235,9 @@ final class OnboardingAnimationQATests: XCTestCase {
             XCTAssertFalse(slide.label.contains("uniquement si tu le décides"))
             let indicator = app.buttons["onboarding.page.\(index)"]
             XCTAssertEqual(indicator.label, locale == "fr" ? "Étape \(index + 1) sur 3" : "Step \(index + 1) of 3")
-            XCTAssertGreaterThanOrEqual(indicator.frame.height, 44)
-            XCTAssertGreaterThanOrEqual(indicator.frame.width, 44)
+            // 44 pt au calcul près : le cadre remonte à 43,999… après conversion d'échelle.
+            XCTAssertGreaterThanOrEqual(indicator.frame.height, 44 - 0.01)
+            XCTAssertGreaterThanOrEqual(indicator.frame.width, 44 - 0.01)
             if index == 2 {
                 XCTAssertTrue(slide.label.contains(locale == "fr" ? "contributions de la communauté" : "community contributions"))
             }
