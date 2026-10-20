@@ -2789,8 +2789,14 @@ puisse ni les retirer ni les changer.
     un. Le serveur le stocke et le séquence comme un message (les clients le
     lisent au curseur). Il met à jour l'activité de la conversation, mais
     jamais son dernier message, son heure de dernier message ni le non-lu ; il
-    ne la sort pas de l'étagère ; il émet `e2ee_v2:message` avec `delivery`,
-    sans `conversation:message`.
+    ne la sort pas de l'étagère ; il émet `e2ee_v2:message` avec la clé
+    additive `delivery`, sans `conversation:message`. Le reçu d'envoi ne
+    change pas. Il garde `delivery` en base (colonne additive, `message` par
+    défaut).
+  - Demande de message (DM-REQ-1) : une annotation n'ouvre jamais une demande
+    et n'en devient pas le premier message. Tant que la demande n'est pas
+    acceptée, elle est retenue comme les autres envois, sans temps réel ni
+    push.
 - `notifyUserId` : identifiant opaque (A.1) ou chaîne vide.
   - Non vide seulement avec `annotation`. Le serveur envoie alors une alerte
     générique à ce seul membre, et à personne d'autre. Il refuse (422
@@ -2810,8 +2816,10 @@ puisse ni les retirer ni les changer.
   est rejeté) ; `REACTION` exige `annotation` ; `EDIT` et `DELETE` acceptent
   les deux. Un `notifyUserId` non vide hors `REACTION` `ADD` est rejeté.
 - Envoi : une enveloppe v3 ne part que si l'intersection (§12) contient
-  `envelopeVersions` `"3"`. Le serveur le vérifie déjà, puisqu'il voit la
-  version d'enveloppe (`409 E2EE_CAPABILITY_MISSING`). Sinon l'émetteur
+  `envelopeVersions` `"3"`. Le serveur le vérifie : il analyse la v3, puis
+  exige `"3"` dans l'intersection des appareils des membres actuels, sinon
+  `409 E2EE_CAPABILITY_MISSING` avec `details.missing` =
+  `["envelopeVersions:3"]`. Sinon l'émetteur
   reste en v2 pour `TEXT`, `EDIT` et `DELETE`, et n'envoie pas de réaction.
   Avec `"3"` disponible, `EDIT` et `DELETE` partent de préférence en
   `annotation`.
@@ -2874,7 +2882,13 @@ puisse ni les retirer ni les changer.
 - `REMOVE`, ou réaction à son propre message : `notifyUserId` vide, aucune
   notification.
 - Le serveur envoie au seul `notifyUserId` une alerte générique, sans emoji
-  ni texte. L'extension la déchiffre et la précise (« Camille a réagi ❤️ à ton
+  ni texte : le même push `e2ee_v2_envelope` qu'un message (`envelopeId`,
+  `epochNumber`), que l'extension sait déjà traiter. Il respecte les réglages
+  de la cible, comme pour une réaction v1 : conversation en sourdine ou
+  notifications de messages coupées, rien ne part.
+- Anti-rafale : au plus une alerte d'annotation par (émetteur,
+  `notifyUserId`, conversation) toutes les 60 s. Les suivantes sont stockées
+  et diffusées en temps réel, sans push. L'extension la déchiffre et la précise (« Camille a réagi ❤️ à ton
   message »). Si elle n'y arrive pas, l'alerte reste générique : jamais
   d'emoji ni d'extrait côté serveur.
 
