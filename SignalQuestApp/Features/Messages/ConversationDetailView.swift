@@ -461,15 +461,16 @@ struct ConversationDetailView: View {
                                     message,
                                     isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId
                                         || unreadDivider?.messageId == message.id || !callsBefore.isEmpty,
-                                    isGroupEnd: isGroupEnd(message, next: next) || nextHasCalls
+                                    isGroupEnd: isGroupEnd(message, next: next) || nextHasCalls,
+                                    showsTime: showsTime(message, next: next) || nextHasCalls
                                 )
                                 if message.id == receiptMessageId {
                                     readReceiptFooter(for: message)
                                 }
                             }
-                            // Groupes de messages : même auteur = 2 pt, changement
+                            // Groupes de messages : même auteur = 3 pt, changement
                             // d'auteur = 10 pt (l'horodatage de section gère le sien).
-                            .padding(.top, stamp != nil ? SQSpace.xs : (previous == nil ? 0 : (previous?.senderId == message.senderId ? 2 : 10)))
+                            .padding(.top, stamp != nil ? SQSpace.xs : (previous == nil ? 0 : (previous?.senderId == message.senderId ? 3 : 10)))
                             .id(message.id)
                             .background(
                                 RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
@@ -1501,7 +1502,7 @@ struct ConversationDetailView: View {
 
     // MARK: Bulles
 
-    private func messageBubble(_ message: MessageItem, isGroupStart: Bool = true, isGroupEnd: Bool = true) -> some View {
+    private func messageBubble(_ message: MessageItem, isGroupStart: Bool = true, isGroupEnd: Bool = true, showsTime: Bool = true) -> some View {
         let mine = (message.senderId == currentUserId)
         let reactions = reactionSummaries(for: message)
         let photoOnly = isPhotoOnlyMessage(message)
@@ -1519,7 +1520,7 @@ struct ConversationDetailView: View {
                 }
             }
             VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
-                bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, isGroupEnd: isGroupEnd, photoOnly: photoOnly, reactions: reactions)
+                bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime, photoOnly: photoOnly, reactions: reactions)
                 if sendStatus[message.id] == .failed {
                     failedRetryRow(for: message)
                 }
@@ -1538,7 +1539,7 @@ struct ConversationDetailView: View {
     /// EST la bulle — pas de cadre brique/surface autour), avec les réactions
     /// posées en capsules qui chevauchent légèrement le bas de la bulle.
     @ViewBuilder
-    private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
+    private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
         Group {
             // L'ombre reste sur la photo et la carte seules ; une bulle de texte n'en a plus
             // (un calque d'ombre par bulle coûtait cher au défilement).
@@ -1546,10 +1547,10 @@ struct ConversationDetailView: View {
                 attachmentsView(for: message, mine: mine, standalone: true)
                     .sqShadowSoft()
             } else if let embed = sharedPostEmbedTarget(for: message) {
-                standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart)
+                standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime)
                     .sqShadowSoft()
             } else {
-                classicBubble(for: message, mine: mine, isGroupStart: isGroupStart, isGroupEnd: isGroupEnd)
+                classicBubble(for: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime)
             }
         }
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
@@ -1586,7 +1587,8 @@ struct ConversationDetailView: View {
         card: ShareCardData,
         postId: String,
         mine: Bool,
-        isGroupStart: Bool
+        isGroupStart: Bool,
+        showsTime: Bool
     ) -> some View {
         VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
             if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
@@ -1612,7 +1614,7 @@ struct ConversationDetailView: View {
             )
             // Heure discrète sous la carte (la carte n'a pas de zone méta).
             HStack(spacing: SQSpace.xs) {
-                if let created = message.createdAt {
+                if showsTime, let created = message.createdAt {
                     Text(created, format: .dateTime.hour().minute())
                 }
                 if message.editedAt != nil { Text("modifié") }
@@ -1623,7 +1625,7 @@ struct ConversationDetailView: View {
         }
     }
 
-    private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool) -> some View {
+    private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool) -> some View {
             let card = shareCard(for: message)
             let site = siteShare(for: message, hasCard: card != nil)
             // Contenu interactif dans la bulle (embed de publication, photo
@@ -1762,35 +1764,42 @@ struct ConversationDetailView: View {
                 }
                 // Heure en 12 pt et encre pleine : à 10,5 pt et 60 % d'opacité,
                 // elle passait sous le contraste AA (SOC-31, TRX-12).
-                HStack(spacing: SQSpace.xs) {
-                    if let created = message.createdAt {
-                        Text(created, format: .dateTime.hour().minute())
-                            .font(SQType.micro(.regular))
-                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
-                            .accessibilityIdentifier("message.time")
+                // Dans une série, l'heure ne figure que sur le dernier message ; un pied
+                // vide garderait l'espacement de la pile sous la bulle.
+                let hasMeta = (showsTime && message.createdAt != nil)
+                    || (message.deletedAt == nil && (message.expiresAt != nil || message.editedAt != nil))
+                    || sendStatus[message.id] == .sending
+                if hasMeta {
+                    HStack(spacing: SQSpace.xs) {
+                        if showsTime, let created = message.createdAt {
+                            Text(created, format: .dateTime.hour().minute())
+                                .font(SQType.micro(.regular))
+                                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                                .accessibilityIdentifier("message.time")
+                        }
+                        if message.expiresAt != nil && message.deletedAt == nil {
+                            Image(systemName: "timer")
+                                .font(.system(size: 11))
+                                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                                .accessibilityLabel("Message éphémère")
+                        }
+                        if message.editedAt != nil && message.deletedAt == nil {
+                            Text("modifié")
+                                .font(SQType.micro(.regular))
+                                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                                .accessibilityIdentifier("message.time.edited")
+                        }
+                        sendStatusIndicator(for: message)
                     }
-                    if message.expiresAt != nil && message.deletedAt == nil {
-                        Image(systemName: "timer")
-                            .font(.system(size: 11))
-                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
-                            .accessibilityLabel("Message éphémère")
-                    }
-                    if message.editedAt != nil && message.deletedAt == nil {
-                        Text("modifié")
-                            .font(SQType.micro(.regular))
-                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
-                            .accessibilityIdentifier("message.time.edited")
-                    }
-                    sendStatusIndicator(for: message)
                 }
             }
             .padding(.vertical, MessageBubbleMetrics.verticalPadding)
             .padding(.horizontal, MessageBubbleMetrics.horizontalPadding)
-            .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine, first: isGroupStart, last: isGroupEnd))
+            .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine, first: isGroupStart))
             // En OLED, bulle reçue et fond sont noirs : le liseré des cartes
             // la détache (SOC-26). Transparent hors OLED.
             .overlay {
-                if !mine { bubbleShape(mine: false, first: isGroupStart, last: isGroupEnd).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
+                if !mine { bubbleShape(mine: false, first: isGroupStart).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
             }
             .modifier(SpokenBubble(summary: spokenSummary, interactive: hasInteractiveContent))
     }
@@ -2047,9 +2056,11 @@ struct ConversationDetailView: View {
     /// Coins asymétriques DA : le coin bas côté émetteur est plus petit,
     /// comme une « pointe » de bulle. Dans une série du même auteur, les coins
     /// côté émetteur se resserrent entre deux bulles.
-    private func bubbleShape(mine: Bool, first: Bool = true, last: Bool = true) -> UnevenRoundedRectangle {
+    /// Coins côté expéditeur à 8 pt (jonctions et pointe, comme le web) ; seul le haut
+    /// du premier message d'une série reste arrondi.
+    private func bubbleShape(mine: Bool, first: Bool = true) -> UnevenRoundedRectangle {
         let top: CGFloat = first ? SQRadius.xl : 8
-        let bottom: CGFloat = last ? 6 : 8
+        let bottom: CGFloat = 8
         return UnevenRoundedRectangle(
             topLeadingRadius: mine ? SQRadius.xl : top,
             bottomLeadingRadius: mine ? SQRadius.xl : bottom,
@@ -2692,6 +2703,14 @@ struct ConversationDetailView: View {
     }
 
     /// Dernier message d'un groupe du même auteur (porte l'avatar en groupe entrant).
+    /// Heure affichée sur le dernier message d'une série, ou quand le suivant arrive plus de
+    /// 5 min après : l'heure répétée à chaque bulle chargeait la conversation.
+    private func showsTime(_ message: MessageItem, next: MessageItem?) -> Bool {
+        if isGroupEnd(message, next: next) { return true }
+        guard let at = message.createdAt, let nextAt = next?.createdAt else { return true }
+        return nextAt.timeIntervalSince(at) > 5 * 60
+    }
+
     private func isGroupEnd(_ message: MessageItem, next: MessageItem?) -> Bool {
         guard let next else { return true }
         if next.senderId != message.senderId { return true }
