@@ -1466,6 +1466,11 @@ final class ANFRZoneCompareTests: XCTestCase {
         let canada = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(
             #"{"market":"CA","capabilities":{"bands":false,"planned":false},"operators":[]}"#.utf8))
         XCTAssertEqual(canada.capabilities, ANFRZoneCapabilities(generations: true, bands: false, planned: false))
+        XCTAssertTrue(canada.capabilities.registryCoversCenter, "Absente : le registre couvre le centre")
+        let liege = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(
+            #"{"market":"BE","capabilities":{"generations":false,"registryCoversCenter":false},"total":{"active":0},"operators":[]}"#.utf8))
+        XCTAssertFalse(liege.capabilities.registryCoversCenter)
+        XCTAssertEqual(liege.totalActive, 0)
     }
 
     /// Le registre réel (embarqué) et ses aires : Lyon et Pointe-à-Pitre sont interrogeables, Montréal et l'Atlantique non.

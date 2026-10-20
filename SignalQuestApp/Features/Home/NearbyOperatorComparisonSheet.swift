@@ -1113,6 +1113,14 @@ private struct ZoneAntennasSection: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, SQSpace.xl)
                 .accessibilityLabel("Chargement des antennes de la zone")
+        case .loaded(let data) where !data.capabilities.registryCoversCenter && data.totalActive == 0:
+            // Centre en Wallonie et aucun site flamand ou bruxellois dans le cercle : rien à compter.
+            EmptyStateView(
+                title: "Pas de registre d’antennes",
+                message: "La Wallonie ne publie pas de registre officiel des antennes. Signal et Débit restent comparables dans cette zone.",
+                systemImage: "antenna.radiowaves.left.and.right.slash"
+            )
+            .padding(.top, SQSpace.lg)
         case .loaded(let data):
             loadedContent(data)
         case .noAntennaData:
@@ -1141,6 +1149,12 @@ private struct ZoneAntennasSection: View {
         let rows = data.operators.filter { $0.key.uppercased() != "ALL" }
         let capabilities = data.capabilities
         return VStack(alignment: .leading, spacing: SQSpace.md) {
+            if !capabilities.registryCoversCenter {
+                Text("La Wallonie ne publie pas de registre : seuls les sites de Flandre et de Bruxelles sont comptés.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             summary(data)
             if rows.isEmpty {
                 EmptyStateView(

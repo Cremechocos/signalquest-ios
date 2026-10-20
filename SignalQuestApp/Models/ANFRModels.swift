@@ -1125,20 +1125,23 @@ enum ANFRZoneMarket {
 
 /// Ce que le registre d'un pays permet de compter (`capabilities` de zone-compare). Absent :
 /// tout, comme la France. La Belgique ne publie pas les générations ; le Canada et la Suisse
-/// ni les bandes ni les projets.
+/// ni les bandes ni les projets. `registryCoversCenter` (Belgique seulement) est faux quand le
+/// centre tombe en Wallonie, qui ne publie pas de registre : seuls la Flandre et Bruxelles comptent.
 struct ANFRZoneCapabilities: Decodable, Equatable, Sendable {
     let generations: Bool
     let bands: Bool
     let planned: Bool
+    let registryCoversCenter: Bool
 
     static let all = ANFRZoneCapabilities(generations: true, bands: true, planned: true)
 
-    enum CodingKeys: String, CodingKey { case generations, bands, planned }
+    enum CodingKeys: String, CodingKey { case generations, bands, planned, registryCoversCenter }
 
-    init(generations: Bool, bands: Bool, planned: Bool) {
+    init(generations: Bool, bands: Bool, planned: Bool, registryCoversCenter: Bool = true) {
         self.generations = generations
         self.bands = bands
         self.planned = planned
+        self.registryCoversCenter = registryCoversCenter
     }
 
     init(from decoder: Decoder) throws {
@@ -1146,6 +1149,7 @@ struct ANFRZoneCapabilities: Decodable, Equatable, Sendable {
         generations = c.value(Bool.self, .generations, true)
         bands = c.value(Bool.self, .bands, true)
         planned = c.value(Bool.self, .planned, true)
+        registryCoversCenter = c.value(Bool.self, .registryCoversCenter, true)
     }
 }
 

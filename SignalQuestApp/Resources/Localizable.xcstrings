@@ -94733,6 +94733,38 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "La Wallonie ne publie pas de registre officiel des antennes. Signal et Débit restent comparables dans cette zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wallonia doesn’t publish an official antenna registry. Signal and Speed can still be compared in this area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Wallonie ne publie pas de registre officiel des antennes. Signal et Débit restent comparables dans cette zone."
+          }
+        }
+      }
+    },
+    "La Wallonie ne publie pas de registre : seuls les sites de Flandre et de Bruxelles sont comptés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wallonia doesn’t publish a registry: only sites in Flanders and Brussels are counted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Wallonie ne publie pas de registre : seuls les sites de Flandre et de Bruxelles sont comptés."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
