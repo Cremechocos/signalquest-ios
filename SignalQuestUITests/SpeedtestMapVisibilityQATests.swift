@@ -33,7 +33,7 @@ final class SpeedtestMapVisibilityQATests: XCTestCase {
             sfr.tap()
             app.buttons["map.layers.close"].tap()
         }
-        let marker = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 100 Mbps")).firstMatch
+        let marker = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 100 Mb/s")).firstMatch
         let displayed = NSPredicate { _, _ in marker.exists && marker.isHittable }
         let appeared = await fulfillmentResult(displayed, timeout: 40)
         capture(app, "map-mask-before")
@@ -48,7 +48,7 @@ final class SpeedtestMapVisibilityQATests: XCTestCase {
         let testTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
         XCTAssertTrue(testTab.isHittable)
         testTab.tap()
-        let history = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "100 Mbps")).firstMatch
+        let history = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "100 Mb/s")).firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 15))
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(history, in: app))
         history.tap()

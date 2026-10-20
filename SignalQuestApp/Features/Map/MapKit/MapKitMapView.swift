@@ -724,7 +724,7 @@ struct MapKitMapView: UIViewRepresentable {
             MapAnnotationPayload(
                 id: "speed-\(speedtest.id)",
                 kind: .speedtest,
-                title: "\(Int(speedtest.downloadMbps.rounded())) Mbps",
+                title: "\(Int(speedtest.downloadMbps.rounded())) Mb/s",
                 subtitle: speedtest.tech ?? String(localized: "Speedtest"),
                 coordinate: speedtest.coordinate,
                 metric: speedtest.uploadMbps.map { String(localized: "\(Int($0.rounded())) Mbps en envoi") },

@@ -58,14 +58,14 @@ final class SpeedtestDetailSheetTests: XCTestCase {
     }
 
     /// Les formats suivent le lexique (formateur commun `SQUnits`) : virgule
-    /// française, « Mbit/s », Gbit/s au-delà de 1000, tiret quand la mesure manque.
+    /// française, « Mb/s », Gb/s au-delà de 1000, tiret quand la mesure manque.
     func testSpeedFormattingMatchesShareCard() {
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(487).value, "487")
-        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(487).unit, "Mbit/s")
+        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(487).unit, "Mb/s")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(45.3).value, "45")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(4.53).value, "4,5")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).value, "1,420")
-        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).unit, "Gbit/s")
+        XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(1_420).unit, "Gb/s")
         // Upload raté : pas de zéro trompeur.
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(nil).value, "—")
         XCTAssertEqual(SpeedtestDetailSheet.formatSpeedParts(0).value, "—")

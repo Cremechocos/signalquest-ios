@@ -834,13 +834,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbps"
+            "value" : "Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbit/s"
+            "value" : "Mb/s"
           }
         }
       }
@@ -850,13 +850,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gbps"
+            "value" : "Gb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gbit/s"
+            "value" : "Gb/s"
           }
         }
       }

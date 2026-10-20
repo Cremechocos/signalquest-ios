@@ -123,7 +123,8 @@ enum SQUnits {
 
     // MARK: Débit, latence, bande
 
-    /// « 412 Mbit/s », « 7,5 Mbit/s », « 1,722 Gbit/s » ; « Mbps » en anglais.
+    /// « 412 Mb/s », « 7,5 Mb/s », « 1,722 Gb/s », dans toutes les langues comme
+    /// Android et le web (décision du 20/10).
     ///
     /// Trente écrans formataient le débit à la main avec `String(format:)`, donc
     /// avec un point décimal en français (« 64.0 »), et « Mbps » partout (TRX-24,

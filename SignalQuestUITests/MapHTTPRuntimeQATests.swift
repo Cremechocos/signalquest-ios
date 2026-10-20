@@ -361,8 +361,8 @@ final class MapHTTPRuntimeQATests: XCTestCase {
 
         let map = app.maps.firstMatch
         guard map.waitForExistence(timeout: 10) else { throw RecipeError.missingControl }
-        let centerMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mbps")).firstMatch
-        let eastMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 160 Mbps")).firstMatch
+        let centerMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mb/s")).firstMatch
+        let eastMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 160 Mb/s")).firstMatch
         let beforePanX = centerMeasure.frame.midX
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.50))
             .press(forDuration: 0.1, thenDragTo: map.coordinate(withNormalizedOffset: CGVector(dx: 0.50, dy: 0.50)),
@@ -375,7 +375,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertTrue(operatorState(in: app).hasPrefix("SFR"))
         capture(app, name: "map-speedtests-after-pan-and-pinch")
 
-        let selectedMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mbps")).firstMatch
+        let selectedMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mb/s")).firstMatch
         try tap(selectedMeasure, in: app)
         XCTAssertTrue(app.scrollViews["map.item.content"].waitForExistence(timeout: 10), "Tapping the visible measurement must open its detail")
         capture(app, name: "map-speedtest-touch-selection")

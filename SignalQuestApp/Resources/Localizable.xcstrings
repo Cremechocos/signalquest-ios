@@ -27722,13 +27722,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ Mbps"
+            "value" : "%@ Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ Mbps"
+            "value" : "%@ Mb/s"
           }
         }
       }
@@ -28873,13 +28873,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps download"
+            "value" : "%lld Mb/s download"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps en réception"
+            "value" : "%lld Mb/s en réception"
           }
         }
       }
@@ -28889,13 +28889,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps upload"
+            "value" : "%lld Mb/s upload"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps en envoi"
+            "value" : "%lld Mb/s en envoi"
           }
         }
       }
@@ -28937,13 +28937,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps"
+            "value" : "%lld Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbps"
+            "value" : "%lld Mb/s"
           }
         }
       }
@@ -30070,13 +30070,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld test · avg DL %lld Mbps · min ping %lld ms"
+                  "value" : "%lld test · avg DL %lld Mb/s · min ping %lld ms"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld tests · avg DL %lld Mbps · min ping %lld ms"
+                  "value" : "%lld tests · avg DL %lld Mb/s · min ping %lld ms"
                 }
               }
             }
@@ -30088,13 +30088,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld test · moy. DL %lld Mbps · ping min %lld ms"
+                  "value" : "%lld test · moy. DL %lld Mb/s · ping min %lld ms"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld tests · moy. DL %lld Mbps · ping min %lld ms"
+                  "value" : "%lld tests · moy. DL %lld Mb/s · ping min %lld ms"
                 }
               }
             }
@@ -30761,13 +30761,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "10 to 30 Mbps"
+            "value" : "10 to 30 Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "10 à 30 Mbit/s"
+            "value" : "10 à 30 Mb/s"
           }
         }
       }
@@ -30793,13 +30793,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "100 Mbps and above"
+            "value" : "100 Mb/s and above"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "100 Mbit/s et plus"
+            "value" : "100 Mb/s et plus"
           }
         }
       }
@@ -30873,13 +30873,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "20 Mbps and above"
+            "value" : "20 Mb/s and above"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "20 Mbit/s et plus"
+            "value" : "20 Mb/s et plus"
           }
         }
       }
@@ -31002,13 +31002,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 to 10 Mbps"
+            "value" : "3 to 10 Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 à 10 Mbit/s"
+            "value" : "3 à 10 Mb/s"
           }
         }
       }
@@ -45941,13 +45941,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Latest speedtest — %lld Mbps"
+            "value" : "Latest speedtest — %lld Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dernier Speedtest — %lld Mbps"
+            "value" : "Dernier Speedtest — %lld Mb/s"
           }
         }
       }
@@ -47004,13 +47004,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Measured speed (Mbps)"
+            "value" : "Measured speed (Mb/s)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Débit mesuré (Mbit/s)"
+            "value" : "Débit mesuré (Mb/s)"
           }
         }
       }
@@ -50492,13 +50492,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gbps"
+            "value" : "Gb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gbit/s"
+            "value" : "Gb/s"
           }
         }
       }
@@ -58992,13 +58992,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbps"
+            "value" : "Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbit/s"
+            "value" : "Mb/s"
           }
         }
       }
@@ -59008,13 +59008,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Median Mbps"
+            "value" : "Median Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbit/s médian"
+            "value" : "Mb/s médian"
           }
         }
       }
@@ -59024,13 +59024,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbps"
+            "value" : "Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mbps"
+            "value" : "Mb/s"
           }
         }
       }
@@ -75590,13 +75590,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest speedtest — %lld Mbps"
+            "value" : "SignalQuest speedtest — %lld Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Speedtest SignalQuest — %lld Mbps"
+            "value" : "Speedtest SignalQuest — %lld Mb/s"
           }
         }
       }
@@ -85926,13 +85926,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "under 1 Mbps"
+            "value" : "under 1 Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "moins de 1 Mbit/s"
+            "value" : "moins de 1 Mb/s"
           }
         }
       }
@@ -85974,13 +85974,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "under 3 Mbps"
+            "value" : "under 3 Mb/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "moins de 3 Mbit/s"
+            "value" : "moins de 3 Mb/s"
           }
         }
       }
@@ -92779,7 +92779,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Mbit/s median"
+            "value" : "%lld Mb/s median"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mb/s médian"
           }
         }
       }

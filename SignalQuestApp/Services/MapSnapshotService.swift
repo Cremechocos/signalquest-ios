@@ -681,7 +681,7 @@ extension SocialMapSnapshot {
         if filters.contains(.speedtest) {
             items += speedtests.compactMap { speedtest in
                 guard let lat = speedtest.latitude, let lng = speedtest.longitude else { return nil }
-                return MapDisplayItem(id: "speed-\(speedtest.id)", kind: .speedtest, title: "\(Int(speedtest.averageSpeed)) Mbps", subtitle: speedtest.mobileOperator ?? speedtest.networkType ?? "Speedtest", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng), metric: speedtest.uploadAvg.map { "\(Int($0)) up" })
+                return MapDisplayItem(id: "speed-\(speedtest.id)", kind: .speedtest, title: "\(Int(speedtest.averageSpeed)) Mb/s", subtitle: speedtest.mobileOperator ?? speedtest.networkType ?? "Speedtest", coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng), metric: speedtest.uploadAvg.map { "\(Int($0)) up" })
             }
         }
         if filters.contains(.coverage) {
