@@ -350,22 +350,19 @@ final class SignalQuestUITests: XCTestCase {
             allowOnce.tap()
         }
 
-        XCTAssertTrue(app.staticTexts["Résultat"].waitForExistence(timeout: 120))
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.result"].firstMatch.waitForExistence(timeout: 120))
         let labels = app.staticTexts.allElementsBoundByIndex.map { $0.label }.joined(separator: " | ")
         print("REAL_SPEEDTEST_LABELS: \(labels)")
 
-        // Le verdict d'abord ; les métriques d'expert sont repliées (MES-05).
-        XCTAssertTrue(app.descendants(matching: .any)["speedtest.verdict"].exists)
-        let details = app.buttons["speedtest.result.details"]
-        for _ in 0..<4 where details.exists && !details.isHittable { app.swipeUp() }
-        if details.exists { details.tap() }
-        XCTAssertTrue(app.staticTexts["Réception (moyenne)"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Réception (pic)"].exists)
-        XCTAssertTrue(app.staticTexts["Envoi (moyenne)"].exists)
-        XCTAssertTrue(app.staticTexts["Envoi (pic)"].exists)
-        XCTAssertTrue(app.staticTexts["Latence"].exists)
-        XCTAssertTrue(app.staticTexts["Gigue"].exists)
-        XCTAssertTrue(app.staticTexts["Réseau"].exists)
+        // Deux grands chiffres, puis les détails dans une feuille à onglets :
+        // la tuile « Données » ouvre l'onglet Débit.
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.result.saved"].firstMatch.exists)
+        let data = app.descendants(matching: .any)["speedtest.result.data"].firstMatch
+        for _ in 0..<4 where data.exists && !data.isHittable { app.swipeUp() }
+        if data.exists { data.tap() }
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.details"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Moyenne"].exists)
+        XCTAssertTrue(app.staticTexts["MAX"].exists)
         XCTAssertFalse(app.staticTexts["P90"].exists)
         XCTAssertFalse(app.staticTexts["P95"].exists)
         XCTAssertFalse(app.staticTexts["Ping médian"].exists)

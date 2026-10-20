@@ -12,7 +12,8 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         hasUpload: Bool = true,
         hasLoadedPings: Bool = true,
         hasCoordinate: Bool = true,
-        download: Double = 487
+        download: Double = 487,
+        loadedDownloadPing: Double? = 28
     ) -> SpeedtestRunResult {
         var dl: [Double] = []
         var ul: [Double] = []
@@ -34,7 +35,7 @@ final class SpeedtestDetailSheetTests: XCTestCase {
             uploadP90Mbps: nil, uploadP95Mbps: nil,
             pingMs: 18, pingMedianMs: 18, pingMinMs: 14, pingMaxMs: 30,
             jitterMs: 3,
-            pingDlMs: hasLoadedPings ? 28 : nil,
+            pingDlMs: hasLoadedPings ? loadedDownloadPing : nil,
             jitterDlMs: hasLoadedPings ? 4.1 : nil,
             pingUlMs: hasLoadedPings ? 36 : nil,
             jitterUlMs: hasLoadedPings ? 5.2 : nil,
@@ -123,5 +124,67 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         XCTAssertFalse(message.isEmpty)
         XCTAssertGreaterThan(message.count, 20, "Un motif d'échec doit être explicité, pas nommé")
         XCTAssertFalse(message.contains("unknownServerId"))
+    }
+
+    // MARK: - Page Speedtest (piste A, 20/10)
+
+    /// Le chiffre de l'anneau rejoint sa cible au rythme e^(-dt/180 ms), repart de
+    /// zéro à chaque phase et ne saute pas après une pause de l'écran.
+    func testGlideFollowsTheTargetWithTimeConstant() {
+        let glide = SpeedtestGlide()
+        let start = Date(timeIntervalSince1970: 0)
+        XCTAssertEqual(glide.step(toward: 100, key: "1-2", at: start), 0)
+        let afterOneTau = glide.step(toward: 100, key: "1-2", at: start.addingTimeInterval(SpeedtestGlide.timeConstant))
+        XCTAssertEqual(afterOneTau, 100 * (1 - exp(-1)), accuracy: 0.001)
+        // Une pause de 10 s compte pour 0,5 s : la valeur approche sans bondir d'un coup.
+        let afterPause = glide.step(toward: 100, key: "1-2", at: start.addingTimeInterval(10))
+        XCTAssertLessThan(afterPause, 100)
+        XCTAssertGreaterThan(afterPause, afterOneTau)
+        // Nouvelle phase : repart de zéro.
+        XCTAssertEqual(glide.step(toward: 40, key: "1-3", at: start.addingTimeInterval(11)), 0)
+    }
+
+    /// « Sous charge » = latence en réception moins la latence affichée, jamais
+    /// négatif ; repli sur l'envoi ; rien sans mesure chargée.
+    func testUnderLoadDeltaFallsBackAndNeverGoesNegative() {
+        let loaded = SpeedtestResultFigures(result: sample())
+        XCTAssertEqual(loaded.latencyMs, 18)
+        XCTAssertEqual(loaded.underLoad?.deltaMs, 10)
+        XCTAssertEqual(loaded.underLoad?.whileReceiving, true)
+
+        let uploadOnly = sample(loadedDownloadPing: nil)
+        XCTAssertEqual(SpeedtestResultFigures(result: uploadOnly).underLoad?.deltaMs, 18)
+        XCTAssertEqual(SpeedtestResultFigures(result: uploadOnly).underLoad?.whileReceiving, false)
+
+        let faster = sample(loadedDownloadPing: 12)
+        XCTAssertEqual(SpeedtestResultFigures(result: faster).underLoad?.deltaMs, 0)
+
+        XCTAssertNil(SpeedtestResultFigures(result: sample(hasLoadedPings: false)).underLoad)
+    }
+
+    /// Les données comptées par l'appareil servent de repli quand la trace manque.
+    func testTransferredBytesFallsBackToTheDeviceCounter() {
+        let figures = SpeedtestResultFigures(result: sample())
+        XCTAssertEqual(figures.transferredBytes(deviceCount: 52_000_000), 52_000_000)
+        XCTAssertNil(figures.transferredBytes(deviceCount: nil))
+        XCTAssertNil(figures.transferredBytes(deviceCount: 0))
+    }
+
+    /// Les valeurs absentes sont listées une fois : un groupe entier vide se
+    /// nomme par son titre, pas ligne par ligne.
+    func testMissingValuesAreListedOnce() {
+        let figures = SpeedtestResultFigures(result: sample(hasUpload: false))
+        let groups = SpeedtestTestDetailsSheet.groups(for: .speed, figures: figures)
+        let missing = SpeedtestTestDetailsSheet.missing(in: groups)
+        let upload = String(localized: "↑ Montant").trimmingCharacters(in: CharacterSet(charactersIn: "↓↑ ")).lowercased()
+        XCTAssertTrue(missing.contains(upload), "\(missing)")
+        XCTAssertEqual(missing.filter { $0 == upload }.count, 1)
+        XCTAssertFalse(missing.contains { $0.hasPrefix(String(localized: "Moyenne").lowercased()) && $0.contains(upload) })
+    }
+
+    func testPlmnIsSplitAfterTheCountryCode() {
+        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("20801"), "208-01")
+        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("302720"), "302-720")
+        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("—"), "—")
     }
 }

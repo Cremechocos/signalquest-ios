@@ -86,14 +86,18 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         ], locale: locale)
         capture(app, name: "publication-\(locale)-login")
         SignalQuestUITestSupport.enterGuestApplication(app, tab: "speed", locale: locale)
-        XCTAssertTrue(app.buttons["speedtest.settings"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["speedtest.more"].waitForExistence(timeout: 15))
         capture(app, name: "publication-\(locale)-guest-idle")
         return app
     }
 
     private func openAndInspectSettings(_ app: XCUIApplication, locale: String) throws {
-        let settings = app.buttons["speedtest.settings"]
-        XCTAssertTrue(settings.isHittable)
+        // Réglages et Drive Test vivent dans le menu ⋮ de l'en-tête.
+        let more = app.buttons["speedtest.more"]
+        XCTAssertTrue(more.isHittable)
+        more.tap()
+        let settings = app.buttons["speedtest.settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
         XCTAssertTrue(app.staticTexts[locale == "fr" ? "Réglages du test" : "Test settings"]
             .waitForExistence(timeout: 10), "Settings sheet not presented in expected language")
@@ -122,8 +126,9 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         XCTAssertTrue(done.isHittable)
         done.tap()
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
         capture(app, name: "publication-\(locale)-guest-still-idle")
+        more.tap()
         let openDrive = app.descendants(matching: .any)["speedtest.driveTest"].firstMatch
         XCTAssertTrue(openDrive.waitForExistence(timeout: 5))
         openDrive.tap() // Opens the dedicated controller; never starts a measurement.

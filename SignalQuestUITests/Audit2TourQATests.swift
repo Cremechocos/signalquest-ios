@@ -108,7 +108,8 @@ final class Audit2TourQATests: XCTestCase {
         pause(1)
         snap("tester-bas")
         app.swipeDown(); app.swipeDown()
-        if tapIfExists(identified("speedtest.settings", in: app), in: app) {
+        if tapIfExists(identified("speedtest.more", in: app), in: app),
+           tapIfExists(identified("speedtest.settings", in: app), in: app) {
             pause(2)
             snap("tester-reglages")
             app.swipeUp()
@@ -116,12 +117,14 @@ final class Audit2TourQATests: XCTestCase {
             snap("tester-reglages-bas")
             dismissSheet(app)
         }
-        if tapIfExists(identified("speedtest.history", in: app), in: app) {
+        // L'historique est sous le test : le bouton de l'en-tête y fait défiler.
+        if tapIfExists(identified("speedtest.historyButton", in: app), in: app) {
             pause(2)
             snap("tester-historique")
-            back(app)
+            app.swipeDown(); app.swipeDown()
         }
-        if tapIfExists(identified("speedtest.driveTest", in: app), in: app) {
+        if tapIfExists(identified("speedtest.more", in: app), in: app),
+           tapIfExists(identified("speedtest.driveTest", in: app), in: app) {
             pause(2)
             // L'invite de localisation peut s'ouvrir par-dessus la présentation (MES-10).
             dismissSystemAlerts()

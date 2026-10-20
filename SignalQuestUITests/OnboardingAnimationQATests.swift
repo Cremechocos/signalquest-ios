@@ -72,7 +72,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "guest-application-\(locale)-home"; shot.lifetime = .keepAlways; add(shot)
         for (title, identifier) in [(locale == "fr" ? "Carte" : "Map", "map.filters"),
-                                     (locale == "fr" ? "Tester" : "Test", "speedtest.settings")] {
+                                     (locale == "fr" ? "Tester" : "Test", "speedtest.more")] {
             let tab = SignalQuestUITestSupport.tab(named: title, in: app)
             XCTAssertTrue(tab.waitForExistence(timeout: 10)); tab.tap()
             XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 20))
