@@ -122,6 +122,10 @@
     {
       "name": "condensat non canonique",
       "text": "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDB\n1"
+    },
+    {
+      "name": "prevLinkHash qui n’est pas un condensat",
+      "text": "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nx\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1"
     }
   ]
 }

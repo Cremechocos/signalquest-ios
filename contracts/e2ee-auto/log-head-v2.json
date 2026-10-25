@@ -96,5 +96,73 @@
     "note": "Tête re-signée une heure plus tard, même seq et même condensat (§3.4).",
     "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790039600000",
     "signatureB64": "MEUCIQDd2PP/wdgWFOztIrHXBCM/BmCXRRq9pOz+Vr0QzV6oyQIgRX9fZ8eWoUNhkxqoI68ZDeuqfJXoLn8raHYJYbPJXdE="
-  }
+  },
+  "invalidTexts": [
+    {
+      "name": "linkHash qui n’est pas un condensat",
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\nx\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000",
+      "signatureB64": "MEQCIGK7oJd94H7DzZORSif7jHfPewuhssvHgEeeC1FFHtwqAiAygFVL1bDYfsoWLkdsLlvLqpiXtsoll82HtyGKiSBGNw==",
+      "expect": "HEAD_FORMAT"
+    },
+    {
+      "name": "logKeyId qui n’est pas un condensat",
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4B\n1790036000000",
+      "signatureB64": "MEQCICIRw4/NyhhmnVqo2njN3GZC0G/B83jxonEMZ/tqu5xSAiBRJbfIOK6t8a+Bl4KH8tihRp7iaxiqdGOMniwdOr0lFA==",
+      "expect": "HEAD_FORMAT"
+    },
+    {
+      "name": "seq à zéro de tête",
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n016\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000",
+      "signatureB64": "MEQCIAnR6/OvjCpC0htMMAwty1MteS8/9Eg+0Vtq68OC5p8fAiBXC1m81Jz5A+rBB9WHDXINVbI1JM1fe+X1Onr/kVALUQ==",
+      "expect": "HEAD_FORMAT"
+    },
+    {
+      "name": "ligne en trop",
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000\nx",
+      "signatureB64": "MEQCIFZKMFADrQPqx2WTyS22lm0WLnXY5QnB3MzIGSn0r+TAAiA2XHgYKcauE0d/Ghj2pDDfUWAa8k/suCWOt+NzIVKmQg==",
+      "expect": "HEAD_FORMAT"
+    }
+  ],
+  "boundaryHeads": [
+    {
+      "name": "tête au seq 12, signée par la clé 1",
+      "keptSeq": 12,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEUCIQDqO7LODbDDLPaJmr8P0lJ5Kz4nEQ2P9RXGJekwcKicWAIgA+8t0pSGqZi6Qbz1XGBFN0eIvbKuQy0RuhNtsOL0J+Q="
+      },
+      "nowMs": 1790025200000,
+      "expect": "ok"
+    },
+    {
+      "name": "tête au seq 12, signée par la clé 2 (pas encore en vigueur)",
+      "keptSeq": 12,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790025200000",
+        "signatureB64": "MEQCIAnXJR+0lDnzQDUZMxF6pwuoEygraf3Ab353CGeJYSYJAiAk8rtUw3IT8urNwAyn6+3oKrpAOeqvKix7evqM7IZUIQ=="
+      },
+      "nowMs": 1790025200000,
+      "expect": "HEAD_LOG_KEY"
+    },
+    {
+      "name": "tête au seq 13, signée par la clé 2",
+      "keptSeq": 13,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n13\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790025200000",
+        "signatureB64": "MEUCIQCH75QCdJOnxUmTOIdwEuv38a+IFYKVus2N+dF79SQ9ewIgXRk+DLFGZjP7F433wkJfxcCwZdc8E8/TKD8t9YLl4Y4="
+      },
+      "nowMs": 1790025200000,
+      "expect": "ok"
+    },
+    {
+      "name": "tête au seq 13, signée par la clé 1 (remplacée)",
+      "keptSeq": 13,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n13\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEQCIDn2zfSHBep5PfETrtmfRl2UBSvlGIY3D65FKKotOXsqAiBt3PuTPsFM520Hg/PYxAFKJIXKc7+30xqKKC8OMoQIuQ=="
+      },
+      "nowMs": 1790025200000,
+      "expect": "HEAD_LOG_KEY"
+    }
+  ]
 }

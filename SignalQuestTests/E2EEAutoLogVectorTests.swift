@@ -71,6 +71,7 @@ final class E2EEAutoLogVectorTests: XCTestCase {
             case "keyVersion": XCTAssertEqual(device.keyVersion, value as? Int, label)
             case "identityKeyB64": XCTAssertEqual(device.identityKeyB64, value as? String, label)
             case "addedAtMs": XCTAssertEqual(device.addedAtMs, try int64(expect, key), label)
+            case "activatedAtMs": XCTAssertEqual(device.activatedAtMs, (value as? NSNumber)?.int64Value, label)
             case "revokeReason": XCTAssertEqual(device.revokeReason?.rawValue, value as? String, label)
             case "revokeSeq": XCTAssertEqual(device.revokeSeq, (value as? NSNumber)?.int64Value, label)
             case "revokedAtMs": XCTAssertEqual(device.revokedAtMs, (value as? NSNumber)?.int64Value, label)
@@ -176,6 +177,40 @@ final class E2EEAutoLogVectorTests: XCTestCase {
             XCTAssertEqual(result, .invalid(try XCTUnwrap(E2EEAutoLog.HeadError(rawValue: try string(invalid, "expect")))), name)
         }
 
+        for invalid in try objects(vectors, "invalidTexts") {
+            let result = E2EEAutoLog.checkHead(
+                text: try string(invalid, "text"), signatureB64: try string(invalid, "signatureB64"), logKeyB64: next,
+                nowMs: try XCTUnwrap(E2EEAutoLog.parseHead(text)).createdAtMs
+            )
+            let name = try string(invalid, "name")
+            XCTAssertEqual(result, .invalid(try XCTUnwrap(E2EEAutoLog.HeadError(rawValue: try string(invalid, "expect")))), name)
+        }
+
+        // Autour de la LOG_KEY du maillon 13 : la tête se vérifie avec la clé en vigueur à son seq.
+        let chainVectors = try load("log-chain-v2")
+        let reference = try XCTUnwrap(chainVectors["reference"] as? [String: Any])
+        let referenceLinks = try XCTUnwrap(reference["links"] as? [String])
+        for boundary in try objects(vectors, "boundaryHeads") {
+            let name = try string(boundary, "name")
+            let kept = try E2EEAutoLog.extendChain(
+                try initialChain(chainVectors), links: Array(referenceLinks.prefix(Int(try int64(boundary, "keptSeq")))),
+                logKeyEntries: try logKeyEntries(reference)
+            ).get()
+            let head = try XCTUnwrap(boundary["head"] as? [String: Any], name)
+            let result = E2EEAutoLog.checkHead(
+                text: try string(head, "text"), signatureB64: try string(head, "signatureB64"), logKeyB64: kept.logKeyB64,
+                nowMs: try int64(boundary, "nowMs")
+            )
+            switch (result, try string(boundary, "expect")) {
+            case let (.ok(verified), "ok"):
+                XCTAssertEqual(E2EEAutoLog.compare(head: verified, to: kept), .match, name)
+            case let (.invalid(error), expected):
+                XCTAssertEqual(error.rawValue, expected, name)
+            default:
+                XCTFail("\(name) : \(result)")
+            }
+        }
+
         // Journal vide : tête de seq 0 au condensat de genèse, signée par la clé épinglée.
         let empty = try XCTUnwrap(vectors["emptyHead"] as? [String: Any])
         let emptyCheck = E2EEAutoLog.checkHead(
@@ -275,7 +310,8 @@ final class E2EEAutoLogVectorTests: XCTestCase {
                 continue
             }
             let accountError = try XCTUnwrap(E2EEAutoLog.AccountError(rawValue: try string(expect, "accountError")), name)
-            XCTAssertEqual(result.failure, E2EEAutoLog.AccountFailure(error: accountError, seq: try int64(expect, "seq")), name)
+            // `seq` nul : refus avant tout maillon (sel mal formé).
+            XCTAssertEqual(result.failure, E2EEAutoLog.AccountFailure(error: accountError, seq: (expect["seq"] as? NSNumber)?.int64Value), name)
         }
     }
 

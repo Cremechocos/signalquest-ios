@@ -46,14 +46,58 @@
       ]
     }
   },
+  "logVariants": {
+    "hk4WithoutRevoke": {
+      "note": "Le journal principal, plus une HISTORY_KEY hk4 au seq 14 signée par A1, sans REVOKE depuis hk3.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\n76e0OUhGV4UICTfCdblUNcvi9tqa5WYXJXC5sT2zHc4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nIdyIqGJqQEnyr0uEa761wLOz40_m-oHCeXOaeXhZTuc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\nfHdAzM1NRavarNkIOhWKXJ522EuXmwg66J4pQYIR044\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nRPOTizZppclI3rRaXy3cszz1KWM28JXXP4NV850uy04\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nhE1vd5pFeQ7hSgnsFxVY2hX2Bjc3t_VxSmJ51UPB65g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nomY4auAQr_W33AH9JR9tY0Y42aUbJcBwZ2HuYERnOz0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\npTBF3LI0lRznYompZQ5A4wOAOAsF3zNJhXXUVG8N9L0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nqCDa_pvq9hqtUnv_EU-5_caUlxkOBCkrKnIvYcamTcY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\nBkmzpkRsjqeKWkyL01M161gBf2jxG_kBWfxKcjYeNzc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\ngbnMoDdC97UEFpsbs9sx8HgYialLEoTmFejBnEjbTjs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\n0Cic8gkzSm4DwvFkFFF-EPgQ9gwAqL1Ns0rkW32aTyQ\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\n-LR84-2PththNiSMDu6roZtA_tKaA8oR47KEBsUkln0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nylYHOtW1d1onoV2MU0qXMhUNMO12YWX9-NlujNG1iDg\n0"
+      ],
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_w1_000001\nios\nBMaSqnroPXsj2iS2QMgar6d0RGGKPXyNJjFN9f7dasxiQT+Kqf4168GIsGy2/7k+l3xVtTsBTI7WwS7WUyrvHLc=\nBPDkIOGSkfrflqIZDJJTRO4cny17+AjLTmhzFLtZelLjcrbSscafgVZoi8FAjiAA8rpMqORyHWWoHp0DHyt0mAs=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=:MEUCIQD5v1G9GV9soZzZaoPd+0D7Fm2hnveQuCX2Jrc1lfkO2wIgC9+cP2RfMeEkYCOwvzAJixNmNnrO++Jpc3S28kef+Xg=\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\nADD\ndevice_alice_w2_000002\nweb\nBKDb3Sk0F3Njr+xYOx2dEHw+tVB8gcAeOw0ml3OGuFqsHE3pcABVBG9gYPF3VC2djxQhW9VPc/yL3DKABOt102E=\nBEbtsFpq0AtAU9jTtc4qhDbbTs1761ZXxHgyPfCNPEsEdv76cM5X6C5tTHSir0mH/ewIdVqsLOhNDWZZAYo25XA=\n1\n-\n1789568000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nADD\ndevice_alice_w3_000003\nandroid\nBNUy5CKmiA1jHMlgmGgyywmwpNcYLYwmw8/e0mXA+ekU1FX1kjv819LelrChbWNWoxTu+3wxKyAlTX1/wZDjvtg=\nBBgq0ipBXtzojZmSvZwxovLn/YQDcH2wn5vI5KJvzetIr/jtwaTRc+HN/XczuzjEPCzPp89VVpuXaGXaSiCkXvM=\n1\n-\n1789654400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\nREVOKE\ndevice_alice_w3_000003\n-\n-\n-\n-\nUSER:device_alice_w1_000001:MEQCICpMJoxifeevylgSQGDpJYuio6GA7U76/yZcstGxD7PuAiBytzcr1fqertsfEumaqFj/iNh0PvW7wQIUKOeAAKrMFg==\n1789740800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=:MEQCIBLAyHGJCP/pIDgWH0nMxs/WvQzUkv3WMODJlKz7bMTPAiBiVVRaHZdxsZwYVBrNiPFPO7nD1f6ogBPwbqCm7iSaXQ==\n1789740860000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\nADD\ndevice_alice_w4_000004\nios\nBBCelbHnFG4wEg6THDWoCNftu5DSNx9PVG9W7EmNevQ4tsjyitlb9QFA/7iyY5DuNjlyCXPwKeyc+MDhqdzX0Zc=\nBG9lgblHJOpr0sPeF5npME2m7iJeQTNteTmayV3kbv1Vj8YnX7tHbMUoSq9pCS6cH/Dt/SVpQk0T1ik+VuZCbyc=\n1\n-\n1789827200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\nREVOKE\ndevice_alice_w4_000004\n-\n-\n-\n-\nNOT_ME:device_alice_w1_000001:MEQCIFLS0QOABT3pavA4lgPJT74R67avFoxiRmGXzBoVnOu8AiBAJEiB25JEnkjiQuwTj4vw390w4XpfQyF6xTz3U7xiUA==\n1789913600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=:MEQCIErbx6cco+eKMF4MVcDx+t29PEVeNXkXvcxz0hJVomM+AiASUsURGYl2gbzKwf83zJBLxJ64rN9ojxvVL7IU9aI3/A==\n1789913660000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nROTATE\ndevice_alice_w2_000002\n-\nBGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=\n-\n2\nMEUCIQCcclPSCcppMV3/QhwcOLkS0hs35jF/MquHg3rkHPq7EQIgBYWDZYodO2r91R75rz3XqkiTdoPX0Fog8h86P/U0iTE=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_alice_00000000001\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\nMODE\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:STRICT:MEUCIQCvUB8pODxMpMpgvSONM8bs62DOWezjNrpwarZR83fPugIgcdJSuvpSm3zf1n4/ur7ivzBdTUYkPxSzLP2RQ8rvbFc=\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_alice_00000000001\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\nADD_PENDING\ndevice_alice_w5_000005\nweb\nBGJtv2o0nC7tM9OMJ9jO9fC1mmQ2pCH1yjClLIsdzKvIq0n9wRtqEFTcSzXlUEvgBLqoiylZDYQDvu7b09D4Ld4=\nBDb48h7LxzsN2P/kp9jSwCNGf01Ou0Nqv4CjybNN8nfxgKLYvLSEhCCG2I74mOJER1Vqd53O1QmiIBuKF3DP9F4=\n1\n-\n1790007200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_alice_00000000001\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=:MEQCIDL+y+Qm27q643nP5Pj2rKe4H39C0j/ERXFKu4rH9eLGAiAzQAsBWnfXOyYSfAw4XRDuMilb6kzWTsMLq+qDiWHKxA==\n1790010800000"
+        ]
+      }
+    }
+  },
   "secrets": {
-    "note": "Clés privées de test, pour déchiffrer : la clé d’accord de A2 (kv 1 et 2), A1, et les trois HK.",
+    "note": "Clés privées de test, pour déchiffrer : la clé d’accord de A2 (kv 1, 2 et une kv 3 absente du journal), A1, A3, les quatre HK et une HK absente du journal.",
     "a1IdentityPrivateB64": "U3RO2BW/1hrJ1o8vMrBlwPcrIspQckY7IIHf7Nz+IgA=",
     "a2IdentityKv1PrivateB64": "1yQjgnbd84EI/Tmw1m75EPrDdzI2UxGnwttkSKtB2sg=",
     "a2IdentityKv2PrivateB64": "r8jf8x+E3LHe12hohXt6gUB8GCcRD36OtHp3iNaXTWg=",
     "hk1ScalarB64": "2p2ktDH0gOfdeGJ7KNH9aSOrXHVERP4xmhozOxNstJs=",
     "hk2ScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ=",
-    "hk3ScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+    "hk3ScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc=",
+    "hk4ScalarB64": "hLtFXT0mANaOnPbSXhV/w6UmpKDXuuEwMTyAzlrml44=",
+    "hkUnknownScalarB64": "3287RrzQ3IOOe/0dZKp217AwNvIAG5hGxPyXERIrc3o=",
+    "a2IdentityKv3PrivateB64": "Cx8Qwus6cJpb7vzaYAhk6I8VL0f5UD1Z5K6Wv1YTmHA=",
+    "a3IdentityPrivateB64": "JYZ72hAD0cdDX1NBopbHDDm/4Z6xfaOueRwYKD5NOd4="
   },
   "cases": [
     {
@@ -186,7 +230,7 @@
     },
     {
       "name": "request-key-version-unknown",
-      "note": "kv 3 n’existe pas dans le journal.",
+      "note": "kv 3 n’existe pas dans le journal ; chiffrée pour une clé kv 3 que A2 dit garder (clé privée dans secrets).",
       "reader": {
         "kind": "device",
         "deviceId": "device_alice_w2_000002",
@@ -208,18 +252,18 @@
         "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
         "ephemeralB64": "BIBS4EdpYW6eetQLtqZjodsyp12yOt5P9MhNiRoMnvF2j//Wc8/dj8tDy5+JFKTE+vPHAzUmqOKW3k4Ljxu5oFE=",
         "nonceB64": "SoA6H5oLT5LFfhSt",
-        "wrappedB64": "oldvRd4jFijmkXYWEQGR1C2RjyuEQ81rWRnz+HQvcJbuMe7/Yyxfbk7dXTExakUk",
-        "signatureB64": "MEQCIAtBZ+k3YeesXTTRwFrdo7gosYz+yCzDyhCo1MqqEnjfAiBn2JSX5uxfA2H6x0Fi3D8RdvzyPg5cEL41wMkszjblKQ=="
+        "wrappedB64": "StQzIY/MhpbV87ZC5vPsHUPJ5e8ESaUfPm4WK+m0e+3RUVxhB9ieqCA1mhinrSJq",
+        "signatureB64": "MEUCIQDi8ywa2OKiScAYMFqga7vOJOTjZC/g6f+lFHVxCJVMtwIgGLHvI0Z/D+XWya4O0oEcqBLs0gua2tzYc1kLJagWnIU="
       },
       "intermediates": {
         "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n3\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
         "saltB64": "X+ITN1Zu0VLefvdUbJ5++zihDuv3Stgpp9V60uym3U4=",
         "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n3\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBIBS4EdpYW6eetQLtqZjodsyp12yOt5P9MhNiRoMnvF2j//Wc8/dj8tDy5+JFKTE+vPHAzUmqOKW3k4Ljxu5oFE=",
-        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n3\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBIBS4EdpYW6eetQLtqZjodsyp12yOt5P9MhNiRoMnvF2j//Wc8/dj8tDy5+JFKTE+vPHAzUmqOKW3k4Ljxu5oFE=\nSoA6H5oLT5LFfhSt\noldvRd4jFijmkXYWEQGR1C2RjyuEQ81rWRnz+HQvcJbuMe7/Yyxfbk7dXTExakUk",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n3\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBIBS4EdpYW6eetQLtqZjodsyp12yOt5P9MhNiRoMnvF2j//Wc8/dj8tDy5+JFKTE+vPHAzUmqOKW3k4Ljxu5oFE=\nSoA6H5oLT5LFfhSt\nStQzIY/MhpbV87ZC5vPsHUPJ5e8ESaUfPm4WK+m0e+3RUVxhB9ieqCA1mhinrSJq",
         "ephemeralPrivateB64": "eA+YtaRzNSNpdJ6ZEupDggPFhpl8JQlnqr3Q+vltGI8=",
-        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
-        "sharedSecretB64": "RPlA16MwIhq2OzKPpMe1EgaxKWzPhXfZor1E8q9oOfE=",
-        "derivedKeyB64": "1wibQaRChTeTLWdcunC6eWR5vZlFaQcgDaqEqRoke9U=",
+        "recipientAgreementPublicB64": "BKjwfq6/fvX+hocFvckkucoQsLHYPHX4TN2gnStnG7lRUUemqkz9LnL4BE/LFR+dl8f+Omlhgjz+azaH4F1e8VI=",
+        "sharedSecretB64": "4P9GcDWX47KBNV1Fqno8DGbzxOvf1K/2Y5xomnbDkWQ=",
+        "derivedKeyB64": "6UpDvLx3lR2j3g4crJ81YNx99+aI/TFT+kpl0vJq8ds=",
         "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
       },
       "expect": {
@@ -833,6 +877,604 @@
         "check": "SENDER",
         "plaintextMatches": null
       }
+    },
+    {
+      "name": "request-recipient-only",
+      "note": "Tout est pour A2 sauf recipient = A1.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w1_000001",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BImCPnInYXJ4oqlzdL1iiJxuL0otzK1S0QfZzHrQSJ7v2Eb4/77HUlKWVVLBy+MKv9V/mTO1JEcEjEysxJ+XCII=",
+        "nonceB64": "28t4Z31u6sWGjowz",
+        "wrappedB64": "yzzXPdNNySOwqMHta9Cv3almPhTvuoDKIraDhysi4Gsqk6ECoEh/5HMhpnJwEEUn",
+        "signatureB64": "MEUCIQDU+Zr6cwamNMT73CFKSUnb+LrOI0i3CLvYWOVb0m4rswIgO3qwsvu0/Qkua85SpeU1MU6QRwPgo2BQm/llBXmH3z4="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w1_000001\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "wVZoe/4Av6KlLDbajvHbQsMe1VcvyUY1eShsNhydnbM=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w1_000001\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBImCPnInYXJ4oqlzdL1iiJxuL0otzK1S0QfZzHrQSJ7v2Eb4/77HUlKWVVLBy+MKv9V/mTO1JEcEjEysxJ+XCII=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w1_000001\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBImCPnInYXJ4oqlzdL1iiJxuL0otzK1S0QfZzHrQSJ7v2Eb4/77HUlKWVVLBy+MKv9V/mTO1JEcEjEysxJ+XCII=\n28t4Z31u6sWGjowz\nyzzXPdNNySOwqMHta9Cv3almPhTvuoDKIraDhysi4Gsqk6ECoEh/5HMhpnJwEEUn",
+        "ephemeralPrivateB64": "TVLqn3hzC+t+CSLKppGTfuzz+ZacjfhWecLvnA25KKs=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "lFtiarxUourdjp3hGuljstSR9/5cji8wMRYERrmKd28=",
+        "derivedKeyB64": "+AOsaAFjVmjsEAlkyuZLbTN36ln5aywRWeoQe3dwTsU=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "request-reader-revoked",
+      "note": "A3, révoqué (seq 6), lit une enveloppe qui lui est adressée.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w3_000003",
+        "keyVersions": [
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w3_000003",
+        "keyVersion": 1,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "Wj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BNZrjHfG76XrSwwFwspOBtDdEw8nN5Erb7Po+Ym9niISeyRP43sZUeea0mE9zziqFHKhfzH9smJCqvIpBeoCfGA=",
+        "nonceB64": "XDMAvP4kURK35Hiq",
+        "wrappedB64": "Lep2uNC0Tzjzv4l0OyTl+vvCkPWEwYcEGmfqq8LaH4ijS1Dk2wQkvevaTmxVRvgO",
+        "signatureB64": "MEQCIE3wKO8OSYtgAX4hU+YL6lH1RJ+J/srfMPr3SRwZ+Y3dAiBmqlDzi6cROexVi8fetL+eVp/u3yWwDf8eGvr9zycV1g=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w3_000003\n1\nhistreq_alice_w2_00001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg",
+        "saltB64": "SYJ/YO20oW2R2pqlPex1w9Kjasae6UhbUpo6+LCe870=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w3_000003\n1\nhistreq_alice_w2_00001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBNZrjHfG76XrSwwFwspOBtDdEw8nN5Erb7Po+Ym9niISeyRP43sZUeea0mE9zziqFHKhfzH9smJCqvIpBeoCfGA=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w3_000003\n1\nhistreq_alice_w2_00001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBNZrjHfG76XrSwwFwspOBtDdEw8nN5Erb7Po+Ym9niISeyRP43sZUeea0mE9zziqFHKhfzH9smJCqvIpBeoCfGA=\nXDMAvP4kURK35Hiq\nLep2uNC0Tzjzv4l0OyTl+vvCkPWEwYcEGmfqq8LaH4ijS1Dk2wQkvevaTmxVRvgO",
+        "ephemeralPrivateB64": "x/y2rvTbLRU57G9BFEMkgnVAbfv5LG+Y8TIM3YY/gtM=",
+        "recipientAgreementPublicB64": "BNUy5CKmiA1jHMlgmGgyywmwpNcYLYwmw8/e0mXA+ekU1FX1kjv819LelrChbWNWoxTu+3wxKyAlTX1/wZDjvtg=",
+        "sharedSecretB64": "ImUr2e/L2m74WAC7zaOWlAmheEuvNurPMzVG6aAhrG8=",
+        "derivedKeyB64": "FatD73i5M1YpSoEw+F1hL/aBSYj0arIe8mvxOs+HEbE=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "request-reader-unknown",
+      "note": "Lecteur absent du journal du compte.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_wz_000099",
+        "keyVersions": [
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_wz_000099",
+        "keyVersion": 1,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BLargJlkLl6eSv9b+y4NtkJdNnV7pVEt4pzaVGI65Xv9aKP3L7ICXPeKwDgY1JBugzMlulIE78uCE0GEvrHmh+M=",
+        "nonceB64": "PA9HFvStV/js5H1B",
+        "wrappedB64": "D3rJ+FmQWtZWglCdqR5JrF7L8MsGjGWFQKygEJFI3nXTg/ycoHqnyh7tAfgku7Hq",
+        "signatureB64": "MEQCIDd3SMETJfN+eXK+BClLqJK1YxqQW7iorg6JdZilYPeOAiBDfItBVoU4tRNctLF5ukjL4XkdAQTgHrfOrtsYv88HGQ=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_wz_000099\n1\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "O0gh/Xxmg9FwWdU3hZE08GzBlQMFEDam44MAijhKhy8=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_wz_000099\n1\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBLargJlkLl6eSv9b+y4NtkJdNnV7pVEt4pzaVGI65Xv9aKP3L7ICXPeKwDgY1JBugzMlulIE78uCE0GEvrHmh+M=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_wz_000099\n1\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBLargJlkLl6eSv9b+y4NtkJdNnV7pVEt4pzaVGI65Xv9aKP3L7ICXPeKwDgY1JBugzMlulIE78uCE0GEvrHmh+M=\nPA9HFvStV/js5H1B\nD3rJ+FmQWtZWglCdqR5JrF7L8MsGjGWFQKygEJFI3nXTg/ycoHqnyh7tAfgku7Hq",
+        "ephemeralPrivateB64": "BG0pkCPIEOrdpLbZ79+Y4WYfiMzy1iO882z63aE736U=",
+        "recipientAgreementPublicB64": "BMaSqnroPXsj2iS2QMgar6d0RGGKPXyNJjFN9f7dasxiQT+Kqf4168GIsGy2/7k+l3xVtTsBTI7WwS7WUyrvHLc=",
+        "sharedSecretB64": "3An1+JioSTAu8RZQdqKxRrDXu2t83MUBPb1vZ1adoXc=",
+        "derivedKeyB64": "LXgio5etp4LaP4YLMwtKALjROeFcFs9YS4GAqRO7IMk=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "request-sender-is-reader",
+      "note": "A2 s’envoie HK à lui-même : l’émetteur doit être un autre appareil.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w2_000002",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BGRv3bGyBwVyaEWUvL1rIbMAhL23KuZS6IKp4tXnkEpMSF8le5ogQl8XInPto4D1Vb7xN7WLian5i+EJNKmIqRw=",
+        "nonceB64": "rpk1xF8Aew06nNhX",
+        "wrappedB64": "1ywOnT22gXMDV3foKxFv8VihrNaCJfONORVkIy2HisHBwZdCjbBbOuW8JRdGVyVe",
+        "signatureB64": "MEQCIHfD3VZsFZCJltwkNOWXQ9Msef302kyzreg6dvSOEfV4AiB8eOb2s0SwDHgQ9pjU8p/ZEmGHcDFoMKkVfiDuvVDR9Q=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "UzMotOmOoD4KaM+Zmqr3ye9dQ8Yt8RjddIzcivKn5eI=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBGRv3bGyBwVyaEWUvL1rIbMAhL23KuZS6IKp4tXnkEpMSF8le5ogQl8XInPto4D1Vb7xN7WLian5i+EJNKmIqRw=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBGRv3bGyBwVyaEWUvL1rIbMAhL23KuZS6IKp4tXnkEpMSF8le5ogQl8XInPto4D1Vb7xN7WLian5i+EJNKmIqRw=\nrpk1xF8Aew06nNhX\n1ywOnT22gXMDV3foKxFv8VihrNaCJfONORVkIy2HisHBwZdCjbBbOuW8JRdGVyVe",
+        "ephemeralPrivateB64": "Wmws0O3UrObzLN86TROQKCJpeRor/MegWAKXfBkEI24=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "n3AkZowEOdEEn+aFRwKy3EeVvdh57QNxZvfz0zwIezQ=",
+        "derivedKeyB64": "SyWVW8ewSNcj8uvI7k5GZWWj6xo59+sdvwOHWL0wDVM=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "SENDER",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "request-other-account",
+      "note": "Journal d’Alice présenté pour une enveloppe du compte de Bob.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "checkUserId": "user_bob_0000000000002",
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BNNZRz20UthxPvah1Dx+A4OXlPL7CYm+4K+llAD7GtpxPBEVlrKz1eDqgR43BrnktW9bA8FKhifZn9X40JoZaVA=",
+        "nonceB64": "ovpNgMSMG35Ov0eb",
+        "wrappedB64": "LBeAbYE3A2TpGsC8CWyWkulJ/SMzrKRZOhkQHG8lHVo7coPQmK2jCDhptpVmTP9k",
+        "signatureB64": "MEUCIQDXjniOR+mEDQHxPL777QiAYASCOK54T5c7vlpVpDA6ygIgXLPK7lVRh++AhTybG8J8tIccY0t7EYGmhLzyhkzZh7A="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "1hym5R6KXsahXtU10p9JT/f6T+JdrTiFEy0KTo1azj0=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBNNZRz20UthxPvah1Dx+A4OXlPL7CYm+4K+llAD7GtpxPBEVlrKz1eDqgR43BrnktW9bA8FKhifZn9X40JoZaVA=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBNNZRz20UthxPvah1Dx+A4OXlPL7CYm+4K+llAD7GtpxPBEVlrKz1eDqgR43BrnktW9bA8FKhifZn9X40JoZaVA=\novpNgMSMG35Ov0eb\nLBeAbYE3A2TpGsC8CWyWkulJ/SMzrKRZOhkQHG8lHVo7coPQmK2jCDhptpVmTP9k",
+        "ephemeralPrivateB64": "gux0mIgm1SfstKafZYecgBm7WCxAVBNmzHt5Fm863+g=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "VxqcU7McRO4UaWAfKvIJT5kXlXnFxWWWWwFnsBHczYc=",
+        "derivedKeyB64": "hrRrP2Sk3BPcecavxBfU+YDRws93Bbvabrs4NA5sRps=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "rotation-without-held-key",
+      "note": "Le lecteur ne détient aucune HK : une rotation ne lui est pas destinée.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [],
+        "heldHkPubB64": null
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "rotation-10",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BJf3lKHZADMobPstdvmHdY9PhICsJJYhnctT2xA+NeilQjS+Dy/NXBcWHa9kqSLgfGQ6AYyLKKeTGGlJHddW4Vg=",
+        "nonceB64": "Y5e9eLblH/dTxCIx",
+        "wrappedB64": "YRikhziwX/c2lOTPuuuzC5GS8TkcVL9zcskwt0RlE6hchuNcJB14cHe78jpQXZrO",
+        "signatureB64": "MEQCIHOzfgtjh94GS3eYW0ZmLUT0wB2gxRW2TUqlx7iBP9FOAiBxuq//2pnMLZLfBmKA0mz+X+I5Gt9mIdQrK0durixgqA=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-10\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "UFZKyUmk7+nyUP3zi2CxHEJmTbQxY4jzGizSTtWiJ90=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-10\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBJf3lKHZADMobPstdvmHdY9PhICsJJYhnctT2xA+NeilQjS+Dy/NXBcWHa9kqSLgfGQ6AYyLKKeTGGlJHddW4Vg=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-10\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBJf3lKHZADMobPstdvmHdY9PhICsJJYhnctT2xA+NeilQjS+Dy/NXBcWHa9kqSLgfGQ6AYyLKKeTGGlJHddW4Vg=\nY5e9eLblH/dTxCIx\nYRikhziwX/c2lOTPuuuzC5GS8TkcVL9zcskwt0RlE6hchuNcJB14cHe78jpQXZrO",
+        "ephemeralPrivateB64": "pgCnxRj7njTdsHJmtOf+WWDqVlah/lIVgurhMzaMrl0=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "4mB+CkaowlNUQ7C6U8yoqIDhsaiv8qs1k9S2tcAO3UA=",
+        "derivedKeyB64": "g8Plus/75KVk247MzfpcqQH6+BDEX/ixOQxVNFH9BGs=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ROTATION",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "rotation-not-a-history-key",
+      "note": "seq 8 est un ADD, pas une HISTORY_KEY.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [],
+        "heldHkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "rotation-8",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BEgTUYqGHnNt3k222TgTPsYWkHgm3bWf3334QC4VJKuizBL6NSllR0wHG/LKHE+JWnrEQgVEusZptgiPy+kln+o=",
+        "nonceB64": "xUtPhfFN2qTLr8hX",
+        "wrappedB64": "1IseT3agLj0IxzhZMoJ1ndcw6NR2uODQ44VdQyTS9KZSQMDXzEyvfldZuOd1R8qw",
+        "signatureB64": "MEUCIQCtaKC5VfgeVNaLqLW4BZZCJmK/taELScVCn9ITPQ1siAIgDfO78zNOIZq/NewstF6pzWbjP7Kv9pu0hwyKAzk8VTk="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-8\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "ZhSGt2JMOiaAPE8xREJWVONEH38YiT8ntApJkESHNEE=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-8\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBEgTUYqGHnNt3k222TgTPsYWkHgm3bWf3334QC4VJKuizBL6NSllR0wHG/LKHE+JWnrEQgVEusZptgiPy+kln+o=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-8\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBEgTUYqGHnNt3k222TgTPsYWkHgm3bWf3334QC4VJKuizBL6NSllR0wHG/LKHE+JWnrEQgVEusZptgiPy+kln+o=\nxUtPhfFN2qTLr8hX\n1IseT3agLj0IxzhZMoJ1ndcw6NR2uODQ44VdQyTS9KZSQMDXzEyvfldZuOd1R8qw",
+        "ephemeralPrivateB64": "vqjNknv0/PU5YyPTiiLM5Wbu1M9IsX4HPYNO5VrFNO4=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "9p/BQzx4Nm6b/iiG8udBOpHoWEmVRSKvKiQYCVn+CeM=",
+        "derivedKeyB64": "itLgo6A9EjD9pUgmvaQiidkO4C6GIKlfMSu3QIKDrbw=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ROTATION",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "rotation-older-history-key",
+      "note": "seq 7 (hk2) suit bien un REVOKE et le lecteur détient hk1, mais l’enveloppe porte hk3.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [],
+        "heldHkPubB64": "BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "rotation-7",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BDOyaFvWsKkuNCjh7Gqgtt66EKgg68xeI4TmEtVSk6coiQeevMxxvXSj4aY9a5cEaigsG62ZY6CjCZhvXj6LECs=",
+        "nonceB64": "ZALfJ87MG/TECzlL",
+        "wrappedB64": "NSmyxpC6atFabPsnVoJnH7hUjedKvxt2gjq9BAg1llkOZo+NobDM4vVoI9KLkMlx",
+        "signatureB64": "MEUCIQCI4St2pZM6O55B8+bVnZ8En7KHkMaNqf84VG7wiHvjjQIgekRI9BNVgxM2Rxm2GfpDQWUQvMTFANcR4XHrJ3qyKNA="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-7\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "kz/zCclvtJ9701nnWyvkH9QzySWfdigvUBRgDt+N3EY=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-7\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBDOyaFvWsKkuNCjh7Gqgtt66EKgg68xeI4TmEtVSk6coiQeevMxxvXSj4aY9a5cEaigsG62ZY6CjCZhvXj6LECs=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-7\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBDOyaFvWsKkuNCjh7Gqgtt66EKgg68xeI4TmEtVSk6coiQeevMxxvXSj4aY9a5cEaigsG62ZY6CjCZhvXj6LECs=\nZALfJ87MG/TECzlL\nNSmyxpC6atFabPsnVoJnH7hUjedKvxt2gjq9BAg1llkOZo+NobDM4vVoI9KLkMlx",
+        "ephemeralPrivateB64": "PEIY3i+tz3WFQH7YKjjLv9f546IyXPxpru7sQjEUCwQ=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "5QPFqxaB0vap9kuMX5H3LwjFuONc1e8XZNbHfXd0wzE=",
+        "derivedKeyB64": "E0E/s5qv73sz2r8mAi165YpogASsqjEGo78bo5zuLwI=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ROTATION",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "rotation-not-after-revoke",
+      "note": "Journal hk4WithoutRevoke : hk4 (seq 14) ne suit aucun REVOKE.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [],
+        "heldHkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "log": "hk4WithoutRevoke",
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "rotation-14",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "ephemeralB64": "BBTcqGfyvxmjp3ir9en5QXCCb7Qffho6Tdle/s0c3Yqb4aBT8AXwtgnbfB+ORJibSLs+L40tJjjo/V06IVrNikE=",
+        "nonceB64": "k22u4HFfpXGuXbyB",
+        "wrappedB64": "Pu00fruF67Gr+PUuH1gDe70zfnukApF3wVgQCLtGneo8FbfM1G/9FjkpirbT0Om8",
+        "signatureB64": "MEUCIQC6rVG72+JVjMQL+a6hZtEWEpU++JEGccpETXk4Z/CG9QIgDIqcVlTNEK16qEgJlRMYlZv+LZ5z5UElJsYpYouzgJw="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-14\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "bAWYeexhHGJqZ53zktgQ2C8s63DcAvtIKbOPvLLoNr8=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-14\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\nBBTcqGfyvxmjp3ir9en5QXCCb7Qffho6Tdle/s0c3Yqb4aBT8AXwtgnbfB+ORJibSLs+L40tJjjo/V06IVrNikE=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nrotation-14\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\nBBTcqGfyvxmjp3ir9en5QXCCb7Qffho6Tdle/s0c3Yqb4aBT8AXwtgnbfB+ORJibSLs+L40tJjjo/V06IVrNikE=\nk22u4HFfpXGuXbyB\nPu00fruF67Gr+PUuH1gDe70zfnukApF3wVgQCLtGneo8FbfM1G/9FjkpirbT0Om8",
+        "ephemeralPrivateB64": "RZ5Bx/GaeGsJlStomAHR4KTr7z8YYpAD2sfe/BlUzYo=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "N0/hXedvE65ActDPiTu1wgk4JeuYnL32F+mk+9kYwmo=",
+        "derivedKeyB64": "LjDTkOM7Vy1kzQWg/JfnsAgO1S7uYYjEPrBvndNNMHU=",
+        "plaintextScalarB64": "hLtFXT0mANaOnPbSXhV/w6UmpKDXuuEwMTyAzlrml44="
+      },
+      "expect": {
+        "check": "ROTATION",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "rotation-not-after-revoke-as-request",
+      "note": "Témoin : la même hk4 servie sur une demande « C’est moi » est acceptée.",
+      "reader": {
+        "kind": "device",
+        "deviceId": "device_alice_w2_000002",
+        "keyVersions": [
+          2,
+          1
+        ],
+        "openRequestIds": [
+          "histreq_alice_w2_00001"
+        ],
+        "heldHkPubB64": null
+      },
+      "log": "hk4WithoutRevoke",
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "ephemeralB64": "BARvAOdZQ3msRnTOXfhMOo+AEHGMI2c1H2KgMQ9m2rOmF2KUUGF4nxWnFR7NinkcyQYp9SKhQtcqeQBLfVyBsfc=",
+        "nonceB64": "OkAJYqxRiMqVIb+Z",
+        "wrappedB64": "ZXqNpVJ0oLMkcREHpNg2Gk5HAbpdPk8gj8WIQKFonoRiAkgD5t+ChYxiAMaACKTY",
+        "signatureB64": "MEUCIQDlADwoxEVWzBUISvhKRaBa7Cmtb8JKZhLlHUEWYPOROwIgJvUPS2GzrD2Nh2ggYUdZcmeyLQeE+eb8bNHuPavZNI0="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "saltB64": "1hym5R6KXsahXtU10p9JT/f6T+JdrTiFEy0KTo1azj0=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\nBARvAOdZQ3msRnTOXfhMOo+AEHGMI2c1H2KgMQ9m2rOmF2KUUGF4nxWnFR7NinkcyQYp9SKhQtcqeQBLfVyBsfc=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\ndevice_alice_w2_000002\n2\nhistreq_alice_w2_00001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nBLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\nBARvAOdZQ3msRnTOXfhMOo+AEHGMI2c1H2KgMQ9m2rOmF2KUUGF4nxWnFR7NinkcyQYp9SKhQtcqeQBLfVyBsfc=\nOkAJYqxRiMqVIb+Z\nZXqNpVJ0oLMkcREHpNg2Gk5HAbpdPk8gj8WIQKFonoRiAkgD5t+ChYxiAMaACKTY",
+        "ephemeralPrivateB64": "gnS6+leeqlLJriZZJiNUiGgk61htv4zgyfp8WrWudnA=",
+        "recipientAgreementPublicB64": "BGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=",
+        "sharedSecretB64": "hG/UytRhhRFOtP+WXc5nGdSVIXd/liLZnrlCsWTY3MI=",
+        "derivedKeyB64": "s6YCiWF4mQFEB6yNA0Ttgj4vYUhYAtQd9sbOF+sZcsA=",
+        "plaintextScalarB64": "hLtFXT0mANaOnPbSXhV/w6UmpKDXuuEwMTyAzlrml44="
+      },
+      "expect": {
+        "check": "ok",
+        "plaintextMatches": true
+      }
+    },
+    {
+      "name": "chain-wrong-recipient",
+      "note": "Maillon adressé à hk2, lu par le détenteur de hk3.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "history:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=",
+        "ephemeralB64": "BH1FpDbB+u2V2/+P4F+1nbigDnBANfa361Ml5YujOuDRO9Oq7Sj8SRTtoxcmgNf1NZO7Gud1r70ZvBKKegnB6MQ=",
+        "nonceB64": "FFif9P/sbGbCFZtp",
+        "wrappedB64": "l6e6jyB2jISXmqoFTqsLOpeu3j67OcLgUjISLic0CyKMPLB8vyru/KVu2nBzHuIu",
+        "signatureB64": "MEQCIG5KT9w3vnGBrkvTpNGA1m+08rcpjS+5iugHb10iYXGrAiAiUAydgTHhyqtSS5chtz933iLDReRmALLf56UZD11sAQ=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "+Z1zCg9wKDeiAIdMyyQ7HIXWoSoS336DQsAfTU4vdLs=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=\nBH1FpDbB+u2V2/+P4F+1nbigDnBANfa361Ml5YujOuDRO9Oq7Sj8SRTtoxcmgNf1NZO7Gud1r70ZvBKKegnB6MQ=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=\nBH1FpDbB+u2V2/+P4F+1nbigDnBANfa361Ml5YujOuDRO9Oq7Sj8SRTtoxcmgNf1NZO7Gud1r70ZvBKKegnB6MQ=\nFFif9P/sbGbCFZtp\nl6e6jyB2jISXmqoFTqsLOpeu3j67OcLgUjISLic0CyKMPLB8vyru/KVu2nBzHuIu",
+        "ephemeralPrivateB64": "WHwwlitVhuFpsFjTdMmz2oAfNKZBE+ZhrK7btH3Gl2Y=",
+        "recipientAgreementPublicB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "sharedSecretB64": "NxevCgHEjlMjm+xEZ6QRducqqll33pXKgLU4+dsXRHk=",
+        "derivedKeyB64": "99fVYlHlAwdgVd0StoZL/GRWhaRtS8jKyczbBoBfYxc=",
+        "plaintextScalarB64": "2p2ktDH0gOfdeGJ7KNH9aSOrXHVERP4xmhozOxNstJs="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-unknown-history-key",
+      "note": "Le lecteur détient une HK absente du journal.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "history:BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BB4l+tyG484fp8n1k6mahjtQb7Mb8hk0zsFwaGzl1/duJNyaT34jCLNe/Tj56WhbDsiY4/0u6ZSqd9DVo16LweU=",
+        "nonceB64": "OjzA0fq1GdzpaB/d",
+        "wrappedB64": "UINxhhRyNpyVUob6x7Tp2mMcTcJcTAVX81hL4O9pRCYF0O5v7XNPsh2dBgqlhVX/",
+        "signatureB64": "MEUCIQDetmdPnR4fn5R3ShQZ7td7jp2KbcWziYhVTzMaxUnQ1wIgWhaGRZfg0/uADCHikjdnpBipWHk/eNJKNnW1n2l4kZk="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "ETf3b3Ajx8PPqoVjZPQcLQo9MDMQnvctA7hBxONymFE=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBB4l+tyG484fp8n1k6mahjtQb7Mb8hk0zsFwaGzl1/duJNyaT34jCLNe/Tj56WhbDsiY4/0u6ZSqd9DVo16LweU=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBB4l+tyG484fp8n1k6mahjtQb7Mb8hk0zsFwaGzl1/duJNyaT34jCLNe/Tj56WhbDsiY4/0u6ZSqd9DVo16LweU=\nOjzA0fq1GdzpaB/d\nUINxhhRyNpyVUob6x7Tp2mMcTcJcTAVX81hL4O9pRCYF0O5v7XNPsh2dBgqlhVX/",
+        "ephemeralPrivateB64": "itI1arhJICGOljW/eTa8MEY4eZ/g9cPK0Qo3KWOH7OA=",
+        "recipientAgreementPublicB64": "BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=",
+        "sharedSecretB64": "c2BOJ+3sI1MYViW7x7TqOhZNvVVMyT04KTzpSa5ZSLs=",
+        "derivedKeyB64": "qo+RHM/z0bEEpYwceflAeuCpNm5VTWMp4IlTHl5ipMU=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "RECIPIENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-wrong-add-hash",
+      "note": "addHash de la HISTORY_KEY de hk2 au lieu de hk3.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "history:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "kL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BFyxLpUyRzjKxP1W1QQwhGRUXKMTDE8/1pX7JDa2BeLaCzik/7WTooiaDtHrkeFG+UZMEgZ6N/gPiWCC/52Zy1M=",
+        "nonceB64": "iSIAA9dIOwS8DHGm",
+        "wrappedB64": "CFDonx7W4GhKcsncQYLwyqUqdM9AxEy4IIZd4BEJPRCq8yXFa6N1Ohc2qeS5bvyH",
+        "signatureB64": "MEUCIQCf2SyPfRo4Sz20jz0DBTIT/jTBSsIbg51xiRk1fpV9WQIgZyPlQsM8rkLFsWc8V/LZXxFyz5yrEFrCCqerNIPBh2M="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY",
+        "saltB64": "vHT/6smq4YsjFtmv84h+MpsSw+bTdcr6rHXccF52FvE=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBFyxLpUyRzjKxP1W1QQwhGRUXKMTDE8/1pX7JDa2BeLaCzik/7WTooiaDtHrkeFG+UZMEgZ6N/gPiWCC/52Zy1M=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBFyxLpUyRzjKxP1W1QQwhGRUXKMTDE8/1pX7JDa2BeLaCzik/7WTooiaDtHrkeFG+UZMEgZ6N/gPiWCC/52Zy1M=\niSIAA9dIOwS8DHGm\nCFDonx7W4GhKcsncQYLwyqUqdM9AxEy4IIZd4BEJPRCq8yXFa6N1Ohc2qeS5bvyH",
+        "ephemeralPrivateB64": "tAJGkmUULTnQT5EI2CeyG4gR9z49paYy49fZw9JDBYI=",
+        "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "sharedSecretB64": "fkANYL/85ZMmETK7sZRLMeNXsSSxhB8D8EZ2LnEv740=",
+        "derivedKeyB64": "wLpU4wZRrDYyKta00QnRQhTjoAKAC21kdZ0GzMmT3MY=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "ADD_HASH",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-from-first-history-key",
+      "note": "hk1 est la première HK : rien ne la précède.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "history:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "ne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U",
+        "hkPubB64": "BEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=",
+        "ephemeralB64": "BNJWVDftUqP1En4QWXU2fmW2Ata5Hk48mKs4ai5EJ0LAWM2m7rr8+GTXqoejnm6C4ee0wnVfpcasKZNV+dzHvtc=",
+        "nonceB64": "OiAP5yMXECW19fzK",
+        "wrappedB64": "nEgRgrxn3ZvHf+Qcpuqw9gCkTN89KCcg6BW4CCIKLVXZdZ5v+NiNkWXTFS7gPiNo",
+        "signatureB64": "MEUCIQDqaZjt871+PBJKISx4yFdf7G1RsYEspnIFL8bfWSfCZgIgB19CPi1rsJ4HLo8Ida2hvhJ9UbS65t35hyVARV5dNlw="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=\n1\nchain\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U",
+        "saltB64": "XF1u9kDId9THMXmvSJRmPpU9cxko+FkwsCxDaas0hwU=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=\n1\nchain\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\nBEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=\nBNJWVDftUqP1En4QWXU2fmW2Ata5Hk48mKs4ai5EJ0LAWM2m7rr8+GTXqoejnm6C4ee0wnVfpcasKZNV+dzHvtc=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=\n1\nchain\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\nBEWXjZbyq3JoYyLfu/WEjciZMM15y4V5mQz38gljCvwO43WWP9aNyfC7poE7Msjkw++1K/zFFLljN+bXs1HjUG4=\nBNJWVDftUqP1En4QWXU2fmW2Ata5Hk48mKs4ai5EJ0LAWM2m7rr8+GTXqoejnm6C4ee0wnVfpcasKZNV+dzHvtc=\nOiAP5yMXECW19fzK\nnEgRgrxn3ZvHf+Qcpuqw9gCkTN89KCcg6BW4CCIKLVXZdZ5v+NiNkWXTFS7gPiNo",
+        "ephemeralPrivateB64": "us8Rf0FP8eJPkR7xosbcs030c+njIOAUkHsgsv7zgd4=",
+        "recipientAgreementPublicB64": "BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=",
+        "sharedSecretB64": "VofhCTEkGltQDVS/ZZ5OiJj+PnPycpW+DYlMLtMGiLc=",
+        "derivedKeyB64": "XGUa4YYvNT/4klqZE/9qry1/MZsnyojdTVJpKAdW2WE=",
+        "plaintextScalarB64": "3287RrzQ3IOOe/0dZKp217AwNvIAG5hGxPyXERIrc3o="
+      },
+      "expect": {
+        "check": "CHAIN",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-bad-signature",
+      "note": "Maillon signé par une clé étrangère.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "history:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BAN9bdCxJRJWZnzCFJqRa7h5Y97JcD1XJ7LHcVqELDfA9jNV7jRmADzflQwlMpLwgtj73k9QLFYkMRaWxKC7LY8=",
+        "nonceB64": "xQF3dSFUaO/x+G6q",
+        "wrappedB64": "qFQghQMr5FExD+BOIrIJXOd2JVMFxhveMFAvbAF7n9D8QVhcqu603AIpqyzog85/",
+        "signatureB64": "MEUCIQDcBCxzGQQwYus009EL8te5amlU0Jl9oAliaMYrhR2vdQIgNHajkyem6+bp9Q8Gtd/HQcuLj9wTQWFlVJ2dZUViCY8="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "gHADMCrVsQ1mH/Imn1He+irmC6w1W4JZqldUnnBXRa8=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBAN9bdCxJRJWZnzCFJqRa7h5Y97JcD1XJ7LHcVqELDfA9jNV7jRmADzflQwlMpLwgtj73k9QLFYkMRaWxKC7LY8=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w1_000001\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBAN9bdCxJRJWZnzCFJqRa7h5Y97JcD1XJ7LHcVqELDfA9jNV7jRmADzflQwlMpLwgtj73k9QLFYkMRaWxKC7LY8=\nxQF3dSFUaO/x+G6q\nqFQghQMr5FExD+BOIrIJXOd2JVMFxhveMFAvbAF7n9D8QVhcqu603AIpqyzog85/",
+        "ephemeralPrivateB64": "C73BkYaDiJu+fn8RmxbfZIirE5Rp0qecK9x0n/xnNQM=",
+        "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "sharedSecretB64": "7o0M56P4TJuZO6r0sOzuIhSvNPWrlLx413BaPOkYOv0=",
+        "derivedKeyB64": "8xOzB6RbyIKDIGKUD6kdjEONF8ujTRcuosIGH6p0RhM=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "SIGNATURE",
+        "plaintextMatches": null
+      }
     }
   ],
   "invalidObjects": [
@@ -984,6 +1626,83 @@
         "nonceB64": "1VgVt9ccKxlZLbIH",
         "wrappedB64": "Hek2r0b+zcHGRaLsh6fA+vEbzDo4r7fIi5HPxyGGaIzI7X/3om2BeVAl9pmrqPEn",
         "signatureB64": "MEQCICJ1RgaVbFc6J4dnizchNXV5z2A5ii+lbHnJvNPWHF0/AiBISAjSmONWzEw7Et8Ced4OfoIOKuN7WAC1vb2TRtaqBg=="
+      }
+    },
+    {
+      "name": "recipient en nombre",
+      "value": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": 7,
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=",
+        "nonceB64": "HZnMr3JTZDYXCGqg",
+        "wrappedB64": "hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi",
+        "signatureB64": "MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8="
+      }
+    },
+    {
+      "name": "requestId en tableau",
+      "value": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": [
+          "rotation-10"
+        ],
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=",
+        "nonceB64": "HZnMr3JTZDYXCGqg",
+        "wrappedB64": "hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi",
+        "signatureB64": "MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8="
+      }
+    },
+    {
+      "name": "addHash qui n’est pas un condensat",
+      "value": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "abc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=",
+        "nonceB64": "HZnMr3JTZDYXCGqg",
+        "wrappedB64": "hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi",
+        "signatureB64": "MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8="
+      }
+    },
+    {
+      "name": "hkPub hors courbe",
+      "value": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflg=",
+        "ephemeralB64": "BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=",
+        "nonceB64": "HZnMr3JTZDYXCGqg",
+        "wrappedB64": "hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi",
+        "signatureB64": "MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8="
+      }
+    },
+    {
+      "name": "signatureB64 en nombre",
+      "value": {
+        "senderDeviceId": "device_alice_w1_000001",
+        "recipient": "device_alice_w2_000002",
+        "keyVersion": 2,
+        "requestId": "histreq_alice_w2_00001",
+        "addHash": "LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=",
+        "nonceB64": "HZnMr3JTZDYXCGqg",
+        "wrappedB64": "hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi",
+        "signatureB64": 5
       }
     },
     {

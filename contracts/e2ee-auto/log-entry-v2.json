@@ -163,6 +163,26 @@
     {
       "name": "clé au dernier caractère b64 changé (point hors courbe)",
       "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEA=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000"
+    },
+    {
+      "name": "LOG_KEY avec un userId",
+      "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_alice_00000000001\n-\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
+    },
+    {
+      "name": "LOG_KEY avec un prevUserEntryHash",
+      "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\n-\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
+    },
+    {
+      "name": "clé de signature hors courbe",
+      "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\n1\n-\n1790003600000"
+    },
+    {
+      "name": "userId qui n’est pas opaque",
+      "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nalice\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000"
+    },
+    {
+      "name": "prevUserEntryHash qui n’est pas un condensat",
+      "text": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nx\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000"
     }
   ],
   "highSSignatureDetail": {

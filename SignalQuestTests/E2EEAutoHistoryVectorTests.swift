@@ -22,27 +22,33 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         try XCTUnwrap(Data(base64Encoded: try string(object, key)), key)
     }
 
-    /// Journal vérifié du compte d'Alice sur lequel les enveloppes sont jugées.
-    private func verifiedAccount(_ vectors: [String: Any]) throws -> E2EEAutoLog.AccountState {
-        let log = try XCTUnwrap(vectors["log"] as? [String: Any])
+    /// Journal vérifié du compte d'Alice sur lequel les enveloppes sont jugées ;
+    /// `variant` : un journal de `logVariants`, sur la même clé, sans tête propre.
+    private func verifiedAccount(_ vectors: [String: Any], variant: String? = nil) throws -> E2EEAutoLog.AccountState {
+        let main = try XCTUnwrap(vectors["log"] as? [String: Any])
+        let log = try variant.map { try XCTUnwrap((vectors["logVariants"] as? [String: Any])?[$0] as? [String: Any], $0) } ?? main
         let links = try XCTUnwrap(log["links"] as? [String])
-        XCTAssertEqual((log["logKeyEntries"] as? [String: String])?.isEmpty, true)
+        XCTAssertEqual((main["logKeyEntries"] as? [String: String])?.isEmpty, true)
         let chain = try E2EEAutoLog.extendChain(
-            .initial(pinnedLogKeyB64: try string(log, "pinnedLogKeyB64")), links: links, logKeyEntries: [:]
+            .initial(pinnedLogKeyB64: try string(main, "pinnedLogKeyB64")), links: links, logKeyEntries: [:]
         ).get()
-        let head = try XCTUnwrap(log["head"] as? [String: Any])
-        let check = E2EEAutoLog.checkHead(
-            text: try string(head, "text"), signatureB64: try string(head, "signatureB64"), logKeyB64: chain.logKeyB64,
-            nowMs: try XCTUnwrap((log["headNowMs"] as? NSNumber)?.int64Value)
-        )
-        guard case let .ok(verifiedHead) = check else { throw XCTSkip("tête : \(check)") }
-        XCTAssertEqual(E2EEAutoLog.compare(head: verifiedHead, to: chain), .match)
+        if variant == nil { try checkHead(main, chain: chain) }
         let account = try XCTUnwrap(log["account"] as? [String: Any])
         let bySeq = try Dictionary(uniqueKeysWithValues: links.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
         return try E2EEAutoLog.verifyAccount(
             userId: try string(account, "userId"), accountSaltB64: try string(account, "accountSaltB64"),
             entries: try XCTUnwrap(account["entries"] as? [String]), links: bySeq, chain: chain
         ).get()
+    }
+
+    private func checkHead(_ log: [String: Any], chain: E2EEAutoLog.ChainState) throws {
+        let head = try XCTUnwrap(log["head"] as? [String: Any])
+        let check = E2EEAutoLog.checkHead(
+            text: try string(head, "text"), signatureB64: try string(head, "signatureB64"), logKeyB64: chain.logKeyB64,
+            nowMs: try XCTUnwrap((log["headNowMs"] as? NSNumber)?.int64Value)
+        )
+        guard case let .ok(verifiedHead) = check else { return XCTFail("tête : \(check)") }
+        XCTAssertEqual(E2EEAutoLog.compare(head: verifiedHead, to: chain), .match)
     }
 
     private func reader(_ object: [String: Any]) throws -> E2EEAutoHistory.Reader {
@@ -57,7 +63,8 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         case "history":
             return .history(hkPubB64: try string(object, "hkPubB64"))
         default:
-            throw XCTSkip("lecteur inconnu")
+            XCTFail("lecteur inconnu")
+            throw CocoaError(.coderInvalidValue)
         }
     }
 
@@ -71,13 +78,14 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         let secrets = try XCTUnwrap(vectors["secrets"] as? [String: Any])
         // Clés privées d'accord du lecteur : A2 par version de clé, et chaque HK par sa clé publique.
         var historyScalars: [String: Data] = [:]
-        for name in ["hk1ScalarB64", "hk2ScalarB64", "hk3ScalarB64"] {
+        for name in ["hk1ScalarB64", "hk2ScalarB64", "hk3ScalarB64", "hk4ScalarB64", "hkUnknownScalarB64"] {
             let scalar = try bytes(secrets, name)
             historyScalars[try XCTUnwrap(E2EEAutoHistoryKey.publicKeyB64(scalar: scalar))] = scalar
         }
 
         let cases = try XCTUnwrap(vectors["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 19)
+        XCTAssertEqual(cases.count, 34)
+        var variants: [String: E2EEAutoLog.AccountState] = [:]
         for testCase in cases {
             let name = try string(testCase, "name")
             let object = try XCTUnwrap(testCase["wrap"] as? [String: Any], name)
@@ -127,9 +135,16 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
                 XCTAssertEqual(sealed, wrap, name)
             }
 
-            // Côté lecteur : verdict avant tout déchiffrement.
+            // Côté lecteur : verdict avant tout déchiffrement, sur le journal du cas
+            // et, s'il le fixe, pour un autre compte que celui de l'enveloppe.
+            var judged = account
+            if let variant = testCase["log"] as? String {
+                if variants[variant] == nil { variants[variant] = try verifiedAccount(vectors, variant: variant) }
+                judged = try XCTUnwrap(variants[variant], name)
+            }
             let verdict = E2EEAutoHistory.check(
-                userId: userId, wrap: wrap, account: account, reader: try reader(try XCTUnwrap(testCase["reader"] as? [String: Any]))
+                userId: testCase["checkUserId"] as? String ?? userId, wrap: wrap, account: judged,
+                reader: try reader(try XCTUnwrap(testCase["reader"] as? [String: Any]))
             )
             XCTAssertEqual(verdict?.rawValue ?? "ok", try string(expect, "check"), name)
             guard verdict == nil else { continue }
