@@ -241,8 +241,8 @@ actor E2EEAutoLogReader {
     static let productionLogKeys: (current: String, next: [String])? = nil
 
     typealias FetchLinks = @Sendable (_ after: Int64) async throws -> (data: Data, serverDate: Date?)
-    /// nil : compte non servi (404).
-    typealias FetchAccount = @Sendable (_ userId: String, _ after: Int64) async throws -> Data?
+    /// Entrées de seq dans `]after, upTo]` ; nil : compte non servi (404).
+    typealias FetchAccount = @Sendable (_ userId: String, _ after: Int64, _ upTo: Int64) async throws -> Data?
 
     private let ownerScopeId: String
     private let pinnedLogKeyB64: String
@@ -297,10 +297,11 @@ actor E2EEAutoLogReader {
                 case .failure(let failure): throw failure
                 }
             },
-            fetchAccount: { userId, after in
+            fetchAccount: { userId, after, upTo in
                 guard E2EEV2Canonical.isOpaque(userId) else { return nil }
                 let result = await transport.getSessionJSON(
-                    path: "/api/e2ee/auto/log/accounts/\(userId)", query: [URLQueryItem(name: "after", value: String(after))],
+                    path: "/api/e2ee/auto/log/accounts/\(userId)",
+                    query: [URLQueryItem(name: "after", value: String(after)), URLQueryItem(name: "upTo", value: String(upTo))],
                     expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle
                 )
                 switch result {
@@ -327,29 +328,53 @@ actor E2EEAutoLogReader {
         let state = rebuiltChain(file, anchor: anchor)
         if state == nil { file = E2EEAutoLogStore.LogFile() }
         var chainState = state ?? .initial(pinnedLogKeyB64: pinnedLogKeyB64, nextLogKeysB64: nextLogKeysB64)
+        // Chaîne partie de la tête gardée ; sinon relue depuis 1, et la tête gardée se contrôle à la fin.
+        var fromKept = state != nil
+        var previousHeadSeq: Int64?
 
         for _ in 0..<Self.maxLinkPages {
             let (data, serverDate) = try await fetchLinks(chainState.seq)
             let receivedAtMs = nowMs
             guard let page = E2EEAutoLogPages.parseLinks(data) else { throw Failure.malformed }
+            // La tête peut avancer d'une page à l'autre, jamais reculer (révision 6).
+            let after = chainState.seq
+            if let headSeq = E2EEAutoLog.parseHead(page.headText)?.seq {
+                if let previousHeadSeq, headSeq < previousHeadSeq { throw Failure.malformed }
+                previousHeadSeq = headSeq
+                // Page qui contredit sa tête : non concluante. Une page vide sous `after` va à la
+                // vérification : valide, c'est un retour en arrière (révision 6).
+                if page.links.isEmpty ? headSeq > after : headSeq <= after { throw Failure.malformed }
+            }
             switch E2EEAutoLog.extendChain(chainState, links: page.links, logKeyEntries: page.logKeyEntries) {
             case .success(let extended):
                 chainState = extended
-            case .failure(let failure) where failure.error == .linkPrevHash && failure.seq == chainState.seq + 1:
-                // Le serveur ne prolonge pas ce qui est gardé : une autre histoire.
-                return try raise(.init(error: .fork, seq: chainState.seq), anchor: anchor)
+            case .failure(let failure) where failure.error == .linkPrevHash && fromKept && after == state?.seq:
+                // Le serveur ne prolonge pas la tête gardée. Fourche seulement si une tête vérifiée
+                // le prouve (révision 6) : relecture depuis 1, puis contrôle de la tête gardée.
+                (file, chainState, fromKept) = (E2EEAutoLogStore.LogFile(), .initial(pinnedLogKeyB64: pinnedLogKeyB64, nextLogKeysB64: nextLogKeysB64), false)
+                continue
             case .failure(let failure):
                 throw Failure.invalidChain(failure)
             }
+            // Exactement une entrée `LOG_KEY` par maillon de tag `-` de la page, pas une de plus.
+            let logKeySeqs = page.links.compactMap(E2EEAutoLog.parseLink).filter(\.isLogKey).map(\.seq)
+            guard Set(page.logKeyEntries.keys) == Set(logKeySeqs) else { throw Failure.malformed }
             file.links += page.links
             for (seq, entry) in page.logKeyEntries { file.logKeyEntries[String(seq)] = entry }
             if page.hasMore {
-                guard !page.links.isEmpty else { throw Failure.malformed }
+                // `hasMore` si et seulement si le dernier maillon précède la tête.
+                guard !page.links.isEmpty, let headSeq = previousHeadSeq, chainState.seq < headSeq else { throw Failure.malformed }
                 continue
             }
+            let headSeq = E2EEAutoLog.parseHead(page.headText)?.seq
+            // Un dernier maillon autre que la tête : page incohérente, pas un retour en arrière.
+            if !page.links.isEmpty && headSeq != chainState.seq { throw Failure.malformed }
             if let serverDate { clockOffsetMs = Int64((serverDate.timeIntervalSince1970 * 1_000).rounded(.down)) - receivedAtMs }
+            // Une tête en arrière se vérifie avec la clé du journal en vigueur à son `seq`.
+            var logKeyB64 = chainState.logKeyB64
+            if let headSeq, headSeq < chainState.seq, let earlier = fileChain(file, upTo: headSeq) { logKeyB64 = earlier.logKeyB64 }
             let check = E2EEAutoLog.checkHead(
-                text: page.headText, signatureB64: page.headSignatureB64, logKeyB64: chainState.logKeyB64, nowMs: receivedAtMs
+                text: page.headText, signatureB64: page.headSignatureB64, logKeyB64: logKeyB64, nowMs: receivedAtMs
             )
             let head: E2EEAutoLog.Head
             switch check {
@@ -362,7 +387,7 @@ actor E2EEAutoLogReader {
             case .failure(let error): return try raise(.init(error: error, seq: head.seq), anchor: anchor)
             }
             // Le fichier perdu a été relu depuis 1 : la tête gardée doit en faire partie.
-            if let anchor, state == nil {
+            if let anchor, !fromKept {
                 guard anchor.seq <= chainState.seq else { return try raise(.init(error: .rollback, seq: chainState.seq), anchor: anchor) }
                 let kept = anchor.seq == 0 ? E2EEAutoLog.genesisHash : E2EEAutoLog.digest(file.links[Int(anchor.seq) - 1])
                 guard kept == anchor.linkHash else { return try raise(.init(error: .fork, seq: anchor.seq), anchor: anchor) }
@@ -382,15 +407,22 @@ actor E2EEAutoLogReader {
 
     /// La chaîne du fichier gardé, si elle mène exactement à la tête du trousseau.
     private func rebuiltChain(_ file: E2EEAutoLogStore.LogFile, anchor: E2EEAutoLogStore.Anchor?) -> E2EEAutoLog.ChainState? {
-        guard let anchor, Int64(file.links.count) == anchor.seq else { return nil }
+        guard let anchor, Int64(file.links.count) == anchor.seq,
+              let state = fileChain(file, upTo: anchor.seq), state.linkHash == anchor.linkHash else { return nil }
+        return state
+    }
+
+    /// L'état de la chaîne du fichier au maillon `seq`.
+    private func fileChain(_ file: E2EEAutoLogStore.LogFile, upTo seq: Int64) -> E2EEAutoLog.ChainState? {
+        guard seq >= 0, seq <= Int64(file.links.count) else { return nil }
         var entries: [Int64: String] = [:]
         for (key, entry) in file.logKeyEntries {
             guard let seq = Int64(key) else { return nil }
             entries[seq] = entry
         }
         let initial = E2EEAutoLog.ChainState.initial(pinnedLogKeyB64: pinnedLogKeyB64, nextLogKeysB64: nextLogKeysB64)
-        guard case .success(let state) = E2EEAutoLog.extendChain(initial, links: file.links, logKeyEntries: entries),
-              state.seq == anchor.seq, state.linkHash == anchor.linkHash else { return nil }
+        guard case .success(let state) = E2EEAutoLog.extendChain(initial, links: Array(file.links.prefix(Int(seq))), logKeyEntries: entries),
+              state.seq == seq else { return nil }
         return state
     }
 
@@ -416,11 +448,24 @@ actor E2EEAutoLogReader {
         // Les entrées gardées au-delà de la chaîne lue (fichier d'un autre état) sont relues.
         if after > chain.seq { (entries, after) = ([], 0) }
 
+        var pageSalt: String??
         for _ in 0..<Self.maxAccountPages {
-            guard let data = try await fetchAccount(userId, after) else { return nil }
+            guard let data = try await fetchAccount(userId, after, chain.seq) else { return nil }
             guard let page = E2EEAutoLogPages.parseAccount(data, userId: userId) else { throw Failure.malformed }
+            // Pages strictes : même sel sur toutes les pages (révision 6).
+            if let pageSalt, pageSalt != page.accountSaltB64 { throw Failure.malformed }
+            pageSalt = page.accountSaltB64
             salt = page.accountSaltB64
-            entries += page.entries
+            // Une entrée au-delà de la tête vérifiée attend la prochaine lecture des maillons :
+            // écartée sans erreur ni alerte (révision 6). Une entrée illisible reste, le vérificateur la refuse.
+            let kept = page.entries.filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) <= chain.seq }
+            // `seq` strictement croissants dans ]after, upTo], sans doublon.
+            var previous = after
+            for seq in kept.compactMap({ E2EEAutoLog.parseEntry($0)?.entry.seq }) {
+                guard seq > previous else { throw Failure.malformed }
+                previous = seq
+            }
+            entries += kept
             if page.hasMore {
                 guard let last = page.entries.last.flatMap({ E2EEAutoLog.parseEntry($0)?.entry.seq }), last > after else {
                     throw Failure.malformed

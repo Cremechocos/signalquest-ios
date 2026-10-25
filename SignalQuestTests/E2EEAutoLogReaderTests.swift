@@ -62,6 +62,16 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         var pageSize = 1_000
         var accounts: [String: (salt: String?, entries: [String])] = [:]
         var serverDate: Date?
+        /// Tête servie à chaque appel de log/links, dans l'ordre ; à défaut, `headText`.
+        var headsByCall: [(text: String, signatureB64: String)] = []
+        /// Un serveur qui ignore `upTo` et rend toutes les entrées après `after`.
+        var ignoresUpTo = false
+        /// Une fois, pour ce `after` : premier maillon dont le `prevLinkHash` ne suit pas.
+        var tamperedAfter: Int64?
+        var accountPageSize = 1_000
+        /// Sel servi à partir de la deuxième page d'un compte.
+        var saltAfterFirstPage: String?
+        var reversesEntries = false
         private(set) var linkAfters: [Int64] = []
         private(set) var accountAfters: [Int64] = []
 
@@ -74,8 +84,14 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         }
 
         func linksPage(after: Int64) -> Data {
+            let head = linkAfters.count < headsByCall.count ? headsByCall[linkAfters.count] : (text: headText, signatureB64: headSignatureB64)
             linkAfters.append(after)
-            let page = Array(links.dropFirst(Int(after)).prefix(pageSize))
+            var page = Array(links.dropFirst(Int(after)).prefix(pageSize))
+            if after == tamperedAfter, var lines = page.first?.components(separatedBy: "\n") {
+                tamperedAfter = nil
+                lines[3] = E2EEAutoLog.digest("autre histoire")
+                page[0] = lines.joined(separator: "\n")
+            }
             let last = Int(after) + page.count
             var entries: [String: String] = [:]
             for seq in (Int(after) + 1)..<(last + 1) where logKeyEntries[Int64(seq)] != nil {
@@ -83,18 +99,23 @@ final class E2EEAutoLogReaderTests: XCTestCase {
             }
             let object: [String: Any] = [
                 "links": page, "logKeyEntries": entries,
-                "head": ["text": headText, "signatureB64": headSignatureB64], "hasMore": last < links.count,
+                "head": ["text": head.text, "signatureB64": head.signatureB64], "hasMore": last < links.count,
             ]
             return try! JSONSerialization.data(withJSONObject: object)
         }
 
-        func accountPage(userId: String, after: Int64) -> Data? {
+        func accountPage(userId: String, after: Int64, upTo: Int64) -> Data? {
             accountAfters.append(after)
             guard let account = accounts[userId] else { return nil }
-            let entries = account.entries.filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) > after }
+            let remaining = account.entries.filter {
+                let seq = E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0
+                return seq > after && (ignoresUpTo || seq <= upTo)
+            }
+            let entries = Array(remaining.prefix(accountPageSize))
+            let salt = after > 0 ? saltAfterFirstPage ?? account.salt : account.salt
             let object: [String: Any] = [
-                "userId": userId, "accountSaltB64": account.salt.map { $0 as Any } ?? NSNull(),
-                "entries": entries, "hasMore": false,
+                "userId": userId, "accountSaltB64": salt.map { $0 as Any } ?? NSNull(),
+                "entries": reversesEntries ? entries.reversed() : entries, "hasMore": remaining.count > entries.count,
             ]
             return try! JSONSerialization.data(withJSONObject: object)
         }
@@ -112,7 +133,7 @@ final class E2EEAutoLogReaderTests: XCTestCase {
             ownerScopeId: Self.owner, pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64,
             store: store,
             fetchLinks: { after in (server.linksPage(after: after), server.serverDate) },
-            fetchAccount: { userId, after in server.accountPage(userId: userId, after: after) },
+            fetchAccount: { userId, after, upTo in server.accountPage(userId: userId, after: after, upTo: upTo) },
             now: { Date(timeIntervalSince1970: TimeInterval(nowMs) / 1_000) }
         )
     }
@@ -228,6 +249,116 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         XCTAssertEqual(rollback, .alert(.init(error: "ROLLBACK", seq: 16)))
     }
 
+    func testRecedingHeadBetweenPagesInvalidatesTheRead() async throws {
+        let reference = try reference(), server = Server(reference), store = makeStore()
+        let boundary = try boundaryHead(seq: 12)
+        server.pageSize = 5
+        server.headsByCall = [(reference.headText, reference.headSignatureB64), boundary]
+        let result = await status(makeReader(reference, server: server, store: store, nowMs: reference.headNowMs))
+        guard case .failure(let error) = result, case .malformed = error as? E2EEAutoLogReader.Failure else {
+            return XCTFail("tête 16 puis 12 : \(result)")
+        }
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner))
+    }
+
+    /// Les entrées au-delà de la tête vérifiée sont écartées avant le vérificateur, même si le serveur ignore `upTo`.
+    func testEntriesBeyondVerifiedHeadAreSetAside() async throws {
+        let reference = try reference(), server = Server(reference)
+        let boundary = try boundaryHead(seq: 12)
+        server.links = Array(reference.links.prefix(12))
+        (server.headText, server.headSignatureB64) = boundary
+        server.ignoresUpTo = true
+        let nowMs = try XCTUnwrap(E2EEAutoLog.parseHead(boundary.text)).createdAtMs
+        let reader = makeReader(reference, server: server, store: makeStore(), nowMs: nowMs)
+        let status = try await reader.refreshLinks()
+        guard case .current(let head) = status else { return XCTFail("tête 12 : \(status)") }
+        XCTAssertEqual(head.seq, 12)
+
+        let chain = try E2EEAutoLog.extendChain(
+            .initial(pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64),
+            links: server.links, logKeyEntries: [:]
+        ).get()
+        let bySeq = Dictionary(uniqueKeysWithValues: server.links.enumerated().map { (Int64($0.offset + 1), $0.element) })
+        for (userId, account) in reference.accounts {
+            XCTAssertTrue(account.entries.contains { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) > 12 }, userId)
+            let kept = account.entries.filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) <= 12 }
+            let expected = E2EEAutoLog.verifyAccount(userId: userId, accountSaltB64: account.salt, entries: kept, links: bySeq, chain: chain)
+            XCTAssertNotNil(try? expected.get(), userId)
+            let read = try await reader.account(userId)
+            XCTAssertEqual(read, expected, userId)
+        }
+    }
+
+    /// Lecteur qui garde la tête 12 (avant la LOG_KEY du maillon 13), sur le même magasin.
+    private func keepHead12(_ reference: Reference, store: E2EEAutoLogStore) async throws {
+        let server = Server(reference), boundary = try boundaryHead(seq: 12)
+        server.links = Array(reference.links.prefix(12))
+        (server.headText, server.headSignatureB64) = boundary
+        let nowMs = try XCTUnwrap(E2EEAutoLog.parseHead(boundary.text)).createdAtMs
+        let status = try await makeReader(reference, server: server, store: store, nowMs: nowMs).refreshLinks()
+        guard case .current = status else { return XCTFail("tête 12 : \(status)") }
+    }
+
+    /// Fourche seulement si une tête vérifiée la prouve (révision 6) : relecture depuis 1 d'abord.
+    func testFirstLinkNotExtendingKeptHeadIsRereadBeforeAnyAlert() async throws {
+        let reference = try reference(), store = makeStore()
+        try await keepHead12(reference, store: store)
+        let server = Server(reference)
+        server.tamperedAfter = 12
+        let status = try await makeReader(reference, server: server, store: store, nowMs: reference.headNowMs).refreshLinks()
+        XCTAssertEqual(status, .current(try XCTUnwrap(E2EEAutoLog.parseHead(reference.headText))))
+        XCTAssertEqual(server.linkAfters, [12, 0])
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert)
+    }
+
+    func testIncoherentPagesAreInconclusive() async throws {
+        let reference = try reference(), boundary = try boundaryHead(seq: 12)
+        func expectInconclusive(_ server: Server, store: E2EEAutoLogStore, keptSeq: Int64?, _ message: String) async throws {
+            let result = await status(makeReader(reference, server: server, store: store, nowMs: reference.headNowMs))
+            guard case .failure(let error) = result, case .malformed = error as? E2EEAutoLogReader.Failure else {
+                return XCTFail("\(message) : \(result)")
+            }
+            let anchor = try store.anchor(ownerScopeId: Self.owner)
+            XCTAssertEqual(anchor?.seq, keptSeq, message)
+            XCTAssertNil(anchor?.alert, message)
+        }
+
+        let extraEntry = Server(reference)
+        extraEntry.logKeyEntries[5] = reference.logKeyEntries[13]
+        try await expectInconclusive(extraEntry, store: makeStore(), keptSeq: nil, "entrée LOG_KEY en trop")
+
+        let shortHead = Server(reference)
+        (shortHead.headText, shortHead.headSignatureB64) = boundary
+        try await expectInconclusive(shortHead, store: makeStore(), keptSeq: nil, "dernier maillon 16, tête 12")
+
+        let store = makeStore()
+        try await keepHead12(reference, store: store)
+        let emptyAhead = Server(reference)
+        emptyAhead.links = Array(reference.links.prefix(12))
+        try await expectInconclusive(emptyAhead, store: store, keptSeq: 12, "page vide, tête 16 après 12")
+    }
+
+    /// Page vide sous une tête plus ancienne : vérifiée avec la clé de son `seq`, c'est un retour en arrière.
+    func testEmptyPageWithOlderVerifiedHeadIsRollback() async throws {
+        let reference = try reference(), store = makeStore()
+        _ = try await makeReader(reference, server: Server(reference), store: store, nowMs: reference.headNowMs).refreshLinks()
+        let server = Server(reference), boundary = try boundaryHead(seq: 12)
+        server.links = Array(reference.links.prefix(12))
+        (server.headText, server.headSignatureB64) = boundary
+        let status = try await makeReader(reference, server: server, store: store, nowMs: reference.headNowMs).refreshLinks()
+        XCTAssertEqual(status, .alert(.init(error: "ROLLBACK", seq: 12)))
+    }
+
+    /// Tête au seq 12 de `log-head-v2`, signée par la clé épinglée (avant la LOG_KEY du maillon 13).
+    private func boundaryHead(seq: Int64) throws -> (text: String, signatureB64: String) {
+        let boundaries = try XCTUnwrap(try load("log-head-v2")["boundaryHeads"] as? [[String: Any]])
+        let match = try XCTUnwrap(boundaries.first {
+            ($0["expect"] as? String) == "ok" && ($0["keptSeq"] as? NSNumber)?.int64Value == seq
+        })
+        let head = try XCTUnwrap(match["head"] as? [String: String])
+        return (try XCTUnwrap(head["text"]), try XCTUnwrap(head["signatureB64"]))
+    }
+
     func testClockOffsetFromDateHeader() async throws {
         let reference = try reference(), server = Server(reference)
         server.serverDate = Date(timeIntervalSince1970: TimeInterval(reference.headNowMs + 90_000) / 1_000)
@@ -279,6 +410,39 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         let withheld = try await reader.account(alice)
         guard case .failure(let failure)? = withheld else { return XCTFail("compte tu : \(String(describing: withheld))") }
         XCTAssertEqual(failure.error, .accountLinkMissing)
+    }
+
+    func testAccountPagesAreStrict() async throws {
+        let reference = try reference(), alice = "user_alice_00000000001", bob = "user_bob_0000000000002"
+        for (label, configure) in [
+            ("sel changé d'une page à l'autre", { (server: Server) in
+                server.accountPageSize = 1
+                server.saltAfterFirstPage = reference.accounts[bob]?.salt
+            }),
+            ("seq décroissants", { (server: Server) in server.reversesEntries = true }),
+        ] {
+            let server = Server(reference)
+            configure(server)
+            let reader = makeReader(reference, server: server, store: makeStore(), nowMs: reference.headNowMs)
+            _ = try await reader.refreshLinks()
+            do {
+                let read = try await reader.account(alice)
+                XCTFail("\(label) : \(String(describing: read))")
+            } catch E2EEAutoLogReader.Failure.malformed {
+            }
+        }
+    }
+
+    /// Sel sans maillon `ACCOUNT` : toléré sans entrée, sinon échec à la première entrée (révision 6).
+    func testSaltWithoutAccountLink() throws {
+        let reference = try reference(), alice = "user_alice_00000000001"
+        let account = try XCTUnwrap(reference.accounts[alice])
+        let initial = E2EEAutoLog.ChainState.initial(pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64)
+        let empty = E2EEAutoLog.verifyAccount(userId: alice, accountSaltB64: account.salt, entries: [], links: [:], chain: initial)
+        XCTAssertNotNil(try? empty.get())
+        let refused = E2EEAutoLog.verifyAccount(userId: alice, accountSaltB64: account.salt, entries: account.entries, links: [:], chain: initial)
+        let firstSeq = try XCTUnwrap(account.entries.first.flatMap { E2EEAutoLog.parseEntry($0)?.entry.seq })
+        XCTAssertEqual(refused, .failure(.init(error: .accountLinkMissing, seq: firstSeq)))
     }
 
     func testDeviceSetFromLog() async throws {

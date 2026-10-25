@@ -95,8 +95,10 @@ enum E2EEAutoHistory {
         if isHistoryRecipient(recipient) {
             guard requestId == chainRequest, keyVersion == 1, recipient != historyRecipientPrefix + hkPubB64 else { return nil }
         } else {
+            // `rotation-` se lit d'abord comme une rotation, jamais comme un opaque A.1 (révision 6).
             guard E2EEV2Canonical.isOpaque(recipient),
-                  E2EEV2Canonical.isOpaque(requestId) || rotationRequestSeq(requestId) != nil else { return nil }
+                  rotationRequestSeq(requestId) != nil || (!requestId.hasPrefix("rotation-") && E2EEV2Canonical.isOpaque(requestId))
+            else { return nil }
         }
         return Wrap(
             senderDeviceId: senderDeviceId, recipient: recipient, keyVersion: Int(keyVersion), requestId: requestId,

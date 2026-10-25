@@ -602,7 +602,10 @@ enum E2EEAutoLog {
         }
         guard E2EEV2Canonical.isOpaque(userId), isAccountSalt(accountSaltB64) else { return fail(.accountSalt) }
         guard let account = chain.accounts[accountId(userId: userId)] else {
-            return entries.isEmpty ? .success(AccountState(userId: userId, accountSaltB64: accountSaltB64)) : fail(.accountLinkMissing)
+            // Sel sans maillon `ACCOUNT` : toléré sans entrée, sinon échec à la première (révision 6).
+            return entries.isEmpty
+                ? .success(AccountState(userId: userId, accountSaltB64: accountSaltB64))
+                : fail(.accountLinkMissing, entries.first.flatMap(parseEntry)?.entry.seq)
         }
         guard account.saltCommitment == saltCommitment(accountSaltB64: accountSaltB64) else { return fail(.accountSalt, account.seq) }
 

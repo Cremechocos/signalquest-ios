@@ -169,6 +169,22 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         }
     }
 
+    /// Révision 6 : `rotation-` se lit d'abord comme une rotation ; un `rotation-0…` assez long pour
+    /// être un opaque A.1 reste refusé.
+    func testRotationPrefixIsNeverAnOpaqueRequestId() throws {
+        let vectors = try load("history-wrap-v1")
+        let cases = try XCTUnwrap(vectors["cases"] as? [[String: Any]])
+        let deviceCase = try XCTUnwrap(cases.first {
+            (($0["wrap"] as? [String: Any])?["recipient"] as? String).map { !E2EEAutoHistory.isHistoryRecipient($0) } == true
+        })
+        var object = try XCTUnwrap(deviceCase["wrap"] as? [String: Any])
+        for (requestId, accepted) in [("rotation-12", true), ("rotation-0000012", false), ("rotation-00000000012", false), ("rotation-12abcdefgh", false)] {
+            object["requestId"] = requestId
+            XCTAssertEqual(E2EEAutoHistory.parseWrap(object) != nil, accepted, requestId)
+        }
+        XCTAssertTrue(E2EEV2Canonical.isOpaque("rotation-0000012"), "16 caractères : un opaque A.1 valide")
+    }
+
     func testHistoryWrapRefusedObjects() throws {
         let vectors = try load("history-wrap-v1")
         for invalid in try XCTUnwrap(vectors["invalidObjects"] as? [[String: Any]]) {
