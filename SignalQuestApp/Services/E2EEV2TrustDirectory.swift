@@ -14,6 +14,9 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     /// avec une époque (`memberListVersions`, E.2) : le serveur refuse une
     /// époque bâtie sur une liste qui n'est plus la courante.
     var listVersions: [String: Int] = [:]
+    /// Journal auto (E2EE-AUTO §7.1) : `lastSeq` vérifié de chaque compte lu,
+    /// envoyé en `memberLogSeqs` à la place de `listVersions`.
+    var logSeqs: [String: Int64] = [:]
     /// Comptes supprimés (410 `E2EE_ACCOUNT_DELETED`, D.4 v0.4.30) : membres
     /// sans appareil, ni refusés ni à relire ; un administrateur les retire.
     var deleted: Set<String> = []

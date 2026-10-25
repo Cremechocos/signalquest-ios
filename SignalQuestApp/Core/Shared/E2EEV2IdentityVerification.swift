@@ -118,6 +118,10 @@ struct E2EEV2CertifiedDevice: Equatable, Sendable {
     let fingerprint: String
     /// Dernier document de capacités valide de l'appareil, s'il en a un.
     let capabilities: E2EEV2CapabilitiesDocument?
+    /// Appareil actif vérifié dans le journal auto (E2EE-AUTO §4.2) : pas de
+    /// document de capacités publié, toute app au-dessus de la version minimale
+    /// sait tout faire (§7) ; jamais mis à l'écart.
+    var verifiedByLog = false
 
     var signingKey: P256.Signing.PublicKey? {
         Data(base64Encoded: signingKeyB64).flatMap { try? P256.Signing.PublicKey(x963Representation: $0) }
@@ -128,6 +132,7 @@ struct E2EEV2CertifiedDevice: Equatable, Sendable {
     /// dans le futur, qui ne vieillirait jamais (v0.4.16). Il sort de
     /// l'intersection et des nouvelles époques.
     func isSidelined(nowMs: Int64) -> Bool {
+        if verifiedByLog { return false }
         guard let capabilities else { return true }
         return nowMs - capabilities.issuedAtMs >= E2EEV2IdentityVerification.capabilityFreshnessMs
             || capabilities.issuedAtMs - nowMs > E2EEV2IdentityVerification.capabilityFutureSkewMs

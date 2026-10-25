@@ -1973,6 +1973,33 @@ final class E2EEV2APITransport: @unchecked Sendable {
         )
     }
 
+    /// Lecture par session, avec la date de l'en-tête `Date` de la réponse :
+    /// l'écart d'horloge du journal auto (E2EE-AUTO §7.1) se mesure dessus.
+    func getSessionJSONWithServerDate(
+        path: String,
+        query: [URLQueryItem] = [],
+        expectedOwnerScopeId: String,
+        capabilitySet: E2EEV2RequestCapabilitySet
+    ) async -> (result: E2EEV2TransportResult<Data>, serverDate: Date?) {
+        var serverDate: Date?
+        let result = await execute(
+            path: path, query: query, method: .get, body: nil, contentType: nil,
+            expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: capabilitySet, signs: false,
+            onResponse: { serverDate = Self.httpDate($0.value(forHTTPHeaderField: "Date")) }
+        )
+        return (result, serverDate)
+    }
+
+    /// Date HTTP (RFC 9110, IMF-fixdate), sinon nil.
+    static func httpDate(_ header: String?) -> Date? {
+        guard let header else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return formatter.date(from: header)
+    }
+
     func postJSON(
         path: String,
         body: Data,
@@ -2178,7 +2205,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
         expectedOwnerScopeId: String,
         capabilitySet: E2EEV2RequestCapabilitySet,
         useResetCandidate: Bool = false,
-        signs: Bool = true
+        signs: Bool = true,
+        onResponse: ((HTTPURLResponse) -> Void)? = nil
     ) async -> E2EEV2TransportResult<Data> {
         guard validPath(path), validOwner(expectedOwnerScopeId), E2EEV2SignedTarget.isEncodedPath(path) else {
             return localFailure("invalid-e2ee-request-scope")
@@ -2239,6 +2267,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
             guard currentOwnerIs(expectedOwnerScopeId) else {
                 return authenticationFailure("account-scope-changed")
             }
+            onResponse?(response)
             return responseResult(data: data, response: response)
         } catch {
             return exceptionResult(error)

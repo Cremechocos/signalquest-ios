@@ -13,12 +13,16 @@ actor E2EEV2DeviceDirectoryCache {
         let devices: [E2EEV2CertifiedDevice]?
         let refusal: E2EEV2IdentityVerification.Failure?
         let listVersion: Int?
+        var logSeq: Int64? = nil
         var deleted = false
         let readAt: Date
     }
 
     let session: LocalAccountSession
     private let directory: E2EEV2TrustDirectory
+    /// Source auto (E2EE-AUTO §4.2) : quand elle est là, les appareils viennent
+    /// du journal vérifié ; l'annuaire v2 ne sert plus qu'au numéro de sécurité.
+    private let autoRead: (@Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet)?
     private let now: @Sendable () -> Date
     private var entries: [String: Entry] = [:]
     /// Invalidations par compte : une lecture commencée avant une invalidation
@@ -27,9 +31,15 @@ actor E2EEV2DeviceDirectoryCache {
     private var generations: [String: Int] = [:]
     private var generation = 0
 
-    init(session: LocalAccountSession, directory: E2EEV2TrustDirectory, now: @escaping @Sendable () -> Date = Date.init) {
+    init(
+        session: LocalAccountSession,
+        directory: E2EEV2TrustDirectory,
+        autoRead: (@Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet)? = nil,
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
         self.session = session
         self.directory = directory
+        self.autoRead = autoRead
         self.now = now
     }
 
@@ -52,7 +62,26 @@ actor E2EEV2DeviceDirectoryCache {
             ownAccountKey: { (try? accountIdentityStore.load(ownerNamespace: namespace))?.publicKey },
             fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: session.ownerScopeId)
         )
-        return E2EEV2DeviceDirectoryCache(session: session, directory: directory)
+        let autoRead = SQFeatures.e2eeAutoLogEnabled
+            ? E2EEAutoLogReader.live(session: session, api: api, identityStore: identityStore).map(Self.autoRead)
+            : nil
+        return E2EEV2DeviceDirectoryCache(session: session, directory: directory, autoRead: autoRead)
+    }
+
+    /// Les maillons d'abord, puis chaque compte demandé. Un journal pas à jour
+    /// sert encore (§3.4 : envoi sous l'époque adoptée) ; une alerte gardée ne
+    /// rend plus aucun appareil.
+    static func autoRead(_ reader: E2EEAutoLogReader) -> @Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet {
+        { userIds in
+            if case .alert = try await reader.refreshLinks() {
+                return E2EEV2CertifiedDeviceSet(
+                    devicesByUser: [:], refusals: Dictionary(uniqueKeysWithValues: userIds.map { ($0, .invalidDeviceList) })
+                )
+            }
+            var accounts: [String: Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>?] = [:]
+            for userId in Set(userIds).sorted() { accounts[userId] = try await reader.account(userId) }
+            return E2EEAutoDeviceDirectory.deviceSet(accounts: accounts)
+        }
     }
 
     /// Les comptes demandés, relus s'ils manquent ou ont plus de 5 minutes. Un
@@ -68,20 +97,27 @@ actor E2EEV2DeviceDirectoryCache {
         if !stale.isEmpty {
             let users = stale.sorted()
             let before = (all: generation, users: users.map { generations[$0] ?? 0 })
-            let read = try await directory.certifiedDevices(for: users)
+            let read: E2EEV2CertifiedDeviceSet
+            if let autoRead {
+                read = try await autoRead(users)
+            } else {
+                read = try await directory.certifiedDevices(for: users)
+            }
             fresh = read
             let readAt = now()
             for (user, seen) in zip(users, before.users)
             where before.all == generation && seen == (generations[user] ?? 0) {
                 entries[user] = Entry(
                     devices: read.devicesByUser[user], refusal: read.refusals[user],
-                    listVersion: read.listVersions[user], deleted: read.deleted.contains(user), readAt: readAt
+                    listVersion: read.listVersions[user], logSeq: read.logSeqs[user],
+                    deleted: read.deleted.contains(user), readAt: readAt
                 )
             }
         }
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         var versions: [String: Int] = [:]
+        var logSeqs: [String: Int64] = [:]
         var deleted: Set<String> = []
         for user in wanted {
             // Ce qui vient d'être lu sert à cet appel même si une invalidation
@@ -92,17 +128,26 @@ actor E2EEV2DeviceDirectoryCache {
             if let refusalRead { refusals[user] = refusalRead }
             if let devicesRead { devices[user] = devicesRead }
             if let versionRead { versions[user] = versionRead }
+            if let logSeqRead = fresh?.logSeqs[user] ?? (stale.contains(user) ? nil : entries[user]?.logSeq) {
+                logSeqs[user] = logSeqRead
+            }
             let isDeleted = stale.contains(user)
                 ? fresh?.deleted.contains(user) == true
                 : entries[user]?.deleted == true
             if isDeleted { deleted.insert(user) }
         }
-        let owners = devices.values.flatMap { $0 }.reduce(into: [String: Int]()) { $0[$1.deviceId, default: 0] += 1 }
-        let ambiguous = Set(owners.filter { $0.value > 1 }.keys)
-        if !ambiguous.isEmpty {
-            devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
+        // v2 : un identifiant d'appareil certifié par deux comptes n'est cru pour
+        // aucun. Le journal auto admet le couple (userId, deviceId) (§7.1).
+        if autoRead == nil {
+            let owners = devices.values.flatMap { $0 }.reduce(into: [String: Int]()) { $0[$1.deviceId, default: 0] += 1 }
+            let ambiguous = Set(owners.filter { $0.value > 1 }.keys)
+            if !ambiguous.isEmpty {
+                devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
+            }
         }
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions, deleted: deleted)
+        return E2EEV2CertifiedDeviceSet(
+            devicesByUser: devices, refusals: refusals, listVersions: versions, logSeqs: logSeqs, deleted: deleted
+        )
     }
 
     /// Comptes à relire au prochain appel ; tous si `nil`.

@@ -48,6 +48,12 @@ enum SQFeatures {
     /// Sans l'annonce, le bouton de réaction reste masqué dans une conversation
     /// chiffrée. Le verrou ne sert plus qu'à couper la fonction par une build.
     static let e2eeReactionsEnabled = true
+
+    /// Chiffrement automatique (contrat E2EE-AUTO) : les appareils des membres
+    /// viennent du journal vérifié au lieu des paquets de confiance v2. Fermé
+    /// jusqu'à la bascule ; il faut aussi la clé du journal épinglée
+    /// (`E2EEAutoLogReader.productionLogKeys`).
+    static let e2eeAutoLogEnabled = false
 }
 
 struct AppConfig: Equatable {
