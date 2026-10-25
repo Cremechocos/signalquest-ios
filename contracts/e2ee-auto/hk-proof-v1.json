@@ -1,0 +1,45 @@
+{
+  "fixtureVersion": 1,
+  "proof": {
+    "userId": "user_alice_00000000001",
+    "deviceId": "device_alice_a1_000001",
+    "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
+    "revokeSeq": 10,
+    "payloadUtf8": "SQ-E2EE-AUTO-HK-PROOF\n1\nuser_alice_00000000001\ndevice_alice_a1_000001\nBLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=\n10",
+    "signatureB64": "MEUCIQDecEHhAO1mOMN+tOs0RR+pI70i4pStwsxx5eTR90ZttAIgRHjIGPuAI4E9BF+UVwmRK/Z7uVYNsoIIxFxYFIRd6r0="
+  },
+  "invalid": [
+    {
+      "name": "autre revokeSeq",
+      "userId": "user_alice_00000000001",
+      "deviceId": "device_alice_a1_000001",
+      "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
+      "revokeSeq": 11,
+      "signatureB64": "MEQCIHZ51Xp9T+rH4hX1QOmsMqTQMyAMA/VByt4TVQ9vRGPZAiB7tXEa5v2ZATrNa7QHbGS6CdkZD5UXSccXHeGHVi+gBg=="
+    },
+    {
+      "name": "signée par une autre clé",
+      "userId": "user_alice_00000000001",
+      "deviceId": "device_alice_a1_000001",
+      "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
+      "revokeSeq": 10,
+      "signatureB64": "MEUCIQDMQLxdxlNiu44nyYxhq3cae9i+uWV9DMn7IPTJ3+RW5AIgUQjR7TBfeopIWs/vdoidTnjLK1pER1elsKHlUpzvhTI="
+    },
+    {
+      "name": "signature à S haut",
+      "userId": "user_alice_00000000001",
+      "deviceId": "device_alice_a1_000001",
+      "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
+      "revokeSeq": 10,
+      "signatureB64": "MEYCIQDzz7zik4NvQQsbEdeYlYRc6lTbwtxhrX9bUhRqAZFnoQIhAKCBXEyOM+1GDc2rfnjfp0yABOBRXff82aozT/ywkBfU"
+    }
+  ],
+  "servingRule": "Un appareil actif sans preuve valide n’est pas servi ; un appareil révoqué (A2, seq 10) non plus, même avec une preuve.",
+  "revokedDeviceProof": {
+    "userId": "user_alice_00000000001",
+    "deviceId": "device_alice_a2_000002",
+    "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
+    "revokeSeq": 10,
+    "signatureB64": "MEUCIQDKn8ai4A1vvMdzFNza7PwZ0FTBSqMhwPDRe+w0+fWgQAIgVTPYSSAjB8YPNo92PLRuU0a7X48q1pOqzxOL1TjuoAs="
+  }
+}

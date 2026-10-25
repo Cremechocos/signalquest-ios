@@ -1,0 +1,49 @@
+{
+  "fixtureVersion": 1,
+  "note": "Scalaire HK : 32 octets big-endian, complétés à gauche, dans [1, n − 1] (§2.2).",
+  "pairs": [
+    {
+      "name": "alice-history-key-1",
+      "scalarB64": "+2CXpkb0kkO7ciQIKf9bSiv7qq2x5tRpR1n9YvF0KJQ=",
+      "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY="
+    },
+    {
+      "name": "alice-history-key-2",
+      "scalarB64": "yYhVLyzE+dj1eS4x9wb6mHPY0FmCMq1gY5Qg2jMm4Yg=",
+      "hkPubB64": "BFyoPC6RfAiXzsUfPLkVqn+5UTVdSOZF18JkjQpXEAPFLa2oetN6pJFaGAIkOXcGl3yKwlgyEWdtKzLGY+NiUMY="
+    },
+    {
+      "name": "bob-history-key-1",
+      "scalarB64": "d0viRpLZTkK3hB+z6BZLe6SzrJs8ft/VsM0a5u2Jbxo=",
+      "hkPubB64": "BPSAQyNhOI+YFW1yzkLfxtgmOWz7h773Mgcwwp8ma7/KmSzG8TAP+xtAiIQjWu3AGPBHE/JzCStK/v7UQ9FDt7E="
+    },
+    {
+      "name": "scalar-one",
+      "scalarB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=",
+      "hkPubB64": "BGsX0fLhLEJH+Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7Oy7ZAaDe/UfU="
+    },
+    {
+      "name": "leading-zero",
+      "scalarB64": "AKDi2rGaDtEVVRLo48JuXKxuoL6TAVnrNbyVDPmoq7M=",
+      "hkPubB64": "BEjaFaj+gstLOxeE+oj+HwrCY/jzVv1wt7IACN2wbTG83aJcGsjm008uULgCSFqt5k03kmP+2cAC6Hw6Ve31OD0="
+    }
+  ],
+  "invalidScalars": [
+    {
+      "name": "33 octets",
+      "scalarB64": "APtgl6ZG9JJDu3IkCCn/W0or+6qtsebUaUdZ/WLxdCiU"
+    },
+    {
+      "name": "31 octets",
+      "scalarB64": "oOLasZoO0RVVEujjwm5crG6gvpMBWes1vJUM+airsw=="
+    },
+    {
+      "name": "zéro",
+      "scalarB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    {
+      "name": "n",
+      "scalarB64": "/////wAAAAD//////////7zm+q2nF56E87nKwvxjJVE="
+    }
+  ]
+}

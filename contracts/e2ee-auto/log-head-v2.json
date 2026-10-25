@@ -1,0 +1,66 @@
+{
+  "fixtureVersion": 1,
+  "pinnedLogKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+  "nextLogKeyB64": "BAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=",
+  "logKeyIds": {
+    "logKey1": "4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns",
+    "logKey2": "6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s"
+  },
+  "rotationEntrySeq": 13,
+  "head": {
+    "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\npCMUSI-nnV_WziY4fFiDTBNlbEleiRTzCPjlFyW0uxs\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000",
+    "signatureB64": "MEUCIQD73j27m1xKTQdfENAY9UqwbVhpBMTDQs9JiVsvy61wywIgc8wo4dxLmrTKWqLqU3oYK/COx3uedpKloju7PKU3gQA="
+  },
+  "checks": [
+    {
+      "name": "à l’heure",
+      "nowMs": 1790036300000,
+      "expect": "ok"
+    },
+    {
+      "name": "tête de 24 h 9 min (tolérance)",
+      "nowMs": 1790122940000,
+      "expect": "ok"
+    },
+    {
+      "name": "tête de 24 h 11 min : journal pas à jour",
+      "nowMs": 1790123060000,
+      "expect": "stale"
+    },
+    {
+      "name": "horloge en retard de 9 min (tolérance)",
+      "nowMs": 1790035460000,
+      "expect": "ok"
+    },
+    {
+      "name": "horloge en retard de 11 min : journal pas à jour",
+      "nowMs": 1790035340000,
+      "expect": "stale"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "signature à S haut",
+      "signatureB64": "MEYCIQDFItoxK+lL1YKDlj/LosSNxcG1PadU1tMkl5z1naK6lgIhAJAJ0SP+ePltI+Mlka3zPAbSQwPWd2WGLk8yGViry8Cd",
+      "logKeyB64": "BAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=",
+      "expect": "HEAD_SIGNATURE"
+    },
+    {
+      "name": "signée par l’ancienne clé",
+      "signatureB64": "MEUCIQDNmPqLNC2Cb+TPzKesSF/VVPumk3GSbimIQh7fYvNpOgIgDZlmPfmTAv1LSYxgtSZC1olBGVrhxc72PE3avivPKM4=",
+      "logKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+      "expect": "HEAD_LOG_KEY"
+    },
+    {
+      "name": "clé étrangère",
+      "signatureB64": "MEQCIGvhoN7QTGAF0vnIbFWIWyjzQHw99fewoAxoNud09RHwAiAZexZIGHg5sLEv1v7+gU3OerH9BfGBgxQSs13qb7Hipg==",
+      "logKeyB64": "BAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=",
+      "expect": "HEAD_SIGNATURE"
+    }
+  ],
+  "heartbeat": {
+    "note": "Tête re-signée une heure plus tard, même seq et même condensat (§3.4).",
+    "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\npCMUSI-nnV_WziY4fFiDTBNlbEleiRTzCPjlFyW0uxs\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790039600000",
+    "signatureB64": "MEUCIQCqoHzx+BRknmppfbLOks7zFHZG61mcffY6dlIMQXZHsQIgDYlqaRgfSu6TXdKLKiX5jlnbp8FGKIuyhsRLVIWxrpk="
+  }
+}
