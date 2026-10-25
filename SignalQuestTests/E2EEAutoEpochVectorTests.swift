@@ -78,7 +78,7 @@ final class E2EEAutoEpochVectorTests: XCTestCase {
         let vectors = try load("epoch-recipients-v1")
         var accountsBySeq: [Int64: [String: E2EEAutoLog.AccountState]] = [:]
         let manifests = try XCTUnwrap(vectors["manifests"] as? [[String: Any]])
-        XCTAssertEqual(manifests.count, 38)
+        XCTAssertEqual(manifests.count, 45)
         for testCase in manifests {
             let name = try string(testCase, "name")
             let logSeq = try XCTUnwrap((testCase["logSeq"] as? NSNumber)?.int64Value, name)
@@ -157,7 +157,7 @@ final class E2EEAutoEpochVectorTests: XCTestCase {
             XCTAssertEqual(E2EEAutoSafetyCode.accountDigits(account), try string(expected, "accountDigits"), userId)
         }
 
-        for key in ["pair", "pairWithEmptyAccount"] {
+        for key in ["pair", "pairWithEmptyAccount", "pairByteOrder"] {
             let pair = try XCTUnwrap(vectors[key] as? [String: Any])
             let userIds = try XCTUnwrap(pair["userIds"] as? [String])
             let left = try XCTUnwrap(accounts[userIds[0]]), right = try XCTUnwrap(accounts[userIds[1]])

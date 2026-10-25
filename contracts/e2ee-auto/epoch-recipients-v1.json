@@ -28,7 +28,9 @@
       "SQ-E2EE-AUTO-LOG-LINK\n1\n18\n_IJG06I6FrBuQXt_-ZW_OWbR-CHQHw3n_T8gxD8kOV4\nACCOUNT\nNIc0S5vq_SJnELY0XzaZmcQoImCPqnPRjMu0543Uhh4\nEQlwoA3KlrIDODgbQTsknuDcwV5WIglxhnCHw0mmZyM\n0",
       "SQ-E2EE-AUTO-LOG-LINK\n1\n19\n_Cfkw47w5u_oX46r65fsEwmRarW6iR_7fkNIf6hFKJE\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nzRtpQ9_ppziAquIeDVvmDEK-9_6iIGDllQXmSicMfQw\n0",
       "SQ-E2EE-AUTO-LOG-LINK\n1\n20\nCaEjJgNAlOU1v__DuLo0XmXpIbKXeg2Zeng4MlZ5haA\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nRgNW8tQ5LHJbpZHSVjOx3Oq1XDqAPc6KEq37fA7KnpI\n0",
-      "SQ-E2EE-AUTO-LOG-LINK\n1\n21\nGVBi8BPXrLH0mDI8Y5SVBFhTlyBGSCT7G2yW04X4FJU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAczl-30XRDeuEwcw9BzPXVSTq1930AuaoJdZ0Vw5Y38\n0"
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n21\nGVBi8BPXrLH0mDI8Y5SVBFhTlyBGSCT7G2yW04X4FJU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAczl-30XRDeuEwcw9BzPXVSTq1930AuaoJdZ0Vw5Y38\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n22\nz0-R71XZ8Ga6zhcX1jJ_QSM2YKpQYUVin1tQVwQjWcQ\nACCOUNT\ngEP_7-aehCqi9xWShBZu1-m99yXzWr6t1eRYnDwBRxQ\nAP7yKaXBTaYtWJER1tmLSUcwCwTNMq_m9LOPOS-5rZo\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n23\ncA_QcmRFwdcp22ToG36JXW_ysiBi9R0TwMrm-ctKptU\nENTRY\ng8c8usXaydrgdZmCSXssbNog5qJZKlNbQDd4V_p2N38\njBxOZEaC8WuSnCLkgBB76HSF3Y3EOoCkmKcKkGP2xwo\n0"
     ],
     "logKeyEntries": {
       "13": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\n-\n-\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
@@ -73,6 +75,13 @@
         "userId": "user_dave_000000000004",
         "accountSaltB64": "1NTU1NTU1NTU1NTU1NTU1A==",
         "entries": []
+      },
+      {
+        "userId": "user_Zed_0000000000006",
+        "accountSaltB64": "WlpaWlpaWlpaWlpaWlpaWg==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n23\nuser_Zed_0000000000006\n-\nADD\ndevice_zed_z1_00000001\nweb\nBHLbmvyVOxjPXQDDMRtaOjfaBP7RvsCnz3hMg58M706YcanJRURRupazWQImQOQyGATlWUdOoMJEhzyfR31coZM=\nBHLbmvyVOxjPXQDDMRtaOjfaBP7RvsCnz3hMg58M706YcanJRURRupazWQImQOQyGATlWUdOoMJEhzyfR31coZM=\n1\n-\n1790035820000"
+        ]
       }
     ]
   },
@@ -166,6 +175,25 @@
           "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
           "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
           "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+        ]
+      }
+    },
+    {
+      "name": "ordre des octets : user_Zed (majuscule) avant user_alice",
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_Zed_0000000000006"
+      ],
+      "excluded": [],
+      "expect": {
+        "memberLogSeqs": {
+          "user_Zed_0000000000006": "23",
+          "user_alice_00000000001": "16"
+        },
+        "recipients": [
+          "user_Zed_0000000000006\ndevice_zed_z1_00000001\nweb\nCV5ExaQyQdnAwS877R5Q5uPimNRdaNvEekS7T3n0XO8",
+          "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+          "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
         ]
       }
     }
@@ -281,6 +309,24 @@
         "19",
         "0"
       ],
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQS_MISSING"
+      }
+    },
+    {
+      "name": "memberLogSeqs en chaîne",
+      "memberLogSeqs": "16",
       "hasMemberListVersions": false,
       "excludesWeb": false,
       "recipients": [
@@ -762,6 +808,32 @@
           "user_bob_0000000000002"
         ]
       }
+    },
+    {
+      "name": "userIds par ordre des octets : user_Zed avant user_alice",
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_Zed_0000000000006"
+      ],
+      "memberLogSeqs": {
+        "user_alice_00000000001": "0",
+        "user_Zed_0000000000006": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_Zed_0000000000006\ndevice_zed_z1_00000001\nweb\nCV5ExaQyQdnAwS877R5Q5uPimNRdaNvEekS7T3n0XO8",
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_Zed_0000000000006",
+        "userIds": [
+          "user_Zed_0000000000006",
+          "user_alice_00000000001"
+        ]
+      }
     }
   ],
   "manifests": [
@@ -789,7 +861,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "appareil divergent B2 exclu",
@@ -814,7 +886,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "excludesWeb = 1 : non adopté, sans alerte (époques d’avant la bascule)",
@@ -842,7 +914,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ADD de A3 à manifeste + T (borne incluse)",
@@ -863,7 +935,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ADD de A3 à manifeste + T + 1 ms",
@@ -888,7 +960,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "destinataire ADD_PENDING, journal pas encore relu",
@@ -920,7 +992,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "destinataire ADD_PENDING après relecture",
@@ -951,7 +1023,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "révoqué sans ACTIVATE, journal pas encore relu",
@@ -977,7 +1049,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "révoqué sans ACTIVATE après relecture : jamais destinataire",
@@ -1002,7 +1074,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ancienne clé de A1, ROTATE à manifeste − T + 1 ms",
@@ -1023,7 +1095,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ancienne clé de A1, ROTATE à manifeste − T",
@@ -1048,7 +1120,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "A2, REVOKE à manifeste − T + 1 ms",
@@ -1069,7 +1141,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "A2, REVOKE à manifeste − T",
@@ -1094,7 +1166,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "appareil inconnu et empreinte inconnue, journaux pas encore relus",
@@ -1126,7 +1198,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "journal en retard chez Alice et Bob, userIds triés",
@@ -1160,7 +1232,189 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
+    },
+    {
+      "name": "LOG_BEHIND par ordre des octets : user_Zed avant user_alice",
+      "manifestCreatedAtMs": 1790036000000,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_Zed_0000000000006"
+      ],
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU",
+        "user_Zed_0000000000006\ndevice_zed_zz_000099\nweb\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_Zed_0000000000006",
+          "user_alice_00000000001"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "logSeq": 23
+    },
+    {
+      "name": "deux échecs au point 2 : la première ligne (non-membre) alerte",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_eve_0000000000005\ndevice_eve_e1_00000001\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "NOT_MEMBER",
+        "userId": "user_eve_0000000000005",
+        "deviceId": "device_eve_e1_00000001"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
+    },
+    {
+      "name": "deux échecs au point 2 : la première ligne (plateforme) alerte",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_eve_0000000000005\ndevice_eve_e1_00000001\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PLATFORM",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
+    },
+    {
+      "name": "point 2 avant point 5, même sur une ligne suivante",
+      "manifestCreatedAtMs": 1790018600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PLATFORM",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
+    },
+    {
+      "name": "point 3 avant point 5, même sur une ligne suivante",
+      "manifestCreatedAtMs": 1790018600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "ADDED_AFTER_MANIFEST",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
+    },
+    {
+      "name": "deux échecs au point 5 : la première ligne (REVOKE) alerte",
+      "manifestCreatedAtMs": 1790018600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA",
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "REVOKED",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a2_000002"
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
+    },
+    {
+      "name": "deux échecs au point 5 : la première ligne (ROTATE) alerte",
+      "manifestCreatedAtMs": 1790018600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw",
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "KEY_ROTATED",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a1_000001"
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 23
     },
     {
       "name": "échec du point 3 face à une ligne à relire : journal en retard d’abord",
@@ -1187,7 +1441,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "échec du point 5 face à une ligne à relire : journal en retard d’abord",
@@ -1214,7 +1468,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "échec définitif après un échec à relire : alerte sans relecture",
@@ -1240,7 +1494,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "échec définitif avant relecture : non membre",
@@ -1271,7 +1525,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "lecteur à la tête 15 : A3 et l’appareil de Carol inconnus, à relire (Bob est à jour)",
@@ -1308,7 +1562,7 @@
     {
       "name": "même manifeste après relecture complète : accepté",
       "manifestCreatedAtMs": 1790036000000,
-      "logSeq": 21,
+      "logSeq": 23,
       "recipients": [
         "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
         "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
@@ -1406,7 +1660,7 @@
         "user_carol_00000000003",
         "user_dave_000000000004"
       ],
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "appareil inconnu du compte après relecture",
@@ -1437,7 +1691,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "mauvaise plateforme",
@@ -1462,7 +1716,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "empreinte d’une autre clé après relecture",
@@ -1487,7 +1741,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "compte sans journal, hors des membres",
@@ -1518,7 +1772,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "Carol hors de l’appartenance du manifeste",
@@ -1547,7 +1801,7 @@
       "excludesWeb": false,
       "ownManifest": false,
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ACTIVATE de B3 à manifeste + T (borne incluse)",
@@ -1568,7 +1822,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "ACTIVATE de B3 à manifeste + T + 1 ms (ADD_PENDING dans T)",
@@ -1593,7 +1847,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "daté de +T (borne incluse)",
@@ -1619,7 +1873,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "daté de +T + 1 ms : non adopté, sans alerte",
@@ -1647,7 +1901,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "son propre manifeste daté de +T + 1 ms",
@@ -1673,7 +1927,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "horloge du créateur à +2 j, ROTATE de A1 depuis : FUTURE sans alerte",
@@ -1696,7 +1950,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "horloge du créateur à +2 j, REVOKE de A2 depuis : FUTURE sans alerte",
@@ -1719,7 +1973,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "date dans le futur, mais ADD de A3 après manifeste + T : alerte d’abord",
@@ -1744,7 +1998,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     },
     {
       "name": "date dans le futur, mais appareil inconnu : alerte d’abord",
@@ -1769,7 +2023,7 @@
         "user_dave_000000000004"
       ],
       "refreshed": true,
-      "logSeq": 21
+      "logSeq": 23
     }
   ],
   "sendable": [

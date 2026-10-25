@@ -122,6 +122,26 @@
       "ignoredDevices": [],
       "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_dave_000000000004\n0",
       "accountDigits": "863272115940260988076881162348"
+    },
+    {
+      "userId": "user_Zed_0000000000006",
+      "activeDevices": [
+        {
+          "deviceId": "device_zed_z1_00000001",
+          "signingKeyB64": "BHLbmvyVOxjPXQDDMRtaOjfaBP7RvsCnz3hMg58M706YcanJRURRupazWQImQOQyGATlWUdOoMJEhzyfR31coZM=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_Zed_0000000000006\ndevice_zed_z1_00000001\nBHLbmvyVOxjPXQDDMRtaOjfaBP7RvsCnz3hMg58M706YcanJRURRupazWQImQOQyGATlWUdOoMJEhzyfR31coZM=",
+          "fingerprint": "nTVTqRUf3Ive7Tpq5kuREoZOngu_0nOGkMT-HD0gdgg",
+          "shortFingerprint": [
+            "40693",
+            "40269",
+            "80689",
+            "10539"
+          ]
+        }
+      ],
+      "ignoredDevices": [],
+      "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_Zed_0000000000006\n1\nnTVTqRUf3Ive7Tpq5kuREoZOngu_0nOGkMT-HD0gdgg",
+      "accountDigits": "761254849705368841174011382829"
     }
   ],
   "pair": {
@@ -167,6 +187,28 @@
       "62348"
     ],
     "qr": "SQSC1|793126054516600527312991502085863272115940260988076881162348"
+  },
+  "pairByteOrder": {
+    "userIds": [
+      "user_alice_00000000001",
+      "user_Zed_0000000000006"
+    ],
+    "digits": "761254849705368841174011382829793126054516600527312991502085",
+    "groups": [
+      "76125",
+      "48497",
+      "05368",
+      "84117",
+      "40113",
+      "82829",
+      "79312",
+      "60545",
+      "16600",
+      "52731",
+      "29915",
+      "02085"
+    ],
+    "qr": "SQSC1|761254849705368841174011382829793126054516600527312991502085"
   },
   "invalidQr": [
     {
