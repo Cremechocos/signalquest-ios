@@ -387,9 +387,14 @@ enum E2EEAutoLog {
         var accounts: [String: AccountLink]
         /// Clé du journal en vigueur à `seq`, après les entrées `LOG_KEY`.
         var logKeyB64: String
+        /// Clés suivantes épinglées dans l'app, dans l'ordre : un `LOG_KEY` ne mène qu'à la première (§3.4).
+        var nextLogKeysB64: [String]
 
-        static func initial(pinnedLogKeyB64: String) -> ChainState {
-            ChainState(seq: 0, linkHash: genesisHash, genesisClosed: false, accounts: [:], logKeyB64: pinnedLogKeyB64)
+        static func initial(pinnedLogKeyB64: String, nextLogKeysB64: [String] = []) -> ChainState {
+            ChainState(
+                seq: 0, linkHash: genesisHash, genesisClosed: false, accounts: [:],
+                logKeyB64: pinnedLogKeyB64, nextLogKeysB64: nextLogKeysB64
+            )
         }
     }
 
@@ -401,6 +406,7 @@ enum E2EEAutoLog {
         case duplicateAccount = "DUPLICATE_ACCOUNT"
         case logKeyEntryMissing = "LOG_KEY_ENTRY_MISSING"
         case logKeyEntryInvalid = "LOG_KEY_ENTRY_INVALID"
+        case logKeyNotPinned = "LOG_KEY_NOT_PINNED"
         case rollback = "ROLLBACK"
         case fork = "FORK"
     }
@@ -443,7 +449,12 @@ enum E2EEAutoLog {
                       ) else {
                     return .failure(ChainFailure(error: .logKeyEntryInvalid, seq: link.seq))
                 }
+                // Une ancienne clé volée ne doit pas pouvoir en installer une autre (§3.4, v2).
+                guard newLogKeyB64 == state.nextLogKeysB64.first else {
+                    return .failure(ChainFailure(error: .logKeyNotPinned, seq: link.seq))
+                }
                 state.logKeyB64 = newLogKeyB64
+                state.nextLogKeysB64.removeFirst()
             }
             state.seq = link.seq
             state.linkHash = digest(text)
@@ -474,6 +485,13 @@ enum E2EEAutoLog {
         case revoked = "REVOKED"
     }
 
+    /// Clé d'accord d'un appareil : `sinceMs` = `createdAtMs` de l'`ADD` (version 1) ou du `ROTATE` (§7.1).
+    struct IdentityKey: Equatable, Sendable {
+        let keyVersion: Int
+        let identityKeyB64: String
+        let sinceMs: Int64
+    }
+
     struct DeviceState: Equatable, Sendable {
         let deviceId: String
         let platform: Platform
@@ -483,9 +501,29 @@ enum E2EEAutoLog {
         var status: DeviceStatus
         /// `createdAtMs` de l'entrée `ADD` ou `ADD_PENDING` (heure d'approbation v2 pour `GENESIS`).
         let addedAtMs: Int64
+        /// `createdAtMs` de l'`ADD`, ou de l'`ACTIVATE` après un `ADD_PENDING` : destinataire
+        /// depuis (§7.1). nil = jamais activé (en attente, ou révoqué sans `ACTIVATE`).
+        var activatedAtMs: Int64?
         let addEntryHash: String
+        /// Clés d'accord successives, pour lire un manifeste face au journal (§7.1).
+        var identityKeys: [IdentityKey]
         var revokeReason: RevokeReason?
         var revokeSeq: Int64?
+        var revokedAtMs: Int64?
+    }
+
+    /// Une entrée `HISTORY_KEY` vérifiée : la chaîne de HK (§5.6) et les rotations s'y lisent.
+    struct HistoryKeyRecord: Equatable, Sendable {
+        let seq: Int64
+        let entryHash: String
+        let hkPubB64: String
+        let previousHkPubB64: String?
+        let signerDeviceId: String
+        /// `addedAtMs` du signataire : l'ancienneté de 24 h se juge à `createdAtMs` de l'entrée.
+        let signerAddedAtMs: Int64
+        let createdAtMs: Int64
+        /// `seq` du dernier `REVOKE` (hors `ACCOUNT_DELETED`) que cette HK remplace.
+        let afterRevokeSeq: Int64?
     }
 
     struct AccountState: Equatable, Sendable {
@@ -494,9 +532,14 @@ enum E2EEAutoLog {
         var devices: [String: DeviceState]
         var historyKeyPubB64: String?
         var historyKeyEntryHash: String?
+        var historyKeys: [HistoryKeyRecord]
+        /// `REVOKE` vu depuis la dernière HK : une rotation est due (§5.6).
+        var rotationDueRevokeSeq: Int64?
         var mode: Mode
         var lastEntryHash: String?
         var lastSeq: Int64
+        /// `seq` de chaque entrée du compte, croissants : `memberLogSeqs` n'en cite qu'un (§7.1).
+        var entrySeqs: [Int64]
 
         init(userId: String, accountSaltB64: String) {
             self.userId = userId
@@ -504,9 +547,12 @@ enum E2EEAutoLog {
             devices = [:]
             historyKeyPubB64 = nil
             historyKeyEntryHash = nil
+            historyKeys = []
+            rotationDueRevokeSeq = nil
             mode = .normal
             lastEntryHash = nil
             lastSeq = 0
+            entrySeqs = []
         }
 
         /// Appareils à qui envelopper une époque (§4.2, §6) : actifs seulement, jamais `PENDING`.
@@ -569,23 +615,22 @@ enum E2EEAutoLog {
         }
         taggedSeqs.sort()
 
-        let parsedEntries = entries.map { (text: $0, parsed: parseEntry($0)) }
-        guard parsedEntries.count == taggedSeqs.count else {
-            let present = Set(parsedEntries.compactMap { $0.parsed?.entry.seq })
-            if let missing = taggedSeqs.first(where: { !present.contains($0) }) { return fail(.entryMissing, missing) }
-            return fail(.entryNotInChain)
-        }
-
+        // §3.5 (v2) : les maillons du compte dans l'ordre des `seq` ; le premier contrôle
+        // qui échoue fixe le `seq` fautif.
         var state = AccountState(userId: userId, accountSaltB64: accountSaltB64)
         var lastNonGenesisMs: Int64 = -1
-        for (index, item) in parsedEntries.enumerated() {
+        for index in 0..<max(taggedSeqs.count, entries.count) {
+            let text = index < entries.count ? entries[index] : nil
+            let parsed = text.flatMap(parseEntry)
+            guard index < taggedSeqs.count else { return fail(.entryNotInChain, parsed?.entry.seq) }
             let expectedSeq = taggedSeqs[index]
-            guard let (entry, detail) = item.parsed else { return fail(.entryFormat, expectedSeq) }
+            guard let text else { return fail(.entryMissing, expectedSeq) }
+            guard let (entry, detail) = parsed else { return fail(.entryFormat, expectedSeq) }
             guard entry.seq == expectedSeq else {
-                return fail(entry.seq < expectedSeq ? .entryNotInChain : .entryMissing, expectedSeq)
+                return entry.seq < expectedSeq ? fail(.entryNotInChain, entry.seq) : fail(.entryMissing, expectedSeq)
             }
             guard entry.userId == userId, entry.op != .logKey else { return fail(.entryUser, entry.seq) }
-            let entryHash = digest(item.text)
+            let entryHash = digest(text)
             guard let linkText = links[entry.seq], let link = parseLink(linkText), link.hash == entryHash else {
                 return fail(.entryHash, entry.seq)
             }
@@ -599,6 +644,7 @@ enum E2EEAutoLog {
             if let error = apply(entry, detail: detail, entryHash: entryHash, to: &state) { return fail(error, entry.seq) }
             state.lastEntryHash = entryHash
             state.lastSeq = entry.seq
+            state.entrySeqs.append(entry.seq)
         }
         return .success(state)
     }
@@ -621,7 +667,10 @@ enum E2EEAutoLog {
                 deviceId: entry.deviceId, platform: platform, identityKeyB64: entry.identityKeyB64,
                 signingKeyB64: entry.signingKeyB64, keyVersion: keyVersion,
                 status: detail == .addPending ? .pending : .active, addedAtMs: entry.createdAtMs,
-                addEntryHash: entryHash, revokeReason: nil, revokeSeq: nil
+                activatedAtMs: detail == .addPending ? nil : entry.createdAtMs,
+                addEntryHash: entryHash,
+                identityKeys: [IdentityKey(keyVersion: keyVersion, identityKeyB64: entry.identityKeyB64, sinceMs: entry.createdAtMs)],
+                revokeReason: nil, revokeSeq: nil, revokedAtMs: nil
             )
             return nil
 
@@ -641,6 +690,7 @@ enum E2EEAutoLog {
             )
             guard verify(publicKeyB64: approver.signingKeyB64, payload: payload, signatureB64: signatureB64) else { return .signature }
             device.status = .active
+            device.activatedAtMs = entry.createdAtMs
             state.devices[entry.deviceId] = device
             return nil
 
@@ -655,6 +705,7 @@ enum E2EEAutoLog {
             guard verify(publicKeyB64: device.signingKeyB64, payload: payload, signatureB64: signatureB64) else { return .signature }
             device.identityKeyB64 = entry.identityKeyB64
             device.keyVersion = keyVersion
+            device.identityKeys.append(IdentityKey(keyVersion: keyVersion, identityKeyB64: entry.identityKeyB64, sinceMs: entry.createdAtMs))
             state.devices[entry.deviceId] = device
             return nil
 
@@ -683,7 +734,9 @@ enum E2EEAutoLog {
             device.status = .revoked
             device.revokeReason = reason
             device.revokeSeq = entry.seq
+            device.revokedAtMs = entry.createdAtMs
             state.devices[entry.deviceId] = device
+            if reason != .accountDeleted && state.historyKeyPubB64 != nil { state.rotationDueRevokeSeq = entry.seq }
             return nil
 
         case let .historyKey(signerDeviceId, hkPubB64, signatureB64):
@@ -698,8 +751,14 @@ enum E2EEAutoLog {
                 previousHkPubB64: state.historyKeyPubB64, hkPubB64: hkPubB64
             )
             guard verify(publicKeyB64: signer.signingKeyB64, payload: payload, signatureB64: signatureB64) else { return .signature }
+            state.historyKeys.append(HistoryKeyRecord(
+                seq: entry.seq, entryHash: entryHash, hkPubB64: hkPubB64, previousHkPubB64: state.historyKeyPubB64,
+                signerDeviceId: signerDeviceId, signerAddedAtMs: signer.addedAtMs, createdAtMs: entry.createdAtMs,
+                afterRevokeSeq: state.rotationDueRevokeSeq
+            ))
             state.historyKeyPubB64 = hkPubB64
             state.historyKeyEntryHash = entryHash
+            state.rotationDueRevokeSeq = nil
             return nil
 
         case let .mode(signerDeviceId, mode, signatureB64):

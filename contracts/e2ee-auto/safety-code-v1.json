@@ -1,0 +1,211 @@
+{
+  "fixtureVersion": 1,
+  "note": "Contrat §7. Entrées : les appareils ACTIVE de chaque compte (deviceId, clé de signature) ; ignoredDevices (révoqué, en attente) n’entrent pas dans le code. Les clés d’accord non plus : un ROTATE ne change pas le code. Le journal est celui de epoch-recipients-v1.",
+  "digitRule": "Groupe i (i = 0…n−1) : octets [5i, 5i + 5) du condensat, entier big-endian modulo 100000, sur 5 chiffres avec zéros de tête.",
+  "accounts": [
+    {
+      "userId": "user_alice_00000000001",
+      "activeDevices": [
+        {
+          "deviceId": "device_alice_a1_000001",
+          "signingKeyB64": "BLPm4T23SvmU0YbzgjuCmcMO8FkM/jrIM8p+bkPakYhNgYvGaeb1/3BDne2x0bGXWPpG8AXziXmf8znMHz/zBDg=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_alice_00000000001\ndevice_alice_a1_000001\nBLPm4T23SvmU0YbzgjuCmcMO8FkM/jrIM8p+bkPakYhNgYvGaeb1/3BDne2x0bGXWPpG8AXziXmf8znMHz/zBDg=",
+          "fingerprint": "FKTO7JZwgK7qcUDvhAsAHovwt3ijSVhwE1KI-CQVy3U",
+          "shortFingerprint": [
+            "70326",
+            "84081",
+            "15136",
+            "27512"
+          ]
+        },
+        {
+          "deviceId": "device_alice_a3_000003",
+          "signingKeyB64": "BJDutRnOtaHOVMluYIKu3wUNg9v7vRPoeFUKySXgnSFgMhOA0+ShIrIsetYjkqCfTQF4jTmTVuDxAKvaLh+rRsU=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_alice_00000000001\ndevice_alice_a3_000003\nBJDutRnOtaHOVMluYIKu3wUNg9v7vRPoeFUKySXgnSFgMhOA0+ShIrIsetYjkqCfTQF4jTmTVuDxAKvaLh+rRsU=",
+          "fingerprint": "YzECOr2YXd7rZp38NgsyiPCehU28SP51hbHSUlsqK5k",
+          "shortFingerprint": [
+            "91997",
+            "19334",
+            "65714",
+            "72909"
+          ]
+        }
+      ],
+      "ignoredDevices": [
+        {
+          "deviceId": "device_alice_a2_000002",
+          "status": "REVOKED",
+          "signingKeyB64": "BP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU="
+        }
+      ],
+      "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_alice_00000000001\n2\nFKTO7JZwgK7qcUDvhAsAHovwt3ijSVhwE1KI-CQVy3U\nYzECOr2YXd7rZp38NgsyiPCehU28SP51hbHSUlsqK5k",
+      "accountDigits": "793126054516600527312991502085"
+    },
+    {
+      "userId": "user_bob_0000000000002",
+      "activeDevices": [
+        {
+          "deviceId": "device_bob_b1_00000001",
+          "signingKeyB64": "BEBSDk9cKn9gJAoUcLWPfWD+8gywTUFS3nN3wpioYCn6D9+h9UtWspQZhXrX8cIYq8qxxgUpL7IlVrZfDoitSSc=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_bob_0000000000002\ndevice_bob_b1_00000001\nBEBSDk9cKn9gJAoUcLWPfWD+8gywTUFS3nN3wpioYCn6D9+h9UtWspQZhXrX8cIYq8qxxgUpL7IlVrZfDoitSSc=",
+          "fingerprint": "ryWMMFyg7T6TjGPNaCZMiGA9QAsTUDNXiSi5Fbpts9g",
+          "shortFingerprint": [
+            "21212",
+            "68556",
+            "17132",
+            "79083"
+          ]
+        },
+        {
+          "deviceId": "device_bob_b2_00000002",
+          "signingKeyB64": "BKs4B5IosjBMBO9q6H+f91GjnbW2uv+XOjppu0Da6VtkZ1RicFQA14ILEFhth7YC88aNmXL7lFs8EWowMMOAIUU=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_bob_0000000000002\ndevice_bob_b2_00000002\nBKs4B5IosjBMBO9q6H+f91GjnbW2uv+XOjppu0Da6VtkZ1RicFQA14ILEFhth7YC88aNmXL7lFs8EWowMMOAIUU=",
+          "fingerprint": "WhMtjRFGiPbakbBtVi_bAz6jGI8jLG09FSgx9kxh_hk",
+          "shortFingerprint": [
+            "08977",
+            "89905",
+            "08987",
+            "77935"
+          ]
+        },
+        {
+          "deviceId": "device_bob_b3_00000003",
+          "signingKeyB64": "BKNm1+e0N6bcM33L7eLzL71ROqXKbNa3jJa/KCzqPtOWgoQ0L0GSHAlhsN/xVzqmuFNqXe6QLBy6qY9OARIJ1JU=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_bob_0000000000002\ndevice_bob_b3_00000003\nBKNm1+e0N6bcM33L7eLzL71ROqXKbNa3jJa/KCzqPtOWgoQ0L0GSHAlhsN/xVzqmuFNqXe6QLBy6qY9OARIJ1JU=",
+          "fingerprint": "0MPJY3fGKxjxDN-mPDCAfOVIGP4j9qJTBKu24J6nLHw",
+          "shortFingerprint": [
+            "52887",
+            "79468",
+            "69440",
+            "52158"
+          ]
+        }
+      ],
+      "ignoredDevices": [
+        {
+          "deviceId": "device_bob_b4_00000004",
+          "status": "PENDING",
+          "signingKeyB64": "BGkDBwpE9rcXtUfYHzqK+jjnQaUnRgCOcgEvQh3oD4pmsPOuVwRIbly91t/E5LZW+SIZIlbuvs/Do688qsmt0CU="
+        },
+        {
+          "deviceId": "device_bob_b5_00000005",
+          "status": "REVOKED",
+          "signingKeyB64": "BI0lA808KFma3HDRjjUKPZj3U4MG8CsyHc8UGfq37kNOyzlC5x6mCsd2OChAEUK3tU33m0c2Y4n/OKEuvYCFc3w="
+        }
+      ],
+      "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_bob_0000000000002\n3\n0MPJY3fGKxjxDN-mPDCAfOVIGP4j9qJTBKu24J6nLHw\nWhMtjRFGiPbakbBtVi_bAz6jGI8jLG09FSgx9kxh_hk\nryWMMFyg7T6TjGPNaCZMiGA9QAsTUDNXiSi5Fbpts9g",
+      "accountDigits": "195900982416486670017462537619"
+    },
+    {
+      "userId": "user_carol_00000000003",
+      "activeDevices": [
+        {
+          "deviceId": "device_bob_b1_00000001",
+          "signingKeyB64": "BAW65Xl1iRie/YhqC+c2OiHUPuzyDZwpf3iuLecKnahdqP9082mwbOFX3Lps4jsd7yMiUuBT2pYN/JsCF8KZ6zM=",
+          "fingerprintUtf8": "SQ-E2EE-AUTO-DEVICE-FINGERPRINT\n1\nuser_carol_00000000003\ndevice_bob_b1_00000001\nBAW65Xl1iRie/YhqC+c2OiHUPuzyDZwpf3iuLecKnahdqP9082mwbOFX3Lps4jsd7yMiUuBT2pYN/JsCF8KZ6zM=",
+          "fingerprint": "c6Y3HW47esJURWpYtC3AXi_a1Rqq-2CfG6P3n2OgurU",
+          "shortFingerprint": [
+            "68910",
+            "26373",
+            "36576",
+            "96378"
+          ]
+        }
+      ],
+      "ignoredDevices": [],
+      "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_carol_00000000003\n1\nc6Y3HW47esJURWpYtC3AXi_a1Rqq-2CfG6P3n2OgurU",
+      "accountDigits": "329715476379793182958401926050"
+    },
+    {
+      "userId": "user_dave_000000000004",
+      "activeDevices": [],
+      "ignoredDevices": [],
+      "accountUtf8": "SQ-E2EE-AUTO-SAFETY-ACCOUNT\n1\nuser_dave_000000000004\n0",
+      "accountDigits": "863272115940260988076881162348"
+    }
+  ],
+  "pair": {
+    "userIds": [
+      "user_alice_00000000001",
+      "user_bob_0000000000002"
+    ],
+    "digits": "793126054516600527312991502085195900982416486670017462537619",
+    "groups": [
+      "79312",
+      "60545",
+      "16600",
+      "52731",
+      "29915",
+      "02085",
+      "19590",
+      "09824",
+      "16486",
+      "67001",
+      "74625",
+      "37619"
+    ],
+    "qr": "SQSC1|793126054516600527312991502085195900982416486670017462537619"
+  },
+  "pairWithEmptyAccount": {
+    "userIds": [
+      "user_alice_00000000001",
+      "user_dave_000000000004"
+    ],
+    "digits": "793126054516600527312991502085863272115940260988076881162348",
+    "groups": [
+      "79312",
+      "60545",
+      "16600",
+      "52731",
+      "29915",
+      "02085",
+      "86327",
+      "21159",
+      "40260",
+      "98807",
+      "68811",
+      "62348"
+    ],
+    "qr": "SQSC1|793126054516600527312991502085863272115940260988076881162348"
+  },
+  "invalidQr": [
+    {
+      "name": "préfixe absent",
+      "value": "793126054516600527312991502085195900982416486670017462537619"
+    },
+    {
+      "name": "version inconnue",
+      "value": "SQSC2|793126054516600527312991502085195900982416486670017462537619"
+    },
+    {
+      "name": "59 chiffres",
+      "value": "SQSC1|93126054516600527312991502085195900982416486670017462537619"
+    },
+    {
+      "name": "61 chiffres",
+      "value": "SQSC1|7931260545166005273129915020851959009824164866700174625376190"
+    },
+    {
+      "name": "chiffre arabe-indien",
+      "value": "SQSC1|93126054516600527312991502085195900982416486670017462537619٣"
+    },
+    {
+      "name": "espace final",
+      "value": "SQSC1|793126054516600527312991502085195900982416486670017462537619 "
+    }
+  ],
+  "invalidShortFingerprintInputs": [
+    {
+      "name": "b64url avec remplissage",
+      "value": "FKTO7JZwgK7qcUDvhAsAHovwt3ijSVhwE1KI-CQVy3U="
+    },
+    {
+      "name": "31 octets",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw"
+    },
+    {
+      "name": "b64 standard",
+      "value": "+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s="
+    }
+  ]
+}

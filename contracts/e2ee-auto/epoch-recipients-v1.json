@@ -1,0 +1,1841 @@
+{
+  "fixtureVersion": 1,
+  "toleranceMs": 600000,
+  "note": "Contrat §7.1 et §11. Normatifs : côté serveur, ok, le statut 400, le 409 et ses details (userIds triés, userId = userIds[0]) ; côté lecteur, adoptable ou non, l’alerte et son couple (userId, deviceId), ou l’absence d’alerte et son cas (LOG_BEHIND et ses userIds, FUTURE, EXCLUDES_WEB). Les noms des raisons de 400 et d’alerte sont ceux de la référence TS, à titre indicatif.",
+  "log": {
+    "pinnedLogKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+    "pinnedNextLogKeysB64": [
+      "BAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc="
+    ],
+    "links": [
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nGxx8anlIONjMEb8drYDRk3vbKnQYztqlqo3m5AN1SJA\nACCOUNT\nR27gP0zCGVvu3vqkFiaONkBhkGlNUIhwAiwdaQDua98\n_2LqS8SVYJfYPFE3eUu3Hi8-V8zaca57DkkzKdYFhtA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nObanguziQzE6MLa3xp2FCNhpRuTiLprzR9_P5CJ5Y_Q\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nGfRIeVGPQD7OBwJpII-kB4CVufZDRdnmHoSBlW2w0oY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nX4Koyk1X_cOBg2B1Id6yzUZHg2mfVCY01igJX3AT8Es\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nDrJKIpN_UzUQUJHE0-fC2-pE9Gx-wFIHDZ007KA5ZlA\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nZrEMi2sMCBWTyKZHQcMghkQFpgrdv_Ems-OUzocb0QY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nEem_IadeS7Bi8VNe8NS9wRMju_nJm7Hlm7E1PGtPDEc\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nKOMmTzV3RWxWrNb2i3-hrBVbdCKi0w4-ENkoqnUEFi4\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nZNVKRynYn5ZbSXrJBFee5wE5ERHTL1j8pg023pmkxYg\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n11\ngfsnn7YSkn9zaQL7jgMNTw2hyVsjhWqaMeSOaYAxcPU\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n12\nwRogfAV__F6NOswuKo3-es4_7Bt3OFMuoT3s7cwvBR4\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nr24e6HESRQ8GqS7LcPnUkg6867GlyDB5b6FYDWnzr_w\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n13\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\nENTRY\n-\nx6Nfrd51LYIV61SuoQUOdC3Okw7chvj5IZ9hjkL_6aQ\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n14\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nYNdMGgfZI7xCEFElHFJNeL7r7tJ7IKUUNRu-lV4nfTc\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n15\nmwH2CJjopy0vBixsD8wFft-PywLk9MzTur0K25mL5KU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAQlW-i7ocOQifRtgBCkmeCmIZ4vz35FwL1Gu4ikkVBk\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n16\nw0x4eI1f3B8O09rNWdVGgp7UoFv_q4KE68rSNYqoQoI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n17\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nuHsoOUw7-sQvUBfv6FyL97ZPW-aEko5iexPJ1DOrA-4\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n18\n_IJG06I6FrBuQXt_-ZW_OWbR-CHQHw3n_T8gxD8kOV4\nACCOUNT\nNIc0S5vq_SJnELY0XzaZmcQoImCPqnPRjMu0543Uhh4\nEQlwoA3KlrIDODgbQTsknuDcwV5WIglxhnCHw0mmZyM\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n19\n_Cfkw47w5u_oX46r65fsEwmRarW6iR_7fkNIf6hFKJE\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nzRtpQ9_ppziAquIeDVvmDEK-9_6iIGDllQXmSicMfQw\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n20\nCaEjJgNAlOU1v__DuLo0XmXpIbKXeg2Zeng4MlZ5haA\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nRgNW8tQ5LHJbpZHSVjOx3Oq1XDqAPc6KEq37fA7KnpI\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n21\nGVBi8BPXrLH0mDI8Y5SVBFhTlyBGSCT7G2yW04X4FJU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAczl-30XRDeuEwcw9BzPXVSTq1930AuaoJdZ0Vw5Y38\n0"
+    ],
+    "logKeyEntries": {
+      "13": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\n-\n-\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
+    },
+    "accounts": [
+      {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_a1_000001\nios\nBJ1E/TNbxTHr+Bj3zhT7mcR+fj8LYenKUfHlipSGsFBbdUbn6TCcnnEdKP1kTzDgeQI34eQ8Bka8fPEgoYuyhf0=\nBLPm4T23SvmU0YbzgjuCmcMO8FkM/jrIM8p+bkPakYhNgYvGaeb1/3BDne2x0bGXWPpG8AXziXmf8znMHz/zBDg=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=:MEUCIQDbLf3xZMFFx+0BA+RBqAw1WvkEVdlLBuXUxk+NlTgYjwIgV87VvE5wiJe1nLVr8N7tihmdeEkv8WoeB1L+lanfnYw=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\nROTATE\ndevice_alice_a1_000001\n-\nBMu3NmkpxeWFaJu08ufOycZxONa32XU2sngLgDKXHUp/uVwDaT0l4G68OTVHm1DPvM7KtGOXVJ9UktsdcaP70WU=\n-\n2\nMEUCIQCR8oyxKtAHzoPgAw9LxzlZ2LlFQ5gBjpopEgT8ymcaMwIgJ+REIgnuVgjdZPM4i8Sx46QVxNRtgXcrDXcvM5z8vII=\n1790010800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\nREVOKE\ndevice_alice_a2_000002\n-\n-\n-\n-\nNOT_ME:device_alice_a1_000001:MEQCIB393Lol7hWSdPYtqC6zDyYsWuXcLyyienBd3ChyWJLLAiA9HijSxnRsDUqgDG4qz8fZKbJVQ8gER1B2HFNROyaWGQ==\n1790018000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BFyoPC6RfAiXzsUfPLkVqn+5UTVdSOZF18JkjQpXEAPFLa2oetN6pJFaGAIkOXcGl3yKwlgyEWdtKzLGY+NiUMY=:MEUCIQDMYS9Gyi79ZI/+jsCxtp3lifZBFTfNxXjcGyzBXlWPjQIgL2MNz+OS2ja23a6lWvuc0Tn/CA4bblmC79eGBWCuxMs=\n1790018060000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n16\nuser_alice_00000000001\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\nADD\ndevice_alice_a3_000003\nandroid\nBJ/3CpjAtwHYghD9dCgwkFw2r4hpdlwStJjJVMkOWmxw2wigSC7Ij0dYO/VbNMHUycI9+6Y2gILxgSYQf/eFr0I=\nBJDutRnOtaHOVMluYIKu3wUNg9v7vRPoeFUKySXgnSFgMhOA0+ShIrIsetYjkqCfTQF4jTmTVuDxAKvaLh+rRsU=\n1\n-\n1790032400000"
+        ]
+      },
+      {
+        "userId": "user_bob_0000000000002",
+        "accountSaltB64": "srKysrKysrKysrKysrKysg==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_bob_0000000000002\n-\nADD\ndevice_bob_b1_00000001\nandroid\nBHnklHI0hM0ZqlXI0F5/df+ahuLD8xC+btjHNGTgT3oEZ5TnLTCNMGcHpXRtLd3SGe+uSIK3GeZkqH4FZsY9vwI=\nBEBSDk9cKn9gJAoUcLWPfWD+8gywTUFS3nN3wpioYCn6D9+h9UtWspQZhXrX8cIYq8qxxgUpL7IlVrZfDoitSSc=\n1\nGENESIS\n1789568000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_bob_0000000000002\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_bob_b1_00000001:BPSAQyNhOI+YFW1yzkLfxtgmOWz7h773Mgcwwp8ma7/KmSzG8TAP+xtAiIQjWu3AGPBHE/JzCStK/v7UQ9FDt7E=:MEQCIDucL7N9xwoSNx6EfjCKMB9RN2MSuZ45t4jUZVpuxj/CAiA4cxAfMoASbIGSI44a9O40eTn9U1gV6vE2iS41W1HJiw==\n1790007200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_bob_0000000000002\nDrJKIpN_UzUQUJHE0-fC2-pE9Gx-wFIHDZ007KA5ZlA\nADD\ndevice_bob_b2_00000002\nios\nBJp5J6vw+LKjQXWqnFtjuwP2Equ+uEAi+7wSeuR0ORrXyG6PynAdDjT4p9VosmVyVUF8273O/X/G+1V/fC6J4Cw=\nBKs4B5IosjBMBO9q6H+f91GjnbW2uv+XOjppu0Da6VtkZ1RicFQA14ILEFhth7YC88aNmXL7lFs8EWowMMOAIUU=\n1\n-\n1790014400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_bob_0000000000002\nKOMmTzV3RWxWrNb2i3-hrBVbdCKi0w4-ENkoqnUEFi4\nMODE\n-\n-\n-\n-\n-\ndevice_bob_b1_00000001:STRICT:MEQCIDThNlAEvoOT0bvb20lwPqdZLmqSoMfR35NRMRDR7MUqAiBBIiII8eH0Sa9avtqnFi+H/E4n2EISf5mmuegBfwZuUg==\n1790021600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_bob_0000000000002\nr24e6HESRQ8GqS7LcPnUkg6867GlyDB5b6FYDWnzr_w\nADD_PENDING\ndevice_bob_b3_00000003\nweb\nBESPqL9FboaYvtpnoOOXs8/56hbzzE5AnkKgd+eAar7lW6jyljZ/mnLGlQHH6CR3JltxldaeFlQ3P2uT5Kh1kLk=\nBKNm1+e0N6bcM33L7eLzL71ROqXKbNa3jJa/KCzqPtOWgoQ0L0GSHAlhsN/xVzqmuFNqXe6QLBy6qY9OARIJ1JU=\n1\n-\n1790028800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n15\nuser_bob_0000000000002\nYNdMGgfZI7xCEFElHFJNeL7r7tJ7IKUUNRu-lV4nfTc\nACTIVATE\ndevice_bob_b3_00000003\nweb\nBESPqL9FboaYvtpnoOOXs8/56hbzzE5AnkKgd+eAar7lW6jyljZ/mnLGlQHH6CR3JltxldaeFlQ3P2uT5Kh1kLk=\nBKNm1+e0N6bcM33L7eLzL71ROqXKbNa3jJa/KCzqPtOWgoQ0L0GSHAlhsN/xVzqmuFNqXe6QLBy6qY9OARIJ1JU=\n1\ndevice_bob_b1_00000001:MEUCIQC/Yudj0PQAbvMQORl0ksC3+kb7NyFGXqgwdgawFGc+xgIgYNYsz2IbZSuvwY8stEK7pBBzcAuUPk0EeZwAVJXwF8o=\n1790028920000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_bob_0000000000002\nAQlW-i7ocOQifRtgBCkmeCmIZ4vz35FwL1Gu4ikkVBk\nADD_PENDING\ndevice_bob_b4_00000004\nios\nBBOZiCpe40luQvt7ROepsmWBKI4Scew2jXEWosj2V4RGuuJm5J2ApOAwsvJ8dTp23fFFG5jxWbTAUgY/Amd0iSA=\nBGkDBwpE9rcXtUfYHzqK+jjnQaUnRgCOcgEvQh3oD4pmsPOuVwRIbly91t/E5LZW+SIZIlbuvs/Do688qsmt0CU=\n1\n-\n1790034200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n20\nuser_bob_0000000000002\nuHsoOUw7-sQvUBfv6FyL97ZPW-aEko5iexPJ1DOrA-4\nADD_PENDING\ndevice_bob_b5_00000005\nandroid\nBEuqKSFEjrLSe7XDj8jnITndkkk95F6m+Lty9+BuSVZ78fPTgOarAw8mb6Ycoc4sICkXoj2ZHqcx/9V7GGhhMng=\nBI0lA808KFma3HDRjjUKPZj3U4MG8CsyHc8UGfq37kNOyzlC5x6mCsd2OChAEUK3tU33m0c2Y4n/OKEuvYCFc3w=\n1\n-\n1790035400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n21\nuser_bob_0000000000002\nRgNW8tQ5LHJbpZHSVjOx3Oq1XDqAPc6KEq37fA7KnpI\nREVOKE\ndevice_bob_b5_00000005\n-\n-\n-\n-\nNOT_ME:device_bob_b1_00000001:MEQCIDXGa7pdpX3o6ICjbI0EO2OWmrOGET5nT9eY0U2djqnDAiBhkSdxpUz7RpFxJG7YBxdYlLUIoHL/6Rz0/Q7xZU4tGg==\n1790035700000"
+        ]
+      },
+      {
+        "userId": "user_carol_00000000003",
+        "accountSaltB64": "w8PDw8PDw8PDw8PDw8PDww==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n19\nuser_carol_00000000003\n-\nADD\ndevice_bob_b1_00000001\nweb\nBDSB/gbqlaixnd5C99IZTobQ76He7xRS0Hzpsu70yMLuR7gFKxzIkYvueqbQFmPMnME9rxjCA13UzXj9R5LLghI=\nBAW65Xl1iRie/YhqC+c2OiHUPuzyDZwpf3iuLecKnahdqP9082mwbOFX3Lps4jsd7yMiUuBT2pYN/JsCF8KZ6zM=\n1\n-\n1790034800000"
+        ]
+      },
+      {
+        "userId": "user_dave_000000000004",
+        "accountSaltB64": "1NTU1NTU1NTU1NTU1NTU1A==",
+        "entries": []
+      }
+    ]
+  },
+  "members": [
+    "user_alice_00000000001",
+    "user_bob_0000000000002",
+    "user_carol_00000000003",
+    "user_dave_000000000004"
+  ],
+  "compose": [
+    {
+      "name": "tous les appareils ACTIVE, Dave à \"0\", B4 en attente écarté",
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "excluded": [],
+      "expect": {
+        "memberLogSeqs": {
+          "user_alice_00000000001": "16",
+          "user_bob_0000000000002": "21",
+          "user_carol_00000000003": "19",
+          "user_dave_000000000004": "0"
+        },
+        "recipients": [
+          "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+          "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+          "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+          "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+          "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+          "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+        ]
+      }
+    },
+    {
+      "name": "appareil divergent B2 exclu par l’app",
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "excluded": [
+        {
+          "userId": "user_bob_0000000000002",
+          "deviceId": "device_bob_b2_00000002"
+        }
+      ],
+      "expect": {
+        "memberLogSeqs": {
+          "user_alice_00000000001": "16",
+          "user_bob_0000000000002": "21",
+          "user_carol_00000000003": "19",
+          "user_dave_000000000004": "0"
+        },
+        "recipients": [
+          "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+          "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+          "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+          "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+          "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+        ]
+      }
+    },
+    {
+      "name": "exclusion par couple : B1 de Bob exclu, B1 de Carol gardé",
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "excluded": [
+        {
+          "userId": "user_bob_0000000000002",
+          "deviceId": "device_bob_b1_00000001"
+        }
+      ],
+      "expect": {
+        "memberLogSeqs": {
+          "user_alice_00000000001": "16",
+          "user_bob_0000000000002": "21",
+          "user_carol_00000000003": "19",
+          "user_dave_000000000004": "0"
+        },
+        "recipients": [
+          "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+          "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+          "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+          "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+          "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+        ]
+      }
+    }
+  ],
+  "submissions": [
+    {
+      "name": "requête conforme",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "sous-ensemble (appareil divergent exclu)",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "même deviceId sous deux comptes (B1 de Bob et de Carol)",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "memberListVersions sur une conversation auto",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": true,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LIST_VERSIONS"
+      }
+    },
+    {
+      "name": "memberLogSeqs absent",
+      "memberLogSeqs": null,
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQS_MISSING"
+      }
+    },
+    {
+      "name": "memberLogSeqs en tableau",
+      "memberLogSeqs": [
+        "16",
+        "21",
+        "19",
+        "0"
+      ],
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQS_MISSING"
+      }
+    },
+    {
+      "name": "clé en trop",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0",
+        "user_eve_0000000000005": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQS_KEYS"
+      }
+    },
+    {
+      "name": "clé manquante",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQS_KEYS"
+      }
+    },
+    {
+      "name": "valeur à zéro de tête",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "016",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQ_FORMAT"
+      }
+    },
+    {
+      "name": "valeur en nombre JSON",
+      "memberLogSeqs": {
+        "user_alice_00000000001": 16,
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQ_FORMAT"
+      }
+    },
+    {
+      "name": "seq d’une entrée de Bob annoncé pour Alice",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "9",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQ_UNKNOWN"
+      }
+    },
+    {
+      "name": "seq au-delà de la dernière entrée",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "22",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQ_UNKNOWN"
+      }
+    },
+    {
+      "name": "seq d’un maillon ACCOUNT",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "1",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "MEMBER_LOG_SEQ_UNKNOWN"
+      }
+    },
+    {
+      "name": "excludesWeb = 1",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": true,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "EXCLUDES_WEB"
+      }
+    },
+    {
+      "name": "destinataire hors des membres",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_eve_0000000000005\ndevice_eve_e1_00000001\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "RECIPIENT_NOT_MEMBER"
+      }
+    },
+    {
+      "name": "couple (userId, deviceId) cité deux fois",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "DUPLICATE_DEVICE"
+      }
+    },
+    {
+      "name": "400 avant 409 : excludesWeb et seq en retard",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "15",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": true,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 400,
+        "reason": "EXCLUDES_WEB"
+      }
+    },
+    {
+      "name": "seq de Bob en retard (ADD_PENDING de B4 à 17)",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "15",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_bob_0000000000002",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "seq de Bob à l’ADD_PENDING de B5 (REVOKE à 21 depuis)",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "20",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_bob_0000000000002",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "\"0\" pour Alice, qui a des entrées",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "0",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_alice_00000000001",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      }
+    },
+    {
+      "name": "destinataire ADD_PENDING",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_bob_0000000000002",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "destinataire révoqué",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_alice_00000000001",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      }
+    },
+    {
+      "name": "ancienne clé d’accord de A1",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_alice_00000000001",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      }
+    },
+    {
+      "name": "mauvaise plateforme",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "21",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_alice_00000000001",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      }
+    },
+    {
+      "name": "deux comptes à relire, triés",
+      "memberLogSeqs": {
+        "user_alice_00000000001": "16",
+        "user_bob_0000000000002": "15",
+        "user_carol_00000000003": "19",
+        "user_dave_000000000004": "0"
+      },
+      "hasMemberListVersions": false,
+      "excludesWeb": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "status": 409,
+        "userId": "user_alice_00000000001",
+        "userIds": [
+          "user_alice_00000000001",
+          "user_bob_0000000000002"
+        ]
+      }
+    }
+  ],
+  "manifests": [
+    {
+      "name": "manifeste conforme",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "appareil divergent B2 exclu",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "excludesWeb = 1 : non adopté, sans alerte (époques d’avant la bascule)",
+      "manifestCreatedAtMs": 1790036000000,
+      "excludesWeb": true,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "EXCLUDES_WEB"
+      },
+      "correctedNowMs": 1790036000000,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ADD de A3 à manifeste + T (borne incluse)",
+      "manifestCreatedAtMs": 1790031800000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790031800000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ADD de A3 à manifeste + T + 1 ms",
+      "manifestCreatedAtMs": 1790031799999,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "ADDED_AFTER_MANIFEST",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790031799999,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "destinataire ADD_PENDING, journal pas encore relu",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "destinataire ADD_PENDING après relecture",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PENDING",
+        "userId": "user_bob_0000000000002",
+        "deviceId": "device_bob_b4_00000004"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "révoqué sans ACTIVATE, journal pas encore relu",
+      "manifestCreatedAtMs": 1790035520000,
+      "refreshed": false,
+      "recipients": [
+        "user_bob_0000000000002\ndevice_bob_b5_00000005\nandroid\nQsXcwnIJq99wiKox9amlcLN614E9N6cg0lrsfkzcUv4"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      },
+      "correctedNowMs": 1790035520000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "révoqué sans ACTIVATE après relecture : jamais destinataire",
+      "manifestCreatedAtMs": 1790035520000,
+      "recipients": [
+        "user_bob_0000000000002\ndevice_bob_b5_00000005\nandroid\nQsXcwnIJq99wiKox9amlcLN614E9N6cg0lrsfkzcUv4"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PENDING",
+        "userId": "user_bob_0000000000002",
+        "deviceId": "device_bob_b5_00000005"
+      },
+      "correctedNowMs": 1790035520000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ancienne clé de A1, ROTATE à manifeste − T + 1 ms",
+      "manifestCreatedAtMs": 1790011399999,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790011399999,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ancienne clé de A1, ROTATE à manifeste − T",
+      "manifestCreatedAtMs": 1790011400000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "KEY_ROTATED",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a1_000001"
+      },
+      "correctedNowMs": 1790011400000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "A2, REVOKE à manifeste − T + 1 ms",
+      "manifestCreatedAtMs": 1790018599999,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790018599999,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "A2, REVOKE à manifeste − T",
+      "manifestCreatedAtMs": 1790018600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "REVOKED",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a2_000002"
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "appareil inconnu et empreinte inconnue, journaux pas encore relus",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nW9NWNgzKE6K4-b_CGZ32NY-8fE7sfexO318T1P1rLr8",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "journal en retard chez Alice et Bob, userIds triés",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE",
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_alice_00000000001",
+          "user_bob_0000000000002"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "échec du point 3 face à une ligne à relire : journal en retard d’abord",
+      "manifestCreatedAtMs": 1790031799999,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      },
+      "correctedNowMs": 1790031799999,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "échec du point 5 face à une ligne à relire : journal en retard d’abord",
+      "manifestCreatedAtMs": 1790018600000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      },
+      "correctedNowMs": 1790018600000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "échec définitif après un échec à relire : alerte sans relecture",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PLATFORM",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "échec définitif avant relecture : non membre",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_eve_0000000000005\ndevice_eve_e1_00000001\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "NOT_MEMBER",
+        "userId": "user_eve_0000000000005",
+        "deviceId": "device_eve_e1_00000001"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "lecteur à la tête 15 : A3 et l’appareil de Carol inconnus, à relire (Bob est à jour)",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "logSeq": 15,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_alice_00000000001",
+          "user_carol_00000000003"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ]
+    },
+    {
+      "name": "même manifeste après relecture complète : accepté",
+      "manifestCreatedAtMs": 1790036000000,
+      "logSeq": 21,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true
+    },
+    {
+      "name": "lecteur à la tête 7 : empreinte de la clé kv 2 de A1 inconnue, à relire",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "logSeq": 7,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "LOG_BEHIND",
+        "userIds": [
+          "user_alice_00000000001"
+        ]
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ]
+    },
+    {
+      "name": "lecteur à la tête 7, relecture faite, clé toujours inconnue : alerte",
+      "manifestCreatedAtMs": 1790036000000,
+      "logSeq": 7,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "FINGERPRINT",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a1_000001"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true
+    },
+    {
+      "name": "échec définitif avant un échec à relire : alerte sans relecture",
+      "manifestCreatedAtMs": 1790036000000,
+      "refreshed": false,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PLATFORM",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "logSeq": 21
+    },
+    {
+      "name": "appareil inconnu du compte après relecture",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "DEVICE_UNKNOWN",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_zz_000099"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "mauvaise plateforme",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nios\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "PLATFORM",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "empreinte d’une autre clé après relecture",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nW9NWNgzKE6K4-b_CGZ32NY-8fE7sfexO318T1P1rLr8"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "FINGERPRINT",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "compte sans journal, hors des membres",
+      "manifestCreatedAtMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_eve_0000000000005\ndevice_eve_e1_00000001\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "NOT_MEMBER",
+        "userId": "user_eve_0000000000005",
+        "deviceId": "device_eve_e1_00000001"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "Carol hors de l’appartenance du manifeste",
+      "manifestCreatedAtMs": 1790036000000,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_dave_000000000004"
+      ],
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "NOT_MEMBER",
+        "userId": "user_carol_00000000003",
+        "deviceId": "device_bob_b1_00000001"
+      },
+      "correctedNowMs": 1790036000000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ACTIVATE de B3 à manifeste + T (borne incluse)",
+      "manifestCreatedAtMs": 1790028320000,
+      "recipients": [
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "correctedNowMs": 1790028320000,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "ACTIVATE de B3 à manifeste + T + 1 ms (ADD_PENDING dans T)",
+      "manifestCreatedAtMs": 1790028319999,
+      "recipients": [
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "ADDED_AFTER_MANIFEST",
+        "userId": "user_bob_0000000000002",
+        "deviceId": "device_bob_b3_00000003"
+      },
+      "correctedNowMs": 1790028319999,
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "daté de +T (borne incluse)",
+      "manifestCreatedAtMs": 1790036000000,
+      "correctedNowMs": 1790035400000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "daté de +T + 1 ms : non adopté, sans alerte",
+      "manifestCreatedAtMs": 1790036000000,
+      "correctedNowMs": 1790035399999,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "FUTURE"
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "son propre manifeste daté de +T + 1 ms",
+      "manifestCreatedAtMs": 1790036000000,
+      "correctedNowMs": 1790035399999,
+      "ownManifest": true,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": {
+        "adoptable": true
+      },
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "horloge du créateur à +2 j, ROTATE de A1 depuis : FUTURE sans alerte",
+      "manifestCreatedAtMs": 1790180000000,
+      "correctedNowMs": 1790014400000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nsnZemJAoHBfJZgcWGooi2PpusT2POTZUkIpZblMTyGw"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "FUTURE"
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "horloge du créateur à +2 j, REVOKE de A2 depuis : FUTURE sans alerte",
+      "manifestCreatedAtMs": 1790187200000,
+      "correctedNowMs": 1790021600000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": false,
+        "reason": "FUTURE"
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "date dans le futur, mais ADD de A3 après manifeste + T : alerte d’abord",
+      "manifestCreatedAtMs": 1790031799999,
+      "correctedNowMs": 1790028800000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "ADDED_AFTER_MANIFEST",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_a3_000003"
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    },
+    {
+      "name": "date dans le futur, mais appareil inconnu : alerte d’abord",
+      "manifestCreatedAtMs": 1790122400000,
+      "correctedNowMs": 1790036000000,
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": {
+        "adoptable": false,
+        "alert": true,
+        "reason": "DEVICE_UNKNOWN",
+        "userId": "user_alice_00000000001",
+        "deviceId": "device_alice_zz_000099"
+      },
+      "excludesWeb": false,
+      "ownManifest": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_carol_00000000003",
+        "user_dave_000000000004"
+      ],
+      "refreshed": true,
+      "logSeq": 21
+    }
+  ],
+  "sendable": [
+    {
+      "name": "tous les destinataires ACTIVE",
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8"
+      ],
+      "expect": true
+    },
+    {
+      "name": "A2 révoqué, même dans la tolérance de lecture",
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_a2_000002\nweb\nk1Zvp7wlmM7j3GEIrPijJgUC8ivrFoohCHVk1Sf25QA"
+      ],
+      "expect": false
+    },
+    {
+      "name": "destinataire absent du journal",
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_alice_00000000001\ndevice_alice_zz_000099\nios\nnJgvsQ7OsIm43_KwGz_aQKYgd1N0Jgp3CqNs6OnoTBU"
+      ],
+      "expect": false
+    },
+    {
+      "name": "destinataire en attente",
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b4_00000004\nios\nLzpXcI-NazcP7UtJpRzXu_orjEXw4mjUtD3D1AByuoE"
+      ],
+      "expect": false
+    },
+    {
+      "name": "destinataire révoqué sans ACTIVATE",
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1_000001\nios\nERgxkf0LNHlDDu2hQlM2FC6DfmK4LzEuZzw5CjmLAOM",
+        "user_alice_00000000001\ndevice_alice_a3_000003\nandroid\nQTqQIOXFuyohmpiNtoB728AXOmCQPqz1AZQ9X7v4dX0",
+        "user_bob_0000000000002\ndevice_bob_b1_00000001\nandroid\nL3AmHlf69Ue3tIVr6VZoTKpwQajysG_mhqeTUZSdHos",
+        "user_bob_0000000000002\ndevice_bob_b2_00000002\nios\nLBA7y_Z3aeB_UOgpwC3IcqbKUmlKO0crQcuLs7cBh1k",
+        "user_bob_0000000000002\ndevice_bob_b3_00000003\nweb\n589_kA_3ytYYunTw_lScI_V6ilYTHhUZ8V8pwmAWW50",
+        "user_carol_00000000003\ndevice_bob_b1_00000001\nweb\njX-ruyiG2IXSJoCPDaBFQEe8h1c4RHRhFBfdRBhizO8",
+        "user_bob_0000000000002\ndevice_bob_b5_00000005\nandroid\nQsXcwnIJq99wiKox9amlcLN614E9N6cg0lrsfkzcUv4"
+      ],
+      "expect": false
+    }
+  ]
+}

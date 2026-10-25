@@ -2,7 +2,7 @@ import XCTest
 @testable import SignalQuest
 
 /// Vecteurs communs du chiffrement automatique (`contracts/e2ee-auto/`, contrat
-/// E2EE-AUTO §11, phase 1a) rejoués contre `E2EEAutoLog` et
+/// E2EE-AUTO §11, phases 1a et 1b) rejoués contre `E2EEAutoLog` et
 /// `E2EEAutoHistoryKey` : lecture stricte dans les deux sens, condensats,
 /// chaîne de référence complète et chaque refus attendu avec son `seq`.
 final class E2EEAutoLogVectorTests: XCTestCase {
@@ -32,6 +32,60 @@ final class E2EEAutoLogVectorTests: XCTestCase {
 
     private func linksBySeq(_ texts: [String]) throws -> [Int64: String] {
         try Dictionary(uniqueKeysWithValues: texts.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
+    }
+
+    /// État de départ : clé épinglée et clés suivantes épinglées (§3.4, v2).
+    private func initialChain(_ vectors: [String: Any]) throws -> E2EEAutoLog.ChainState {
+        .initial(
+            pinnedLogKeyB64: try string(vectors, "pinnedLogKeyB64"),
+            nextLogKeysB64: try XCTUnwrap(vectors["pinnedNextLogKeysB64"] as? [String])
+        )
+    }
+
+    /// Compare l'état vérifié aux champs attendus ; un champ inconnu fait échouer
+    /// le test au lieu d'être ignoré.
+    private func assertState(_ state: E2EEAutoLog.AccountState, _ expect: [String: Any], _ label: String) throws {
+        for (key, value) in expect {
+            switch key {
+            case "lastSeq": XCTAssertEqual(state.lastSeq, try int64(expect, key), label)
+            case "historyKeyPubB64": XCTAssertEqual(state.historyKeyPubB64, value as? String, label)
+            case "rotationDueRevokeSeq": XCTAssertEqual(state.rotationDueRevokeSeq, (value as? NSNumber)?.int64Value, label)
+            case "mode": XCTAssertEqual(state.mode.rawValue, value as? String, label)
+            case "devices":
+                let devices = try XCTUnwrap(value as? [String: [String: Any]], label)
+                // Les cas ne citent que les appareils touchés ; la référence les cite tous (vérifié à part).
+                XCTAssertTrue(Set(devices.keys).isSubset(of: state.devices.keys), label)
+                for (deviceId, expected) in devices {
+                    let device = try XCTUnwrap(state.devices[deviceId], "\(label) \(deviceId)")
+                    try assertDevice(device, expected, "\(label) \(deviceId)")
+                }
+            default: XCTFail("\(label) : champ attendu non comparé « \(key) »")
+            }
+        }
+    }
+
+    private func assertDevice(_ device: E2EEAutoLog.DeviceState, _ expect: [String: Any], _ label: String) throws {
+        for (key, value) in expect {
+            switch key {
+            case "status": XCTAssertEqual(device.status.rawValue, value as? String, label)
+            case "keyVersion": XCTAssertEqual(device.keyVersion, value as? Int, label)
+            case "identityKeyB64": XCTAssertEqual(device.identityKeyB64, value as? String, label)
+            case "addedAtMs": XCTAssertEqual(device.addedAtMs, try int64(expect, key), label)
+            case "revokeReason": XCTAssertEqual(device.revokeReason?.rawValue, value as? String, label)
+            case "revokeSeq": XCTAssertEqual(device.revokeSeq, (value as? NSNumber)?.int64Value, label)
+            case "revokedAtMs": XCTAssertEqual(device.revokedAtMs, (value as? NSNumber)?.int64Value, label)
+            case "identityKeys":
+                let keys = try XCTUnwrap(value as? [[String: Any]], label)
+                let expected = try keys.map {
+                    E2EEAutoLog.IdentityKey(
+                        keyVersion: try XCTUnwrap($0["keyVersion"] as? Int), identityKeyB64: try string($0, "identityKeyB64"),
+                        sinceMs: try int64($0, "sinceMs")
+                    )
+                }
+                XCTAssertEqual(device.identityKeys, expected, label)
+            default: XCTFail("\(label) : champ attendu non comparé « \(key) »")
+            }
+        }
     }
 
     // MARK: Entrées
@@ -122,6 +176,16 @@ final class E2EEAutoLogVectorTests: XCTestCase {
             XCTAssertEqual(result, .invalid(try XCTUnwrap(E2EEAutoLog.HeadError(rawValue: try string(invalid, "expect")))), name)
         }
 
+        // Journal vide : tête de seq 0 au condensat de genèse, signée par la clé épinglée.
+        let empty = try XCTUnwrap(vectors["emptyHead"] as? [String: Any])
+        let emptyCheck = E2EEAutoLog.checkHead(
+            text: try string(empty, "text"), signatureB64: try string(empty, "signatureB64"), logKeyB64: pinned,
+            nowMs: try int64(empty, "nowMs")
+        )
+        guard case let .ok(emptyHead) = emptyCheck else { return XCTFail("tête vide : \(emptyCheck)") }
+        XCTAssertEqual(emptyHead.seq, 0)
+        XCTAssertEqual(E2EEAutoLog.compare(head: emptyHead, to: try initialChain(vectors)), .match)
+
         // La pulsation re-signe le même seq et le même condensat une heure plus tard.
         let heartbeat = try XCTUnwrap(vectors["heartbeat"] as? [String: Any])
         let original = try XCTUnwrap(E2EEAutoLog.parseHead(text))
@@ -140,11 +204,10 @@ final class E2EEAutoLogVectorTests: XCTestCase {
         let vectors = try load("log-chain-v2")
         let reference = try XCTUnwrap(vectors["reference"] as? [String: Any])
         let links = try XCTUnwrap(reference["links"] as? [String])
-        let chain = try E2EEAutoLog.extendChain(
-            .initial(pinnedLogKeyB64: try string(vectors, "pinnedLogKeyB64")), links: links, logKeyEntries: logKeyEntries(reference)
-        ).get()
+        let chain = try E2EEAutoLog.extendChain(try initialChain(vectors), links: links, logKeyEntries: logKeyEntries(reference)).get()
         XCTAssertEqual(chain.seq, Int64(links.count))
-        XCTAssertNotEqual(chain.logKeyB64, try string(vectors, "pinnedLogKeyB64"), "LOG_KEY appliquée")
+        XCTAssertEqual(chain.logKeyB64, try XCTUnwrap(vectors["pinnedNextLogKeysB64"] as? [String]).first, "LOG_KEY appliquée")
+        XCTAssertTrue(chain.nextLogKeysB64.isEmpty)
 
         let head = try XCTUnwrap(reference["head"] as? [String: Any])
         let check = E2EEAutoLog.checkHead(
@@ -162,19 +225,8 @@ final class E2EEAutoLogVectorTests: XCTestCase {
                 entries: try XCTUnwrap(account["entries"] as? [String]), links: bySeq, chain: chain
             ).get()
             let expect = try XCTUnwrap(account["expect"] as? [String: Any])
-            XCTAssertEqual(state.lastSeq, try int64(expect, "lastSeq"), userId)
-            XCTAssertEqual(state.historyKeyPubB64, expect["historyKeyPubB64"] as? String, userId)
-            XCTAssertEqual(state.mode.rawValue, try string(expect, "mode"), userId)
-            let devices = try XCTUnwrap(expect["devices"] as? [String: [String: Any]])
-            XCTAssertEqual(Set(state.devices.keys), Set(devices.keys), userId)
-            for (deviceId, expected) in devices {
-                let device = try XCTUnwrap(state.devices[deviceId])
-                XCTAssertEqual(device.status.rawValue, try string(expected, "status"), deviceId)
-                if let keyVersion = expected["keyVersion"] as? Int { XCTAssertEqual(device.keyVersion, keyVersion, deviceId) }
-                if let identityKey = expected["identityKeyB64"] as? String { XCTAssertEqual(device.identityKeyB64, identityKey, deviceId) }
-                if let reason = expected["revokeReason"] as? String { XCTAssertEqual(device.revokeReason?.rawValue, reason, deviceId) }
-                if expected["revokeSeq"] != nil { XCTAssertEqual(device.revokeSeq, try int64(expected, "revokeSeq"), deviceId) }
-            }
+            try assertState(state, expect, userId)
+            XCTAssertEqual(Set(state.devices.keys), Set(try XCTUnwrap(expect["devices"] as? [String: Any]).keys), userId)
             XCTAssertTrue(state.activeDevices.allSatisfy { $0.status == .active })
         }
     }
@@ -186,8 +238,7 @@ final class E2EEAutoLogVectorTests: XCTestCase {
         let entries = try logKeyEntries(try XCTUnwrap(vectors["reference"] as? [String: Any]))
         for kept in try objects(vectors, "keptStateCases") {
             let state = try E2EEAutoLog.extendChain(
-                .initial(pinnedLogKeyB64: try string(vectors, "pinnedLogKeyB64")),
-                links: try XCTUnwrap(kept["keptLinks"] as? [String]), logKeyEntries: entries
+                try initialChain(vectors), links: try XCTUnwrap(kept["keptLinks"] as? [String]), logKeyEntries: entries
             ).get()
             let head = E2EEAutoLog.Head(seq: try int64(kept, "headSeq"), linkHash: try string(kept, "headLinkHash"), logKeyId: "", createdAtMs: 0)
             let expected = try XCTUnwrap(E2EEAutoLog.ChainError(rawValue: try string(kept, "expect")))
@@ -198,12 +249,12 @@ final class E2EEAutoLogVectorTests: XCTestCase {
 
     func testChainAndAccountRefusals() throws {
         let vectors = try load("log-chain-v2")
-        let pinned = try string(vectors, "pinnedLogKeyB64")
+        let initial = try initialChain(vectors)
         for testCase in try objects(vectors, "cases") {
             let name = try string(testCase, "name")
             let expect = try XCTUnwrap(testCase["expect"] as? [String: Any])
             let links = try XCTUnwrap(testCase["links"] as? [String])
-            let extended = E2EEAutoLog.extendChain(.initial(pinnedLogKeyB64: pinned), links: links, logKeyEntries: try logKeyEntries(testCase))
+            let extended = E2EEAutoLog.extendChain(initial, links: links, logKeyEntries: try logKeyEntries(testCase))
 
             if let chainError = expect["chainError"] as? String {
                 XCTAssertEqual(
@@ -219,6 +270,10 @@ final class E2EEAutoLogVectorTests: XCTestCase {
                 userId: try string(account, "userId"), accountSaltB64: try string(account, "accountSaltB64"),
                 entries: try XCTUnwrap(account["entries"] as? [String]), links: try linksBySeq(links), chain: chain
             )
+            if expect["ok"] as? Bool == true {
+                try assertState(try result.get(), try XCTUnwrap(expect["state"] as? [String: Any]), name)
+                continue
+            }
             let accountError = try XCTUnwrap(E2EEAutoLog.AccountError(rawValue: try string(expect, "accountError")), name)
             XCTAssertEqual(result.failure, E2EEAutoLog.AccountFailure(error: accountError, seq: try int64(expect, "seq")), name)
         }

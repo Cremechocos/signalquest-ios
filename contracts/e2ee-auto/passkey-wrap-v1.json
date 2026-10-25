@@ -1,0 +1,95 @@
+{
+  "fixtureVersion": 1,
+  "kdfInfo": "signalquest-e2ee-auto-passkey-wrap-v1",
+  "algorithm": "clé = HKDF-SHA256(ikm = sortie PRF de 32 octets, salt = SHA-256(saltUtf8), info = kdfInfo, 32 octets) ; AES-256-GCM, nonce 12 octets, AAD = aadUtf8 ; wrappedB64 = chiffré ‖ étiquette.",
+  "prfNote": "prfSaltB64 est l’entrée `eval.first` de l’extension WebAuthn prf ; prfOutputB64 est ce que rend `getClientExtensionResults().prf.results.first`. Jamais de hmac-secret CTAP brut.",
+  "userId": "user_alice_00000000001",
+  "credentialId": "2apqzV_rJd-aAxEuMQDe7w",
+  "prfOutputB64": "gkf3l3ySMWHFenReDn83byY0UANLCjPKCfOC3DVDaek=",
+  "saltUtf8": "SQ-E2EE-AUTO-PASSKEY-SALT\n1\nuser_alice_00000000001\n2apqzV_rJd-aAxEuMQDe7w",
+  "saltB64": "AodfeI2h4tEBmnlirGLioTMfPlI/Jj/QCmpknxkap/8=",
+  "derivedKeyB64": "IKDEcM6u9CWjMHrpe0OfUAoQF19MpMZuLZwd/np7Jt8=",
+  "aadUtf8": "SQ-E2EE-AUTO-PASSKEY-WRAP\n1\nuser_alice_00000000001\n2apqzV_rJd-aAxEuMQDe7w\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+  "hkScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc=",
+  "body": {
+    "prfSaltB64": "LIZIJmvChRWNUOoZlz9Ejus/rTbL1evNTtnlWlHDWeE=",
+    "nonceB64": "F1ksRWheqqmIwLPM",
+    "wrappedB64": "FAbaMwSULY8c7FD/lINTgAsQBLYKEOsLw3pu2zB9yHEFd+Ez3vEAuNTE8u8mqNt9",
+    "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+  },
+  "invalidBodies": [
+    {
+      "name": "prfSalt de 16 octets",
+      "value": {
+        "prfSaltB64": "66HbFOgscdyKznbgFpiJ+g==",
+        "nonceB64": "F1ksRWheqqmIwLPM",
+        "wrappedB64": "FAbaMwSULY8c7FD/lINTgAsQBLYKEOsLw3pu2zB9yHEFd+Ez3vEAuNTE8u8mqNt9",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      }
+    },
+    {
+      "name": "nonce de 16 octets",
+      "value": {
+        "prfSaltB64": "LIZIJmvChRWNUOoZlz9Ejus/rTbL1evNTtnlWlHDWeE=",
+        "nonceB64": "9HtIqNznWHPOxiSzaB/7pw==",
+        "wrappedB64": "FAbaMwSULY8c7FD/lINTgAsQBLYKEOsLw3pu2zB9yHEFd+Ez3vEAuNTE8u8mqNt9",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      }
+    },
+    {
+      "name": "wrapped de 32 octets",
+      "value": {
+        "prfSaltB64": "LIZIJmvChRWNUOoZlz9Ejus/rTbL1evNTtnlWlHDWeE=",
+        "nonceB64": "F1ksRWheqqmIwLPM",
+        "wrappedB64": "CVlUkIZzldpeRdVyh0hn4YnomseiATtwPwFUHdfI3Pg=",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      }
+    },
+    {
+      "name": "champ en trop",
+      "value": {
+        "prfSaltB64": "LIZIJmvChRWNUOoZlz9Ejus/rTbL1evNTtnlWlHDWeE=",
+        "nonceB64": "F1ksRWheqqmIwLPM",
+        "wrappedB64": "FAbaMwSULY8c7FD/lINTgAsQBLYKEOsLw3pu2zB9yHEFd+Ez3vEAuNTE8u8mqNt9",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "credentialId": "2apqzV_rJd-aAxEuMQDe7w"
+      }
+    },
+    {
+      "name": "hkPub hors courbe",
+      "value": {
+        "prfSaltB64": "LIZIJmvChRWNUOoZlz9Ejus/rTbL1evNTtnlWlHDWeE=",
+        "nonceB64": "F1ksRWheqqmIwLPM",
+        "wrappedB64": "FAbaMwSULY8c7FD/lINTgAsQBLYKEOsLw3pu2zB9yHEFd+Ez3vEAuNTE8u8mqNt9",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflg="
+      }
+    }
+  ],
+  "validCredentialIds": [
+    "2apqzV_rJd-aAxEuMQDe7w",
+    "AA",
+    "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH"
+  ],
+  "invalidCredentialIds": [
+    {
+      "name": "bourrage",
+      "value": "AQI="
+    },
+    {
+      "name": "alphabet standard",
+      "value": "ab+/"
+    },
+    {
+      "name": "vide",
+      "value": ""
+    },
+    {
+      "name": "1 024 octets",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw"
+    },
+    {
+      "name": "bits de queue non nuls",
+      "value": "AB"
+    }
+  ]
+}
