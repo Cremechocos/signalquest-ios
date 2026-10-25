@@ -193,6 +193,20 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         }
     }
 
+    /// `keyVersion` lu par `JSON.parse` du texte donné : `2.0` et `2e0` valent 2, `2.5` est refusé (révision 7).
+    func testHistoryWrapKeyVersionJsonTexts() throws {
+        let vectors = try load("history-wrap-v1")
+        let cases = try XCTUnwrap(vectors["keyVersionJsonTexts"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+        for item in cases {
+            let name = try string(item, "name")
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try string(item, "json").utf8)) as? [String: Any], name)
+            let wrap = E2EEAutoHistory.parseWrap(object)
+            XCTAssertEqual(wrap != nil, try XCTUnwrap(item["accepted"] as? Bool, name), name)
+            if let wrap { XCTAssertEqual(wrap.keyVersion, 2, name) }
+        }
+    }
+
     // MARK: Passkey
 
     func testPasskeyWrap() throws {

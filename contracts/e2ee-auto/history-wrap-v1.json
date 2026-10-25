@@ -1477,6 +1477,23 @@
       }
     }
   ],
+  "keyVersionJsonTexts": [
+    {
+      "name": "keyVersion 2.0",
+      "accepted": true,
+      "json": "{\"senderDeviceId\":\"device_alice_w1_000001\",\"recipient\":\"device_alice_w2_000002\",\"keyVersion\":2.0,\"requestId\":\"histreq_alice_w2_00001\",\"addHash\":\"LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\",\"hkPubB64\":\"BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\",\"ephemeralB64\":\"BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=\",\"nonceB64\":\"HZnMr3JTZDYXCGqg\",\"wrappedB64\":\"hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi\",\"signatureB64\":\"MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8=\"}"
+    },
+    {
+      "name": "keyVersion 2e0",
+      "accepted": true,
+      "json": "{\"senderDeviceId\":\"device_alice_w1_000001\",\"recipient\":\"device_alice_w2_000002\",\"keyVersion\":2e0,\"requestId\":\"histreq_alice_w2_00001\",\"addHash\":\"LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\",\"hkPubB64\":\"BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\",\"ephemeralB64\":\"BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=\",\"nonceB64\":\"HZnMr3JTZDYXCGqg\",\"wrappedB64\":\"hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi\",\"signatureB64\":\"MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8=\"}"
+    },
+    {
+      "name": "keyVersion 2.5",
+      "accepted": false,
+      "json": "{\"senderDeviceId\":\"device_alice_w1_000001\",\"recipient\":\"device_alice_w2_000002\",\"keyVersion\":2.5,\"requestId\":\"histreq_alice_w2_00001\",\"addHash\":\"LbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\",\"hkPubB64\":\"BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\",\"ephemeralB64\":\"BE0Ol3irWJGOfqNOG2BK1bR6u067Bdf+N5SLpQxhffve0CeS1PpPYg3EQdDmG6yTt3y4a9r3qpWbyv1uuxEqszY=\",\"nonceB64\":\"HZnMr3JTZDYXCGqg\",\"wrappedB64\":\"hyjxZHJdb1h/CeCH82r3haQWGBUdJeZIzFph62us7el6jwcel5G4EKK9mYN6vyoi\",\"signatureB64\":\"MEUCIQDtyVDsgm9tMBCoFk+6BKyigDhQOBBfasyQqW1eDsqG/gIgZO7ybr51HUXLnkvDowdjMF5kmxjJL9mgULJmnYw/pd8=\"}"
+    }
+  ],
   "invalidObjects": [
     {
       "name": "champ en trop",

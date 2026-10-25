@@ -164,5 +164,92 @@
       "nowMs": 1790025200000,
       "expect": "HEAD_LOG_KEY"
     }
-  ]
+  ],
+  "earlierHeads": [
+    {
+      "name": "seq 12 signée par la clé 1, en vigueur à 12 : retour en arrière",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEUCIQDqO7LODbDDLPaJmr8P0lJ5Kz4nEQ2P9RXGJekwcKicWAIgA+8t0pSGqZi6Qbz1XGBFN0eIvbKuQy0RuhNtsOL0J+Q="
+      },
+      "expect": "ROLLBACK"
+    },
+    {
+      "name": "seq 12 signée par la clé 2, pas encore en vigueur : non concluant",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790025200000",
+        "signatureB64": "MEQCIAnXJR+0lDnzQDUZMxF6pwuoEygraf3Ab353CGeJYSYJAiAk8rtUw3IT8urNwAyn6+3oKrpAOeqvKix7evqM7IZUIQ=="
+      },
+      "expect": "INCONCLUSIVE"
+    },
+    {
+      "name": "seq 14 signée par la clé 2 : retour en arrière",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n14\nmwH2CJjopy0vBixsD8wFft-PywLk9MzTur0K25mL5KU\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790025200000",
+        "signatureB64": "MEUCIQDH20dW+ulQtt1d26Os0p1RLq6ZAHSqaFpdgsgQeKCFWgIgWkOP2VrBV9YNVlJuGEdluElF6rzXpA0NHi7GpCFNNcs="
+      },
+      "expect": "ROLLBACK"
+    },
+    {
+      "name": "seq 13 signée par la clé 1, remplacée à 13 : non concluant",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n13\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEQCIDn2zfSHBep5PfETrtmfRl2UBSvlGIY3D65FKKotOXsqAiBt3PuTPsFM520Hg/PYxAFKJIXKc7+30xqKKC8OMoQIuQ=="
+      },
+      "expect": "INCONCLUSIVE"
+    },
+    {
+      "name": "seq 12 signée il y a 5 jours : retour en arrière quel que soit l’âge",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1789568000000",
+        "signatureB64": "MEQCIC/7i9GVbY1JHZo7HtmY1bDwrAuQPPc3YCIGPHSJeWuwAiBvsI1QVVKRBpCQKcSxVy2L5b7YW3sk87cPE/NOD+ezyg=="
+      },
+      "expect": "ROLLBACK"
+    },
+    {
+      "name": "seq 12, signature d’une autre tête : non concluant",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEUCIQDqEjWvyn+sUCZMjN49TUKbwJp+luQssTBsRe1JOZjwnQIgZqLggww3hj4aH0j5o+3tbVQa6h9kHS68uZ9hafXaENk="
+      },
+      "expect": "INCONCLUSIVE"
+    },
+    {
+      "name": "seq 12 signée par une clé étrangère : non concluant",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n12\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\nSaW22RgcoW6FgYeFrp_f1RE7HjaN8VgP9EiHbzh2Vwc\n1790025200000",
+        "signatureB64": "MEQCIDfs8+Z+uXYjuoGkLzYGLfPp2Oglq1w72KJf6Lk9cdudAiBFl0kPr46dBrcFd8Y3EK/G48A7YPry8A+rdq8kdw003w=="
+      },
+      "expect": "INCONCLUSIVE"
+    },
+    {
+      "name": "seq 14 nommant la clé 1 mais signée par la clé 2 : non concluant",
+      "after": 16,
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n14\nmwH2CJjopy0vBixsD8wFft-PywLk9MzTur0K25mL5KU\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790025200000",
+        "signatureB64": "MEQCIEeKO8wHnu53Ml4cwTCxP1PDyS65rldPxbduwNch08FaAiBMuPvOj/urw507twWFOCkys5BTEqiDX/mEdcy9vqgskA=="
+      },
+      "expect": "INCONCLUSIVE"
+    }
+  ],
+  "fresherHead": {
+    "kept": {
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000",
+      "signatureB64": "MEUCIQD72rRxhwkpbg6z/IdhZsSVN8aXIDWkQG/GSpLQcpQVoQIgOskdV0jwC1LeyVm1Z10AJey/u0i+CBBfOmO04vYppTQ="
+    },
+    "received": {
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790039600000",
+      "signatureB64": "MEUCIQDd2PP/wdgWFOztIrHXBCM/BmCXRRq9pOz+Vr0QzV6oyQIgRX9fZ8eWoUNhkxqoI68ZDeuqfJXoLn8raHYJYbPJXdE="
+    },
+    "nowMs": 1790124200000,
+    "keptExpect": "stale",
+    "receivedExpect": "ok"
+  }
 }

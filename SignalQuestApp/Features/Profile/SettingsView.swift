@@ -117,8 +117,9 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             identityGeneration = inventory.identity?.generation
             if inventory.activationEnabled, currentDeviceCanRevoke {
                 E2EEV2NotificationContextEvents.requestRefresh(.identity)
-                // §2.6 : clé d'accord de 30 jours ou plus, recertifiée en passant.
-                if case .success(true) = await lifecycle.recertifyIfDue() { E2EEV2NotificationContextEvents.requestRefresh(.identity) }
+                // §2.6 : clé d'accord de 30 jours ou plus, recertifiée en passant
+                // (en mode automatique, la rotation passe par le journal).
+                if !SQFeatures.e2eeAutoLogEnabled, case .success(true) = await lifecycle.recertifyIfDue() { E2EEV2NotificationContextEvents.requestRefresh(.identity) }
                 // §12 : document de capacités publié à chaque build et tous les 30 jours.
                 _ = await lifecycle.publishCapabilitiesIfNeeded()
             }

@@ -1,0 +1,346 @@
+{
+  "fixtureVersion": 1,
+  "note": "Requête A.2 (spec v2) de POST /api/e2ee/auto/devices : x-sq-e2ee-device-id = deviceId du corps, signature par signingKeyB64 du corps sur canonicalRequestUtf8. Le serveur hache les octets reçus du corps, sans le re-sérialiser.",
+  "userId": "user_alice_00000000001",
+  "method": "POST",
+  "path": "/api/e2ee/auto/devices",
+  "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+  "bodySha256B64Url": "2bcrdkJNpTbMFtm9UplPTBdBZyjY70rP3a4ojoFlOIQ",
+  "canonicalRequestUtf8": "SQ-E2EE-V2\nPOST\n/api/e2ee/auto/devices\n1790036000000\nregister_nonce_01J7ABCD2345678\n2bcrdkJNpTbMFtm9UplPTBdBZyjY70rP3a4ojoFlOIQ",
+  "headers": {
+    "x-sq-e2ee-device-id": "device_alice_a4_000004",
+    "x-sq-e2ee-timestamp-ms": "1790036000000",
+    "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+    "x-sq-e2ee-signature": "MEUCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIgTzW87GhiNpckAXVbYPwgagox66+OgtWqySurCjTCLOM="
+  },
+  "signingPrivateScalarB64": "SZqFHxwNfaVJvF0ydVX1QBiDswEz2I71uCQk2oLpcPY=",
+  "serverNowMs": 1790036000250,
+  "entryContext": {
+    "seq": 17,
+    "prevUserEntryHash": "hc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y",
+    "createdAtMs": 1790036000250
+  },
+  "addEntryUtf8": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nADD\ndevice_alice_a4_000004\nandroid\nBIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\nBMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\n1\n-\n1790036000250",
+  "addPendingEntryUtf8": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nADD_PENDING\ndevice_alice_a4_000004\nandroid\nBIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\nBMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\n1\n-\n1790036000250",
+  "refusedRequests": [
+    {
+      "name": "signée par la clé d’accord",
+      "expect": "SIGNATURE_INVALID",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQCczV9DaA9JLPTNqEBL+wHvfPJ4r0JA+GFKSiAaKRomxQIgbkRoOz7tYyVF3unEfWrPtn3W5ksyT8prbaMKaS0Tz6o="
+      }
+    },
+    {
+      "name": "corps modifié après signature",
+      "expect": "SIGNATURE_INVALID",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 9\",\"historyKey\":\"absent\"}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIgTzW87GhiNpckAXVbYPwgagox66+OgtWqySurCjTCLOM="
+      }
+    },
+    {
+      "name": "signée pour la route v2",
+      "expect": "SIGNATURE_INVALID",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQDQUZZnWU2b7ugNXnmcSmjmaCHsLTv8PRe0L3Iw/oADRwIgRpQGaSMd1/94+ztEKo4WpLErswnzjYhu0pKBsADv9sc="
+      }
+    },
+    {
+      "name": "signature à S haut",
+      "expect": "SIGNATURE_INVALID",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEYCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIhALDKQxKXnclp2/6KpJ8D35WytQ7+GJTI2iqOH7jHoPhu"
+      }
+    },
+    {
+      "name": "en-tête deviceId d’un autre appareil",
+      "expect": "DEVICE_ID_MISMATCH",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a3_000003",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIgTzW87GhiNpckAXVbYPwgagox66+OgtWqySurCjTCLOM="
+      }
+    }
+  ],
+  "validBodies": [
+    {
+      "name": "keyVersion écrit 1.0",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1.0,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}"
+    },
+    {
+      "name": "libellé de 64 points de code, accents et emoji",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Safari sur macOS éééééééééééééééééééééééééééééééééééééééééééééé📱\",\"historyKey\":\"absent\"}"
+    },
+    {
+      "name": "historyKey present, plateforme web",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"web\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"present\"}"
+    },
+    {
+      "name": "keyVersion 3 (appareil v2 repris, réinscription rejouée)",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":3,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}"
+    },
+    {
+      "name": "keyVersion 2³¹ − 2",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":2147483646,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}"
+    },
+    {
+      "name": "libellé avec U+00A0 au milieu",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}"
+    }
+  ],
+  "invalidBodies": [
+    {
+      "name": "champ en trop",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent",
+        "mode": "NORMAL"
+      }
+    },
+    {
+      "name": "champ manquant",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "keyVersion 0",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 0,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "keyVersion 2³¹ − 1",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 2147483647,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "keyVersion non entière",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1.5,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "keyVersion en chaîne",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": "1",
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "plateforme inconnue",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "macos",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "historyKey hors ensemble",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "yes"
+      }
+    },
+    {
+      "name": "deviceId non opaque",
+      "value": {
+        "deviceId": "short",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "clé d’accord hors courbe",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytk=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "clé de signature en base64url",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT_556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp_P5DmYUDJKCA1w",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé vide",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé de 65 points de code",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé sur deux lignes",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel\n8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec espace final",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8 ",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec caractère de format",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel​8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+00A0 en tête",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": " Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+3000 en fin",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8　",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "tableau",
+      "value": [
+        {
+          "deviceId": "device_alice_a4_000004",
+          "platform": "android",
+          "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+          "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+          "keyVersion": 1,
+          "label": "Pixel 8",
+          "historyKey": "absent"
+        }
+      ]
+    }
+  ],
+  "invalidBodyTexts": [
+    {
+      "name": "libellé avec une demi-paire de substitution seule",
+      "json": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1,\"label\":\"Pixel \\ud800\",\"historyKey\":\"absent\"}"
+    }
+  ]
+}

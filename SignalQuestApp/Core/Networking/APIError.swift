@@ -196,6 +196,8 @@ struct BackendErrorResponse: Codable {
     let code: String?
     let requestId: String?
     let details: [String: JSONValue]?
+    /// Raison d'un `403 E2EE_DEVICE_REVOKED` (E2EE-AUTO §4.3), au premier niveau.
+    let reason: String?
 }
 
 extension Error {

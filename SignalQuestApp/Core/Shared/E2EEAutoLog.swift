@@ -366,9 +366,12 @@ enum E2EEAutoLog {
         guard let head = parseHead(text) else { return .invalid(.format) }
         guard head.logKeyId == logKeyId(logKeyB64) else { return .invalid(.logKey) }
         guard verify(publicKeyB64: logKeyB64, payload: text, signatureB64: signatureB64) else { return .invalid(.signature) }
-        let tooOld = nowMs - head.createdAtMs > headMaxAgeMs + clockToleranceMs
-        let inFuture = head.createdAtMs - nowMs > clockToleranceMs
-        return tooOld || inFuture ? .stale(head) : .ok(head)
+        return isFresh(createdAtMs: head.createdAtMs, nowMs: nowMs) ? .ok(head) : .stale(head)
+    }
+
+    /// 24 h au plus, et pas plus de la tolérance dans le futur (§3.4).
+    static func isFresh(createdAtMs: Int64, nowMs: Int64) -> Bool {
+        nowMs - createdAtMs <= headMaxAgeMs + clockToleranceMs && createdAtMs - nowMs <= clockToleranceMs
     }
 
     // MARK: - Chaîne publique des maillons (§3.3, §3.5 points 1, 3 et 4)
@@ -816,6 +819,25 @@ enum E2EEAutoHistoryKey {
                 payload: proofPayload(userId: userId, deviceId: deviceId, hkPubB64: hkPubB64, revokeSeq: revokeSeq),
                 signatureB64: signatureB64
             )
+    }
+
+    /// Règle de service d'une rotation de HK (§5.6 étape 4, révision 7), appliquée par
+    /// l'émetteur : HK′ ne part qu'aux appareils `ACTIVE` du journal vérifié, hors lui-même,
+    /// dont la preuve se vérifie avec la HK précédente et le `revokeSeq` de la rotation.
+    /// `deviceId` triés par octets, sans doublon.
+    static func servedDevices(
+        state: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord,
+        proofs: [(deviceId: String, signatureB64: String)], selfDeviceId: String
+    ) -> [String] {
+        guard let previousHkPubB64 = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq else { return [] }
+        var served = Set<String>()
+        for proof in proofs where proof.deviceId != selfDeviceId && state.devices[proof.deviceId]?.status == .active {
+            if verifyProof(userId: state.userId, deviceId: proof.deviceId, hkPubB64: previousHkPubB64,
+                           revokeSeq: revokeSeq, signatureB64: proof.signatureB64) {
+                served.insert(proof.deviceId)
+            }
+        }
+        return served.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
     }
 
     /// Produit la preuve avec le scalaire HK. Refuse un scalaire qui ne

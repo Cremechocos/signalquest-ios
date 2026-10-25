@@ -333,6 +333,31 @@ final class E2EEAutoLogVectorTests: XCTestCase {
         }
     }
 
+    /// Règle de service chez l'émetteur (révision 7) : compte d'Alice du journal de référence, rotation du `seq` 11.
+    func testHistoryKeyProofServing() throws {
+        let vectors = try load("hk-proof-v1"), chainVectors = try load("log-chain-v2")
+        let reference = try XCTUnwrap(chainVectors["reference"] as? [String: Any])
+        let links = try XCTUnwrap(reference["links"] as? [String])
+        let chain = try E2EEAutoLog.extendChain(try initialChain(chainVectors), links: links, logKeyEntries: try logKeyEntries(reference)).get()
+        let alice = try XCTUnwrap((reference["accounts"] as? [[String: Any]])?.first { $0["userId"] as? String == "user_alice_00000000001" })
+        let state = try E2EEAutoLog.verifyAccount(
+            userId: try string(alice, "userId"), accountSaltB64: try string(alice, "accountSaltB64"),
+            entries: try XCTUnwrap(alice["entries"] as? [String]), links: try linksBySeq(links), chain: chain
+        ).get()
+        let cases = try objects(vectors, "servingCases")
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let name = try string(testCase, "name")
+            let rotationSeq = try int64(testCase, "rotationSeq")
+            let rotation = try XCTUnwrap(state.historyKeys.first { $0.seq == rotationSeq }, name)
+            let proofs = try objects(testCase, "proofs").map { (deviceId: try string($0, "deviceId"), signatureB64: try string($0, "signatureB64")) }
+            XCTAssertEqual(
+                E2EEAutoHistoryKey.servedDevices(state: state, rotation: rotation, proofs: proofs, selfDeviceId: try string(testCase, "selfDeviceId")),
+                try XCTUnwrap(testCase["served"] as? [String]), name
+            )
+        }
+    }
+
     func testHistoryKeyProofs() throws {
         let vectors = try load("hk-proof-v1")
         func verify(_ proof: [String: Any]) throws -> Bool {

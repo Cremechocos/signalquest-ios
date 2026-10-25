@@ -41,5 +41,79 @@
     "hkPubB64": "BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=",
     "revokeSeq": 10,
     "signatureB64": "MEQCIA1k/5xntlbVvbKDH4hxCjt3dhVwBujtCXN/DZqH7ZY0AiAA/iCn8iDTyTUy+iFAHhlNUH6hpAtI4KYy4LPu7ihA3Q=="
-  }
+  },
+  "servingCases": [
+    {
+      "name": "émetteur A1 : lui-même, A2 révoqué et une preuve signée par HK2 ne sont pas servis",
+      "rotationSeq": 11,
+      "selfDeviceId": "device_alice_a1_000001",
+      "proofs": [
+        {
+          "deviceId": "device_alice_a1_000001",
+          "signatureB64": "MEUCIQD1H/D7hAzJYlwgpUvb+RCJ1o8spV55Ok+9IIJvzUhw3QIgXxSFx8y7nk72Iigm3+7Qbf7huogDLbVIW9Ov81V7YHw="
+        },
+        {
+          "deviceId": "device_alice_a2_000002",
+          "signatureB64": "MEQCIA1k/5xntlbVvbKDH4hxCjt3dhVwBujtCXN/DZqH7ZY0AiAA/iCn8iDTyTUy+iFAHhlNUH6hpAtI4KYy4LPu7ihA3Q=="
+        },
+        {
+          "deviceId": "device_alice_a3_000003",
+          "signatureB64": "MEUCIQCHUqHQ89D+JFM1l+bM/B4yHT+XGw5M3eM9ht5BYhAHUAIgFAj2C5cBpghiBJgpGobf7XDwl/JcmgsLinTJFiKsXhA="
+        }
+      ],
+      "served": []
+    },
+    {
+      "name": "émetteur A3 : la preuve tardive de A1 est servie, une fois même en double",
+      "rotationSeq": 11,
+      "selfDeviceId": "device_alice_a3_000003",
+      "proofs": [
+        {
+          "deviceId": "device_alice_a1_000001",
+          "signatureB64": "MEUCIQD1H/D7hAzJYlwgpUvb+RCJ1o8spV55Ok+9IIJvzUhw3QIgXxSFx8y7nk72Iigm3+7Qbf7huogDLbVIW9Ov81V7YHw="
+        },
+        {
+          "deviceId": "device_alice_a1_000001",
+          "signatureB64": "MEUCIQD1H/D7hAzJYlwgpUvb+RCJ1o8spV55Ok+9IIJvzUhw3QIgXxSFx8y7nk72Iigm3+7Qbf7huogDLbVIW9Ov81V7YHw="
+        },
+        {
+          "deviceId": "device_alice_a2_000002",
+          "signatureB64": "MEQCIA1k/5xntlbVvbKDH4hxCjt3dhVwBujtCXN/DZqH7ZY0AiAA/iCn8iDTyTUy+iFAHhlNUH6hpAtI4KYy4LPu7ihA3Q=="
+        }
+      ],
+      "served": [
+        "device_alice_a1_000001"
+      ]
+    },
+    {
+      "name": "émetteur A1 : preuve de A3 pour un autre revokeSeq, ou d’un appareil inconnu",
+      "rotationSeq": 11,
+      "selfDeviceId": "device_alice_a1_000001",
+      "proofs": [
+        {
+          "deviceId": "device_alice_a3_000003",
+          "signatureB64": "MEUCIQDBDejX+04bK2nAZajLUkflhBvFZkpGcMs8GnjNNV1kBAIgGeMpQmceIR55R4flLeso9at19+csQyaIabne6uaST90="
+        },
+        {
+          "deviceId": "device_alice_ghost_0001",
+          "signatureB64": "MEQCIEp60Y1tKmPLtsdhfL6u2DASd3mx4ih9okm6U7IJ4IrTAiBAf9YukHvTfuiUPKWMdZZvp0PPL8twRKSiBpcnHUPZ8Q=="
+        }
+      ],
+      "served": []
+    },
+    {
+      "name": "émetteur A1 : preuve valide de A3",
+      "rotationSeq": 11,
+      "selfDeviceId": "device_alice_a1_000001",
+      "proofs": [
+        {
+          "deviceId": "device_alice_a3_000003",
+          "signatureB64": "MEUCIQDSm8tUjr2VwGU6F4qB2HIUqSPK3+CqS1nfmkMvyadqgwIgGEYsnUbuiIBnPgNiqbLqvpKdPX6U/McuS54GOlaTHig="
+        }
+      ],
+      "served": [
+        "device_alice_a3_000003"
+      ]
+    }
+  ]
 }

@@ -354,6 +354,8 @@ struct AppRootView: View {
                     }
                     // Le ton a pu changer depuis un autre appareil.
                     if case .authenticated = session.state {
+                        // E2EE-AUTO §4.3 : rotation de la clé d'accord au premier plan.
+                        Task { await services.enrollE2EEAutoDevice() }
                         Task {
                             await addressStore.refresh(using: services.privacy)
                             addressStore.applyTone()

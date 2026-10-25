@@ -1801,19 +1801,23 @@ struct E2EEV2TransportFailure: Error, Equatable, Sendable {
     /// `details` de l'erreur (E.0), aujourd'hui seulement pour
     /// `E2EE_DEVICE_LIST_STALE` : les membres dont relire l'identité.
     let details: [String: JSONValue]?
+    /// Raison d'un `403 E2EE_DEVICE_REVOKED` (E2EE-AUTO §4.3).
+    let reason: String?
 
     init(
         kind: E2EEV2TransportFailureKind,
         statusCode: Int? = nil,
         code: String? = nil,
         message: String,
-        details: [String: JSONValue]? = nil
+        details: [String: JSONValue]? = nil,
+        reason: String? = nil
     ) {
         self.kind = kind
         self.statusCode = statusCode
         self.code = code
         self.message = message
         self.details = details
+        self.reason = reason
     }
 
     /// `E2EE_DEVICE_LIST_STALE` : `details.userIds`, à défaut `details.userId`.
@@ -2311,7 +2315,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
                 message: decoded?.error?.isEmpty == false
                     ? decoded?.error ?? "e2ee-http-\(response.statusCode)"
                     : "e2ee-http-\(response.statusCode)",
-                details: decoded?.details
+                details: decoded?.details,
+                reason: decoded?.reason
             )
         )
     }

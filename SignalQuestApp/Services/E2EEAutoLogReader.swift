@@ -376,13 +376,20 @@ actor E2EEAutoLogReader {
             let check = E2EEAutoLog.checkHead(
                 text: page.headText, signatureB64: page.headSignatureB64, logKeyB64: logKeyB64, nowMs: receivedAtMs
             )
-            let head: E2EEAutoLog.Head
+            var head: E2EEAutoLog.Head, isCurrent: Bool
             switch check {
-            case .ok(let verified), .stale(let verified): head = verified
+            // Une tête plus courte que la gardée se juge sans son âge : retour en arrière (révision 7).
+            case .ok(let verified): (head, isCurrent) = (verified, true)
+            case .stale(let verified): (head, isCurrent) = (verified, false)
             case .invalid(let error): throw Failure.invalidHead(error)
             }
             switch E2EEAutoLog.compare(head: head, to: chainState) {
-            case .match: break
+            case .match:
+                // Même tête que la gardée : la plus fraîche des deux borne les 24 h (révision 7).
+                if let anchor, anchor.seq == head.seq, anchor.linkHash == head.linkHash, anchor.headCreatedAtMs > head.createdAtMs {
+                    head = .init(seq: head.seq, linkHash: head.linkHash, logKeyId: head.logKeyId, createdAtMs: anchor.headCreatedAtMs)
+                    isCurrent = E2EEAutoLog.isFresh(createdAtMs: head.createdAtMs, nowMs: receivedAtMs)
+                }
             case .ahead: throw Failure.malformed
             case .failure(let error): return try raise(.init(error: error, seq: head.seq), anchor: anchor)
             }
@@ -399,8 +406,7 @@ actor E2EEAutoLogReader {
             )
             chain = chainState
             linksBySeq = Dictionary(uniqueKeysWithValues: file.links.enumerated().map { (Int64($0.offset + 1), $0.element) })
-            if case .ok = check { return .current(head) }
-            return .notCurrent(head)
+            return isCurrent ? .current(head) : .notCurrent(head)
         }
         throw Failure.malformed
     }
