@@ -440,6 +440,23 @@
         }
       }
     },
+    "%lld points gagnés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld points earned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld points gagnés"
+          }
+        }
+      }
+    },
     "Activer le nouveau chiffrement sur cet appareil" : {
       "localizations" : {
         "en" : {
@@ -452,6 +469,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer le nouveau chiffrement sur cet appareil"
+          }
+        }
+      }
+    },
+    "Activité réseau" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network activity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité réseau"
           }
         }
       }
@@ -486,6 +520,125 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le détail de ce test n’a pas pu être chargé. %@"
+          }
+        }
+      }
+    },
+    "Niveau %lld atteint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level %lld reached"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niveau %lld atteint"
+          }
+        }
+      }
+    },
+    "Nouveau département exploré" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New department explored"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau département exploré"
+          }
+        }
+      }
+    },
+    "Nouveau niveau" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New level"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau niveau"
+          }
+        }
+      }
+    },
+    "Nouveau site exploré" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New site explored"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau site exploré"
+          }
+        }
+      }
+    },
+    "Quête terminée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quest completed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quête terminée"
+          }
+        }
+      }
+    },
+    "Récap officiel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official recap"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récap officiel"
+          }
+        }
+      }
+    },
+    "Récompense obtenue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reward earned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récompense obtenue"
           }
         }
       }
@@ -17971,6 +18124,23 @@
         }
       }
     },
+    "Signalement de bug validé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bug report confirmed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement de bug validé"
+          }
+        }
+      }
+    },
     "Signalement envoyé. Merci, nous allons l'examiner." : {
       "localizations" : {
         "en" : {
@@ -18084,6 +18254,23 @@
         }
       }
     },
+    "Site ajouté sur la carte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site added to the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site ajouté sur la carte"
+          }
+        }
+      }
+    },
     "Site communautaire · %@" : {
       "localizations" : {
         "en" : {
@@ -18096,6 +18283,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site communautaire · %@"
+          }
+        }
+      }
+    },
+    "Site découvert en premier" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First to discover a site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site découvert en premier"
           }
         }
       }
@@ -18875,6 +19079,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sélectionner le texte"
+          }
+        }
+      }
+    },
+    "Série de %lld jours" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld-day streak"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Série de %lld jours"
+          }
+        }
+      }
+    },
+    "Série en cours" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streak in progress"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Série en cours"
           }
         }
       }
@@ -21305,6 +21543,23 @@
         }
       }
     },
+    "Voir le site" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View the site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir le site"
+          }
+        }
+      }
+    },
     "Voir les messages plus anciens" : {
       "localizations" : {
         "en" : {
@@ -21317,6 +21572,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir les messages plus anciens"
+          }
+        }
+      }
+    },
+    "Voir ma progression" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View my progress"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir ma progression"
           }
         }
       }

@@ -146,6 +146,7 @@
 		2A342FEE30C81599FFBF2CB8 /* MapDisplayPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E42B98FC629E7504CCF403 /* MapDisplayPreferencesTests.swift */; };
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
 		2AA932278D5187C33838BDAE /* TwoFactorSetupViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41CC95388D4EF3CC89B75F5 /* TwoFactorSetupViewModelTests.swift */; };
+		2ACC1A07393B28E170732031 /* ActivityCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E6653C0AA5AAB30FE5BCBC /* ActivityCardView.swift */; };
 		2AD2A54A5E2F7DD2502DED01 /* RemoteImageRuntimeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01FB363AF0BE7B5E3B330E74 /* RemoteImageRuntimeQATests.swift */; };
 		2AE3D8AFA78A50D3114E392A /* PhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F641884A080F0EC459B546 /* PhotoService.swift */; };
 		2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */; };
@@ -894,6 +895,7 @@
 
 /* Begin PBXFileReference section */
 		009442F7832311AF08419B4A /* SQPhotoMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQPhotoMarkerView.swift; sourceTree = "<group>"; };
+		00E6653C0AA5AAB30FE5BCBC /* ActivityCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityCardView.swift; sourceTree = "<group>"; };
 		01369D5FB0B0C64E298726B8 /* VoiceNotePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNotePlayer.swift; sourceTree = "<group>"; };
 		0137F623C211B60E80B9A5C8 /* CarPlayPOIController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayPOIController.swift; sourceTree = "<group>"; };
 		01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskScope.swift; sourceTree = "<group>"; };
@@ -2585,6 +2587,7 @@
 		CCFCCE071F97F59DD0BF3345 /* Cards */ = {
 			isa = PBXGroup;
 			children = (
+				00E6653C0AA5AAB30FE5BCBC /* ActivityCardView.swift */,
 				91DE6C62E4954951C0A2419C /* CoverageCardView.swift */,
 				1F4F7435470D7B186E080C8E /* FeedItemCard.swift */,
 				A497779B95276F8B69AB2B7D /* FeedPollView.swift */,
@@ -3501,6 +3504,7 @@
 				BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */,
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
 				EB44A3D8FD41548A92D24D29 /* AccountSpeedtestRow.swift in Sources */,
+				2ACC1A07393B28E170732031 /* ActivityCardView.swift in Sources */,
 				E255A40A100134664CABBBAB /* AndroidDataPresence.swift in Sources */,
 				EDA2AC7EAF239065EC5A756C /* AntennaCoverageFocus.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,

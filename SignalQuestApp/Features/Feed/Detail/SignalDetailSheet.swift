@@ -58,7 +58,19 @@ struct SignalDetailSheet: View {
                     ProgressView("En cours")
                         .tint(SQColor.brandRed)
                 }
-                if !item.text.isEmpty {
+                // Post automatique : le même résumé que sa carte, et le lien vers
+                // ce qu'il raconte, plutôt que le texte français du serveur (F2).
+                if let activity = FeedActivity(item: item) {
+                    ActivitySummaryRow(activity: activity)
+                    if let link = activity.link {
+                        GradientButton(link.title, systemImage: link.symbol, style: .secondary) {
+                            Haptics.selection()
+                            dismiss()
+                            link.open(with: services.router)
+                        }
+                        .accessibilityIdentifier("feed.detail.activityLink")
+                    }
+                } else if !item.text.isEmpty {
                     Text(item.text)
                         .font(SQFont.body(16, .regular, relativeTo: .body))
                         .lineSpacing(4)
@@ -145,6 +157,7 @@ struct SignalDetailSheet: View {
         // Même état que la carte du fil (Rétabli / Dégradé / Panne), lu dans la metadata.
         case "outage": return OutageFeedBadge.label(severity: metaString("outageSeverity"), state: metaString("outageState"))
         case "photo", "antenna_photo": return String(localized: "Photo d’antenne")
+        case "post" where FeedActivity(item: item)?.family == .officialRecap: return String(localized: "Officiel")
         default: return nil
         }
     }

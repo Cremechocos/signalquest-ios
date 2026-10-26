@@ -113,23 +113,37 @@ struct SignalBarsView: View {
                 Text("Radio indisponible sur iOS")
                     .font(SQType.caption)
             } else {
-                ForEach(0..<4, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(index <= level ? AnyShapeStyle(SQColor.success) : AnyShapeStyle(SQColor.fill))
-                        .frame(width: 6, height: CGFloat(8 + index * 5))
+                // Des barres seulement pour un niveau mesuré : la technologie seule
+                // n'en dit rien, trois barres sur quatre étaient un faux niveau (F-13).
+                if let level {
+                    ForEach(0..<4, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(index <= level ? AnyShapeStyle(SQColor.success) : AnyShapeStyle(SQColor.fill))
+                            .frame(width: 6, height: CGFloat(8 + index * 5))
+                    }
                 }
                 if let technology = summary?.technology {
-                    Text(technology)
+                    Text(verbatim: technology)
                         .font(SQType.micro)
                 }
             }
         }
         .foregroundStyle(SQColor.labelSecondary)
-        .accessibilityLabel("Résumé radio serveur")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
     }
 
-    private var level: Int {
-        guard let rsrp = summary?.rsrp else { return summary?.technology == nil ? -1 : 2 }
+    private var accessibilityText: String {
+        let technology = summary?.technology ?? ""
+        guard let rsrp = summary?.rsrp else {
+            return technology.isEmpty ? String(localized: "Radio indisponible sur iOS") : String(localized: "Réseau \(technology)")
+        }
+        let signal = String(localized: "Signal \(SignalFormatters.dbm(rsrp))")
+        return technology.isEmpty ? signal : "\(signal), \(technology)"
+    }
+
+    private var level: Int? {
+        guard let rsrp = summary?.rsrp else { return nil }
         if rsrp > -85 { return 3 }
         if rsrp > -100 { return 2 }
         if rsrp > -112 { return 1 }

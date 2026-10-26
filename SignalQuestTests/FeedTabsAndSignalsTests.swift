@@ -254,6 +254,71 @@ final class FeedPrivacyTests: XCTestCase {
     }
 }
 
+/// Lot F (F2) : un post automatique se lit dans son metadata, une carte par famille.
+final class FeedActivityTests: XCTestCase {
+
+    private func item(kind: String, text: String = "", mine: Bool = false, _ metadata: String) throws -> UnifiedSocialFeedItem {
+        try JSONDecoder().decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"a1","kind":"\(kind)","author":{"id":"u1"},"text":\(String(reflecting: text)),
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,
+         "isMine":\(mine),"metadata":{\(metadata)}}
+        """.utf8))
+    }
+
+    func testEachFamilyIsReadFromItsActivityType() throws {
+        let level = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: "Niveau 12 atteint !",
+            #""activityType":"level_up","newLevel":12,"points":10"#)))
+        XCTAssertEqual(level.family, .level)
+        XCTAssertTrue(level.title.contains("12"))
+        XCTAssertEqual(level.points, 10)
+
+        let quest = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: #"Quête "Explorer le réseau" terminée"#,
+            #""activityType":"quest_claim","questKey":"explore-week""#)))
+        XCTAssertEqual(quest.family, .quest)
+        XCTAssertEqual(quest.subtitle, "Explorer le réseau")
+        XCTAssertNil(quest.points, "no points key, no tag")
+
+        let streak = try XCTUnwrap(FeedActivity(item: item(kind: "badge", #""activityType":"streak_bonus","streak":7"#)))
+        XCTAssertEqual(streak.family, .streak)
+        XCTAssertTrue(streak.title.contains("7"))
+
+        let badge = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: #"Badge "Chasseur de 5G" obtenu !"#,
+            #""activityType":"badge_earned","badgeId":"ckbdg0001""#)))
+        XCTAssertEqual(badge.subtitle, "Chasseur de 5G", "the name in the text stands in for a missing badgeName")
+
+        let discovery = try XCTUnwrap(FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR""#)))
+        XCTAssertEqual(discovery.family, .siteDiscovered)
+        XCTAssertEqual(discovery.link, .site(id: "ANFR-0381234", market: "FR"))
+        XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","firstDiscovery":false"#))?.family, .siteVisited)
+
+        let official = try XCTUnwrap(FeedActivity(item: item(kind: "post", text: "3 nouvelles antennes au Luxembourg",
+            #""source":"netmonster_sync","created":3,"points":10"#)))
+        XCTAssertEqual(official.family, .officialRecap)
+        XCTAssertNil(official.points)
+        XCTAssertEqual(try FeedActivity(item: item(kind: "telecom", text: "a ajouté une activité telecom", #""platform":"ios""#))?.subtitle, nil)
+    }
+
+    func testAnOrdinaryPostKeepsItsPostCard() throws {
+        XCTAssertNil(FeedActivity(item: try item(kind: "post", text: "Bonjour", #""source":"composer""#)))
+        XCTAssertNil(FeedActivity(item: try item(kind: "speedtest", #""activityType":"speedtest""#)))
+    }
+
+    func testProgressionLinksOnlyFromOnesOwnPosts() throws {
+        let metadata = #""activityType":"level_up","newLevel":3"#
+        XCTAssertEqual(FeedActivity(item: try item(kind: "badge", mine: true, metadata))?.link, .progression)
+        XCTAssertNil(FeedActivity(item: try item(kind: "badge", mine: false, metadata))?.link,
+                     "a friend's level must not open my own progression")
+        let bug = #""activityType":"bug_report_resolved","bugId":"ckbug0001""#
+        XCTAssertEqual(FeedActivity(item: try item(kind: "badge", text: "Signalement de bug validé : La carte se fige", mine: true, bug))?.link,
+                       .bug(id: "ckbug0001"))
+        XCTAssertEqual(FeedActivity(item: try item(kind: "badge", text: "Signalement de bug validé : La carte se fige", bug))?.subtitle,
+                       "La carte se fige")
+    }
+}
+
 /// Lot F (F-46) : les lieux d'Explorer restent proches et cèdent la place aux membres.
 final class ExplorePlacesTests: XCTestCase {
     private let grenoble = CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724)

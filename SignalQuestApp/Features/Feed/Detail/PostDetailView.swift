@@ -16,6 +16,7 @@ struct PostDetailView: View {
     @State private var confirmsDeletion = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
+    @EnvironmentObject private var services: AppServices
     @StateObject private var actions: PostDetailActions
     /// Auteur dont on pousse le profil public.
     @State private var profileAuthor: SocialFeedAuthor?
@@ -58,7 +59,7 @@ struct PostDetailView: View {
                 }
                 FeedItemCard(
                     item: actions.item,
-                    onTap: { showSignalSheet = true },
+                    onTap: openSignalOrActivity,
                     onLike: { Task { await actions.mutate(.react) } },
                     onRepost: { Task { await actions.mutate(.repost) } },
                     onComment: { showCommentsSheet = true },
@@ -68,6 +69,11 @@ struct PostDetailView: View {
                     // Sans ce vote, le sondage disparaissait du détail (AF-FIL-06).
                     onPollVote: { option in Task { await vote(option) } }
                 )
+                // Post automatique : le lien vers ce qu'il raconte (site, progression).
+                if let link = FeedActivity(item: actions.item)?.link {
+                    GradientButton(link.title, systemImage: link.symbol, style: .secondary) { follow(link) }
+                        .accessibilityIdentifier("post.detail.activityLink")
+                }
                 GradientButton(
                     String(localized: "Voir tous les commentaires (\(actions.item.commentsCount))"),
                     systemImage: "bubble.left.and.bubble.right",
@@ -202,6 +208,25 @@ struct PostDetailView: View {
 
     /// Vote (ou retrait de vote) sur le sondage ; l'échec remonte à l'écran
     /// au lieu d'être avalé.
+    /// Un post automatique mène à son objet ; sans lien, la fiche radio n'a
+    /// de sens que si le post porte une mesure.
+    private func openSignalOrActivity() {
+        guard let activity = FeedActivity(item: actions.item) else {
+            showSignalSheet = true
+            return
+        }
+        if let link = activity.link {
+            follow(link)
+        } else if actions.item.signal != nil {
+            showSignalSheet = true
+        }
+    }
+
+    private func follow(_ link: FeedActivity.Link) {
+        Haptics.selection()
+        link.open(with: services.router)
+    }
+
     private func vote(_ option: FeedPoll.Option) async {
         guard actions.item.poll?.isOpen == true else { return }
         do {

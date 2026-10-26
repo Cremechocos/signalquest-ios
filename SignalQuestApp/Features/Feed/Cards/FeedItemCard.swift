@@ -18,6 +18,22 @@ struct FeedItemCard: View {
     var onPollVote: ((FeedPoll.Option) -> Void)? = nil
 
     var body: some View {
+        // Posts automatiques (quête, niveau, badge, série, site, récap officiel) :
+        // une carte par famille plutôt que le texte seul d'un post (F-09).
+        if let activity = FeedActivity(item: item) {
+            ActivityCardView(
+                item: item, activity: activity,
+                onTap: onTap, onLike: onLike, onRepost: onRepost,
+                onComment: onComment, onFavorite: onFavorite, onShare: onShare,
+                onAuthorTap: onAuthorTap, onReact: onReact
+            )
+        } else {
+            kindCard
+        }
+    }
+
+    @ViewBuilder
+    private var kindCard: some View {
         switch normalizedKind {
         case "speedtest":
             SpeedtestCardView(
