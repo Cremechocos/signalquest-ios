@@ -57,10 +57,15 @@ enum KeychainError: Error, LocalizedError, Equatable {
 final class KeychainStore: TokenStore, @unchecked Sendable {
     private let service: String
     private let accessGroup: String?
+    /// Trousseau iCloud : l'élément suit le compte sur ses appareils Apple, et
+    /// sa suppression aussi. Lisible après le premier déverrouillage, jamais
+    /// « cet appareil seulement » (qu'Apple refuse pour un élément synchronisé).
+    private let synchronizable: Bool
 
-    init(service: String = "fr.signalquest.ios", accessGroup: String? = nil) {
+    init(service: String = "fr.signalquest.ios", accessGroup: String? = nil, synchronizable: Bool = false) {
         self.service = service
         self.accessGroup = accessGroup
+        self.synchronizable = synchronizable
     }
 
     func string(for key: String) throws -> String? {
@@ -83,7 +88,7 @@ final class KeychainStore: TokenStore, @unchecked Sendable {
         var query = baseQuery(key)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: accessibility.cfValue
+            kSecAttrAccessible as String: synchronizable ? kSecAttrAccessibleAfterFirstUnlock : accessibility.cfValue
         ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecSuccess { return }
@@ -139,6 +144,7 @@ final class KeychainStore: TokenStore, @unchecked Sendable {
             kSecAttrService as String: service,
         ]
         if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+        if synchronizable { query[kSecAttrSynchronizable as String] = kCFBooleanTrue }
         return query
     }
 }

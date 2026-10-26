@@ -272,6 +272,23 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         }
     }
 
+    /// « present » seulement si la HK courante du journal vérifié est détenue ici (§5.3).
+    func testRegistrationDeclaresTheCurrentHistoryKeyOnlyWhenHeldHere() async throws {
+        let held = E2EEAutoHistoryKeyStore(store: InMemoryTokenStore())
+        let hkPubB64 = try held.create(userId: Self.userId)
+        for (published, expected) in [(hkPubB64, "present"), (nil, "absent")] as [(String?, String)] {
+            var account = Self.account([])
+            account.historyKeyPubB64 = published
+            let fake = Fake(reads: [.verified(account)])
+            let device = fake.keys.device()
+            fake.responses = [.success(value: Self.written(Self.addEntry(device), seq: 20, status: "ACTIVE"), statusCode: 201, idempotentReplay: false)]
+            var dependencies = fake.dependencies()
+            dependencies.historyKeyPresent = { $0.flatMap { try? held.scalar(userId: Self.userId, hkPubB64: $0) } != nil }
+            _ = await E2EEAutoEnrollment(dependencies).run()
+            XCTAssertEqual(fake.posts.first?.body["historyKey"] as? String, expected)
+        }
+    }
+
     func testRefusedLogWritesNothing() async {
         let fake = Fake(reads: [.refused])
         let outcome = await E2EEAutoEnrollment(fake.dependencies()).run()

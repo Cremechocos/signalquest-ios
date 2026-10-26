@@ -156,7 +156,8 @@ actor E2EEAutoEnrollment {
     struct Dependencies: Sendable {
         var userId: String
         var label: String
-        var historyKeyPresent: @Sendable () -> Bool = { false }
+        /// HK courante du compte (dernière `HISTORY_KEY` vérifiée) détenue ici (§5.3).
+        var historyKeyPresent: @Sendable (_ hkPubB64: String?) -> Bool = { _ in false }
         /// L'identité v2 de l'appareil, créée si besoin.
         var device: @Sendable () throws -> E2EEV2DeviceDescriptor
         /// Efface l'identité locale : la prochaine lecture en crée une nouvelle.
@@ -232,7 +233,8 @@ actor E2EEAutoEnrollment {
                 return try await known(device: device, account: account)
             }
             let body = try E2EEAutoEnrollmentContract.registrationBody(
-                device: device, label: dependencies.label, historyKeyPresent: dependencies.historyKeyPresent()
+                device: device, label: dependencies.label,
+                historyKeyPresent: dependencies.historyKeyPresent(account?.historyKeyPubB64)
             )
             for attempt in 0..<2 {
                 switch await post(E2EEAutoEnrollmentContract.registerPath, body) {
@@ -413,7 +415,8 @@ extension E2EEAutoEnrollment {
         api: APIClient,
         label: String,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        markerStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")
+        markerStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
+        historyKeys: E2EEAutoHistoryKeyStore = E2EEAutoHistoryKeyStore()
     ) -> E2EEAutoEnrollment? {
         guard SQFeatures.e2eeAutoLogEnabled, session.ownerScopeId.hasPrefix("user:"),
               let reader = E2EEAutoLogReader.live(session: session, api: api, identityStore: identityStore) else { return nil }
@@ -425,6 +428,10 @@ extension E2EEAutoEnrollment {
         }
         return E2EEAutoEnrollment(Dependencies(
             userId: userId, label: label,
+            historyKeyPresent: { hkPubB64 in
+                // Sans HK publiée ni journal lu : « absent », la demande suivra (§5.3).
+                hkPubB64.flatMap { try? historyKeys.scalar(userId: userId, hkPubB64: $0) } != nil
+            },
             device: { try current(); return try identityStore.loadOrCreate(ownerNamespace: namespace) },
             resetDevice: { try current(); try identityStore.reset() },
             dueRotation: {
