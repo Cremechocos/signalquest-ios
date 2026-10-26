@@ -99432,6 +99432,38 @@
           }
         }
       }
+    },
+    "Actif à l’instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active just now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actif à l’instant"
+          }
+        }
+      }
+    },
+    "Actif %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actif %@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

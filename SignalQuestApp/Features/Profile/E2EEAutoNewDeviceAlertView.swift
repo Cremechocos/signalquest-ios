@@ -112,12 +112,17 @@ struct E2EEAutoNewDeviceAlertView: View {
 
     private func deviceCard(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(E2EEAutoDevicesView.platformName(row))
+            Text(E2EEAutoDevicesView.deviceName(row))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
             Text(E2EEAutoDevicesView.addedText(row))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+            if let activity = E2EEAutoDevicesView.activityText(row) {
+                Text(activity)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
             if !row.shortFingerprint.isEmpty {
                 Text("Empreinte")
                     .font(SQType.caption)

@@ -7,13 +7,16 @@ import UIKit
 /// Appareils du compte lus dans le journal vérifié (E2EE-AUTO §4.2, §4.4) : ce
 /// que l'écran montre vient des entrées signées, jamais d'une liste du serveur.
 /// Le libellé (« iPhone », « Pixel 8 ») n'est pas au journal : seule la
-/// plateforme, la date d'ajout et l'empreinte courte le sont.
+/// plateforme, la date d'ajout et l'empreinte courte le sont. Libellé et
+/// dernière activité viennent d'une lecture à part, pour l'affichage seul.
 @MainActor
 final class E2EEAutoDevicesViewModel: ObservableObject {
     struct Dependencies {
         var ownDeviceId: () -> String?
         var readOwnAccount: () async -> E2EEAutoEnrollment.OwnAccount
         var revoke: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason) async -> E2EEAutoDeviceRevocation.Outcome
+        /// Libellés et activités (§4.2, révision 12) ; nil : inconnus, sans message.
+        var readLabels: () async -> [String: E2EEAutoDeviceLabels.Display]? = { nil }
         var nowMs: () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
     }
 
@@ -38,6 +41,9 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         let revokeReason: E2EEAutoLog.RevokeReason?
         /// 4 groupes de 5 chiffres (§7), à comparer avec l'écran de l'autre appareil.
         let shortFingerprint: [String]
+        /// Texte fourni à l'inscription, affiché tel quel : il ne prouve rien.
+        var label: String?
+        var lastSeenAtMs: Int64?
     }
 
     /// Retirés depuis moins de 30 jours : la trace d'une révocation reste visible un temps.
@@ -55,6 +61,9 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     @Published private(set) var signedOut = false
 
     private let dependencies: Dependencies
+    /// Dernière lecture réussie : une lecture en échec ne les efface pas.
+    private var labels: [String: E2EEAutoDeviceLabels.Display] = [:]
+    private var account: E2EEAutoLog.AccountState?
 
     init(dependencies: Dependencies) {
         self.dependencies = dependencies
@@ -79,7 +88,12 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     func load() async {
         if rows.isEmpty { phase = .loading }
         switch await dependencies.readOwnAccount() {
-        case .verified(let account): apply(account)
+        case .verified(let account):
+            apply(account)
+            if let read = await dependencies.readLabels() {
+                labels = read
+                if let kept = self.account { apply(kept) }
+            }
         case .refused:
             rows = []
             revokedRows = []
@@ -91,6 +105,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     }
 
     func apply(_ account: E2EEAutoLog.AccountState) {
+        self.account = account
         let ownId = dependencies.ownDeviceId()
         let nowMs = dependencies.nowMs()
         let all = account.devices.values.map { device in
@@ -99,7 +114,8 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
                 addedAtMs: device.addedAtMs, revokedAtMs: device.revokedAtMs, revokeReason: device.revokeReason,
                 shortFingerprint: E2EEAutoSafetyCode.shortFingerprint(E2EEAutoSafetyCode.deviceFingerprint(
                     userId: account.userId, deviceId: device.deviceId, signingKeyB64: device.signingKeyB64
-                )) ?? []
+                )) ?? [],
+                label: labels[device.deviceId]?.label, lastSeenAtMs: labels[device.deviceId]?.lastSeenAtMs
             )
         }
         // Cet appareil d'abord, puis du plus récent au plus ancien.
@@ -168,7 +184,8 @@ extension E2EEAutoDevicesViewModel {
             revoke: { deviceId, reason in
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
                 return await revocation.revoke(deviceId: deviceId, reason: reason)
-            }
+            },
+            readLabels: E2EEAutoDeviceLabels.live(session: session, api: api)
         ))
     }
 }
@@ -275,7 +292,7 @@ struct E2EEAutoDevicesView: View {
             Task { await session.logout() }
         }
         .confirmationDialog(
-            rowToRevoke.map { String(localized: "Retirer \(Self.platformName($0)) ?") } ?? "",
+            rowToRevoke.map { String(localized: "Retirer \(Self.deviceName($0)) ?") } ?? "",
             isPresented: Binding(get: { rowToRevoke != nil }, set: { if !$0 { rowToRevoke = nil } }),
             titleVisibility: .visible,
             presenting: rowToRevoke
@@ -360,7 +377,7 @@ struct E2EEAutoDevicesView: View {
                             .frame(width: 44, height: 44)
                     }
                 }
-                .accessibilityLabel(String(localized: "Retirer \(Self.platformName(row))"))
+                .accessibilityLabel(String(localized: "Retirer \(Self.deviceName(row))"))
                 .disabled(model.isActing)
             }
         }
@@ -388,6 +405,11 @@ struct E2EEAutoDevicesView: View {
                 Text(Self.addedText(row))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
+                if let activity = Self.activityText(row) {
+                    Text(activity)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
@@ -427,7 +449,7 @@ struct E2EEAutoDevicesView: View {
             }
             .scrollContentBackground(.hidden)
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(Self.platformName(row))
+            .navigationTitle(Self.deviceName(row))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -451,6 +473,11 @@ struct E2EEAutoDevicesView: View {
             Text(Self.addedText(row))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+            if let activity = Self.activityText(row) {
+                Text(activity)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -469,7 +496,7 @@ struct E2EEAutoDevicesView: View {
 
     @ViewBuilder
     private func title(_ row: E2EEAutoDevicesViewModel.Row, stacked: Bool = false) -> some View {
-        Text(Self.platformName(row))
+        Text(Self.deviceName(row))
             .font(SQType.heading)
         if row.isCurrent {
             // En ligne, la pastille ne se coupe pas ; sous le nom, elle rétrécit un peu plutôt que de se couper.
@@ -490,6 +517,11 @@ struct E2EEAutoDevicesView: View {
         case .web: return "globe"
         case .ios: return "iphone"
         }
+    }
+
+    /// Le libellé servi s'il y en a un, sinon la plateforme du journal.
+    static func deviceName(_ row: E2EEAutoDevicesViewModel.Row) -> String {
+        row.label ?? platformName(row)
     }
 
     static func platformName(_ row: E2EEAutoDevicesViewModel.Row) -> String {
@@ -523,6 +555,18 @@ struct E2EEAutoDevicesView: View {
         return String(localized: "Ajouté le \(added)")
     }
 
+    /// Dernière requête signée, arrondie à la minute par le serveur ; ni pour cet
+    /// appareil, ni pour un appareil retiré.
+    static func activityText(_ row: E2EEAutoDevicesViewModel.Row, now: Date = Date()) -> String? {
+        guard !row.isCurrent, row.status != .revoked, let ms = row.lastSeenAtMs else { return nil }
+        let seen = Date(timeIntervalSince1970: TimeInterval(ms) / 1_000)
+        guard now.timeIntervalSince(seen) >= 60 else { return String(localized: "Actif à l’instant") }
+        let formatter = RelativeDateTimeFormatter()
+        // `.abbreviated` donne « -2 j » en français : `.short` donne « il y a 2 j ».
+        formatter.unitsStyle = .short
+        return String(localized: "Actif \(formatter.localizedString(for: seen, relativeTo: now))")
+    }
+
     private static func date(_ ms: Int64) -> String {
         Date(timeIntervalSince1970: TimeInterval(ms) / 1_000).formatted(date: .abbreviated, time: .shortened)
     }
@@ -530,7 +574,7 @@ struct E2EEAutoDevicesView: View {
 
 /// Banc visuel (simulateur Debug) : un compte de démonstration, sans réseau.
 /// `--qa-auto-devices`, `--qa-auto-devices-recent` (garde des 24 h),
-/// `--qa-auto-devices-refused` (journal refusé).
+/// `--qa-auto-devices-refused` (journal refusé), `--qa-auto-devices-unlabeled` (sans libellés).
 struct E2EEAutoDevicesQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     static func model() -> E2EEAutoDevicesViewModel {
@@ -558,10 +602,19 @@ struct E2EEAutoDevicesQAScreen: View {
             device("web_device_qa_000000000004", .web, seed: 0x44, addedAgo: 9 * 24 * hour, status: .revoked, revokedAgo: 2 * 24 * hour, reason: .notMe),
         ] { account.devices[state.deviceId] = state }
         let refused = AppEnvironment.hasQAFlag("auto-devices-refused")
+        // Libellés servis (révision 12) ; `--qa-auto-devices-unlabeled` : lecture en échec.
+        let labels: [String: E2EEAutoDeviceLabels.Display] = [
+            ownId: .init(label: "iPhone 17", lastSeenAtMs: now),
+            "android_device_qa_00000002": .init(label: "Pixel 8", lastSeenAtMs: now - 2 * hour),
+            "web_device_qa_000000000003": .init(label: "Safari sur macOS", lastSeenAtMs: now - 3 * 24 * hour),
+            "web_device_qa_000000000004": .init(label: "Chrome sur Windows", lastSeenAtMs: now - 3 * 24 * hour),
+        ]
+        let unlabeled = AppEnvironment.hasQAFlag("auto-devices-unlabeled")
         return E2EEAutoDevicesViewModel(dependencies: .init(
             ownDeviceId: { ownId },
             readOwnAccount: { refused ? .refused : .verified(account) },
-            revoke: { _, _ in .revoked(ownDevice: false) }
+            revoke: { _, _ in .revoked(ownDevice: false) },
+            readLabels: { unlabeled ? nil : labels }
         ))
     }
     #endif
