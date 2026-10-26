@@ -951,6 +951,30 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(patchBody["visibility"] as? String, "private")
     }
 
+    /// Ticket du 26/10 : l'historique du compte se lit page par page, sur toute la période.
+    func testAccountSpeedtestsAskForTheRequestedPageAndReadHasMore() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        var query: [URLQueryItem] = []
+        MockURLProtocol.requestHandler = { request in
+            query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let body = #"{"speedtests":[{"id":"a"}],"meta":{"page":3,"limit":20,"total":61,"hasMore":true}}"#
+            return (response, Data(body.utf8))
+        }
+
+        let page = try await SocialFeedService(api: client).mySpeedtests(page: 3, limit: 20)
+
+        XCTAssertEqual(query.first { $0.name == "period" }?.value, "all")
+        XCTAssertEqual(query.first { $0.name == "page" }?.value, "3")
+        XCTAssertEqual(query.first { $0.name == "limit" }?.value, "20")
+        XCTAssertEqual(page.tests.map(\.id), ["a"])
+        XCTAssertTrue(page.hasMore)
+    }
+
     func testPrivacyServiceDecodesAndPersistsCanonicalContract() async throws {
         let client = APIClient(
             config: .test,

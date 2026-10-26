@@ -23,3 +23,79 @@ enum SpeedtestAccountHistory {
         return abs(download - local.downloadAverageMbps) <= tolerance
     }
 }
+
+extension SpeedtestAccountHistory {
+    /// Détail serveur d'un test du compte, mis à la forme d'un test local pour
+    /// réutiliser la même fiche. Les ordres de repli sont ceux de la carte : la
+    /// moyenne d'abord, puis le débit brut, qu'Android remplit avec le pic.
+    static func runResult(from detail: SpeedtestDetail) -> SpeedtestRunResult {
+        let download = detail.averageSpeed ?? detail.downloadAvg ?? detail.downloadSpeed ?? 0
+        let upload = detail.uploadAvg ?? detail.uploadSpeed
+        let technology = cellularTechnology(detail.networkType)
+        let coordinate = detail.latitude.flatMap { lat in
+            detail.longitude.map { Coordinates(latitude: lat, longitude: $0) }
+        }
+        return SpeedtestRunResult(
+            id: UUID(uuidString: detail.id) ?? UUID(),
+            label: detail.id,
+            downloadMbps: download,
+            downloadAverageMbps: download,
+            downloadMaxMbps: detail.downloadMax ?? detail.downloadPeakMbps ?? detail.maxSpeed ?? download,
+            downloadP90Mbps: detail.downloadP90,
+            downloadP95Mbps: detail.downloadP95,
+            uploadMbps: upload,
+            uploadAverageMbps: upload,
+            uploadMaxMbps: detail.uploadMax ?? detail.uploadPeakMbps ?? upload,
+            uploadP90Mbps: detail.uploadP90,
+            uploadP95Mbps: detail.uploadP95,
+            pingMs: detail.pingAvg ?? detail.ping,
+            pingMedianMs: detail.pingMedian,
+            pingMinMs: detail.pingMin,
+            pingMaxMs: detail.pingMax,
+            jitterMs: detail.jitter,
+            pingDlMs: detail.pingDl,
+            jitterDlMs: detail.jitterDl,
+            pingUlMs: detail.pingUl,
+            jitterUlMs: detail.jitterUl,
+            pingProtocol: detail.pingProtocol,
+            durationSeconds: detail.testDuration ?? 0,
+            connectionType: connectionKind(detail.connectionType, technology: technology),
+            cellularTechnology: technology,
+            networkOperatorName: detail.mobileOperator,
+            networkOperatorMcc: detail.mcc,
+            networkOperatorMnc: detail.mnc,
+            address: detail.address,
+            coordinate: coordinate,
+            serverName: detail.server,
+            downloadServerName: detail.downloadServerName,
+            downloadServerId: detail.downloadServerId,
+            createdAt: detail.timestamp ?? detail.createdAt ?? Date(),
+            uploadMeasurementSource: detail.uploadMeasurementSource,
+            deviceModel: detail.deviceModel,
+            measurementTrace: detail.measurementTrace,
+            methodologyVersion: detail.methodologyVersion,
+            pingServerHost: detail.pingServerHost,
+            pingServerPort: detail.pingServerPort,
+            uploadServerHost: detail.uploadServerHost,
+            uploadServerPort: detail.uploadServerPort
+        )
+    }
+
+    /// « 5G NSA », « LTE », « 4G »… tel que les trois apps l'envoient.
+    static func cellularTechnology(_ raw: String?) -> CellularRadioTechnology? {
+        guard let value = raw?.trimmingCharacters(in: .whitespaces).uppercased(), !value.isEmpty else { return nil }
+        if let exact = CellularRadioTechnology(rawValue: value) { return exact }
+        if value.hasPrefix("LTE") { return .fourG }
+        // « 5G » seul ne dit pas NSA ou SA : on ne devine pas.
+        return nil
+    }
+
+    static func connectionKind(_ raw: String?, technology: CellularRadioTechnology?) -> NetworkConnectionKind {
+        switch raw?.uppercased() {
+        case "WIFI", "WI-FI": return .wifi
+        case "CELLULAR", "MOBILE": return .cellular
+        case "WIRED", "ETHERNET": return .wired
+        default: return technology == nil ? .other : .cellular
+        }
+    }
+}

@@ -367,6 +367,7 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     func searchUsers(query: String, limit: Int) async throws -> [SocialUserSearchResult] { throw ComposerFixtureError.unused }
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest? { throw ComposerFixtureError.unused }
     func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest] { throw ComposerFixtureError.unused }
+    func mySpeedtests(page: Int, limit: Int) async throws -> (tests: [SocialShareableSpeedtest], hasMore: Bool) { throw ComposerFixtureError.unused }
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse { throw ComposerFixtureError.unused }
     func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker] { throw ComposerFixtureError.unused }
 }

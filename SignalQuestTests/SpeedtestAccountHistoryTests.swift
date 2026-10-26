@@ -44,3 +44,39 @@ final class SpeedtestAccountHistoryTests: XCTestCase {
         XCTAssertEqual(AccountSpeedtestRow(test: test).subtitleLine, "4G · Orange")
     }
 }
+
+/// Ticket du 26/10 : un test fait ailleurs s'ouvre avec la même fiche qu'un
+/// test du téléphone, à partir du détail renvoyé par le serveur.
+final class AccountSpeedtestDetailTests: XCTestCase {
+    private func detail(_ json: String) throws -> SpeedtestDetail {
+        try JSONDecoder.signalQuest.decode(SpeedtestDetail.self, from: Data(json.utf8))
+    }
+
+    func testServerDetailBecomesTheSameCardAsALocalTest() throws {
+        let result = SpeedtestAccountHistory.runResult(from: try detail("""
+        {"id":"cksp1","timestamp":"2026-10-20T10:00:00.000Z","downloadSpeed":410,"averageSpeed":312.4,
+         "downloadMax":401,"uploadAvg":48.2,"uploadMax":60,"pingMin":18,"ping":21,"jitter":3.4,
+         "testDuration":15,"connectionType":"CELLULAR","networkType":"5G NSA","mobileOperator":"Orange",
+         "latitude":45.76,"longitude":4.83,"downloadServerName":"Cloudflare Paris","deviceModel":"iPhone 16"}
+        """))
+        XCTAssertEqual(result.downloadAverageMbps, 312.4, "the average leads, never the raw peak")
+        XCTAssertEqual(result.downloadMaxMbps, 401)
+        XCTAssertEqual(result.uploadAverageMbps, 48.2)
+        XCTAssertEqual(result.pingMinMs, 18)
+        XCTAssertEqual(result.connectionType, .cellular)
+        XCTAssertEqual(result.cellularTechnology, .fiveGNSA)
+        XCTAssertEqual(result.networkOperatorName, "Orange")
+        XCTAssertEqual(result.coordinate?.latitude, 45.76)
+        XCTAssertEqual(result.downloadServerName, "Cloudflare Paris")
+        XCTAssertEqual(result.durationSeconds, 15)
+    }
+
+    func testNetworkKindIsReadWithoutGuessing() {
+        XCTAssertEqual(SpeedtestAccountHistory.cellularTechnology("LTE"), .fourG)
+        XCTAssertNil(SpeedtestAccountHistory.cellularTechnology("5G"), "5G alone is neither NSA nor SA")
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind("wifi", technology: nil), .wifi)
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(nil, technology: .fourG), .cellular)
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(nil, technology: nil), .other)
+    }
+}
+

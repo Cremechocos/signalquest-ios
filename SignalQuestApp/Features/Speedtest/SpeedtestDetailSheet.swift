@@ -358,8 +358,13 @@ struct SpeedtestDetailContent: View {
                     dotRow("Min · max", "\(Int(minMs.rounded())) · \(Int(maxMs.rounded())) ms")
                 }
                 dotRow("Gigue", Self.msLabel(result.jitterMs, jitter: true))
-                dotRow("En réception", Self.msLabel(result.pingDlMs), trailing: gigue(result.jitterDlMs))
-                dotRow("En envoi", Self.msLabel(result.pingUlMs), trailing: gigue(result.jitterUlMs))
+                // Les anciens tests n'ont pas de latence en charge : rien plutôt que « — gigue — ».
+                if result.pingDlMs != nil || result.jitterDlMs != nil {
+                    dotRow("En réception", Self.msLabel(result.pingDlMs), trailing: gigue(result.jitterDlMs))
+                }
+                if result.pingUlMs != nil || result.jitterUlMs != nil {
+                    dotRow("En envoi", Self.msLabel(result.pingUlMs), trailing: gigue(result.jitterUlMs))
+                }
                 if let average = result.pingMs {
                     dotRow("Latence moyenne", Self.msLabel(average))
                 }

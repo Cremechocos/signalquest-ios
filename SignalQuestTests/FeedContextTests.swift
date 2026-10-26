@@ -226,6 +226,7 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
     func searchUsers(query: String, limit: Int) async throws -> [SocialUserSearchResult] { throw FeedFixtureError.unused }
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest? { throw FeedFixtureError.unused }
     func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest] { throw FeedFixtureError.unused }
+    func mySpeedtests(page: Int, limit: Int) async throws -> (tests: [SocialShareableSpeedtest], hasMore: Bool) { throw FeedFixtureError.unused }
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse { throw FeedFixtureError.unused }
     func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker] { throw FeedFixtureError.unused }
 }

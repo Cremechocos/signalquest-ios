@@ -65,6 +65,11 @@ struct SpeedtestView: View {
     @State private var pendingHistoryIds: Set<UUID> = []
     /// Derniers tests du compte, tous appareils (UI-12). Vide en invité.
     @State private var accountHistory: [SocialShareableSpeedtest] = []
+    /// Dernière page chargée des tests du compte, et s'il en reste après.
+    @State private var accountPage = 1
+    @State private var accountHasMore = false
+    @State private var loadingMoreAccountHistory = false
+    @State private var selectedAccountTest: SocialShareableSpeedtest?
     @State private var errorMessage: String?
     @State private var isRetryingPendingSave = false
     /// Échec du MOTEUR de test (≠ échec de synchronisation) : carte dédiée
@@ -210,6 +215,11 @@ struct SpeedtestView: View {
                 guestMode: guestMode
             )
             .id(item.id)
+        }
+        .sheet(item: $selectedAccountTest) { test in
+            AccountSpeedtestDetailSheet(testId: test.id) { [speedtest = services.speedtest] id in
+                try await speedtest.details(id: id)
+            }
         }
         .sheet(item: $detailsTab) { tab in
             if let result {
@@ -1108,7 +1118,9 @@ struct SpeedtestView: View {
                         .sqFadeUp()
                     }
                 }
-                if !accountOnlyHistory.isEmpty {
+                // Visible aussi quand la première page ne contient que des tests de
+                // ce téléphone : les plus anciens restent à charger.
+                if !accountOnlyHistory.isEmpty || accountHasMore {
                     accountHistorySection
                 }
             }
@@ -1148,14 +1160,41 @@ struct SpeedtestView: View {
                     .padding(.horizontal, SQSpace.xs)
             }
             .padding(.top, history.isEmpty ? 0 : SQSpace.sm)
-            VStack(spacing: 0) {
-                ForEach(Array(accountOnlyHistory.enumerated()), id: \.element.id) { index, test in
-                    if index > 0 { historyDivider }
-                    AccountSpeedtestRow(test: test)
+            if !accountOnlyHistory.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(accountOnlyHistory.enumerated()), id: \.element.id) { index, test in
+                        if index > 0 { historyDivider }
+                        Button {
+                            Haptics.selection()
+                            selectedAccountTest = test
+                        } label: {
+                            AccountSpeedtestRow(test: test)
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityHint("Voir le détail du test")
+                    }
                 }
+                .padding(.vertical, 2)
+                .sqCardBackground()
             }
-            .padding(.vertical, 2)
-            .sqCardBackground()
+            // Tout l'historique du compte, page par page : la première page
+            // seule cachait les tests plus anciens (ticket du 26/10).
+            if accountHasMore {
+                Button {
+                    Task { await loadMoreAccountHistory() }
+                } label: {
+                    HStack(spacing: SQSpace.sm) {
+                        if loadingMoreAccountHistory { ProgressView() }
+                        Text("Voir plus de tests")
+                            .font(SQFont.body(15, .semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .foregroundStyle(SQColor.accentInk)
+                .disabled(loadingMoreAccountHistory)
+                .accessibilityIdentifier("speedtest.accountHistory.more")
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("speedtest.accountHistory")
@@ -1169,9 +1208,25 @@ struct SpeedtestView: View {
             accountHistory = Self.demoAccountHistory
             return
         }
-        if let tests = try? await services.feed.mySpeedtests(limit: 20) {
-            accountHistory = tests
+        if let page = try? await services.feed.mySpeedtests(page: 1, limit: Self.accountPageSize) {
+            accountHistory = page.tests
+            accountPage = 1
+            accountHasMore = page.hasMore
         }
+    }
+
+    private static let accountPageSize = 20
+
+    private func loadMoreAccountHistory() async {
+        guard !loadingMoreAccountHistory else { return }
+        loadingMoreAccountHistory = true
+        defer { loadingMoreAccountHistory = false }
+        let next = accountPage + 1
+        guard let page = try? await services.feed.mySpeedtests(page: next, limit: Self.accountPageSize) else { return }
+        let known = Set(accountHistory.map(\.id))
+        accountHistory += page.tests.filter { !known.contains($0.id) }
+        accountPage = next
+        accountHasMore = page.hasMore
     }
 
     /// Démo (`--demo-data`, tours de captures) : trois tests d'un autre appareil.

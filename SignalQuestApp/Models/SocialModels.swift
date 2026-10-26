@@ -1028,4 +1028,8 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
 
 struct UserSpeedtestsResponse: Codable {
     let speedtests: [SocialShareableSpeedtest]
+    /// Servi quand la requête porte `limit` : `hasMore` dit s'il reste une page.
+    var meta: Meta? = nil
+
+    struct Meta: Codable { let hasMore: Bool? }
 }

@@ -86,6 +86,8 @@ protocol SocialFeedServicing: Sendable {
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest?
     /// Derniers speedtests du compte, tous appareils confondus (onglet Tester).
     func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest]
+    /// Une page des speedtests du compte, et s'il en reste après.
+    func mySpeedtests(page: Int, limit: Int) async throws -> (tests: [SocialShareableSpeedtest], hasMore: Bool)
     /// Pouls réseau autour d'une position : `GET /api/social/network-pulse`.
     /// `radiusMeters` optionnel (défaut backend 3 km si nil/≤0).
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse
@@ -755,15 +757,19 @@ final class SocialFeedService: SocialFeedServicing {
     }
 
     func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest] {
+        try await mySpeedtests(page: 1, limit: limit).tests
+    }
+
+    func mySpeedtests(page: Int, limit: Int) async throws -> (tests: [SocialShareableSpeedtest], hasMore: Bool) {
         let response: UserSpeedtestsResponse = try await api.request(
             APIEndpoint(path: "/api/user/speedtests", query: [
                 URLQueryItem(name: "period", value: "all"),
                 URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "page", value: "1")
+                URLQueryItem(name: "page", value: String(page))
             ]),
             as: UserSpeedtestsResponse.self
         )
-        return response.speedtests
+        return (response.speedtests, response.meta?.hasMore ?? false)
     }
 }
 

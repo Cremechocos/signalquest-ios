@@ -473,6 +473,23 @@
         }
       }
     },
+    "Le détail de ce test n’a pas pu être chargé. %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This test’s details could not be loaded. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le détail de ce test n’a pas pu être chargé. %@"
+          }
+        }
+      }
+    },
     "SQFormal|%@ veut t’écrire" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21364,6 +21381,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir plus de réponses"
+          }
+        }
+      }
+    },
+    "Voir plus de tests" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show more tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir plus de tests"
           }
         }
       }
