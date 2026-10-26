@@ -445,7 +445,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     let score: Double?
     let author: SocialFeedAuthor
     let text: String
-    let visibility: String?
+    var visibility: String?
     let status: String?
     let targetType: String?
     let targetId: String?
@@ -471,15 +471,36 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     var pinnedAt: Date?
     /// Sondage attaché, servi par le backend et jusqu'ici ignoré.
     var poll: FeedPoll?
+    /// Post écrit par le serveur (activité, photo, avis, panne, synchro) :
+    /// son texte et ses chiffres ne se modifient pas. Absent avant #694.
+    let generated: Bool?
 
     /// Vrai si l'utilisateur peut éditer, supprimer ou épingler ce post.
     /// L'autorité reste le SERVEUR (403 sinon) : ceci ne fait que masquer des
     /// actions vouées à échouer.
     var canManage: Bool { isMine == true }
+    /// Modifier : seulement un post écrit à la main (le serveur répond 403
+    /// GENERATED_POST_READ_ONLY sur un post automatique).
+    var canEdit: Bool { canManage && generated != true }
+
+    /// Lieu à afficher : jamais un identifiant de site. Avant #694, le serveur
+    /// mettait le code du site (« ANFR-0381234 ») dans `placeLabel` des photos (F-02).
+    var readablePlaceLabel: String? {
+        guard let label = placeLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty,
+              label != signal?.siteLabel else { return nil }
+        for key in ["siteId", "enb"] {
+            switch metadata?[key] {
+            case .string(let id)? where id == label: return nil
+            case .number(let number)? where abs(number) < 1e15 && String(Int(number)) == label: return nil
+            default: continue
+            }
+        }
+        return label
+    }
     var isPinned: Bool { pinnedAt != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll
+        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll, generated
     }
 
     init(from decoder: Decoder) throws {
@@ -514,6 +535,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine)
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
         poll = try c.decodeIfPresent(FeedPoll.self, forKey: .poll)
+        generated = try? c.decodeIfPresent(Bool.self, forKey: .generated)
     }
 }
 

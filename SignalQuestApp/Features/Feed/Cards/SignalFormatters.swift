@@ -617,14 +617,21 @@ struct FeedMeasureBlock: View {
                 .textCase(.uppercase)
                 .foregroundStyle(SQColor.ink2)
                 .accessibilityIdentifier("feed.measure.kicker")
-            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
-                Text(verbatim: download.map { SQUnits.throughputValue(mbps: $0) } ?? "—")
-                    .font(SQFont.display(26, .heavy, relativeTo: .title))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
-                Text(verbatim: SQUnits.throughputUnit(mbps: download ?? 0))
+            if let measured = measuredDownload {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text(verbatim: SQUnits.throughputValue(mbps: measured))
+                        .font(SQFont.display(26, .heavy, relativeTo: .title))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: SQUnits.throughputUnit(mbps: measured))
+                        .font(SQType.subhead(.bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            } else {
+                // Anciens posts dont le speedtest a disparu : pas de « — Mb/s » (F-12).
+                Text("Résultat indisponible")
                     .font(SQType.subhead(.bold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
             }
             if !details.isEmpty {
                 Text(verbatim: details)
@@ -645,6 +652,12 @@ struct FeedMeasureBlock: View {
         .accessibilityIdentifier("feed.speedtest.measure")
     }
 
+    /// Débit de réception réellement mesuré ; zéro ou absent ne s'affiche pas.
+    private var measuredDownload: Double? {
+        guard let download, download > 0 else { return nil }
+        return download
+    }
+
     /// « ↑ 64 Mbit/s · 18 ms · SFR 5G », plus la SIM quand elle voyage.
     private var details: String {
         var parts: [String] = []
@@ -658,7 +671,8 @@ struct FeedMeasureBlock: View {
     }
 
     private var spoken: String {
-        var parts = [String(localized: "réception \(SignalFormatters.speed(download))")]
+        var parts = [measuredDownload.map { String(localized: "réception \(SignalFormatters.speed($0))") }
+            ?? String(localized: "Résultat indisponible")]
         if let upload { parts.append(String(localized: "envoi \(SignalFormatters.speed(upload))")) }
         if let ping { parts.append(String(localized: "latence \(SignalFormatters.ms(ping))")) }
         if let operatorAndTech { parts.append(operatorAndTech) }

@@ -95339,6 +95339,26 @@
           }
         }
       }
+    },
+    "Résultat indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Result unavailable"
+          }
+        }
+      }
+    },
+    "Cette publication est créée automatiquement : son contenu ne se modifie pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This post is created automatically: its content can't be edited."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

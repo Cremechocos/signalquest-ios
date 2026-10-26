@@ -87,8 +87,15 @@ struct PostDetailView: View {
                 Menu {
                     // Réservé à l'auteur, comme dans le fil : le serveur revérifie.
                     if actions.item.canManage {
-                        Button { editingPost = actions.item } label: {
-                            Label("Modifier", systemImage: "pencil")
+                        // Un post automatique ne change que de visibilité (403 sinon, #694).
+                        if actions.item.canEdit {
+                            Button { editingPost = actions.item } label: {
+                                Label("Modifier", systemImage: "pencil")
+                            }
+                        } else {
+                            PostVisibilityPicker(current: actions.item.visibility) { value in
+                                Task { await setVisibility(value) }
+                            }
                         }
                         Button { Task { await togglePin() } } label: {
                             Label(actions.item.isPinned ? "Désépingler" : "Épingler",
@@ -216,6 +223,17 @@ struct PostDetailView: View {
             try await feedService.setPinned(postId: actions.item.id, pinned: willPin)
             actions.update { $0.pinnedAt = willPin ? Date() : nil }
         } catch {
+            if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    private func setVisibility(_ visibility: SocialVisibility) async {
+        let previous = actions.item.visibility
+        actions.update { $0.visibility = visibility.rawValue }
+        do {
+            _ = try await feedService.setVisibility(postId: actions.item.id, visibility: visibility.rawValue)
+        } catch {
+            actions.update { $0.visibility = previous }
             if !error.isCancellation { actions.fail(error) }
         }
     }

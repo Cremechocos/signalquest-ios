@@ -923,6 +923,34 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(page.items.isEmpty)
     }
 
+    /// Post automatique (#694) : le PATCH ne porte QUE la visibilité, sinon 403.
+    func testPostVisibilityPatchSendsOnlyTheVisibility() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        var method: String?
+        var path: String?
+        var patchBody: [String: Any] = [:]
+        MockURLProtocol.requestHandler = { request in
+            method = request.httpMethod
+            path = request.url?.path
+            if let body = Self.requestBody(request) {
+                patchBody = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"item":null}"#.utf8))
+        }
+
+        _ = try await SocialFeedService(api: client).setVisibility(postId: "post-1", visibility: "private")
+
+        XCTAssertEqual(method, "PATCH")
+        XCTAssertEqual(path, "/api/social/posts/1") // identifiant unifié normalisé, comme pour l'édition
+        XCTAssertEqual(patchBody.keys.sorted(), ["visibility"])
+        XCTAssertEqual(patchBody["visibility"] as? String, "private")
+    }
+
     func testPrivacyServiceDecodesAndPersistsCanonicalContract() async throws {
         let client = APIClient(
             config: .test,

@@ -147,6 +147,8 @@ enum APIError: Error, LocalizedError, Equatable {
         "MESSAGE_REQUEST_NOT_FOUND": String(localized: "Cette demande n’existe plus."),
         "MESSAGE_REQUEST_ALREADY_ACCEPTED": String(localized: "Cette demande a déjà été acceptée."),
         "EMAIL_NOT_VERIFIED": String(localized: "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil."),
+        // Post écrit par le serveur (lot F) : seule sa visibilité change.
+        "GENERATED_POST_READ_ONLY": String(localized: "Cette publication est créée automatiquement : son contenu ne se modifie pas."),
 
         // Identification d'un site (`/api/android/map/identify/direct`). Le serveur
         // renvoie déjà un message FR pour la plupart ; ceux-ci n'en portent qu'un

@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import SignalQuest
 
 /// Le fil envoyait `filter=all` + `ranking=smart` en dur alors que le serveur
@@ -216,6 +217,64 @@ final class FeedItemOwnershipTests: XCTestCase {
         """)
         XCTAssertFalse(item.canManage)
         XCTAssertFalse(item.isPinned)
+    }
+}
+
+/// Lot F (F1) : ce qui ne doit jamais s'afficher au fil.
+final class FeedPrivacyTests: XCTestCase {
+
+    private func decode(_ extra: String) throws -> UnifiedSocialFeedItem {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"p1","kind":"photo","author":{"id":"u1"},"text":"",
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,
+         "isMine":true\(extra)}
+        """.utf8))
+    }
+
+    func testAGeneratedPostCannotBeEditedButStaysManageable() throws {
+        let item = try decode(#","generated":true"#)
+        XCTAssertTrue(item.canManage)
+        XCTAssertFalse(item.canEdit)
+    }
+
+    func testAWrittenPostCanBeEdited() throws {
+        XCTAssertTrue(try decode(#","generated":false"#).canEdit)
+        // Serveur antérieur à #694 : le champ manque, le 403 reste rattrapé par le message.
+        XCTAssertTrue(try decode("").canEdit)
+    }
+
+    func testASiteCodeIsNeverShownAsThePlace() throws {
+        XCTAssertNil(try decode(#","placeLabel":"ANFR-0381234","metadata":{"siteId":"ANFR-0381234"}"#).readablePlaceLabel)
+        XCTAssertNil(try decode(#","placeLabel":"812345","metadata":{"enb":812345}"#).readablePlaceLabel)
+        XCTAssertNil(try decode(#","placeLabel":"  ""#).readablePlaceLabel)
+        XCTAssertEqual(try decode(#","placeLabel":"Grenoble","metadata":{"siteId":"ANFR-0381234"}"#).readablePlaceLabel, "Grenoble")
+    }
+}
+
+/// Lot F (F-46) : les lieux d'Explorer restent proches et cèdent la place aux membres.
+final class ExplorePlacesTests: XCTestCase {
+    private let grenoble = CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724)
+    private let lyon = PlaceResult(id: "lyon", name: "Lyon", subtitle: nil, latitude: 45.764, longitude: 4.836)
+    private let sydney = PlaceResult(id: "syd", name: "Lyon Street", subtitle: nil, latitude: -33.87, longitude: 151.21)
+    private let member = SocialUserSearchResult(id: "u1", name: "Élodie Martin", handle: "elodie", avatarUrl: nil, isFriend: nil)
+
+    func testWithoutAReferencePointNoPlaceIsShown() {
+        XCTAssertTrue(ExploreViewModel.placesToShow([lyon], query: "Lyon", members: [], center: nil).isEmpty)
+    }
+
+    func testFarAwayPlacesAreDropped() {
+        let shown = ExploreViewModel.placesToShow([lyon, sydney], query: "Lyon", members: [], center: grenoble)
+        XCTAssertEqual(shown.map(\.id), ["lyon"])
+    }
+
+    func testTypingAMemberNameShowsNoPlace() {
+        for query in ["elodie martin", "Elodie Martin", "@elodie", "ELODIE"] {
+            XCTAssertTrue(ExploreViewModel.placesToShow([lyon], query: query, members: [member], center: grenoble).isEmpty, query)
+        }
+        XCTAssertEqual(ExploreViewModel.placesToShow([lyon], query: "Élo", members: [member], center: grenoble).count, 1)
     }
 }
 

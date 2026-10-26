@@ -335,6 +335,7 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     func repost(postId: String) async throws -> ReactionResponse { throw ComposerFixtureError.unused }
     func muteNotifications(postId: String) async throws -> SuccessResponse { throw ComposerFixtureError.unused }
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? { throw ComposerFixtureError.unused }
+    func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? { throw ComposerFixtureError.unused }
     func deletePost(postId: String) async throws { throw ComposerFixtureError.unused }
     func setPinned(postId: String, pinned: Bool) async throws { throw ComposerFixtureError.unused }
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll? { throw ComposerFixtureError.unused }

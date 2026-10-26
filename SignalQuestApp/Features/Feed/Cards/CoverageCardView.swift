@@ -42,7 +42,7 @@ struct CoverageCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
-                    place: signal?.city ?? item.placeLabel,
+                    place: signal?.city ?? item.readablePlaceLabel,
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,
@@ -148,7 +148,8 @@ struct CoverageCardView: View {
         } else if let avg = signal?.averageSignalDbm {
             parts.append(String(localized: "Signal \(SignalFormatters.dbm(avg))"))
         }
-        if let device = signal?.deviceModel { parts.append(String(localized: "Appareil \(device)")) }
+        // Le modèle d'appareil n'apprend rien aux autres : il reste dans le
+        // détail de ses propres publications (lot F, F-05).
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

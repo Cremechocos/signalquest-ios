@@ -33,6 +33,8 @@ protocol SocialFeedServicing: Sendable {
     /// Édite un post dont on est l'auteur. Le serveur vérifie la propriété et
     /// répond 403 sinon — on ne s'appuie donc pas sur le seul masquage de l'UI.
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem?
+    /// Change seulement la visibilité : seul champ qu'un post automatique accepte (#694).
+    func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem?
     /// Suppression définitive. Irréversible côté serveur.
     func deletePost(postId: String) async throws
     /// Épingle ou détache un post sur son profil. Le serveur ne garde qu'un seul
@@ -479,6 +481,22 @@ final class SocialFeedService: SocialFeedServicing {
                 method: .patch,
                 headers: ["Content-Type": "application/json"],
                 body: body
+            ),
+            as: Response.self
+        )
+        return response.item
+    }
+
+    func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? {
+        // Sans `text` : sur un post automatique, toute autre clé vaut un 403.
+        struct Patch: Encodable { let visibility: String }
+        struct Response: Decodable { let item: UnifiedSocialFeedItem? }
+        let response: Response = try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))",
+                method: .patch,
+                headers: ["Content-Type": "application/json"],
+                body: try JSONEncoder.signalQuest.encode(Patch(visibility: visibility))
             ),
             as: Response.self
         )

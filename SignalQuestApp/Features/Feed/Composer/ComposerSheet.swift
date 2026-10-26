@@ -23,6 +23,27 @@ enum SocialVisibility: String, CaseIterable, Identifiable {
     }
 }
 
+/// Sous-menu « Visibilité » d'un post automatique : le seul réglage que le
+/// serveur lui laisse changer (#694), à la place de « Modifier ».
+struct PostVisibilityPicker: View {
+    let current: String?
+    let onSelect: (SocialVisibility) -> Void
+
+    var body: some View {
+        Picker(selection: Binding<SocialVisibility?>(
+            get: { current.flatMap(SocialVisibility.init(rawValue:)) },
+            set: { if let value = $0 { onSelect(value) } }
+        )) {
+            ForEach(SocialVisibility.allCases) { value in
+                Label(value.label, systemImage: value.icon).tag(Optional(value))
+            }
+        } label: {
+            Label("Visibilité", systemImage: "eye")
+        }
+        .pickerStyle(.menu)
+    }
+}
+
 enum ComposerMode {
     case edit
     case preview

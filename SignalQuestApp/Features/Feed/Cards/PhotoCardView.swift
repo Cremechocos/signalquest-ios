@@ -25,7 +25,7 @@ struct PhotoCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 CardHeader(
                     author: item.author,
-                    place: item.signal?.city ?? item.placeLabel,
+                    place: item.signal?.city ?? item.readablePlaceLabel,
                     createdAt: item.createdAt,
                     kindBadge: "Photo d’antenne",
                     kindColor: SQColor.success,
@@ -105,7 +105,8 @@ struct PhotoCardView: View {
     /// « Orange · support 1552054 » sur un voile sombre, lisible sur toute photo.
     @ViewBuilder
     private var siteCaption: some View {
-        let parts = [item.signal?.operator, item.signal?.siteLabel].compactMap { $0 }.filter { !$0.isEmpty }
+        // Opérateur seul : le code du site (« ANFR-… ») reste dans le détail (lot F, F-02).
+        let parts = [item.signal?.operator].compactMap { $0 }.filter { !$0.isEmpty }
         if !parts.isEmpty {
             HStack(spacing: SQSpace.xs) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
@@ -130,7 +131,7 @@ struct PhotoCardView: View {
         if let alt = item.imageAttachments.first?.trimmedAltText { return alt }
         let caption = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !caption.isEmpty { return String(localized: "Photo. \(caption)") }
-        if let place = (item.signal?.city ?? item.placeLabel), !place.isEmpty {
+        if let place = (item.signal?.city ?? item.readablePlaceLabel), !place.isEmpty {
             return String(localized: "Photo à \(place)")
         }
         return String(localized: "Photo partagée")

@@ -36,7 +36,7 @@ struct SignalDetailSheet: View {
     private var detailsHidden: Bool { signal?.detailsHidden == true || detailsHiddenByServer }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
     private var isSpeedtest: Bool { item.kind.lowercased() == "speedtest" }
-    private var place: String? { signal?.city ?? item.placeLabel }
+    private var place: String? { signal?.city ?? item.readablePlaceLabel }
 
     var body: some View {
         ScrollView {
@@ -261,7 +261,8 @@ struct SignalDetailSheet: View {
                 ("EARFCN", signal.earfcn.map(String.init) ?? ""),
                 ("ARFCN", signal.arfcn.map(String.init) ?? ""),
                 ("Secteurs", signal.sectors?.prefix(4).map(String.init).joined(separator: " · ") ?? ""),
-                ("Appareil", signal.deviceModel ?? "")
+                // Le modèle d'appareil ne sert qu'à l'auteur (lot F, F-05).
+                ("Appareil", item.canManage ? signal.deviceModel ?? "" : "")
             ]
         }
         pairs += outagePairs
@@ -386,7 +387,7 @@ struct SignalDetailSheet: View {
             detail.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: detail.uploadMeasurementSource)
         return [
             ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
-            ("Appareil", [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ")),
+            ("Appareil", item.canManage ? [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ") : ""),
             ("Durée", SignalFormatters.duration(detail.testDuration)),
             ("Latence moyenne", SignalFormatters.ms(detail.pingAvg)),
             ("Latence médiane", SignalFormatters.ms(detail.pingMedian)),

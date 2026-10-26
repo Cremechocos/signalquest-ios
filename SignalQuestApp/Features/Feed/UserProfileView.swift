@@ -201,6 +201,22 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
+    /// Visibilité seule (post automatique) : remise en place si le serveur refuse.
+    func setVisibility(_ item: UnifiedSocialFeedItem, to visibility: SocialVisibility) {
+        items = items.map { current in
+            var copy = current
+            if current.id == item.id { copy.visibility = visibility.rawValue }
+            return copy
+        }
+        Task {
+            do { _ = try await service.setVisibility(postId: item.id, visibility: visibility.rawValue) }
+            catch {
+                restore(item)
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     /// Retire la publication tout de suite ; elle revient à sa place si le serveur refuse.
     func delete(_ item: UnifiedSocialFeedItem) {
         let index = items.firstIndex { $0.id == item.id } ?? 0
@@ -1097,8 +1113,13 @@ struct UserProfileView: View {
     @ViewBuilder
     private func postMenu(for item: UnifiedSocialFeedItem) -> some View {
         if item.canManage {
-            Button { editingPost = item } label: {
-                Label("Modifier", systemImage: "pencil")
+            // Un post automatique ne change que de visibilité (403 sinon, #694).
+            if item.canEdit {
+                Button { editingPost = item } label: {
+                    Label("Modifier", systemImage: "pencil")
+                }
+            } else {
+                PostVisibilityPicker(current: item.visibility) { model.setVisibility(item, to: $0) }
             }
             Button { model.togglePin(item) } label: {
                 Label(item.isPinned ? "Désépingler" : "Épingler",

@@ -23,7 +23,7 @@ struct ValidationCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
-                    place: signal?.city ?? item.placeLabel,
+                    place: signal?.city ?? item.readablePlaceLabel,
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.success,

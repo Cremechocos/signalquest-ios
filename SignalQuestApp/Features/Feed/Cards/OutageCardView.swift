@@ -74,7 +74,7 @@ struct OutageCardView: View {
         }
     }
 
-    private var place: String? { string("outageAddress") ?? item.placeLabel }
+    private var place: String? { string("outageAddress") ?? item.readablePlaceLabel }
 
     /// Les services touchés, composés ICI à partir des trois drapeaux de la metadata.
     ///

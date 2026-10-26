@@ -29,6 +29,8 @@ final class ExploreViewModel: ObservableObject {
     @Published var searchError: String?
     /// Posé par la vue : le service des antennes vit dans l'environnement.
     var antennas: AntennasServicing?
+    /// Posé par la vue : borne la recherche de lieux autour de l'utilisateur.
+    var location: LocationService?
 
     // Flux filtré par hashtag
     @Published var selectedHashtag: String?
@@ -174,7 +176,8 @@ final class ExploreViewModel: ObservableObject {
         // Une recherche remplacée en cours de route ne remet pas le drapeau à faux.
         defer { if !Task.isCancelled { isSearching = false } }
         let antennasService = antennas
-        async let map = Self.mapResults(for: query, antennas: antennasService)
+        let center = Self.placesCenter(location: location)
+        async let map = Self.mapResults(for: query, antennas: antennasService, near: center)
         do {
             // UN appel au lieu de deux, et surtout : la recherche renvoie enfin
             // des PUBLICATIONS. `searchUsers` n'en rapportait aucune, si bien
@@ -195,7 +198,7 @@ final class ExploreViewModel: ObservableObject {
         }
         let found = await map
         guard !Task.isCancelled else { return }
-        searchPlaces = found.places
+        searchPlaces = Self.placesToShow(found.places, query: query, members: searchResults, center: center)
         searchSites = found.sites
     }
 
@@ -204,16 +207,53 @@ final class ExploreViewModel: ObservableObject {
     ///
     /// Un @pseudo ou un #hashtag ne part pas chez Apple : la recherche de lieux
     /// ne reçoit que ce qui peut être un lieu, de trois caractères au moins.
+    /// Sans centre, aucun lieu : une recherche mondiale proposait « Noah QLD,
+    /// Australie » pour un prénom, lu comme la position du membre (F-46).
     nonisolated static func mapResults(
-        for query: String, antennas: AntennasServicing?
+        for query: String, antennas: AntennasServicing?, near center: CLLocationCoordinate2D?
     ) async -> (places: [PlaceResult], sites: [AntennaSite]) {
         guard query.count >= 2, let first = query.first, first != "@", first != "#" else { return ([], []) }
-        let searchesPlaces = query.count >= 3
-        async let places: [PlaceResult] = searchesPlaces ? await MapExplorerViewModel.geocodePlaces(query, near: nil) : []
+        let searchesPlaces = query.count >= 3 && center != nil
+        async let places: [PlaceResult] = searchesPlaces ? await MapExplorerViewModel.geocodePlaces(query, near: center) : []
         async let sites = (try? await antennas?.quickSearch(
             query: query, market: MapMarketStore.initialMarketCode(), department: nil
         )) ?? []
         return (Array(await places.prefix(3)), Array(await sites.prefix(3)))
+    }
+
+    /// Rayon au-delà duquel un lieu n'a plus rien à faire dans Explorer : la
+    /// France métropolitaine tient dedans depuis n'importe quelle ville.
+    nonisolated static let placesRadiusMeters: CLLocationDistance = 1_000_000
+
+    /// Centre de la recherche de lieux : la position déjà connue si elle est
+    /// autorisée (aucune demande ici), sinon la dernière zone vue sur la carte.
+    static func placesCenter(location: LocationService?) -> CLLocationCoordinate2D? {
+        if let location, LocationFixPolicy.isAuthorized(location.authorizationStatus),
+           let fix = location.lastLocation {
+            return fix.coordinate
+        }
+        return MapRegionStore.lastRegion()?.center
+    }
+
+    /// Lieux à montrer : proches du centre, et aucun quand la requête désigne
+    /// exactement un membre trouvé — un lieu qui porte son nom passerait pour
+    /// sa position.
+    nonisolated static func placesToShow(
+        _ places: [PlaceResult], query: String, members: [SocialUserSearchResult],
+        center: CLLocationCoordinate2D?
+    ) -> [PlaceResult] {
+        guard let center else { return [] }
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let handleNeedle = needle.hasPrefix("@") ? String(needle.dropFirst()) : needle
+        let namesMember = members.contains { member in
+            member.displayName.compare(needle, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                || (member.handle.map { $0.compare(handleNeedle, options: .caseInsensitive) == .orderedSame } ?? false)
+        }
+        guard !namesMember else { return [] }
+        let origin = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        return places.filter {
+            origin.distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude)) <= placesRadiusMeters
+        }
     }
 
     static let demoPlaces = [
@@ -450,6 +490,7 @@ struct ExploreView: View {
         .onAppear {
             recentProfiles = Self.storedRecentProfiles()
             model.antennas = services.antennas
+            model.location = services.location
         }
         .onReceive(NotificationCenter.default.publisher(for: RecentlyViewedStore.didChange)) { _ in
             recentProfiles = Self.storedRecentProfiles()

@@ -21,7 +21,7 @@ struct PostCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 CardHeader(
                     author: item.author,
-                    place: item.placeLabel,
+                    place: item.readablePlaceLabel,
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.label,

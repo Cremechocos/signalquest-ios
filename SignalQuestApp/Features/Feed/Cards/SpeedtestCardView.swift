@@ -22,7 +22,7 @@ struct SpeedtestCardView: View {
                 // Plus de badge « Speedtest » : le bloc de mesure le dit déjà.
                 CardHeader(
                     author: item.author,
-                    place: signal?.city ?? item.placeLabel,
+                    place: signal?.city ?? item.readablePlaceLabel,
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,

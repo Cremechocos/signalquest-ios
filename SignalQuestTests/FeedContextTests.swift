@@ -204,6 +204,7 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
     func repost(postId: String) async throws -> ReactionResponse { throw FeedFixtureError.unused }
     func muteNotifications(postId: String) async throws -> SuccessResponse { throw FeedFixtureError.unused }
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
+    func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
     func deletePost(postId: String) async throws { throw FeedFixtureError.unused }
     func setPinned(postId: String, pinned: Bool) async throws { throw FeedFixtureError.unused }
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll? { throw FeedFixtureError.unused }

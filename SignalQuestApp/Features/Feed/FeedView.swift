@@ -353,6 +353,20 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Visibilité seule (post automatique) : appliquée tout de suite, remise
+    /// en place si le serveur refuse.
+    func setVisibility(_ item: UnifiedSocialFeedItem, to visibility: SocialVisibility) {
+        let previous = item
+        Task {
+            await applyLocalToggle(itemId: item.id) { var copy = $0; copy.visibility = visibility.rawValue; return copy }
+            do { _ = try await service.setVisibility(postId: item.id, visibility: visibility.rawValue) }
+            catch {
+                await restore(previous)
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     /// Suppression définitive. Retrait optimiste puis remise en place en cas
     /// d'échec — un post qui disparaît sans confirmation serveur ferait croire
     /// à une suppression réussie.
@@ -1574,8 +1588,13 @@ struct FeedView: View {
         // 403 : ce masquage évite d'offrir une action vouée
         // à échouer, il ne fait pas autorité.
         if item.canManage {
-            Button { editingPost = item } label: {
-                Label("Modifier", systemImage: "pencil")
+            // Un post automatique ne change que de visibilité (403 sinon, #694).
+            if item.canEdit {
+                Button { editingPost = item } label: {
+                    Label("Modifier", systemImage: "pencil")
+                }
+            } else {
+                PostVisibilityPicker(current: item.visibility) { model.setVisibility(item, to: $0) }
             }
             Button { model.togglePin(item) } label: {
                 Label(item.isPinned ? "Désépingler" : "Épingler",
