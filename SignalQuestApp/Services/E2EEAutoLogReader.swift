@@ -236,9 +236,13 @@ actor E2EEAutoLogReader {
     static let maxLinkPages = 100
     static let maxAccountPages = 20
 
-    /// Clé du journal épinglée et clés suivantes (§3.4) : posées avec la clé de
-    /// prod, que génère Alexandre. Sans elles, pas de lecteur.
-    static let productionLogKeys: (current: String, next: [String])? = nil
+    /// Clé du journal épinglée et clé suivante (§3.4), en X9.63 base64 : tirées
+    /// par Alexandre le 26/10 (logKeyId `pMHQt1dV…` et `hL8oRK4X…`). Le lecteur
+    /// reste coupé tant que `SQFeatures.e2eeAutoLogEnabled` est fermé.
+    static let productionLogKeys: (current: String, next: [String])? = (
+        current: "BCaJETLIVIYzLKqloGCh3ORVJDBqye6azjdY77hDMSCiUCBLgJSTwuWPrlmM8mCtgj0zlZBm3DKQwHn2MKEtYho=",
+        next: ["BF5ImQG7MrKenFAYOmzOSOrjRBAS6W14Lv/KlOQiv0ARjQtrP7HYUBfvLRug6WBvd0vJ32L07KU7+b87PvXXwm8="]
+    )
 
     typealias FetchLinks = @Sendable (_ after: Int64) async throws -> (data: Data, serverDate: Date?)
     /// Entrées de seq dans `]after, upTo]` ; nil : compte non servi (404).

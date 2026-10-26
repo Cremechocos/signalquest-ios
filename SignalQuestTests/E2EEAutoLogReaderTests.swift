@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import SignalQuest
 
@@ -515,6 +516,24 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         }
         let withoutDave = E2EEV2CertifiedDeviceSet(devicesByUser: set.devicesByUser, refusals: [:])
         XCTAssertNotNil(withoutDave.capabilityIntersection(nowMs: reference.headNowMs, excludesWeb: false))
+    }
+
+    // MARK: Clés de production
+
+    /// Les clés épinglées sont celles annoncées le 26/10 (§3.4) : points P-256
+    /// valides, `logKeyId` attendus, et jamais les clés publiques des vecteurs.
+    func testProductionLogKeysArePinnedAndAreNotVectorKeys() throws {
+        let keys = try XCTUnwrap(E2EEAutoLogReader.productionLogKeys)
+        XCTAssertEqual(keys.next.count, 1)
+        for key in [keys.current] + keys.next {
+            XCTAssertNoThrow(try P256.Signing.PublicKey(x963Representation: try XCTUnwrap(Data(base64Encoded: key))))
+        }
+        XCTAssertEqual(E2EEAutoLog.logKeyId(keys.current), "pMHQt1dVtqYasYPPTsFLVZmAE5g9csUaJ-_-EJK5toU")
+        XCTAssertEqual(E2EEAutoLog.logKeyId(keys.next[0]), "hL8oRK4XxGnJk8GFNc-Ys6tMf0tHB4Doxshv116AmLU")
+        let vectors = try reference()
+        let vectorKeys = Set([vectors.pinnedLogKeyB64] + vectors.nextLogKeysB64)
+        XCTAssertTrue(vectorKeys.isDisjoint(with: [keys.current] + keys.next))
+        XCTAssertFalse(SQFeatures.e2eeAutoLogEnabled, "le journal reste fermé jusqu'à la bascule")
     }
 
     // MARK: Pages
