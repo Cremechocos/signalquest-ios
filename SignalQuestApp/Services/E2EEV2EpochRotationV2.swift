@@ -400,12 +400,21 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
             return .failure(localError("e2ee-epoch-proposal-invalid"))
         }
 
+        // Une fois la bascule faite (§7.2), le `lastSeq` vérifié de chaque membre
+        // remplace la version de sa liste ; un membre sans journal lu est relu.
+        let body: E2EEV2JSON
+        if E2EEV2ServerGate.autoActive {
+            let unlogged = membership.members.filter { devices.logSeqs[$0] == nil }
+                .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+            guard unlogged.isEmpty else { return .failure(E2EEV2DeviceListReread.failure(unlogged)) }
+            body = proposal.json(memberLogSeqs: devices.logSeqs.filter { membership.members.contains($0.key) })
+        } else {
+            body = proposal.json(memberListVersions: devices.listVersions.filter { membership.members.contains($0.key) })
+        }
         let bound = transport.bound(to: session)
         switch await bound.postJSON(
             path: "/api/e2ee/v2/conversations/\(conversationId)/epochs",
-            body: E2EEV2CanonicalJSON.encode(proposal.json(
-                memberListVersions: devices.listVersions.filter { membership.members.contains($0.key) }
-            )),
+            body: E2EEV2CanonicalJSON.encode(body),
             expectedOwnerScopeId: expectedOwnerScopeId,
             capabilitySet: .message
         ) {

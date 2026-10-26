@@ -248,7 +248,12 @@ final class E2EEV2CallRuntime: @unchecked Sendable {
         in members: E2EEV2MessagingRuntime.CallMembers,
         nowMs: Int64
     ) -> P256.Signing.PublicKey? {
-        guard let device = members.devices.device(deviceId: deviceId), members.members.contains(device.userId),
+        // Le descripteur ne nomme que l'appareil, et le journal admet un même
+        // deviceId sous deux comptes (E2EE-AUTO §3.2) : deux clés différentes
+        // parmi les membres rendent l'appelant indécidable, donc refusé.
+        let candidates = members.members.compactMap { members.devices.device(userId: $0, deviceId: deviceId) }
+        guard Set(candidates.map(\.signingKeyB64)).count == 1,
+              let device = candidates.first,
               device.supports("calls", nowMs: nowMs),
               !(members.excludesWeb && device.platform == "web") else { return nil }
         return device.signingKey

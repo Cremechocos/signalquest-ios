@@ -41,6 +41,15 @@ struct E2EEV2EpochProposal: Sendable {
         object["memberListVersions"] = .object(memberListVersions.mapValues { .string(String($0)) })
         return .object(object)
     }
+
+    /// Le même corps, une fois la bascule faite (E2EE-AUTO §7.1, §7.2) : le
+    /// `lastSeq` vérifié de chaque membre (`memberLogSeqs`), obligatoire même
+    /// quand tous valent `"0"`.
+    func json(memberLogSeqs: [String: Int64]) -> E2EEV2JSON {
+        guard case .object(var object) = json else { return json }
+        object["memberLogSeqs"] = .object(memberLogSeqs.mapValues { .string(String($0)) })
+        return .object(object)
+    }
 }
 
 enum E2EEV2EpochProposals {
@@ -129,6 +138,9 @@ struct E2EEV2ConversationCreation: Sendable {
         /// Un appareil compté ne lit pas encore le v2 (v0.4.17) : la
         /// conversation chiffrée naît en v1 tant que le serveur l'accepte.
         case capabilityMissing
+        /// Une fois la bascule faite (E2EE-AUTO §7.2) : membres dont le journal
+        /// n'a pas été lu, à relire avant de composer `memberLogSeqs`.
+        case membersUnlogged([String])
     }
 
     /// Règle commune iOS et Android (v0.4.17) : une conversation ne passe en
@@ -154,16 +166,23 @@ struct E2EEV2ConversationCreation: Sendable {
     let epoch: E2EEV2EpochProposal
     /// Membres sans appareil certifié : ils recevront la clé à leur arrivée.
     let pendingUserIds: [String]
+    /// `lastSeq` vérifié de chaque membre, à la racine du corps une fois la
+    /// bascule faite (E2EE-AUTO §7.1, §7.2) ; nil avant.
+    var memberLogSeqs: [String: Int64]?
 
     var body: Data {
-        E2EEV2CanonicalJSON.encode(.object([
+        var object: [String: E2EEV2JSON] = [
             "conversationId": .string(conversationId),
             "isGroup": .bool(isGroup),
             "title": title.map(E2EEV2JSON.string) ?? .null,
             "participantIds": .array(participantIds.map(E2EEV2JSON.string)),
             "membership": .array(membership.map(E2EEV2MembershipChange.json)),
             "epoch": epoch.json,
-        ]))
+        ]
+        if let memberLogSeqs {
+            object["memberLogSeqs"] = .object(memberLogSeqs.mapValues { .string(String($0)) })
+        }
+        return E2EEV2CanonicalJSON.encode(.object(object))
     }
 
     /// Migration d'une conversation v1 (§14.2) : la conversation existe déjà.
@@ -201,6 +220,11 @@ struct E2EEV2ConversationCreation: Sendable {
         guard members.count == participantIds.count + 1, isGroup || members.count == 2 else {
             throw Failure.invalidMembers
         }
+        let autoActive = E2EEV2ServerGate.autoActive
+        let unlogged = autoActive
+            ? members.filter { devices.logSeqs[$0] == nil }.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+            : []
+        guard unlogged.isEmpty else { throw Failure.membersUnlogged(unlogged) }
         // Un membre sans identité v2 (E2EE_IDENTITY_NOT_FOUND) ne lit pas le v2 :
         // la conversation naît en v1 (v0.4.17). Une identité changée ou
         // invalide, elle, suspend tout (§2.4).
@@ -248,7 +272,8 @@ struct E2EEV2ConversationCreation: Sendable {
             conversationId: conversationId, isGroup: isGroup, title: title,
             participantIds: participantIds.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) },
             membership: signedChanges, genesis: genesis, epoch: epoch,
-            pendingUserIds: genesis.members.subtracting(served).sorted()
+            pendingUserIds: genesis.members.subtracting(served).sorted(),
+            memberLogSeqs: autoActive ? devices.logSeqs.filter { members.contains($0.key) } : nil
         )
     }
 }
@@ -364,6 +389,8 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         let envelopes: [E2EEV2SignedEpochEnvelope]
         let pendingUserIds: [String]
         let body: Data
+        /// Corps composé une fois la bascule faite (`memberLogSeqs`, E2EE-AUTO §7.2).
+        var logged = false
 
         init(_ creation: E2EEV2ConversationCreation, body: Data) {
             conversationId = creation.conversationId
@@ -374,12 +401,15 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             envelopes = creation.epoch.envelopes
             pendingUserIds = creation.pendingUserIds
             self.body = body
+            logged = creation.memberLogSeqs != nil
         }
 
         /// Corps de création gardé (reçu perdu), relu strictement.
         init?(creationBody: String, pendingUserIds: [String]) {
             guard let root = try? E2EEV2CanonicalJSON.parseCanonical(creationBody).objectValue,
-                  Set(root.keys) == ["conversationId", "isGroup", "title", "participantIds", "membership", "epoch"],
+                  // `memberLogSeqs` une fois la bascule faite (E2EE-AUTO §7.2), seulement.
+                  Set(root.keys).subtracting(["memberLogSeqs"])
+                    == ["conversationId", "isGroup", "title", "participantIds", "membership", "epoch"],
                   let conversationId = root["conversationId"]?.stringValue, E2EEV2Canonical.isOpaque(conversationId),
                   case .bool(let isGroup)? = root["isGroup"],
                   let migration = Self(
@@ -396,6 +426,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             envelopes = migration.envelopes
             self.pendingUserIds = pendingUserIds
             body = Data(creationBody.utf8)
+            logged = root["memberLogSeqs"] != nil
         }
 
         /// Corps de migration gardé, relu strictement.
@@ -471,7 +502,9 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                 if let pending = try stateStore.pendingCreation(request: request, ownerNamespace: context.ownerNamespace),
                    (0..<Self.pendingCreationLifetimeMs).contains(nowMs - pending.savedAtMs),
                    let restored = Prepared(creationBody: pending.body, pendingUserIds: pending.pendingUserIds),
-                   Set(restored.recipients) == expectedRecipients {
+                   Set(restored.recipients) == expectedRecipients,
+                   // Un corps gardé d'un côté de la bascule n'est jamais renvoyé de l'autre.
+                   restored.logged == E2EEV2ServerGate.autoActive {
                     return restored
                 }
                 let creation = try build(context) {
@@ -728,6 +761,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         case E2EEV2ConversationCreation.Failure.invalidMembers: localError("e2ee-creation-invalid-members")
         case E2EEV2ConversationCreation.Failure.capabilityMissing: localError("e2ee-v2-capability-missing")
         case E2EEV2ConversationCreation.Failure.membersNotTrusted: localError("e2ee-v2-members-not-trusted")
+        case E2EEV2ConversationCreation.Failure.membersUnlogged(let userIds): E2EEV2DeviceListReread.failure(userIds)
         default: localError("e2ee-conversation-creation-invalid")
         }
     }

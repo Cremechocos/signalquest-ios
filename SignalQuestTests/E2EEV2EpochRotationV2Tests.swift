@@ -150,6 +150,61 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(current.keyCommitmentB64, try E2EEV2EpochCrypto.keyCommitment(stored.epochKey))
     }
 
+    /// E2EE-AUTO §7.2 : une fois la bascule faite, `memberLogSeqs` (chaînes
+    /// décimales, exactement les membres) remplace `memberListVersions`.
+    func testOnceSwitchedOnARotationSendsMemberLogSeqs() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        let tablet = remote(user: bruno, device: "device_bruno_tablet_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [phone.device, tablet.device])
+        devices.listVersions = [fixture.user: 2, bruno: 5]
+        devices.logSeqs = [fixture.user: 9, bruno: 31, "user_former_01J7ABCD23456789": 4]
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
+                "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": "2", "status": "active", "createdAt": "2026-10-26T20:00:00.000Z"],
+                "recipientCount": String((body["envelopes"] as? [Any])?.count ?? 0),
+            ]))
+        }
+        let result = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(result, .rotated(epochNumber: 2))
+        let body = try XCTUnwrap(captured.first?.1)
+        XCTAssertEqual(Set(body.keys), ["epochNumber", "previousEpochNumber", "manifest", "envelopes", "memberLogSeqs"])
+        XCTAssertEqual(body["memberLogSeqs"] as? [String: String], [fixture.user: "9", bruno: "31"])
+    }
+
+    /// Un membre dont le journal n'a pas été lu est relu avant toute époque.
+    func testOnceSwitchedOnAMemberWithoutAReadLogIsReadFirst() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        let tablet = remote(user: bruno, device: "device_bruno_tablet_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [phone.device, tablet.device])
+        devices.logSeqs = [fixture.user: 9]
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("Rien ne part sans le journal de chaque membre")
+            throw URLError(.badServerResponse)
+        }
+        let result = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure(let failure) = result else { return XCTFail("Attendu un échec à relire, reçu \(result)") }
+        XCTAssertEqual(failure.code, "E2EE_DEVICE_LIST_STALE")
+        XCTAssertEqual(failure.staleUserIds, [bruno])
+    }
+
     /// Conflit : l'époque acceptée entre-temps est relue, vérifiée et adoptée.
     func testAConflictAdoptsTheAcceptedEpochAfterVerifyingIt() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }

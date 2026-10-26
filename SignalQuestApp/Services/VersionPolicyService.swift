@@ -134,10 +134,14 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
     let minWriteProtocol: Int
     let legacyWriteDeadline: Date?
     let serverCapabilities: Set<String>
+    /// Interrupteur global du chiffrement automatique (E2EE-AUTO §7.2) : vrai
+    /// seulement pour un booléen `true`, absent ou illisible = faux.
+    let e2eeAutoActive: Bool
 
     enum CodingKeys: String, CodingKey {
         case minVersionCode, recommendedVersionCode, warnMessage, blockMessage, storeUrl
         case serverProtocolVersion, minWriteProtocol, legacyWriteDeadline, serverCapabilities
+        case e2eeAutoActive
     }
 
     init(from decoder: Decoder) throws {
@@ -161,6 +165,7 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
             }
             return normalized
         })
+        e2eeAutoActive = ((try? c.decodeIfPresent(Bool.self, forKey: .e2eeAutoActive)) ?? nil) ?? false
     }
 
     init(
@@ -172,7 +177,8 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
         serverProtocolVersion: Int = 1,
         minWriteProtocol: Int = 1,
         legacyWriteDeadline: Date? = nil,
-        serverCapabilities: Set<String> = []
+        serverCapabilities: Set<String> = [],
+        e2eeAutoActive: Bool = false
     ) {
         self.minVersionCode = minVersionCode
         self.recommendedVersionCode = recommendedVersionCode
@@ -183,6 +189,7 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
         self.minWriteProtocol = minWriteProtocol
         self.legacyWriteDeadline = legacyWriteDeadline
         self.serverCapabilities = serverCapabilities
+        self.e2eeAutoActive = e2eeAutoActive
     }
 }
 
@@ -260,7 +267,10 @@ final class VersionPolicyService: ObservableObject {
                     legacyWriteDeadline: policy.legacyWriteDeadline
                 )
             )
-            if E2EEV2ServerGate.record(serverCapabilities: policy.serverCapabilities, host: api.config.apiBaseURL.host) {
+            let autoChanged = policy.e2eeAutoActive
+                && E2EEV2ServerGate.recordAutoActive(host: api.config.apiBaseURL.host)
+            if E2EEV2ServerGate.record(serverCapabilities: policy.serverCapabilities, host: api.config.apiBaseURL.host)
+                || autoChanged {
                 NotificationCenter.default.post(name: E2EEV2ServerGate.didChange, object: nil)
             }
             state = Self.evaluate(policy: policy, currentBuild: currentBuild)

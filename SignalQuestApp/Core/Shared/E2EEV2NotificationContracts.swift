@@ -1324,6 +1324,39 @@ enum E2EEV2ServerGate {
         return before != (messagingOpen, callsOpen, reactionsOpen)
     }
 
+    #if DEBUG
+    /// Tests unitaires : interrupteur auto sans état partagé.
+    nonisolated(unsafe) static var autoActiveOverrideForTesting: Bool?
+    #endif
+
+    /// Interrupteur global du chiffrement automatique (E2EE-AUTO §7.2), publié
+    /// par `version-policy`. Le serveur ne le rabaisse jamais : une fois vu,
+    /// il reste allumé pour cet hôte, et une réponse qui dirait le contraire
+    /// ne ramène pas l'app au chemin v2.
+    static var autoActive: Bool {
+        #if DEBUG
+        if let autoActiveOverrideForTesting { return autoActiveOverrideForTesting }
+        #endif
+        guard let store = Store.current else { return false }
+        return store.defaults.bool(forKey: store.autoActiveKey)
+    }
+
+    /// Interrupteur vu allumé sur `host` (ou, sans hôte, sur celui de l'app :
+    /// un `400 E2EE_AUTO_REQUIRED` vient de lui). Vrai s'il vient de s'allumer.
+    @discardableResult
+    static func recordAutoActive(host: String? = nil) -> Bool {
+        #if DEBUG
+        if autoActiveOverrideForTesting != nil {
+            defer { autoActiveOverrideForTesting = true }
+            return autoActiveOverrideForTesting == false
+        }
+        #endif
+        guard let store = Store.current, (host?.lowercased() ?? store.host) == store.host,
+              !store.defaults.bool(forKey: store.autoActiveKey) else { return false }
+        store.defaults.set(true, forKey: store.autoActiveKey)
+        return true
+    }
+
     private static var published: Set<String> {
         #if DEBUG
         if let overrideForTesting { return overrideForTesting }
@@ -1340,6 +1373,7 @@ enum E2EEV2ServerGate {
         let host: String
         var publishedKey: String { "sq.e2ee.v2.server-capabilities.\(host)" }
         var readsOpenedKey: String { "sq.e2ee.v2.reads-opened.\(host)" }
+        var autoActiveKey: String { "sq.e2ee.auto.active.\(host)" }
 
         static let shared: Store? = {
             let info = Bundle.main

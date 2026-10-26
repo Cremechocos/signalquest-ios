@@ -180,8 +180,15 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         return await operation(try await parts.directory.devices(for: again.sorted()))
     }
 
-    private static func stale(_ failure: E2EEV2TransportFailure) -> [String]? {
-        failure.code == "E2EE_DEVICE_LIST_STALE" ? failure.staleUserIds : nil
+    static func stale(_ failure: E2EEV2TransportFailure) -> [String]? {
+        // La bascule a eu lieu sans que version-policy l'ait encore dit
+        // (E2EE-AUTO §7.2) : l'interrupteur est retenu allumé, et l'opération
+        // refaite une fois, sur des journaux relus, avec `memberLogSeqs`.
+        if failure.statusCode == 400, failure.code == "E2EE_AUTO_REQUIRED", !E2EEV2ServerGate.autoActive {
+            E2EEV2ServerGate.recordAutoActive()
+            return []
+        }
+        return failure.code == "E2EE_DEVICE_LIST_STALE" ? failure.staleUserIds : nil
     }
 
     // MARK: Opérations

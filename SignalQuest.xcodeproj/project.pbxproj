@@ -14,6 +14,7 @@
 		02593AF0CFF83B2C69D9F79A /* SentinelleCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0421A119135C490C2075C09 /* SentinelleCharts.swift */; };
 		027E3130C3FF0E1E4C1FC6FC /* E2EEV2ThreadPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FD7F46C63A1733CA825E36 /* E2EEV2ThreadPresentationTests.swift */; };
 		0293550C16599D9A28374FB9 /* MapHTTPRuntimeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E51CEABE03315848B6AED88 /* MapHTTPRuntimeQATests.swift */; };
+		03F729FEA4C26B4411AEDEEC /* E2EEAutoSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A1E74BF431984A6A304 /* E2EEAutoSwitchTests.swift */; };
 		03F9AFEEE08F4A89518363D5 /* ContinuousSessionAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */; };
 		03FAF13136B9E540F08B5A98 /* UntranslatedSweepQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A220418E768D630538FCBDB6 /* UntranslatedSweepQATests.swift */; };
 		044254633FC07356DEE15A05 /* MapSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C51010FA360E6C3806F7179 /* MapSnapshotService.swift */; };
@@ -1456,6 +1457,7 @@
 		AD67A7B51B7000BB42264042 /* MessageDraftsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageDraftsQATests.swift; sourceTree = "<group>"; };
 		AD6D6F9AEC13320786BD614D /* SpeedtestServerPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestServerPicker.swift; sourceTree = "<group>"; };
 		AD8048DF32A4922952CF4D9B /* SignalQuestWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SignalQuestWidget.entitlements; sourceTree = "<group>"; };
+		ADAF1A1E74BF431984A6A304 /* E2EEAutoSwitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoSwitchTests.swift; sourceTree = "<group>"; };
 		AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2JalonAVectorTests.swift; sourceTree = "<group>"; };
 		AEB3FB0048F8A13762D3E9A7 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSupportSilhouette.swift; sourceTree = "<group>"; };
@@ -2829,6 +2831,7 @@
 				69AD3C3E2E16BAECC4AE1678 /* E2EEAutoLogLocalIntegrationTests.swift */,
 				82F5F3F57103EBEE5FBD5CAA /* E2EEAutoLogReaderTests.swift */,
 				27DBB5E1934AE25DF1AC6A34 /* E2EEAutoLogVectorTests.swift */,
+				ADAF1A1E74BF431984A6A304 /* E2EEAutoSwitchTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				5F1BBEC3068C79034419B5CE /* E2EEV2A1ContractTests.swift */,
 				214621A144EF0AF09A3DCD5D /* E2EEV2A1LifecycleTests.swift */,
@@ -4124,6 +4127,7 @@
 				EE10520BC1BD04FD670428B9 /* E2EEAutoLogLocalIntegrationTests.swift in Sources */,
 				D4A05239E07B114BF5897E58 /* E2EEAutoLogReaderTests.swift in Sources */,
 				AA559DB0E49221D8C0918940 /* E2EEAutoLogVectorTests.swift in Sources */,
+				03F729FEA4C26B4411AEDEEC /* E2EEAutoSwitchTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				9DDECAE6CF3EAE2DFA8C39D9 /* E2EEV2A1ContractTests.swift in Sources */,
 				42BF8C537C0F1D8D59E744E1 /* E2EEV2A1LifecycleTests.swift in Sources */,
