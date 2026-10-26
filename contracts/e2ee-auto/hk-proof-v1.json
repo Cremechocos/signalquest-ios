@@ -115,5 +115,134 @@
         "device_alice_a3_000003"
       ]
     }
-  ]
+  ],
+  "rotationLog": {
+    "note": "Journal à part, maillons 1 à 13, clé du journal épinglée sans rotation. La HISTORY_KEY du seq 13 suit deux REVOKE (11 : USER, 12 : INACTIVE) : son revokeSeq est 12, celui du dernier REVOKE qui la précède (§5.6 point 4). C6 est PENDING (ADD_PENDING du seq 10, jamais activé). La liste servie est triée par octets UTF-8 des deviceId.",
+    "pinnedLogKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+    "links": [
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nNIc0S5vq_SJnELY0XzaZmcQoImCPqnPRjMu0543Uhh4\nEQlwoA3KlrIDODgbQTsknuDcwV5WIglxhnCHw0mmZyM\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nbip0rWXSIguFJ0xYIgNaqeXz_Tv5gPujDJncBeYUClQ\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nTXyRNYn4FIHGL4VeafuXu7Iy84F_JP4ZJB-6SZJbpz4\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n3\npk8QM5qK0Dz2liy8EE5Kci0e1da0F2m2Yu9fVSJzEYI\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\na37bqy9ujHWFo1cV3tAwZcu_MFjU42AwEzXSNgabR-g\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nSFSo0IgZhwfoQcVDoAgTYhFHJsWw58_yM3u0F1u0lN4\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nsRVyJHKBeslrOz_R3hSiAPUkwWqpqGSMnpOk2_t9LEU\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n5\nzG-M3lnWWtkXfBDxmz1dxef39KF9uHtMhBctSCBYutY\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nfvLbBQDzAmFc3fbYMZPKfv-u_Y3-kahaBYxPnnNV5Bk\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nQ821StXh__GzodiNGBfo9YfbJiYy6_zjzUxt5cKiCDo\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nDPMmggmlQuT3oNclQERQ3OJesiUAkniwBmbvoPteERE\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n7\n4pF1330ldXM02B9sm__5YMrl1sgqvCN7PsA-dNDNbNU\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\n_aF9m62_QoTYkn9sx-Yxu0cLH0FKYF_-HblUaL-HxbM\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n8\npkS6HmAZgpvxOxIjp_R_JqEEhqdcleThauXvFNAOGIs\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nLtSDA5mcNLGn1IPQorGUvtMjEJVrwHQNH_4h_CsYJYw\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nWgNWRSRlLbwko4_KkKbC7DXTSK3vkruaUv-cGa26uyU\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nK3d5AIioryj9YtYVZlY-hs6B53v4z1QlxtPQ4OVXdIE\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n10\npJYpDst2trbwNURmQA_65vHWbZ3-0RGuznD5hXhJqtA\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\n5_8mDPDIUfbybIkcfRtfdO174Al20WFLfUrU-aNKZ4A\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n11\ncGsOlGuvKy7ppoQaHPKV4O6ueBsuJiQM4jpQUR4ITY0\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nLZq4DHwk4X1VnDG38Fzj1c-Q5yqKT776IhAIahThAL8\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n12\n7u5nmDDv_6w4MR4GuUiEaMgHvPxc5ki6HN3QkvVPnNc\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nCoGt4jUcbouFUMuedi0KqtiSKVlhM2fekoD6uJu952o\n0",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n13\nG2sRBNFFICqwI8lJChk-7OBUV_5HedNDNe6s5hBHc04\nENTRY\nYUiRGUG1oaMiFaExje7g517W948ehwJuQNpXyz5_9eo\nbJetPXWDRGaL5f9_gO4KLluZGoDXDYv03iQURY4x0hY\n0"
+    ],
+    "logKeyEntries": {},
+    "head": {
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n13\nvyZ_rYZyUVYFdTE5U6JzK8VccmpdPBlLtOBxWzmNe54\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+      "signatureB64": "MEUCIQDU+WJ+VOP3si0XHYxiFwROI9hXYZHlh2fxMuZswaF7dAIgArnAWyJNn0DNexbZBpybw1ai98TT4SnediuAwnyukbA="
+    },
+    "account": {
+      "userId": "user_carol_00000000003",
+      "accountSaltB64": "w8PDw8PDw8PDw8PDw8PDww==",
+      "entries": [
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_carol_00000000003\n-\nADD\ndevice_carol_c1_000001\nios\nBKo1mLbz/osuI6X5xJ1OPcixBab5BaajxEhIRSze/DiNFS56QvOWVN+ELuL5iDPQdJKDGBI8R5HatsT7qUBlBuY=\nBJGzE4RQ7dRdT2IJFK6MwA7iGnXeWirz+JEJ2LQdFIlI3ZgEcNNV88TEutRxqf44mGhcoXGhABjL9PfuI6kDyj8=\n1\nGENESIS\n1789136000000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_carol_00000000003\nTXyRNYn4FIHGL4VeafuXu7Iy84F_JP4ZJB-6SZJbpz4\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_carol_c1_000001:BGvgRjwiBTmrmTwSGQRSAgZ/PJgQHr5Cc/l4ETNtxRzP2BAPr13Fx7gvQRu/KxPMeULwZYMtQxloGLuNfVnN99g=:MEUCIQDHUXNf3Um5FlO+tfNXsneq8PGKoDMES6vPXcDnSo4dLgIgcoekLTgHi+HA6U1cx7+xhc1sfoNDHQ6vGc2cX15YKvc=\n1789222400000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_carol_00000000003\na37bqy9ujHWFo1cV3tAwZcu_MFjU42AwEzXSNgabR-g\nADD\ndevice_carol_c2_000002\nandroid\nBDJLfv31w2+qAk/gJz/FeQEx2vqvS54l7vV/wFL2n3acgsQNrJ0CHuNNE5MOrdrxkrk+najQQiZH2COQRPZkEAM=\nBJoKWOCccH1EXTkXw3JIBF9/akOB4OKKPyQhT8M+a3NXVl0wcJkNccv5UEBi1z1YLALTMtcznbURTNv16G1ju4Q=\n1\n-\n1789308800000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_carol_00000000003\nsRVyJHKBeslrOz_R3hSiAPUkwWqpqGSMnpOk2_t9LEU\nADD\ndevice_carol_C4_000004\nweb\nBJUBYJzvz0Fanf4fDOFW8ET3z8fvKtnlDidcFXvg1q2pB0MZc/XbulB3lO8oCmNKyOCvwYnAtdTqPbliaQQy498=\nBCMjKo+g+/2BNRuvApGhY8kN2MC53BDSbEMbWam+wVITD9EwJCIoJ5s29x05RcnBtrYYH6jibBjWJLehlQlOAVM=\n1\n-\n1789312400000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_carol_00000000003\nfvLbBQDzAmFc3fbYMZPKfv-u_Y3-kahaBYxPnnNV5Bk\nADD\ndevice_carol_-5_000005\nios\nBJg5Woi3rlUDGcJldrjbxV4yLdpRdsLa/coT+ebB/cbFZhDBtx65PtLLxg8xnJQsAGf4DgQBOIc5wNOxxYx3iuc=\nBFO+KFJIvwsYrCqDw6nMNBut665pC4dG7OWao1mPe2FmbGDoAMkoUQLzdvOqeU6MJgjr8MDK5mJkPEX9UdJhdes=\n1\n-\n1789316000000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_carol_00000000003\nDPMmggmlQuT3oNclQERQ3OJesiUAkniwBmbvoPteERE\nADD\ndevice_carol_c3_000003\nandroid\nBMx26SKYedgfpsqcXqe01h0lySyKY+YiI6C4tJNDrs7n7p0Df7xqBlNY5XalJBNz7EqRhRjXEyihSXuvtTnBUBw=\nBEsNbxPoH+4gCGFh4hOH9wetOFVkcFozGGwivbbK++2ceiDI53/mNX4ed/f5rFHItP/hx/xAwXVkFNifi+aiNDY=\n1\n-\n1789319600000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_carol_00000000003\n_aF9m62_QoTYkn9sx-Yxu0cLH0FKYF_-HblUaL-HxbM\nADD\ndevice_carol_c7_000007\nweb\nBNiELJF16hHUy1mWCx1FnkqaPN/1Cym2BIzfhUwC2JbMQduiigfZvRnmHUWsqc3BbhkH85rNN/rQNO8LY7xcvf8=\nBFzGXb0t/u7j2Lzf44dUKcWkKqhUmZv5gTp+elSavtAsxiHTkdDaf0e9Lf+Expt1MWXBozshCpk7xklIxmkRywM=\n1\n-\n1789323200000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_carol_00000000003\nLtSDA5mcNLGn1IPQorGUvtMjEJVrwHQNH_4h_CsYJYw\nMODE\n-\n-\n-\n-\n-\ndevice_carol_c1_000001:STRICT:MEQCIBzUvNROXB260Skubtzfl/zYOTC60EYwEHXFlyRUZvuHAiBgsWusU6UH2eSPKnyTGKkNrHkWKMpMHBvB4maJiNteug==\n1789395200000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_carol_00000000003\nK3d5AIioryj9YtYVZlY-hs6B53v4z1QlxtPQ4OVXdIE\nADD_PENDING\ndevice_carol_c6_000006\nios\nBFg4fjZbCcGKzivs23U5PbDG+xOIKEvpaWOHp9l0ssoji0k90k4B6nkqMpeEWHSzVQnFgNJJSNwNd8DX1LqLijU=\nBCaE+sYgAZXDWtz6uZplFzprkku1Di92koTbc4WH6LDodn+mzMPBFlrbz4WcR/blI2w/OhcJ2lv+qOg9KRWW8TA=\n1\n-\n1789481600000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_carol_00000000003\n5_8mDPDIUfbybIkcfRtfdO174Al20WFLfUrU-aNKZ4A\nREVOKE\ndevice_carol_c3_000003\n-\n-\n-\n-\nUSER:device_carol_c1_000001:MEQCIDb65MuA9nmWSyfWWu01KNYFRPhVhOKcV3RFB1tVhgPrAiAzo3QJKPF5MsQF3I36P/x+8FwNzYo29xPwSDrcwLZnYw==\n1789827200000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_carol_00000000003\nLZq4DHwk4X1VnDG38Fzj1c-Q5yqKT776IhAIahThAL8\nREVOKE\ndevice_carol_c7_000007\n-\n-\n-\n-\nINACTIVE\n1789913600000",
+        "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_carol_00000000003\nCoGt4jUcbouFUMuedi0KqtiSKVlhM2fekoD6uJu952o\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_carol_c1_000001:BM4Vs4b3nz/hrGrijbj2CFPjwtO9uhvPGPtakT7zPVJmwl5wINJaapWVxeH3OqKy7OhLrcYIeVRNy9x2OwCq+j8=:MEUCIQCIGVz3MQCZTWzsN9+xwxRMH78ld46tzJEUcJpn2cgynQIgZmvo5D9w4JDgH7xCIoqUpa6WHoYDrPTU6+YLgFWUjNI=\n1790000000000"
+      ]
+    },
+    "rotationSeq": 13,
+    "afterRevokeSeq": 12,
+    "firstRevokeSeq": 11,
+    "previousHkPubB64": "BGvgRjwiBTmrmTwSGQRSAgZ/PJgQHr5Cc/l4ETNtxRzP2BAPr13Fx7gvQRu/KxPMeULwZYMtQxloGLuNfVnN99g=",
+    "cases": [
+      {
+        "name": "deux REVOKE avant la rotation : seule une preuve pour le dernier (12) est servie",
+        "selfDeviceId": "device_carol_c1_000001",
+        "proofs": [
+          {
+            "deviceId": "device_carol_c2_000002",
+            "signatureB64": "MEUCIQCCxrB2VPI2Mi8YiifQemf+1e9XrEaM+hk18edEkK51VQIgdstuZ01exCgb0jLVufF+6MNdDXWek6gWx+ZIG9jH9ws="
+          },
+          {
+            "deviceId": "device_carol_C4_000004",
+            "signatureB64": "MEUCIQD0JP6NdkZGz5T99NrLtJtzs91Ez/ewqGYZJ+wivWXcogIgLUcVZ1EL9Ju7ihGLw38ftaQsCerA3AGePD/I/y1POAw="
+          }
+        ],
+        "served": [
+          "device_carol_c2_000002"
+        ]
+      },
+      {
+        "name": "appareil PENDING et appareil révoqué : jamais servis, même avec une preuve valide",
+        "selfDeviceId": "device_carol_c1_000001",
+        "proofs": [
+          {
+            "deviceId": "device_carol_c6_000006",
+            "signatureB64": "MEQCIFMzEV16oINb+X7GJa0O2a8WTmrZyU6PWsKKvWeUE/TzAiBgE9SpUblKR+oog6hHzdkmqg5PqQFAIovDSiF2w4cPHA=="
+          },
+          {
+            "deviceId": "device_carol_c7_000007",
+            "signatureB64": "MEUCIQCNrWyx6Q7J81OdavHxaQIXrxuSOVj6m/AzsJ0rhMg0pQIgaWpEqbJSxjsWB3AoZOSGVE8lZEDjVDj6+gC6CwkFmGs="
+          },
+          {
+            "deviceId": "device_carol_c3_000003",
+            "signatureB64": "MEQCIAbUuN1ZSTAJMPlNMDC2lNHrdQyHs32eh32+E03I67U4AiAJX0Wg8wCz9y8TW6FQFVtGB99lkuYsxuocDHSmPg20Rw=="
+          }
+        ],
+        "served": []
+      },
+      {
+        "name": "trois appareils servis, triés par octets UTF-8 (« - » < « C » < « c »)",
+        "selfDeviceId": "device_carol_c1_000001",
+        "proofs": [
+          {
+            "deviceId": "device_carol_c2_000002",
+            "signatureB64": "MEUCIQCCxrB2VPI2Mi8YiifQemf+1e9XrEaM+hk18edEkK51VQIgdstuZ01exCgb0jLVufF+6MNdDXWek6gWx+ZIG9jH9ws="
+          },
+          {
+            "deviceId": "device_carol_C4_000004",
+            "signatureB64": "MEUCIQD8YCqKBOwPlGxSoT4uZUA800juVOhMIvh3IfR2uZF3swIgFFDAWx0VRYlmfwlGI3XfKVYh06fBLx0Rit9jNBjHq5E="
+          },
+          {
+            "deviceId": "device_carol_-5_000005",
+            "signatureB64": "MEUCIQCoLfUZaQFTjPv4GKS3ZszHCfgg9iPRiSYoPVw8VwsFkgIgVtCEZtkgW02C/kdOoT28m7cbu0H395R0zHvP48igSks="
+          }
+        ],
+        "served": [
+          "device_carol_-5_000005",
+          "device_carol_C4_000004",
+          "device_carol_c2_000002"
+        ]
+      },
+      {
+        "name": "émetteur C2 : il ne se sert pas lui-même ; C1 et C5 le sont",
+        "selfDeviceId": "device_carol_c2_000002",
+        "proofs": [
+          {
+            "deviceId": "device_carol_-5_000005",
+            "signatureB64": "MEUCIQCoLfUZaQFTjPv4GKS3ZszHCfgg9iPRiSYoPVw8VwsFkgIgVtCEZtkgW02C/kdOoT28m7cbu0H395R0zHvP48igSks="
+          },
+          {
+            "deviceId": "device_carol_c2_000002",
+            "signatureB64": "MEUCIQCCxrB2VPI2Mi8YiifQemf+1e9XrEaM+hk18edEkK51VQIgdstuZ01exCgb0jLVufF+6MNdDXWek6gWx+ZIG9jH9ws="
+          },
+          {
+            "deviceId": "device_carol_c1_000001",
+            "signatureB64": "MEUCIQDozIKFa5UEkyvHUiMPjMkrHG9RlUBcDy+7FqBgj7lH2wIgU0tw/4ZzZSNT44weHv8GT7z3uZBJUO/JVyrzHhdvF7M="
+          }
+        ],
+        "served": [
+          "device_carol_-5_000005",
+          "device_carol_c1_000001"
+        ]
+      }
+    ]
+  }
 }

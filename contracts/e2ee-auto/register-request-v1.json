@@ -77,6 +77,45 @@
         "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
         "x-sq-e2ee-signature": "MEUCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIgTzW87GhiNpckAXVbYPwgagox66+OgtWqySurCjTCLOM="
       }
+    },
+    {
+      "name": "signée sur le corps re-sérialisé, pas sur les octets envoyés",
+      "expect": "SIGNATURE_INVALID",
+      "bodyUtf8": "{\n  \"label\": \"Pixel 8\",\n  \"keyVersion\": 1,\n  \"deviceId\": \"device_alice_a4_000004\",\n  \"platform\": \"android\",\n  \"identityKeyB64\": \"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\n  \"signingKeyB64\": \"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\n  \"historyKey\": \"absent\"\n}",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQCYsgKnySBmMSoBVKOKppOSllSvT5wXNeIkNyI4fTmz1wIgTzW87GhiNpckAXVbYPwgagox66+OgtWqySurCjTCLOM="
+      }
+    }
+  ],
+  "receivedBytesRequests": [
+    {
+      "name": "corps avec espaces et autre ordre des champs",
+      "bodyUtf8": "{\n  \"label\": \"Pixel 8\",\n  \"keyVersion\": 1,\n  \"deviceId\": \"device_alice_a4_000004\",\n  \"platform\": \"android\",\n  \"identityKeyB64\": \"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\n  \"signingKeyB64\": \"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\n  \"historyKey\": \"absent\"\n}",
+      "bodySha256B64Url": "5cFLNSA1XdkcQ7bnyvnuDxVybvDmO0TYx0maIyk3mTE",
+      "canonicalRequestUtf8": "SQ-E2EE-V2\nPOST\n/api/e2ee/auto/devices\n1790036000000\nregister_nonce_01J7ABCD2345678\n5cFLNSA1XdkcQ7bnyvnuDxVybvDmO0TYx0maIyk3mTE",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQDTCa2MWMHiFoW5mwfFtA9boGvb/aqfJg+RSpiruKfi4wIgNPWZ+pQNgW8IcNvD9pb8/BQ+ev+0gE8legNdK8w5MRE="
+      },
+      "addEntryUtf8": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nADD\ndevice_alice_a4_000004\nandroid\nBIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\nBMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\n1\n-\n1790036000250"
+    },
+    {
+      "name": "keyVersion écrite 1.0",
+      "bodyUtf8": "{\"deviceId\":\"device_alice_a4_000004\",\"platform\":\"android\",\"identityKeyB64\":\"BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\",\"signingKeyB64\":\"BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\",\"keyVersion\":1.0,\"label\":\"Pixel 8\",\"historyKey\":\"absent\"}",
+      "bodySha256B64Url": "atI10Gb-uMbskvrOxa97sXFtvQo_jfjwraM7W6S3goo",
+      "canonicalRequestUtf8": "SQ-E2EE-V2\nPOST\n/api/e2ee/auto/devices\n1790036000000\nregister_nonce_01J7ABCD2345678\natI10Gb-uMbskvrOxa97sXFtvQo_jfjwraM7W6S3goo",
+      "headers": {
+        "x-sq-e2ee-device-id": "device_alice_a4_000004",
+        "x-sq-e2ee-timestamp-ms": "1790036000000",
+        "x-sq-e2ee-nonce": "register_nonce_01J7ABCD2345678",
+        "x-sq-e2ee-signature": "MEUCIQCHPF6AG7HzQ3EXJJSIBPH0Mq/bgFo+K2olCvaUcf1BkQIgH+5uv3dAiLuv1e5ASSwtOApcbgh+rx5xro9rw8cN6Lw="
+      },
+      "addEntryUtf8": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nADD\ndevice_alice_a4_000004\nandroid\nBIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=\nBMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=\n1\n-\n1790036000250"
     }
   ],
   "validBodies": [
@@ -335,6 +374,66 @@
           "historyKey": "absent"
         }
       ]
+    },
+    {
+      "name": "libellé avec tabulation (Cc)",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel\t8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+0007 (Cc)",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel\u00078",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+007F (Cc)",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+2028",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
+    },
+    {
+      "name": "libellé avec U+2029",
+      "value": {
+        "deviceId": "device_alice_a4_000004",
+        "platform": "android",
+        "identityKeyB64": "BIvByMLplwYB2E3H8qQgsJd9Qv/tqAgRADVdl4wLISc/he6tpv40PUDlJyMbawvNRzdE1RSt59+4hBhpCVEUytg=",
+        "signingKeyB64": "BMT/556Low5UbXgM1BLzZzi2i5hFTeSKhthveHm7hTORmHUe55jSlhAFNaozzFG3vTZZFIbbp/P5DmYUDJKCA1w=",
+        "keyVersion": 1,
+        "label": "Pixel 8",
+        "historyKey": "absent"
+      }
     }
   ],
   "invalidBodyTexts": [

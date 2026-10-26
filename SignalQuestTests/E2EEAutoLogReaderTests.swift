@@ -393,6 +393,30 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         XCTAssertEqual(try store.anchor(ownerScopeId: Self.owner)?.headCreatedAtMs, receivedHead.createdAtMs)
     }
 
+    /// Même tête reçue plus ancienne que la tête gardée (révision 9) : la gardée reste et borne les 24 h.
+    func testOlderReceivedHeadDoesNotReplaceTheKeptOne() async throws {
+        let reference = try reference(), vectors = try XCTUnwrap(try load("log-head-v2")["olderReceivedHead"] as? [String: Any])
+        let kept = try XCTUnwrap(vectors["kept"] as? [String: String]), received = try XCTUnwrap(vectors["received"] as? [String: String])
+        let nowMs = try XCTUnwrap((vectors["nowMs"] as? NSNumber)?.int64Value)
+        XCTAssertEqual(vectors["keptExpect"] as? String, "ok")
+        XCTAssertEqual(vectors["receivedExpect"] as? String, "stale")
+        XCTAssertEqual(vectors["fresher"] as? String, "kept")
+        let store = makeStore()
+        func read(_ head: [String: String]) async throws -> E2EEAutoLogReader.Status {
+            let server = Server(reference)
+            (server.headText, server.headSignatureB64) = (try XCTUnwrap(head["text"]), try XCTUnwrap(head["signatureB64"]))
+            return try await makeReader(reference, server: server, store: store, nowMs: nowMs).refreshLinks()
+        }
+        let keptHead = try XCTUnwrap(E2EEAutoLog.parseHead(try XCTUnwrap(kept["text"])))
+        guard case .notCurrent = try await read(received) else { return XCTFail("tête reçue seule : stale") }
+        let first = try await read(kept)
+        XCTAssertEqual(first, .current(keptHead))
+        let older = try await read(received)
+        XCTAssertEqual(older, .current(keptHead), "la tête reçue plus ancienne ne remplace pas la gardée")
+        XCTAssertEqual(try store.anchor(ownerScopeId: Self.owner)?.headCreatedAtMs, keptHead.createdAtMs)
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert)
+    }
+
     /// Tête au seq 12 de `log-head-v2`, signée par la clé épinglée (avant la LOG_KEY du maillon 13).
     private func boundaryHead(seq: Int64) throws -> (text: String, signatureB64: String) {
         let boundaries = try XCTUnwrap(try load("log-head-v2")["boundaryHeads"] as? [[String: Any]])

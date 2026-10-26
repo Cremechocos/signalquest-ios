@@ -358,6 +358,44 @@ final class E2EEAutoLogVectorTests: XCTestCase {
         }
     }
 
+    /// Journal à part de Carol (révision 9) : deux REVOKE avant la rotation, seul le dernier
+    /// compte ; appareils PENDING et révoqués jamais servis ; tri par octets UTF-8.
+    func testHistoryKeyProofServingAfterTwoRevokes() throws {
+        let log = try XCTUnwrap(try load("hk-proof-v1")["rotationLog"] as? [String: Any])
+        let links = try XCTUnwrap(log["links"] as? [String])
+        let chain = try E2EEAutoLog.extendChain(
+            .initial(pinnedLogKeyB64: try string(log, "pinnedLogKeyB64"), nextLogKeysB64: []),
+            links: links, logKeyEntries: try logKeyEntries(log)
+        ).get()
+        let head = try XCTUnwrap(log["head"] as? [String: Any])
+        let check = E2EEAutoLog.checkHead(
+            text: try string(head, "text"), signatureB64: try string(head, "signatureB64"), logKeyB64: chain.logKeyB64,
+            nowMs: try XCTUnwrap(E2EEAutoLog.parseHead(try string(head, "text"))).createdAtMs
+        )
+        guard case let .ok(verifiedHead) = check else { return XCTFail("tête : \(check)") }
+        XCTAssertEqual(E2EEAutoLog.compare(head: verifiedHead, to: chain), .match)
+
+        let account = try XCTUnwrap(log["account"] as? [String: Any])
+        let state = try E2EEAutoLog.verifyAccount(
+            userId: try string(account, "userId"), accountSaltB64: try string(account, "accountSaltB64"),
+            entries: try XCTUnwrap(account["entries"] as? [String]), links: try linksBySeq(links), chain: chain
+        ).get()
+        let rotation = try XCTUnwrap(state.historyKeys.first { $0.seq == (try? int64(log, "rotationSeq")) })
+        XCTAssertEqual(rotation.afterRevokeSeq, try int64(log, "afterRevokeSeq"), "le dernier REVOKE, pas le premier")
+        XCTAssertNotEqual(rotation.afterRevokeSeq, try int64(log, "firstRevokeSeq"))
+        XCTAssertEqual(rotation.previousHkPubB64, try string(log, "previousHkPubB64"))
+        let cases = try objects(log, "cases")
+        XCTAssertEqual(cases.count, 4)
+        for testCase in cases {
+            let name = try string(testCase, "name")
+            let proofs = try objects(testCase, "proofs").map { (deviceId: try string($0, "deviceId"), signatureB64: try string($0, "signatureB64")) }
+            XCTAssertEqual(
+                E2EEAutoHistoryKey.servedDevices(state: state, rotation: rotation, proofs: proofs, selfDeviceId: try string(testCase, "selfDeviceId")),
+                try XCTUnwrap(testCase["served"] as? [String]), name
+            )
+        }
+    }
+
     func testHistoryKeyProofs() throws {
         let vectors = try load("hk-proof-v1")
         func verify(_ proof: [String: Any]) throws -> Bool {

@@ -58,6 +58,17 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
             let refusedBody = Data(try XCTUnwrap(refused["bodyUtf8"] as? String).utf8)
             XCTAssertFalse(try accepted(refusedBody, try XCTUnwrap(refused["headers"] as? [String: String])), name)
         }
+        // Révision 9 : la signature porte sur les octets reçus, quels que soient espaces, ordre ou `1.0`,
+        // et l'entrée écrite est la même.
+        for received in try XCTUnwrap(vectors["receivedBytesRequests"] as? [[String: Any]]) {
+            let name = try XCTUnwrap(received["name"] as? String)
+            let receivedBody = Data(try XCTUnwrap(received["bodyUtf8"] as? String).utf8)
+            let receivedHeaders = try XCTUnwrap(received["headers"] as? [String: String])
+            XCTAssertEqual(E2EEV2SignedRequest.bodySHA256Base64URL(receivedBody), received["bodySha256B64Url"] as? String, name)
+            XCTAssertEqual(try canonical(receivedBody, receivedHeaders), received["canonicalRequestUtf8"] as? String, name)
+            XCTAssertTrue(try accepted(receivedBody, receivedHeaders), name)
+            XCTAssertEqual(received["addEntryUtf8"] as? String, vectors["addEntryUtf8"] as? String, name)
+        }
 
         // Le corps produit ici : les sept champs du §4.1, ni plus ni moins, et une signature de la nouvelle clé.
         let expected = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])

@@ -251,5 +251,19 @@
     "nowMs": 1790124200000,
     "keptExpect": "stale",
     "receivedExpect": "ok"
+  },
+  "olderReceivedHead": {
+    "kept": {
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790039600000",
+      "signatureB64": "MEUCIQDd2PP/wdgWFOztIrHXBCM/BmCXRRq9pOz+Vr0QzV6oyQIgRX9fZ8eWoUNhkxqoI68ZDeuqfJXoLn8raHYJYbPJXdE="
+    },
+    "received": {
+      "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n16\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790036000000",
+      "signatureB64": "MEUCIQD72rRxhwkpbg6z/IdhZsSVN8aXIDWkQG/GSpLQcpQVoQIgOskdV0jwC1LeyVm1Z10AJey/u0i+CBBfOmO04vYppTQ="
+    },
+    "nowMs": 1790124200000,
+    "keptExpect": "ok",
+    "receivedExpect": "stale",
+    "fresher": "kept"
   }
 }
