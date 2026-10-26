@@ -20,6 +20,7 @@ enum APIError: Error, LocalizedError, Equatable {
         case .transport:
             if isOffline { return SQOfflineText.message }
             if isTimeout { return String(localized: "Le réseau est absent ou trop lent. Réessaie quand tu as du réseau.") }
+            if isServerUnreachable { return SQOfflineText.serverUnreachable }
             return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
         case .http(let status, let code, let message, _, _):
             return APIError.userFacingMessage(status: status, code: code, serverMessage: message)
@@ -37,6 +38,7 @@ enum APIError: Error, LocalizedError, Equatable {
     // panne quelconque, sans changer la forme du cas `.transport`.
     private static let offlineTag = "offline"
     private static let timeoutTag = "timeout"
+    private static let unreachableTag = "unreachable"
 
     static func transport(from error: Error) -> APIError {
         guard let url = error as? URLError else { return .transport(error.localizedDescription) }
@@ -45,6 +47,8 @@ enum APIError: Error, LocalizedError, Equatable {
             return .transport("\(offlineTag): \(url.localizedDescription)")
         case .timedOut:
             return .transport("\(timeoutTag): \(url.localizedDescription)")
+        case .cannotConnectToHost:
+            return .transport("\(unreachableTag): \(url.localizedDescription)")
         default:
             return .transport(url.localizedDescription)
         }
@@ -59,6 +63,13 @@ enum APIError: Error, LocalizedError, Equatable {
     /// Aucune réponse dans le délai : réseau absent ou trop lent.
     var isTimeout: Bool {
         if case .transport(let detail) = self { return detail.hasPrefix(Self.timeoutTag) }
+        return false
+    }
+
+    /// L'appareil a du réseau, mais le serveur refuse ou ignore la connexion :
+    /// « hors ligne » accuserait à tort le réseau du membre (lot F, F-32).
+    var isServerUnreachable: Bool {
+        if case .transport(let detail) = self { return detail.hasPrefix(Self.unreachableTag) }
         return false
     }
 
@@ -83,7 +94,8 @@ enum APIError: Error, LocalizedError, Equatable {
 
     /// Construit le message utilisateur : code connu → libellé localisé ; sinon le
     /// message serveur s'il est lisible (déjà FR) ; sinon repli par statut.
-    static func userFacingMessage(status: Int, code: String?, serverMessage: String) -> String {
+    static func userFacingMessage(status: Int, code: String?, serverMessage: String,
+                                  appIsFrench: Bool = appLanguageIsFrench) -> String {
         if let code, let mapped = localizedMessages[code.uppercased()] {
             return mapped
         }
@@ -96,10 +108,17 @@ enum APIError: Error, LocalizedError, Equatable {
             return statusFallback(status)
         }
         let trimmed = serverMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty, !looksLikeRawCode(trimmed) {
+        // Le serveur n'écrit qu'en français : en anglais, son message s'affichait
+        // tel quel au milieu d'une app traduite (lot F, F-37).
+        if !trimmed.isEmpty, !looksLikeRawCode(trimmed), appIsFrench {
             return trimmed
         }
         return statusFallback(status)
+    }
+
+    /// Langue retenue pour l'app, pas celle de la région.
+    static var appLanguageIsFrench: Bool {
+        Bundle.main.preferredLocalizations.first?.hasPrefix("fr") ?? true
     }
 
     /// Détecte un identifiant technique renvoyé tel quel (ex. `INVALID_OPERATOR`)
@@ -239,6 +258,8 @@ extension Error {
                 return SQOfflineText.message
             case .timedOut:
                 return String(localized: "Le serveur met trop de temps à répondre. Réessaie.")
+            case .cannotConnectToHost:
+                return SQOfflineText.serverUnreachable
             default:
                 return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
             }
@@ -264,4 +285,5 @@ extension Error {
 /// présenter l'état hors ligne plutôt qu'une erreur (TRX-10).
 enum SQOfflineText {
     static var message: String { String(localized: "Pas de connexion Internet. Vérifie ton réseau puis réessaie.") }
+    static var serverUnreachable: String { String(localized: "SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant.") }
 }

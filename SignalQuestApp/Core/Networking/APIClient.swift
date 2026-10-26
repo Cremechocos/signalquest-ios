@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import os
 
 extension Notification.Name {
@@ -130,6 +131,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         encoder: JSONEncoder = .signalQuest
     ) {
         let session = session ?? Self.makeSession()
+        _ = Self.pathMonitor
         self.config = config
         self.credentials = credentials
         self.cookieStore = AuthCookieStore(credentials: credentials)
@@ -723,6 +725,19 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// Corps volumineux (photo, média) : l'envoi peut être lent mais réel.
     static let largeWriteConnectivityBudget: Duration = .seconds(180)
     static let largeWriteBodyBytes = 256 * 1024
+    /// Attente tolérée, appareil en ligne, avant de conclure à un serveur
+    /// injoignable : couvre un changement de cellule ou de Wi-Fi.
+    static let serverUnreachableGrace: Duration = .seconds(15)
+
+    /// Chemin réseau de l'appareil, suivi en continu pour trancher entre
+    /// « hors ligne » et « serveur injoignable » sans attendre un premier relevé.
+    private static let pathMonitor: NWPathMonitor = {
+        let monitor = NWPathMonitor()
+        monitor.start(queue: DispatchQueue(label: "fr.signalquest.ios.apiclient.path", qos: .utility))
+        return monitor
+    }()
+
+    static var deviceHasNetwork: Bool { pathMonitor.currentPath.status == .satisfied }
 
     static func defaultDeadline(for request: URLRequest) -> Duration {
         if (request.httpMethod ?? "GET") == "GET" { return readConnectivityBudget }
@@ -737,9 +752,24 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
             group.addTask { try await session.data(for: request, delegate: delegate) }
             group.addTask {
-                try await Task.sleep(for: deadline)
-                // Toujours en attente du réseau à l'échéance : l'appareil est hors ligne.
-                throw URLError(delegate?.isWaitingForConnectivity == true ? .notConnectedToInternet : .timedOut)
+                // `waitsForConnectivity` attend aussi quand le SERVEUR refuse la
+                // connexion. Appareil en ligne et requête toujours en attente :
+                // c'est le serveur qui manque, inutile d'attendre la minute
+                // entière pour accuser le réseau du membre (lot F, F-32).
+                let clock = ContinuousClock()
+                let end = clock.now.advanced(by: deadline)
+                var waitingWhileOnline: Duration = .zero
+                while clock.now < end {
+                    try await Task.sleep(for: min(.seconds(1), clock.now.duration(to: end)))
+                    if delegate?.isWaitingForConnectivity == true, Self.deviceHasNetwork {
+                        waitingWhileOnline += .seconds(1)
+                        if waitingWhileOnline >= Self.serverUnreachableGrace { throw URLError(.cannotConnectToHost) }
+                    } else {
+                        waitingWhileOnline = .zero
+                    }
+                }
+                guard delegate?.isWaitingForConnectivity == true else { throw URLError(.timedOut) }
+                throw URLError(Self.deviceHasNetwork ? .cannotConnectToHost : .notConnectedToInternet)
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else { throw CancellationError() }

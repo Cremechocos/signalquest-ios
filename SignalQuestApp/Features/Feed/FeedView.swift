@@ -632,6 +632,8 @@ struct FeedView: View {
     /// Lien vers une publication supprimée ou inexistante : rien à réessayer.
     @State private var routedPostMissing = false
     @State private var routedPostRevision = UUID()
+    /// Feuille ouverte par-dessus le détail (commentaires, signalement, partage).
+    @State private var detailOverlay: FeedSheet?
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
         case comments(UnifiedSocialFeedItem)
@@ -644,6 +646,43 @@ struct FeedView: View {
             case .report(let i): return "report-\(i.id)"
             case .share(let i): return "share-\(i.id)"
             }
+        }
+    }
+
+    /// Commentaires, signalement et partage : ouverts depuis le fil à la place
+    /// de toute autre feuille, ou depuis le détail par-dessus lui.
+    @ViewBuilder
+    private func overlaySheet(_ sheet: FeedSheet) -> some View {
+        switch sheet {
+        case .comments(let item):
+            CommentsSheet(
+                service: services.comments,
+                postId: item.backendPostId,
+                profileService: services.feed,
+                reports: services.reports,
+                commentsCount: item.commentsCount,
+                onCommentPosted: {
+                    recordSignal("comment", for: item)
+                    model.commentPosted(on: item)
+                },
+                onCommentDeleted: { model.commentDeleted(on: item) }
+            )
+        case .report(let item):
+            ReportSheet(post: item, service: services.reports)
+        case .share(let item):
+            PostShareSheet(
+                post: item,
+                messagesService: services.messages,
+                onShare: { conversation in
+                    await model.share(item, to: conversation)
+                },
+                onShared: { messageId, conversation in
+                    recordSignal("share", for: item)
+                    presentShareUndo(messageId: messageId, conversation: conversation)
+                }
+            )
+        case .detail:
+            EmptyView()
         }
     }
 
@@ -713,7 +752,8 @@ struct FeedView: View {
                     }
                     if let error = model.errorMessage {
                         ErrorStateView(title: "Fil indisponible", message: error) {
-                            Task { await model.load() }
+                            // Le pouls a échoué avec le fil : il revient avec lui.
+                            Task { await model.load(); await model.loadPulse() }
                         }
                     }
                     if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
@@ -731,6 +771,9 @@ struct FeedView: View {
                             systemImage: "sparkles"
                         )
                         .padding(.top, SQSpace.xxl)
+                        if model.tab == .forYou, model.selectedHashtag == nil {
+                            emptyFeedNextSteps
+                        }
                     }
                     if model.tab.rendersAsGallery {
                         photoGallery(model.page?.items ?? [])
@@ -794,7 +837,9 @@ struct FeedView: View {
         .task {
             isFeedVisible = true
             model.startStream(services.sse)
-            if model.page == nil { await model.load() }
+            // Au lancement à froid, le passage à l'état actif arrive pendant ce
+            // premier chargement : sans `isLoading`, le fil partait deux fois (F-44).
+            if model.page == nil, !model.isLoading { await model.load() }
             guard !Task.isCancelled, isFeedVisible else { return }
             await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
@@ -805,7 +850,7 @@ struct FeedView: View {
             guard isFeedVisible else { return }
             if phase == .active {
                 model.startStream(services.sse)
-                if model.page == nil { Task { await model.load() } }
+                if model.page == nil, !model.isLoading { Task { await model.load() } }
             } else { model.stopStream() }
         }
         .refreshable {
@@ -948,10 +993,12 @@ struct FeedView: View {
                         if !item.favoritedByMe { recordSignal("favorite", for: item) }
                         model.favorite(item)
                     },
-                    onComment: { presentedSheet = .comments(item) },
-                    onShare: { presentedSheet = .share(item) },
+                    // Par-dessus le détail, pas à sa place : fermer les commentaires
+                    // ramène au détail au lieu du fil (F-29).
+                    onComment: { detailOverlay = .comments(item) },
+                    onShare: { detailOverlay = .share(item) },
                     onMute: { model.muteNotifications(item) },
-                    onReport: { presentedSheet = .report(item) },
+                    onReport: { detailOverlay = .report(item) },
                     onPollVote: { option in model.votePoll(item, option: option) },
                     onAuthorTap: {
                         presentedSheet = nil
@@ -959,33 +1006,9 @@ struct FeedView: View {
                     },
                     actionError: model.actionError
                 )
-            case .comments(let item):
-                CommentsSheet(
-                    service: services.comments,
-                    postId: item.backendPostId,
-                    profileService: services.feed,
-                    reports: services.reports,
-                    commentsCount: item.commentsCount,
-                    onCommentPosted: {
-                        recordSignal("comment", for: item)
-                        model.commentPosted(on: item)
-                    },
-                    onCommentDeleted: { model.commentDeleted(on: item) }
-                )
-            case .report(let item):
-                ReportSheet(post: item, service: services.reports)
-            case .share(let item):
-                PostShareSheet(
-                    post: item,
-                    messagesService: services.messages,
-                    onShare: { conversation in
-                        await model.share(item, to: conversation)
-                    },
-                    onShared: { messageId, conversation in
-                        recordSignal("share", for: item)
-                        presentShareUndo(messageId: messageId, conversation: conversation)
-                    }
-                )
+                .sheet(item: $detailOverlay) { overlaySheet($0) }
+            case .comments, .report, .share:
+                overlaySheet(sheet)
             }
         }
         .fullScreenCover(item: Binding(
@@ -1386,6 +1409,64 @@ struct FeedView: View {
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityIdentifier("community.header.action.\(identifier)")
+    }
+
+    /// Fil vide : publier se fait déjà depuis la ligne « Quoi de neuf ? » au-dessus.
+    /// Reste à trouver qui suivre : les membres que le serveur suggère, puis Explorer.
+    @ViewBuilder
+    private var emptyFeedNextSteps: some View {
+        let suggestions = Array((model.page?.suggestedUsers ?? []).prefix(3))
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            if !suggestions.isEmpty {
+                Text("Membres à découvrir")
+                    .sqKicker()
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.leading, SQSpace.xs)
+                VStack(spacing: 0) {
+                    ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, author in
+                        if index > 0 { Divider().padding(.leading, 58) }
+                        Button {
+                            Haptics.light()
+                            profileAuthor = author
+                        } label: {
+                            HStack(spacing: SQSpace.md) {
+                                SQAvatar(url: author.avatarUrl, name: author.displayName, size: 34)
+                                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                                    Text(author.displayName)
+                                        .font(SQType.body(.bold))
+                                        .foregroundStyle(SQColor.label)
+                                        .lineLimit(1)
+                                    if let handle = author.handle {
+                                        Text(verbatim: "@\(handle)")
+                                            .font(SQType.caption)
+                                            .foregroundStyle(SQColor.labelSecondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .accessibilityHidden(true)
+                            }
+                            .frame(minHeight: 44)
+                            .padding(.horizontal, SQSpace.md)
+                            .padding(.vertical, SQSpace.xs2)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Voir le profil de \(author.displayName)")
+                        .accessibilityIdentifier("feed.empty.suggestion")
+                    }
+                }
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            }
+            GradientButton(String(localized: "Découvrir des membres"), systemImage: "magnifyingglass",
+                           style: .secondary) {
+                showExplore = true
+            }
+            .accessibilityIdentifier("feed.empty.explore")
+        }
     }
 
     /// « Quoi de neuf ? » : la publication commence ici, en une ligne. Photo

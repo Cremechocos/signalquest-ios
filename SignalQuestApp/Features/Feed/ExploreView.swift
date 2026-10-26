@@ -1177,7 +1177,12 @@ final class RoomsHomeModel: ObservableObject {
             phase = .loaded
         } catch {
             guard !error.isCancellation else { return }
-            if rooms.isEmpty { phase = .failed(error.userFacingMessage) }
+            guard rooms.isEmpty else { return }
+            // Réseau : le message dit quoi faire. Réponse du serveur : sa phrase
+            // ne parle pas des salons, une phrase fixe le fait.
+            var isNetwork = error is URLError
+            if case .transport? = error as? APIError { isNetwork = true }
+            phase = .failed(isNetwork ? error.userFacingMessage : String(localized: "Salons indisponibles pour le moment."))
         }
     }
 }
@@ -1234,6 +1239,28 @@ struct ExploreRoomsSection: View {
                 SQSpinner()
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, SQSpace.sm)
+            } else if case .failed(let message) = model.phase {
+                // Un échec se dit : la description seule laissait croire à une
+                // section vide (lot F, F-40).
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text(message)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: SQSpace.xs)
+                    Button {
+                        Task { await model.load(services) }
+                    } label: {
+                        Text("Réessayer")
+                            .font(SQType.caption(.bold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("explore.rooms.retry")
+                }
+                .padding(.leading, SQSpace.xs)
             } else {
                 Text("Discute avec les autres membres, par région et par opérateur.")
                     .font(SQType.caption)

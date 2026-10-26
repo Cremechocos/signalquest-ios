@@ -822,6 +822,28 @@ final class APIClientTests: XCTestCase {
         XCTAssertFalse(APIError.transport("account-deletion-not-confirmed").isOffline)
     }
 
+    /// F-32 : un serveur qui refuse la connexion alors que l'appareil est en ligne
+    /// n'est pas « hors ligne » : le message le dit, sans accuser le réseau.
+    func testRefusedConnectionReadsAsServerUnreachable() {
+        let refused = APIError.transport(from: URLError(.cannotConnectToHost))
+        XCTAssertTrue(refused.isServerUnreachable)
+        XCTAssertFalse(refused.isOffline)
+        XCTAssertFalse(refused.isTimeout)
+        XCTAssertEqual(refused.errorDescription, SQOfflineText.serverUnreachable)
+        XCTAssertEqual((URLError(.cannotConnectToHost) as Error).userFacingMessage, SQOfflineText.serverUnreachable)
+        XCTAssertFalse(APIError.transport(from: URLError(.notConnectedToInternet)).isServerUnreachable)
+    }
+
+    /// F-37 : le serveur n'écrit qu'en français ; une app en anglais garde son
+    /// repli traduit par statut au lieu d'afficher la phrase du serveur.
+    func testServerMessageIsShownOnlyInFrench() {
+        XCTAssertEqual(APIError.userFacingMessage(status: 404, code: nil, serverMessage: "Publication introuvable",
+                                                  appIsFrench: true), "Publication introuvable")
+        XCTAssertEqual(APIError.userFacingMessage(status: 404, code: nil, serverMessage: "Publication introuvable",
+                                                  appIsFrench: false),
+                       APIError.userFacingMessage(status: 404, code: nil, serverMessage: "", appIsFrench: false))
+    }
+
     /// CORE-19 : `Retry-After` en secondes ou en date HTTP.
     func testRetryAfterReadsSecondsAndHTTPDates() throws {
         let now = Date(timeIntervalSince1970: 1_792_000_000)

@@ -32,7 +32,9 @@ final class ExploreGlobalSearchQATests: XCTestCase {
         field.typeText("Lyon")
         let place = app.buttons["explore.map.place"].firstMatch
         XCTAssertTrue(place.waitForExistence(timeout: 10), "Lieu « Lyon » absent des résultats")
-        XCTAssertTrue(app.staticTexts[onMap].exists, "Section « \(onMap) » absente")
+        // Titre de section en petites capitales (`sqKicker`) : le libellé exposé est en majuscules.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", onMap)).firstMatch.exists,
+                      "Section « \(onMap) » absente")
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "explore-global-search-\(locale)"
         screenshot.lifetime = .keepAlways

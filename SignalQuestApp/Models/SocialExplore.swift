@@ -13,12 +13,13 @@ struct SocialExploreResult: Decodable, Equatable {
     let hashtags: [TrendingHashtag]
 
     /// Les trois listes sont facultatives côté serveur selon la requête : un
-    /// champ absent vaut liste vide, pas un échec de décodage.
+    /// champ absent vaut liste vide, pas un échec de décodage. Un élément
+    /// illisible se perd seul, sans vider sa liste (F-41).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        posts = (try? c.decode([UnifiedSocialFeedItem].self, forKey: .posts)) ?? []
-        people = (try? c.decode([SocialFeedAuthor].self, forKey: .people)) ?? []
-        hashtags = (try? c.decode([TrendingHashtag].self, forKey: .hashtags)) ?? []
+        posts = c.decodeLossyArray([UnifiedSocialFeedItem].self, forKey: .posts)
+        people = c.decodeLossyArray([SocialFeedAuthor].self, forKey: .people)
+        hashtags = c.decodeLossyArray([TrendingHashtag].self, forKey: .hashtags)
     }
 
     init(posts: [UnifiedSocialFeedItem] = [], people: [SocialFeedAuthor] = [], hashtags: [TrendingHashtag] = []) {

@@ -587,6 +587,22 @@
         }
       }
     },
+    "Découvrir des membres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover members"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découvrir des membres"
+          }
+        }
+      }
+    },
     "En tête : le meilleur score, moitié signal moyen, moitié débit médian, parmi les opérateurs qui ont au moins 50 points de couverture." : {
       "localizations" : {
         "en" : {
@@ -648,6 +664,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le détail de ce test n’a pas pu être chargé. %@"
+          }
+        }
+      }
+    },
+    "Membres à découvrir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Members to discover"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membres à découvrir"
           }
         }
       }
@@ -847,6 +879,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Référence %1$@ : %2$@ (%3$lld speedtests)"
+          }
+        }
+      }
+    },
+    "Salons indisponibles pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rooms are unavailable right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salons indisponibles pour le moment."
+          }
+        }
+      }
+    },
+    "SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest isn't responding right now. Your connection works: try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant."
           }
         }
       }
@@ -18755,6 +18819,18 @@
           }
         }
       }
+    },
+    "SQFormal|SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ne répond pas pour le moment. Votre connexion fonctionne : réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
     },
     "SQFormal|Sois le premier à écrire dans ce salon." : {
       "extractionState" : "manual",

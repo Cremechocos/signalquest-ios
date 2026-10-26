@@ -557,7 +557,8 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
         metadata = try c.decodeIfPresent([String: JSONValue].self, forKey: .metadata)
         attachments = c.decodeLossyArray([SocialPostAttachment].self, forKey: .attachments)
-        signal = try c.decodeIfPresent(SocialSignalSummary.self, forKey: .signal)
+        // Un résumé ou un sondage mal formé se perd seul, pas tout le post (F-31).
+        signal = (try? c.decodeIfPresent(SocialSignalSummary.self, forKey: .signal)) ?? nil
         hashtags = c.decodeLossyArray([String].self, forKey: .hashtags)
         reactions = c.decodeLossyArray([SocialReactionSummary].self, forKey: .reactions)
         commentsCount = (try? c.decode(Int.self, forKey: .commentsCount)) ?? 0
@@ -569,7 +570,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         notificationsMutedByMe = try c.decodeIfPresent(Bool.self, forKey: .notificationsMutedByMe)
         isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine)
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
-        poll = try c.decodeIfPresent(FeedPoll.self, forKey: .poll)
+        poll = (try? c.decodeIfPresent(FeedPoll.self, forKey: .poll)) ?? nil
         generated = try? c.decodeIfPresent(Bool.self, forKey: .generated)
     }
 }

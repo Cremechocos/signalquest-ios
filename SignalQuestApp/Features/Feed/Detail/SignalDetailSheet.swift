@@ -524,7 +524,8 @@ struct SignalDetailSheet: View {
             }
             .frame(height: 160)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        } else if item.kind.lowercased() == "speedtest" {
+        } else if item.kind.lowercased() == "speedtest", (place ?? "").isEmpty {
+            // Seulement sans lieu : sous « Lieu : Lyon », le message se contredisait (F-30).
             Label("Localisation non partagée", systemImage: "location.slash")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)

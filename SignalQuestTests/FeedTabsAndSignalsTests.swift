@@ -683,3 +683,42 @@ final class FeedOtherScreensTests: XCTestCase {
         XCTAssertEqual(ComposerSheet.quickHashtags(trending: (1...9).map { "t\($0)" }).count, 6)
     }
 }
+
+/// Lot F (F7) : un élément illisible ne doit jamais emporter ses voisins.
+final class FeedDecodingRobustnessTests: XCTestCase {
+
+    private let post = #"""
+    {"id":"%@","kind":"post","author":{"id":"u1"},"text":"bonjour",
+     "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+     "likedByMe":false,"favoritedByMe":false,"repostedByMe":false%@}
+    """#
+
+    private func postJSON(_ id: String, extra: String = "") -> String {
+        String(format: post, id, extra)
+    }
+
+    /// F-31 : un sondage ou un résumé de mesure mal formé faisait tomber tout le post.
+    func testMalformedPollOrSignalKeepsThePost() throws {
+        let withPoll = try JSONDecoder().decode(UnifiedSocialFeedItem.self,
+                                                from: Data(postJSON("p1", extra: #","poll":"oops""#).utf8))
+        XCTAssertEqual(withPoll.id, "p1")
+        XCTAssertNil(withPoll.poll)
+        let withSignal = try JSONDecoder().decode(UnifiedSocialFeedItem.self,
+                                                  from: Data(postJSON("p2", extra: #","signal":42"#).utf8))
+        XCTAssertEqual(withSignal.id, "p2")
+        XCTAssertNil(withSignal.signal)
+    }
+
+    /// F-41 : Explorer décode chaque liste élément par élément.
+    func testExploreDropsOnlyTheUnreadableEntries() throws {
+        let json = """
+        {"posts":[\(postJSON("p1")),{"id":"broken"},\(postJSON("p2"))],
+         "people":[{"id":"u1"},"pas un objet",{"id":"u2"}],
+         "hashtags":[{"tag":"5g","postCount":3},{"tag":"x"},{"tag":"fibre","postCount":1}]}
+        """
+        let result = try JSONDecoder().decode(SocialExploreResult.self, from: Data(json.utf8))
+        XCTAssertEqual(result.posts.map(\.id), ["p1", "p2"])
+        XCTAssertEqual(result.people.map(\.id), ["u1", "u2"])
+        XCTAssertEqual(result.hashtags.map(\.tag), ["5g", "fibre"])
+    }
+}
