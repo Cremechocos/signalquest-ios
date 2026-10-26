@@ -20,6 +20,12 @@ struct E2EEV2ThreadPresentation: Equatable {
         case unsupported(count: Int)
         /// L'appareil n'a pas encore la clé de l'époque courante (§3.2).
         case waitingForEpoch
+        /// Un manifeste cite un appareil que le journal des appareils refuse
+        /// (E2EE-AUTO §7.1) : la conversation passe à une nouvelle clé sans lui.
+        case deviceRefused(userId: String, name: String?)
+        /// Une clé de la conversation n'a pas pu être vérifiée (époque non
+        /// marquée après une époque marquée, §7.2) : elle est remplacée.
+        case keyUnverified
 
         var text: String {
             switch self {
@@ -41,6 +47,12 @@ struct E2EEV2ThreadPresentation: Equatable {
                 return String(localized: "Un message demande une version plus récente de SignalQuest.")
             case .waitingForEpoch:
                 return String(localized: "En attente de la clé de cette conversation chiffrée.")
+            case .deviceRefused(_, let name?):
+                return String(localized: "Un appareil de \(name) ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.")
+            case .deviceRefused(_, nil):
+                return String(localized: "Un appareil d’un membre ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.")
+            case .keyUnverified:
+                return String(localized: "Une clé de cette conversation n’a pas pu être vérifiée : elle est remplacée par une nouvelle.")
             }
         }
     }
@@ -114,6 +126,15 @@ enum E2EEV2ThreadPresenter {
             return refusals[userId] == .uikChanged
                 ? .identityChanged(userId: userId, name: name)
                 : .identityUnverified(userId: userId, name: name)
+        }
+        // Une ligne par appareil refusé, la plus récente gardée.
+        var refusedDevices = Set<String>()
+        for alert in result.securityAlerts.reversed() {
+            if alert.code == "UNMARKED_EPOCH" {
+                if !notices.contains(.keyUnverified) { notices.append(.keyUnverified) }
+            } else if refusedDevices.insert(alert.userId + "\n" + alert.deviceId).inserted {
+                notices.append(.deviceRefused(userId: alert.userId, name: members[alert.userId]?.displayName))
+            }
         }
         if result.waitingForEpoch { notices.append(.waitingForEpoch) }
         if !result.snapshot.equivocalRefs.isEmpty {

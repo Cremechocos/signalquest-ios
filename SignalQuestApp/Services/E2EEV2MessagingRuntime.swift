@@ -177,7 +177,11 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         // ou des auteurs à la chaîne gardée.
         let again = Set(self.accounts(conversationId: conversationId, participantIds: participantIds, parts: parts))
             .union(stale)
-        return await operation(try await parts.directory.devices(for: again.sorted()))
+        var reread = try await parts.directory.devices(for: again.sorted())
+        // La relecture d'un journal en retard est faite : le manifeste qui
+        // échoue encore alerte (E2EE-AUTO §7.1, une relecture et une seule).
+        reread.logRereadUserIds = Set(stale.isEmpty ? accounts : stale)
+        return await operation(reread)
     }
 
     static func stale(_ failure: E2EEV2TransportFailure) -> [String]? {

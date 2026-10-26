@@ -17,6 +17,14 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     /// Journal auto (E2EE-AUTO §7.1) : `lastSeq` vérifié de chaque compte lu,
     /// envoyé en `memberLogSeqs` à la place de `listVersions`.
     var logSeqs: [String: Int64] = [:]
+    /// Journal auto : l'état vérifié de chaque compte lu, avec l'historique des
+    /// clés et des révocations dont la lecture d'un manifeste a besoin (§7.1).
+    var logAccounts: [String: E2EEAutoLog.AccountState] = [:]
+    /// Écart d'horloge mesuré sur la dernière page de maillons (§7.1, horloge du créateur).
+    var logClockOffsetMs: Int64?
+    /// Comptes relus après un « journal en retard » : leur relecture est faite,
+    /// un échec persistant du manifeste alerte (§7.1, point 2).
+    var logRereadUserIds: Set<String> = []
     /// Comptes supprimés (410 `E2EE_ACCOUNT_DELETED`, D.4 v0.4.30) : membres
     /// sans appareil, ni refusés ni à relire ; un administrateur les retire.
     var deleted: Set<String> = []

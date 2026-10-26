@@ -243,7 +243,8 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 epoch, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
                 ownDeviceId: device.deviceId, genesis: genesis,
                 previousMembershipChangeNumber: previous?.membershipChangeNumber, devices: devices,
-                membershipAt: membershipAt,
+                membershipAt: membershipAt, firstAutoEpochNumber: previous?.firstAutoEpochNumber,
+                nowMs: Int64(self.now().timeIntervalSince1970 * 1_000),
                 unwrap: { [identityStore = self.identityStore] in
                     try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: ownerNamespace)
                 }
@@ -254,13 +255,16 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 return .failure(self.localError("e2ee-membership-behind"))
             case .invalid:
                 return .failure(self.localError("invalid-e2ee-current-epoch"))
-            case .opened(var epochKey, let manifest, let state):
+            case .logBehind(let userIds):
+                return .failure(E2EEV2EpochVerifierV2.logBehindFailure(userIds, devices: devices))
+            case .opened(var epochKey, let manifest, let state, let use):
                 defer { epochKey.resetBytes(in: 0..<epochKey.count) }
                 guard E2EEV2EpochVerifierV2.keep(
                     epochKey: epochKey, accepted: epoch.accepted, conversationId: conversationId,
                     commitment: manifest.keyCommitmentB64, membership: state, recipients: epoch.recipients,
                     createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(self.now().timeIntervalSince1970 * 1_000),
-                    session: session, keyStore: self.keyStore, stateStore: self.stateStore
+                    session: session, keyStore: self.keyStore, stateStore: self.stateStore,
+                    e2eeAuto: epoch.accepted.e2eeAuto, use: use
                 ) else { return .failure(self.localError("e2ee-received-epoch-storage-failed")) }
                 kept.append(manifest.epochNumber)
                 return nil

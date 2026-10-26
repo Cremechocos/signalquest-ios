@@ -16,6 +16,9 @@ enum E2EEV2RotationPolicy {
         case age
         /// 10 000 messages au plus par époque.
         case volume
+        /// Époque lisible mais pas adoptée pour l'envoi : manifeste refusé face au
+        /// journal, ou époque non marquée une fois la bascule faite (E2EE-AUTO §7.2).
+        case notAdoptable
     }
 
     static let maxEpochAgeMs: Int64 = 30 * 24 * 60 * 60 * 1_000
@@ -26,7 +29,8 @@ enum E2EEV2RotationPolicy {
         membership: E2EEV2MembershipState,
         expectedRecipients: [String],
         nowMs: Int64,
-        messageCount: Int = 0
+        messageCount: Int = 0,
+        autoActive: Bool = E2EEV2ServerGate.autoActive
     ) -> [Reason] {
         var reasons: [Reason] = []
         if Set(current.memberIds) != membership.members { reasons.append(.members) }
@@ -37,6 +41,7 @@ enum E2EEV2RotationPolicy {
         if current.excludesWeb != membership.excludesWeb { reasons.append(.browsers) }
         if nowMs - current.acceptedAtMs >= maxEpochAgeMs { reasons.append(.age) }
         if messageCount >= maxEpochMessages { reasons.append(.volume) }
+        if current.readOnly == true || (autoActive && current.e2eeAuto != true) { reasons.append(.notAdoptable) }
         return reasons
     }
 
@@ -67,6 +72,9 @@ enum E2EEV2EpochContractV2 {
         let epochId: String
         let epochNumber: Int
         let createdAt: String
+        /// Époque créée avec `memberLogSeqs` (E2EE-AUTO §7.2) : seule une époque
+        /// marquée passe le contrôle du journal. Servi seulement à `true`.
+        var e2eeAuto = false
     }
 
     /// Époque courante servie à un appareil : l'époque acceptée, son manifeste
@@ -120,7 +128,11 @@ enum E2EEV2EpochContractV2 {
     }
 
     static func epoch(_ value: E2EEV2JSON?) -> Accepted? {
-        guard let epoch = value?.objectValue, Set(epoch.keys) == ["id", "epochNumber", "status", "createdAt"],
+        // Le marqueur `e2eeAuto` n'est servi qu'à `true` : `false` est refusé
+        // comme toute autre clé, pour garder les réponses d'avant identiques.
+        guard let epoch = value?.objectValue,
+              Set(epoch.keys).subtracting(["e2eeAuto"]) == ["id", "epochNumber", "status", "createdAt"],
+              epoch["e2eeAuto"].map({ $0 == .bool(true) }) ?? true,
               let epochId = epoch["id"]?.stringValue, E2EEV2Canonical.isOpaque(epochId),
               let number = epoch["epochNumber"]?.stringValue.flatMap(E2EEV2Canonical.sequenceNumber),
               // « retired » : une époque remplacée depuis (relue après coup) ;
@@ -129,7 +141,7 @@ enum E2EEV2EpochContractV2 {
               let createdAt = epoch["createdAt"]?.stringValue, !createdAt.isEmpty, createdAt.count <= 64 else {
             return nil
         }
-        return Accepted(epochId: epochId, epochNumber: number, createdAt: createdAt)
+        return Accepted(epochId: epochId, epochNumber: number, createdAt: createdAt, e2eeAuto: epoch["e2eeAuto"] != nil)
     }
 
     static func envelope(_ value: E2EEV2JSON?) -> E2EEV2SignedEpochEnvelope? {
@@ -157,8 +169,20 @@ enum E2EEV2EpochContractV2 {
 /// de cet appareil parmi les destinataires, enveloppe signée par le créateur,
 /// engagement de la clé.
 enum E2EEV2EpochVerifierV2 {
+    /// Ce qu'une époque ouverte permet (E2EE-AUTO §7.1, §7.2).
+    enum Use: Equatable, Sendable {
+        case send
+        /// Lisible, jamais adoptée pour l'envoi : elle tourne avant le prochain
+        /// envoi, avec une ligne de sécurité si le manifeste est refusé.
+        case readOnly(alert: E2EEV2ConversationStateStore.SecurityAlert?)
+
+        var isReadOnly: Bool { self != .send }
+    }
+
     enum Outcome {
-        case opened(epochKey: Data, manifest: E2EEV2EpochManifest, membership: E2EEV2MembershipState)
+        case opened(epochKey: Data, manifest: E2EEV2EpochManifest, membership: E2EEV2MembershipState, use: Use)
+        /// Journaux de ces comptes à relire avant de juger le manifeste (§7.1, point 2).
+        case logBehind([String])
         /// La chaîne locale n'atteint pas l'état sur lequel repose l'époque.
         case needsMembershipSync
         /// Époque valide, mais cet appareil n'en est pas destinataire.
@@ -178,11 +202,18 @@ enum E2EEV2EpochVerifierV2 {
         previousMembershipChangeNumber: Int?,
         devices: E2EEV2CertifiedDeviceSet,
         membershipAt: (Int) -> E2EEV2MembershipState?,
+        firstAutoEpochNumber: Int? = nil,
+        autoActive: Bool = E2EEV2ServerGate.autoActive,
+        nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000),
         unwrap: (E2EEV2EpochDelivery) throws -> Data
     ) -> Outcome {
         let fields = served.manifest.canonical.components(separatedBy: "\n")
+        // Époque marquée : son créateur a pu être révoqué depuis, le journal garde
+        // sa clé de signature et le contrôle du §7.1 juge la date.
         guard genesis.conversationId == conversationId,
-              fields.count == 13, let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5]),
+              fields.count == 13,
+              let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5])
+                ?? (served.accepted.e2eeAuto ? logSigningKey(devices, userId: fields[4], deviceId: fields[5]) : nil),
               let manifest = try? E2EEV2EpochManifest.verify(
                   served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
               ),
@@ -212,6 +243,15 @@ enum E2EEV2EpochVerifierV2 {
                   ) else {
                 return .invalid
             }
+            let use: Use
+            switch autoUse(
+                served, manifest: manifest, members: state.members, recipients: lines, ownUserId: ownUserId,
+                ownDeviceId: ownDeviceId, devices: devices, firstAutoEpochNumber: firstAutoEpochNumber,
+                autoActive: autoActive, nowMs: nowMs
+            ) {
+            case .success(let value): use = value
+            case .failure(let behind): return .logBehind(behind.userIds)
+            }
             // Destinataire selon le manifeste, mais enveloppe déjà accusée
             // ailleurs ou retirée : la clé ne peut plus venir de là.
             guard let envelope = served.envelope else { return .notRecipient }
@@ -236,9 +276,69 @@ enum E2EEV2EpochVerifierV2 {
                 senderPublicSigningKeyB64: creatorKey.x963Representation.base64EncodedString(),
                 envelope: envelope
             ))
-            return .opened(epochKey: epochKey, manifest: manifest, membership: state)
+            return .opened(epochKey: epochKey, manifest: manifest, membership: state, use: use)
         } catch {
             return .invalid
+        }
+    }
+
+    struct LogBehind: Error { let userIds: [String] }
+
+    private static func logSigningKey(_ devices: E2EEV2CertifiedDeviceSet, userId: String, deviceId: String) -> P256.Signing.PublicKey? {
+        guard let raw = devices.logAccounts[userId]?.devices[deviceId]?.signingKeyB64,
+              let data = Data(base64Encoded: raw) else { return nil }
+        return try? P256.Signing.PublicKey(x963Representation: data)
+    }
+
+    /// Époque marquée : le manifeste face aux journaux des membres de son
+    /// appartenance (§7.1). Non marquée une fois la bascule faite : lisible,
+    /// jamais adoptée, avec une ligne de sécurité au-dessus d'une époque marquée
+    /// déjà vue (retour en arrière, §7.2). Avant la bascule : le chemin v2.
+    static func autoUse(
+        _ served: E2EEV2EpochContractV2.Current,
+        manifest: E2EEV2EpochManifest,
+        members: Set<String>,
+        recipients: [E2EEV2EpochManifest.Recipient],
+        ownUserId: String,
+        ownDeviceId: String,
+        devices: E2EEV2CertifiedDeviceSet,
+        firstAutoEpochNumber: Int?,
+        autoActive: Bool,
+        nowMs: Int64
+    ) -> Result<Use, LogBehind> {
+        func alert(_ code: String, userId: String, deviceId: String) -> E2EEV2ConversationStateStore.SecurityAlert {
+            .init(code: code, userId: userId, deviceId: deviceId, epochNumber: manifest.epochNumber, atMs: nowMs)
+        }
+        guard served.accepted.e2eeAuto else {
+            guard autoActive else { return .success(.send) }
+            let downgrade = firstAutoEpochNumber.map { manifest.epochNumber > $0 } ?? false
+            return .success(.readOnly(alert: downgrade
+                ? alert("UNMARKED_EPOCH", userId: manifest.creatorUserId, deviceId: manifest.creatorDeviceId)
+                : nil))
+        }
+        // Chaque membre doit avoir son journal vérifié ; un journal absent se relit.
+        let unread = members.filter { devices.logAccounts[$0] == nil }
+            .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+        guard unread.isEmpty else { return .failure(LogBehind(userIds: unread)) }
+        let check = { (refreshed: Bool) in
+            E2EEAutoEpoch.checkManifest(
+                createdAtMs: manifest.createdAtMs, excludesWeb: manifest.excludesWeb, memberUserIds: Array(members),
+                recipients: recipients, accounts: devices.logAccounts,
+                correctedNowMs: nowMs + (devices.logClockOffsetMs ?? 0),
+                ownManifest: manifest.creatorUserId == ownUserId && manifest.creatorDeviceId == ownDeviceId,
+                refreshed: refreshed
+            )
+        }
+        var verdict = check(false)
+        // Une relecture et une seule : faite pour tous ces comptes, l'échec alerte.
+        if case .logBehind(let userIds) = verdict, Set(userIds).isSubset(of: devices.logRereadUserIds) {
+            verdict = check(true)
+        }
+        switch verdict {
+        case .adoptable: return .success(.send)
+        case .logBehind(let userIds): return .failure(LogBehind(userIds: userIds))
+        case let .alert(error, userId, deviceId): return .success(.readOnly(alert: alert(error.rawValue, userId: userId, deviceId: deviceId)))
+        case .future, .excludesWeb: return .success(.readOnly(alert: nil))
         }
     }
 
@@ -257,7 +357,9 @@ enum E2EEV2EpochVerifierV2 {
         acceptedAtMs: Int64,
         session: LocalAccountSession,
         keyStore: E2EEV2EpochKeyStore,
-        stateStore: E2EEV2ConversationStateStore
+        stateStore: E2EEV2ConversationStateStore,
+        e2eeAuto: Bool = false,
+        use: Use = .send
     ) -> Bool {
         advanceLock.lock()
         defer { advanceLock.unlock() }
@@ -268,7 +370,8 @@ enum E2EEV2EpochVerifierV2 {
                     membershipChangeNumber: membership.changeNumber, memberIds: membership.members.sorted(),
                     recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: recipients),
                     excludesWeb: membership.excludesWeb, createdAtMs: createdAtMs, acceptedAtMs: acceptedAtMs,
-                    epochId: accepted.epochId, keyCommitmentB64: commitment
+                    epochId: accepted.epochId, keyCommitmentB64: commitment,
+                    e2eeAuto: e2eeAuto ? true : nil, readOnly: use.isReadOnly ? true : nil
                 ),
                 ownerNamespace: session.ownerNamespace
             ) {
@@ -280,10 +383,22 @@ enum E2EEV2EpochVerifierV2 {
                     epochKey: epochKey, ownerNamespace: session.ownerNamespace, expectedSession: session
                 ) else { throw E2EEV2ConversationStateStore.Failure.invalidRecord }
             }
+            if case .readOnly(let alert?) = use {
+                try? stateStore.recordSecurityAlert(alert, conversationId: conversationId, ownerNamespace: session.ownerNamespace)
+            }
             return true
         } catch {
             return false
         }
+    }
+
+    /// Un manifeste à juger sur des journaux relus : relecture demandée la
+    /// première fois ; une fois relus, un journal toujours absent n'est pas à
+    /// jour (ni alerte, ni adoption, nouvel essai plus tard).
+    static func logBehindFailure(_ userIds: [String], devices: E2EEV2CertifiedDeviceSet) -> E2EEV2TransportFailure {
+        Set(userIds).isSubset(of: devices.logRereadUserIds)
+            ? E2EEV2TransportFailure(kind: .retryable, message: "e2ee-log-not-up-to-date")
+            : E2EEV2DeviceListReread.failure(userIds)
     }
 }
 
@@ -403,7 +518,8 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         // Une fois la bascule faite (§7.2), le `lastSeq` vérifié de chaque membre
         // remplace la version de sa liste ; un membre sans journal lu est relu.
         let body: E2EEV2JSON
-        if E2EEV2ServerGate.autoActive {
+        let autoActive = E2EEV2ServerGate.autoActive
+        if autoActive {
             let unlogged = membership.members.filter { devices.logSeqs[$0] == nil }
                 .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
             guard unlogged.isEmpty else { return .failure(E2EEV2DeviceListReread.failure(unlogged)) }
@@ -438,7 +554,7 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
             guard keep(
                 epochKey: epochKey, accepted: accepted, conversationId: conversationId,
                 commitment: proposal.keyCommitmentB64, membership: membership, recipients: proposal.recipients,
-                createdAtMs: proposal.createdAtMs, session: session
+                createdAtMs: proposal.createdAtMs, session: session, e2eeAuto: autoActive
             ) else { return .failure(localError("e2ee-rotated-epoch-storage-failed")) }
             // Le créateur, destinataire de son époque, l'accuse comme les autres
             // une fois la clé gardée (§2.6, v0.4.26) ; un accusé perdu ne change rien
@@ -481,19 +597,22 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         switch E2EEV2EpochVerifierV2.open(
             served, conversationId: conversationId, ownUserId: ownUserId, ownDeviceId: ownDeviceId, genesis: genesis,
             previousMembershipChangeNumber: current.membershipChangeNumber, devices: devices,
-            membershipAt: membershipAt,
+            membershipAt: membershipAt, firstAutoEpochNumber: current.firstAutoEpochNumber,
+            nowMs: Int64(now().timeIntervalSince1970 * 1_000),
             unwrap: { [identityStore] in try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: session.ownerNamespace) }
         ) {
         case .needsMembershipSync:
             return .needsMembershipSync
+        case .logBehind(let userIds):
+            return .failure(E2EEV2EpochVerifierV2.logBehindFailure(userIds, devices: devices))
         case .notRecipient, .invalid:
             return .failure(localError("invalid-e2ee-current-epoch"))
-        case .opened(var epochKey, let manifest, let state):
+        case .opened(var epochKey, let manifest, let state, let use):
             defer { epochKey.resetBytes(in: 0..<epochKey.count) }
             guard keep(
                 epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
                 commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
-                createdAtMs: manifest.createdAtMs, session: session
+                createdAtMs: manifest.createdAtMs, session: session, e2eeAuto: served.accepted.e2eeAuto, use: use
             ) else { return .failure(localError("e2ee-adopted-epoch-storage-failed")) }
             // Accusé une fois la clé gardée (E.2) ; un accusé perdu se refait.
             if session.isCurrent {
@@ -514,13 +633,15 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         membership: E2EEV2MembershipState,
         recipients: [String],
         createdAtMs: Int64,
-        session: LocalAccountSession
+        session: LocalAccountSession,
+        e2eeAuto: Bool = false,
+        use: E2EEV2EpochVerifierV2.Use = .send
     ) -> Bool {
         E2EEV2EpochVerifierV2.keep(
             epochKey: epochKey, accepted: accepted, conversationId: conversationId, commitment: commitment,
             membership: membership, recipients: recipients, createdAtMs: createdAtMs,
             acceptedAtMs: Int64(now().timeIntervalSince1970 * 1_000), session: session,
-            keyStore: keyStore, stateStore: stateStore
+            keyStore: keyStore, stateStore: stateStore, e2eeAuto: e2eeAuto, use: use
         )
     }
 

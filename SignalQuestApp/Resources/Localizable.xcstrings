@@ -97456,6 +97456,54 @@
           }
         }
       }
+    },
+    "Un appareil de %@ ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One of %@’s devices doesn’t match the device log: the conversation moves to a new key without it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil de %@ ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui."
+          }
+        }
+      }
+    },
+    "Un appareil d’un membre ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member’s device doesn’t match the device log: the conversation moves to a new key without it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil d’un membre ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui."
+          }
+        }
+      }
+    },
+    "Une clé de cette conversation n’a pas pu être vérifiée : elle est remplacée par une nouvelle." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A key of this conversation couldn’t be verified: it’s being replaced with a new one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une clé de cette conversation n’a pas pu être vérifiée : elle est remplacée par une nouvelle."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

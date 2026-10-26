@@ -41,7 +41,27 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         /// tient cet engagement (§2.6, v0.4.13). Absents des époques gardées avant.
         var epochId: String? = nil
         var keyCommitmentB64: String? = nil
+        /// Époque marquée par le serveur (E2EE-AUTO §7.2). Absent des époques gardées avant.
+        var e2eeAuto: Bool? = nil
+        /// Lisible mais jamais adoptée pour l'envoi (§7.1, §7.2) : elle tourne avant le prochain envoi.
+        var readOnly: Bool? = nil
+        /// Plus petit numéro d'époque marquée vu dans la conversation : une époque
+        /// non marquée au-dessus est un retour en arrière (§7.2).
+        var firstAutoEpochNumber: Int? = nil
     }
+
+    /// Manifeste refusé face au journal (E2EE-AUTO §7.1) : la ligne de sécurité
+    /// locale du fil. Gardée après la rotation qui le remplace.
+    struct SecurityAlert: Codable, Equatable, Sendable {
+        /// Code du §7.1 (`REVOKED`, `KEY_ROTATED`…) ou `UNMARKED_EPOCH`.
+        let code: String
+        let userId: String
+        let deviceId: String
+        let epochNumber: Int
+        let atMs: Int64
+    }
+
+    static let securityAlertLimit = 20
 
     /// Époque acceptée, gardée après son remplacement : membres de l'époque
     /// (§5.3) et fenêtre de 24 heures des messages en vol (§3.4).
@@ -172,12 +192,15 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
         Self.lock.lock()
         defer { Self.lock.unlock() }
-        if let known = try currentEpoch(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace) {
+        let known = try currentEpoch(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace)
+        if let known {
             guard epoch.epochNumber > known.epochNumber,
                   epoch.membershipChangeNumber >= known.membershipChangeNumber else {
                 throw Failure.regressed
             }
         }
+        var epoch = epoch
+        epoch.firstAutoEpochNumber = known?.firstAutoEpochNumber ?? (epoch.e2eeAuto == true ? epoch.epochNumber : nil)
         try beforeRecord()
         let data = try JSONEncoder().encode(epoch)
         guard let value = String(data: data, encoding: .utf8) else { throw Failure.invalidRecord }
@@ -223,6 +246,32 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
             for: acceptedKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
             accessibility: .afterFirstUnlock
         )
+    }
+
+    /// Ligne de sécurité d'un manifeste refusé (E2EE-AUTO §7.1), une fois par
+    /// époque ; les 20 dernières sont gardées.
+    func recordSecurityAlert(_ alert: SecurityAlert, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var alerts = try securityAlerts(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        guard !alerts.contains(where: { $0.epochNumber == alert.epochNumber }) else { return }
+        alerts.append(alert)
+        let data = try JSONEncoder().encode(Array(alerts.suffix(Self.securityAlertLimit)))
+        try tokenStore.set(
+            String(decoding: data, as: UTF8.self),
+            for: securityKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    /// Lignes de sécurité gardées, les plus anciennes d'abord.
+    func securityAlerts(conversationId: String, ownerNamespace: String) throws -> [SecurityAlert] {
+        guard let raw = try tokenStore.string(for: securityKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [] }
+        guard let data = raw.data(using: .utf8), let alerts = try? JSONDecoder().decode([SecurityAlert].self, from: data)
+        else { throw Failure.invalidRecord }
+        return alerts
     }
 
     /// Époques acceptées, les plus anciennes d'abord (256 au plus).
@@ -489,6 +538,10 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     private func acceptedKey(conversationId: String, ownerNamespace: String) -> String {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":accepted"
+    }
+
+    private func securityKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":security"
     }
 
     private func sentKey(conversationId: String, ownerNamespace: String) -> String {

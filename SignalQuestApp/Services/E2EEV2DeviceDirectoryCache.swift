@@ -14,6 +14,7 @@ actor E2EEV2DeviceDirectoryCache {
         let refusal: E2EEV2IdentityVerification.Failure?
         let listVersion: Int?
         var logSeq: Int64? = nil
+        var logAccount: E2EEAutoLog.AccountState? = nil
         var deleted = false
         let readAt: Date
     }
@@ -25,6 +26,8 @@ actor E2EEV2DeviceDirectoryCache {
     private let autoRead: (@Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet)?
     private let now: @Sendable () -> Date
     private var entries: [String: Entry] = [:]
+    /// Dernier écart d'horloge mesuré par le journal (§7.1).
+    private var logClockOffsetMs: Int64?
     /// Invalidations par compte : une lecture commencée avant une invalidation
     /// (révocation, numéro accepté) n'écrit pas son résultat après elle, ce
     /// que la réentrance de l'acteur permettrait pendant l'`await`.
@@ -80,7 +83,9 @@ actor E2EEV2DeviceDirectoryCache {
             }
             var accounts: [String: Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>?] = [:]
             for userId in Set(userIds).sorted() { accounts[userId] = try await reader.account(userId) }
-            return E2EEAutoDeviceDirectory.deviceSet(accounts: accounts)
+            var set = E2EEAutoDeviceDirectory.deviceSet(accounts: accounts)
+            set.logClockOffsetMs = await reader.clockOffsetMs
+            return set
         }
     }
 
@@ -104,13 +109,14 @@ actor E2EEV2DeviceDirectoryCache {
                 read = try await directory.certifiedDevices(for: users)
             }
             fresh = read
+            if let offset = read.logClockOffsetMs { logClockOffsetMs = offset }
             let readAt = now()
             for (user, seen) in zip(users, before.users)
             where before.all == generation && seen == (generations[user] ?? 0) {
                 entries[user] = Entry(
                     devices: read.devicesByUser[user], refusal: read.refusals[user],
                     listVersion: read.listVersions[user], logSeq: read.logSeqs[user],
-                    deleted: read.deleted.contains(user), readAt: readAt
+                    logAccount: read.logAccounts[user], deleted: read.deleted.contains(user), readAt: readAt
                 )
             }
         }
@@ -118,6 +124,7 @@ actor E2EEV2DeviceDirectoryCache {
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         var versions: [String: Int] = [:]
         var logSeqs: [String: Int64] = [:]
+        var logAccounts: [String: E2EEAutoLog.AccountState] = [:]
         var deleted: Set<String> = []
         for user in wanted {
             // Ce qui vient d'être lu sert à cet appel même si une invalidation
@@ -130,6 +137,9 @@ actor E2EEV2DeviceDirectoryCache {
             if let versionRead { versions[user] = versionRead }
             if let logSeqRead = fresh?.logSeqs[user] ?? (stale.contains(user) ? nil : entries[user]?.logSeq) {
                 logSeqs[user] = logSeqRead
+            }
+            if let accountRead = fresh?.logAccounts[user] ?? (stale.contains(user) ? nil : entries[user]?.logAccount) {
+                logAccounts[user] = accountRead
             }
             let isDeleted = stale.contains(user)
                 ? fresh?.deleted.contains(user) == true
@@ -146,7 +156,8 @@ actor E2EEV2DeviceDirectoryCache {
             }
         }
         return E2EEV2CertifiedDeviceSet(
-            devicesByUser: devices, refusals: refusals, listVersions: versions, logSeqs: logSeqs, deleted: deleted
+            devicesByUser: devices, refusals: refusals, listVersions: versions, logSeqs: logSeqs,
+            logAccounts: logAccounts, logClockOffsetMs: logClockOffsetMs, deleted: deleted
         )
     }
 

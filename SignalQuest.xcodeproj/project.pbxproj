@@ -103,6 +103,7 @@
 		1CAE82D920D95AB2CF54AF18 /* AuthFormsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B517C6393E3FDD2A21D16E34 /* AuthFormsQATests.swift */; };
 		1D28698E2B20210A26DF1D9A /* AppStoreTransactionSynchronizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754787A246D3FF9F9B99202D /* AppStoreTransactionSynchronizer.swift */; };
 		1E08C8632734607458C0A7DF /* WiFiSSIDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */; };
+		1E0ED8F6B953AA69FAB83C10 /* E2EEAutoEpochAdoptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F64A135AD2825474C3B0FA7 /* E2EEAutoEpochAdoptionTests.swift */; };
 		1E1CD4866A389E7F2AB1DBEA /* MapProgressivePublicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E973B43C3108240D1CD5A6 /* MapProgressivePublicationTests.swift */; };
 		1E85BE17631EC5FEDBB2967B /* MentionAutocompleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */; };
 		1E97EC5725E0B9B4C65382AB /* E2EEV2ConversationSyncV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DB63F96676D57869124FC9 /* E2EEV2ConversationSyncV2Tests.swift */; };
@@ -1419,6 +1420,7 @@
 		9EC5960ABF8C24952322E392 /* PrivacyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyService.swift; sourceTree = "<group>"; };
 		9F1F8D2350D491820FAEF688 /* UserOverviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserOverviewTests.swift; sourceTree = "<group>"; };
 		9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceDescriptor.swift; sourceTree = "<group>"; };
+		9F64A135AD2825474C3B0FA7 /* E2EEAutoEpochAdoptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoEpochAdoptionTests.swift; sourceTree = "<group>"; };
 		9F7996D06DFF212012F7841D /* MapAccessibilityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityQATests.swift; sourceTree = "<group>"; };
 		9FAEDD9D40E5F10914ECF24F /* MessageDraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageDraftStoreTests.swift; sourceTree = "<group>"; };
 		A0012B13A7B2878BF00E6CEB /* SQAntennaGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQAntennaGlyph.swift; sourceTree = "<group>"; };
@@ -2826,6 +2828,7 @@
 				87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */,
 				BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */,
 				580487B685558C2106751EDD /* E2EEAutoEnrollmentTests.swift */,
+				9F64A135AD2825474C3B0FA7 /* E2EEAutoEpochAdoptionTests.swift */,
 				CA0A26064553F7CE68B3A3D1 /* E2EEAutoEpochVectorTests.swift */,
 				8521CC0A027DA12FE7738211 /* E2EEAutoHistoryVectorTests.swift */,
 				69AD3C3E2E16BAECC4AE1678 /* E2EEAutoLogLocalIntegrationTests.swift */,
@@ -4122,6 +4125,7 @@
 				FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */,
 				FCDA55A3E109754904290CDF /* DriveTestSessionRecapTests.swift in Sources */,
 				A26109194E86E4656054F927 /* E2EEAutoEnrollmentTests.swift in Sources */,
+				1E0ED8F6B953AA69FAB83C10 /* E2EEAutoEpochAdoptionTests.swift in Sources */,
 				518477132538130E98067DB4 /* E2EEAutoEpochVectorTests.swift in Sources */,
 				A520A04B888E2E2DD3CB176C /* E2EEAutoHistoryVectorTests.swift in Sources */,
 				EE10520BC1BD04FD670428B9 /* E2EEAutoLogLocalIntegrationTests.swift in Sources */,

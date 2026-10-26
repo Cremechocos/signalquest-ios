@@ -36,11 +36,13 @@ enum E2EEAutoDeviceDirectory {
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         var logSeqs: [String: Int64] = [:]
+        var logAccounts: [String: E2EEAutoLog.AccountState] = [:]
         for (userId, read) in accounts {
             switch read {
             case .success(let account)?:
                 devices[userId] = account.activeDevices.map { certifiedDevice(userId: userId, device: $0) }
                 logSeqs[userId] = account.lastSeq
+                logAccounts[userId] = account
             case .failure?:
                 refusals[userId] = .invalidDeviceList
             case nil:
@@ -49,6 +51,8 @@ enum E2EEAutoDeviceDirectory {
         }
         // Un destinataire est un couple (userId, deviceId) : le même deviceId sous
         // deux comptes est admis (§7.1, révision 4), sans filtre d'ambiguïté.
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, logSeqs: logSeqs)
+        return E2EEV2CertifiedDeviceSet(
+            devicesByUser: devices, refusals: refusals, logSeqs: logSeqs, logAccounts: logAccounts
+        )
     }
 }

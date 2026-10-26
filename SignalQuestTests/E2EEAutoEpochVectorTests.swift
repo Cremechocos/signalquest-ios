@@ -16,36 +16,8 @@ final class E2EEAutoEpochVectorTests: XCTestCase {
         try XCTUnwrap(object[key] as? String, key)
     }
 
-    /// Journaux vérifiés de chaque compte, tels qu'un lecteur les tient à la tête `atSeq`
-    /// (`nil` : tout le journal).
     private func accounts(_ vectors: [String: Any], atSeq: Int64? = nil) throws -> [String: E2EEAutoLog.AccountState] {
-        let log = try XCTUnwrap(vectors["log"] as? [String: Any])
-        let allLinks = try XCTUnwrap(log["links"] as? [String])
-        let limit = atSeq ?? Int64(allLinks.count)
-        let links = Array(allLinks.prefix(Int(limit)))
-        let logKeyEntries = try XCTUnwrap(log["logKeyEntries"] as? [String: String])
-            .reduce(into: [Int64: String]()) { result, item in
-                if let seq = Int64(item.key), seq <= limit { result[seq] = item.value }
-            }
-        let chain = try E2EEAutoLog.extendChain(
-            .initial(
-                pinnedLogKeyB64: try string(log, "pinnedLogKeyB64"),
-                nextLogKeysB64: try XCTUnwrap(log["pinnedNextLogKeysB64"] as? [String])
-            ),
-            links: links, logKeyEntries: logKeyEntries
-        ).get()
-        let bySeq = try Dictionary(uniqueKeysWithValues: links.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
-        var result: [String: E2EEAutoLog.AccountState] = [:]
-        for account in try XCTUnwrap(log["accounts"] as? [[String: Any]]) {
-            let userId = try string(account, "userId")
-            let entries = try XCTUnwrap(account["entries"] as? [String])
-                .filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? .max) <= limit }
-            result[userId] = try E2EEAutoLog.verifyAccount(
-                userId: userId, accountSaltB64: try string(account, "accountSaltB64"),
-                entries: entries, links: bySeq, chain: chain
-            ).get()
-        }
-        return result
+        try E2EEAutoVectorLog.accounts(vectors, atSeq: atSeq)
     }
 
     private func recipients(_ object: [String: Any]) throws -> [E2EEAutoEpoch.Recipient] {
@@ -178,5 +150,44 @@ final class E2EEAutoEpochVectorTests: XCTestCase {
             let name = try string(invalid, "name")
             XCTAssertNil(E2EEAutoSafetyCode.shortFingerprint(try string(invalid, "value")), name)
         }
+    }
+}
+
+/// Journal du vecteur `epoch-recipients-v1`, vérifié comme le tient un lecteur.
+enum E2EEAutoVectorLog {
+    static func string(_ object: [String: Any], _ key: String) throws -> String {
+        try XCTUnwrap(object[key] as? String, key)
+    }
+
+    /// Journaux vérifiés de chaque compte, tels qu'un lecteur les tient à la tête `atSeq`
+    /// (`nil` : tout le journal).
+    static func accounts(_ vectors: [String: Any], atSeq: Int64? = nil) throws -> [String: E2EEAutoLog.AccountState] {
+        let log = try XCTUnwrap(vectors["log"] as? [String: Any])
+        let allLinks = try XCTUnwrap(log["links"] as? [String])
+        let limit = atSeq ?? Int64(allLinks.count)
+        let links = Array(allLinks.prefix(Int(limit)))
+        let logKeyEntries = try XCTUnwrap(log["logKeyEntries"] as? [String: String])
+            .reduce(into: [Int64: String]()) { result, item in
+                if let seq = Int64(item.key), seq <= limit { result[seq] = item.value }
+            }
+        let chain = try E2EEAutoLog.extendChain(
+            .initial(
+                pinnedLogKeyB64: try E2EEAutoVectorLog.string(log, "pinnedLogKeyB64"),
+                nextLogKeysB64: try XCTUnwrap(log["pinnedNextLogKeysB64"] as? [String])
+            ),
+            links: links, logKeyEntries: logKeyEntries
+        ).get()
+        let bySeq = try Dictionary(uniqueKeysWithValues: links.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
+        var result: [String: E2EEAutoLog.AccountState] = [:]
+        for account in try XCTUnwrap(log["accounts"] as? [[String: Any]]) {
+            let userId = try E2EEAutoVectorLog.string(account, "userId")
+            let entries = try XCTUnwrap(account["entries"] as? [String])
+                .filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? .max) <= limit }
+            result[userId] = try E2EEAutoLog.verifyAccount(
+                userId: userId, accountSaltB64: try E2EEAutoVectorLog.string(account, "accountSaltB64"),
+                entries: entries, links: bySeq, chain: chain
+            ).get()
+        }
+        return result
     }
 }

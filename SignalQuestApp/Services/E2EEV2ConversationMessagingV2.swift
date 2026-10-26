@@ -11,6 +11,8 @@ struct E2EEV2MessagesV2: Equatable, Sendable {
     let missingByDevice: [String: Int]
     /// L'appareil n'est pas encore destinataire de l'époque courante (§3.2).
     let waitingForEpoch: Bool
+    /// Manifestes refusés face au journal (E2EE-AUTO §7.1), les plus anciens d'abord.
+    var securityAlerts: [E2EEV2ConversationStateStore.SecurityAlert] = []
 }
 
 enum E2EEV2RefreshResultV2: Equatable, Sendable {
@@ -222,7 +224,10 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
             return .refreshed(E2EEV2MessagesV2(
                 snapshot: snapshot, unsupported: unsupported, missingByDevice: missing,
-                waitingForEpoch: synced == .waitingForEpoch
+                waitingForEpoch: synced == .waitingForEpoch,
+                securityAlerts: (try? stateStore.securityAlerts(
+                    conversationId: conversationId, ownerNamespace: session.ownerNamespace
+                )) ?? []
             ))
         } catch {
             return .failure(localError("e2ee-message-store-unavailable"))
