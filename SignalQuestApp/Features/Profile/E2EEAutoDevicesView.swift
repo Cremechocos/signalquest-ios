@@ -124,9 +124,14 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
             signedOut = true
             return
         case .revoked:
-            confirmationMessage = reason == .notMe
+            var message = reason == .notMe
                 ? String(localized: "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît.")
                 : String(localized: "Appareil retiré. Il ne reçoit plus tes messages.")
+            // Un appareil Apple resté sur l'identifiant Apple garde la synchro du trousseau iCloud.
+            if row.platform == .ios {
+                message += "\n\n" + String(localized: "S’il est perdu ou volé, retire-le aussi de ton identifiant Apple : Réglages > ton nom, ou Localiser > Effacer.")
+            }
+            confirmationMessage = message
         case .tooRecent:
             errorMessage = String(localized: "Cet appareil a été ajouté il y a moins de 24 h : passe par un appareil plus ancien pour en retirer un autre.")
         case .notActive:
@@ -170,8 +175,10 @@ extension E2EEAutoDevicesViewModel {
 
 struct E2EEAutoDevicesView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var model: E2EEAutoDevicesViewModel
     @State private var rowToRevoke: E2EEAutoDevicesViewModel.Row?
+    @State private var detailRow: E2EEAutoDevicesViewModel.Row?
     @State private var confirmsSignOut = false
 
     init(api: APIClient) {
@@ -299,6 +306,9 @@ struct E2EEAutoDevicesView: View {
             }
             Button("Annuler", role: .cancel) {}
         }
+        .sheet(item: $detailRow) { row in
+            detailSheet(row)
+        }
         .alert("Appareils", isPresented: Binding(
             get: { model.confirmationMessage != nil },
             set: { if !$0 { model.confirmationMessage = nil } }
@@ -322,7 +332,7 @@ struct E2EEAutoDevicesView: View {
                 if let hours = model.hoursBeforeRevokingOthers {
                     Text("Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans \(hours) h ; d’ici là, retire-les depuis un appareil plus ancien.")
                 } else {
-                    Text("L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître.")
+                    Text("Touche un appareil pour voir son empreinte et vérifier que c’est bien lui.")
                 }
             }
         }
@@ -330,43 +340,25 @@ struct E2EEAutoDevicesView: View {
 
     @ViewBuilder
     private func deviceRow(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: platformIcon(row.platform))
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.brandRed)
-                .frame(width: 40, height: 40)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 5) {
-                // Aux grandes tailles de texte, la pastille passe sous le nom plutôt que de se couper.
-                ViewThatFits(in: .horizontal) {
-                    HStack { title(row) }
-                    VStack(alignment: .leading, spacing: 4) { title(row) }
-                }
-                if let status = statusText(row) {
-                    Text(status)
-                        .font(SQFont.body(12, .bold, relativeTo: .caption))
-                        .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.warning)
-                }
-                Text(addedText(row))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                if !row.shortFingerprint.isEmpty {
-                    Text(row.shortFingerprint.joined(separator: " "))
-                        .font(.caption.monospaced())
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .textSelection(.enabled)
-                        .accessibilityLabel(String(localized: "Empreinte \(row.shortFingerprint.joined(separator: ", "))"))
-                }
-            }
-            .accessibilityElement(children: .combine)
-            Spacer(minLength: 8)
+        // Aux tailles d'accessibilité, la corbeille passe sous la ligne pour laisser au nom toute la largeur.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: SQSpace.md))
+        layout {
+            Button { detailRow = row } label: { rowSummary(row) }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("Affiche l’empreinte de l’appareil"))
             if !row.isCurrent, row.status != .revoked, model.canRevokeOthers {
                 Button(role: .destructive) {
                     rowToRevoke = row
                 } label: {
-                    Image(systemName: "trash")
-                        .frame(width: 44, height: 44)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Label("Retirer cet appareil", systemImage: "trash")
+                            .frame(minHeight: 44)
+                    } else {
+                        Image(systemName: "trash")
+                            .frame(width: 44, height: 44)
+                    }
                 }
                 .accessibilityLabel(String(localized: "Retirer \(platformName(row))"))
                 .disabled(model.isActing)
@@ -375,14 +367,117 @@ struct E2EEAutoDevicesView: View {
         .padding(.vertical, 4)
     }
 
+    private func rowSummary(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: platformIcon(row.platform))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                // Aux grandes tailles de texte, la pastille passe sous le nom plutôt que de se couper.
+                titleBlock(row)
+                if let status = statusText(row) {
+                    Text(status)
+                        .font(SQFont.body(12, .bold, relativeTo: .caption))
+                        .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.warning)
+                }
+                Text(addedText(row))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(minHeight: 40)
+                .accessibilityHidden(true)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    /// L'empreinte courte (§7) : la seule donnée de la ligne qu'un serveur ne peut pas inventer.
+    private func detailSheet(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
+        NavigationStack {
+            List {
+                Section {
+                    rowSummaryHeader(row)
+                }
+                if !row.shortFingerprint.isEmpty {
+                    Section {
+                        Text(row.shortFingerprint.joined(separator: " "))
+                            .font(.system(.title3, design: .monospaced, weight: .semibold))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityLabel(String(localized: "Empreinte \(row.shortFingerprint.joined(separator: ", "))"))
+                    } header: {
+                        Text("Empreinte")
+                    } footer: {
+                        if row.isCurrent {
+                            Text("C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils.")
+                        } else {
+                            Text("Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui.")
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(SQColor.bg.ignoresSafeArea())
+            .navigationTitle(platformName(row))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("OK") { detailRow = nil }
+                }
+            }
+        }
+        .tint(SQColor.brandRed)
+        // Aux tailles d'accessibilité, la demi-feuille cacherait l'empreinte.
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+    }
+
+    private func rowSummaryHeader(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            titleBlock(row)
+            if let status = statusText(row) {
+                Text(status)
+                    .font(SQFont.body(12, .bold, relativeTo: .caption))
+                    .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.warning)
+            }
+            Text(addedText(row))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     @ViewBuilder
-    private func title(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
+    private func titleBlock(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 4) { title(row, stacked: true) }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack { title(row) }
+                VStack(alignment: .leading, spacing: 4) { title(row, stacked: true) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func title(_ row: E2EEAutoDevicesViewModel.Row, stacked: Bool = false) -> some View {
         Text(platformName(row))
             .font(SQType.heading)
         if row.isCurrent {
+            // En ligne, la pastille ne se coupe pas ; sous le nom, elle rétrécit un peu plutôt que de se couper.
             Text("Cet appareil")
                 .font(SQFont.body(12, .bold, relativeTo: .caption2))
-                .fixedSize()
+                .lineLimit(1)
+                .minimumScaleFactor(stacked ? 0.8 : 1)
+                .fixedSize(horizontal: !stacked, vertical: true)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .background(SQColor.accentSoft, in: Capsule())

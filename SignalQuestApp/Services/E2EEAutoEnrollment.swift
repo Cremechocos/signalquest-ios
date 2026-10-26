@@ -10,9 +10,16 @@ enum E2EEAutoEnrollmentContract {
 
     static func rotatePath(deviceId: String) -> String { "/api/e2ee/auto/devices/\(deviceId)/rotate" }
 
-    /// Libellé tiré de la plateforme, sans nom ni numéro de version (§4.1) :
-    /// il sert à reconnaître son appareil, il ne prouve rien.
-    static func label(isPad: Bool) -> String { isPad ? "iPad" : "iPhone" }
+    /// Libellé tiré du modèle, sans nom ni numéro de version d'iOS (§4.1) : il
+    /// sert à reconnaître son appareil, il ne prouve rien. Modèle commercial
+    /// connu (« iPhone 15 Pro »), sinon « iPhone » ou « iPad », jamais
+    /// l'identifiant brut.
+    static func label(isPad: Bool, modelName: String = AppleDeviceDescriptor.currentModelName) -> String {
+        let generic = isPad ? "iPad" : "iPhone"
+        guard modelName.hasPrefix(generic + " "), !modelName.hasSuffix("Simulator"),
+              modelName.unicodeScalars.count <= 64 else { return generic }
+        return modelName
+    }
 
     static func registrationBody(device: E2EEV2DeviceDescriptor, label: String, historyKeyPresent: Bool) throws -> Data {
         try JSONSerialization.data(withJSONObject: [

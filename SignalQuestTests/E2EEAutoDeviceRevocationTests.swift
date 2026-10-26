@@ -327,10 +327,18 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         await selfRevoked.revoke(try XCTUnwrap(selfRevoked.current), reason: .user)
         XCTAssertTrue(selfRevoked.signedOut)
 
-        let notMe = model(account([ownState(), state(otherId)])) { _, _ in .revoked(ownDevice: false) }
+        let notMe = model(account([ownState(), state(otherId, platform: .android)])) { _, _ in .revoked(ownDevice: false) }
         await notMe.load()
         await notMe.revoke(try XCTUnwrap(notMe.rows.last), reason: .notMe)
         XCTAssertEqual(notMe.confirmationMessage, String(localized: "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît."))
         XCTAssertFalse(notMe.signedOut)
+
+        // Un appareil Apple retiré : conseil de le retirer aussi de l'identifiant Apple (synchro iCloud).
+        let advice = String(localized: "S’il est perdu ou volé, retire-le aussi de ton identifiant Apple : Réglages > ton nom, ou Localiser > Effacer.")
+        let apple = model(account([ownState(), state(otherId, platform: .ios)])) { _, _ in .revoked(ownDevice: false) }
+        await apple.load()
+        await apple.revoke(try XCTUnwrap(apple.rows.last), reason: .user)
+        XCTAssertEqual(apple.confirmationMessage, String(localized: "Appareil retiré. Il ne reçoit plus tes messages.") + "\n\n" + advice)
+        XCTAssertFalse(notMe.confirmationMessage?.contains(advice) ?? true, "pas pour un appareil Android")
     }
 }

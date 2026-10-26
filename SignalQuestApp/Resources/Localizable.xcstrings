@@ -98021,34 +98021,6 @@
       },
       "shouldTranslate" : false
     },
-    "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A device’s fingerprint also appears on it, in Settings > Devices: compare them to recognize it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître."
-          }
-        }
-      }
-    },
-    "SQFormal|L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : comparez-la pour le reconnaître."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Empreinte %@" : {
       "localizations" : {
         "en" : {
@@ -98160,6 +98132,150 @@
           }
         }
       }
+    },
+    "S’il est perdu ou volé, retire-le aussi de ton identifiant Apple : Réglages > ton nom, ou Localiser > Effacer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it was lost or stolen, also remove it from your Apple Account: Settings > your name, or Find My > Erase."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’il est perdu ou volé, retire-le aussi de ton identifiant Apple : Réglages > ton nom, ou Localiser > Effacer."
+          }
+        }
+      }
+    },
+    "SQFormal|S’il est perdu ou volé, retire-le aussi de ton identifiant Apple : Réglages > ton nom, ou Localiser > Effacer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’il est perdu ou volé, retirez-le aussi de votre identifiant Apple : Réglages > votre nom, ou Localiser > Effacer."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Touche un appareil pour voir son empreinte et vérifier que c’est bien lui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a device to see its fingerprint and check that it’s really that device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche un appareil pour voir son empreinte et vérifier que c’est bien lui."
+          }
+        }
+      }
+    },
+    "SQFormal|Touche un appareil pour voir son empreinte et vérifier que c’est bien lui." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez un appareil pour voir son empreinte et vérifier que c’est bien lui."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Affiche l’empreinte de l’appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the device’s fingerprint"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche l’empreinte de l’appareil"
+          }
+        }
+      }
+    },
+    "Empreinte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fingerprint"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empreinte"
+          }
+        }
+      }
+    },
+    "C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is this device’s fingerprint. Your other devices show the same one for it in Settings > Devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est l’empreinte de cet appareil. Vos autres appareils affichent la même pour lui dans Réglages > Appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It comes from the device’s key, recorded in the signed log. Open Settings > Devices on that device: if it shows the same fingerprint for “This device”, it’s really that device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui."
+          }
+        }
+      }
+    },
+    "SQFormal|Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvrez Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -109,8 +109,11 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
     }
 
     func testLabelAndPolicy() {
-        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: false), "iPhone")
-        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: true), "iPad")
+        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: false, modelName: "iPhone 15 Pro"), "iPhone 15 Pro")
+        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: false, modelName: "iPhone18,9"), "iPhone", "identifiant inconnu")
+        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: false, modelName: "iPhone Simulator"), "iPhone")
+        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: true, modelName: "iPad14,1"), "iPad")
+        XCTAssertEqual(E2EEAutoEnrollmentContract.label(isPad: true, modelName: "iPhone 15 Pro"), "iPad")
         func action(_ status: Int, _ code: String?, reason: String? = nil, keyVersion: Int = 1) -> E2EEAutoEnrollmentPolicy.Action {
             E2EEAutoEnrollmentPolicy.action(for: E2EEV2TransportFailure(
                 kind: E2EEV2TransportFailurePolicy.classify(statusCode: status, code: code), statusCode: status, code: code, message: "x",
