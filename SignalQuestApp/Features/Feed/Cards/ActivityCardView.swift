@@ -62,17 +62,20 @@ struct FeedActivity: Equatable {
         // Un récap officiel ne fait gagner de points à personne.
         self.points = family == .officialRecap ? nil : int("points").flatMap { $0 > 0 ? $0 : nil }
 
-        let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let quoted = Self.quotedName(in: text)
+        // La phrase traduite remplace le français du serveur partout où il
+        // servait de titre ou de repli (F8).
+        let key = FeedTextKey(key: item.textKey, args: item.textArgs)
+        let text = (key?.text ?? item.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        let quoted = Self.quotedName(in: item.text)
         let siteLink = string("siteId").map { Link.site(id: $0, market: string("marketCode")) }
         let isMine = item.isMine == true
         switch family {
         case .quest:
             title = String(localized: "Quête terminée")
-            subtitle = quoted
+            subtitle = key?.string("questTitle") ?? quoted
             link = isMine ? .progression : nil
         case .level:
-            if let level = int("newLevel") {
+            if let level = int("newLevel") ?? key?.integer("level").map({ Int(clamping: $0) }) {
                 title = String(localized: "Niveau \(level) atteint")
             } else {
                 title = text.isEmpty ? String(localized: "Nouveau niveau") : text
@@ -81,10 +84,10 @@ struct FeedActivity: Equatable {
             link = isMine ? .progression : nil
         case .badge:
             title = String(localized: "Badge obtenu")
-            subtitle = string("badgeName") ?? quoted
+            subtitle = string("badgeName") ?? key?.string("badgeName") ?? quoted
             link = isMine ? .progression : nil
         case .streak:
-            if let days = int("streak") {
+            if let days = int("streak") ?? key?.integer("days").map({ Int(clamping: $0) }) {
                 title = String(localized: "Série de \(days) jours")
             } else {
                 title = text.isEmpty ? String(localized: "Série en cours") : text
@@ -101,16 +104,17 @@ struct FeedActivity: Equatable {
             link = siteLink
         case .department:
             title = String(localized: "Nouveau département exploré")
-            subtitle = string("dept")
+            subtitle = key?.string("departmentCode") ?? string("dept")
             link = siteLink
         case .bugResolved:
             title = String(localized: "Signalement de bug validé")
             // Le titre du signalement suit les deux-points du texte serveur.
-            subtitle = text.range(of: ": ").map { String(text[$0.upperBound...]) }.flatMap { $0.isEmpty ? nil : $0 }
+            subtitle = item.text.range(of: ": ").map { String(item.text[$0.upperBound...]) }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
             link = isMine ? string("bugId").map { Link.bug(id: $0) } : nil
         case .customSite:
             title = String(localized: "Site ajouté sur la carte")
-            subtitle = string("customSiteName") ?? quoted
+            subtitle = string("customSiteName") ?? key?.string("siteName") ?? quoted
             // Un site communautaire ne se retrouve pas par la recherche de la carte.
             link = nil
         case .officialRecap:

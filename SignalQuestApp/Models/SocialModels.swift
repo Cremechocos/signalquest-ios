@@ -509,6 +509,15 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// Post écrit par le serveur (activité, photo, avis, panne, synchro) :
     /// son texte et ses chiffres ne se modifient pas. Absent avant #694.
     let generated: Bool?
+    /// Clé et arguments du texte d'un post automatique (#695) : `text` reste le
+    /// repli français quand l'app ne sait pas écrire la phrase.
+    let textKey: String?
+    let textArgs: [String: JSONValue]?
+
+    /// Texte du serveur dans la langue de l'app, quand sa clé est connue (F8).
+    var feedText: String? { FeedTextKey(key: textKey, args: textArgs)?.text }
+    /// Ce qu'affiche une carte sans fiche dédiée : la phrase traduite, sinon `text`.
+    var displayText: String { feedText ?? text }
 
     /// Vrai si l'utilisateur peut éditer, supprimer ou épingler ce post.
     /// L'autorité reste le SERVEUR (403 sinon) : ceci ne fait que masquer des
@@ -535,7 +544,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     var isPinned: Bool { pinnedAt != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll, generated
+        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll, generated, textKey, textArgs
     }
 
     init(from decoder: Decoder) throws {
@@ -572,6 +581,9 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
         poll = (try? c.decodeIfPresent(FeedPoll.self, forKey: .poll)) ?? nil
         generated = try? c.decodeIfPresent(Bool.self, forKey: .generated)
+        // Une clé mal formée ne coûte que la traduction : `text` reste.
+        textKey = (try? c.decodeIfPresent(String.self, forKey: .textKey)) ?? nil
+        textArgs = (try? c.decodeIfPresent([String: JSONValue].self, forKey: .textArgs)) ?? nil
     }
 }
 

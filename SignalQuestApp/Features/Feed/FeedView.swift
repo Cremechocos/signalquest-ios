@@ -1896,12 +1896,12 @@ struct PostShareSheet: View {
                     MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "post.share.close") { dismiss() }
                 }
 
-                if !post.text.isEmpty {
-                    Text(post.text)
+                if !post.displayText.isEmpty {
+                    Text(post.displayText)
                         .font(SQType.caption)
                         .lineLimit(2)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .accessibilityLabel(Text("Publication : \(post.text)"))
+                        .accessibilityLabel(Text("Publication : \(post.displayText)"))
                 }
 
                 SQSearchField(text: $query, placeholder: "Rechercher une conversation")

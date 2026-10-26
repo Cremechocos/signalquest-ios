@@ -385,7 +385,8 @@ extension UnifiedSocialFeedItem {
             return Self.serverPhotoTexts.contains { trimmed.hasPrefix($0) } ? nil : trimmed
         // « A évalué ce signal · ★★★★ » : les étoiles sont déjà sur la carte.
         case "rating": return trimmed.hasPrefix("A évalué ce signal") ? nil : trimmed
-        default: return trimmed
+        // La phrase du serveur dans la langue de l'app quand sa clé est connue (F8).
+        default: return feedText ?? trimmed
         }
     }
 

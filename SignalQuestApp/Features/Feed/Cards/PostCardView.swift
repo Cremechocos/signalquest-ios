@@ -29,8 +29,8 @@ struct PostCardView: View {
                     isPinned: item.isPinned
                 )
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if !item.displayText.isEmpty {
+                    Text(item.displayText)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)

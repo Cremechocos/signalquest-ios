@@ -424,6 +424,22 @@
         }
       }
     },
+    "%@, %@ et %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@ and %3$@ %4$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, %@ et %@ %@"
+          }
+        }
+      }
+    },
     "%lld %% par rapport aux 30 jours précédents" : {
       "localizations" : {
         "en" : {
@@ -440,6 +456,47 @@
         }
       }
     },
+    "%lld adresses mises à jour" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld address updated"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld addresses updated"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld adresse mise à jour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld adresses mises à jour"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même." : {
       "localizations" : {
         "en" : {
@@ -452,6 +509,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même."
+          }
+        }
+      }
+    },
+    "%lld mises à jour" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updated"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updated"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mise à jour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mises à jour"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld nouvelles antennes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new site"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new sites"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouvelle antenne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouvelles antennes"
+                }
+              }
+            }
           }
         }
       }
@@ -489,6 +628,38 @@
         }
       }
     },
+    "a ajouté %@ sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "added %@ to the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a ajouté %@ sur la carte"
+          }
+        }
+      }
+    },
+    "A évalué ce signal · %lld/5" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rated this signal · %lld/5"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A évalué ce signal · %lld/5"
+          }
+        }
+      }
+    },
     "Activer le nouveau chiffrement sur cet appareil" : {
       "localizations" : {
         "en" : {
@@ -522,6 +693,54 @@
         }
       }
     },
+    "Appui long sur le preset Canada" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long press on the Canada preset"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appui long sur le preset Canada"
+          }
+        }
+      }
+    },
+    "au Canada" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in Canada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "au Canada"
+          }
+        }
+      }
+    },
+    "au Luxembourg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in Luxembourg"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "au Luxembourg"
+          }
+        }
+      }
+    },
     "Autre réaction" : {
       "localizations" : {
         "en" : {
@@ -534,6 +753,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autre réaction"
+          }
+        }
+      }
+    },
+    "à Monaco" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in Monaco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à Monaco"
+          }
+        }
+      }
+    },
+    "Badge Canada découvert dans Radio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada badge found in Radio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge Canada découvert dans Radio"
+          }
+        }
+      }
+    },
+    "Badge « %@ » obtenu !" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge “%@” earned!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge « %@ » obtenu !"
           }
         }
       }
@@ -571,6 +838,22 @@
         }
       }
     },
+    "Combo LIVE SIGNAL Canada" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LIVE SIGNAL Canada combo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combo LIVE SIGNAL Canada"
+          }
+        }
+      }
+    },
     "Comment c’est calculé" : {
       "localizations" : {
         "en" : {
@@ -599,6 +882,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Découvrir des membres"
+          }
+        }
+      }
+    },
+    "en Belgique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in Belgium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en Belgique"
+          }
+        }
+      }
+    },
+    "en France" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in France"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en France"
+          }
+        }
+      }
+    },
+    "en Suisse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in Switzerland"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en Suisse"
           }
         }
       }
@@ -679,6 +1010,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Génial"
+          }
+        }
+      }
+    },
+    "Identification directe depuis la carte : %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identified from the map: %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification directe depuis la carte : %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Identification hors-ligne : %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline identification: %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification hors-ligne : %1$@ %2$@"
           }
         }
       }
@@ -829,6 +1192,22 @@
         }
       }
     },
+    "Niveau %lld atteint !" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level %lld reached!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niveau %lld atteint !"
+          }
+        }
+      }
+    },
     "Non testé" : {
       "localizations" : {
         "en" : {
@@ -858,6 +1237,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau département exploré"
+          }
+        }
+      }
+    },
+    "Nouveau département exploré (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New department explored (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau département exploré (%@)"
           }
         }
       }
@@ -896,6 +1291,38 @@
         }
       }
     },
+    "Nouvelle validation %@ créée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New %@ identification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle validation %@ créée"
+          }
+        }
+      }
+    },
+    "Nouvelle validation %@ créée · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New %1$@ identification · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle validation %@ créée · %@"
+          }
+        }
+      }
+    },
     "Ouverture de pages" : {
       "localizations" : {
         "en" : {
@@ -928,6 +1355,134 @@
         }
       }
     },
+    "Photo approuvée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo approved"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo approuvée"
+          }
+        }
+      }
+    },
+    "Photo terrain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo terrain"
+          }
+        }
+      }
+    },
+    "Photo terrain ajoutée pour « %@ »" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field photo added for “%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo terrain ajoutée pour « %@ »"
+          }
+        }
+      }
+    },
+    "Photo terrain · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field photo · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo terrain · %@"
+          }
+        }
+      }
+    },
+    "Photo uploadée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploaded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploadée"
+          }
+        }
+      }
+    },
+    "Photo uploadée · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploaded · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploadée · %@"
+          }
+        }
+      }
+    },
+    "Premier partage speedtest en thème Canada" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First speed test shared with the Canada theme"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier partage speedtest en thème Canada"
+          }
+        }
+      }
+    },
+    "Preset Canada équipé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada preset equipped"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset Canada équipé"
+          }
+        }
+      }
+    },
     "Quête terminée" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -941,6 +1496,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quête terminée"
+          }
+        }
+      }
+    },
+    "Quête « %@ » terminée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quest “%@” completed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quête « %@ » terminée"
           }
         }
       }
@@ -1091,6 +1662,95 @@
         }
       }
     },
+    "Session de couverture terminée : %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage session done: %1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session de couverture terminée : %@, %@"
+          }
+        }
+      }
+    },
+    "Série de %lld jours consécutifs !" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld-day streak!"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld-day streak!"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Série de %lld jour consécutif !"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Série de %lld jours consécutifs !"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Signalement d’un problème d’identification accepté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification issue report accepted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement d’un problème d’identification accepté"
+          }
+        }
+      }
+    },
+    "Signalement d’un problème d’identification accepté · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification issue report accepted · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement d’un problème d’identification accepté · %@"
+          }
+        }
+      }
+    },
     "SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant." : {
       "localizations" : {
         "en" : {
@@ -1103,6 +1763,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SignalQuest ne répond pas pour le moment. Ta connexion fonctionne : réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "Site découvert en premier !" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First to discover this site!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site découvert en premier !"
           }
         }
       }
@@ -20301,6 +20977,38 @@
         }
       }
     },
+    "Test de débit effectué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed test done"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test de débit effectué"
+          }
+        }
+      }
+    },
+    "Test de débit effectué (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed test done (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test de débit effectué (%@)"
+          }
+        }
+      }
+    },
     "Test du trajet · %@" : {
       "localizations" : {
         "en" : {
@@ -21900,6 +22608,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utilisateur"
+          }
+        }
+      }
+    },
+    "Validation %@ confirmée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ identification confirmed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validation %@ confirmée"
+          }
+        }
+      }
+    },
+    "Validation %@ confirmée · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ identification confirmed · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validation %@ confirmée · %@"
+          }
+        }
+      }
+    },
+    "Validation %@ soumise" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ identification submitted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validation %@ soumise"
+          }
+        }
+      }
+    },
+    "Validation %@ soumise · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ identification submitted · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validation %@ soumise · %@"
           }
         }
       }

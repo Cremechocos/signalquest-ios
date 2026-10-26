@@ -1,0 +1,2116 @@
+{
+  "contract": "docs/feed-text-keys-contract.md",
+  "version": 1,
+  "frozen": "2026-10-26",
+  "note": "Gabarits fr et en : référence et proposition (§4) ; le pays de feed.netmonster.daily vient de countryCode. Entrée : colonnes du post (sourceType, marketCode), texte servi, metadata, et noms résolus par le serveur (place, badgeName, questTitle). Sortie : textKey/textArgs servis. Une sortie à null veut dire : afficher text.",
+  "keys": [
+    {
+      "key": "feed.speedtest.done",
+      "args": {
+        "downloadMbps": "decimal"
+      },
+      "fr": "Test de débit effectué ({downloadMbps} Mbps)",
+      "en": "Speed test done ({downloadMbps} Mbps)"
+    },
+    {
+      "key": "feed.speedtest.done_no_speed",
+      "args": {},
+      "fr": "Test de débit effectué",
+      "en": "Speed test done"
+    },
+    {
+      "key": "feed.session.completed",
+      "args": {
+        "distanceMeters": "integer",
+        "measureCount": "integer"
+      },
+      "fr": "Session de couverture terminée : {distance} km, {measureCount} mesures",
+      "en": "Coverage session done: {distance}, {measureCount} measurements"
+    },
+    {
+      "key": "feed.badge.earned",
+      "args": {
+        "badgeId": "string",
+        "badgeName": "string"
+      },
+      "fr": "Badge \"{badgeName}\" obtenu !",
+      "en": "Badge \"{badgeName}\" earned!"
+    },
+    {
+      "key": "feed.level.reached",
+      "args": {
+        "level": "integer"
+      },
+      "fr": "Niveau {level} atteint !",
+      "en": "Level {level} reached!"
+    },
+    {
+      "key": "feed.quest.completed",
+      "args": {
+        "questKey": "string",
+        "questTitle": "string"
+      },
+      "fr": "Quête \"{questTitle}\" terminée",
+      "en": "Quest \"{questTitle}\" completed"
+    },
+    {
+      "key": "feed.streak.bonus",
+      "args": {
+        "days": "integer"
+      },
+      "fr": "Série de {days} jours consécutifs !",
+      "en": "{days}-day streak!"
+    },
+    {
+      "key": "feed.site.first_discovery",
+      "args": {},
+      "fr": "Site découvert en premier !",
+      "en": "First to discover this site!"
+    },
+    {
+      "key": "feed.site.visited",
+      "args": {},
+      "fr": "Nouveau site exploré",
+      "en": "New site explored"
+    },
+    {
+      "key": "feed.department.new",
+      "args": {
+        "departmentCode": "string"
+      },
+      "fr": "Nouveau département exploré ({departmentCode})",
+      "en": "New department explored ({departmentCode})"
+    },
+    {
+      "key": "feed.validation.submitted",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb"
+      },
+      "fr": "Validation {identifierType} soumise",
+      "en": "{identifierType} identification submitted"
+    },
+    {
+      "key": "feed.validation.submitted_with_place",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb",
+        "place": "string"
+      },
+      "fr": "Validation {identifierType} soumise · {place}",
+      "en": "{identifierType} identification submitted · {place}"
+    },
+    {
+      "key": "feed.validation.confirmed",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb"
+      },
+      "fr": "Validation {identifierType} confirmée",
+      "en": "{identifierType} identification confirmed"
+    },
+    {
+      "key": "feed.validation.confirmed_with_place",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb",
+        "place": "string"
+      },
+      "fr": "Validation {identifierType} confirmée · {place}",
+      "en": "{identifierType} identification confirmed · {place}"
+    },
+    {
+      "key": "feed.validation.created",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb"
+      },
+      "fr": "Nouvelle validation {identifierType} créée",
+      "en": "New {identifierType} identification"
+    },
+    {
+      "key": "feed.validation.created_with_place",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb",
+        "place": "string"
+      },
+      "fr": "Nouvelle validation {identifierType} créée · {place}",
+      "en": "New {identifierType} identification · {place}"
+    },
+    {
+      "key": "feed.validation.direct",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb",
+        "identifierValue": "integer"
+      },
+      "fr": "Identification directe depuis la carte : {identifierType} {identifierValue}",
+      "en": "Identified from the map: {identifierType} {identifierValue}"
+    },
+    {
+      "key": "feed.validation.offline",
+      "args": {
+        "identifierType": "enum:cellid|pci|enb|gnb",
+        "identifierValue": "integer"
+      },
+      "fr": "Identification hors-ligne : {identifierType} {identifierValue}",
+      "en": "Offline identification: {identifierType} {identifierValue}"
+    },
+    {
+      "key": "feed.antenna_report.accepted",
+      "args": {},
+      "fr": "Signalement d'un problème d'identification accepté",
+      "en": "Identification issue report accepted"
+    },
+    {
+      "key": "feed.antenna_report.accepted_with_place",
+      "args": {
+        "place": "string"
+      },
+      "fr": "Signalement d'un problème d'identification accepté · {place}",
+      "en": "Identification issue report accepted · {place}"
+    },
+    {
+      "key": "feed.bug_report.resolved",
+      "args": {},
+      "fr": "Signalement de bug validé",
+      "en": "Bug report confirmed"
+    },
+    {
+      "key": "feed.photo.uploaded",
+      "args": {},
+      "fr": "Photo uploadée",
+      "en": "Photo uploaded"
+    },
+    {
+      "key": "feed.photo.uploaded_with_place",
+      "args": {
+        "place": "string"
+      },
+      "fr": "Photo uploadée · {place}",
+      "en": "Photo uploaded · {place}"
+    },
+    {
+      "key": "feed.photo.approved",
+      "args": {},
+      "fr": "Photo approuvée",
+      "en": "Photo approved"
+    },
+    {
+      "key": "feed.photo.site",
+      "args": {},
+      "fr": "Photo terrain",
+      "en": "Field photo"
+    },
+    {
+      "key": "feed.photo.site_with_place",
+      "args": {
+        "place": "string"
+      },
+      "fr": "Photo terrain · {place}",
+      "en": "Field photo · {place}"
+    },
+    {
+      "key": "feed.photo.custom_site",
+      "args": {
+        "siteName": "string"
+      },
+      "fr": "Photo terrain ajoutée pour « {siteName} »",
+      "en": "Field photo added for \"{siteName}\""
+    },
+    {
+      "key": "feed.custom_site.created",
+      "args": {
+        "siteName": "string"
+      },
+      "fr": "a ajouté {siteName} sur la carte",
+      "en": "added {siteName} to the map"
+    },
+    {
+      "key": "feed.rating.signal",
+      "args": {
+        "stars": "integer"
+      },
+      "fr": "A évalué ce signal · {stars}/5",
+      "en": "Rated this signal · {stars}/5"
+    },
+    {
+      "key": "feed.netmonster.daily",
+      "args": {
+        "created": "integer",
+        "updated": "integer",
+        "addressesUpdated": "integer",
+        "countryCode": "string"
+      },
+      "fr": "{created} nouvelle(s) antenne(s), {updated} mise(s) à jour et {addressesUpdated} adresse(s) mise(s) à jour au Luxembourg",
+      "en": "{created} new sites, {updated} updated and {addressesUpdated} addresses updated in Luxembourg"
+    },
+    {
+      "key": "feed.experience.done",
+      "args": {},
+      "fr": "Test d'expérience",
+      "en": "Experience test"
+    },
+    {
+      "key": "feed.canada.speedtest_share",
+      "args": {},
+      "fr": "Premier partage speedtest en thème Canada",
+      "en": "First speed test shared with the Canada theme"
+    },
+    {
+      "key": "feed.canada.theme_equipped",
+      "args": {},
+      "fr": "Preset Canada équipé",
+      "en": "Canada preset equipped"
+    },
+    {
+      "key": "feed.canada.theme_long_press",
+      "args": {},
+      "fr": "Appui long sur le preset Canada",
+      "en": "Long press on the Canada preset"
+    },
+    {
+      "key": "feed.canada.radio_badge_press",
+      "args": {},
+      "fr": "Badge Canada découvert dans Radio",
+      "en": "Canada badge found in Radio"
+    },
+    {
+      "key": "feed.canada.live_signal_combo",
+      "args": {},
+      "fr": "Combo LIVE SIGNAL Canada",
+      "en": "LIVE SIGNAL Canada combo"
+    }
+  ],
+  "cases": [
+    {
+      "name": "speedtest avec débit décimal brut",
+      "input": {
+        "sourceType": "activity",
+        "text": "Test de débit effectué (87.3 Mbps)",
+        "metadata": {
+          "activityType": "speedtest",
+          "averageSpeed": 87.34
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.speedtest.done",
+        "textArgs": {
+          "downloadMbps": 87.34
+        }
+      }
+    },
+    {
+      "name": "speedtest sans averageSpeed",
+      "input": {
+        "sourceType": "activity",
+        "text": "Test de débit effectué",
+        "metadata": {
+          "activityType": "speedtest"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.speedtest.done_no_speed",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "speedtest à 0 Mbps",
+      "input": {
+        "sourceType": "activity",
+        "text": "Test de débit effectué (0.0 Mbps)",
+        "metadata": {
+          "activityType": "speedtest",
+          "averageSpeed": 0
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.speedtest.done_no_speed",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "speedtest débit en chaîne : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Test de débit effectué (50.0 Mbps)",
+        "metadata": {
+          "activityType": "speedtest",
+          "averageSpeed": "50"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "session 0,8 km et 0 mesure",
+      "input": {
+        "sourceType": "activity",
+        "text": "Session de couverture terminée : 0.80 km, 0 mesures",
+        "metadata": {
+          "activityType": "coverage_session_completed",
+          "distance": "0.80",
+          "totalPoints": 0
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.session.completed",
+        "textArgs": {
+          "distanceMeters": 800,
+          "measureCount": 0
+        }
+      }
+    },
+    {
+      "name": "session 12,35 km et 1 mesure",
+      "input": {
+        "sourceType": "activity",
+        "text": "Session de couverture terminée : 12.35 km, 1 mesures",
+        "metadata": {
+          "activityType": "coverage_session_completed",
+          "distance": "12.35",
+          "totalPoints": 1
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.session.completed",
+        "textArgs": {
+          "distanceMeters": 12350,
+          "measureCount": 1
+        }
+      }
+    },
+    {
+      "name": "session, ancienne forme de texte, 245 mesures",
+      "input": {
+        "sourceType": "activity",
+        "text": "Session de couverture terminée : 245 points, 1.2 km",
+        "metadata": {
+          "activityType": "coverage_session_completed",
+          "distance": "1.20",
+          "totalPoints": 245
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.session.completed",
+        "textArgs": {
+          "distanceMeters": 1200,
+          "measureCount": 245
+        }
+      }
+    },
+    {
+      "name": "session sans distance : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Session de couverture terminée",
+        "metadata": {
+          "activityType": "coverage_session_completed",
+          "totalPoints": 12
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "badge du catalogue",
+      "input": {
+        "sourceType": "activity",
+        "text": "Badge \"Explorateur\" obtenu !",
+        "metadata": {
+          "activityType": "badge_earned",
+          "badgeId": "explorer"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": "Explorateur",
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.badge.earned",
+        "textArgs": {
+          "badgeId": "explorer",
+          "badgeName": "Explorateur"
+        }
+      }
+    },
+    {
+      "name": "badge inconnu du catalogue : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Badge \"?\" obtenu !",
+        "metadata": {
+          "activityType": "badge_earned",
+          "badgeId": "retired_badge"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "niveau 12",
+      "input": {
+        "sourceType": "activity",
+        "text": "Niveau 12 atteint !",
+        "metadata": {
+          "activityType": "level_up",
+          "newLevel": 12,
+          "oldLevel": 11
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.level.reached",
+        "textArgs": {
+          "level": 12
+        }
+      }
+    },
+    {
+      "name": "niveau négatif : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Niveau -1 atteint !",
+        "metadata": {
+          "activityType": "level_up",
+          "newLevel": -1
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "quête terminée",
+      "input": {
+        "sourceType": "activity",
+        "text": "Quête \"Radar du jour\" terminée",
+        "metadata": {
+          "activityType": "quest_claim",
+          "questKey": "daily_signal_sweep"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": "Radar du jour"
+      },
+      "expect": {
+        "textKey": "feed.quest.completed",
+        "textArgs": {
+          "questKey": "daily_signal_sweep",
+          "questTitle": "Radar du jour"
+        }
+      }
+    },
+    {
+      "name": "série de 7 jours",
+      "input": {
+        "sourceType": "activity",
+        "text": "Série de 7 jours consécutifs !",
+        "metadata": {
+          "activityType": "streak_bonus",
+          "streak": 7
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.streak.bonus",
+        "textArgs": {
+          "days": 7
+        }
+      }
+    },
+    {
+      "name": "site découvert en premier",
+      "input": {
+        "sourceType": "activity",
+        "text": "Site découvert en premier !",
+        "metadata": {
+          "activityType": "new_site_visited",
+          "firstDiscovery": true,
+          "siteId": "123456"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.site.first_discovery",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "site visité",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau site exploré",
+        "metadata": {
+          "activityType": "new_site_visited",
+          "firstDiscovery": false,
+          "siteId": "123456"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.site.visited",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "département 38",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau département exploré (38)",
+        "metadata": {
+          "activityType": "new_department",
+          "dept": "38"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.department.new",
+        "textArgs": {
+          "departmentCode": "38"
+        }
+      }
+    },
+    {
+      "name": "département 2A",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau département exploré (2A)",
+        "metadata": {
+          "activityType": "new_department",
+          "dept": "2A"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.department.new",
+        "textArgs": {
+          "departmentCode": "2A"
+        }
+      }
+    },
+    {
+      "name": "département 2b",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau département exploré (2b)",
+        "metadata": {
+          "activityType": "new_department",
+          "dept": "2b"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.department.new",
+        "textArgs": {
+          "departmentCode": "2B"
+        }
+      }
+    },
+    {
+      "name": "département 971",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau département exploré (971)",
+        "metadata": {
+          "activityType": "new_department",
+          "dept": "971"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.department.new",
+        "textArgs": {
+          "departmentCode": "971"
+        }
+      }
+    },
+    {
+      "name": "département hors format : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau département exploré (Isère)",
+        "metadata": {
+          "activityType": "new_department",
+          "dept": "Isère"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "validation cellid soumise, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation cellid soumise pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "cellid",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Saint-Égrève",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted_with_place",
+        "textArgs": {
+          "identifierType": "cellid",
+          "place": "Saint-Égrève"
+        }
+      }
+    },
+    {
+      "name": "validation cellid soumise, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation cellid soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "cellid",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted",
+        "textArgs": {
+          "identifierType": "cellid"
+        }
+      }
+    },
+    {
+      "name": "validation pci soumise, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci soumise pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Saint-Égrève",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted_with_place",
+        "textArgs": {
+          "identifierType": "pci",
+          "place": "Saint-Égrève"
+        }
+      }
+    },
+    {
+      "name": "validation pci soumise, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted",
+        "textArgs": {
+          "identifierType": "pci"
+        }
+      }
+    },
+    {
+      "name": "validation enb soumise, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation enb soumise pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Saint-Égrève",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted_with_place",
+        "textArgs": {
+          "identifierType": "enb",
+          "place": "Saint-Égrève"
+        }
+      }
+    },
+    {
+      "name": "validation enb soumise, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation enb soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted",
+        "textArgs": {
+          "identifierType": "enb"
+        }
+      }
+    },
+    {
+      "name": "validation gnb soumise, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation gnb soumise pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "gnb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Saint-Égrève",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted_with_place",
+        "textArgs": {
+          "identifierType": "gnb",
+          "place": "Saint-Égrève"
+        }
+      }
+    },
+    {
+      "name": "validation gnb soumise, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation gnb soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "gnb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted",
+        "textArgs": {
+          "identifierType": "gnb"
+        }
+      }
+    },
+    {
+      "name": "validation cellid confirmée, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation cellid confirmée pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "cellid",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed_with_place",
+        "textArgs": {
+          "identifierType": "cellid",
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "validation cellid confirmée, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation cellid confirmée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "cellid",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed",
+        "textArgs": {
+          "identifierType": "cellid"
+        }
+      }
+    },
+    {
+      "name": "validation pci confirmée, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci confirmée pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed_with_place",
+        "textArgs": {
+          "identifierType": "pci",
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "validation pci confirmée, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci confirmée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed",
+        "textArgs": {
+          "identifierType": "pci"
+        }
+      }
+    },
+    {
+      "name": "validation enb confirmée, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation enb confirmée pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed_with_place",
+        "textArgs": {
+          "identifierType": "enb",
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "validation enb confirmée, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation enb confirmée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed",
+        "textArgs": {
+          "identifierType": "enb"
+        }
+      }
+    },
+    {
+      "name": "validation, type en majuscules",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation PCI soumise pour le site 380123",
+        "metadata": {
+          "activityType": "validation",
+          "type": "PCI",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.submitted",
+        "textArgs": {
+          "identifierType": "pci"
+        }
+      }
+    },
+    {
+      "name": "validation, nom de site communautaire comme lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation enb confirmée pour le site Château d'eau des Crêts",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb",
+          "siteId": "cmpo873aw0jnx2fll7pthh8ii"
+        },
+        "marketCode": null,
+        "place": "Château d'eau des Crêts",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed_with_place",
+        "textArgs": {
+          "identifierType": "enb",
+          "place": "Château d'eau des Crêts"
+        }
+      }
+    },
+    {
+      "name": "validationStage l'emporte sur un texte inconnu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Texte réécrit plus tard",
+        "metadata": {
+          "activityType": "validation",
+          "type": "gnb",
+          "validationStage": "confirmed"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.confirmed",
+        "textArgs": {
+          "identifierType": "gnb"
+        }
+      }
+    },
+    {
+      "name": "validationStage created, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouvelle validation cellid créée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "cellid",
+          "validationStage": "created"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.created_with_place",
+        "textArgs": {
+          "identifierType": "cellid",
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "ancien gabarit « Nouvelle validation … créée », sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouvelle validation enb créée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "enb"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.created",
+        "textArgs": {
+          "identifierType": "enb"
+        }
+      }
+    },
+    {
+      "name": "validationStage inconnu : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci",
+          "validationStage": "pending"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "gabarit inconnu sans validationStage : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation pci envoyée",
+        "metadata": {
+          "activityType": "validation",
+          "type": "pci"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "identifierType inconnu : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Validation nci soumise",
+        "metadata": {
+          "activityType": "validation",
+          "type": "nci"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "direct par eNB",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification directe depuis la carte : 123456",
+        "metadata": {
+          "activityType": "direct_map_validation",
+          "enb": "123456",
+          "pci": 212,
+          "tech": "4G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.direct",
+        "textArgs": {
+          "identifierType": "enb",
+          "identifierValue": 123456
+        }
+      }
+    },
+    {
+      "name": "direct par gNB au-delà de 2³¹ − 1",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification directe depuis la carte : 4294967295",
+        "metadata": {
+          "activityType": "direct_map_validation",
+          "gnb": "4294967295",
+          "pci": 17,
+          "tech": "5G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.direct",
+        "textArgs": {
+          "identifierType": "gnb",
+          "identifierValue": 4294967295
+        }
+      }
+    },
+    {
+      "name": "direct par PCI (« PCI N » en texte)",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification directe depuis la carte : PCI 213",
+        "metadata": {
+          "activityType": "direct_map_validation",
+          "pci": 213,
+          "tech": "4G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.direct",
+        "textArgs": {
+          "identifierType": "pci",
+          "identifierValue": 213
+        }
+      }
+    },
+    {
+      "name": "direct, eNB et gNB vides, PCI 0",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification directe depuis la carte : PCI 0",
+        "metadata": {
+          "activityType": "direct_map_validation",
+          "enb": "",
+          "gnb": "",
+          "pci": 0,
+          "tech": "5G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.direct",
+        "textArgs": {
+          "identifierType": "pci",
+          "identifierValue": 0
+        }
+      }
+    },
+    {
+      "name": "direct, eNB non numérique : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification directe depuis la carte : ZB-12",
+        "metadata": {
+          "activityType": "direct_map_validation",
+          "enb": "ZB-12",
+          "pci": 4,
+          "tech": "4G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "hors ligne d'avant, 4G lue dans tech",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : 654321",
+        "metadata": {
+          "activityType": "offline_validation",
+          "tech": "4G",
+          "band": "B3"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.offline",
+        "textArgs": {
+          "identifierType": "enb",
+          "identifierValue": 654321
+        }
+      }
+    },
+    {
+      "name": "hors ligne d'avant, LTE",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : 654322",
+        "metadata": {
+          "activityType": "offline_validation",
+          "tech": "LTE"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.offline",
+        "textArgs": {
+          "identifierType": "enb",
+          "identifierValue": 654322
+        }
+      }
+    },
+    {
+      "name": "hors ligne d'avant, 5G SA",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : 1234567",
+        "metadata": {
+          "activityType": "offline_validation",
+          "tech": "5G SA"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.offline",
+        "textArgs": {
+          "identifierType": "gnb",
+          "identifierValue": 1234567
+        }
+      }
+    },
+    {
+      "name": "hors ligne d'avant, PCI en texte",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : PCI 42",
+        "metadata": {
+          "activityType": "offline_validation",
+          "tech": "4G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.offline",
+        "textArgs": {
+          "identifierType": "pci",
+          "identifierValue": 42
+        }
+      }
+    },
+    {
+      "name": "hors ligne d'avant, technologie inconnue : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : 7654",
+        "metadata": {
+          "activityType": "offline_validation",
+          "tech": "3G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "hors ligne avec eNB en metadata",
+      "input": {
+        "sourceType": "activity",
+        "text": "Identification hors-ligne : 98765",
+        "metadata": {
+          "activityType": "offline_validation",
+          "enb": "98765",
+          "tech": "4G"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.validation.offline",
+        "textArgs": {
+          "identifierType": "enb",
+          "identifierValue": 98765
+        }
+      }
+    },
+    {
+      "name": "signalement accepté, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Signalement d'un problème d'identification accepté pour le site 380123",
+        "metadata": {
+          "activityType": "antenna_report",
+          "source": "admin_resolve",
+          "siteId": "380123",
+          "reportType": "incorrect_enb"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.antenna_report.accepted_with_place",
+        "textArgs": {
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "signalement accepté, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Signalement d'un problème d'identification accepté pour le site 999999",
+        "metadata": {
+          "activityType": "antenna_report",
+          "source": "admin_resolve",
+          "siteId": "999999",
+          "reportType": "other"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.antenna_report.accepted",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "signalement jamais accepté (ancien) : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Signalement d'un problème d'identification pour le site 380123",
+        "metadata": {
+          "activityType": "antenna_report",
+          "siteId": "380123",
+          "reportType": "incorrect_pci"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "bug validé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Signalement de bug validé",
+        "metadata": {
+          "activityType": "bug_report_resolved",
+          "bugId": "b1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.bug_report.resolved",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "photo uploadée, avec lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Photo uploadée pour le site 380123",
+        "metadata": {
+          "activityType": "photo_upload",
+          "siteId": "380123",
+          "photoId": "p1"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.uploaded_with_place",
+        "textArgs": {
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "photo uploadée, sans lieu",
+      "input": {
+        "sourceType": "activity",
+        "text": "Photo uploadée pour le site 999999",
+        "metadata": {
+          "activityType": "photo_upload",
+          "siteId": "999999",
+          "photoId": "p2"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.uploaded",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "photo approuvée",
+      "input": {
+        "sourceType": "activity",
+        "text": "Photo approuvée",
+        "metadata": {
+          "activityType": "photo_approved",
+          "photoId": "p1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.approved",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "photo terrain du site, avec lieu",
+      "input": {
+        "sourceType": "photo",
+        "text": "Photo terrain du site Grenoble",
+        "metadata": {
+          "photoId": "p1",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.site_with_place",
+        "textArgs": {
+          "place": "Grenoble"
+        }
+      }
+    },
+    {
+      "name": "photo terrain par défaut, sans lieu",
+      "input": {
+        "sourceType": "photo",
+        "text": "Photo terrain partagée sur SignalQuest.",
+        "metadata": {
+          "photoId": "p3",
+          "siteId": "999999"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.site",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "photo avec légende de l'auteur : pas de clé",
+      "input": {
+        "sourceType": "photo",
+        "text": "Belle vue sur le pylône",
+        "metadata": {
+          "photoId": "p4",
+          "siteId": "380123"
+        },
+        "marketCode": null,
+        "place": "Grenoble",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "photo de site communautaire, son gabarit",
+      "input": {
+        "sourceType": "custom_site_photo",
+        "text": "Photo terrain ajoutée pour « Château d'eau des Crêts »",
+        "metadata": {
+          "customSiteId": "cmpo873aw0jnx2fll7pthh8ii",
+          "customSiteName": "Château d'eau des Crêts"
+        },
+        "marketCode": null,
+        "place": "Château d'eau des Crêts",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.custom_site",
+        "textArgs": {
+          "siteName": "Château d'eau des Crêts"
+        }
+      }
+    },
+    {
+      "name": "photo de site communautaire, gabarit photo terrain",
+      "input": {
+        "sourceType": "custom_site_photo",
+        "text": "Photo terrain du site Château d'eau des Crêts",
+        "metadata": {
+          "customSiteId": "cmpo873aw0jnx2fll7pthh8ii",
+          "customSiteName": "Château d'eau des Crêts"
+        },
+        "marketCode": null,
+        "place": "Château d'eau des Crêts",
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.photo.site_with_place",
+        "textArgs": {
+          "place": "Château d'eau des Crêts"
+        }
+      }
+    },
+    {
+      "name": "site communautaire ajouté",
+      "input": {
+        "sourceType": "activity",
+        "text": "a ajouté Château d'eau des Crêts sur la carte",
+        "metadata": {
+          "activityType": "custom_site_created",
+          "customSiteName": "Château d'eau des Crêts",
+          "customSiteId": "cmpo873aw0jnx2fll7pthh8ii"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.custom_site.created",
+        "textArgs": {
+          "siteName": "Château d'eau des Crêts"
+        }
+      }
+    },
+    {
+      "name": "avis 1 étoile(s)",
+      "input": {
+        "sourceType": "signal_rating",
+        "text": "A évalué ce signal · ★",
+        "metadata": {
+          "stars": 1,
+          "ratingId": "r1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.rating.signal",
+        "textArgs": {
+          "stars": 1
+        }
+      }
+    },
+    {
+      "name": "avis 4 étoile(s)",
+      "input": {
+        "sourceType": "signal_rating",
+        "text": "A évalué ce signal · ★★★★",
+        "metadata": {
+          "stars": 4,
+          "ratingId": "r1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.rating.signal",
+        "textArgs": {
+          "stars": 4
+        }
+      }
+    },
+    {
+      "name": "avis 5 étoile(s)",
+      "input": {
+        "sourceType": "signal_rating",
+        "text": "A évalué ce signal · ★★★★★",
+        "metadata": {
+          "stars": 5,
+          "ratingId": "r1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.rating.signal",
+        "textArgs": {
+          "stars": 5
+        }
+      }
+    },
+    {
+      "name": "avis à 0 étoile : pas de clé",
+      "input": {
+        "sourceType": "signal_rating",
+        "text": "A évalué ce signal",
+        "metadata": {
+          "stars": 0,
+          "ratingId": "r2"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "avis à 6 étoile : pas de clé",
+      "input": {
+        "sourceType": "signal_rating",
+        "text": "A évalué ce signal",
+        "metadata": {
+          "stars": 6,
+          "ratingId": "r2"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "netmonster 0 créée",
+      "input": {
+        "sourceType": "netmonster_sync_daily",
+        "text": "0 nouvelle(s) antenne(s), 12 adresse(s) mise(s) à jour au Luxembourg",
+        "metadata": {
+          "created": 0,
+          "updated": 1,
+          "addressesUpdated": 12,
+          "source": "netmonster"
+        },
+        "marketCode": "LU",
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.netmonster.daily",
+        "textArgs": {
+          "created": 0,
+          "updated": 1,
+          "addressesUpdated": 12,
+          "countryCode": "LU"
+        }
+      }
+    },
+    {
+      "name": "netmonster 1 créée",
+      "input": {
+        "sourceType": "netmonster_sync_daily",
+        "text": "1 nouvelle antenne, 3 antennes mises à jour et 2 adresses mises à jour au Luxembourg",
+        "metadata": {
+          "created": 1,
+          "updated": 3,
+          "addressesUpdated": 2,
+          "source": "netmonster"
+        },
+        "marketCode": "LU",
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.netmonster.daily",
+        "textArgs": {
+          "created": 1,
+          "updated": 3,
+          "addressesUpdated": 2,
+          "countryCode": "LU"
+        }
+      }
+    },
+    {
+      "name": "netmonster plusieurs créées",
+      "input": {
+        "sourceType": "netmonster_sync_daily",
+        "text": "4 nouvelles antennes, 9 antennes mises à jour et 5 adresses mises à jour au Luxembourg",
+        "metadata": {
+          "created": 4,
+          "updated": 9,
+          "addressesUpdated": 5,
+          "source": "netmonster"
+        },
+        "marketCode": "LU",
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.netmonster.daily",
+        "textArgs": {
+          "created": 4,
+          "updated": 9,
+          "addressesUpdated": 5,
+          "countryCode": "LU"
+        }
+      }
+    },
+    {
+      "name": "netmonster sans marketCode : pas de clé",
+      "input": {
+        "sourceType": "netmonster_sync_daily",
+        "text": "4 nouvelles antennes au Luxembourg",
+        "metadata": {
+          "created": 4,
+          "updated": 0,
+          "addressesUpdated": 0,
+          "source": "netmonster"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "test d'expérience",
+      "input": {
+        "sourceType": "experience_test",
+        "text": "Test d'expérience : vidéo jusqu'à 1080p",
+        "metadata": {
+          "experience": {
+            "highlights": {}
+          }
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.experience.done",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "Canada speedtest_share",
+      "input": {
+        "sourceType": "activity",
+        "text": "texte Canada",
+        "metadata": {
+          "activityType": "canada_speedtest_share",
+          "feature": "canada"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.canada.speedtest_share",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "Canada theme_equipped",
+      "input": {
+        "sourceType": "activity",
+        "text": "texte Canada",
+        "metadata": {
+          "activityType": "canada_theme_equipped",
+          "feature": "canada"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.canada.theme_equipped",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "Canada theme_long_press",
+      "input": {
+        "sourceType": "activity",
+        "text": "texte Canada",
+        "metadata": {
+          "activityType": "canada_theme_long_press",
+          "feature": "canada"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.canada.theme_long_press",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "Canada radio_badge_press",
+      "input": {
+        "sourceType": "activity",
+        "text": "texte Canada",
+        "metadata": {
+          "activityType": "canada_radio_badge_press",
+          "feature": "canada"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.canada.radio_badge_press",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "Canada live_signal_combo",
+      "input": {
+        "sourceType": "activity",
+        "text": "texte Canada",
+        "metadata": {
+          "activityType": "canada_live_signal_combo",
+          "feature": "canada"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.canada.live_signal_combo",
+        "textArgs": {}
+      }
+    },
+    {
+      "name": "post écrit à la main : pas de clé",
+      "input": {
+        "sourceType": null,
+        "text": "Validation pci soumise",
+        "metadata": null,
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "panne : pas de clé",
+      "input": {
+        "sourceType": "site_outage",
+        "text": "Panne en cours",
+        "metadata": {
+          "outageId": "o1"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "mesure de couverture (retirée) : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Mesure de couverture",
+        "metadata": {
+          "activityType": "coverage_measurement"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "activité sans activityType : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Niveau 3 atteint !",
+        "metadata": {
+          "newLevel": 3
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "activité inconnue : pas de clé",
+      "input": {
+        "sourceType": "activity",
+        "text": "Nouveau truc",
+        "metadata": {
+          "activityType": "future_activity"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    }
+  ]
+}
