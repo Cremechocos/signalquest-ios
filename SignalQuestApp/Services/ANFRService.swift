@@ -148,6 +148,10 @@ protocol ANFRServicing: Sendable {
     /// Toujours filtrée (génération, opérateur, semaines) : la réponse complète
     /// pèse 2,2 Mo, une génération d'un opérateur sur 53 semaines 20 à 45 Ko.
     func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats
+    /// Les mêmes, pour un marché : `market=DROM` en outre-mer, rien en métropole
+    /// (réponse et cache inchangés).
+    func stats(market: ANFRStatsMarket) async throws -> ANFRStats
+    func bandStats(market: ANFRStatsMarket, weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats
     /// Snapshot carte : tous les sites du relevé `date` (ou le dernier si `nil`).
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot
     /// Relevé léger d'une date : supports et compteurs par type, sans les antennes.
@@ -171,6 +175,17 @@ protocol ANFRServicing: Sendable {
 }
 
 extension ANFRServicing {
+    /// Les services sans outre-mer ne servent que la métropole.
+    func stats(market: ANFRStatsMarket) async throws -> ANFRStats {
+        guard market == .fr else { throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil) }
+        return try await stats()
+    }
+
+    func bandStats(market: ANFRStatsMarket, weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
+        guard market == .fr else { throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil) }
+        return try await bandStats(weeks: weeks, generation: generation, operatorKey: operatorKey)
+    }
+
     /// Les services qui n'affichent pas de barres n'ont rien à fournir.
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] { [] }
 
@@ -232,11 +247,21 @@ final class ANFRService: ANFRServicing {
     }
 
     func stats() async throws -> ANFRStats {
-        try await api.request(APIEndpoint(path: "/api/anfr/stats"), as: ANFRStats.self)
+        try await stats(market: .fr)
+    }
+
+    func stats(market: ANFRStatsMarket) async throws -> ANFRStats {
+        let query = market == .fr ? [] : [URLQueryItem(name: "market", value: market.rawValue)]
+        return try await api.request(APIEndpoint(path: "/api/anfr/stats", query: query), as: ANFRStats.self)
     }
 
     func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
+        try await bandStats(market: .fr, weeks: weeks, generation: generation, operatorKey: operatorKey)
+    }
+
+    func bandStats(market: ANFRStatsMarket, weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
         var query = [URLQueryItem(name: "view", value: "bands")]
+        if market != .fr { query.append(URLQueryItem(name: "market", value: market.rawValue)) }
         if let generation { query.append(URLQueryItem(name: "generation", value: generation)) }
         if let operatorKey { query.append(URLQueryItem(name: "operator", value: operatorKey)) }
         if let weeks { query.append(URLQueryItem(name: "weeks", value: String(min(max(weeks, 1), 520)))) }

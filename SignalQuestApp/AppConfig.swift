@@ -54,6 +54,12 @@ enum SQFeatures {
     /// jusqu'à la bascule ; il faut aussi la clé du journal épinglée
     /// (`E2EEAutoLogReader.productionLogKeys`).
     static let e2eeAutoLogEnabled = false
+
+    /// Statistiques ANFR des cinq départements d'outre-mer (contrats ANFR DROM
+    /// v1 et bandes DROM v2) : sélecteur France / Outre-mer sur les statistiques
+    /// et les générations. Ouvert après l'annonce « servi données » du serveur
+    /// (26/10) ; le refermer masque le sélecteur, la France reste inchangée.
+    static let anfrDromStatsEnabled = true
 }
 
 struct AppConfig: Equatable {

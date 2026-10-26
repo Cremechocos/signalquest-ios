@@ -63,6 +63,60 @@ enum ANFROperator: String, CaseIterable, Identifiable, Sendable, Hashable {
     }
 }
 
+// MARK: - Stats market and operators
+
+/// Marché des statistiques ANFR : la métropole, ou le total des cinq
+/// départements d'outre-mer (971, 972, 973, 974, 976 ; les COM sont exclues).
+enum ANFRStatsMarket: String, CaseIterable, Identifiable, Sendable {
+    case fr = "FR"
+    case drom = "DROM"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fr: return String(localized: "France")
+        case .drom: return String(localized: "Outre-mer")
+        }
+    }
+
+    /// Garde-fou du contrat : des chiffres d'outre-mer ne s'affichent que si
+    /// le serveur les annonce comme tels (`meta.market`). La vue par bande de
+    /// la métropole n'a pas de `meta.market`.
+    func accepts(served: String?) -> Bool {
+        switch self {
+        case .fr: return served == nil || served == rawValue
+        case .drom: return served == rawValue
+        }
+    }
+}
+
+/// Opérateur d'un écran de statistiques : les quatre de la métropole, ou ceux
+/// que le serveur sert en outre-mer, avec leurs libellés et couleurs.
+struct ANFRStatsOperator: Identifiable, Hashable, Sendable {
+    /// Clé de l'API (`orange`, `bytel`… ou `ORANGE`, `DIGICEL`…).
+    let key: String
+    let label: String
+    let color: Color
+
+    var id: String { key }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.key == rhs.key }
+    func hash(into hasher: inout Hasher) { hasher.combine(key) }
+
+    init(key: String, label: String, color: Color) {
+        self.key = key
+        self.label = label
+        self.color = color
+    }
+
+    init(_ op: ANFROperator) {
+        self.init(key: op.apiKey, label: op.label, color: op.color)
+    }
+
+    static let france = ANFROperator.allCases.map(ANFRStatsOperator.init)
+}
+
 // MARK: - Modification type
 
 /// Type de modification d'une antenne entre deux relevés ANFR.
@@ -169,21 +223,29 @@ enum ANFRGeneration: String, CaseIterable, Identifiable, Sendable, Hashable {
 /// retombe sur une valeur vide, jamais d'échec dur.
 struct ANFRStats: Decodable, Sendable {
     let latestDate: String?
+    /// `FR` ou `DROM` ; absent des réponses d'avant le contrat DROM.
+    let market: String?
     /// Série temporelle nationale (un point par date × opérateur × bande).
     let series: [ANFRStatsPoint]
     /// Dernier relevé par opérateur × bande, avec deltas hebdo.
     let latest: [ANFRStatsLatest]
     /// Métriques territoriales (régions) du dernier relevé.
     let regions: [ANFRTerritoryMetric]
+    /// Départements d'outre-mer du dernier relevé, lus seulement en `DROM` :
+    /// en métropole, la centaine de départements ne sert pas à l'écran.
+    let departments: [ANFRTerritoryMetric]
+    /// Opérateurs présents, dans l'ordre et aux couleurs de la carte (`filters`).
+    let operators: [ANFRStatsOperator]
 
     enum CodingKeys: String, CodingKey {
-        case meta, national, territories
+        case meta, national, territories, filters
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let meta = try? c.nestedContainer(keyedBy: MetaKeys.self, forKey: .meta)
         latestDate = meta?.optional(String.self, .latestDate)
+        market = meta?.optional(String.self, .market)
 
         if let national = try? c.nestedContainer(keyedBy: NationalKeys.self, forKey: .national) {
             series = national.value([ANFRStatsPoint].self, .series, [])
@@ -195,21 +257,48 @@ struct ANFRStats: Decodable, Sendable {
 
         if let territories = try? c.nestedContainer(keyedBy: TerritoryKeys.self, forKey: .territories) {
             regions = territories.value([ANFRTerritoryMetric].self, .regions, [])
+            departments = market == ANFRStatsMarket.drom.rawValue
+                ? territories.value([ANFRTerritoryMetric].self, .departments, [])
+                : []
         } else {
             regions = []
+            departments = []
+        }
+
+        let filters = try? c.nestedContainer(keyedBy: FilterKeys.self, forKey: .filters)
+        operators = filters?.value([FilterOperator].self, .operators, []).compactMap(\.statsOperator) ?? []
+    }
+
+    private enum MetaKeys: String, CodingKey { case latestDate, market }
+    private enum NationalKeys: String, CodingKey { case series, latest }
+    private enum TerritoryKeys: String, CodingKey { case regions, departments, crozon }
+    private enum FilterKeys: String, CodingKey { case operators }
+
+    /// `{ key, label, color }` des filtres ; `DROM_OTHER` est dit « Autres »
+    /// dans la langue de l'app.
+    private struct FilterOperator: Decodable {
+        let key: String
+        let label: String?
+        let color: String?
+
+        var statsOperator: ANFRStatsOperator? {
+            guard !key.isEmpty else { return nil }
+            let name = key == "DROM_OTHER" ? String(localized: "Autres") : (label ?? key)
+            let rgb = color.flatMap { UInt32($0.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) }
+            return ANFRStatsOperator(key: key, label: name, color: rgb.map { Color(hex: $0) } ?? SQColor.labelSecondary)
         }
     }
 
-    private enum MetaKeys: String, CodingKey { case latestDate }
-    private enum NationalKeys: String, CodingKey { case series, latest }
-    private enum TerritoryKeys: String, CodingKey { case regions, departments, crozon }
-
     /// Constructeur direct (données de démo).
-    init(latestDate: String?, series: [ANFRStatsPoint], latest: [ANFRStatsLatest], regions: [ANFRTerritoryMetric]) {
+    init(latestDate: String?, series: [ANFRStatsPoint], latest: [ANFRStatsLatest], regions: [ANFRTerritoryMetric],
+         market: String? = nil, departments: [ANFRTerritoryMetric] = [], operators: [ANFRStatsOperator] = []) {
         self.latestDate = latestDate
+        self.market = market
         self.series = series
         self.latest = latest
         self.regions = regions
+        self.departments = departments
+        self.operators = operators
     }
 }
 

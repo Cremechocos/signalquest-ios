@@ -10,8 +10,9 @@ import SwiftUI
 final class ANFRBandsViewModel: ObservableObject {
     static let generations = ["2g", "3g", "4g", "5g"]
     /// `all` : supports distincts tous opérateurs, jamais la somme des quatre.
-    static let operators: [(key: String, label: String)] = [("all", "Tous")]
-        + ANFROperator.allCases.map { ($0.apiKey, $0.label) }
+    let operators: [(key: String, label: String)]
+    /// Métropole ou outre-mer : fixé pour l'écran, comme sur les statistiques.
+    let market: ANFRStatsMarket
     /// Un an et une semaine : l'écart sur 52 semaines se lit sur la courbe.
     static let weeks = 53
 
@@ -27,7 +28,11 @@ final class ANFRBandsViewModel: ObservableObject {
     private let service: ANFRServicing
     private var cache: [String: ANFRBandStats] = [:]
 
-    init(service: ANFRServicing) { self.service = service }
+    init(service: ANFRServicing, market: ANFRStatsMarket = .fr, operators: [ANFRStatsOperator] = ANFRStatsOperator.france) {
+        self.service = service
+        self.market = market
+        self.operators = [("all", String(localized: "Tous"))] + operators.map { ($0.key, $0.label) }
+    }
 
     func load() async {
         guard overview == nil || detail == nil else { return }
@@ -80,7 +85,9 @@ final class ANFRBandsViewModel: ObservableObject {
             return ANFRDemoData.bandStats(generation: generation, operatorKey: operatorKey, weeks: weeks)
         }
         #endif
-        let loaded = try await service.bandStats(weeks: weeks, generation: generation, operatorKey: operatorKey)
+        let loaded = try await service.bandStats(market: market, weeks: weeks, generation: generation, operatorKey: operatorKey)
+        // Garde-fou du contrat : des chiffres d'outre-mer seulement s'ils sont annoncés tels.
+        guard market.accepts(served: loaded.meta.market) else { throw URLError(.cannotParseResponse) }
         cache[key] = loaded
         return loaded
     }
@@ -192,14 +199,16 @@ struct ANFRBandsView: View {
     @StateObject private var model: ANFRBandsViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(service: ANFRServicing) {
-        _model = StateObject(wrappedValue: ANFRBandsViewModel(service: service))
+    init(service: ANFRServicing, market: ANFRStatsMarket = .fr, operators: [ANFRStatsOperator] = ANFRStatsOperator.france) {
+        _model = StateObject(wrappedValue: ANFRBandsViewModel(service: service, market: market, operators: operators))
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
-                Text("Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande.")
+                Text(model.market == .fr
+                     ? "Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande."
+                     : "Outre-mer (Guadeloupe, Martinique, Guyane, La Réunion et Mayotte) : supports en service relevés chaque semaine par l’ANFR, génération par génération et bande par bande.")
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -270,7 +279,7 @@ struct ANFRBandsView: View {
     private var operatorChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(ANFRBandsViewModel.operators, id: \.key) { item in
+                ForEach(model.operators, id: \.key) { item in
                     SQChip(label: item.label, isSelected: model.operatorKey == item.key) {
                         Task { await model.select(operatorKey: item.key) }
                     }

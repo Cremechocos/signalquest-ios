@@ -112,12 +112,12 @@ final class ANFRBandsViewModelTests: XCTestCase {
     func testTrendSeriesPerOperatorAndChangeOverThePeriod() {
         let model = ANFRStatsViewModel(service: BandsOnlyService())
         model.stats = ANFRDemoData.stats
-        let orange = model.trendSeries(for: .orange)
+        let orange = model.trendSeries(for: ANFRStatsOperator(.orange))
         XCTAssertGreaterThan(orange.count, 1)
         XCTAssertEqual(orange.map(\.date), orange.map(\.date).sorted())
-        XCTAssertNotEqual(orange.map(\.value), model.trendSeries(for: .free).map(\.value))
+        XCTAssertNotEqual(orange.map(\.value), model.trendSeries(for: ANFRStatsOperator(.free)).map(\.value))
         XCTAssertEqual(model.trendSeries.map(\.id), orange.map(\.id), "La carte suit l'opérateur choisi")
-        XCTAssertEqual(model.trendSeries(for: .orange).map(\.id), orange.map(\.id), "Le geste ne retrace pas la courbe")
+        XCTAssertEqual(model.trendSeries(for: ANFRStatsOperator(.orange)).map(\.id), orange.map(\.id), "Le geste ne retrace pas la courbe")
 
         func points(_ values: Int...) -> [ANFRTrendPoint] {
             values.enumerated().map { ANFRTrendPoint(date: Date(timeIntervalSince1970: Double($0.offset) * 604_800), value: $0.element, generation: .g4) }

@@ -38,8 +38,10 @@ final class ANFRStatsViewModel: ObservableObject {
     @Published var stats: ANFRStats? { didSet { trendCache.removeAll() } }
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Métropole, ou les cinq départements d'outre-mer.
+    @Published private(set) var market: ANFRStatsMarket = .fr
     /// Opérateur sélectionné pour le graphe d'évolution.
-    @Published var selectedOperator: ANFROperator = .orange
+    @Published var selectedOperator = ANFRStatsOperator(.orange)
     /// Bascule opérationnel ↔ total (incluant le projeté).
     @Published var showProjected = false
     /// Filtre sélectionné (par défaut 4G).
@@ -51,7 +53,55 @@ final class ANFRStatsViewModel: ObservableObject {
     /// refiltrait, retriait et reparsait des milliers de lignes de la série nationale,
     /// plusieurs fois (courbe, résumé VoiceOver). Vidé quand les statistiques changent.
     private var trendCache: [String: [ANFRTrendPoint]] = [:]
+    /// Dernières statistiques de chaque marché : revenir à l'autre est immédiat.
+    private var loadedByMarket: [ANFRStatsMarket: ANFRStats] = [:]
     init(service: ANFRServicing) { self.service = service }
+
+    /// Le sélecteur France / Outre-mer, hors données de démo (métropole seule).
+    var offersOverseas: Bool {
+        #if DEBUG
+        if AppEnvironment.usesDemoData { return false }
+        #endif
+        return SQFeatures.anfrDromStatsEnabled
+    }
+
+    /// Les opérateurs du marché : les quatre de la métropole, ou ceux que le
+    /// serveur sert en outre-mer, dans l'ordre de la carte.
+    var operators: [ANFRStatsOperator] {
+        market == .fr ? ANFRStatsOperator.france : (stats?.operators ?? [])
+    }
+
+    /// Régions en métropole, départements en outre-mer.
+    var territories: [ANFRTerritoryMetric] {
+        market == .fr ? (stats?.regions ?? []) : (stats?.departments ?? [])
+    }
+
+    func select(market: ANFRStatsMarket) async {
+        guard market != self.market else { return }
+        self.market = market
+        errorMessage = nil
+        stats = loadedByMarket[market]
+        keepSelectedOperator()
+        guard stats == nil else { return }
+        await load()
+    }
+
+    /// Un opérateur absent du nouveau marché cède la place au premier présent.
+    private func keepSelectedOperator() {
+        let operators = operators
+        if !operators.contains(selectedOperator), let first = operators.first {
+            selectedOperator = first
+        }
+    }
+
+    /// Une réponse d'un autre marché que celui demandé est refusée : jamais de
+    /// chiffres de la métropole sous le titre « Outre-mer », ni l'inverse.
+    private func fetch(_ market: ANFRStatsMarket) async throws -> ANFRStats {
+        let loaded = try await service.stats(market: market)
+        guard market.accepts(served: loaded.market) else { throw URLError(.cannotParseResponse) }
+        loadedByMarket[market] = loaded
+        return loaded
+    }
 
     func load() async {
         #if DEBUG
@@ -62,13 +112,17 @@ final class ANFRStatsViewModel: ObservableObject {
         }
         #endif
         guard stats == nil else { return }
+        let market = market
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer { if market == self.market { isLoading = false } }
         do {
-            stats = try await service.stats()
+            let loaded = try await fetch(market)
+            guard market == self.market else { return }
+            stats = loaded
+            keepSelectedOperator()
         } catch {
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if !error.isCancellation, market == self.market { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -79,11 +133,15 @@ final class ANFRStatsViewModel: ObservableObject {
             return
         }
         #endif
+        let market = market
         do {
-            stats = try await service.stats()
+            let loaded = try await fetch(market)
+            guard market == self.market else { return }
+            stats = loaded
+            keepSelectedOperator()
             errorMessage = nil
         } catch {
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if !error.isCancellation, market == self.market { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -108,31 +166,33 @@ final class ANFRStatsViewModel: ObservableObject {
     }
 
     /// Valeur agrégée par opérateur sur les bandes phares.
-    private var latestForMetric: [(operator: ANFROperator, value: Int)] {
+    private var latestForMetric: [(operator: ANFRStatsOperator, value: Int)] {
         guard let stats else { return [] }
-        var byOp: [ANFROperator: Int] = [:]
+        let operators = operators
+        var byOp: [String: Int] = [:]
         for row in stats.latest where headlineBands.contains(row.band) {
-            guard let op = ANFROperator.from(raw: row.operatorKey) else { continue }
-            byOp[op, default: 0] += showProjected ? row.total : row.operational
+            byOp[row.operatorKey, default: 0] += showProjected ? row.total : row.operational
         }
-        return ANFROperator.allCases.compactMap { op in
-            byOp[op].map { (op, $0) }
+        return operators.compactMap { op in
+            byOp[op.key].map { (op, $0) }
         }
     }
 
     /// Répartition par opérateur (pour barres / pastilles).
-    var operatorBreakdown: [(operator: ANFROperator, value: Int, delta: Int)] {
+    var operatorBreakdown: [(operator: ANFRStatsOperator, value: Int, delta: Int)] {
         guard let stats else { return [] }
-        var value: [ANFROperator: Int] = [:]
-        var delta: [ANFROperator: Int] = [:]
+        var value: [String: Int] = [:]
+        var delta: [String: Int] = [:]
         for row in stats.latest where headlineBands.contains(row.band) {
-            guard let op = ANFROperator.from(raw: row.operatorKey) else { continue }
-            value[op, default: 0] += showProjected ? row.total : row.operational
-            delta[op, default: 0] += showProjected ? row.deltaTotal : row.deltaOperational
+            value[row.operatorKey, default: 0] += showProjected ? row.total : row.operational
+            delta[row.operatorKey, default: 0] += showProjected ? row.deltaTotal : row.deltaOperational
         }
-        return ANFROperator.allCases.compactMap { op in
-            value[op].map { (op, $0, delta[op] ?? 0) }
+        return operators.compactMap { op in
+            value[op.key].map { (op, $0, delta[op.key] ?? 0) }
         }
+        // Un opérateur sans site ni variation sur la bande (fréquent en 5G
+        // outre-mer) n'apprend rien : pas de ligne « 0 stable ».
+        .filter { $0.value > 0 || $0.delta != 0 }
         .sorted { $0.value > $1.value }
     }
 
@@ -140,7 +200,7 @@ final class ANFRStatsViewModel: ObservableObject {
     var bandBreakdown: [ANFRStatsLatest] {
         guard let stats else { return [] }
         return stats.latest
-            .filter { ANFROperator.from(raw: $0.operatorKey) == selectedOperator }
+            .filter { $0.operatorKey == selectedOperator.key }
             .filter { headlineBands.contains($0.band) }
             .sorted { $0.operational > $1.operational }
     }
@@ -150,9 +210,9 @@ final class ANFRStatsViewModel: ObservableObject {
 
     /// Série d'un opérateur sur la bande filtrée : le plein écran en superpose
     /// plusieurs.
-    func trendSeries(for op: ANFROperator) -> [ANFRTrendPoint] {
+    func trendSeries(for op: ANFRStatsOperator) -> [ANFRTrendPoint] {
         guard let stats else { return [] }
-        let cacheKey = "\(op.rawValue)|\(selectedFilter.rawValue)|\(showProjected)"
+        let cacheKey = "\(op.key)|\(selectedFilter.rawValue)|\(showProjected)"
         if let cached = trendCache[cacheKey] { return cached }
         let band: String
         let gen: ANFRGeneration
@@ -163,7 +223,7 @@ final class ANFRStatsViewModel: ObservableObject {
         case .g5_700: (band, gen) = ("n28", .g5)
         }
         let points = stats.series
-            .filter { $0.operatorKey == op.apiKey && $0.band == band }
+            .filter { $0.operatorKey == op.key && $0.band == band }
             .sorted { $0.date < $1.date }
             .compactMap { row in
                 ANFRDateParser.date(from: row.date).map {
@@ -198,9 +258,9 @@ struct ANFRTrendPoint: Identifiable {
 
 /// Une courbe du graphique : la série d'un opérateur.
 struct ANFRTrendSeries: Identifiable {
-    let op: ANFROperator
+    let op: ANFRStatsOperator
     let points: [ANFRTrendPoint]
-    var id: String { op.rawValue }
+    var id: String { op.key }
 }
 
 // MARK: - View
@@ -232,6 +292,9 @@ struct ANFRStatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header
+                if model.offersOverseas {
+                    marketPicker
+                }
                 // Des chiffres sont affichés, mais l'actualisation a échoué : on ne laisse pas
                 // croire qu'ils sont à jour.
                 if model.stats != nil, model.errorMessage != nil {
@@ -247,8 +310,11 @@ struct ANFRStatsView: View {
                         .sqFadeUp()
                     bandsLink
                         .sqFadeUp()
-                    changesMapLink
-                        .sqFadeUp()
+                    // La carte des changements suit la métropole.
+                    if model.market == .fr {
+                        changesMapLink
+                            .sqFadeUp()
+                    }
                     operatorSection
                         .sqFadeUp()
                     trendSection
@@ -259,7 +325,9 @@ struct ANFRStatsView: View {
                         regionsSection
                             .sqFadeUp()
                     }
-                    Text("Source : Observatoire ANFR. Les régions suivent l’opérateur choisi dans « Évolution ».")
+                    Text(model.market == .fr
+                         ? "Source : Observatoire ANFR. Les régions suivent l’opérateur choisi dans « Évolution »."
+                         : "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution ».")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -326,7 +394,9 @@ struct ANFRStatsView: View {
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
                     .accessibilityIdentifier("anfr.stats.title")
-                Text("Le réseau mobile français, d’après l’Agence nationale des fréquences.")
+                Text(model.market == .fr
+                     ? "Le réseau mobile français, d’après l’Agence nationale des fréquences."
+                     : "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte, d’après l’Agence nationale des fréquences.")
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -339,6 +409,19 @@ struct ANFRStatsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Marché
+
+    private var marketPicker: some View {
+        MapSegmented(
+            selection: Binding(get: { model.market }, set: { market in
+                scrubDate = nil
+                Task { await model.select(market: market) }
+            }),
+            options: ANFRStatsMarket.allCases.map { ($0, $0.label) },
+            identifier: "anfr.stats.market"
+        )
     }
 
     // MARK: Op/Proj toggle
@@ -433,7 +516,7 @@ struct ANFRStatsView: View {
 
     private var bandsLink: some View {
         NavigationLink {
-            ANFRBandsView(service: service)
+            ANFRBandsView(service: service, market: model.market, operators: model.operators)
         } label: {
             HStack(spacing: SQSpace.md) {
                 SQIconPastille(systemImage: "square.stack.3d.up.fill", size: 40)
@@ -554,7 +637,7 @@ struct ANFRStatsView: View {
         }
     }
 
-    private func operatorBar(_ row: (operator: ANFROperator, value: Int, delta: Int), fraction: Double) -> some View {
+    private func operatorBar(_ row: (operator: ANFRStatsOperator, value: Int, delta: Int), fraction: Double) -> some View {
         VStack(spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Circle().fill(row.operator.color).frame(width: 9, height: 9)
@@ -611,7 +694,7 @@ struct ANFRStatsView: View {
                     series: [ANFRTrendSeries(op: op, points: points)],
                     selection: $scrubDate,
                     animate: appeared && !reduceMotion,
-                    drawKey: "\(op.rawValue)-\(model.selectedFilter.rawValue)-\(model.showProjected)",
+                    drawKey: "\(op.key)-\(model.selectedFilter.rawValue)-\(model.showProjected)",
                     onTap: { openFullScreen() }
                 )
                 .frame(height: 196)
@@ -690,7 +773,7 @@ struct ANFRStatsView: View {
         }
     }
 
-    private func seriesCaption(for op: ANFROperator) -> String {
+    private func seriesCaption(for op: ANFRStatsOperator) -> String {
         let metric = model.showProjected
             ? String(localized: "sites opérationnels et projetés")
             : String(localized: "sites opérationnels")
@@ -701,7 +784,7 @@ struct ANFRStatsView: View {
     private var operatorPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(ANFROperator.allCases) { op in
+                ForEach(model.operators) { op in
                     let selected = model.selectedOperator == op
                     SQChip(
                         label: op.label, isSelected: selected, dot: op.color,
@@ -761,7 +844,10 @@ struct ANFRStatsView: View {
     private var regionsSection: some View {
         let rows = topRegions
         let maxValue = max(rows.map(\.operational).max() ?? 1, 1)
-        return statsCard("Top régions · \(model.selectedOperator.label) \(model.selectedFilter.label)") {
+        let title: LocalizedStringKey = model.market == .fr
+            ? "Top régions · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+            : "Par département · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+        return statsCard(title) {
             VStack(spacing: SQSpace.sm2) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, region in
                     HStack(spacing: SQSpace.sm2) {
@@ -796,9 +882,8 @@ struct ANFRStatsView: View {
     }
 
     private var topRegions: [ANFRTerritoryMetric] {
-        guard let stats = model.stats else { return [] }
-        return stats.regions
-            .filter { $0.operatorKey == model.selectedOperator.apiKey && model.selectedFilter.bands.contains($0.band) }
+        return model.territories
+            .filter { $0.operatorKey == model.selectedOperator.key && model.selectedFilter.bands.contains($0.band) }
             .sorted { $0.operational > $1.operational }
             .prefix(6)
             .map { $0 }
@@ -935,7 +1020,7 @@ private struct ANFRTrendChart: View {
     /// connu de Swift Charts avec `symbolSize`).
     private var selectionDates: [Date] { selection.map { [$0] } ?? [] }
 
-    private var selectedPoints: [(op: ANFROperator, point: ANFRTrendPoint)] {
+    private var selectedPoints: [(op: ANFRStatsOperator, point: ANFRTrendPoint)] {
         guard let selection else { return [] }
         return series.compactMap { s in Self.nearest(in: visible(s.points), to: selection).map { (s.op, $0) } }
     }
@@ -1164,7 +1249,7 @@ private struct ANFRTrendChart: View {
 private struct ANFRTrendFullScreen: View {
     @ObservedObject var model: ANFRStatsViewModel
     let onClose: () -> Void
-    @State private var shown: Set<ANFROperator> = Set(ANFROperator.allCases)
+    @State private var shown: Set<ANFRStatsOperator>
     @State private var range: TrendRange = .all
     /// Période ajustée au pincement ; `nil` = celle du segment.
     @State private var zoomDomain: ClosedRange<Date>?
@@ -1173,14 +1258,20 @@ private struct ANFRTrendFullScreen: View {
 
     private enum TrendRange: Hashable { case oneYear, threeYears, all }
 
+    init(model: ANFRStatsViewModel, onClose: @escaping () -> Void) {
+        self.model = model
+        self.onClose = onClose
+        _shown = State(initialValue: Set(model.operators))
+    }
+
     private var series: [ANFRTrendSeries] {
-        ANFROperator.allCases
+        model.operators
             .filter { shown.contains($0) }
             .map { ANFRTrendSeries(op: $0, points: model.trendSeries(for: $0)) }
     }
 
     private var fullDomain: ClosedRange<Date>? {
-        let dates = ANFROperator.allCases.flatMap { model.trendSeries(for: $0) }.map(\.date)
+        let dates = model.operators.flatMap { model.trendSeries(for: $0) }.map(\.date)
         guard let first = dates.min(), let last = dates.max(), first < last else { return nil }
         return first...last
     }
@@ -1206,7 +1297,7 @@ private struct ANFRTrendFullScreen: View {
     }
 
     /// Hausse de l'opérateur choisi (ou du premier affiché) sur la période visible.
-    private var changeSummary: (op: ANFROperator, change: Double)? {
+    private var changeSummary: (op: ANFRStatsOperator, change: Double)? {
         let op = shown.contains(model.selectedOperator) ? model.selectedOperator : series.first?.op
         guard let op, let domain else { return nil }
         let points = model.trendSeries(for: op).filter { domain.contains($0.date) }
@@ -1292,7 +1383,7 @@ private struct ANFRTrendFullScreen: View {
     private var operatorToggles: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(ANFROperator.allCases) { op in
+                ForEach(model.operators) { op in
                     let on = shown.contains(op)
                     SQChip(
                         label: op.label, isSelected: on, selectedSystemImage: "checkmark", dot: op.color,

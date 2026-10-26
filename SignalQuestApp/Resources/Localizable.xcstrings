@@ -757,6 +757,70 @@
         }
       }
     },
+    "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte, d’après l’Agence nationale des fréquences." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guadeloupe, Martinique, French Guiana, Réunion and Mayotte, according to the French frequency agency (ANFR)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte, d’après l’Agence nationale des fréquences."
+          }
+        }
+      }
+    },
+    "Outre-mer (Guadeloupe, Martinique, Guyane, La Réunion et Mayotte) : supports en service relevés chaque semaine par l’ANFR, génération par génération et bande par bande." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overseas (Guadeloupe, Martinique, French Guiana, Réunion and Mayotte): sites in service, recorded every week by the ANFR, generation by generation and band by band."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outre-mer (Guadeloupe, Martinique, Guyane, La Réunion et Mayotte) : supports en service relevés chaque semaine par l’ANFR, génération par génération et bande par bande."
+          }
+        }
+      }
+    },
+    "Par département · %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By department · %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par département · %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ANFR observatory. Departments follow the carrier chosen in “Trend”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution »."
+          }
+        }
+      }
+    },
     "à Monaco" : {
       "localizations" : {
         "en" : {

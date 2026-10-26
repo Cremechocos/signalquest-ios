@@ -10,8 +10,10 @@ struct ANFRBandStats: Decodable, Equatable, Sendable {
         let latestDate: String
         /// Rattrapage incomplet côté serveur : les chiffres peuvent encore bouger.
         let partial: Bool
+        /// `DROM` en outre-mer ; absent de la vue de la métropole.
+        let market: String?
 
-        enum CodingKeys: String, CodingKey { case firstDate, latestDate, partial }
+        enum CodingKeys: String, CodingKey { case firstDate, latestDate, partial, market }
 
         /// Seule la dernière date est indispensable : un champ de plus ou de moins dans
         /// `meta` ne doit pas faire échouer toute la réponse.
@@ -20,6 +22,7 @@ struct ANFRBandStats: Decodable, Equatable, Sendable {
             latestDate = try c.decode(String.self, forKey: .latestDate)
             firstDate = c.decodeFlexibleString(forKey: .firstDate) ?? latestDate
             partial = (try? c.decodeIfPresent(Bool.self, forKey: .partial)) ?? false
+            market = (try? c.decodeIfPresent(String.self, forKey: .market)) ?? nil
         }
     }
 
