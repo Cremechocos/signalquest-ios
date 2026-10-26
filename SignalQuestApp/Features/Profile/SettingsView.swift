@@ -2183,7 +2183,13 @@ struct SettingsView: View {
     private func destination(for destination: SettingsDestination) -> some View {
         switch destination {
         case .password: ChangePasswordView(appleLinked: appleLinked)
-        case .devices: E2EEV2TrustedDevicesView(api: services.api)
+        case .devices:
+            // E2EE-AUTO §4 : les appareils viennent du journal vérifié.
+            if SQFeatures.e2eeAutoLogEnabled {
+                E2EEAutoDevicesView(api: services.api)
+            } else {
+                E2EEV2TrustedDevicesView(api: services.api)
+            }
         case .privacy: PrivacySettingsView(service: services.privacy)
         case .notifications: NotificationSettingsView(userService: services.users)
         case .glossary: SQGlossaryView()

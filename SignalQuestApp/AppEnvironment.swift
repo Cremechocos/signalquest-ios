@@ -183,6 +183,15 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsAutoDevicesQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-devices") || hasArgument("--qa-auto-devices-recent")
+            || hasArgument("--qa-auto-devices-refused")
+        #else
+        false
+        #endif
+    }
+
     static var showsAccountKeyQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-account-key") || hasArgument("--qa-account-key-verified")

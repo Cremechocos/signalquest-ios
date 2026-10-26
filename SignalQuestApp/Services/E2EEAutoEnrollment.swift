@@ -84,7 +84,7 @@ enum E2EEAutoEnrollmentContract {
     }
 
     /// `entry` et `link` en textes bruts, `head` présente : le maillon porte l'entrée.
-    private static func writtenEntry(_ object: [String: Any]) -> (E2EEAutoLog.Entry, E2EEAutoLog.Detail)? {
+    static func writtenEntry(_ object: [String: Any]) -> (E2EEAutoLog.Entry, E2EEAutoLog.Detail)? {
         guard let entryText = object["entry"] as? String, let linkText = object["link"] as? String,
               let head = object["head"] as? [String: Any], head["text"] is String, head["signatureB64"] is String,
               let parsed = E2EEAutoLog.parseEntry(entryText), let link = E2EEAutoLog.parseLink(linkText),
@@ -448,15 +448,7 @@ extension E2EEAutoEnrollment {
                     path: path, body: body, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle, clockOffsetMs: clockOffsetMs
                 )
             },
-            readOwnAccount: {
-                do {
-                    if case .alert = try await reader.refreshLinks() { return .refused }
-                    guard case .success(let state)? = try await reader.account(userId) else { return .refused }
-                    return .verified(state)
-                } catch {
-                    return .inconclusive
-                }
-            },
+            readOwnAccount: { await E2EEAutoDeviceRevocation.ownAccount(reader: reader, userId: userId) },
             revocation: {
                 E2EEAutoRevocationMarker.read(store: markerStore, ownerNamespace: namespace, authToken: credentials.accessToken())
             },

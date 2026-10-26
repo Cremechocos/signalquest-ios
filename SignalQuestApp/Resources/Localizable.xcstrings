@@ -97536,6 +97536,630 @@
           }
         }
       }
+    },
+    "Impossible d’actualiser la liste des appareils. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t refresh the device list. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’actualiser la liste des appareils. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible d’actualiser la liste des appareils. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’actualiser la liste des appareils. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device removed. Your other sessions were signed out: change your password if someone else knows it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît."
+          }
+        }
+      }
+    },
+    "SQFormal|Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil retiré. Vos autres sessions ont été fermées : changez votre mot de passe si quelqu’un d’autre le connaît."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Appareil retiré. Il ne reçoit plus tes messages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device removed. It no longer receives your messages."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil retiré. Il ne reçoit plus tes messages."
+          }
+        }
+      }
+    },
+    "SQFormal|Appareil retiré. Il ne reçoit plus tes messages." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil retiré. Il ne reçoit plus vos messages."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h : passe par un appareil plus ancien pour en retirer un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago: use an older device to remove another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : passe par un appareil plus ancien pour en retirer un autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h : passe par un appareil plus ancien pour en retirer un autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : passez par un appareil plus ancien pour en retirer un autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil attend encore son activation : il ne peut retirer aucun appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is still waiting to be activated: it can’t remove any device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil attend encore son activation : il ne peut retirer aucun appareil."
+          }
+        }
+      }
+    },
+    "Cet appareil n’existe plus sur ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is no longer on your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’existe plus sur ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil n’existe plus sur ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’existe plus sur votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Mets à jour SignalQuest pour gérer tes appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update SignalQuest to manage your devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mets à jour SignalQuest pour gérer tes appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|Mets à jour SignalQuest pour gérer tes appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettez à jour SignalQuest pour gérer vos appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le journal des appareils n’a pas pu être vérifié. Aucun appareil n’a été retiré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device log couldn’t be verified. No device was removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal des appareils n’a pas pu être vérifié. Aucun appareil n’a été retiré."
+          }
+        }
+      }
+    },
+    "Impossible de retirer cet appareil. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t remove this device. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de retirer cet appareil. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible de retirer cet appareil. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de retirer cet appareil. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil s’inscrit au chiffrement de bout en bout. Reviens dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is joining end-to-end encryption. Check back in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil s’inscrit au chiffrement de bout en bout. Reviens dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil s’inscrit au chiffrement de bout en bout. Reviens dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil s’inscrit au chiffrement de bout en bout. Revenez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le journal des appareils n’a pas pu être vérifié. Par prudence, rien n’est affiché ni modifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device log couldn’t be verified. To be safe, nothing is shown or changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal des appareils n’a pas pu être vérifié. Par prudence, rien n’est affiché ni modifié."
+          }
+        }
+      }
+    },
+    "Retirés récemment" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recently removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirés récemment"
+          }
+        }
+      }
+    },
+    "Déconnecter cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign out this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déconnecter cet appareil"
+          }
+        }
+      }
+    },
+    "Ferme la session sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signs out of this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferme la session sur cet appareil."
+          }
+        }
+      }
+    },
+    "Retire cet appareil du compte et ferme sa session. Il faudra te reconnecter pour l’ajouter de nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes this device from the account and signs it out. You’ll need to sign in again to add it back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retire cet appareil du compte et ferme sa session. Il faudra te reconnecter pour l’ajouter de nouveau."
+          }
+        }
+      }
+    },
+    "SQFormal|Retire cet appareil du compte et ferme sa session. Il faudra te reconnecter pour l’ajouter de nouveau." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retire cet appareil du compte et ferme sa session. Il faudra vous reconnecter pour l’ajouter de nouveau."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Retirer %@ ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %@?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer %@ ?"
+          }
+        }
+      }
+    },
+    "Retirer cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer cet appareil"
+          }
+        }
+      }
+    },
+    "Ce n’est pas moi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This wasn’t me"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce n’est pas moi"
+          }
+        }
+      }
+    },
+    "Il ne recevra plus tes messages. « Ce n’est pas moi » ferme aussi toutes tes autres sessions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will no longer receive your messages. “This wasn’t me” also signs out all your other sessions."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne recevra plus tes messages. « Ce n’est pas moi » ferme aussi toutes tes autres sessions."
+          }
+        }
+      }
+    },
+    "SQFormal|Il ne recevra plus tes messages. « Ce n’est pas moi » ferme aussi toutes tes autres sessions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne recevra plus vos messages. « Ce n’est pas moi » ferme aussi toutes vos autres sessions."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Déconnecter cet appareil ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign out this device?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déconnecter cet appareil ?"
+          }
+        }
+      }
+    },
+    "Déconnecter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign Out"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déconnecter"
+          }
+        }
+      }
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago. It can remove your other devices in %lld h; until then, remove them from an older device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer vos autres appareils dans %lld h ; d’ici là, retirez-les depuis un appareil plus ancien."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device’s fingerprint also appears on it, in Settings > Devices: compare them to recognize it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître."
+          }
+        }
+      }
+    },
+    "SQFormal|L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : compare-la pour le reconnaître." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’empreinte d’un appareil s’affiche aussi sur lui, dans Réglages > Appareils : comparez-la pour le reconnaître."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Empreinte %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fingerprint %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empreinte %@"
+          }
+        }
+      }
+    },
+    "En attente d’activation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for activation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d’activation"
+          }
+        }
+      }
+    },
+    "Retiré : « Ce n’est pas moi »" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed: “This wasn’t me”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré : « Ce n’est pas moi »"
+          }
+        }
+      }
+    },
+    "Retiré après 45 jours sans activité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed after 45 days of inactivity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré après 45 jours sans activité"
+          }
+        }
+      }
+    },
+    "Retiré par l’équipe SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed by the SignalQuest team"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré par l’équipe SignalQuest"
+          }
+        }
+      }
+    },
+    "Retiré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré"
+          }
+        }
+      }
+    },
+    "Ajouté le %@ · retiré le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added on %1$@ · removed on %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouté le %@ · retiré le %@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

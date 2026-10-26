@@ -545,6 +545,8 @@ struct RootView: View {
                 E2EEV2BrowserExclusionQAScreen()
             } else if AppEnvironment.showsActivationQA {
                 E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
+            } else if AppEnvironment.showsAutoDevicesQA {
+                E2EEAutoDevicesQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {
                 E2EEV2AccountKeyQAScreen()
             } else if AppEnvironment.showsApprovalScannerQA {
