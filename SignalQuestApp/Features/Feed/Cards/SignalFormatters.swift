@@ -481,8 +481,6 @@ struct CardActionsBar: View {
     /// Réaction emoji via l'appui long sur ❤️ (REACT-FEAT-01). Repli sur onLike.
     var onReact: ((String) -> Void)? = nil
 
-    @State private var showReactionPicker = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.feedCardMenu) private var menu
 
     var body: some View {
@@ -508,17 +506,6 @@ struct CardActionsBar: View {
         .padding(.vertical, -SQSpace.xs)
         .buttonStyle(.plain)
         .font(SQType.subhead(.semibold))
-        .overlay(alignment: .topLeading) {
-            if showReactionPicker {
-                ReactionPicker { emoji in
-                    (onReact ?? { _ in onLike() })(emoji)
-                    dismissPicker()
-                }
-                .offset(y: -56)
-                .transition(.scale(scale: 0.55, anchor: .bottomLeading).combined(with: .opacity))
-                .zIndex(2)
-            }
-        }
         // VoiceOver lit la carte d'un bloc : la barre y ajoute ses compteurs en
         // mots (« 4 réactions, 2 commentaires », pas « 4, 🔥 4, 2 ») et ses
         // actions dans l'ordre d'usage, puis celles du menu ⋯ : plus de
@@ -537,8 +524,9 @@ struct CardActionsBar: View {
             // Le sélecteur d'emojis s'ouvre à l'appui long, introuvable au
             // lecteur d'écran : chaque réaction est une action nommée.
             if let onReact {
-                ForEach(Array(ReactionPicker.defaultEmojis.dropFirst()), id: \.self) { emoji in
-                    Button(String(localized: "Réagir avec \(emoji)")) { onReact(emoji) }
+                // À rebours aussi : sur cette énumération, la sonde les lisait inversées.
+                ForEach(Array(FeedReaction.allCases.dropFirst().reversed()), id: \.self) { reaction in
+                    Button(String(localized: "Réagir : \(reaction.name)")) { onReact(reaction.rawValue) }
                 }
             }
             Button("Partager", action: onShare)
@@ -549,14 +537,14 @@ struct CardActionsBar: View {
         }
     }
 
-    /// « 4 réactions (🔥 3), 2 commentaires, 1 repartage » ; rien sans activité.
+    /// « 4 réactions (Génial 3), 2 commentaires, 1 repartage » ; rien sans activité.
     private var spokenCounts: String {
         var parts: [String] = []
         if reactionCount > 0 {
             let others = item.reactions
-                .filter { $0.count > 0 && !$0.emoji.hasPrefix("❤") }
+                .filter { $0.count > 0 && FeedReaction(emoji: $0.emoji) != .like }
                 .sorted { $0.count > $1.count }
-                .map { "\($0.emoji) \($0.count)" }
+                .map { "\(FeedReaction.name(for: $0.emoji)) \($0.count)" }
             let total = String(localized: "\(reactionCount) réactions")
             parts.append(others.isEmpty ? total : "\(total) (\(others.joined(separator: ", ")))")
         }
@@ -604,9 +592,7 @@ struct CardActionsBar: View {
         .accessibilityLabel("Partager")
     }
 
-    /// Bouton ❤️ : tap = like ; appui long = sélecteur de réactions animé.
-    /// Vue à gestes (pas un Button) pour que le tap court et l'appui long ne se
-    /// déclenchent pas tous les deux.
+    /// Bouton ❤️ : tap = like ; appui long = les six réactions.
     private var likeButton: some View {
         HStack(spacing: 5) {
             Image(systemName: item.likedByMe ? "heart.fill" : "heart")
@@ -615,12 +601,15 @@ struct CardActionsBar: View {
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("feed.action.count")
             }
-            // Les autres emojis posés sur la publication, du plus fréquent au
-            // moins fréquent : le total seul cachait les réactions non ❤️.
-            if !topOtherEmojis.isEmpty {
-                Text(verbatim: topOtherEmojis.joined())
-                    .font(SQType.caption)
-                    .accessibilityIdentifier("feed.action.emojis")
+            // Les autres réactions posées sur la publication, du plus fréquent au
+            // moins fréquent : le total seul cachait les réactions non ❤️. Des
+            // symboles SF, pas les emojis stockés (Halo, F-27).
+            if !topOtherSymbols.isEmpty {
+                HStack(spacing: 2) {
+                    ForEach(topOtherSymbols, id: \.self) { Image(systemName: $0) }
+                }
+                .font(SQType.caption)
+                .accessibilityIdentifier("feed.action.emojis")
             }
         }
         .foregroundStyle(item.likedByMe ? SQColor.like : (reactedByMe ? SQColor.accentInk : SQColor.chipInk))
@@ -628,14 +617,30 @@ struct CardActionsBar: View {
         .padding(.horizontal, SQSpace.sm)
         .frame(minWidth: 44, minHeight: 44)
         .contentShape(Rectangle())
-        .onTapGesture {
-            if showReactionPicker { dismissPicker() } else { onLike() }
-        }
-        .onLongPressGesture(minimumDuration: 0.3) {
-            guard onReact != nil else { onLike(); return }
-            Haptics.medium()
-            withAnimation(SQMotion.resolve(SQMotion.bouncy, reduceMotion)) { showReactionPicker = true }
-            scheduleAutoDismiss()
+        .onTapGesture(perform: onLike)
+        // Un menu propre au ❤️ : l'appui long de la carte ouvre son propre menu
+        // contextuel, qui prenait le pas sur l'ancien sélecteur flottant, jamais
+        // affiché dans le fil. Le menu le plus proche du doigt l'emporte.
+        .contextMenu { reactionMenu }
+    }
+
+    /// Rangée de symboles sous iOS 17 ; liste de libellés avant.
+    @ViewBuilder
+    private var reactionMenu: some View {
+        let react = onReact ?? { _ in onLike() }
+        if #available(iOS 17.0, *) {
+            ControlGroup {
+                ForEach(FeedReaction.allCases, id: \.self) { reaction in
+                    Button { react(reaction.rawValue) } label: { Label(reaction.name, systemImage: reaction.symbol) }
+                }
+            }
+            .controlGroupStyle(.palette)
+            // Une palette reste ouverte après un choix par défaut.
+            .menuActionDismissBehavior(.enabled)
+        } else {
+            ForEach(FeedReaction.allCases, id: \.self) { reaction in
+                Button { react(reaction.rawValue) } label: { Label(reaction.name, systemImage: reaction.symbol) }
+            }
         }
     }
 
@@ -644,22 +649,13 @@ struct CardActionsBar: View {
         item.likedByMe || item.reactions.contains { $0.reactedByMe == true }
     }
 
-    private var topOtherEmojis: [String] {
-        item.reactions
-            .filter { $0.count > 0 && !$0.emoji.hasPrefix("❤") }
-            .sorted { $0.count > $1.count }
-            .prefix(3)
-            .map(\.emoji)
-    }
-
-    private func dismissPicker() {
-        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { showReactionPicker = false }
-    }
-
-    private func scheduleAutoDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-            if showReactionPicker { dismissPicker() }
+    private var topOtherSymbols: [String] {
+        var symbols: [String] = []
+        for reaction in item.reactions.filter({ $0.count > 0 && FeedReaction(emoji: $0.emoji) != .like }).sorted(by: { $0.count > $1.count }) {
+            let symbol = FeedReaction.symbol(for: reaction.emoji)
+            if !symbols.contains(symbol) { symbols.append(symbol) }
         }
+        return Array(symbols.prefix(3))
     }
 
     private var reactionCount: Int { item.reactions.reduce(0) { $0 + $1.count } }

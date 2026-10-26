@@ -490,6 +490,38 @@
         }
       }
     },
+    "Autre réaction" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other reaction"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre réaction"
+          }
+        }
+      }
+    },
+    "Bravo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Well done"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bravo"
+          }
+        }
+      }
+    },
     "Cet emoji ne peut pas être envoyé dans une conversation chiffrée." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -503,6 +535,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet emoji ne peut pas être envoyé dans une conversation chiffrée."
+          }
+        }
+      }
+    },
+    "Fulgurant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lightning fast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fulgurant"
+          }
+        }
+      }
+    },
+    "Génial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Great"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Génial"
           }
         }
       }
@@ -605,6 +669,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quête terminée"
+          }
+        }
+      }
+    },
+    "Rapide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapide"
+          }
+        }
+      }
+    },
+    "Réagir : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "React: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réagir : %@"
           }
         }
       }

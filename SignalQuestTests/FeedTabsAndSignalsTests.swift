@@ -567,3 +567,24 @@ final class SocialExploreTests: XCTestCase {
         XCTAssertEqual(converted.first?.handle, "nora")
     }
 }
+
+/// Réactions dessinées en symboles SF à partir des emojis stockés (lot F, F-27).
+final class FeedReactionTests: XCTestCase {
+    func testStoredEmojiMatchesWithOrWithoutVariationSelector() {
+        XCTAssertEqual(FeedReaction(emoji: "⚡"), .bolt)
+        XCTAssertEqual(FeedReaction(emoji: "\u{26A1}\u{FE0F}"), .bolt)
+        XCTAssertEqual(FeedReaction(emoji: "\u{2764}"), .like)
+        XCTAssertEqual(FeedReaction(emoji: "❤️"), .like)
+    }
+
+    func testUnknownEmojiStaysCountedUnderANeutralSymbol() {
+        XCTAssertNil(FeedReaction(emoji: "😂"))
+        XCTAssertEqual(FeedReaction.symbol(for: "😂"), "face.smiling")
+        XCTAssertFalse(FeedReaction.name(for: "😂").isEmpty)
+    }
+
+    func testPickerKeepsSendingTheStoredEmojisLikeFirst() {
+        XCTAssertEqual(FeedReaction.allCases.map(\.rawValue), ["❤️", "🔥", "👏", "🚀", "⚡", "📡"])
+        XCTAssertEqual(Set(FeedReaction.allCases.map(\.symbol)).count, FeedReaction.allCases.count)
+    }
+}

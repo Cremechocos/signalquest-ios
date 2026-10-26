@@ -60,10 +60,10 @@ struct PostCardView: View {
                         if images.count > 1 {
                             Text(verbatim: "1/\(images.count)")
                                 .font(SQType.caption(.semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(SQColor.onGlass)
                                 .padding(.horizontal, SQSpace.sm2)
                                 .padding(.vertical, SQSpace.xs)
-                                .background(Color.black.opacity(0.62), in: Capsule(style: .continuous))
+                                .background(SQColor.glassDense, in: Capsule(style: .continuous))
                                 .padding(SQSpace.sm2)
                                 .accessibilityHidden(true)
                         }

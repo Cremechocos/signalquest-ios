@@ -116,10 +116,10 @@ struct PhotoCardView: View {
                     .font(SQType.caption(.semibold))
                     .lineLimit(1)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(SQColor.onGlass)
             .padding(.horizontal, SQSpace.sm2)
             .padding(.vertical, SQSpace.xs)
-            .background(Color.black.opacity(0.62), in: Capsule(style: .continuous))
+            .background(SQColor.glassDense, in: Capsule(style: .continuous))
             .padding(SQSpace.sm2)
         }
     }

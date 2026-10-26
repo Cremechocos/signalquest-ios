@@ -692,7 +692,7 @@ struct BugReportComposerSheet: View {
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.system(size: 20))
-                                        .foregroundStyle(.white, .black.opacity(0.55))
+                                        .foregroundStyle(SQColor.onGlass, SQColor.glass)
                                         .frame(width: 44, height: 44, alignment: .topTrailing)
                                         .contentShape(Rectangle())
                                 }
@@ -1373,7 +1373,7 @@ struct BugReportDetailView: View {
                                         Button { model.pendingImages.removeAll { $0.id == pending.id } } label: {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.system(size: 18))
-                                                .foregroundStyle(.white, .black.opacity(0.55))
+                                                .foregroundStyle(SQColor.onGlass, SQColor.glass)
                                                 .frame(width: 44, height: 44, alignment: .topTrailing)
                                                 .contentShape(Rectangle())
                                         }

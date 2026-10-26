@@ -1,43 +1,55 @@
 import SwiftUI
 
-struct ReactionPicker: View {
-    let emojis: [String]
-    var onPick: (String) -> Void
+/// Réaction du Feed : le serveur stocke un emoji, l'app dessine un symbole SF
+/// (Halo : symboles plutôt qu'emojis, lot F, F-27). L'emoji reste la valeur
+/// envoyée et lue, pour rester compatible avec Android, le Web et l'existant.
+enum FeedReaction: String, CaseIterable {
+    case like = "❤️"
+    case fire = "🔥"
+    case clap = "👏"
+    case rocket = "🚀"
+    case bolt = "⚡"
+    case antenna = "📡"
 
-    /// Réactions proposées par défaut ; le ❤️ vient en premier (c'est le « J'aime »).
-    static let defaultEmojis = ["❤️", "🔥", "👏", "🚀", "⚡", "📡"]
-
-    init(emojis: [String] = ReactionPicker.defaultEmojis, onPick: @escaping (String) -> Void) {
-        self.emojis = emojis
-        self.onPick = onPick
+    /// Emoji stocké → réaction connue, avec ou sans sélecteur de variante (U+FE0F).
+    init?(emoji: String) {
+        let bare = { (value: String) in value.unicodeScalars.filter { $0.value != 0xFE0F }.map(String.init).joined() }
+        guard let match = Self.allCases.first(where: { bare($0.rawValue) == bare(emoji) }) else { return nil }
+        self = match
     }
 
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(spacing: SQSpace.sm2) {
-            ForEach(Array(emojis.enumerated()), id: \.element) { index, emoji in
-                Button {
-                    Haptics.light()
-                    onPick(emoji)
-                } label: {
-                    Text(emoji)
-                        .font(.title2)
-                        .padding(SQSpace.sm2)
-                        .sqSurface(SQColor.surfaceMuted, in: Circle())
-                }
-                .buttonStyle(SQPressButtonStyle())
-                .accessibilityLabel("Réagir avec \(emoji)")
-                // Entrée en cascade : chaque emoji « pop » avec un léger décalage.
-                .scaleEffect(appeared ? 1 : 0.1)
-                .opacity(appeared ? 1 : 0)
-                .animation(reduceMotion ? nil : SQMotion.bouncy.delay(Double(index) * 0.04), value: appeared)
-            }
+    var symbol: String {
+        switch self {
+        case .like: "heart.fill"
+        case .fire: "flame.fill"
+        case .clap: "hands.clap.fill"
+        // Pas de fusée parmi les symboles SF : le compteur dit « rapide ».
+        case .rocket: "speedometer"
+        case .bolt: "bolt.fill"
+        case .antenna: "antenna.radiowaves.left.and.right"
         }
-        .padding(SQSpace.sm)
-        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-        .sqShadowDock()
-        .onAppear { appeared = true }
+    }
+
+    var name: String {
+        switch self {
+        case .like: String(localized: "J’aime")
+        case .fire: String(localized: "Génial")
+        case .clap: String(localized: "Bravo")
+        case .rocket: String(localized: "Rapide")
+        case .bolt: String(localized: "Fulgurant")
+        case .antenna: String(localized: "Bon réseau")
+        }
+    }
+
+    var tint: Color { self == .like ? SQColor.like : SQColor.accentInk }
+
+    /// Symbole d'un emoji stocké quelconque : un emoji posé par une autre app
+    /// et inconnu ici reste compté, sous un visage neutre.
+    static func symbol(for emoji: String) -> String {
+        FeedReaction(emoji: emoji)?.symbol ?? "face.smiling"
+    }
+
+    static func name(for emoji: String) -> String {
+        FeedReaction(emoji: emoji)?.name ?? String(localized: "Autre réaction")
     }
 }

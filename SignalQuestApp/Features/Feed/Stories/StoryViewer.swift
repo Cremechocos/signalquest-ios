@@ -268,10 +268,10 @@ struct StoryViewer: View {
         HStack(spacing: SQSpace.xs) {
             ForEach(stories.indices, id: \.self) { i in
                 GeometryReader { proxy in
-                    Capsule().fill(Color.white.opacity(0.30))
+                    Capsule().fill(SQColor.onGlass.opacity(0.30))
                         .overlay(alignment: .leading) {
                             // Jauge crème, comme sur le web.
-                            Capsule().fill(Color(red: 0.957, green: 0.949, blue: 0.925))
+                            Capsule().fill(SQColor.onGlass)
                                 .frame(width: proxy.size.width * fillRatio(for: i, now: now))
                         }
                 }
@@ -295,11 +295,11 @@ struct StoryViewer: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(story.isMine == true ? String(localized: "Ta story") : story.author.displayName)
                                 .font(SQFont.body(14, .bold, relativeTo: .subheadline))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(SQColor.onGlass)
                             if let date = story.createdAt {
                                 Text(date, format: .relative(presentation: .named))
                                     .font(SQFont.body(12, .regular, relativeTo: .caption))
-                                    .foregroundStyle(.white.opacity(0.78))
+                                    .foregroundStyle(SQColor.onGlass.opacity(0.78))
                             }
                         }
                     }
@@ -316,7 +316,7 @@ struct StoryViewer: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SQColor.onGlass)
                         .frame(width: 44, height: 44)
                         .background(.ultraThinMaterial, in: Circle())
                 }
@@ -343,7 +343,7 @@ struct StoryViewer: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.onGlass)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
             }
@@ -366,7 +366,7 @@ struct StoryViewer: View {
                     Text(caption)
                         .font(SQFont.body(16, .semibold, relativeTo: .body))
                         .lineSpacing(3)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SQColor.onGlass)
                         .lineLimit(4)
                 }
                 if !pills.isEmpty {
@@ -374,11 +374,11 @@ struct StoryViewer: View {
                         ForEach(pills, id: \.self) { pill in
                             Text(verbatim: pill)
                                 .font(SQType.caption(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(SQColor.onGlass)
                                 .lineLimit(1)
                                 .padding(.horizontal, SQSpace.sm2)
                                 .frame(minHeight: 26)
-                                .background(.white.opacity(0.16), in: Capsule(style: .continuous))
+                                .background(SQColor.onGlass.opacity(0.16), in: Capsule(style: .continuous))
                         }
                     }
                     .accessibilityElement(children: .combine)
@@ -397,7 +397,7 @@ struct StoryViewer: View {
             if replySubmission.sentStoryID == currentStory?.id {
                 Label("Envoyé", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.onGlass)
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -406,7 +406,7 @@ struct StoryViewer: View {
             if replySubmission.failedStoryID == currentStory?.id {
                 Label("Échec de l'envoi. Réessaie.", systemImage: "exclamationmark.circle.fill")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.onGlass)
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, SQSpace.sm)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -414,25 +414,25 @@ struct StoryViewer: View {
             }
             if replySubmission.isSending {
                 ProgressView("Envoi…")
-                    .tint(.white)
-                    .foregroundStyle(.white)
+                    .tint(SQColor.onGlass)
+                    .foregroundStyle(SQColor.onGlass)
                     .accessibilityIdentifier("story.reply.sending")
             }
             // Réponse et réactions sur une ligne : message privé à l'auteur.
             HStack(spacing: SQSpace.sm) {
-                TextField("", text: $replySubmission.draft, prompt: Text(replyPrompt).foregroundColor(.white.opacity(0.75)))
+                TextField("", text: $replySubmission.draft, prompt: Text(replyPrompt).foregroundColor(SQColor.onGlass.opacity(0.75)))
                     .focused($replyFocused)
                     .accessibilityIdentifier("story.reply.input")
                     .disabled(replySubmission.isSending)
                     .font(SQFont.body(14, .regular, relativeTo: .body))
-                    .foregroundStyle(.white)
-                    .tint(.white)
+                    .foregroundStyle(SQColor.onGlass)
+                    .tint(SQColor.onGlass)
                     .submitLabel(.send)
                     .onSubmit(sendReply)
                     .padding(.horizontal, SQSpace.lg)
                     .frame(minHeight: 44)
                     .overlay {
-                        Capsule(style: .continuous).strokeBorder(.white.opacity(0.32), lineWidth: 1)
+                        Capsule(style: .continuous).strokeBorder(SQColor.onGlass.opacity(0.32), lineWidth: 1)
                     }
                 if replySubmission.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ForEach(quickReactions, id: \.self) { emoji in
@@ -465,7 +465,7 @@ struct StoryViewer: View {
             }
             Text("Réponse privée sans chiffrement de bout en bout")
                 .font(SQFont.body(11, .regular, relativeTo: .caption2))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(SQColor.onGlass.opacity(0.72))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("story.reply.channel")
         }
@@ -497,7 +497,7 @@ struct StoryViewer: View {
                     Image(systemName: "eye")
                 }
                 .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
-                .foregroundStyle(.white)
+                .foregroundStyle(SQColor.onGlass)
                 .padding(.horizontal, SQSpace.lg)
                 .frame(minHeight: 44)
                 .background(.ultraThinMaterial, in: Capsule())
@@ -701,7 +701,7 @@ private struct StoryVideoPlayer: View {
             if model.failed {
                 Label("Vidéo indisponible", systemImage: "exclamationmark.triangle.fill")
                     .font(SQType.subhead(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.onGlass)
                     .padding(.horizontal, SQSpace.lg)
                     .frame(minHeight: 44)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -711,7 +711,7 @@ private struct StoryVideoPlayer: View {
                 } label: {
                     Label("Lire la vidéo", systemImage: "play.fill")
                         .font(SQType.subhead(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SQColor.onGlass)
                         .padding(.horizontal, SQSpace.lg)
                         .frame(minHeight: 44)
                         .background(.ultraThinMaterial, in: Capsule())

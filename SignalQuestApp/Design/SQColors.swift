@@ -94,6 +94,10 @@ enum SQColor {
     /// Verre posé sur une photo ou une vidéo (`--h-glass`) : identique dans les
     /// deux thèmes, puisque l'image ne change pas avec eux. Texte en `onGlass`.
     static let glass = Color(red: 0x0F / 255, green: 0x13 / 255, blue: 0x12 / 255).opacity(0.52)
+    /// Verre plus dense sous un PETIT texte posé sur une photo (compteur « 1/3 »,
+    /// opérateur d'une photo d'antenne) : `onGlass` y garde 5,4:1 même sur une
+    /// photo blanche, quand `glass` (0,52) tombe à 3,4:1 (lot F, F-28).
+    static let glassDense = Color(red: 0x0F / 255, green: 0x13 / 255, blue: 0x12 / 255).opacity(0.66)
     static let glassLine = Color(red: 0xF4 / 255, green: 0xF2 / 255, blue: 0xEC / 255).opacity(0.16)
     static let onGlass = Color(red: 0xF4 / 255, green: 0xF2 / 255, blue: 0xEC / 255)
 
