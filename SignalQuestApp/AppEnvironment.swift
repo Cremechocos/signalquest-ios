@@ -191,6 +191,15 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Code de sécurité d'un contact ; `--qa-auto-safety-code-changed` ou `-verified` pour ses états.
+    static var showsAutoSafetyCodeQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-safety-code") || hasArgument("--qa-auto-safety-code-changed")
+            || hasArgument("--qa-auto-safety-code-verified")
+        #else
+        false
+        #endif
+    }
     static var showsAutoDevicesQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-auto-devices") || hasArgument("--qa-auto-devices-recent")

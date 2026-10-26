@@ -98448,6 +98448,450 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Ce code se compare avec un contact, pas avec ton propre compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This code is compared with a contact, not with your own account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code se compare avec un contact, pas avec ton propre compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce code se compare avec un contact, pas avec ton propre compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code se compare avec un contact, pas avec votre propre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le code de sécurité avec %@ n’a pas pu être vérifié pour l’instant. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The safety code with %@ could not be verified for now. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code de sécurité avec %@ n’a pas pu être vérifié pour l’instant. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "SQFormal|Le code de sécurité avec %@ n’a pas pu être vérifié pour l’instant. Réessaie plus tard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code de sécurité avec %@ n’a pas pu être vérifié pour l’instant. Réessayez plus tard."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible de charger le code de sécurité. Vérifie ta connexion et réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t load the safety code. Check your connection and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger le code de sécurité. Vérifie ta connexion et réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible de charger le code de sécurité. Vérifie ta connexion et réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger le code de sécurité. Vérifiez votre connexion et réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Code marqué comme vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code marked as verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code marqué comme vérifié"
+          }
+        }
+      }
+    },
+    "Les codes sont différents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The codes are different"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les codes sont différents"
+          }
+        }
+      }
+    },
+    "Les codes sont identiques : code vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The codes match: code verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les codes sont identiques : code vérifié"
+          }
+        }
+      }
+    },
+    "Scanner un code de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan a safety code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanner un code de sécurité"
+          }
+        }
+      }
+    },
+    "Vise le code de sécurité affiché chez ton contact." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point at the safety code shown on your contact’s screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vise le code de sécurité affiché chez ton contact."
+          }
+        }
+      }
+    },
+    "SQFormal|Vise le code de sécurité affiché chez ton contact." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visez le code de sécurité affiché chez votre contact."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou compare les chiffres à l’œil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can’t use the camera. Allow it in iOS Settings, or compare the digits by eye."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou compare les chiffres à l’œil."
+          }
+        }
+      }
+    },
+    "SQFormal|SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou compare les chiffres à l’œil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n’a pas accès à la caméra. Autorisez-la dans les Réglages d’iOS, ou comparez les chiffres à l’œil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucune caméra n’est disponible. Compare les chiffres à l’œil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No camera is available. Compare the digits by eye."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune caméra n’est disponible. Compare les chiffres à l’œil."
+          }
+        }
+      }
+    },
+    "SQFormal|Aucune caméra n’est disponible. Compare les chiffres à l’œil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune caméra n’est disponible. Comparez les chiffres à l’œil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Code de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safety code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de sécurité"
+          }
+        }
+      }
+    },
+    "Chargement du code de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the safety code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement du code de sécurité"
+          }
+        }
+      }
+    },
+    "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant, ou scanne son code. S’ils sont identiques, personne ne s’interpose entre vous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare these digits with the ones shown on %@’s screen, in person or on a call, or scan their code. If they match, no one is standing between you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant, ou scanne son code. S’ils sont identiques, personne ne s’interpose entre vous."
+          }
+        }
+      }
+    },
+    "SQFormal|Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant, ou scanne son code. S’ils sont identiques, personne ne s’interpose entre vous." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparez ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant, ou scannez son code. S’ils sont identiques, personne ne s’interpose entre vous."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce code change quand l’un de vous ajoute ou retire un appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This code changes when either of you adds or removes a device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code change quand l’un de vous ajoute ou retire un appareil."
+          }
+        }
+      }
+    },
+    "Le code a changé depuis ta vérification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The code has changed since you verified it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code a changé depuis ta vérification"
+          }
+        }
+      }
+    },
+    "SQFormal|Le code a changé depuis ta vérification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code a changé depuis votre vérification"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "L’un de vous a ajouté ou retiré un appareil. Tes messages continuent de partir ; compare le nouveau code avec %@ pour le vérifier à nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One of you added or removed a device. Your messages are still sent; compare the new code with %@ to verify it again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’un de vous a ajouté ou retiré un appareil. Tes messages continuent de partir ; compare le nouveau code avec %@ pour le vérifier à nouveau."
+          }
+        }
+      }
+    },
+    "SQFormal|L’un de vous a ajouté ou retiré un appareil. Tes messages continuent de partir ; compare le nouveau code avec %@ pour le vérifier à nouveau." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’un de vous a ajouté ou retiré un appareil. Vos messages continuent de partir ; comparez le nouveau code avec %@ pour le vérifier à nouveau."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les codes sont identiques : code vérifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The codes match: code verified."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les codes sont identiques : code vérifié."
+          }
+        }
+      }
+    },
+    "Les codes sont différents. L’un de vous n’a peut-être pas encore vu un appareil ajouté ou retiré : rouvrez tous les deux cet écran, puis recommencez. S’ils diffèrent encore, quelqu’un pourrait s’interposer entre vous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The codes are different. One of you may not have seen a device that was added or removed yet: both reopen this screen, then try again. If they still differ, someone could be standing between you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les codes sont différents. L’un de vous n’a peut-être pas encore vu un appareil ajouté ou retiré : rouvrez tous les deux cet écran, puis recommencez. S’ils diffèrent encore, quelqu’un pourrait s’interposer entre vous."
+          }
+        }
+      }
+    },
+    "Ce QR n’est pas un code de sécurité SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This QR code isn’t a SignalQuest safety code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce QR n’est pas un code de sécurité SignalQuest."
+          }
+        }
+      }
+    },
+    "Code QR du code de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code of the safety code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code QR du code de sécurité"
+          }
+        }
+      }
+    },
+    "Scanner son code" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan their code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanner son code"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

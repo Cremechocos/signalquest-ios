@@ -110,6 +110,8 @@ struct ConversationDetailView: View {
     @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
     @State private var safetyNumberPeer: SafetyNumberPeer?
+    /// Code de sécurité du chiffrement automatique (E2EE-AUTO §7).
+    @State private var safetyCodePeer: SafetyNumberPeer?
     @State private var showEncryptionInfo = false
     /// Suivi du bas de la conversation : un message qui arrive pendant la
     /// lecture de l'historique n'y ramène plus de force (SOC-20).
@@ -791,6 +793,15 @@ struct ConversationDetailView: View {
                 ReportSheet(target: .profile(id), service: services.reports)
             }
         }
+        .sheet(item: $safetyCodePeer) { peer in
+            NavigationStack {
+                E2EEAutoSafetyCodeView(
+                    api: services.api, peerUserId: peer.userId,
+                    peerName: peer.name ?? String(localized: "Ce membre"),
+                    onClose: { safetyCodePeer = nil }
+                )
+            }
+        }
         .sheet(item: $safetyNumberPeer, onDismiss: { Task { await loadV2() } }) { peer in
             NavigationStack {
                 Group {
@@ -1217,6 +1228,16 @@ struct ConversationDetailView: View {
                         Label("Chiffrement", systemImage: "lock")
                     }
                     .accessibilityIdentifier("conversation.encryption.info")
+                }
+                if SQFeatures.e2eeAutoLogEnabled, usesV2, let id = otherParticipantId {
+                    Button {
+                        safetyCodePeer = SafetyNumberPeer(
+                            userId: id, name: conversation.participants.first { $0.userId == id }?.user.name
+                        )
+                    } label: {
+                        Label("Code de sécurité", systemImage: "checkmark.shield")
+                    }
+                    .accessibilityIdentifier("conversation.safetyCode")
                 }
                 Button { showProtection = true } label: {
                     Label("Conversation protégée", systemImage: "lock.shield")

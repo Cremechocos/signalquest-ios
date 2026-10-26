@@ -3,9 +3,9 @@ import SwiftUI
 import UIKit
 
 /// Lecteur du QR v3 qu'affiche un appareil à approuver (§2.3), navigateur
-/// compris : la caméra ne sert qu'à lire ce code, rien n'est enregistré. Sans
-/// caméra ou sans autorisation, l'écran le dit, et la saisie du contenu du
-/// code reste possible sur l'écran des appareils.
+/// compris, ou du code de sécurité d'un contact (E2EE-AUTO) : la caméra ne sert
+/// qu'à lire ce code, rien n'est enregistré. Sans caméra ou sans autorisation,
+/// l'écran le dit, et dit comment comparer autrement.
 struct E2EEV2ApprovalScannerView: View {
     enum CameraAccess: Equatable {
         case checking
@@ -14,6 +14,22 @@ struct E2EEV2ApprovalScannerView: View {
         case unavailable
     }
 
+    /// Textes propres à ce qui est scanné, lus à l'affichage (tu/vous).
+    struct Copy: Sendable {
+        let title: @Sendable () -> String
+        let hint: @Sendable () -> String
+        let denied: @Sendable () -> String
+        let unavailable: @Sendable () -> String
+
+        static let approval = Copy(
+            title: { String(localized: "Approuver un appareil") },
+            hint: { String(localized: "Vise le code affiché sur l’appareil à approuver.") },
+            denied: { String(localized: "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou colle le contenu du code sur l’écran des appareils.") },
+            unavailable: { String(localized: "Aucune caméra n’est disponible. Colle le contenu du code sur l’écran des appareils.") }
+        )
+    }
+
+    var copy: Copy = .approval
     let onCode: (String) -> Void
     @State private var access: CameraAccess = .checking
     @Environment(\.dismiss) private var dismiss
@@ -36,7 +52,7 @@ struct E2EEV2ApprovalScannerView: View {
                     )
                     .ignoresSafeArea(edges: .bottom)
                     .overlay(alignment: .bottom) {
-                        Text("Vise le code affiché sur l’appareil à approuver.")
+                        Text(verbatim: copy.hint())
                             .font(SQType.body)
                             .foregroundStyle(SQColor.label)
                             .multilineTextAlignment(.center)
@@ -46,18 +62,12 @@ struct E2EEV2ApprovalScannerView: View {
                             .padding(SQSpace.lg)
                     }
                 case .denied:
-                    unavailableMessage(
-                        String(localized: "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou colle le contenu du code sur l’écran des appareils."),
-                        showsSettings: true
-                    )
+                    unavailableMessage(copy.denied(), showsSettings: true)
                 case .unavailable:
-                    unavailableMessage(
-                        String(localized: "Aucune caméra n’est disponible. Colle le contenu du code sur l’écran des appareils."),
-                        showsSettings: false
-                    )
+                    unavailableMessage(copy.unavailable(), showsSettings: false)
                 }
             }
-            .navigationTitle(Text("Approuver un appareil"))
+            .navigationTitle(Text(verbatim: copy.title()))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

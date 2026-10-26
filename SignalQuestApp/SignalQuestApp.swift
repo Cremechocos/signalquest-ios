@@ -559,6 +559,8 @@ struct RootView: View {
                 E2EEV2BrowserExclusionQAScreen()
             } else if AppEnvironment.showsActivationQA {
                 E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
+            } else if AppEnvironment.showsAutoSafetyCodeQA {
+                E2EEAutoSafetyCodeQAScreen()
             } else if AppEnvironment.showsAutoNewDeviceQA {
                 E2EEAutoNewDeviceAlertQAScreen()
             } else if AppEnvironment.showsAutoDevicesQA {

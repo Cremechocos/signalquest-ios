@@ -82,3 +82,52 @@ enum E2EEAutoSafetyCode {
         return digitGroups(bytes, count: shortFingerprintGroups)
     }
 }
+
+/// Codes de sécurité comparés et marqués vérifiés, par compte connecté et par
+/// contact, sur cet appareil seulement. Le code change quand l'un des deux
+/// comptes ajoute ou retire un appareil : l'écran le signale, rien n'est bloqué.
+struct E2EEAutoSafetyCodeVerifications {
+    var defaults: UserDefaults = .standard
+
+    private func key(_ ownerNamespace: String) -> String { "e2ee-auto-safety-verified-v1:\(ownerNamespace)" }
+
+    /// Les 60 chiffres vérifiés avec ce contact, s'il y en a.
+    func verifiedDigits(peerUserId: String, ownerNamespace: String) -> String? {
+        (defaults.dictionary(forKey: key(ownerNamespace)) as? [String: String])?[peerUserId]
+    }
+
+    func setVerified(_ digits: String?, peerUserId: String, ownerNamespace: String) {
+        var all = (defaults.dictionary(forKey: key(ownerNamespace)) as? [String: String]) ?? [:]
+        all[peerUserId] = digits
+        if all.isEmpty {
+            defaults.removeObject(forKey: key(ownerNamespace))
+        } else {
+            defaults.set(all, forKey: key(ownerNamespace))
+        }
+    }
+}
+
+extension E2EEAutoSafetyCode {
+    enum AccountsRead: Equatable, Sendable {
+        case verified(own: E2EEAutoLog.AccountState, peer: E2EEAutoLog.AccountState)
+        /// Journal en alerte, compte tu ou refusé par le vérificateur.
+        case refused
+        /// Réseau ou réponse illisible : réessayer.
+        case inconclusive
+    }
+
+    /// Les deux comptes, lus jusqu'à la tête vérifiée. Les appareils apparus
+    /// depuis la lecture précédente partent comme avec l'annuaire (§4.2, §7).
+    static func accounts(reader: E2EEAutoLogReader, ownUserId: String, peerUserId: String) async -> AccountsRead {
+        do {
+            if case .alert = try await reader.refreshLinks() { return .refused }
+            guard case .success(let own)? = try await reader.account(ownUserId),
+                  case .success(let peer)? = try await reader.account(peerUserId) else { return .refused }
+            let added = await reader.takeAddedDevices()
+            if !added.isEmpty { E2EEAutoDeviceEvents.post(ownerScopeId: reader.ownerScopeId, added: added) }
+            return .verified(own: own, peer: peer)
+        } catch {
+            return .inconclusive
+        }
+    }
+}
