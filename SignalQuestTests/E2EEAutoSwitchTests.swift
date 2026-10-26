@@ -48,6 +48,12 @@ final class E2EEAutoSwitchTests: XCTestCase {
         XCTAssertNil(E2EEV2MessagingRuntime.stale(required), "Déjà allumé : un second refus est une erreur, sans boucle")
         let inactive = E2EEV2TransportFailure(kind: .permanent, statusCode: 400, code: "E2EE_AUTO_INACTIVE", message: "e2ee-auto-inactive")
         XCTAssertNil(E2EEV2MessagingRuntime.stale(inactive), "L'interrupteur ne s'éteint jamais")
+
+        // Écriture sous une époque non marquée : `409`, même traitement.
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
+        let write = E2EEV2TransportFailure(kind: .permanent, statusCode: 409, code: "E2EE_AUTO_REQUIRED", message: "e2ee-auto-required")
+        XCTAssertEqual(E2EEV2MessagingRuntime.stale(write), [])
+        XCTAssertTrue(E2EEV2ServerGate.autoActive)
     }
 
     // MARK: Création

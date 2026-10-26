@@ -63,6 +63,13 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     static let securityAlertLimit = 20
 
+    /// Appareil ajouté chez un contact (E2EE-AUTO §3.5) : la ligne locale « les
+    /// appareils de X ont changé ». La plus récente par membre est gardée.
+    struct DeviceChange: Codable, Equatable, Sendable {
+        let userId: String
+        let atMs: Int64
+    }
+
     /// Époque acceptée, gardée après son remplacement : membres de l'époque
     /// (§5.3) et fenêtre de 24 heures des messages en vol (§3.4).
     struct AcceptedEpoch: Codable, Equatable, Sendable {
@@ -263,6 +270,31 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
             for: securityKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
             accessibility: .afterFirstUnlock
         )
+    }
+
+    /// Appareils changés chez un membre : une ligne par membre, la plus récente.
+    func recordDeviceChange(_ change: DeviceChange, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var changes = try deviceChanges(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            .filter { $0.userId != change.userId }
+        changes.append(change)
+        let data = try JSONEncoder().encode(Array(changes.suffix(Self.securityAlertLimit)))
+        try tokenStore.set(
+            String(decoding: data, as: UTF8.self),
+            for: devicesKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    /// Appareils changés gardés, les plus anciens d'abord.
+    func deviceChanges(conversationId: String, ownerNamespace: String) throws -> [DeviceChange] {
+        guard let raw = try tokenStore.string(for: devicesKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [] }
+        guard let data = raw.data(using: .utf8), let changes = try? JSONDecoder().decode([DeviceChange].self, from: data)
+        else { throw Failure.invalidRecord }
+        return changes
     }
 
     /// Lignes de sécurité gardées, les plus anciennes d'abord.
@@ -542,6 +574,10 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     private func securityKey(conversationId: String, ownerNamespace: String) -> String {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":security"
+    }
+
+    private func devicesKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":devices"
     }
 
     private func sentKey(conversationId: String, ownerNamespace: String) -> String {

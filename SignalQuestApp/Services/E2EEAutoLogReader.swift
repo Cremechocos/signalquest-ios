@@ -248,7 +248,7 @@ actor E2EEAutoLogReader {
     /// Entrées de seq dans `]after, upTo]` ; nil : compte non servi (404).
     typealias FetchAccount = @Sendable (_ userId: String, _ after: Int64, _ upTo: Int64) async throws -> Data?
 
-    private let ownerScopeId: String
+    let ownerScopeId: String
     private let pinnedLogKeyB64: String
     private let nextLogKeysB64: [String]
     private let store: E2EEAutoLogStore
@@ -261,6 +261,9 @@ actor E2EEAutoLogReader {
     /// Horloge du serveur moins l'horloge locale, mesurée sur l'en-tête `Date`
     /// des maillons : sert seulement à dater un manifeste (§7.1).
     private(set) var clockOffsetMs: Int64?
+    /// Appareils apparus depuis la dernière lecture vérifiée de leur compte
+    /// (`ADD` hors `GENESIS`, `ACTIVATE`), par compte : repris par `takeAddedDevices`.
+    private var addedDevices: [String: Set<String>] = [:]
 
     init(
         ownerScopeId: String,
@@ -456,7 +459,11 @@ actor E2EEAutoLogReader {
         var entries = kept?.entries ?? []
         var after = entries.last.flatMap { E2EEAutoLog.parseEntry($0)?.entry.seq } ?? 0
         // Les entrées gardées au-delà de la chaîne lue (fichier d'un autre état) sont relues.
-        if after > chain.seq { (entries, after) = ([], 0) }
+        let reread = after > chain.seq
+        if reread { (entries, after) = ([], 0) }
+        // Un compte lu pour la première fois n'a aucun appareil « nouveau » :
+        // seules les entrées d'après une lecture vérifiée en disent un (§3.5).
+        let seenUpTo: Int64? = kept == nil || reread ? nil : after
 
         var pageSalt: String??
         for _ in 0..<Self.maxAccountPages {
@@ -495,10 +502,32 @@ actor E2EEAutoLogReader {
             if case .success = result {
                 file.accounts[userId] = .init(accountSaltB64: salt, entries: entries)
                 try store.save(file, ownerScopeId: ownerScopeId)
+                if let seenUpTo {
+                    let added = Self.addedDevices(entries, after: seenUpTo)
+                    if !added.isEmpty { addedDevices[userId, default: []].formUnion(added) }
+                }
             }
             return result
         }
         throw Failure.malformed
+    }
+
+    /// Appareils apparus depuis la dernière reprise, vidés à la lecture.
+    func takeAddedDevices() -> [String: Set<String>] {
+        defer { addedDevices = [:] }
+        return addedDevices
+    }
+
+    /// Appareils ajoutés par les entrées d'après `seq` : un `ADD` `GENESIS`
+    /// (reprise v2, §3.6) n'en ajoute aucun, ni pour une alerte ni pour une rotation (§7).
+    static func addedDevices(_ entries: [String], after seq: Int64) -> Set<String> {
+        Set(entries.compactMap(E2EEAutoLog.parseEntry).compactMap { parsed -> String? in
+            guard parsed.entry.seq > seq else { return nil }
+            switch parsed.detail {
+            case .add(genesis: false), .activate: return parsed.entry.deviceId
+            default: return nil
+            }
+        })
     }
 
     /// Sel d'un compte sans maillon `ACCOUNT` : son état vide ne sert qu'à dire « aucun appareil ».

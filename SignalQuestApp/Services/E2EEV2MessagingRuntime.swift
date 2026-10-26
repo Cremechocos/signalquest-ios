@@ -105,6 +105,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     func lacksV2Readiness(_ session: LocalAccountSession) -> Bool {
         let namespace = session.ownerNamespace
         do {
+            // Une fois la bascule faite (E2EE-AUTO §7.2), l'appareil inscrit au
+            // journal suffit : ni clé de compte ni certificat.
+            if E2EEV2ServerGate.autoActive { return try identityStore.load(ownerNamespace: namespace) == nil }
             return try identityStore.load(ownerNamespace: namespace) == nil
                 || accountIdentityStore.load(ownerNamespace: namespace) == nil
                 || accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace)
@@ -187,8 +190,10 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     static func stale(_ failure: E2EEV2TransportFailure) -> [String]? {
         // La bascule a eu lieu sans que version-policy l'ait encore dit
         // (E2EE-AUTO §7.2) : l'interrupteur est retenu allumé, et l'opération
-        // refaite une fois, sur des journaux relus, avec `memberLogSeqs`.
-        if failure.statusCode == 400, failure.code == "E2EE_AUTO_REQUIRED", !E2EEV2ServerGate.autoActive {
+        // refaite une fois, sur des journaux relus, avec `memberLogSeqs`. Le code
+        // seul compte : `400` sur un champ d'époque, `409` sur une écriture sous
+        // une époque non marquée, qui tourne alors avant le nouvel envoi.
+        if failure.code == "E2EE_AUTO_REQUIRED", !E2EEV2ServerGate.autoActive {
             E2EEV2ServerGate.recordAutoActive()
             return []
         }
@@ -290,6 +295,13 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         guard let parts = current() else { return .failure(Self.noSession) }
         let stored: (isGroup: Bool, members: [String])
         switch parts.messaging.storedMembership(conversationId: conversationId) {
+        case .notV2 where E2EEV2ServerGate.autoActive:
+            // Appareil neuf (E2EE-AUTO §7) : une conversation v2 jamais relue
+            // ici se relit d'abord, avec les membres servis ; sa chaîne vérifiée
+            // fait foi ensuite.
+            guard let conversation = await conversationDetail(conversationId), conversation.e2eeV2 != nil
+            else { return .noAction }
+            stored = (conversation.isGroup, conversation.migrationMemberIds)
         case .notV2: return .noAction
         case .unreadable: return .failure(.init(kind: .retryable, message: "e2ee-v2-conversation-state-unreadable"))
         case .v2(let isGroup, let members, _): stored = (isGroup, members)

@@ -186,7 +186,9 @@ enum E2EEV2EpochVerifierV2 {
         /// La chaîne locale n'atteint pas l'état sur lequel repose l'époque.
         case needsMembershipSync
         /// Époque valide, mais cet appareil n'en est pas destinataire.
-        case notRecipient
+        /// `witnessed` : l'époque vue, vérifiée et sans clé, quand l'appareil est
+        /// absent du manifeste ; un appareil neuf tourne à partir d'elle (E2EE-AUTO §7).
+        case notRecipient(witnessed: E2EEV2ConversationStateStore.CurrentEpoch?)
         case invalid
     }
 
@@ -235,7 +237,17 @@ enum E2EEV2EpochVerifierV2 {
                 previousMembershipChangeNumber: previousMembershipChangeNumber
             )
             let lines = served.recipients.compactMap(E2EEV2EpochManifest.Recipient.parse)
-            guard let ownLine = lines.first(where: { $0.deviceId == ownDeviceId }) else { return .notRecipient }
+            guard let ownLine = lines.first(where: { $0.deviceId == ownDeviceId }) else {
+                return .notRecipient(witnessed: .init(
+                    conversationId: conversationId, epochNumber: manifest.epochNumber,
+                    membershipChangeNumber: manifest.membershipChangeNumber, memberIds: state.members.sorted(),
+                    recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: served.recipients),
+                    excludesWeb: state.excludesWeb, createdAtMs: manifest.createdAtMs, acceptedAtMs: nowMs,
+                    epochId: served.accepted.epochId, keyCommitmentB64: manifest.keyCommitmentB64,
+                    e2eeAuto: served.accepted.e2eeAuto ? true : nil, readOnly: true,
+                    firstAutoEpochNumber: served.accepted.e2eeAuto ? manifest.epochNumber : nil
+                ))
+            }
             // Notre ligne doit être exactement notre appareil certifié.
             guard let own = devices.device(userId: ownUserId, deviceId: ownDeviceId),
                   ownLine == E2EEV2EpochManifest.Recipient(
@@ -254,7 +266,7 @@ enum E2EEV2EpochVerifierV2 {
             }
             // Destinataire selon le manifeste, mais enveloppe déjà accusée
             // ailleurs ou retirée : la clé ne peut plus venir de là.
-            guard let envelope = served.envelope else { return .notRecipient }
+            guard let envelope = served.envelope else { return .notRecipient(witnessed: nil) }
             guard envelope.recipientDeviceId == ownDeviceId,
                   let signature = Data(base64Encoded: envelope.signatureB64),
                   signature.base64EncodedString() == envelope.signatureB64,
@@ -467,8 +479,26 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         let ownerNamespace = session.ownerNamespace
         let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
         guard let device = try? identityStore.load(ownerNamespace: ownerNamespace),
-              let genesis = try? stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace),
-              let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
+              let genesis = try? stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) else {
+            return .failure(localError("e2ee-rotation-state-unavailable"))
+        }
+        let stored: E2EEV2ConversationStateStore.CurrentEpoch?
+        do {
+            stored = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        } catch {
+            return .failure(localError("e2ee-rotation-state-unavailable"))
+        }
+        // Appareil neuf, jamais destinataire ici (E2EE-AUTO §7) : l'époque
+        // courante, vérifiée sans clé, sert de base ; il tourne pour s'y ajouter.
+        var base = stored
+        if base == nil, E2EEV2ServerGate.autoActive {
+            base = await witnessedEpoch(
+                conversationId: conversationId, genesis: genesis, ownUserId: ownUserId, ownDeviceId: device.deviceId,
+                membershipAt: membershipAt, devices: devices, transport: transport.bound(to: session),
+                expectedOwnerScopeId: expectedOwnerScopeId
+            )
+        }
+        guard let current = base,
               membership.changeNumber >= current.membershipChangeNumber,
               current.epochNumber < E2EEV2Canonical.maxSequenceNumber else {
             return .failure(localError("e2ee-rotation-state-unavailable"))
@@ -567,6 +597,33 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
             }
             return .rotated(epochNumber: epochNumber)
         }
+    }
+
+    /// Époque courante d'une conversation dont l'appareil n'a aucune époque :
+    /// son manifeste signé, lié à la chaîne gardée, quand l'appareil n'y figure
+    /// pas. Jamais une clé, ni une époque adoptée.
+    private func witnessedEpoch(
+        conversationId: String,
+        genesis: E2EEV2ConversationStateStore.Genesis,
+        ownUserId: String,
+        ownDeviceId: String,
+        membershipAt: (Int) -> E2EEV2MembershipState?,
+        devices: E2EEV2CertifiedDeviceSet,
+        transport: E2EEV2APITransport,
+        expectedOwnerScopeId: String
+    ) async -> E2EEV2ConversationStateStore.CurrentEpoch? {
+        struct NoKey: Error {}
+        guard case .success(let data, _, _) = await transport.getJSON(
+            path: "/api/e2ee/v2/conversations/\(conversationId)/epochs/current",
+            expectedOwnerScopeId: expectedOwnerScopeId,
+            capabilitySet: .message
+        ), let served = E2EEV2EpochContractV2.parseCurrent(data, conversationId: conversationId),
+              case .notRecipient(let witnessed?) = E2EEV2EpochVerifierV2.open(
+                  served, conversationId: conversationId, ownUserId: ownUserId, ownDeviceId: ownDeviceId, genesis: genesis,
+                  previousMembershipChangeNumber: nil, devices: devices, membershipAt: membershipAt,
+                  nowMs: Int64(now().timeIntervalSince1970 * 1_000), unwrap: { _ in throw NoKey() }
+              ) else { return nil }
+        return witnessed
     }
 
     private func adopt(

@@ -13,6 +13,8 @@ struct E2EEV2MessagesV2: Equatable, Sendable {
     let waitingForEpoch: Bool
     /// Manifestes refusés face au journal (E2EE-AUTO §7.1), les plus anciens d'abord.
     var securityAlerts: [E2EEV2ConversationStateStore.SecurityAlert] = []
+    /// Membres dont un appareil a été ajouté (E2EE-AUTO §3.5), les plus anciens d'abord.
+    var deviceChanges: [E2EEV2ConversationStateStore.DeviceChange] = []
 }
 
 enum E2EEV2RefreshResultV2: Equatable, Sendable {
@@ -226,6 +228,9 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                 snapshot: snapshot, unsupported: unsupported, missingByDevice: missing,
                 waitingForEpoch: synced == .waitingForEpoch,
                 securityAlerts: (try? stateStore.securityAlerts(
+                    conversationId: conversationId, ownerNamespace: session.ownerNamespace
+                )) ?? [],
+                deviceChanges: (try? stateStore.deviceChanges(
                     conversationId: conversationId, ownerNamespace: session.ownerNamespace
                 )) ?? []
             ))

@@ -2641,8 +2641,9 @@ private struct NewConversationSheet: View {
                     await onCreated()
                     dismiss()
                     return
-                case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
-                    || failure.kind == .activationBlocked:
+                // Une fois la bascule faite, jamais de repli v1 (E2EE-AUTO §7).
+                case .failure(let failure) where !E2EEV2ServerGate.autoActive
+                    && (failure.message == "e2ee-v2-capability-missing" || failure.kind == .activationBlocked):
                     E2EEV2MessagingRuntime.traceV2("creation", "fallback_v1", failure)
                 // Créé entre-temps ailleurs (autre appareil, autre plateforme) : on l'ouvre.
                 case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":

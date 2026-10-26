@@ -451,6 +451,57 @@ final class AppServices: ObservableObject {
             autoEnrollmentNotBefore = Date().addingTimeInterval(TimeInterval(seconds))
         }
         E2EEV2MessagingRuntime.traceV2("auto-enrollment", outcome.traceStep)
+        // Nouvel appareil inscrit (`ADD`, jamais `GENESIS`) : il fait lui-même
+        // tourner chacune de ses conversations pour s'y ajouter (E2EE-AUTO §7).
+        if case .registered(_, .active) = outcome, E2EEV2ServerGate.autoActive {
+            await rotateConversationsForNewDevice()
+        }
+    }
+
+    /// Appareils ajoutés vus dans le journal vérifié (E2EE-AUTO §3.5, §7) : la
+    /// ligne locale « les appareils de X ont changé » dans les conversations
+    /// communes, puis le filet de secours des rotations, une fois la bascule
+    /// faite. Un appareil de son propre compte fait tourner tout de suite ; celui
+    /// d'un contact après 0 à 30 s, ce que le nouvel appareil a souvent déjà fait.
+    func handleAddedDevices(_ added: [String: Set<String>], session: LocalAccountSession) async {
+        let ownUserId = String(session.ownerScopeId.dropFirst("user:".count))
+        let ownDeviceId = (try? E2EEV2DeviceIdentityStore().load(ownerNamespace: session.ownerNamespace))?.deviceId
+        let ownAdded = (added[ownUserId] ?? []).subtracting(ownDeviceId.map { [$0] } ?? [])
+        let contacts = Set(added.keys).subtracting([ownUserId])
+        guard !ownAdded.isEmpty || !contacts.isEmpty,
+              let conversations = try? await messages.conversations(), session.isCurrent else { return }
+        let encrypted = conversations.filter { $0.e2eeV2 != nil && $0.request?.isIncomingPending != true }
+        let shared = encrypted.filter { !contacts.isDisjoint(with: $0.migrationMemberIds) }
+        let stateStore = E2EEV2ConversationStateStore()
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        for conversation in shared {
+            for userId in contacts.intersection(conversation.migrationMemberIds) {
+                try? stateStore.recordDeviceChange(
+                    .init(userId: userId, atMs: nowMs), conversationId: conversation.id, ownerNamespace: session.ownerNamespace
+                )
+            }
+        }
+        guard E2EEV2ServerGate.autoActive else { return }
+        if !ownAdded.isEmpty {
+            if !encrypted.isEmpty { E2EEV2RotationEvents.recordCommitted(session: session, conversations: encrypted.map(\.id)) }
+            return
+        }
+        guard !shared.isEmpty else { return }
+        try? await Task.sleep(nanoseconds: UInt64.random(in: 0...30_000_000_000))
+        guard session.isCurrent, !Task.isCancelled else { return }
+        E2EEV2RotationEvents.recordCommitted(session: session, conversations: shared.map(\.id))
+    }
+
+    /// Les conversations v2 du compte entrent dans la file durable des
+    /// rotations ; une demande reçue en attente n'est pas touchée (DM-REQ-1).
+    private func rotateConversationsForNewDevice() async {
+        guard let session = LocalAccountScope.sessionSnapshot(),
+              let conversations = try? await messages.conversations(), session.isCurrent else { return }
+        let ids = conversations
+            .filter { $0.e2eeV2 != nil && $0.request?.isIncomingPending != true }
+            .map(\.id)
+        guard !ids.isEmpty else { return }
+        E2EEV2RotationEvents.recordCommitted(session: session, conversations: ids)
     }
 
     private var migrationSweepRunning = false
@@ -1123,8 +1174,9 @@ extension AppServices {
             ) {
             case .created(let conversationId, _):
                 return conversationId
-            case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
-                || failure.kind == .activationBlocked:
+            // Une fois la bascule faite, jamais de repli v1 (E2EE-AUTO §7).
+            case .failure(let failure) where !E2EEV2ServerGate.autoActive
+                && (failure.message == "e2ee-v2-capability-missing" || failure.kind == .activationBlocked):
                 E2EEV2MessagingRuntime.traceV2("creation", "fallback_v1", failure)
             case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
                 if case .string(let existing)? = failure.details?["conversationId"] { return existing }

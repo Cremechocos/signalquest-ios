@@ -1302,9 +1302,11 @@ enum E2EEV2ServerGate {
     private static let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     #endif
 
-    static var messagingOpen: Bool { messagingCapabilities.isSubset(of: published) }
-    static var callsOpen: Bool { callCapabilities.isSubset(of: published) }
-    static var reactionsOpen: Bool { messagingCapabilities.union([reactionsCapability]).isSubset(of: published) }
+    // Une fois la bascule faite, la version minimale tient lieu de capacités :
+    // toute app à jour sait tout faire (E2EE-AUTO §7).
+    static var messagingOpen: Bool { autoActive || messagingCapabilities.isSubset(of: published) }
+    static var callsOpen: Bool { autoActive || callCapabilities.isSubset(of: published) }
+    static var reactionsOpen: Bool { autoActive || messagingCapabilities.union([reactionsCapability]).isSubset(of: published) }
     /// Une fois la lecture ouverte, les conversations déjà v2 restent lisibles
     /// même si le serveur referme sa porte : elles ne repassent jamais en v1.
     static var readsOpen: Bool {

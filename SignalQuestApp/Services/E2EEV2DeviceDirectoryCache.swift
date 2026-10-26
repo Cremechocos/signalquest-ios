@@ -85,6 +85,8 @@ actor E2EEV2DeviceDirectoryCache {
             for userId in Set(userIds).sorted() { accounts[userId] = try await reader.account(userId) }
             var set = E2EEAutoDeviceDirectory.deviceSet(accounts: accounts)
             set.logClockOffsetMs = await reader.clockOffsetMs
+            let added = await reader.takeAddedDevices()
+            if !added.isEmpty { E2EEAutoDeviceEvents.post(ownerScopeId: reader.ownerScopeId, added: added) }
             return set
         }
     }

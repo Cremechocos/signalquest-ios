@@ -227,11 +227,16 @@ struct E2EEV2ConversationCreation: Sendable {
         guard unlogged.isEmpty else { throw Failure.membersUnlogged(unlogged) }
         // Un membre sans identité v2 (E2EE_IDENTITY_NOT_FOUND) ne lit pas le v2 :
         // la conversation naît en v1 (v0.4.17). Une identité changée ou
-        // invalide, elle, suspend tout (§2.4).
-        guard !members.contains(where: { devices.refusals[$0] == .notFound }) else { throw Failure.capabilityMissing }
+        // invalide, elle, suspend tout (§2.4). Une fois la bascule faite, toute
+        // conversation naît chiffrée (E2EE-AUTO §7) : un journal illisible
+        // suspend tout, sans repli v1, et la version minimale tient lieu de
+        // capacités.
+        guard autoActive || !members.contains(where: { devices.refusals[$0] == .notFound }) else { throw Failure.capabilityMissing }
         let untrusted = devices.untrustedMembers(members)
         guard untrusted.isEmpty else { throw Failure.membersNotTrusted(untrusted) }
-        guard readsV2(devices, members: members, excludesWeb: excludesWeb, nowMs: nowMs) else { throw Failure.capabilityMissing }
+        guard autoActive || readsV2(devices, members: members, excludesWeb: excludesWeb, nowMs: nowMs) else {
+            throw Failure.capabilityMissing
+        }
         let actor = E2EEV2MembershipChain.Actor(userId: ownUserId, deviceId: device.deviceId)
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),
               ownCertified.identityKeyB64 == device.publicIdentityKeyB64,

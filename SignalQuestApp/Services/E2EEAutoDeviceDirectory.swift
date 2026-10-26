@@ -56,3 +56,19 @@ enum E2EEAutoDeviceDirectory {
         )
     }
 }
+
+/// Appareils nouveaux vus dans le journal vérifié (E2EE-AUTO §3.5, §7) : la
+/// ligne « les appareils de X ont changé » et le filet de secours des rotations.
+enum E2EEAutoDeviceEvents {
+    static let name = Notification.Name("SignalQuest.E2EEAuto.DevicesAdded.v1")
+
+    static func post(ownerScopeId: String, added: [String: Set<String>]) {
+        NotificationCenter.default.post(name: name, object: nil, userInfo: ["owner": ownerScopeId, "added": added])
+    }
+
+    /// Appareils ajoutés par compte, pour la session `ownerScopeId` seulement.
+    static func added(_ notification: Notification, ownerScopeId: String) -> [String: Set<String>]? {
+        guard notification.userInfo?["owner"] as? String == ownerScopeId else { return nil }
+        return notification.userInfo?["added"] as? [String: Set<String>]
+    }
+}

@@ -97504,6 +97504,38 @@
           }
         }
       }
+    },
+    "Les appareils de %@ ont changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@’s devices have changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les appareils de %@ ont changé."
+          }
+        }
+      }
+    },
+    "Les appareils d’un membre ont changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member’s devices have changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les appareils d’un membre ont changé."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

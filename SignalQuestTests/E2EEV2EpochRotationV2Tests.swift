@@ -205,6 +205,58 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(failure.staleUserIds, [bruno])
     }
 
+    /// Appareil neuf (E2EE-AUTO §7) : sans époque gardée ici, l'époque courante
+    /// dont il n'est pas destinataire, vérifiée, sert de base à la suivante, qui
+    /// l'inclut. Avant la bascule, rien ne part.
+    func testANewDeviceRotatesFromTheCurrentEpochItWasNotGiven() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [phone.device])
+        devices.logSeqs = [fixture.user: 9, bruno: 31]
+        let seeded = try seed(fixture, devices: devices, keepEpoch: false)
+        let withoutUs = E2EEV2CertifiedDeviceSet(devicesByUser: [bruno: [phone.device]], refusals: [:])
+        let served = try servedEpoch(
+            fixture, seeded: seeded, devices: withoutUs, creator: phone, epochKey: Data(repeating: 7, count: 32), withoutEnvelope: true
+        )
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            if request.httpMethod != "POST" {
+                XCTAssertTrue(request.url?.path.hasSuffix("/epochs/current") == true)
+                return E2EEV2AccountFixture.response(request, served)
+            }
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
+                "epoch": ["id": "epoch_rotation_000000000003", "epochNumber": "3", "status": "active", "createdAt": "2026-10-26T20:00:00.000Z"],
+                "recipientCount": String((body["envelopes"] as? [Any])?.count ?? 0),
+            ]))
+        }
+        func rotate() async -> E2EEV2EpochRotationV2Result {
+            await rotator(fixture).rotateIfNeeded(
+                conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+                devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+            )
+        }
+
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
+        guard case .failure(let failure) = await rotate() else { return XCTFail("Avant la bascule, pas d'époque sans base gardée") }
+        XCTAssertEqual(failure.message, "e2ee-rotation-state-unavailable")
+        XCTAssertNil(captured.first)
+
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        let result = await rotate()
+        XCTAssertEqual(result, .rotated(epochNumber: 3))
+        let body = try XCTUnwrap(captured.first?.1)
+        XCTAssertEqual(body["previousEpochNumber"] as? String, "2")
+        let recipients = (body["envelopes"] as? [[String: Any]])?.compactMap { $0["recipientDeviceId"] as? String }
+        XCTAssertEqual(Set(recipients ?? []), [fixture.descriptor.deviceId, phone.device.deviceId], "Il s'ajoute à la nouvelle époque")
+        let kept = try XCTUnwrap(try fixture.states.currentEpoch(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
+        XCTAssertEqual(kept.epochNumber, 3)
+        XCTAssertEqual(kept.e2eeAuto, true)
+    }
+
     /// Conflit : l'époque acceptée entre-temps est relue, vérifiée et adoptée.
     func testAConflictAdoptsTheAcceptedEpochAfterVerifyingIt() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
@@ -326,14 +378,14 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
     }
 
     /// Tête-à-tête créé localement, époque 1 gardée comme si le serveur l'avait acceptée.
-    private func seed(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet) throws -> Seeded {
+    private func seed(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet, keepEpoch: Bool = true) throws -> Seeded {
         let epochKey = Data((0..<32).map { UInt8($0) })
         let creation = try fixture.make(participants: [bruno], isGroup: false, title: nil, excludesWeb: false, devices: devices, epochKey: epochKey)
         let namespace = fixture.session.ownerNamespace
-        XCTAssertTrue(try fixture.keys.put(
+        if keepEpoch { XCTAssertTrue(try fixture.keys.put(
             recordInput: .init(conversationId: creation.conversationId, epochId: "epoch_rotation_000000000001", epochNumber: 1, keyCommitmentB64: creation.epoch.keyCommitmentB64),
             epochKey: epochKey, ownerNamespace: namespace, expectedSession: fixture.session
-        ))
+        )) }
         let current = E2EEV2ConversationStateStore.CurrentEpoch(
             conversationId: creation.conversationId, epochNumber: 1, membershipChangeNumber: creation.genesis.changeNumber,
             memberIds: creation.genesis.members.sorted(),
@@ -351,7 +403,7 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
             ),
             ownerNamespace: namespace
         )
-        try fixture.states.recordCurrentEpoch(current, ownerNamespace: namespace)
+        if keepEpoch { try fixture.states.recordCurrentEpoch(current, ownerNamespace: namespace) }
         return Seeded(conversationId: creation.conversationId, genesis: creation.genesis, current: current)
     }
 
@@ -362,7 +414,8 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         devices: E2EEV2CertifiedDeviceSet,
         creator: Remote,
         epochKey: Data,
-        envelopeSigner: P256.Signing.PrivateKey? = nil
+        envelopeSigner: P256.Signing.PrivateKey? = nil,
+        withoutEnvelope: Bool = false
     ) throws -> Data {
         let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
         let lines = E2EEV2EpochProposals.recipients(devices, members: seeded.genesis.members, excludesWeb: false, nowMs: nowMs)
@@ -394,11 +447,11 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
             "conversationId": seeded.conversationId,
             "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": "2", "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
             "manifest": ["manifest": signed.canonical, "signatureB64": signed.signatureB64, "recipients": lines],
-            "envelope": [
+            "envelope": withoutEnvelope ? NSNull() as Any : [
                 "recipientDeviceId": envelope.recipientDeviceId, "wrapAlgorithm": envelope.wrapAlgorithm,
                 "ephemeralPublicKeyB64": envelope.ephemeralPublicKeyB64, "wrappedEpochKeyB64": envelope.wrappedEpochKeyB64,
                 "nonceB64": envelope.nonceB64, "aadB64": envelope.aadB64, "signatureB64": signature.base64EncodedString(),
-            ],
+            ] as [String: Any],
         ])
     }
 

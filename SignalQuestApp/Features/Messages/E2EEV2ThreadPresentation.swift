@@ -26,6 +26,8 @@ struct E2EEV2ThreadPresentation: Equatable {
         /// Une clé de la conversation n'a pas pu être vérifiée (époque non
         /// marquée après une époque marquée, §7.2) : elle est remplacée.
         case keyUnverified
+        /// Un appareil a été ajouté chez un membre (E2EE-AUTO §3.5), dans les 7 derniers jours.
+        case devicesChanged(userId: String, name: String?)
 
         var text: String {
             switch self {
@@ -53,6 +55,10 @@ struct E2EEV2ThreadPresentation: Equatable {
                 return String(localized: "Un appareil d’un membre ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.")
             case .keyUnverified:
                 return String(localized: "Une clé de cette conversation n’a pas pu être vérifiée : elle est remplacée par une nouvelle.")
+            case .devicesChanged(_, let name?):
+                return String(localized: "Les appareils de \(name) ont changé.")
+            case .devicesChanged(_, nil):
+                return String(localized: "Les appareils d’un membre ont changé.")
             }
         }
     }
@@ -78,6 +84,9 @@ enum E2EEV2ThreadWindow {
 }
 
 enum E2EEV2ThreadPresenter {
+    /// Durée de la ligne « les appareils de X ont changé ».
+    static let deviceChangeWindowMs: Int64 = 7 * 24 * 3_600_000
+
     /// `members` : nom et avatar par utilisateur ; `deviceOwners` : l'utilisateur
     /// de chaque appareil certifié, pour nommer qui a des messages manquants ;
     /// `refusals` : les membres dont l'annuaire n'a pas cru l'identité, en tête
@@ -89,7 +98,8 @@ enum E2EEV2ThreadPresenter {
         deviceOwners: [String: String],
         refusals: [String: E2EEV2IdentityVerification.Failure] = [:],
         ownUserId: String? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
+        nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2ThreadPresentation {
         // Le magasin garde jusqu'à des milliers de messages : seuls les derniers deviennent des
         // `MessageItem`, les précédents se présentent par pages (P03).
@@ -135,6 +145,10 @@ enum E2EEV2ThreadPresenter {
             } else if refusedDevices.insert(alert.userId + "\n" + alert.deviceId).inserted {
                 notices.append(.deviceRefused(userId: alert.userId, name: members[alert.userId]?.displayName))
             }
+        }
+        for change in result.deviceChanges.reversed()
+        where change.userId != ownUserId && nowMs - change.atMs < deviceChangeWindowMs {
+            notices.append(.devicesChanged(userId: change.userId, name: members[change.userId]?.displayName))
         }
         if result.waitingForEpoch { notices.append(.waitingForEpoch) }
         if !result.snapshot.equivocalRefs.isEmpty {

@@ -304,6 +304,12 @@ struct AppRootView: View {
                       let id = note.userInfo?["session"] as? String else { return }
                 services.epochRotations.resume(expected: .init(ownerScopeId: owner, sessionId: id))
             }
+            // Appareils ajoutés vus dans le journal (E2EE-AUTO §3.5, §7).
+            .onReceive(NotificationCenter.default.publisher(for: E2EEAutoDeviceEvents.name).receive(on: RunLoop.main)) { note in
+                guard let account = LocalAccountScope.sessionSnapshot(),
+                      let added = E2EEAutoDeviceEvents.added(note, ownerScopeId: account.ownerScopeId) else { return }
+                Task { await services.handleAddedDevices(added, session: account) }
+            }
             // Porte E2EE v2 levée (ou refermée) pendant que l'app tourne.
             .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
                 services.epochRotations.resume()
