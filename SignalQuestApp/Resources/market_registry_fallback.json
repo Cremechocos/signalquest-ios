@@ -1,14 +1,14 @@
 {
   "schemaVersion": 3,
   "contract": {
-    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-1d71b9f3b4de",
+    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-ab25f05e6253",
     "minimumCompatibleSchemaVersion": 3,
     "positionDate": "2026-08-15",
     "plmnRegistryVersion": "2026-08-15-ob1346-a62-parser2-names3",
     "plmnContentSha256": "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e",
     "plmnResolutionVersion": 1,
     "plmnResolutionSha256": "c385cce4f80ac6734c5ef7d4a6ec31cf404b1c2a80fd36fb387c07138ea0d6b7",
-    "marketContentSha256": "1d71b9f3b4dedfcfce534fe5f0fcd8f2a1e07e520d8092371e6741fe147fd937"
+    "marketContentSha256": "ab25f05e62532b7bef55a22739dcc5037fe5a7ec2bfa23a3cd46ac6f3e09951e"
   },
   "registeredPlmnMarkets": {
     "20200": "GR",
@@ -2882,8 +2882,8 @@
         },
         {
           "key": "FREE_CARAIBES",
-          "label": "Free Caraibes",
-          "shortLabel": "Free Caraibes",
+          "label": "Free Caraïbes",
+          "shortLabel": "Free Caraïbes",
           "color": "#6B7280",
           "background": "rgba(107, 114, 128, 0.12)"
         },
@@ -2998,7 +2998,7 @@
         },
         {
           "key": "FREE_CARAIBES",
-          "label": "Free Caraibe",
+          "label": "Free Caraïbes",
           "shortLabel": "Free",
           "mncs": [
             9
@@ -3022,7 +3022,7 @@
           ],
           "kind": "MNO",
           "aliases": [
-            "Free Caraibes"
+            "Free Caraibe"
           ],
           "color": "#111827",
           "networkGroupKey": "FREE_CARAIBES"
