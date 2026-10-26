@@ -250,6 +250,36 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         XCTAssertEqual(rollback, .alert(.init(error: "ROLLBACK", seq: 16)))
     }
 
+    /// Seule une réinitialisation volontaire (lot 6d) oublie l'alerte : la relecture repart de 1.
+    func testVoluntaryResetForgetsTheAlertAndRereadsFromTheStart() async throws {
+        let reference = try reference()
+        let head = try XCTUnwrap(E2EEAutoLog.parseHead(reference.headText))
+        let store = makeStore(), server = Server(reference)
+        let defaults = UserDefaults(suiteName: "e2ee-auto-log-alert-\(UUID().uuidString)")!
+        let alerts = E2EEAutoLogAlerts(store: store, defaults: defaults)
+        try store.saveAnchor(.init(seq: 9, linkHash: head.linkHash, headCreatedAtMs: 0), ownerScopeId: Self.owner)
+
+        let raised = expectation(forNotification: E2EEAutoLogAlerts.didChange, object: nil)
+        let fork = try await makeReader(reference, server: server, store: store, nowMs: reference.headNowMs).refreshLinks()
+        await fulfillment(of: [raised], timeout: 1)
+        let alert = E2EEAutoLogStore.Alert(error: "FORK", seq: 9)
+        XCTAssertEqual(fork, .alert(alert))
+        XCTAssertEqual(alerts.current(ownerScopeId: Self.owner), alert)
+
+        alerts.setReported("bug_1", for: alert, ownerScopeId: Self.owner)
+        XCTAssertEqual(alerts.reportId(for: alert, ownerScopeId: Self.owner), "bug_1")
+        XCTAssertNil(alerts.reportId(for: .init(error: "FORK", seq: 10), ownerScopeId: Self.owner), "un signalement par alerte")
+
+        let cleared = expectation(forNotification: E2EEAutoLogAlerts.didChange, object: nil)
+        try alerts.reset(ownerScopeId: Self.owner)
+        await fulfillment(of: [cleared], timeout: 1)
+        XCTAssertNil(alerts.current(ownerScopeId: Self.owner))
+        XCTAssertNil(alerts.reportId(for: alert, ownerScopeId: Self.owner))
+        let reread = try await makeReader(reference, server: server, store: store, nowMs: reference.headNowMs).refreshLinks()
+        XCTAssertEqual(reread, .current(head))
+        XCTAssertEqual(server.linkAfters.last, 0, "relu depuis le premier maillon")
+    }
+
     func testRecedingHeadBetweenPagesInvalidatesTheRead() async throws {
         let reference = try reference(), server = Server(reference), store = makeStore()
         let boundary = try boundaryHead(seq: 12)

@@ -191,6 +191,15 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Alerte de fourche ; `--qa-auto-log-alert-rollback` ou `-sent` pour ses états.
+    static var showsAutoLogAlertQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-log-alert") || hasArgument("--qa-auto-log-alert-rollback")
+            || hasArgument("--qa-auto-log-alert-sent") || hasArgument("--qa-auto-log-alert-banner")
+        #else
+        false
+        #endif
+    }
     /// Code de sécurité d'un contact ; `--qa-auto-safety-code-changed` ou `-verified` pour ses états.
     static var showsAutoSafetyCodeQA: Bool {
         #if DEBUG && targetEnvironment(simulator)

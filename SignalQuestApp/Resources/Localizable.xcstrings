@@ -98892,6 +98892,546 @@
           }
         }
       }
+    },
+    "Signalement envoyé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement envoyé"
+          }
+        }
+      }
+    },
+    "Alerte du journal des appareils (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device log alert (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alerte du journal des appareils (%@)"
+          }
+        }
+      }
+    },
+    "Refaire confiance au journal actuel ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trust the current log again?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refaire confiance au journal actuel ?"
+          }
+        }
+      }
+    },
+    "Refaire confiance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trust again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refaire confiance"
+          }
+        }
+      }
+    },
+    "Cet appareil oubliera le journal qu’il avait vérifié. Si un appareil a été glissé à ton insu, il recevra de nouveau tes messages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device will forget the log it had verified. If a device was slipped in without your knowledge, it will receive your messages again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil oubliera le journal qu’il avait vérifié. Si un appareil a été glissé à ton insu, il recevra de nouveau tes messages."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil oubliera le journal qu’il avait vérifié. Si un appareil a été glissé à ton insu, il recevra de nouveau tes messages." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil oubliera le journal qu’il avait vérifié. Si un appareil a été glissé à votre insu, il recevra de nouveau vos messages."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Journal relu depuis le début" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log reread from the start"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal relu depuis le début"
+          }
+        }
+      }
+    },
+    "Cet appareil vérifie de nouveau le journal que montre le serveur. L’envoi chiffré reprend dès que c’est fait. Vérifie ensuite tes appareils dans Réglages > Appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is verifying the log the server shows again. Encrypted sending resumes as soon as that is done. Then check your devices in Settings > Devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil vérifie de nouveau le journal que montre le serveur. L’envoi chiffré reprend dès que c’est fait. Vérifie ensuite tes appareils dans Réglages > Appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil vérifie de nouveau le journal que montre le serveur. L’envoi chiffré reprend dès que c’est fait. Vérifie ensuite tes appareils dans Réglages > Appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil vérifie de nouveau le journal que montre le serveur. L’envoi chiffré reprend dès que c’est fait. Vérifiez ensuite vos appareils dans Réglages > Appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le journal de tes appareils ne correspond plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your device log no longer matches"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal de tes appareils ne correspond plus"
+          }
+        }
+      }
+    },
+    "SQFormal|Le journal de tes appareils ne correspond plus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal de vos appareils ne correspond plus"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le serveur montre une autre version de la liste des appareils que celle que cet appareil a déjà vérifiée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server is showing a different version of the device list from the one this device already verified."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur montre une autre version de la liste des appareils que celle que cet appareil a déjà vérifiée."
+          }
+        }
+      }
+    },
+    "Le serveur montre une version plus ancienne de la liste des appareils que celle que cet appareil a déjà vérifiée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server is showing an older version of the device list than the one this device already verified."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur montre une version plus ancienne de la liste des appareils que celle que cet appareil a déjà vérifiée."
+          }
+        }
+      }
+    },
+    "Cela peut venir d’une erreur du serveur, ou d’une tentative de glisser un appareil dans tes conversations. Par précaution, cet appareil n’envoie plus de messages chiffrés. Ceux déjà reçus restent lisibles." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This may be a server error, or an attempt to slip a device into your conversations. As a precaution, this device no longer sends encrypted messages. Messages already received stay readable."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela peut venir d’une erreur du serveur, ou d’une tentative de glisser un appareil dans tes conversations. Par précaution, cet appareil n’envoie plus de messages chiffrés. Ceux déjà reçus restent lisibles."
+          }
+        }
+      }
+    },
+    "SQFormal|Cela peut venir d’une erreur du serveur, ou d’une tentative de glisser un appareil dans tes conversations. Par précaution, cet appareil n’envoie plus de messages chiffrés. Ceux déjà reçus restent lisibles." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela peut venir d’une erreur du serveur, ou d’une tentative de glisser un appareil dans vos conversations. Par précaution, cet appareil n’envoie plus de messages chiffrés. Ceux déjà reçus restent lisibles."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce que contient le signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What the report contains"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que contient le signalement"
+          }
+        }
+      }
+    },
+    "Écart" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mismatch"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écart"
+          }
+        }
+      }
+    },
+    "Deux versions du journal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two versions of the log"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deux versions du journal"
+          }
+        }
+      }
+    },
+    "Retour en arrière" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rollback"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour en arrière"
+          }
+        }
+      }
+    },
+    "Maillon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maillon"
+          }
+        }
+      }
+    },
+    "App" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        }
+      }
+    },
+    "Aucun message ni contact n’est envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No message or contact is sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun message ni contact n’est envoyé."
+          }
+        }
+      }
+    },
+    "Signalement envoyé. Tu peux le suivre dans Profil > Mes signalements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report sent. You can follow it in Profile > My reports."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement envoyé. Tu peux le suivre dans Profil > Mes signalements."
+          }
+        }
+      }
+    },
+    "SQFormal|Signalement envoyé. Tu peux le suivre dans Profil > Mes signalements." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement envoyé. Vous pouvez le suivre dans Profil > Mes signalements."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le signalement n’est pas parti. Vérifie ta connexion et réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The report wasn’t sent. Check your connection and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement n’est pas parti. Vérifie ta connexion et réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Le signalement n’est pas parti. Vérifie ta connexion et réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement n’est pas parti. Vérifiez votre connexion et réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Signaler à l’équipe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report to the team"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler à l’équipe"
+          }
+        }
+      }
+    },
+    "Si l’équipe te le conseille, ou si tu reconnais tous tes appareils, cet appareil peut refaire confiance au journal que montre le serveur maintenant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the team advises it, or if you recognize all your devices, this device can trust the log the server shows now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’équipe te le conseille, ou si tu reconnais tous tes appareils, cet appareil peut refaire confiance au journal que montre le serveur maintenant."
+          }
+        }
+      }
+    },
+    "SQFormal|Si l’équipe te le conseille, ou si tu reconnais tous tes appareils, cet appareil peut refaire confiance au journal que montre le serveur maintenant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’équipe vous le conseille, ou si vous reconnaissez tous vos appareils, cet appareil peut refaire confiance au journal que montre le serveur maintenant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "La réinitialisation a échoué. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reset failed. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réinitialisation a échoué. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|La réinitialisation a échoué. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réinitialisation a échoué. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Refaire confiance au journal actuel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trust the current log again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refaire confiance au journal actuel"
+          }
+        }
+      }
+    },
+    "Envoi chiffré suspendu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted sending paused"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi chiffré suspendu"
+          }
+        }
+      }
+    },
+    "Le journal de tes appareils ne correspond plus à celui vérifié ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your device log no longer matches the one verified here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal de tes appareils ne correspond plus à celui vérifié ici."
+          }
+        }
+      }
+    },
+    "SQFormal|Le journal de tes appareils ne correspond plus à celui vérifié ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal de vos appareils ne correspond plus à celui vérifié ici."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ouvre l’alerte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the alert"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre l’alerte"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

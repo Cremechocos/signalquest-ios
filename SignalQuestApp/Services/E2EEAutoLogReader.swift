@@ -444,6 +444,7 @@ actor E2EEAutoLogReader {
         var kept = anchor ?? .init(seq: 0, linkHash: E2EEAutoLog.genesisHash, headCreatedAtMs: 0)
         kept.alert = alert
         try store.saveAnchor(kept, ownerScopeId: ownerScopeId)
+        NotificationCenter.default.post(name: E2EEAutoLogAlerts.didChange, object: nil)
         return .alert(alert)
     }
 

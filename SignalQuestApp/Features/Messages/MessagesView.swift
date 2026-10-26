@@ -691,6 +691,7 @@ struct MessagesView: View {
                     MessagesOfflineBanner()
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
+                E2EEAutoLogAlertBanner()
                 if needsV2Activation {
                     v2ActivationCard
                 }
