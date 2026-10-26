@@ -2,8 +2,8 @@ import CryptoKit
 import XCTest
 @testable import SignalQuest
 
-/// Vecteurs `history-wrap-v1` et `passkey-wrap-v1` (contrat E2EE-AUTO §5.4 à
-/// §5.6, phase 1b) rejoués avec CryptoKit dans les deux sens : chaînes de sel,
+/// Vecteurs `history-wrap-v1`, `passkey-wrap-v1` (contrat E2EE-AUTO §5.4 à
+/// §5.6, phase 1b) et `history-epoch-v1` (§5.2, révision 11) rejoués avec CryptoKit dans les deux sens : chaînes de sel,
 /// d'AAD et de signature, secret ECDH, clé HKDF, scellement à l'octet avec
 /// l'éphémère et le nonce du vecteur, ouverture, et chaque verdict du lecteur
 /// face au journal vérifié.
@@ -84,7 +84,7 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         }
 
         let cases = try XCTUnwrap(vectors["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 34)
+        XCTAssertEqual(cases.count, 42)
         var variants: [String: E2EEAutoLog.AccountState] = [:]
         for testCase in cases {
             let name = try string(testCase, "name")
@@ -249,6 +249,157 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
         for invalid in try XCTUnwrap(vectors["invalidCredentialIds"] as? [[String: Any]]) {
             let name = try string(invalid, "name")
             XCTAssertFalse(E2EEAutoHistory.isPasskeyCredentialId(try string(invalid, "value")), name)
+        }
+    }
+
+    // MARK: Époques vers HK
+
+    func testHistoryEpochCases() throws {
+        let vectors = try load("history-epoch-v1")
+        XCTAssertEqual(try string(vectors, "kdfInfo"), E2EEAutoHistory.historyEpochInfo)
+        let userId = try string(vectors, "userId"), conversationId = try string(vectors, "conversationId")
+        let epochNumber = try XCTUnwrap(Int(try string(vectors, "epochNumber")))
+        let keyCommitmentB64 = try string(vectors, "keyCommitmentB64"), epochKey = try bytes(vectors, "epochKeyB64")
+        XCTAssertEqual(try E2EEV2EpochCrypto.keyCommitment(epochKey), keyCommitmentB64)
+        let account = try verifiedAccount(vectors)
+        let secrets = try XCTUnwrap(vectors["secrets"] as? [String: Any])
+        var historyScalars: [String: Data] = [:]
+        for name in ["hk1ScalarB64", "hk2ScalarB64", "hk3ScalarB64", "hkUnknownScalarB64"] {
+            let scalar = try bytes(secrets, name)
+            historyScalars[try XCTUnwrap(E2EEAutoHistoryKey.publicKeyB64(scalar: scalar))] = scalar
+        }
+
+        let cases = try XCTUnwrap(vectors["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 11)
+        for testCase in cases {
+            let name = try string(testCase, "name")
+            let senderDeviceId = try string(testCase, "senderDeviceId")
+            let envelope = try XCTUnwrap(E2EEAutoHistory.parseEpochEnvelope(try XCTUnwrap(testCase["envelope"] as? [String: Any])), name)
+            let steps = try XCTUnwrap(testCase["intermediates"] as? [String: Any], name)
+            let expect = try XCTUnwrap(testCase["expect"] as? [String: Any], name)
+
+            // Chaînes du contrat, dans le contexte de l'émetteur (un autre compte ou
+            // une autre époque pour les cas déplacés).
+            let saltText = try string(steps, "saltUtf8")
+            let writerEpoch = try XCTUnwrap(Int(saltText.components(separatedBy: "\n")[3]), name)
+            let writerUserId = envelope.recipientUserId
+            XCTAssertEqual(
+                E2EEAutoHistory.epochSaltText(
+                    conversationId: conversationId, epochNumber: writerEpoch, senderDeviceId: senderDeviceId,
+                    userId: writerUserId, hkPubB64: envelope.hkPubB64
+                ),
+                saltText, name
+            )
+            XCTAssertEqual(Data(SHA256.hash(data: Data(saltText.utf8))), try bytes(steps, "saltB64"), name)
+            XCTAssertEqual(
+                E2EEAutoHistory.epochAadText(
+                    conversationId: conversationId, epochNumber: writerEpoch, senderDeviceId: senderDeviceId, userId: writerUserId,
+                    hkPubB64: envelope.hkPubB64, keyCommitmentB64: keyCommitmentB64, ephemeralPublicKeyB64: envelope.ephemeralPublicKeyB64
+                ),
+                try string(steps, "aadUtf8"), name
+            )
+            XCTAssertEqual(Data(base64Encoded: envelope.aadB64), Data(try string(steps, "aadUtf8").utf8), name)
+            XCTAssertEqual(
+                E2EEAutoHistory.epochSignaturePayload(
+                    conversationId: conversationId, epochNumber: writerEpoch, senderDeviceId: senderDeviceId, userId: writerUserId,
+                    keyCommitmentB64: keyCommitmentB64, envelope: envelope
+                ),
+                try string(steps, "signatureUtf8"), name
+            )
+
+            // Côté émetteur : ECDH vers la HK, HKDF, puis scellement à l'octet.
+            let ephemeral = try P256.KeyAgreement.PrivateKey(rawRepresentation: try bytes(steps, "ephemeralPrivateB64"))
+            XCTAssertEqual(ephemeral.publicKey.x963Representation.base64EncodedString(), envelope.ephemeralPublicKeyB64, name)
+            let hkKey = try P256.KeyAgreement.PublicKey(x963Representation: try XCTUnwrap(Data(base64Encoded: envelope.hkPubB64)))
+            let secret = try ephemeral.sharedSecretFromKeyAgreement(with: hkKey).withUnsafeBytes { Data($0) }
+            XCTAssertEqual(secret, try bytes(steps, "sharedSecretB64"), name)
+            let key = E2EEAutoHistory.derivedKey(inputKeyMaterial: secret, saltText: saltText, info: E2EEAutoHistory.historyEpochInfo)
+            XCTAssertEqual(key.withUnsafeBytes { Data($0) }, try bytes(steps, "derivedKeyB64"), name)
+
+            let plaintext = try bytes(steps, "plaintextEpochKeyB64")
+            if expect["plaintextMatches"] as? Bool != false {
+                XCTAssertEqual(plaintext, epochKey, name)
+                var signedPayload = ""
+                let sealed = try E2EEAutoHistory.sealEpoch(
+                    epochKey: plaintext, keyCommitmentB64: keyCommitmentB64, userId: writerUserId, conversationId: conversationId,
+                    epochNumber: writerEpoch, senderDeviceId: senderDeviceId, hkPubB64: envelope.hkPubB64,
+                    sign: { payload in
+                        signedPayload = String(decoding: payload, as: UTF8.self)
+                        return try XCTUnwrap(Data(base64Encoded: envelope.signatureB64))
+                    },
+                    ephemeral: ephemeral, nonce: try XCTUnwrap(Data(base64Encoded: envelope.nonceB64))
+                )
+                XCTAssertEqual(signedPayload, try string(steps, "signatureUtf8"), name)
+                XCTAssertEqual(sealed, envelope, name)
+            } else {
+                // Une clé que l'époque n'engage pas n'est jamais enveloppée.
+                XCTAssertThrowsError(try E2EEAutoHistory.sealEpoch(
+                    epochKey: plaintext, keyCommitmentB64: keyCommitmentB64, userId: writerUserId, conversationId: conversationId,
+                    epochNumber: writerEpoch, senderDeviceId: senderDeviceId, hkPubB64: envelope.hkPubB64, sign: { _ in Data() }
+                ), name)
+            }
+
+            // Côté lecteur : verdict avant tout déchiffrement, puis l'engagement.
+            let verdict = E2EEAutoHistory.checkEpoch(
+                userId: userId, conversationId: conversationId, epochNumber: epochNumber, keyCommitmentB64: keyCommitmentB64,
+                senderDeviceId: senderDeviceId, envelope: envelope, account: account,
+                heldHkPubB64s: Set(try XCTUnwrap(testCase["heldHkPubB64s"] as? [String], name))
+            )
+            XCTAssertEqual(verdict?.rawValue ?? "ok", try string(expect, "check"), name)
+            guard verdict == nil else {
+                XCTAssertTrue(expect["plaintextMatches"] is NSNull, name)
+                continue
+            }
+            let scalar = try XCTUnwrap(historyScalars[envelope.hkPubB64], name)
+            let open = {
+                try E2EEAutoHistory.openEpoch(
+                    envelope, scalar: scalar, userId: userId, conversationId: conversationId, epochNumber: epochNumber,
+                    senderDeviceId: senderDeviceId, keyCommitmentB64: keyCommitmentB64
+                )
+            }
+            if expect["plaintextMatches"] as? Bool == true {
+                XCTAssertEqual(try open(), epochKey, name)
+            } else {
+                XCTAssertFalse(E2EEAutoHistory.epochPlaintextMatches(epochKey: plaintext, keyCommitmentB64: keyCommitmentB64), name)
+                XCTAssertThrowsError(try open(), name) {
+                    XCTAssertEqual($0 as? E2EEAutoHistory.Failure, .keyMismatch, name)
+                }
+            }
+        }
+    }
+
+    func testHistoryEpochUploadBodiesAndRefusedEnvelopes() throws {
+        let vectors = try load("history-epoch-v1")
+        let bodies = try XCTUnwrap(vectors["uploadBodies"] as? [[String: Any]])
+        XCTAssertEqual(bodies.count, 5)
+        for body in bodies {
+            let name = try string(body, "name"), value = try XCTUnwrap(body["value"], name)
+            let envelope = E2EEAutoHistory.parseEpochUploadBody(value)
+            XCTAssertEqual(envelope != nil, try XCTUnwrap(body["accepted"] as? Bool, name), name)
+            // Le corps produit ici est celui que le serveur accepte, à la clé près.
+            if let envelope {
+                let produced = try JSONSerialization.jsonObject(with: try E2EEAutoHistory.epochUploadBody(envelope))
+                XCTAssertEqual(produced as? NSDictionary, value as? NSDictionary, name)
+            }
+        }
+        let invalid = try XCTUnwrap(vectors["invalidEnvelopes"] as? [[String: Any]])
+        XCTAssertEqual(invalid.count, 8)
+        for item in invalid {
+            let name = try string(item, "name")
+            XCTAssertNil(E2EEAutoHistory.parseEpochEnvelope(try XCTUnwrap(item["value"] as? [String: Any], name)), name)
+        }
+    }
+
+    func testHistoryKeyPathParams() throws {
+        let params = try XCTUnwrap(try load("history-epoch-v1")["hkPathParams"] as? [String: Any])
+        for valid in try XCTUnwrap(params["valid"] as? [[String: Any]]) {
+            let hkPubB64 = try string(valid, "hkPubB64"), param = try string(valid, "param")
+            XCTAssertEqual(E2EEAutoHistory.hkPathParam(hkPubB64), param)
+            XCTAssertEqual(E2EEAutoHistory.hkPub(pathParam: param), hkPubB64)
+        }
+        for invalid in try XCTUnwrap(params["invalid"] as? [[String: Any]]) {
+            let name = try string(invalid, "name")
+            XCTAssertNil(E2EEAutoHistory.hkPub(pathParam: try string(invalid, "value")), name)
         }
     }
 }

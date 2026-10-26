@@ -84,6 +84,92 @@
           "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_alice_00000000001\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=:MEQCIDL+y+Qm27q643nP5Pj2rKe4H39C0j/ERXFKu4rH9eLGAiAzQAsBWnfXOyYSfAw4XRDuMilb6kzWTsMLq+qDiWHKxA==\n1790010800000"
         ]
       }
+    },
+    "chainSenderBounds": {
+      "note": "Révision 11 : le journal principal, plus A6 en ADD_PENDING (seq 14, T0 + 4 h) activé par A1 (seq 15), l’ACTIVATE de A5 (seq 16, T0 + 28 h), hk4 signée par A1 à la même milliseconde (seq 17) et le REVOKE USER de A2 par A1 (seq 18).",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\n76e0OUhGV4UICTfCdblUNcvi9tqa5WYXJXC5sT2zHc4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nIdyIqGJqQEnyr0uEa761wLOz40_m-oHCeXOaeXhZTuc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\nfHdAzM1NRavarNkIOhWKXJ522EuXmwg66J4pQYIR044\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nRPOTizZppclI3rRaXy3cszz1KWM28JXXP4NV850uy04\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nhE1vd5pFeQ7hSgnsFxVY2hX2Bjc3t_VxSmJ51UPB65g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nomY4auAQr_W33AH9JR9tY0Y42aUbJcBwZ2HuYERnOz0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\npTBF3LI0lRznYompZQ5A4wOAOAsF3zNJhXXUVG8N9L0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nqCDa_pvq9hqtUnv_EU-5_caUlxkOBCkrKnIvYcamTcY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\nBkmzpkRsjqeKWkyL01M161gBf2jxG_kBWfxKcjYeNzc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\ngbnMoDdC97UEFpsbs9sx8HgYialLEoTmFejBnEjbTjs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\n0Cic8gkzSm4DwvFkFFF-EPgQ9gwAqL1Ns0rkW32aTyQ\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\n-LR84-2PththNiSMDu6roZtA_tKaA8oR47KEBsUkln0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n9QCEmR8Se8BDONDBw9dpR4Q8rvmPVazt1OUJWyqLp0Y\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n15\n2TujNhZjrFmywc-1RXYf90kt6Y25QB2Hm26ADkI8Tas\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n8wh-8kHcINCJmRA_dOkE-9VJKksUeejpx2D1pFrGY1s\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n16\nv4dbg734jk8shtc5xLenzB-NnRq9fyZi5LZZs0Vknig\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nXirjGsxF41oIcyS869sL7iL7KUzmmht1E4jBIpGzD64\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n17\npcXnpcxiXjSfaRZudwGMv_AY2TZgvqns4Iew-sJlW3A\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n18\npYwjITI-JlFPA8mczXXbstQJvVkTgtnJjvqm6S92nvA\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nZE0cVNTYde9ZHdY5Aj0fEzTw3r9AF1P5g23y4V6Idqw\n0"
+      ],
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_w1_000001\nios\nBMaSqnroPXsj2iS2QMgar6d0RGGKPXyNJjFN9f7dasxiQT+Kqf4168GIsGy2/7k+l3xVtTsBTI7WwS7WUyrvHLc=\nBPDkIOGSkfrflqIZDJJTRO4cny17+AjLTmhzFLtZelLjcrbSscafgVZoi8FAjiAA8rpMqORyHWWoHp0DHyt0mAs=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=:MEUCIQD5v1G9GV9soZzZaoPd+0D7Fm2hnveQuCX2Jrc1lfkO2wIgC9+cP2RfMeEkYCOwvzAJixNmNnrO++Jpc3S28kef+Xg=\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\nADD\ndevice_alice_w2_000002\nweb\nBKDb3Sk0F3Njr+xYOx2dEHw+tVB8gcAeOw0ml3OGuFqsHE3pcABVBG9gYPF3VC2djxQhW9VPc/yL3DKABOt102E=\nBEbtsFpq0AtAU9jTtc4qhDbbTs1761ZXxHgyPfCNPEsEdv76cM5X6C5tTHSir0mH/ewIdVqsLOhNDWZZAYo25XA=\n1\n-\n1789568000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nADD\ndevice_alice_w3_000003\nandroid\nBNUy5CKmiA1jHMlgmGgyywmwpNcYLYwmw8/e0mXA+ekU1FX1kjv819LelrChbWNWoxTu+3wxKyAlTX1/wZDjvtg=\nBBgq0ipBXtzojZmSvZwxovLn/YQDcH2wn5vI5KJvzetIr/jtwaTRc+HN/XczuzjEPCzPp89VVpuXaGXaSiCkXvM=\n1\n-\n1789654400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\nREVOKE\ndevice_alice_w3_000003\n-\n-\n-\n-\nUSER:device_alice_w1_000001:MEQCICpMJoxifeevylgSQGDpJYuio6GA7U76/yZcstGxD7PuAiBytzcr1fqertsfEumaqFj/iNh0PvW7wQIUKOeAAKrMFg==\n1789740800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=:MEQCIBLAyHGJCP/pIDgWH0nMxs/WvQzUkv3WMODJlKz7bMTPAiBiVVRaHZdxsZwYVBrNiPFPO7nD1f6ogBPwbqCm7iSaXQ==\n1789740860000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\nADD\ndevice_alice_w4_000004\nios\nBBCelbHnFG4wEg6THDWoCNftu5DSNx9PVG9W7EmNevQ4tsjyitlb9QFA/7iyY5DuNjlyCXPwKeyc+MDhqdzX0Zc=\nBG9lgblHJOpr0sPeF5npME2m7iJeQTNteTmayV3kbv1Vj8YnX7tHbMUoSq9pCS6cH/Dt/SVpQk0T1ik+VuZCbyc=\n1\n-\n1789827200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\nREVOKE\ndevice_alice_w4_000004\n-\n-\n-\n-\nNOT_ME:device_alice_w1_000001:MEQCIFLS0QOABT3pavA4lgPJT74R67avFoxiRmGXzBoVnOu8AiBAJEiB25JEnkjiQuwTj4vw390w4XpfQyF6xTz3U7xiUA==\n1789913600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=:MEQCIErbx6cco+eKMF4MVcDx+t29PEVeNXkXvcxz0hJVomM+AiASUsURGYl2gbzKwf83zJBLxJ64rN9ojxvVL7IU9aI3/A==\n1789913660000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nROTATE\ndevice_alice_w2_000002\n-\nBGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=\n-\n2\nMEUCIQCcclPSCcppMV3/QhwcOLkS0hs35jF/MquHg3rkHPq7EQIgBYWDZYodO2r91R75rz3XqkiTdoPX0Fog8h86P/U0iTE=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_alice_00000000001\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\nMODE\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:STRICT:MEUCIQCvUB8pODxMpMpgvSONM8bs62DOWezjNrpwarZR83fPugIgcdJSuvpSm3zf1n4/ur7ivzBdTUYkPxSzLP2RQ8rvbFc=\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_alice_00000000001\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\nADD_PENDING\ndevice_alice_w5_000005\nweb\nBGJtv2o0nC7tM9OMJ9jO9fC1mmQ2pCH1yjClLIsdzKvIq0n9wRtqEFTcSzXlUEvgBLqoiylZDYQDvu7b09D4Ld4=\nBDb48h7LxzsN2P/kp9jSwCNGf01Ou0Nqv4CjybNN8nfxgKLYvLSEhCCG2I74mOJER1Vqd53O1QmiIBuKF3DP9F4=\n1\n-\n1790007200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_alice_00000000001\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\nADD_PENDING\ndevice_alice_w6_000006\nandroid\nBHquvoOygjSa6Bc4eJjnnU0Sazb2p7VPF7Y90+pNff/FQTcA+RumAN2eqKyqlGDzrUW31+eUJrGxgY2e07xK7GM=\nBPOTHuUd4DbB3VTIRY87irTpGxK/7TYbfHLByjhhpZ/PHNmvFarYvs+JP69zijkyvfXuICLZWiMWurD0vPjQ8f0=\n1\n-\n1790014400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n15\nuser_alice_00000000001\n9QCEmR8Se8BDONDBw9dpR4Q8rvmPVazt1OUJWyqLp0Y\nACTIVATE\ndevice_alice_w6_000006\nandroid\nBHquvoOygjSa6Bc4eJjnnU0Sazb2p7VPF7Y90+pNff/FQTcA+RumAN2eqKyqlGDzrUW31+eUJrGxgY2e07xK7GM=\nBPOTHuUd4DbB3VTIRY87irTpGxK/7TYbfHLByjhhpZ/PHNmvFarYvs+JP69zijkyvfXuICLZWiMWurD0vPjQ8f0=\n1\ndevice_alice_w1_000001:MEQCIENpWX7MpH2AiXNKEgBRvA2DGPxtmZweGTzQcxjCp2mIAiAMaIM5geWhr7bWcT9ive1Pf6KY6LpfacyXm+V6DExZbg==\n1790018000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n16\nuser_alice_00000000001\n8wh-8kHcINCJmRA_dOkE-9VJKksUeejpx2D1pFrGY1s\nACTIVATE\ndevice_alice_w5_000005\nweb\nBGJtv2o0nC7tM9OMJ9jO9fC1mmQ2pCH1yjClLIsdzKvIq0n9wRtqEFTcSzXlUEvgBLqoiylZDYQDvu7b09D4Ld4=\nBDb48h7LxzsN2P/kp9jSwCNGf01Ou0Nqv4CjybNN8nfxgKLYvLSEhCCG2I74mOJER1Vqd53O1QmiIBuKF3DP9F4=\n1\ndevice_alice_w1_000001:MEQCIACH3OSGOdQUL4W7MDpkmUzt83E5j1zN9f2oiEFbN+2AAiA+JMsbPC2RJmYxPAoUicZ93s37EF+LYVBo6GFoLQFMDA==\n1790100800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nXirjGsxF41oIcyS869sL7iL7KUzmmht1E4jBIpGzD64\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=:MEQCIByJCBpjTrEWI9ScgzxNYxzBXhIY6YuDIn7bj7yW3w1VAiABYlhGjp3fcFUrDVYA/fVCVtWE2Z+Rcq7ciToUqLoBqQ==\n1790100800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n18\nuser_alice_00000000001\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nREVOKE\ndevice_alice_w2_000002\n-\n-\n-\n-\nUSER:device_alice_w1_000001:MEUCIQCXwJFyMqERW/lC5P5d9cOCQOsrn2084c/seiJgyfVdHAIgRJf+psCWa0cP99UIk+c90/qEKAuGS2oOe1znkp2tNHw=\n1790104400000"
+        ]
+      }
+    },
+    "recentChainSender": {
+      "note": "Révision 11 : le journal principal, plus l’ACTIVATE de A5 par A1 (seq 14, T0 + 2 h 1 min) et une HISTORY_KEY hk4 signée par A1 (seq 15, T0 + 3 h).",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\n76e0OUhGV4UICTfCdblUNcvi9tqa5WYXJXC5sT2zHc4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nIdyIqGJqQEnyr0uEa761wLOz40_m-oHCeXOaeXhZTuc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\nfHdAzM1NRavarNkIOhWKXJ522EuXmwg66J4pQYIR044\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nRPOTizZppclI3rRaXy3cszz1KWM28JXXP4NV850uy04\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nhE1vd5pFeQ7hSgnsFxVY2hX2Bjc3t_VxSmJ51UPB65g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nomY4auAQr_W33AH9JR9tY0Y42aUbJcBwZ2HuYERnOz0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\npTBF3LI0lRznYompZQ5A4wOAOAsF3zNJhXXUVG8N9L0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nqCDa_pvq9hqtUnv_EU-5_caUlxkOBCkrKnIvYcamTcY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\nBkmzpkRsjqeKWkyL01M161gBf2jxG_kBWfxKcjYeNzc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\ngbnMoDdC97UEFpsbs9sx8HgYialLEoTmFejBnEjbTjs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\n0Cic8gkzSm4DwvFkFFF-EPgQ9gwAqL1Ns0rkW32aTyQ\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\n-LR84-2PththNiSMDu6roZtA_tKaA8oR47KEBsUkln0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nlNHo0v8W5UPaUrIg0E3XctbxNp6K6oSgoy1HSmnx4Hk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n15\nYbyBay-MZB85avBsolEy4HJk6qx390Gsh9kOZvsmXpM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg\n0"
+      ],
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_w1_000001\nios\nBMaSqnroPXsj2iS2QMgar6d0RGGKPXyNJjFN9f7dasxiQT+Kqf4168GIsGy2/7k+l3xVtTsBTI7WwS7WUyrvHLc=\nBPDkIOGSkfrflqIZDJJTRO4cny17+AjLTmhzFLtZelLjcrbSscafgVZoi8FAjiAA8rpMqORyHWWoHp0DHyt0mAs=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\n_IzL2gcSNEiJYebxta-sukjvkvnzNYUGAbfuLst9AA8\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BOfVQBCwwxC2pG+R/g2LcUj5T4VB0AZp72kwkPs3CLoRQiBEcovCDbkqG12YA2yaFJAaOOMUYrNN/1wUwPLmRt8=:MEUCIQD5v1G9GV9soZzZaoPd+0D7Fm2hnveQuCX2Jrc1lfkO2wIgC9+cP2RfMeEkYCOwvzAJixNmNnrO++Jpc3S28kef+Xg=\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nne4PZh-IA9ZC7shUkLaP3XVnym7dYUvQd0-YlynBK6U\nADD\ndevice_alice_w2_000002\nweb\nBKDb3Sk0F3Njr+xYOx2dEHw+tVB8gcAeOw0ml3OGuFqsHE3pcABVBG9gYPF3VC2djxQhW9VPc/yL3DKABOt102E=\nBEbtsFpq0AtAU9jTtc4qhDbbTs1761ZXxHgyPfCNPEsEdv76cM5X6C5tTHSir0mH/ewIdVqsLOhNDWZZAYo25XA=\n1\n-\n1789568000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nLbJMODa2oEM8Hzk6xWQH0guHXcQMUNWh4Zthay5odFc\nADD\ndevice_alice_w3_000003\nandroid\nBNUy5CKmiA1jHMlgmGgyywmwpNcYLYwmw8/e0mXA+ekU1FX1kjv819LelrChbWNWoxTu+3wxKyAlTX1/wZDjvtg=\nBBgq0ipBXtzojZmSvZwxovLn/YQDcH2wn5vI5KJvzetIr/jtwaTRc+HN/XczuzjEPCzPp89VVpuXaGXaSiCkXvM=\n1\n-\n1789654400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nWj5aAduxbyGGOthTvILRqZpfkr57aU0CuJSjCNEMJjg\nREVOKE\ndevice_alice_w3_000003\n-\n-\n-\n-\nUSER:device_alice_w1_000001:MEQCICpMJoxifeevylgSQGDpJYuio6GA7U76/yZcstGxD7PuAiBytzcr1fqertsfEumaqFj/iNh0PvW7wQIUKOeAAKrMFg==\n1789740800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\ntrWOWk7QLW6Jwfc0F4UH2AyhbN0FB0ZT9ZWltKl1d10\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=:MEQCIBLAyHGJCP/pIDgWH0nMxs/WvQzUkv3WMODJlKz7bMTPAiBiVVRaHZdxsZwYVBrNiPFPO7nD1f6ogBPwbqCm7iSaXQ==\n1789740860000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nkL_T_PLW4ebikFic5r4b5JXK9MMrQqKzbK8um749gcY\nADD\ndevice_alice_w4_000004\nios\nBBCelbHnFG4wEg6THDWoCNftu5DSNx9PVG9W7EmNevQ4tsjyitlb9QFA/7iyY5DuNjlyCXPwKeyc+MDhqdzX0Zc=\nBG9lgblHJOpr0sPeF5npME2m7iJeQTNteTmayV3kbv1Vj8YnX7tHbMUoSq9pCS6cH/Dt/SVpQk0T1ik+VuZCbyc=\n1\n-\n1789827200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nb7kdcmFR_fbdx2krGqV_zQ53vflXdRxgQqLwPZ6GlXM\nREVOKE\ndevice_alice_w4_000004\n-\n-\n-\n-\nNOT_ME:device_alice_w1_000001:MEQCIFLS0QOABT3pavA4lgPJT74R67avFoxiRmGXzBoVnOu8AiBAJEiB25JEnkjiQuwTj4vw390w4XpfQyF6xTz3U7xiUA==\n1789913600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nXmAGBAyII6zgXENcY9663RrvjLX7mZ8C1YjUucYv90E\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=:MEQCIErbx6cco+eKMF4MVcDx+t29PEVeNXkXvcxz0hJVomM+AiASUsURGYl2gbzKwf83zJBLxJ64rN9ojxvVL7IU9aI3/A==\n1789913660000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nROTATE\ndevice_alice_w2_000002\n-\nBGGHGPcYAEgdwnsnEQ4cBDnWCFC5VolNfNc5IsTGpMmBeHL1qWbOEBzltxWflL2ymuIBpjPs0UfiAZ26fB6+8Yc=\n-\n2\nMEUCIQCcclPSCcppMV3/QhwcOLkS0hs35jF/MquHg3rkHPq7EQIgBYWDZYodO2r91R75rz3XqkiTdoPX0Fog8h86P/U0iTE=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_alice_00000000001\nFneSqfyWOFcvgfDUOg86Npphv2E_jNjyAIHd2aFTo9M\nMODE\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:STRICT:MEUCIQCvUB8pODxMpMpgvSONM8bs62DOWezjNrpwarZR83fPugIgcdJSuvpSm3zf1n4/ur7ivzBdTUYkPxSzLP2RQ8rvbFc=\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_alice_00000000001\n6ZvE06kqsvaPwmWKoV3apGlvp5AqMfbTPUOk7ksaPYA\nADD_PENDING\ndevice_alice_w5_000005\nweb\nBGJtv2o0nC7tM9OMJ9jO9fC1mmQ2pCH1yjClLIsdzKvIq0n9wRtqEFTcSzXlUEvgBLqoiylZDYQDvu7b09D4Ld4=\nBDb48h7LxzsN2P/kp9jSwCNGf01Ou0Nqv4CjybNN8nfxgKLYvLSEhCCG2I74mOJER1Vqd53O1QmiIBuKF3DP9F4=\n1\n-\n1790007200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_alice_00000000001\nKfmFEDJ9f_NAtAayTfZgRY0Qp0VmWbyDylFvL8pXCiY\nACTIVATE\ndevice_alice_w5_000005\nweb\nBGJtv2o0nC7tM9OMJ9jO9fC1mmQ2pCH1yjClLIsdzKvIq0n9wRtqEFTcSzXlUEvgBLqoiylZDYQDvu7b09D4Ld4=\nBDb48h7LxzsN2P/kp9jSwCNGf01Ou0Nqv4CjybNN8nfxgKLYvLSEhCCG2I74mOJER1Vqd53O1QmiIBuKF3DP9F4=\n1\ndevice_alice_w1_000001:MEUCIQCMrauZKPjYHCKi9TNXE+yGTPDFchITzOMD7YthTJJHeAIgTptnMizR0OVDVbuKmwXeUa7p1T84kQ0rJkNF4obGHe8=\n1790007260000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n15\nuser_alice_00000000001\nlNHo0v8W5UPaUrIg0E3XctbxNp6K6oSgoy1HSmnx4Hk\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_w1_000001:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=:MEUCIQDC2dTScVl1BpUyKxqPjaLUFyio0H8omX1s51qEz6SK8wIgPIE+1D3g5Z6wgn1OVVhGs83H5czTgCG2IKeteE9BBcM=\n1790010800000"
+        ]
+      }
     }
   },
   "secrets": {
@@ -844,8 +930,8 @@
       }
     },
     {
-      "name": "chain-wrong-sender",
-      "note": "Le maillon vient du signataire de la HISTORY_KEY, A1, pas de A2.",
+      "name": "chain-other-eligible-sender",
+      "note": "Révision 11 : A2, actif et inscrit depuis plus de 24 h à seq 10, peut déposer le maillon, sans être le signataire de la HISTORY_KEY (A1).",
       "reader": {
         "kind": "history",
         "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
@@ -857,25 +943,25 @@
         "requestId": "chain",
         "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
         "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
-        "ephemeralB64": "BA/1FJFJUjSpL3NYTIPY7N+NzuYokb7/mXWeKOwvtpSvEcWXvt5OnXpYkFPluTliMPiu9PLPHi48zFA0m/IAXTo=",
-        "nonceB64": "xX66jagDp7xGnxAP",
-        "wrappedB64": "x1V4iNoKN/iaiaiICUgKwbK3KHXB9rTVlqVJIQtMcxx6m2GZWv050FTpbKcwKTFC",
-        "signatureB64": "MEQCICdasiT3QDiKuCxXAeYRp+7kFtiOFtU5qiQqMT8ngZnzAiATjuc6eMdy5GAWT/ZbTtBGWnzynpH49FnQ2wSp2zjlJg=="
+        "ephemeralB64": "BKqtaFOO/YNpnynNbX8YBxYh5tl1lLkMp3OsuWxVSg9LegsrsUZg8MlaqgldC0+kMaOvLGXgFx/+aLfrvt03Koc=",
+        "nonceB64": "gF/hcmHamfR4JLMj",
+        "wrappedB64": "X4fb35VnhCQylLOhtW0NxahgpzrfHzpaXmX0Pp011099HmNQa1f39uEOd0rCdqog",
+        "signatureB64": "MEQCIA7u8URK81OMn6uUhNIFVB5z2HBlOixTm7N8i2W6zehjAiAkOpcvU0uBRIfttK63nlSveFsKb4uhVaOs7IigQYcGWw=="
       },
       "intermediates": {
         "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
         "saltB64": "EUJodJl1/eukTocBE+1ACji8a2HqzRJ8vXpVPyrV5pQ=",
-        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBA/1FJFJUjSpL3NYTIPY7N+NzuYokb7/mXWeKOwvtpSvEcWXvt5OnXpYkFPluTliMPiu9PLPHi48zFA0m/IAXTo=",
-        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBA/1FJFJUjSpL3NYTIPY7N+NzuYokb7/mXWeKOwvtpSvEcWXvt5OnXpYkFPluTliMPiu9PLPHi48zFA0m/IAXTo=\nxX66jagDp7xGnxAP\nx1V4iNoKN/iaiaiICUgKwbK3KHXB9rTVlqVJIQtMcxx6m2GZWv050FTpbKcwKTFC",
-        "ephemeralPrivateB64": "UmHm8VLSvbSjVzkiey6gl32eguMgeL1FDOdkcDD3gwI=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBKqtaFOO/YNpnynNbX8YBxYh5tl1lLkMp3OsuWxVSg9LegsrsUZg8MlaqgldC0+kMaOvLGXgFx/+aLfrvt03Koc=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBKqtaFOO/YNpnynNbX8YBxYh5tl1lLkMp3OsuWxVSg9LegsrsUZg8MlaqgldC0+kMaOvLGXgFx/+aLfrvt03Koc=\ngF/hcmHamfR4JLMj\nX4fb35VnhCQylLOhtW0NxahgpzrfHzpaXmX0Pp011099HmNQa1f39uEOd0rCdqog",
+        "ephemeralPrivateB64": "oSW2XEEEpltiOQmSjW3COe+n5BymWK/JQwhhGeGz0lc=",
         "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
-        "sharedSecretB64": "462nU7uxej5DKivC5jdYq/Lw+rOzyk9NdUEP0Ca6RZ0=",
-        "derivedKeyB64": "t0X1PuXvOzIky3WpzI4Zism8hK4FV3OKkyaPDA/8cvg=",
+        "sharedSecretB64": "9MnxdOSCZQhq+VpuU1d3iyF4/qaY7RihGrEF1rUx7UU=",
+        "derivedKeyB64": "LjRPuGAoW+/PWDj0s0WEsHczwG130UUedKrd7KMI8To=",
         "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
       },
       "expect": {
-        "check": "SENDER",
-        "plaintextMatches": null
+        "check": "ok",
+        "plaintextMatches": true
       }
     },
     {
@@ -1474,6 +1560,291 @@
       "expect": {
         "check": "SIGNATURE",
         "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-sender-revoked-before",
+      "note": "A4, inscrit plus de 24 h avant seq 10, mais révoqué au seq 9 : il n’était plus actif à l’entrée de hk3.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w4_000004",
+        "recipient": "history:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BLRyOxd/va5+d2ER68f2t/acvTJK4IXDzgMYE2ifFewBn8FuZle29iuKmB537G3obVqddLL3rfmR1v1Aaq8nCWg=",
+        "nonceB64": "wL7KM/AYBPEWLHUA",
+        "wrappedB64": "wPX/9+DGLcOLpuh0UzWtMv0+MZCSXZfiPv1r7MPGgaoaWm+s13MTcO3zvc2xfq12",
+        "signatureB64": "MEQCIF169Ug/0uAK40s0xcoW438vmv+0KazqKkHCBzAO3H6tAiABZHRavv2yPsbyX7CnmN++I3XW3tUD30SiakjU4Ry+jw=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w4_000004\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "C8/i4MBqeQN/Hsy6/Yjdj7r6VnSSh1H5WPLzzl/QVh4=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w4_000004\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBLRyOxd/va5+d2ER68f2t/acvTJK4IXDzgMYE2ifFewBn8FuZle29iuKmB537G3obVqddLL3rfmR1v1Aaq8nCWg=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w4_000004\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBLRyOxd/va5+d2ER68f2t/acvTJK4IXDzgMYE2ifFewBn8FuZle29iuKmB537G3obVqddLL3rfmR1v1Aaq8nCWg=\nwL7KM/AYBPEWLHUA\nwPX/9+DGLcOLpuh0UzWtMv0+MZCSXZfiPv1r7MPGgaoaWm+s13MTcO3zvc2xfq12",
+        "ephemeralPrivateB64": "FdWdcOuBNm4nUDgUoCeYIjuuWYbaGkrBRaGRv2+rpsM=",
+        "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "sharedSecretB64": "ZvlHCU4iFWbfGZxbLKKMKAwbWlgqD8dMvgZWBqjwb3A=",
+        "derivedKeyB64": "lqPmJcAhZ03tZGf9V2MWH8Q7bdWbAgOvHGa2Xp+MwEc=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "SENDER",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-sender-never-activated",
+      "note": "A5, ADD_PENDING jamais activé (activatedAtMs null).",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_w5_000005",
+        "recipient": "history:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BJ6xfqcIxD6Zb/AZ3f6Pl7K+TgYpp03SzSGKW7p//q2OF4JfvNeNG/tlstQP8wx2hXoiR6BbgNGA5zKgg/bejXY=",
+        "nonceB64": "WSAPQxZyRXioKHfs",
+        "wrappedB64": "+xpit/dWkQlGw0th/ZZ2v3IP2jGxmcYs4NsJ87C4T9uAejaHTjrnWhyIFKmpB0HZ",
+        "signatureB64": "MEUCIQC8T6eQ8h6A1oque1Zs5JaoB+i2Gd6AjKxjc1rIMp5zzgIgF/W6DVEIaystaaR3RWuJdr0aMyKKJt4KZvGkvxalpr0="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "o5jszOe6QD4f32d29Dayf5SDB7PWHoKRzyotnE7fTCM=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBJ6xfqcIxD6Zb/AZ3f6Pl7K+TgYpp03SzSGKW7p//q2OF4JfvNeNG/tlstQP8wx2hXoiR6BbgNGA5zKgg/bejXY=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBJ6xfqcIxD6Zb/AZ3f6Pl7K+TgYpp03SzSGKW7p//q2OF4JfvNeNG/tlstQP8wx2hXoiR6BbgNGA5zKgg/bejXY=\nWSAPQxZyRXioKHfs\n+xpit/dWkQlGw0th/ZZ2v3IP2jGxmcYs4NsJ87C4T9uAejaHTjrnWhyIFKmpB0HZ",
+        "ephemeralPrivateB64": "P83RbsLnDhmLtJvWhqiKj0S/IhyTM7q+5tWg1DkykTg=",
+        "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "sharedSecretB64": "2gdW1ZkaJzdJ0njK46RUpLilI3JOnQR2VObLRWNI3eA=",
+        "derivedKeyB64": "/jTH5+7uk2zoiVHgJ8e5bgszQR8mmFuzgkilP7YtFf0=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "SENDER",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-sender-unknown",
+      "note": "Émetteur absent du journal du compte.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk="
+      },
+      "wrap": {
+        "senderDeviceId": "device_alice_wz_000099",
+        "recipient": "history:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "X2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "hkPubB64": "BJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=",
+        "ephemeralB64": "BBM1eHZFlujDiHzHUQ8oi6/YvZZfbn095KFw7WzgqOzIspkSbPfjLxhx2ZznZwxatBM6zOnSHztE4IlbCY5sPxo=",
+        "nonceB64": "h+M8zvZWw4ds+o6B",
+        "wrappedB64": "OCVIFs8gPKzjPjcI2genC3ztrhLslI8EOmvpcxJoes2TLm4LokFZK8n/SK8jMHZT",
+        "signatureB64": "MEQCIFqgcTDDdmuZ9Y/yQjM9dnoYxzdNSbOZbc2nsHBP1Q6kAiAQMAv+WLVXmKaOIc0RSD6jtmB7+72KcqMsq4I0sm/bAw=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_wz_000099\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg",
+        "saltB64": "3Q6qUSPk74D4d9vXcldUxZ/VxvVfIWK258I1Z6RTKAY=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_wz_000099\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBBM1eHZFlujDiHzHUQ8oi6/YvZZfbn095KFw7WzgqOzIspkSbPfjLxhx2ZznZwxatBM6zOnSHztE4IlbCY5sPxo=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_wz_000099\nhistory:BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\n1\nchain\nX2znlfMzil31IuoYfSbXXtfYvcdYieE9iwq3eBGzUjg\nBJMaOT0mEwabTj1R+/cWufpsV/z9HNPsp2PydWnT3eWam+dNz7rrQvWsdyAOCyXbnPtlLD9UmIHYq8pTJTSwPC8=\nBBM1eHZFlujDiHzHUQ8oi6/YvZZfbn095KFw7WzgqOzIspkSbPfjLxhx2ZznZwxatBM6zOnSHztE4IlbCY5sPxo=\nh+M8zvZWw4ds+o6B\nOCVIFs8gPKzjPjcI2genC3ztrhLslI8EOmvpcxJoes2TLm4LokFZK8n/SK8jMHZT",
+        "ephemeralPrivateB64": "DPvBD6CVDgwwUVy2bnKVdN9zq5FRfwAqj6JCPtfDt5Q=",
+        "recipientAgreementPublicB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "sharedSecretB64": "BWdMUilY0aVXg4UW38c+Oo/oTQZGa/EC3f9STMMDC5M=",
+        "derivedKeyB64": "LKxfWZQ3cuZBwlFZi41ikksNQNNgBKk3vw+eOIH2ip8=",
+        "plaintextScalarB64": "vBPrIfc8AXKtOGJS4sta1uckbdLzxFwHxVGgeMfypQQ="
+      },
+      "expect": {
+        "check": "SENDER",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-sender-too-recent",
+      "note": "Journal recentChainSender : A5, inscrit à T0 + 2 h et activé, dépose le maillon hk3 → hk4 (seq 15, T0 + 3 h) : inscrit depuis moins de 24 h.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE="
+      },
+      "log": "recentChainSender",
+      "wrap": {
+        "senderDeviceId": "device_alice_w5_000005",
+        "recipient": "history:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "wH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BOQMG72G/BEqxoZh7zk+M8m/+F8uPW202G7XNMriHblRBFbDP2DE9/yrJntfM1rrz9xx2usP7AG7ct3zpwebr2Y=",
+        "nonceB64": "O4sDhd8v4qf83QnB",
+        "wrappedB64": "smj9g6xtKWfr4SVkES6umluhRgry7hH5FmChGDXXQ0xCOuUz+6o22z5ob2LMQj7r",
+        "signatureB64": "MEQCIFCHBqo0l/IctFRsf2bliXjd6DTImH1vUKpyym5nwZ3UAiBvrVCgXxwUCzucW3m6MkoPrRbkXfY8bKbNEPh2MoJzwg=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg",
+        "saltB64": "NetNGgZ1ZTXHUdQK178PUj1nyQq2Wip1EQIE7TGisM4=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBOQMG72G/BEqxoZh7zk+M8m/+F8uPW202G7XNMriHblRBFbDP2DE9/yrJntfM1rrz9xx2usP7AG7ct3zpwebr2Y=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBOQMG72G/BEqxoZh7zk+M8m/+F8uPW202G7XNMriHblRBFbDP2DE9/yrJntfM1rrz9xx2usP7AG7ct3zpwebr2Y=\nO4sDhd8v4qf83QnB\nsmj9g6xtKWfr4SVkES6umluhRgry7hH5FmChGDXXQ0xCOuUz+6o22z5ob2LMQj7r",
+        "ephemeralPrivateB64": "CZoGzVmA7YKnr/jGRd8luxnTeMFHPJ5QVsbhQUGaScg=",
+        "recipientAgreementPublicB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "sharedSecretB64": "29xIpMorSSmTxlPmDzPlKqC3c/TcNXnvl+/krXEquZg=",
+        "derivedKeyB64": "oozuOWsdekaraPcLDS3pKQhbn0Fnz6DnN/i3VI1gH5g=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "SENDER_TOO_RECENT",
+        "plaintextMatches": null
+      }
+    },
+    {
+      "name": "chain-recent-variant-eligible",
+      "note": "Témoin : le même maillon déposé par A2 est accepté.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE="
+      },
+      "log": "recentChainSender",
+      "wrap": {
+        "senderDeviceId": "device_alice_w2_000002",
+        "recipient": "history:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "wH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BJREPGcLFfyAyTXG/xWHkjnD8g5TPKeWbbel9gGYE+s9jksUmctN5cBShJC3GAM585S4XidAb2Z2wNyTzrb3J+M=",
+        "nonceB64": "vEK7ZRFSAYKet6pi",
+        "wrappedB64": "KX+8O73jhpUY0LI1CdPC1qkAdpXirv/VP7VXjt28wtr2jmpeP+pC+cSI87/7J6eZ",
+        "signatureB64": "MEQCIF22u3vSxfnIkv6EiX7kDes/1OeOPfnksxqEjNBuWDYgAiAqghfFWrbhPcvAs2uDi6qTdC4miRopDQ3Lp/nVlRlZZA=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg",
+        "saltB64": "4xLLA55rDkbQhMFJkM79Gt/xrLozeYRJz1JF0wxCjpE=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBJREPGcLFfyAyTXG/xWHkjnD8g5TPKeWbbel9gGYE+s9jksUmctN5cBShJC3GAM585S4XidAb2Z2wNyTzrb3J+M=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nwH6u1kf7r1TsFbPAPcYsXs5aXMG0UY1d6kn3JW7afXg\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBJREPGcLFfyAyTXG/xWHkjnD8g5TPKeWbbel9gGYE+s9jksUmctN5cBShJC3GAM585S4XidAb2Z2wNyTzrb3J+M=\nvEK7ZRFSAYKet6pi\nKX+8O73jhpUY0LI1CdPC1qkAdpXirv/VP7VXjt28wtr2jmpeP+pC+cSI87/7J6eZ",
+        "ephemeralPrivateB64": "VkFhlO5CwhM6b10NWcgGxhIPl/5Sow4H2kzJeSMrQs0=",
+        "recipientAgreementPublicB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "sharedSecretB64": "yVJ9bzyLAqh7IpT1KeYrsT/JOrc100oExlTpz0P+BKk=",
+        "derivedKeyB64": "BRg7a2OTL3701ET32x5ehDIMdC0TFzPWArmlFDoxTjE=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ok",
+        "plaintextMatches": true
+      }
+    },
+    {
+      "name": "chain-bounds-exactly-24h",
+      "note": "Journal chainSenderBounds : A6 inscrit à T0 + 4 h, hk4 à T0 + 28 h : 24 h pile suffisent.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE="
+      },
+      "log": "chainSenderBounds",
+      "wrap": {
+        "senderDeviceId": "device_alice_w6_000006",
+        "recipient": "history:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "QpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BPbyheAklEB48rrFUFwFKWher8TJ72jfcpyeYgeyqLq7FtTbgMnfofQV4u0IZWBXWGoA+eq64310UNbQeN8jvxk=",
+        "nonceB64": "u78WAdzzDN9Vh25L",
+        "wrappedB64": "8VVrnX36cXi30p5o/u8p12fYCJPYMZHRYeDoTJxLBm6VL7oyCKfKMytqZczzxD2I",
+        "signatureB64": "MEUCIQC/bMNnOtaLmjdImzdMPQGtkdbPqmTCekXLecX+cXCB+wIgSnRkfsBUXK+wLhHJHT9FDupsQzFlVboUPh3merBlaf8="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w6_000006\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "saltB64": "kMnItE0XqDkYm2rGe2yBqUWw2632ZBMZ9HJ+czgiVo4=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w6_000006\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBPbyheAklEB48rrFUFwFKWher8TJ72jfcpyeYgeyqLq7FtTbgMnfofQV4u0IZWBXWGoA+eq64310UNbQeN8jvxk=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w6_000006\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBPbyheAklEB48rrFUFwFKWher8TJ72jfcpyeYgeyqLq7FtTbgMnfofQV4u0IZWBXWGoA+eq64310UNbQeN8jvxk=\nu78WAdzzDN9Vh25L\n8VVrnX36cXi30p5o/u8p12fYCJPYMZHRYeDoTJxLBm6VL7oyCKfKMytqZczzxD2I",
+        "ephemeralPrivateB64": "lk3TaZjpu8+yXcPjdwaGsf7zhnO39ukf7QlGuYIUtWM=",
+        "recipientAgreementPublicB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "sharedSecretB64": "yD4SZ+alsZClaEsgG7LlK2WfOugR3v9uBBW7fGgEwQg=",
+        "derivedKeyB64": "C/n5b3f4BB0c45QxnZ0/BYMO3hGe+47j2SDRb3R8OfE=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ok",
+        "plaintextMatches": true
+      }
+    },
+    {
+      "name": "chain-bounds-activated-at-history-key",
+      "note": "A5 activé au seq 16 à la même milliseconde que hk4 (seq 17) : activatedAtMs = createdAtMs, éligible.",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE="
+      },
+      "log": "chainSenderBounds",
+      "wrap": {
+        "senderDeviceId": "device_alice_w5_000005",
+        "recipient": "history:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "QpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BC8ay4sWAfrMqTGE9Mkhbj73CgHX57yoar6LYPvwHll/ho6P26yU7xj34cUNHEls82+oTIezsX+s+dPaVLeI+e4=",
+        "nonceB64": "1lpDLBolJfj2Tkhc",
+        "wrappedB64": "UxaN93GmK6duIDrrRv8nZ5T0eeVihU4gMHe599gAGFprSM0skdS3M+KRQ6NCW+Yn",
+        "signatureB64": "MEUCIQDamjwMS1+5ObHErQeDbwi1sNxcj/Th/wCqCGDx6ZTQlQIgS+eiRykZm0xWQFBdPIg+CedO5FuyN+YVugnei7yc+WM="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "saltB64": "T/LsZEJYiDxtzzcNc6D4m0eob89aS+IMliM9naLqiF0=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBC8ay4sWAfrMqTGE9Mkhbj73CgHX57yoar6LYPvwHll/ho6P26yU7xj34cUNHEls82+oTIezsX+s+dPaVLeI+e4=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w5_000005\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBC8ay4sWAfrMqTGE9Mkhbj73CgHX57yoar6LYPvwHll/ho6P26yU7xj34cUNHEls82+oTIezsX+s+dPaVLeI+e4=\n1lpDLBolJfj2Tkhc\nUxaN93GmK6duIDrrRv8nZ5T0eeVihU4gMHe599gAGFprSM0skdS3M+KRQ6NCW+Yn",
+        "ephemeralPrivateB64": "iiq7QQV8I0GBg8DVkCB7PzNcqwzt5dQsycJdIb+jUY0=",
+        "recipientAgreementPublicB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "sharedSecretB64": "HiUs0P9+Z2xn0auw10YXwslgobroIMIYTppeh++BsO8=",
+        "derivedKeyB64": "Xtv1hm3WGNWJJVKprxjqb+2hfRVB5prmQQQJGfpevII=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ok",
+        "plaintextMatches": true
+      }
+    },
+    {
+      "name": "chain-bounds-revoked-after-history-key",
+      "note": "A2 révoqué au seq 18, après hk4 : le maillon reste valide (le lecteur n’exige pas « actif maintenant »).",
+      "reader": {
+        "kind": "history",
+        "hkPubB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE="
+      },
+      "log": "chainSenderBounds",
+      "wrap": {
+        "senderDeviceId": "device_alice_w2_000002",
+        "recipient": "history:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "keyVersion": 1,
+        "requestId": "chain",
+        "addHash": "QpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "hkPubB64": "BGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=",
+        "ephemeralB64": "BBAFJyLlG+jsNe8zEzHj0wgbIbtfmej+qLyrGffbb+XGjjkZISbOG7qb2SKamC5PhxMyT7MVJnAKvoh+ZFmFs4k=",
+        "nonceB64": "9NPnS8T0+odSkt1u",
+        "wrappedB64": "QB6IAXQKBG3UncqqF5t/yV40Dyna2Q1sDZ9HYhNVBuUW4xrzukrgLHiHN+NmjySn",
+        "signatureB64": "MEQCIQDccM8bTc4F1UqY1mtCcsqlEV9h9DAInFsQQ7QZdMaT1gIfW74Opmyl3Ruf6je0oTKsQam5bL6YXDBc9AbXSHl6Xw=="
+      },
+      "intermediates": {
+        "saltUtf8": "SQ-E2EE-AUTO-HISTORY-SALT\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc",
+        "saltB64": "C2ITnr6iEd6htaLxs5zElwlt2jdMEHATOA28xlpX6VA=",
+        "aadUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBBAFJyLlG+jsNe8zEzHj0wgbIbtfmej+qLyrGffbb+XGjjkZISbOG7qb2SKamC5PhxMyT7MVJnAKvoh+ZFmFs4k=",
+        "signatureUtf8": "SQ-E2EE-AUTO-HISTORY-WRAP-SIGNATURE\n1\nuser_alice_00000000001\ndevice_alice_w2_000002\nhistory:BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=\n1\nchain\nQpoRb98bOT63dMMgtAoJmlufiB1FCwC3a_b1j9x1Ikc\nBGF/emxPcTs/ZUiUMXxs7syRKwTUFau0hKFWuOQjFucUiKWe8yZWHN6SIBSWr+0R0hrLK8zk4exrdT/UruCRflk=\nBBAFJyLlG+jsNe8zEzHj0wgbIbtfmej+qLyrGffbb+XGjjkZISbOG7qb2SKamC5PhxMyT7MVJnAKvoh+ZFmFs4k=\n9NPnS8T0+odSkt1u\nQB6IAXQKBG3UncqqF5t/yV40Dyna2Q1sDZ9HYhNVBuUW4xrzukrgLHiHN+NmjySn",
+        "ephemeralPrivateB64": "wZJqMqD/iytTj+oQsOXulO7fWVyWHa4QvAM3WHC1cTI=",
+        "recipientAgreementPublicB64": "BLvy9SvWXUH6MN0aV0VnHq24xNgnavJflUy+jLdscLRp7BSe+K8yV13L8lD+FmdrECwSbq2FJBx4Hh+yHb4nwWE=",
+        "sharedSecretB64": "oKxYMq9Or5ACcb+hCzCKrmcz0uYLhGa0PBbL5xvyW3I=",
+        "derivedKeyB64": "NPr6x4iEglxk/YkDKBeCftGDMySpf+ayOeLcWOqZvOg=",
+        "plaintextScalarB64": "9NlEJ7m1zw0YpP14ES/ws4gV2uwaLhhagXVgEXogehc="
+      },
+      "expect": {
+        "check": "ok",
+        "plaintextMatches": true
       }
     }
   ],

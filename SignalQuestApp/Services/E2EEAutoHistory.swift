@@ -7,7 +7,7 @@ import Foundation
 /// `packages/core/e2ee-auto-history.ts` pour la lecture et le verdict face au
 /// journal vérifié ; le chiffrement (ECDH P-256, HKDF-SHA256, AES-256-GCM), que
 /// le cœur laisse aux apps, est fait ici avec CryptoKit. Vecteurs
-/// `history-wrap-v1` et `passkey-wrap-v1`.
+/// `history-wrap-v1`, `passkey-wrap-v1` et `history-epoch-v1`.
 enum E2EEAutoHistory {
     static let historyWrapInfo = "signalquest-e2ee-auto-history-wrap-v1"
     static let passkeyWrapInfo = "signalquest-e2ee-auto-passkey-wrap-v1"
@@ -178,10 +178,14 @@ enum E2EEAutoHistory {
                   let record = account.historyKeys.first(where: { $0.hkPubB64 == hkPubB64 }) else { return .recipient }
             guard wrap.addHash == record.entryHash else { return .addHash }
             guard let previous = record.previousHkPubB64, wrap.hkPubB64 == previous else { return .chain }
-            guard wrap.senderDeviceId == record.signerDeviceId else { return .sender }
-            guard record.createdAtMs - record.signerAddedAtMs >= E2EEAutoLog.signerMinAgeMs else { return .senderTooRecent }
-            guard let signer = account.devices[record.signerDeviceId] else { return .sender }
-            signingKeyB64 = signer.signingKeyB64
+            // Révision 11 : tout appareil éligible à l'entrée de HK′ dépose le maillon, pas
+            // seulement son signataire — activé au plus tard à elle, pas révoqué avant elle,
+            // et inscrit depuis 24 h ; l'ancienneté seule en défaut a son propre refus.
+            guard let sender = account.devices[wrap.senderDeviceId],
+                  let activatedAtMs = sender.activatedAtMs, activatedAtMs <= record.createdAtMs,
+                  sender.revokeSeq.map({ $0 > record.seq }) ?? true else { return .sender }
+            guard record.createdAtMs - sender.addedAtMs >= E2EEAutoLog.signerMinAgeMs else { return .senderTooRecent }
+            signingKeyB64 = sender.signingKeyB64
 
         case let .device(deviceId, keyVersions, openRequestIds, heldHkPubB64):
             guard wrap.recipient == deviceId, let device = account.devices[deviceId], device.status != .revoked else { return .recipient }
@@ -298,15 +302,21 @@ enum E2EEAutoHistory {
 
     /// `{credentialId}` : `b64url` sans bourrage, canonique, 1 à 1 023 octets une fois décodé.
     static func isPasskeyCredentialId(_ value: String) -> Bool {
+        guard let bytes = base64URLDecodedNoPadding(value) else { return false }
+        return (1...credentialIdMaxBytes).contains(bytes.count)
+    }
+
+    /// `b64url` sans bourrage et canonique, sinon nil.
+    private static func base64URLDecodedNoPadding(_ value: String) -> Data? {
         guard !value.isEmpty,
               value.utf8.allSatisfy({ byte in
                   (UInt8(ascii: "A")...UInt8(ascii: "Z")).contains(byte) || (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(byte)
                       || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(byte) || byte == UInt8(ascii: "-") || byte == UInt8(ascii: "_")
-              }) else { return false }
+              }) else { return nil }
         var standard = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
         standard += String(repeating: "=", count: (4 - standard.count % 4) % 4)
-        guard let bytes = Data(base64Encoded: standard), (1...credentialIdMaxBytes).contains(bytes.count) else { return false }
-        return bytes.base64URLEncodedNoPadding() == value
+        guard let bytes = Data(base64Encoded: standard), bytes.base64URLEncodedNoPadding() == value else { return nil }
+        return bytes
     }
 
     static func parsePasskeyWrap(_ object: [String: Any]) -> PasskeyWrap? {
@@ -359,5 +369,232 @@ enum E2EEAutoHistory {
         )
         guard E2EEAutoHistoryKey.publicKeyB64(scalar: scalar) == body.hkPubB64 else { throw Failure.keyMismatch }
         return scalar
+    }
+}
+
+// MARK: - Époques vers HK (§5.2)
+
+/// Sauvegarde d'une clé d'époque vers la HK du compte (révision 11,
+/// `history-epoch-v1`) : le gabarit de `recovery-epoch-envelope-v1`, la HK à la
+/// place du paquet de récupération et le compte lui-même pour destinataire.
+extension E2EEAutoHistory {
+    static let historyEpochInfo = "signalquest-e2ee-auto-history-epoch-v1"
+    static let epochWrapAlgorithm = "P256_X963_ECDH_HKDF_SHA256_AES_256_GCM"
+    static let epochAadMaxLength = 2_048
+
+    struct EpochEnvelope: Equatable, Sendable {
+        let recipientUserId: String
+        let hkPubB64: String
+        let wrapAlgorithm: String
+        let ephemeralPublicKeyB64: String
+        /// Clé d'époque chiffrée : 32 octets plus l'étiquette GCM de 16.
+        let wrappedEpochKeyB64: String
+        let nonceB64: String
+        let aadB64: String
+        let signatureB64: String
+
+        var jsonObject: [String: Any] {
+            [
+                "recipientUserId": recipientUserId, "hkPubB64": hkPubB64, "wrapAlgorithm": wrapAlgorithm,
+                "ephemeralPublicKeyB64": ephemeralPublicKeyB64, "wrappedEpochKeyB64": wrappedEpochKeyB64,
+                "nonceB64": nonceB64, "aadB64": aadB64, "signatureB64": signatureB64,
+            ]
+        }
+    }
+
+    /// Lecture stricte : les huit champs exacts, formats du §2.3.
+    static func parseEpochEnvelope(_ object: [String: Any]) -> EpochEnvelope? {
+        guard Set(object.keys) == ["recipientUserId", "hkPubB64", "wrapAlgorithm", "ephemeralPublicKeyB64",
+                                   "wrappedEpochKeyB64", "nonceB64", "aadB64", "signatureB64"],
+              let recipientUserId = object["recipientUserId"] as? String, E2EEV2Canonical.isOpaque(recipientUserId),
+              let hkPubB64 = object["hkPubB64"] as? String, E2EEAutoLog.isPublicKey(hkPubB64),
+              object["wrapAlgorithm"] as? String == epochWrapAlgorithm,
+              let ephemeralPublicKeyB64 = object["ephemeralPublicKeyB64"] as? String, E2EEAutoLog.isPublicKey(ephemeralPublicKeyB64),
+              canonicalLength(object["wrappedEpochKeyB64"]) == 48, let wrappedEpochKeyB64 = object["wrappedEpochKeyB64"] as? String,
+              canonicalLength(object["nonceB64"]) == 12, let nonceB64 = object["nonceB64"] as? String,
+              let aadB64 = object["aadB64"] as? String, aadB64.count <= epochAadMaxLength,
+              E2EEAutoLog.canonicalBase64(aadB64) != nil,
+              let signatureB64 = object["signatureB64"] as? String, E2EEAutoLog.isSignature(signatureB64) else { return nil }
+        return EpochEnvelope(
+            recipientUserId: recipientUserId, hkPubB64: hkPubB64, wrapAlgorithm: epochWrapAlgorithm,
+            ephemeralPublicKeyB64: ephemeralPublicKeyB64, wrappedEpochKeyB64: wrappedEpochKeyB64,
+            nonceB64: nonceB64, aadB64: aadB64, signatureB64: signatureB64
+        )
+    }
+
+    /// `conv`, `n`, `S`, `U`, `hk` : le contexte commun au sel, à l'AAD et à la signature.
+    private static func epochContext(conversationId: String, epochNumber: Int, senderDeviceId: String, userId: String, hkPubB64: String) -> [String] {
+        [conversationId, String(epochNumber), senderDeviceId, userId, hkPubB64]
+    }
+
+    static func epochSaltText(conversationId: String, epochNumber: Int, senderDeviceId: String, userId: String, hkPubB64: String) -> String {
+        (["SQ-E2EE-AUTO-HISTORY-EPOCH-SALT", "1"] + epochContext(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId, hkPubB64: hkPubB64
+        )).joined(separator: "\n")
+    }
+
+    static func epochAadText(
+        conversationId: String, epochNumber: Int, senderDeviceId: String, userId: String, hkPubB64: String,
+        keyCommitmentB64: String, ephemeralPublicKeyB64: String
+    ) -> String {
+        (["SQ-E2EE-AUTO-HISTORY-EPOCH-ENVELOPE", "1"] + epochContext(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId, hkPubB64: hkPubB64
+        ) + [keyCommitmentB64, ephemeralPublicKeyB64]).joined(separator: "\n")
+    }
+
+    static func epochSignaturePayload(
+        conversationId: String, epochNumber: Int, senderDeviceId: String, userId: String, keyCommitmentB64: String, envelope: EpochEnvelope
+    ) -> String {
+        (["SQ-E2EE-AUTO-HISTORY-EPOCH-ENVELOPE-SIGNATURE", "1"] + epochContext(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+            hkPubB64: envelope.hkPubB64
+        ) + [
+            envelope.wrapAlgorithm, keyCommitmentB64, envelope.ephemeralPublicKeyB64,
+            envelope.nonceB64, envelope.aadB64, envelope.wrappedEpochKeyB64,
+        ]).joined(separator: "\n")
+    }
+
+    enum EpochCheckError: String, Error, Sendable {
+        case recipient = "RECIPIENT"
+        case historyKey = "HISTORY_KEY"
+        case sender = "SENDER"
+        case aad = "AAD"
+        case signature = "SIGNATURE"
+    }
+
+    /// `checkE2eeAutoHistoryEpochEnvelope` avant de déchiffrer, face au journal
+    /// vérifié du compte. `kc` est l'engagement de l'époque de la page ;
+    /// `heldHkPubB64s` : la dernière HK détenue et celles ouvertes par la chaîne.
+    static func checkEpoch(
+        userId: String, conversationId: String, epochNumber: Int, keyCommitmentB64: String, senderDeviceId: String,
+        envelope: EpochEnvelope, account: E2EEAutoLog.AccountState, heldHkPubB64s: Set<String>
+    ) -> EpochCheckError? {
+        guard account.userId == userId, envelope.recipientUserId == userId else { return .recipient }
+        guard account.historyKeys.contains(where: { $0.hkPubB64 == envelope.hkPubB64 }),
+              heldHkPubB64s.contains(envelope.hkPubB64) else { return .historyKey }
+        // Un appareil révoqué depuis garde ses dépôts ; un appareil jamais activé n'en a aucun.
+        guard let sender = account.devices[senderDeviceId], sender.activatedAtMs != nil else { return .sender }
+        let aad = epochAadText(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+            hkPubB64: envelope.hkPubB64, keyCommitmentB64: keyCommitmentB64, ephemeralPublicKeyB64: envelope.ephemeralPublicKeyB64
+        )
+        guard E2EEAutoLog.canonicalBase64(envelope.aadB64) == Data(aad.utf8) else { return .aad }
+        return E2EEAutoLog.verify(
+            publicKeyB64: sender.signingKeyB64,
+            payload: epochSignaturePayload(
+                conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+                keyCommitmentB64: keyCommitmentB64, envelope: envelope
+            ),
+            signatureB64: envelope.signatureB64
+        ) ? nil : .signature
+    }
+
+    /// Enveloppe une clé d'époque reçue vers `hkPubB64`, la dernière HK détenue.
+    /// `sign` rend une signature DER à S bas de l'appareil qui dépose.
+    static func sealEpoch(
+        epochKey: Data,
+        keyCommitmentB64: String,
+        userId: String,
+        conversationId: String,
+        epochNumber: Int,
+        senderDeviceId: String,
+        hkPubB64: String,
+        sign: (Data) throws -> Data,
+        ephemeral: P256.KeyAgreement.PrivateKey = P256.KeyAgreement.PrivateKey(),
+        nonce: Data = Data(AES.GCM.Nonce())
+    ) throws -> EpochEnvelope {
+        guard epochNumber >= 1, epochPlaintextMatches(epochKey: epochKey, keyCommitmentB64: keyCommitmentB64), nonce.count == 12,
+              E2EEAutoLog.isPublicKey(hkPubB64), let hkData = Data(base64Encoded: hkPubB64) else { throw Failure.invalidField }
+        let recipientKey = try P256.KeyAgreement.PublicKey(x963Representation: hkData)
+        let ephemeralB64 = ephemeral.publicKey.x963Representation.base64EncodedString()
+        let secret = try ephemeral.sharedSecretFromKeyAgreement(with: recipientKey).withUnsafeBytes { Data($0) }
+        let key = derivedKey(
+            inputKeyMaterial: secret,
+            saltText: epochSaltText(
+                conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId, hkPubB64: hkPubB64
+            ),
+            info: historyEpochInfo
+        )
+        let aad = Data(epochAadText(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+            hkPubB64: hkPubB64, keyCommitmentB64: keyCommitmentB64, ephemeralPublicKeyB64: ephemeralB64
+        ).utf8)
+        let sealed = try AES.GCM.seal(epochKey, using: key, nonce: AES.GCM.Nonce(data: nonce), authenticating: aad)
+        let unsigned = EpochEnvelope(
+            recipientUserId: userId, hkPubB64: hkPubB64, wrapAlgorithm: epochWrapAlgorithm, ephemeralPublicKeyB64: ephemeralB64,
+            wrappedEpochKeyB64: (sealed.ciphertext + sealed.tag).base64EncodedString(), nonceB64: nonce.base64EncodedString(),
+            aadB64: aad.base64EncodedString(), signatureB64: ""
+        )
+        let signature = try sign(Data(epochSignaturePayload(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+            keyCommitmentB64: keyCommitmentB64, envelope: unsigned
+        ).utf8))
+        guard let envelope = parseEpochEnvelope(unsigned.jsonObject.merging(["signatureB64": signature.base64EncodedString()]) { $1 }) else {
+            throw Failure.invalidField
+        }
+        return envelope
+    }
+
+    /// Ouvre une enveloppe déjà acceptée par `checkEpoch` avec le scalaire de sa HK,
+    /// puis confirme que la clé reçue est celle que l'époque engage.
+    static func openEpoch(
+        _ envelope: EpochEnvelope, scalar: Data, userId: String, conversationId: String, epochNumber: Int,
+        senderDeviceId: String, keyCommitmentB64: String
+    ) throws -> Data {
+        guard E2EEAutoHistoryKey.publicKeyB64(scalar: scalar) == envelope.hkPubB64,
+              let ephemeralData = Data(base64Encoded: envelope.ephemeralPublicKeyB64),
+              let ephemeral = try? P256.KeyAgreement.PublicKey(x963Representation: ephemeralData),
+              let nonce = E2EEAutoLog.canonicalBase64(envelope.nonceB64), nonce.count == 12,
+              let wrapped = E2EEAutoLog.canonicalBase64(envelope.wrappedEpochKeyB64), wrapped.count == 48 else { throw Failure.invalidField }
+        let agreementKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: scalar)
+        let secret = try agreementKey.sharedSecretFromKeyAgreement(with: ephemeral).withUnsafeBytes { Data($0) }
+        let key = derivedKey(
+            inputKeyMaterial: secret,
+            saltText: epochSaltText(
+                conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+                hkPubB64: envelope.hkPubB64
+            ),
+            info: historyEpochInfo
+        )
+        let aad = epochAadText(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId, userId: userId,
+            hkPubB64: envelope.hkPubB64, keyCommitmentB64: keyCommitmentB64, ephemeralPublicKeyB64: envelope.ephemeralPublicKeyB64
+        )
+        let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonce), ciphertext: wrapped.prefix(32), tag: wrapped.suffix(16))
+        let epochKey = try AES.GCM.open(box, using: key, authenticating: Data(aad.utf8))
+        guard epochPlaintextMatches(epochKey: epochKey, keyCommitmentB64: keyCommitmentB64) else { throw Failure.keyMismatch }
+        return epochKey
+    }
+
+    /// `checkE2eeAutoHistoryEpochPlaintext` : la clé déchiffrée correspond à `kc` (A.3).
+    static func epochPlaintextMatches(epochKey: Data, keyCommitmentB64: String) -> Bool {
+        (try? E2EEV2EpochCrypto.keyCommitment(epochKey)) == keyCommitmentB64
+    }
+
+    /// Corps exact du dépôt : `{ "historyEnvelopes": [une enveloppe] }`.
+    static func epochUploadBody(_ envelope: EpochEnvelope) throws -> Data {
+        try JSONSerialization.data(withJSONObject: ["historyEnvelopes": [envelope.jsonObject]], options: [.sortedKeys])
+    }
+
+    static func parseEpochUploadBody(_ object: Any) -> EpochEnvelope? {
+        guard let body = object as? [String: Any], Set(body.keys) == ["historyEnvelopes"],
+              let list = body["historyEnvelopes"] as? [Any], list.count == 1,
+              let envelope = list[0] as? [String: Any] else { return nil }
+        return parseEpochEnvelope(envelope)
+    }
+
+    // MARK: `{hkPub}` (§5.6)
+
+    /// La HK de 65 octets en `b64url` sans bourrage, pour les chemins et la requête `hkPub`.
+    static func hkPathParam(_ hkPubB64: String) -> String? {
+        guard E2EEAutoLog.isPublicKey(hkPubB64), let data = Data(base64Encoded: hkPubB64) else { return nil }
+        return data.base64URLEncodedNoPadding()
+    }
+
+    /// Le `hkPubB64` d'un `{hkPub}`, ou nil s'il n'est pas canonique ou pas sur la courbe.
+    static func hkPub(pathParam: String) -> String? {
+        guard let data = base64URLDecodedNoPadding(pathParam) else { return nil }
+        let hkPubB64 = data.base64EncodedString()
+        return E2EEAutoLog.isPublicKey(hkPubB64) ? hkPubB64 : nil
     }
 }
