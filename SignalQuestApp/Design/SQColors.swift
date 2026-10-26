@@ -35,6 +35,9 @@ enum SQColor {
 
     // MARK: Labels
     static let label = Color("LabelPrimary")
+    /// #545B57 en clair, plus foncé que le `--h-muted` du web (#636B66) : 6,2:1
+    /// sur crème en valeur nominale, pour rester au-dessus de 4,5:1 à l'écran
+    /// sur les petits textes, que l'anti-crénelage éclaircit (lot F, F-51).
     static let labelSecondary = fieldAwareLabel(
         asset: "LabelSecondary",
         highLight: (0x3C, 0x44, 0x3F),
@@ -227,11 +230,13 @@ enum SQColor {
         light: (0xFF, 0xFF, 0xFF, 0.92), dark: (0x18, 0x1D, 0x1B, 0.92),
         oled: (0x0A, 0x0D, 0x0C, 0.92)
     )
-    /// Items inactifs du dock : le gris-vert `--h-muted`, au moins 4,5:1 sur le
-    /// papier. En mode terrain ou avec « Augmenter le contraste », ils
-    /// prennent les encres secondaires renforcées.
+    /// Items inactifs du dock : le gris-vert secondaire, comme `labelSecondary`.
+    /// Plus foncé que le `--h-muted` du web (#636B66) : celui-ci passait en
+    /// valeur nominale mais tombait sous 4,5:1 à l'écran sur les petits
+    /// libellés (lot F, F-51). En mode terrain ou avec « Augmenter le
+    /// contraste », ils prennent les encres secondaires renforcées.
     static let dockInactive = fieldAwareLabel(
-        light: (0x63, 0x6B, 0x66),
+        light: (0x54, 0x5B, 0x57),
         dark: (0x98, 0xA2, 0x9C),
         highLight: (0x3C, 0x44, 0x3F),
         highDark: (0xC9, 0xD2, 0xCC)

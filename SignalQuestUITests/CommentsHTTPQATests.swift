@@ -65,7 +65,10 @@ final class CommentsHTTPQATests: XCTestCase {
         let post = app.descendants(matching: .any)["feed.item.post-ios_recipe_post_0"].firstMatch
         XCTAssertTrue(post.waitForExistence(timeout: 25))
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(post, in: app))
-        let commentAction = post.buttons["Commenter"].firstMatch
+        // La barre d'actions d'une carte se lit d'un bloc (lot F, F4) : ses
+        // boutons n'existent plus un par un, on passe par le détail.
+        post.tap()
+        let commentAction = app.buttons["signal.detail.comments"].firstMatch
         XCTAssertTrue(commentAction.waitForExistence(timeout: 10))
         commentAction.tap()
         XCTAssertTrue(app.staticTexts["Commentaire synthétique 64"].waitForExistence(timeout: 15))

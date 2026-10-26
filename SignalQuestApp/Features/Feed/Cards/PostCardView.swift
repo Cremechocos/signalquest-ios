@@ -43,7 +43,7 @@ struct PostCardView: View {
                 // c'est l'ordre de lecture naturel, le texte posant la question
                 // que les options répondent.
                 if let poll = item.poll, let onPollVote {
-                    FeedPollView(poll: poll, onVote: onPollVote)
+                    FeedPollView(poll: poll, onVote: onPollVote, speaksAsOneElement: true)
                 }
 
                 // Images seulement : une vidéo ou un audio n'a rien à faire dans un

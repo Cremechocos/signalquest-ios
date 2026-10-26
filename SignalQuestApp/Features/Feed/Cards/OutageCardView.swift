@@ -292,8 +292,10 @@ struct OutageCardView: View {
             value: string("operator") ?? string("operatorKey") ?? "—",
             highlight: true
         )
+        .feedTileSpeech(label: String(localized: "Opérateur"), value: string("operator") ?? string("operatorKey") ?? "—")
         if let siteCode {
             SQMetricTile.filling(label: siteCode.label, value: siteCode.value)
+                .feedTileSpeech(label: siteCode.label, value: siteCode.value)
         }
         // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
         // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
@@ -311,6 +313,7 @@ struct OutageCardView: View {
             value: affected,
             valueLineLimit: 3
         )
+        .feedTileSpeech(label: String(localized: "Touché"), value: affected)
     }
 
     /// Ce que l'opérateur en dit, quand il en dit quelque chose — sinon le décompte communautaire.

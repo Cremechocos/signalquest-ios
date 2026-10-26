@@ -55,13 +55,13 @@ struct CoverageCardView: View {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             coverageHeading
-                            SQEditorialTag(text: signal?.technology ?? bestDetectedTech ?? "—", color: accent)
+                            techTag
                         }
                     } else {
                         HStack(alignment: .center, spacing: SQSpace.md) {
                             coverageHeading
                             Spacer()
-                            SQEditorialTag(text: signal?.technology ?? bestDetectedTech ?? "—", color: accent)
+                            techTag
                         }
                     }
                 }
@@ -115,6 +115,14 @@ struct CoverageCardView: View {
             // « moy. » ne reprend jamais un RSRP ponctuel : sans moyenne, le tiret.
             .init(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm))
         ]
+    }
+
+    /// Déjà dite par le sous-titre (« 4G / 5G NSA »), la technologie de la
+    /// pastille n'est pas relue par VoiceOver (lot F, F-49).
+    private var techTag: some View {
+        let tech = signal?.technology ?? bestDetectedTech ?? "—"
+        return SQEditorialTag(text: tech, color: accent)
+            .accessibilityHidden(subtitle.contains(tech))
     }
 
     private var coverageHeading: some View {

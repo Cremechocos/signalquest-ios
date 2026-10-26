@@ -261,25 +261,33 @@ struct CardHeader: View {
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("Plus d’actions")
+            // VoiceOver trouve ces choix parmi les actions de la carte, après
+            // les siennes (CardActionsBar) : un ⋯ en tête les faisait passer
+            // avant « J’aime » (F-50).
+            .accessibilityHidden(true)
             .accessibilityIdentifier("feed.card.menu")
             .padding(.trailing, -SQSpace.sm2)
             .padding(.vertical, -SQSpace.sm)
         }
     }
 
+    /// Un geste plutôt qu'un bouton : dans une carte, VoiceOver change un bouton
+    /// imbriqué en action et tait son texte. La carte disait « Speedtest » sans
+    /// son auteur ni son heure (lot F, F-47) ; le profil reste une action nommée.
     @ViewBuilder
     private var authorContent: some View {
             if let onAuthorTap {
-                Button {
-                    Haptics.light()
-                    onAuthorTap()
-                } label: {
-                    authorBlock
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Voir le profil de \(author.displayName)")
+                authorBlock
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Haptics.light()
+                        onAuthorTap()
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAction(named: Text("Voir le profil de \(author.displayName)")) { onAuthorTap() }
             } else {
                 authorBlock
+                    .accessibilityElement(children: .combine)
             }
     }
 
@@ -391,8 +399,19 @@ struct FeedMetricGrid: View {
                     label: metric.label, value: metric.value, highlight: metric.highlight,
                     fillsHeight: true, valueLineLimit: 3, identifierPrefix: "feed.metric"
                 )
+                .feedTileSpeech(label: metric.label, value: metric.value)
             }
         }
+    }
+}
+
+extension View {
+    /// « Distance : 3,4 km » d'un seul énoncé. Lue dans une carte, une tuile
+    /// libellé + valeur se séparait : les libellés d'abord, toutes les valeurs à
+    /// la fin (« Distance, Durée… 3,4 km, 21 min ») (lot F, F-49).
+    func feedTileSpeech(label: String, value: String) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : \(value)"))
     }
 }
 
@@ -464,6 +483,7 @@ struct CardActionsBar: View {
 
     @State private var showReactionPicker = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.feedCardMenu) private var menu
 
     var body: some View {
         // J'aime, Commenter, Repartager à gauche ; Enregistrer et Partager à
@@ -499,6 +519,50 @@ struct CardActionsBar: View {
                 .zIndex(2)
             }
         }
+        // VoiceOver lit la carte d'un bloc : la barre y ajoute ses compteurs en
+        // mots (« 4 réactions, 2 commentaires », pas « 4, 🔥 4, 2 ») et ses
+        // actions dans l'ordre d'usage, puis celles du menu ⋯ : plus de
+        // Signaler en tête ni de J'aime en 9e (lot F, F-49, F-50).
+        .accessibilityElement(children: .ignore)
+        .accessibilityValue(Text(verbatim: spokenCounts))
+        // Déclarées À REBOURS : mesuré à la sonde, SwiftUI expose ces actions dans
+        // l'ordre inverse de leur déclaration (pas l'intérieur d'un ForEach).
+        // VoiceOver propose donc J'aime, Commenter, Repartager, Enregistrer,
+        // Partager, les réactions, puis le menu.
+        .accessibilityActions {
+            let like: LocalizedStringKey = item.likedByMe ? "Ne plus aimer" : "J’aime"
+            let repost: LocalizedStringKey = item.repostedByMe ? "Annuler le repartage" : "Repartager"
+            let favorite: LocalizedStringKey = item.favoritedByMe ? "Retirer des enregistrés" : "Enregistrer la publication"
+            if let menu { menu }
+            // Le sélecteur d'emojis s'ouvre à l'appui long, introuvable au
+            // lecteur d'écran : chaque réaction est une action nommée.
+            if let onReact {
+                ForEach(Array(ReactionPicker.defaultEmojis.dropFirst()), id: \.self) { emoji in
+                    Button(String(localized: "Réagir avec \(emoji)")) { onReact(emoji) }
+                }
+            }
+            Button("Partager", action: onShare)
+            Button(favorite, action: onFavorite)
+            Button(repost, action: onRepost)
+            Button("Commenter", action: onComment)
+            Button(like, action: onLike)
+        }
+    }
+
+    /// « 4 réactions (🔥 3), 2 commentaires, 1 repartage » ; rien sans activité.
+    private var spokenCounts: String {
+        var parts: [String] = []
+        if reactionCount > 0 {
+            let others = item.reactions
+                .filter { $0.count > 0 && !$0.emoji.hasPrefix("❤") }
+                .sorted { $0.count > $1.count }
+                .map { "\($0.emoji) \($0.count)" }
+            let total = String(localized: "\(reactionCount) réactions")
+            parts.append(others.isEmpty ? total : "\(total) (\(others.joined(separator: ", ")))")
+        }
+        if item.commentsCount > 0 { parts.append(String(localized: "\(item.commentsCount) commentaires")) }
+        if item.repostsCount > 0 { parts.append(String(localized: "\(item.repostsCount) repartages")) }
+        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -573,21 +637,6 @@ struct CardActionsBar: View {
             withAnimation(SQMotion.resolve(SQMotion.bouncy, reduceMotion)) { showReactionPicker = true }
             scheduleAutoDismiss()
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("J’aime")
-        .accessibilityValue(Text(verbatim: spokenReactions))
-        .accessibilityAddTraits(reactedByMe ? [.isButton, .isSelected] : .isButton)
-        .accessibilityHint(onReact == nil ? "" : "Appui long pour choisir une réaction")
-        .accessibilityAction { onLike() }
-        // Le sélecteur d'emojis se déclenche à l'appui long, introuvable au lecteur
-        // d'écran : chaque réaction devient une action nommée (le ❤️ reste l'action par défaut).
-        .accessibilityActions {
-            if let onReact {
-                ForEach(Array(ReactionPicker.defaultEmojis.dropFirst()), id: \.self) { emoji in
-                    Button(String(localized: "Réagir avec \(emoji)")) { onReact(emoji) }
-                }
-            }
-        }
     }
 
     /// Réaction quelconque posée par l'utilisateur (❤️ ou un autre emoji).
@@ -601,16 +650,6 @@ struct CardActionsBar: View {
             .sorted { $0.count > $1.count }
             .prefix(3)
             .map(\.emoji)
-    }
-
-    /// « 12, 👍 3, 😂 2 » : le total puis le détail, lu par VoiceOver.
-    private var spokenReactions: String {
-        guard reactionCount > 0 else { return "" }
-        let detail = item.reactions
-            .filter { $0.count > 0 }
-            .sorted { $0.count > $1.count }
-            .map { "\($0.emoji) \($0.count)" }
-        return ([String(reactionCount)] + detail).joined(separator: ", ")
     }
 
     private func dismissPicker() {

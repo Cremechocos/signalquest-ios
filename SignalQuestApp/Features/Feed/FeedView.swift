@@ -1557,14 +1557,10 @@ struct FeedView: View {
             onPollVote: { option in model.votePoll(item, option: option) }
         )
         .contextMenu { postMenu(for: item) }
-        // Même menu derrière le ⋯ de la carte.
+        // Même menu derrière le ⋯ de la carte, et en dernières actions VoiceOver,
+        // Signaler compris (CardActionsBar) : plus de « Signaler » en tête (F-50).
         .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
         .environment(\.feedHashtagAction, { filter(byHashtag: $0) })
-        .accessibilityActions {
-            if !item.canManage {
-                Button("Signaler") { presentedSheet = .report(item) }
-            }
-        }
         .sqFadeUp()
         .accessibilityIdentifier("feed.item.\(item.id)")
         .onAppear {

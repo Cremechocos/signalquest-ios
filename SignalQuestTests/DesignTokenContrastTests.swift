@@ -94,9 +94,10 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.labelTertiary), named: "labelTertiary", atLeast: 3.0)
     }
 
-    /// Halo n'a pas de gris tertiaire : `labelTertiary` prend le `--h-muted` du web
-    /// (décision d'Alexandre, 12/10), comme `labelSecondary`. Un écart rouvrirait
-    /// un jeton propre à iOS.
+    /// Halo n'a pas de gris tertiaire : `labelTertiary` suit `labelSecondary`
+    /// (décision d'Alexandre, 12/10), relevé avec lui au-dessus du `--h-muted` du
+    /// web pour le contraste rendu (lot F, F-51). Un écart rouvrirait un jeton
+    /// propre à iOS.
     func testTertiaryTokenMatchesHaloMuted() {
         for style in [UIUserInterfaceStyle.light, .dark] {
             XCTAssertEqual(

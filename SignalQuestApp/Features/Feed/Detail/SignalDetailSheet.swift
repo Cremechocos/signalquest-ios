@@ -97,6 +97,9 @@ struct SignalDetailSheet: View {
                     onFavorite: onFavorite,
                     onShare: onShare
                 )
+                // Hors d'une carte, la barre est un élément à part : son nom
+                // précède les compteurs et les actions qu'elle porte.
+                .accessibilityLabel("Actions")
                 commentsPreview
             }
             .padding(.horizontal, SQSpace.lg)

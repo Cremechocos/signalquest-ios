@@ -9,8 +9,49 @@ import SwiftUI
 struct FeedPollView: View {
     let poll: FeedPoll
     let onVote: (FeedPoll.Option) -> Void
+    /// Dans une carte du fil, que VoiceOver lit d'un bloc : un bouton imbriqué y
+    /// perd son texte, les choix ne se lisaient pas (« Toucher pour voter » ×3)
+    /// et on ne pouvait pas voter. Le sondage s'énonce alors en entier et chaque
+    /// choix devient une action « Voter : … » (lot F, F-48).
+    var speaksAsOneElement = false
 
     var body: some View {
+        if speaksAsOneElement {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: spokenSummary))
+                .accessibilityActions {
+                    // À rebours : mesuré à la sonde, SwiftUI expose ces actions
+                    // dans l'ordre inverse ; VoiceOver propose ainsi le premier choix d'abord.
+                    if poll.isOpen {
+                        ForEach(poll.orderedOptions.reversed()) { option in
+                            Button(String(localized: "Voter : \(option.label)")) { onVote(option) }
+                        }
+                    }
+                }
+        } else {
+            content
+        }
+    }
+
+    /// « Question ? Orange 50 %, sélectionné, SFR 30 %, Free 20 %. 13 votes, Clos »
+    /// (parts révélées seulement après le vote ou à la clôture, comme à l'écran).
+    private var spokenSummary: String {
+        let revealed = poll.hasVoted || poll.hasExpired
+        let options = poll.orderedOptions.map { option -> String in
+            guard revealed else { return option.label }
+            var text = "\(option.label) \(poll.share(of: option).formatted(.percent.precision(.fractionLength(0))))"
+            if option.votedByMe { text += ", " + String(localized: "sélectionné") }
+            return text
+        }
+        var votes = String(localized: "\(poll.totalVotes) vote")
+        if poll.hasExpired { votes += ", " + String(localized: "Clos") }
+        return [poll.question ?? "", options.joined(separator: ", "), votes]
+            .filter { !$0.isEmpty }
+            .joined(separator: ". ")
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if let question = poll.question, !question.isEmpty {
                 Text(verbatim: question)
