@@ -121,6 +121,19 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         XCTAssertEqual(action(429, "E2EE_DEVICE_REGISTRATION_RATE_LIMITED"), .retryLater)
         XCTAssertEqual(action(503, nil), .retryLater)
         XCTAssertEqual(action(400, "E2EE_DEVICE_REGISTRATION_INVALID"), .failed)
+
+        // Révision 8 : réponses communes des routes `auto` signées.
+        XCTAssertEqual(action(403, "E2EE_DEVICE_SIGNATURE_INVALID"), .failed, "403 : refus définitif, pas une session expirée")
+        XCTAssertEqual(action(403, "E2EE_REQUEST_TIMESTAMP_INVALID"), .retryLater)
+        XCTAssertEqual(action(404, "E2EE_SIGNER_DEVICE_NOT_FOUND"), .signerNotFound)
+        XCTAssertEqual(action(409, "E2EE_REQUEST_REPLAYED"), .rereadAndResign)
+        XCTAssertEqual(action(428, "E2EE_MANAGED_SESSION_REQUIRED"), .refreshSession)
+        XCTAssertEqual(action(400, "E2EE_DEVICE_REQUEST_INVALID"), .failed)
+        XCTAssertEqual(action(400, "E2EE_DEVICE_ROTATION_INVALID"), .failed)
+        XCTAssertEqual(action(503, "E2EE_AUTO_LOG_UNAVAILABLE"), .logClosed(retryAfterSeconds: 900))
+        XCTAssertEqual(E2EEAutoEnrollmentPolicy.action(for: E2EEV2TransportFailure(
+            kind: .retryable, statusCode: 503, code: "E2EE_AUTO_LOG_UNAVAILABLE", message: "x", retryAfterSeconds: 1_800
+        )), .logClosed(retryAfterSeconds: 1_800))
     }
 
     // MARK: Coordinateur
@@ -158,6 +171,8 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         private(set) var posts: [(path: String, body: [String: Any])] = []
         var revocation: E2EEAutoEnrollment.Revocation?
         private(set) var deviceReads = 0
+        private(set) var clockOffsets: [Int64] = []
+        let nowMs: Int64 = 1_000_000
 
         init(identities: Int = 2, reads: [E2EEAutoEnrollment.OwnAccount]) {
             self.identities = (0..<identities).map { Keys(deviceId: "ios_device_\($0)_00000000000000") }
@@ -178,8 +193,9 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
                 dueRotation: { [self] in rotationDue && activated.isEmpty ? keys.rotation : nil },
                 activateRotation: { [self] in activated.append($0) },
                 sign: { [self] in try E2EEV2LowS.sign($0, with: keys.signing) },
-                post: { [self] path, body in
+                post: { [self] path, body, clockOffsetMs in
                     posts.append((path, (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]))
+                    clockOffsets.append(clockOffsetMs)
                     return responses.isEmpty ? .failure(.init(kind: .retryable, statusCode: 503, message: "x")) : responses.removeFirst()
                 },
                 readOwnAccount: { [self] in
@@ -187,7 +203,8 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
                     return reads[min(readCount, reads.count - 1)]
                 },
                 revocation: { [self] in revocation },
-                recordRevocation: { [self] in revocation = $0 }
+                recordRevocation: { [self] in revocation = $0 },
+                nowMs: { [self] in nowMs }
             )
         }
     }
@@ -222,10 +239,12 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         ).canonical
     }
 
-    private static func failure(_ status: Int, _ code: String, reason: String? = nil) -> E2EEV2TransportResult<Data> {
+    private static func failure(
+        _ status: Int, _ code: String, reason: String? = nil, details: [String: JSONValue]? = nil
+    ) -> E2EEV2TransportResult<Data> {
         .failure(.init(
             kind: E2EEV2TransportFailurePolicy.classify(statusCode: status, code: code), statusCode: status, code: code, message: "x",
-            reason: reason
+            details: details, reason: reason
         ))
     }
 
@@ -367,6 +386,9 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
             (Self.failure(401, "E2EE_DEVICE_SIGNATURE_INVALID"), .reauthenticate),
             (Self.failure(429, "E2EE_DEVICE_REGISTRATION_RATE_LIMITED"), .retryLater),
             (Self.failure(403, "E2EE_DEVICE_REVOKED", reason: "ACCOUNT_DELETED"), .accountDeleted),
+            (Self.failure(428, "E2EE_MANAGED_SESSION_REQUIRED"), .sessionRefreshRequired),
+            (Self.failure(503, "E2EE_AUTO_LOG_UNAVAILABLE"), .logClosed(retryAfterSeconds: 900)),
+            (Self.failure(403, "E2EE_DEVICE_SIGNATURE_INVALID"), .failed("e2ee-auto-request-refused")),
         ] {
             let fake = Fake(reads: [.inconclusive])
             fake.responses = [response]
@@ -446,6 +468,100 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         XCTAssertEqual(outcome, .active(deviceId: device.deviceId, rotated: true))
         XCTAssertEqual(fake.activated, [rotation])
         XCTAssertTrue(fake.posts.isEmpty)
+    }
+
+    // MARK: Révision 8
+
+    /// Horodatage refusé : l'heure du serveur corrige l'écart, une seule nouvelle signature.
+    func testTimestampRefusalResignsOnceAtServerTime() async throws {
+        let fake = Fake(reads: [.inconclusive])
+        let device = fake.keys.device(), serverTimeMs = fake.nowMs + 600_000
+        let refusal = Self.failure(403, "E2EE_REQUEST_TIMESTAMP_INVALID", details: ["serverTimeMs": .number(Double(serverTimeMs))])
+        fake.responses = [refusal, .success(value: Self.written(Self.addEntry(device), seq: 20, status: "ACTIVE"), statusCode: 201, idempotentReplay: false)]
+        let outcome = await E2EEAutoEnrollment(fake.dependencies()).run()
+        XCTAssertEqual(outcome, .registered(deviceId: device.deviceId, status: .active))
+        XCTAssertEqual(fake.clockOffsets, [0, 600_000])
+
+        let twice = Fake(reads: [.inconclusive])
+        twice.responses = [refusal, refusal]
+        let refusedTwice = await E2EEAutoEnrollment(twice.dependencies()).run()
+        XCTAssertEqual(refusedTwice, .retryLater)
+        XCTAssertEqual(twice.posts.count, 2, "une seule nouvelle signature")
+
+        let unreadable = Fake(reads: [.inconclusive])
+        unreadable.responses = [Self.failure(403, "E2EE_REQUEST_TIMESTAMP_INVALID")]
+        let withoutTime = await E2EEAutoEnrollment(unreadable.dependencies()).run()
+        XCTAssertEqual(withoutTime, .retryLater)
+        XCTAssertEqual(unreadable.posts.count, 1, "sans serverTimeMs, aucun nouvel essai")
+    }
+
+    /// Nonce déjà servi : l'inscription est peut-être écrite, le journal relu le dit.
+    func testReplayedRegistrationIsReadBackFromTheLog() async throws {
+        let written = Fake(reads: [])
+        let device = written.keys.device()
+        written.reads = [.inconclusive, .verified(Self.account([Self.state(device)]))]
+        written.responses = [Self.failure(409, "E2EE_REQUEST_REPLAYED")]
+        let found = await E2EEAutoEnrollment(written.dependencies()).run()
+        XCTAssertEqual(found, .active(deviceId: device.deviceId, rotated: false))
+        XCTAssertEqual(written.posts.count, 1, "rien de renvoyé : l'appareil est au journal")
+
+        let lost = Fake(reads: [])
+        let lostDevice = lost.keys.device()
+        lost.reads = [.inconclusive, .verified(Self.account([]))]
+        lost.responses = [
+            Self.failure(409, "E2EE_REQUEST_REPLAYED"),
+            .success(value: Self.written(Self.addEntry(lostDevice), seq: 20, status: "ACTIVE"), statusCode: 201, idempotentReplay: false),
+        ]
+        let resent = await E2EEAutoEnrollment(lost.dependencies()).run()
+        XCTAssertEqual(resent, .registered(deviceId: lostDevice.deviceId, status: .active))
+        XCTAssertEqual(lost.posts.count, 2)
+
+        let unknown = Fake(reads: [.inconclusive])
+        unknown.responses = [Self.failure(409, "E2EE_REQUEST_REPLAYED")]
+        let unread = await E2EEAutoEnrollment(unknown.dependencies()).run()
+        XCTAssertEqual(unread, .retryLater, "journal illisible : pas de nouvel envoi à l'aveugle")
+        XCTAssertEqual(unknown.posts.count, 1)
+    }
+
+    /// `404 E2EE_SIGNER_DEVICE_NOT_FOUND` seul n'efface jamais les clés.
+    func testSignerNotFoundForgetsKeysOnlyWhenTheVerifiedLogAgrees() async throws {
+        for (secondRead, expected, resets) in [
+            (E2EEAutoEnrollment.OwnAccount.verified(Self.account([])), E2EEAutoEnrollment.Outcome.identityReplaced, 1),
+            (.inconclusive, .retryLater, 0),
+        ] {
+            let fake = Fake(reads: [])
+            fake.reads = [.verified(Self.account([Self.state(fake.keys.device())])), secondRead]
+            fake.rotationDue = true
+            fake.responses = [Self.failure(404, "E2EE_SIGNER_DEVICE_NOT_FOUND")]
+            let outcome = await E2EEAutoEnrollment(fake.dependencies()).run()
+            XCTAssertEqual(outcome, expected)
+            XCTAssertEqual(fake.current, resets)
+        }
+        let stillThere = Fake(reads: [])
+        let state = Self.state(stillThere.keys.device())
+        stillThere.reads = [.verified(Self.account([state])), .verified(Self.account([state]))]
+        stillThere.rotationDue = true
+        stillThere.responses = [Self.failure(404, "E2EE_SIGNER_DEVICE_NOT_FOUND")]
+        let kept = await E2EEAutoEnrollment(stillThere.dependencies()).run()
+        XCTAssertEqual(kept, .retryLater)
+        XCTAssertEqual(stillThere.current, 0, "au journal : clés gardées")
+    }
+
+    /// Rotation rejouée dont la réponse s'est perdue : la relecture y trouve le `ROTATE`.
+    func testReplayedRotationIsRecoveredFromTheLog() async throws {
+        let fake = Fake(reads: [])
+        let device = fake.keys.device(), rotation = fake.keys.rotation
+        var rotated = Self.state(device)
+        rotated.identityKeyB64 = rotation.identityKeyB64
+        rotated.keyVersion = 2
+        rotated.identityKeys.append(.init(keyVersion: 2, identityKeyB64: rotation.identityKeyB64, sinceMs: 2))
+        fake.reads = [.verified(Self.account([Self.state(device)])), .verified(Self.account([rotated]))]
+        fake.rotationDue = true
+        fake.responses = [Self.failure(409, "E2EE_REQUEST_REPLAYED")]
+        let outcome = await E2EEAutoEnrollment(fake.dependencies()).run()
+        XCTAssertEqual(outcome, .active(deviceId: device.deviceId, rotated: true))
+        XCTAssertEqual(fake.activated, [rotation])
+        XCTAssertEqual(fake.posts.count, 1)
     }
 
     func testRotationResponseIsChecked() throws {

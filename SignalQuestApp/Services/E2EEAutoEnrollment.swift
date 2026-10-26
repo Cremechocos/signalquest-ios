@@ -102,12 +102,23 @@ enum E2EEAutoEnrollmentPolicy {
         /// Appareil révoqué (§4.3) : purge, et aucune réinscription avant une nouvelle connexion.
         case revoked(E2EEAutoLog.RevokeReason?)
         case accountDeleted
+        /// `409 E2EE_LOG_STALE`, ou `409 E2EE_REQUEST_REPLAYED` (« peut-être déjà écrit ») :
+        /// relire son compte avant toute nouvelle tentative (révision 8).
         case rereadAndResign
+        /// `404 E2EE_SIGNER_DEVICE_NOT_FOUND` : non concluant, seul le journal vérifié décide (révision 8).
+        case signerNotFound
+        /// `428 E2EE_MANAGED_SESSION_REQUIRED` : rafraîchir la session, puis réessayer une fois.
+        case refreshSession
+        /// `503 E2EE_AUTO_LOG_UNAVAILABLE` : pas de nouvel essai avant `Retry-After`.
+        case logClosed(retryAfterSeconds: Int)
         case updateRequired
         case reauthenticate
         case retryLater
         case failed
     }
+
+    /// Délai sans `Retry-After` lisible : celui du contrat (§4).
+    static let logClosedRetrySeconds = 900
 
     static func action(for failure: E2EEV2TransportFailure, keyVersion: Int = 1) -> Action {
         switch failure.code {
@@ -121,7 +132,13 @@ enum E2EEAutoEnrollmentPolicy {
             }
         // Appareil v2 inconnu du journal sous une `keyVersion` reprise (révision 7) : il repart de 1.
         case "E2EE_DEVICE_REGISTRATION_INVALID" where keyVersion != 1: return .newIdentity
-        case "E2EE_LOG_STALE": return .rereadAndResign
+        case "E2EE_LOG_STALE", "E2EE_REQUEST_REPLAYED": return .rereadAndResign
+        case "E2EE_SIGNER_DEVICE_NOT_FOUND": return .signerNotFound
+        case "E2EE_MANAGED_SESSION_REQUIRED": return .refreshSession
+        case "E2EE_AUTO_LOG_UNAVAILABLE":
+            return .logClosed(retryAfterSeconds: max(60, failure.retryAfterSeconds ?? logClosedRetrySeconds))
+        // Encore hors fenêtre après la correction de l'horloge : au prochain passage.
+        case "E2EE_REQUEST_TIMESTAMP_INVALID": return .retryLater
         case "E2EE_UPDATE_REQUIRED": return .updateRequired
         default: break
         }
@@ -147,13 +164,15 @@ actor E2EEAutoEnrollment {
         var dueRotation: @Sendable () throws -> E2EEV2DeviceIdentityStore.AgreementKeyRotation?
         var activateRotation: @Sendable (E2EEV2DeviceIdentityStore.AgreementKeyRotation) throws -> Void
         var sign: @Sendable (Data) throws -> Data
-        var post: @Sendable (_ path: String, _ body: Data) async -> E2EEV2TransportResult<Data>
+        /// Requête signée, horodatée avec l'écart d'horloge appris du serveur.
+        var post: @Sendable (_ path: String, _ body: Data, _ clockOffsetMs: Int64) async -> E2EEV2TransportResult<Data>
         /// Maillons relus, puis le journal de son propre compte jusqu'à la tête vérifiée.
         var readOwnAccount: @Sendable () async -> OwnAccount
         /// Révocation retenue pour la connexion en cours (§4.3).
         var revocation: @Sendable () -> Revocation?
         /// Retient la révocation jusqu'à la prochaine connexion de l'utilisateur.
         var recordRevocation: @Sendable (Revocation) throws -> Void
+        var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
     }
 
     enum OwnAccount: Equatable, Sendable {
@@ -180,6 +199,10 @@ actor E2EEAutoEnrollment {
         case accountDeleted
         case updateRequired
         case reauthenticate
+        /// `428` : session sans identifiant ; à rafraîchir avant un seul nouveau passage.
+        case sessionRefreshRequired
+        /// Journal fermé (`503`) : aucun passage avant ce délai.
+        case logClosed(retryAfterSeconds: Int)
         case retryLater
         /// Journal du compte refusé par le vérificateur : rien n'est écrit.
         case logRefused
@@ -187,6 +210,8 @@ actor E2EEAutoEnrollment {
     }
 
     private let dependencies: Dependencies
+    /// Écart serveur moins local, appris d'un refus d'horodatage (révision 8).
+    private var clockOffsetMs: Int64 = 0
 
     init(_ dependencies: Dependencies) {
         self.dependencies = dependencies
@@ -203,32 +228,57 @@ actor E2EEAutoEnrollment {
             case .refused: return .logRefused
             case .inconclusive: account = nil
             }
-            if let account, let state = account.devices[device.deviceId] {
-                switch Self.judge(state, device: device) {
-                case .revoked(.accountDeleted?): return .accountDeleted
-                case .revoked(.inactive?), .otherKeys: return try replaceIdentity()
-                case .revoked(let reason): return try revoke(reason)
-                // Un appareil en attente tourne aussi sa clé (révision 7).
-                case .active, .pending: return try await rotateIfDue(device: device, account: account)
+            if let account, account.devices[device.deviceId] != nil {
+                return try await known(device: device, account: account)
+            }
+            let body = try E2EEAutoEnrollmentContract.registrationBody(
+                device: device, label: dependencies.label, historyKeyPresent: dependencies.historyKeyPresent()
+            )
+            for attempt in 0..<2 {
+                switch await post(E2EEAutoEnrollmentContract.registerPath, body) {
+                case .success(let data, _, _):
+                    guard let registration = E2EEAutoEnrollmentContract.parseRegistration(data, userId: dependencies.userId, device: device) else {
+                        return .failed("invalid-e2ee-auto-registration-response")
+                    }
+                    return .registered(deviceId: device.deviceId, status: registration.status)
+                case .failure(let failure):
+                    let action = E2EEAutoEnrollmentPolicy.action(for: failure, keyVersion: device.keyVersion)
+                    // Nonce déjà servi : l'inscription est peut-être écrite. Le journal le dit avant tout nouvel envoi.
+                    guard action == .rereadAndResign, attempt == 0 else { return try refused(action) }
+                    switch await dependencies.readOwnAccount() {
+                    case .verified(let state) where state.devices[device.deviceId] != nil:
+                        return try await known(device: device, account: state)
+                    case .verified: continue
+                    case .refused: return .logRefused
+                    case .inconclusive: return .retryLater
+                    }
                 }
             }
-            switch await dependencies.post(
-                E2EEAutoEnrollmentContract.registerPath,
-                try E2EEAutoEnrollmentContract.registrationBody(
-                    device: device, label: dependencies.label, historyKeyPresent: dependencies.historyKeyPresent()
-                )
-            ) {
-            case .success(let data, _, _):
-                guard let registration = E2EEAutoEnrollmentContract.parseRegistration(data, userId: dependencies.userId, device: device) else {
-                    return .failed("invalid-e2ee-auto-registration-response")
-                }
-                return .registered(deviceId: device.deviceId, status: registration.status)
-            case .failure(let failure):
-                return try refused(E2EEAutoEnrollmentPolicy.action(for: failure, keyVersion: device.keyVersion))
-            }
+            return .retryLater
         } catch {
             return .failed("e2ee-auto-device-identity-unavailable")
         }
+    }
+
+    /// L'appareil figure au journal vérifié du compte.
+    private func known(device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState) async throws -> Outcome {
+        guard let state = account.devices[device.deviceId] else { return .retryLater }
+        switch Self.judge(state, device: device) {
+        case .revoked(.accountDeleted?): return .accountDeleted
+        case .revoked(.inactive?), .otherKeys: return try replaceIdentity()
+        case .revoked(let reason): return try revoke(reason)
+        // Un appareil en attente tourne aussi sa clé (révision 7).
+        case .active, .pending: return try await rotateIfDue(device: device, account: account)
+        }
+    }
+
+    /// Un refus d'horodatage donne l'heure du serveur : l'écart est corrigé et la
+    /// requête re-signée une seule fois, avec un nouveau nonce (révision 8).
+    private func post(_ path: String, _ body: Data) async -> E2EEV2TransportResult<Data> {
+        let first = await dependencies.post(path, body, clockOffsetMs)
+        guard case .failure(let failure) = first, let serverTimeMs = failure.serverTimeMs else { return first }
+        clockOffsetMs = serverTimeMs - dependencies.nowMs()
+        return await dependencies.post(path, body, clockOffsetMs)
     }
 
     enum Judgement: Equatable {
@@ -268,7 +318,9 @@ actor E2EEAutoEnrollment {
         case .accountDeleted: return .accountDeleted
         case .updateRequired: return .updateRequired
         case .reauthenticate: return .reauthenticate
-        case .retryLater, .rereadAndResign: return .retryLater
+        case .refreshSession: return .sessionRefreshRequired
+        case .logClosed(let seconds): return .logClosed(retryAfterSeconds: seconds)
+        case .retryLater, .rereadAndResign, .signerNotFound: return .retryLater
         case .failed: return .failed("e2ee-auto-request-refused")
         }
     }
@@ -290,7 +342,7 @@ actor E2EEAutoEnrollment {
             }
             let payload = E2EEAutoEnrollmentContract.rotationPayload(userId: dependencies.userId, prevUserEntryHash: previous, rotation: rotation)
             let signature = try dependencies.sign(Data(payload.utf8)).base64EncodedString()
-            switch await dependencies.post(
+            switch await post(
                 E2EEAutoEnrollmentContract.rotatePath(deviceId: device.deviceId),
                 try E2EEAutoEnrollmentContract.rotationBody(prevUserEntryHash: previous, rotation: rotation, signatureB64: signature)
             ) {
@@ -303,7 +355,16 @@ actor E2EEAutoEnrollment {
                 return done(rotated: true)
             case .failure(let failure):
                 let action = E2EEAutoEnrollmentPolicy.action(for: failure, keyVersion: device.keyVersion)
-                // Une autre entrée du compte est passée entre-temps : relire, puis re-signer une fois.
+                // Ce 404 seul n'efface rien : il faut que le journal vérifié ignore l'appareil.
+                if action == .signerNotFound {
+                    switch await dependencies.readOwnAccount() {
+                    case .verified(let state) where state.devices[device.deviceId] == nil: return try replaceIdentity()
+                    case .refused: return .logRefused
+                    case .verified, .inconclusive: return .retryLater
+                    }
+                }
+                // Une autre entrée du compte est passée entre-temps, ou la rotation est peut-être
+                // déjà écrite : relire, puis re-signer une fois.
                 guard action == .rereadAndResign, attempt == 0 else { return try refused(action) }
                 guard case .verified(let state) = await dependencies.readOwnAccount() else { return .retryLater }
                 account = state
@@ -375,8 +436,10 @@ extension E2EEAutoEnrollment {
                 try identityStore.activateAgreementKey(rotation, ownerNamespace: namespace, nowMs: Int64(Date().timeIntervalSince1970 * 1_000))
             },
             sign: { try identityStore.sign(canonicalRequest: $0, ownerNamespace: namespace) },
-            post: { path, body in
-                await transport.postJSON(path: path, body: body, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle)
+            post: { path, body, clockOffsetMs in
+                await transport.postJSON(
+                    path: path, body: body, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle, clockOffsetMs: clockOffsetMs
+                )
             },
             readOwnAccount: {
                 do {
@@ -399,6 +462,8 @@ extension E2EEAutoEnrollment {
     /// Passages pour la session courante. Une identité neuve renouvelle la
     /// session locale (contexte de notification) : elle est donc créée avant de
     /// lier le passage, et une identité remplacée en relance un, une seule fois.
+    /// Un `428` rafraîchit la session et relance un passage ; un second mène à
+    /// la reconnexion, jamais à une boucle (révision 8).
     static func runLive(
         api: APIClient,
         label: String,
@@ -407,7 +472,8 @@ extension E2EEAutoEnrollment {
     ) async -> Outcome? {
         guard SQFeatures.e2eeAutoLogEnabled, E2EEAutoLogReader.productionLogKeys != nil else { return nil }
         var outcome: Outcome?
-        for _ in 0..<2 {
+        var (replaced, refreshed) = (false, false)
+        for _ in 0..<3 {
             guard let scope = LocalAccountScope.sessionSnapshot() else { return outcome }
             if let revocation = E2EEAutoRevocationMarker.read(
                 store: markerStore, ownerNamespace: scope.ownerNamespace, authToken: api.credentials.accessToken()
@@ -417,7 +483,16 @@ extension E2EEAutoEnrollment {
                   let enrollment = live(session: session, api: api, label: label, identityStore: identityStore, markerStore: markerStore)
             else { return outcome }
             outcome = await enrollment.run()
-            guard outcome == .identityReplaced else { return outcome }
+            switch outcome {
+            case .identityReplaced? where !replaced:
+                replaced = true
+            case .sessionRefreshRequired?:
+                guard !refreshed else { return .reauthenticate }
+                refreshed = true
+                await api.refreshSession()
+            default:
+                return outcome
+            }
         }
         return outcome
     }
@@ -435,6 +510,8 @@ extension E2EEAutoEnrollment.Outcome {
         case .accountDeleted: return "account-deleted"
         case .updateRequired: return "update-required"
         case .reauthenticate: return "reauthenticate"
+        case .sessionRefreshRequired: return "session-refresh-required"
+        case .logClosed: return "log-closed"
         case .retryLater: return "retry-later"
         case .logRefused: return "log-refused"
         case .failed(let reason): return reason

@@ -1803,6 +1803,8 @@ struct E2EEV2TransportFailure: Error, Equatable, Sendable {
     let details: [String: JSONValue]?
     /// Raison d'un `403 E2EE_DEVICE_REVOKED` (E2EE-AUTO §4.3).
     let reason: String?
+    /// En-tête `Retry-After` en secondes (E2EE-AUTO §4 : journal fermé).
+    let retryAfterSeconds: Int?
 
     init(
         kind: E2EEV2TransportFailureKind,
@@ -1810,7 +1812,8 @@ struct E2EEV2TransportFailure: Error, Equatable, Sendable {
         code: String? = nil,
         message: String,
         details: [String: JSONValue]? = nil,
-        reason: String? = nil
+        reason: String? = nil,
+        retryAfterSeconds: Int? = nil
     ) {
         self.kind = kind
         self.statusCode = statusCode
@@ -1818,6 +1821,14 @@ struct E2EEV2TransportFailure: Error, Equatable, Sendable {
         self.message = message
         self.details = details
         self.reason = reason
+        self.retryAfterSeconds = retryAfterSeconds
+    }
+
+    /// `details.serverTimeMs` d'un `403 E2EE_REQUEST_TIMESTAMP_INVALID` (E2EE-AUTO §4).
+    var serverTimeMs: Int64? {
+        guard code == "E2EE_REQUEST_TIMESTAMP_INVALID", case .number(let value)? = details?["serverTimeMs"],
+              value.isFinite, value > 0, value < Double(E2EEV2Canonical.maxSafeInteger) else { return nil }
+        return Int64(value)
     }
 
     /// `E2EE_DEVICE_LIST_STALE` : `details.userIds`, à défaut `details.userId`.
@@ -2004,11 +2015,14 @@ final class E2EEV2APITransport: @unchecked Sendable {
         return formatter.date(from: header)
     }
 
+    /// `clockOffsetMs` : écart à ajouter à l'horloge locale pour l'horodatage
+    /// signé, appris d'un `403 E2EE_REQUEST_TIMESTAMP_INVALID` (E2EE-AUTO §4).
     func postJSON(
         path: String,
         body: Data,
         expectedOwnerScopeId: String,
-        capabilitySet: E2EEV2RequestCapabilitySet
+        capabilitySet: E2EEV2RequestCapabilitySet,
+        clockOffsetMs: Int64 = 0
     ) async -> E2EEV2TransportResult<Data> {
         guard body.count <= Self.maxJSONResponseBytes else {
             return localFailure("oversized-e2ee-json-request")
@@ -2019,7 +2033,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
             body: body,
             contentType: "application/json; charset=utf-8",
             expectedOwnerScopeId: expectedOwnerScopeId,
-            capabilitySet: capabilitySet
+            capabilitySet: capabilitySet,
+            clockOffsetMs: clockOffsetMs
         )
     }
 
@@ -2210,6 +2225,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
         capabilitySet: E2EEV2RequestCapabilitySet,
         useResetCandidate: Bool = false,
         signs: Bool = true,
+        clockOffsetMs: Int64 = 0,
         onResponse: ((HTTPURLResponse) -> Void)? = nil
     ) async -> E2EEV2TransportResult<Data> {
         guard validPath(path), validOwner(expectedOwnerScopeId), E2EEV2SignedTarget.isEncodedPath(path) else {
@@ -2241,6 +2257,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
                     path: signedPath,
                     bodySHA256Base64URL: bodyHash,
                     ownerNamespace: ownerNamespace,
+                    timestampMs: Int64(Date().timeIntervalSince1970 * 1_000) + clockOffsetMs,
                     identityStore: identityStore
                 )
             }
@@ -2316,7 +2333,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
                     ? decoded?.error ?? "e2ee-http-\(response.statusCode)"
                     : "e2ee-http-\(response.statusCode)",
                 details: decoded?.details,
-                reason: decoded?.reason
+                reason: decoded?.reason,
+                retryAfterSeconds: response.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
             )
         )
     }

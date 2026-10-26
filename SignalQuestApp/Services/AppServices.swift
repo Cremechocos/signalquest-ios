@@ -434,16 +434,22 @@ final class AppServices: ObservableObject {
     }
 
     private var autoEnrollmentRunning = false
+    /// Journal fermé (`503`, révision 8) : aucun passage avant `Retry-After`.
+    private var autoEnrollmentNotBefore: Date?
 
     /// E2EE-AUTO §4.1 et §4.3 : inscription à la connexion, rotation de la clé
     /// d'accord au premier plan. Une seule à la fois.
     func enrollE2EEAutoDevice() async {
-        guard SQFeatures.e2eeAutoLogEnabled, !autoEnrollmentRunning else { return }
+        guard SQFeatures.e2eeAutoLogEnabled, !autoEnrollmentRunning,
+              autoEnrollmentNotBefore.map({ Date() >= $0 }) ?? true else { return }
         autoEnrollmentRunning = true
         defer { autoEnrollmentRunning = false }
         guard let outcome = await E2EEAutoEnrollment.runLive(
             api: api, label: E2EEAutoEnrollmentContract.label(isPad: UIDevice.current.userInterfaceIdiom == .pad)
         ) else { return }
+        if case .logClosed(let seconds) = outcome {
+            autoEnrollmentNotBefore = Date().addingTimeInterval(TimeInterval(seconds))
+        }
         E2EEV2MessagingRuntime.traceV2("auto-enrollment", outcome.traceStep)
     }
 
