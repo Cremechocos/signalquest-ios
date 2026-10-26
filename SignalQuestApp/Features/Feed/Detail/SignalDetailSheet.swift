@@ -23,6 +23,8 @@ struct SignalDetailSheet: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var speedtestDetail: SpeedtestDetail?
+    /// Détail d'un test d'expérience : l'état de chaque test, et la ville pour l'auteur.
+    @State private var experienceDetail: ExperienceTestDetail?
     @State private var detailError: String?
     /// Le serveur a refusé le détail : test fait dans une zone privée de son auteur.
     @State private var detailsHiddenByServer = false
@@ -37,6 +39,7 @@ struct SignalDetailSheet: View {
     private var accent: Color { TechAccent.color(for: signal?.technology) }
     private var isSpeedtest: Bool { item.kind.lowercased() == "speedtest" }
     private var place: String? { signal?.city ?? item.readablePlaceLabel }
+    private var experience: FeedExperience? { FeedExperience(item: item) }
 
     var body: some View {
         ScrollView {
@@ -87,6 +90,9 @@ struct SignalDetailSheet: View {
                 if isSpeedtest {
                     FeedMeasureBlock(signal: signal)
                 }
+                if let experience {
+                    experienceSummary(experience)
+                }
                 detailsSection
                 map
                 CardActionsBar(
@@ -108,6 +114,7 @@ struct SignalDetailSheet: View {
             .sqReadableWidth()
         }
         .task(id: item.sourceId) { await loadSpeedtestDetailIfNeeded() }
+        .task(id: experience?.testId) { await loadExperienceDetailIfNeeded() }
         .task(id: item.id) { await loadFirstCommentIfNeeded() }
         .presentationDetents([.medium, .large])
         .sqSheet()
@@ -169,6 +176,46 @@ struct SignalDetailSheet: View {
         item.kind.lowercased() == "outage"
             ? OutageFeedBadge.ink(severity: metaString("outageSeverity"), state: metaString("outageState"))
             : accent
+    }
+
+    // MARK: Experience
+
+    /// Les mêmes tuiles que la carte, la mesure du jeu, puis l'état de chaque test
+    /// dans « Détails ».
+    private func experienceSummary(_ experience: FeedExperience) -> some View {
+        let highlights = experienceDetail?.highlights ?? experience.highlights
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Test d’expérience")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                if let context = experience.networkContext {
+                    Text(verbatim: context)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            if !highlights.feedMetrics.isEmpty {
+                FeedMetricGrid(metrics: highlights.feedMetrics)
+            }
+            if let note = highlights.gameMethodNote {
+                Text(note)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityIdentifier("signal.detail.experience")
+    }
+
+    private var experiencePairs: [(String, String)] {
+        guard let experienceDetail else { return [] }
+        var pairs = experienceDetail.states.map { ($0.test.title, ExperienceTestKind.stateLabel($0.state)) }
+        // La ville n'est montrée qu'à l'auteur ; le serveur la retire déjà pour les autres.
+        if item.canManage, let city = experienceDetail.location?.city {
+            pairs.append(("Lieu", city))
+        }
+        return pairs
     }
 
     // MARK: Metadata
@@ -283,6 +330,7 @@ struct SignalDetailSheet: View {
         }
         pairs += outagePairs
         pairs += speedtestPairs
+        pairs += experiencePairs
         pairs.append(("Lieu", place ?? ""))
         // Une clé n'apparaît qu'une fois : le détail serveur et le résumé du
         // post se recoupent (appareil, opérateur).
@@ -537,6 +585,12 @@ struct SignalDetailSheet: View {
         // Le détail précis (5 décimales, environ 1 m) reste pour l'auteur ; les
         // autres lecteurs voient la position arrondie (3 décimales, environ 100 m).
         return String(format: item.canManage ? "%.5f, %.5f" : "%.3f, %.3f", lat, lon)
+    }
+
+    private func loadExperienceDetailIfNeeded() async {
+        guard let id = experience?.testId else { return }
+        // Le résumé du post suffit à la carte : sans détail, seules les lignes d'état manquent.
+        experienceDetail = try? await services.feed.experienceTest(id: id)
     }
 
     private func loadSpeedtestDetailIfNeeded() async {

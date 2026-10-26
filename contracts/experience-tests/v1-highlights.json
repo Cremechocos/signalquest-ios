@@ -1,0 +1,260 @@
+{
+  "contract": "experience-tests-v1",
+  "description": "Calcul de metadata.experience.highlights depuis `tests` (docs/contracts/experience-tests-v1.md §4). Médiane : tri croissant ; impair = milieu ; pair = Math.floor((a + b) / 2). Une valeur non mesurée vaut null. `published` : le serveur publie un post si au moins un test a `state: \"measured\"` (un test « measured » porte au moins une valeur, §6).",
+  "cases": [
+    {
+      "name": "tous les tests mesurés, médianes paires",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 6000,
+                  "waitMs": 1200
+                }
+              ]
+            },
+            {
+              "quality": "1440p",
+              "requiredBps": 12000000,
+              "state": "abandoned"
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "score": {
+            "total": 67,
+            "quality": 21,
+            "smoothness": 40,
+            "startup": 15
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2061
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "measured",
+              "totalMs": 1800
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 41
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 20000000,
+              "totalMs": 5000
+            },
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1301
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoMaxQuality": "720p",
+        "videoScore": 67,
+        "pageMedianMs": 1930,
+        "gameMedianMs": 41,
+        "gameProbeMethod": "tcp_connect",
+        "uploadPhotoMs": 1250
+      },
+      "published": true
+    },
+    {
+      "name": "médianes impaires et à une seule valeur, sonde HTTP du web",
+      "tests": {
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 900
+            },
+            {
+              "state": "measured",
+              "totalMs": 3000
+            },
+            {
+              "state": "measured",
+              "totalMs": 1500
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "http_round_trip",
+          "medianMs": 88
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 777
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoMaxQuality": null,
+        "videoScore": null,
+        "pageMedianMs": 1500,
+        "gameMedianMs": 88,
+        "gameProbeMethod": "http_round_trip",
+        "uploadPhotoMs": 777
+      },
+      "published": true
+    },
+    {
+      "name": "pair à moyenne déjà entière, toutes les marches coupées",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 0,
+                  "waitMs": 300
+                }
+              ]
+            }
+          ]
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 40
+            },
+            {
+              "state": "measured",
+              "totalMs": 42
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoMaxQuality": null,
+        "videoScore": null,
+        "pageMedianMs": 41,
+        "gameMedianMs": null,
+        "gameProbeMethod": null,
+        "uploadPhotoMs": null
+      },
+      "published": true
+    },
+    {
+      "name": "tests non mesurés : tout à null",
+      "tests": {
+        "videoAdaptive": {
+          "state": "interrupted",
+          "notTestedReason": "background"
+        },
+        "gameAndCalls": {
+          "state": "failed",
+          "probeMethod": "tcp_connect",
+          "medianMs": 41
+        },
+        "upload": {
+          "state": "failed",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            }
+          ]
+        },
+        "webPage": {
+          "state": "failed",
+          "openings": [
+            {
+              "state": "failed"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoMaxQuality": null,
+        "videoScore": null,
+        "pageMedianMs": null,
+        "gameMedianMs": null,
+        "gameProbeMethod": null,
+        "uploadPhotoMs": null
+      },
+      "published": false
+    },
+    {
+      "name": "lecture adaptative allée au bout sans score : videoScore null ; envois vidéo seulement",
+      "tests": {
+        "videoAdaptive": {
+          "state": "measured",
+          "playbackMs": 30000
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 20000000,
+              "totalMs": 5000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoMaxQuality": null,
+        "videoScore": null,
+        "pageMedianMs": null,
+        "gameMedianMs": null,
+        "gameProbeMethod": null,
+        "uploadPhotoMs": null
+      },
+      "published": true
+    }
+  ]
+}

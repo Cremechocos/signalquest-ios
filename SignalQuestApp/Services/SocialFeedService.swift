@@ -5,6 +5,9 @@ protocol SocialFeedServicing: Sendable {
     func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage
     /// Récupère un post unique (deep-link / notification) par son identifiant.
     func post(id: String) async throws -> UnifiedSocialFeedItem?
+    /// Détail d'un test d'expérience (`GET /api/experience-tests/{id}`), nil si
+    /// le serveur ne le montre pas à ce lecteur (404).
+    func experienceTest(id: String) async throws -> ExperienceTestDetail?
     func createPost(
         text: String,
         visibility: String,
@@ -98,6 +101,8 @@ protocol SocialFeedServicing: Sendable {
 
 extension SocialFeedServicing {
     func retryPendingPosts() async {}
+
+    func experienceTest(id: String) async throws -> ExperienceTestDetail? { nil }
 
     func publishPost(
         text: String,
@@ -198,6 +203,20 @@ final class SocialFeedService: SocialFeedServicing {
             as: SinglePostResponse.self
         )
         return response.item
+    }
+
+    func experienceTest(id: String) async throws -> ExperienceTestDetail? {
+        struct Response: Decodable { let experienceTest: ExperienceTestDetail? }
+        do {
+            let response: Response = try await api.request(
+                APIEndpoint(path: "/api/experience-tests/\(id)"),
+                as: Response.self
+            )
+            return response.experienceTest
+        } catch let error as APIError {
+            if case .http(404, _, _, _, _) = error { return nil }
+            throw error
+        }
     }
 
     func createPost(

@@ -619,6 +619,38 @@
         }
       }
     },
+    "Envoi de fichiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de fichiers"
+          }
+        }
+      }
+    },
+    "Envoi photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi photo"
+          }
+        }
+      }
+    },
     "Fulgurant" : {
       "localizations" : {
         "en" : {
@@ -651,6 +683,54 @@
         }
       }
     },
+    "Jeu et appels" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaming and calls"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu et appels"
+          }
+        }
+      }
+    },
+    "Jeu et appels : aller-retour web depuis un navigateur, à ne pas comparer à une mesure d’app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaming and calls: a web round trip from a browser, not comparable with an app measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu et appels : aller-retour web depuis un navigateur, à ne pas comparer à une mesure d’app."
+          }
+        }
+      }
+    },
+    "Jeu et appels : temps d’ouverture d’une connexion vers un serveur de jeu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaming and calls: time to open a connection to a game server."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu et appels : temps d’ouverture d’une connexion vers un serveur de jeu."
+          }
+        }
+      }
+    },
     "Le détail de ce test n’a pas pu être chargé. %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -664,6 +744,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le détail de ce test n’a pas pu être chargé. %@"
+          }
+        }
+      }
+    },
+    "Les mesures de ce test sont dans son détail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This test's measurements are in its details."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les mesures de ce test sont dans son détail."
           }
         }
       }
@@ -700,6 +796,22 @@
         }
       }
     },
+    "Mesuré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesuré"
+          }
+        }
+      }
+    },
     "Niveau %lld atteint" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -713,6 +825,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Niveau %lld atteint"
+          }
+        }
+      }
+    },
+    "Non testé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not tested"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non testé"
           }
         }
       }
@@ -764,6 +892,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau site exploré"
+          }
+        }
+      }
+    },
+    "Ouverture de pages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page loading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouverture de pages"
+          }
+        }
+      }
+    },
+    "Page web" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web page"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page web"
           }
         }
       }
@@ -883,6 +1043,22 @@
         }
       }
     },
+    "Réseau mobile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau mobile"
+          }
+        }
+      }
+    },
     "Salons indisponibles pour le moment." : {
       "localizations" : {
         "en" : {
@@ -895,6 +1071,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Salons indisponibles pour le moment."
+          }
+        }
+      }
+    },
+    "Score vidéo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video score"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Score vidéo"
           }
         }
       }
@@ -20125,6 +20317,22 @@
         }
       }
     },
+    "Test d’expérience" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experience test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test d’expérience"
+          }
+        }
+      }
+    },
     "Titre" : {
       "localizations" : {
         "en" : {
@@ -21692,6 +21900,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utilisateur"
+          }
+        }
+      }
+    },
+    "Vidéo adaptative" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptive video"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo adaptative"
+          }
+        }
+      }
+    },
+    "Vidéo par paliers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video by quality step"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo par paliers"
+          }
+        }
+      }
+    },
+    "Vidéo sans coupure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video without stalls"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo sans coupure"
           }
         }
       }

@@ -42,6 +42,15 @@ struct FeedItemCard: View {
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
                 onAuthorTap: onAuthorTap, onReact: onReact
             )
+        case "experience":
+            if let experience = FeedExperience(item: item) {
+                ExperienceCardView(
+                    item: item, experience: experience,
+                    onTap: onTap, onLike: onLike, onRepost: onRepost,
+                    onComment: onComment, onFavorite: onFavorite, onShare: onShare,
+                    onAuthorTap: onAuthorTap, onReact: onReact
+                )
+            }
         case "validation":
             ValidationCardView(
                 item: item,

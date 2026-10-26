@@ -378,7 +378,9 @@ extension UnifiedSocialFeedItem {
         guard !trimmed.isEmpty else { return nil }
         guard generated == true else { return trimmed }
         switch kind.lowercased() {
-        case "speedtest", "validation", "coverage", "session", "drive_test": return nil
+        // Un test d'expérience compose sa ligne depuis ses valeurs : le texte du
+        // serveur n'est qu'un repli français pour les anciennes versions.
+        case "speedtest", "validation", "coverage", "session", "drive_test", "experience": return nil
         case "photo", "antenna_photo":
             return Self.serverPhotoTexts.contains { trimmed.hasPrefix($0) } ? nil : trimmed
         // « A évalué ce signal · ★★★★ » : les étoiles sont déjà sur la carte.
@@ -473,11 +475,14 @@ private struct FeedMetricLayout: Layout {
         let layout = rows(width: bounds.width, columns: columns, subviews: subviews)
         var y = bounds.minY
         for (row, height) in layout.heights.enumerated() {
+            // Une tuile seule sur la dernière ligne prend toute la largeur plutôt
+            // que d'en laisser la moitié vide (cinq valeurs d'un test d'expérience).
+            let isLoneTile = row * columns + 1 == subviews.count
             for column in 0..<columns where row * columns + column < subviews.count {
                 subviews[row * columns + column].place(
                     at: CGPoint(x: bounds.minX + CGFloat(column) * (layout.columnWidth + spacing), y: y),
                     anchor: .topLeading,
-                    proposal: ProposedViewSize(width: layout.columnWidth, height: height)
+                    proposal: ProposedViewSize(width: isLoneTile ? bounds.width : layout.columnWidth, height: height)
                 )
             }
             y += height + spacing
