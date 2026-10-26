@@ -173,31 +173,15 @@ struct OutageCardView: View {
 
                 hero
 
-                LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    SQMetricTile.wrapping(
-                        label: String(localized: "Opérateur"),
-                        value: string("operator") ?? string("operatorKey") ?? "—",
-                        highlight: true
-                    )
-                    if let siteCode {
-                        SQMetricTile.wrapping(label: siteCode.label, value: siteCode.value)
+                // Trois tuiles de même hauteur, alignées en haut : la tuile
+                // « Touché » sur trois lignes creusait un vide au-dessus des autres (F-21).
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: SQSpace.sm) { tiles }
+                    } else {
+                        HStack(alignment: .top, spacing: SQSpace.sm) { tiles }
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
-                    // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
-                    // formulaire ne demande pas les paires, et les afficher comme telles
-                    // affirmerait un croisement que personne n'a déclaré.
-                    // TROIS lignes, et non deux : mesuré par rendu de la tuile réelle (390 pt de
-                    // large, grille à 3 colonnes). À la taille de texte par défaut, deux suffisent
-                    // et la troisième ne change rien — « Internet, / Voix · 4G, 5G ». Au premier
-                    // cran d'accessibilité (`dynamicTypeSize .accessibility1`), la limite à deux
-                    // coupait la ligne à « Voix · 4G,… » : les générations, qui sont l'information
-                    // ajoutée ici, disparaissaient précisément chez les gens qui grossissent le
-                    // texte. Avec trois, elle se pose entière sur « Internet, / Voix · / 4G, 5G ».
-                    SQMetricTile.wrapping(
-                        label: String(localized: "Touché"),
-                        value: affected,
-                        valueLineLimit: 3
-                    )
                 }
 
                 // Les précisions sous la grille, et non dans une quatrième tuile : la grille en
@@ -233,7 +217,7 @@ struct OutageCardView: View {
                     Text(footer)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 CardActionsBar(
@@ -301,8 +285,32 @@ struct OutageCardView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
+    @ViewBuilder
+    private var tiles: some View {
+        SQMetricTile.filling(
+            label: String(localized: "Opérateur"),
+            value: string("operator") ?? string("operatorKey") ?? "—",
+            highlight: true
+        )
+        if let siteCode {
+            SQMetricTile.filling(label: siteCode.label, value: siteCode.value)
+        }
+        // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
+        // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
+        // formulaire ne demande pas les paires, et les afficher comme telles
+        // affirmerait un croisement que personne n'a déclaré.
+        // TROIS lignes, et non deux : mesuré par rendu de la tuile réelle (390 pt de
+        // large, grille à 3 colonnes). À la taille de texte par défaut, deux suffisent
+        // et la troisième ne change rien — « Internet, / Voix · 4G, 5G ». Au premier
+        // cran d'accessibilité (`dynamicTypeSize .accessibility1`), la limite à deux
+        // coupait la ligne à « Voix · 4G,… » : les générations, qui sont l'information
+        // ajoutée ici, disparaissaient précisément chez les gens qui grossissent le
+        // texte. Avec trois, elle se pose entière sur « Internet, / Voix · / 4G, 5G ».
+        SQMetricTile.filling(
+            label: String(localized: "Touché"),
+            value: affected,
+            valueLineLimit: 3
+        )
     }
 
     /// Ce que l'opérateur en dit, quand il en dit quelque chose — sinon le décompte communautaire.
@@ -348,5 +356,14 @@ enum OutageFeedBadge {
 
     private static func isResolved(_ state: String?) -> Bool {
         OutageState(rawServerValue: state) == .resolved
+    }
+}
+
+private extension SQMetricTile {
+    /// Tuile du fil qui prend la hauteur de sa rangée.
+    static func filling(label: String, value: String, highlight: Bool = false, valueLineLimit: Int = 2) -> SQMetricTile {
+        var tile = SQMetricTile.wrapping(label: label, value: value, highlight: highlight, valueLineLimit: valueLineLimit)
+        tile.fillsHeight = true
+        return tile
     }
 }

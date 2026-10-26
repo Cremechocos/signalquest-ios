@@ -319,6 +319,32 @@ final class FeedActivityTests: XCTestCase {
     }
 }
 
+/// Lot F (F3) : la carte ne répète pas en phrase ce que ses tuiles montrent déjà.
+final class FeedCardTextTests: XCTestCase {
+
+    private func item(kind: String, text: String, generated: Bool) throws -> UnifiedSocialFeedItem {
+        try JSONDecoder().decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"t1","kind":"\(kind)","author":{"id":"u1"},"text":\(String(reflecting: text)),
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,"generated":\(generated)}
+        """.utf8))
+    }
+
+    func testAutomaticSentencesAreDropped() throws {
+        XCTAssertNil(try item(kind: "speedtest", text: "Speedtest 4G : 120 Mb/s", generated: true).cardText)
+        XCTAssertNil(try item(kind: "coverage", text: "Session de 12 km", generated: true).cardText)
+        XCTAssertNil(try item(kind: "photo", text: "Photo terrain du site Grenoble", generated: true).cardText)
+        XCTAssertNil(try item(kind: "rating", text: "A évalué ce signal · ★★★★", generated: true).cardText)
+        XCTAssertNil(try item(kind: "post", text: "   ", generated: false).cardText)
+    }
+
+    func testWhatTheAuthorWroteIsKept() throws {
+        XCTAssertEqual(try item(kind: "photo", text: "Nouveau mât sur le toit", generated: true).cardText, "Nouveau mât sur le toit")
+        XCTAssertEqual(try item(kind: "speedtest", text: "Enfin la fibre 5G !", generated: false).cardText, "Enfin la fibre 5G !")
+        XCTAssertEqual(try item(kind: "rating", text: "Très stable en gare", generated: true).cardText, "Très stable en gare")
+    }
+}
+
 /// Lot F (F-46) : les lieux d'Explorer restent proches et cèdent la place aux membres.
 final class ExplorePlacesTests: XCTestCase {
     private let grenoble = CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724)

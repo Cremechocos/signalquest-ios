@@ -87,11 +87,13 @@ struct StoriesBar: View {
                         .overlay(Circle().stroke(SQColor.bg, lineWidth: 2))
                         .offset(x: 3, y: 3)
                 }
+                // Une ligne, réduite au besoin : « Votre story » passait sur deux
+                // lignes au vouvoiement, sous des prénoms sur une (F-42).
                 Text("Ta story")
                     .font(SQType.caption(.semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: 68)

@@ -218,13 +218,29 @@ struct CardHeader: View {
                         SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
                     }
                 }
+            } else if let kindBadge {
+                // La pastille passe sous l'auteur plutôt que de repousser l'heure
+                // sur une troisième ligne (lot F, F-22).
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: SQSpace.sm) {
+                        authorContent
+                        Spacer(minLength: SQSpace.xs)
+                        SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
+                        menuButton
+                    }
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        HStack(alignment: .top) {
+                            authorContent
+                            Spacer(minLength: 0)
+                            menuButton
+                        }
+                        SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
+                    }
+                }
             } else {
                 HStack(spacing: SQSpace.sm) {
                     authorContent
                     Spacer(minLength: SQSpace.xs)
-                    if let kindBadge {
-                        SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
-                    }
                     menuButton
                 }
             }
@@ -328,6 +344,111 @@ extension UnifiedSocialFeedItem {
         if let reacted = reactions.first(where: { $0.emoji == emoji })?.reactedByMe { return reacted }
         return emoji == "❤️" && likedByMe
     }
+
+    /// Texte sous l'en-tête d'une carte. Celui qu'écrit le serveur pour un
+    /// speedtest, une identification ou une session répète la fiche (« a partagé
+    /// un speedtest », « Session de couverture terminée : 3.42 km… ») : il n'est
+    /// pas affiché (lot F, F-16 à F-19). La légende d'une photo, écrite par son
+    /// auteur, reste ; seuls les textes par défaut du serveur sont retirés.
+    var cardText: String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard generated == true else { return trimmed }
+        switch kind.lowercased() {
+        case "speedtest", "validation", "coverage", "session", "drive_test": return nil
+        case "photo", "antenna_photo":
+            return Self.serverPhotoTexts.contains { trimmed.hasPrefix($0) } ? nil : trimmed
+        // « A évalué ce signal · ★★★★ » : les étoiles sont déjà sur la carte.
+        case "rating": return trimmed.hasPrefix("A évalué ce signal") ? nil : trimmed
+        default: return trimmed
+        }
+    }
+
+    /// Textes par défaut d'un post photo (`photo-post.ts`, `materialize.ts`).
+    private static let serverPhotoTexts = [
+        "a partagé une photo terrain", "Photo terrain du site ", "Photo terrain partagée sur SignalQuest",
+        "Photo partagée sur SignalQuest", "Photo uploadée pour le site", "Photo approuvée", "Photo terrain ajoutée pour « ",
+    ]
+}
+
+/// Tuiles de mesure d'une carte du fil : sur une rangée quand la plus large y
+/// tient sur une ligne, sinon deux par rangée, sinon une. Plus de « Distanc/e »
+/// ni de « 3,4 / km » coupés, et les tuiles d'une rangée ont la même hauteur
+/// (lot F, F-20, F-21, F-25).
+struct FeedMetricGrid: View {
+    struct Metric: Equatable {
+        let label: String
+        let value: String
+        var highlight = false
+    }
+
+    let metrics: [Metric]
+
+    var body: some View {
+        FeedMetricLayout(spacing: SQSpace.sm) {
+            ForEach(metrics, id: \.label) { metric in
+                SQMetricTile(
+                    label: metric.label, value: metric.value, highlight: metric.highlight,
+                    fillsHeight: true, valueLineLimit: 3, identifierPrefix: "feed.metric"
+                )
+            }
+        }
+    }
+}
+
+/// Colonnes de largeur égale : une rangée ne partage pas sa largeur selon le
+/// contenu, c'est donc la tuile la plus large qui décide du nombre de colonnes.
+private struct FeedMetricLayout: Layout {
+    var spacing: CGFloat
+
+    private func columns(for width: CGFloat, subviews: Subviews) -> Int {
+        let widest = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        for columns in [subviews.count, 2] where columns >= 2 && columns <= subviews.count {
+            if CGFloat(columns) * widest + CGFloat(columns - 1) * spacing <= width { return columns }
+        }
+        return 1
+    }
+
+    private func rows(width: CGFloat, columns: Int, subviews: Subviews) -> (columnWidth: CGFloat, heights: [CGFloat]) {
+        let columnWidth = (width - CGFloat(columns - 1) * spacing) / CGFloat(columns)
+        let heights = stride(from: 0, to: subviews.count, by: columns).map { start in
+            subviews[start..<min(start + columns, subviews.count)]
+                .map { $0.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height }
+                .max() ?? 0
+        }
+        return (columnWidth, heights)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
+        guard let width = proposal.width, width.isFinite else {
+            // Taille idéale : une rangée de tuiles aussi larges que la plus large.
+            let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+            let widest = sizes.map(\.width).max() ?? 0
+            return CGSize(
+                width: CGFloat(sizes.count) * widest + CGFloat(sizes.count - 1) * spacing,
+                height: sizes.map(\.height).max() ?? 0
+            )
+        }
+        let layout = rows(width: width, columns: columns(for: width, subviews: subviews), subviews: subviews)
+        return CGSize(width: width, height: layout.heights.reduce(0, +) + CGFloat(layout.heights.count - 1) * spacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let columns = columns(for: bounds.width, subviews: subviews)
+        let layout = rows(width: bounds.width, columns: columns, subviews: subviews)
+        var y = bounds.minY
+        for (row, height) in layout.heights.enumerated() {
+            for column in 0..<columns where row * columns + column < subviews.count {
+                subviews[row * columns + column].place(
+                    at: CGPoint(x: bounds.minX + CGFloat(column) * (layout.columnWidth + spacing), y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: layout.columnWidth, height: height)
+                )
+            }
+            y += height + spacing
+        }
+    }
 }
 
 /// Bottom toolbar with the reaction / repost / comment / share controls.
@@ -346,40 +467,22 @@ struct CardActionsBar: View {
 
     var body: some View {
         // J'aime, Commenter, Repartager à gauche ; Enregistrer et Partager à
-        // droite. Plus de fond gris : la carte suffit à les regrouper.
-        HStack(spacing: SQSpace.xs) {
-            likeButton
-            actionButton(
-                count: item.commentsCount,
-                systemImage: "bubble.right",
-                label: "Commenter",
-                action: onComment
-            )
-            actionButton(
-                count: item.repostsCount,
-                systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath",
-                tint: item.repostedByMe ? SQColor.success : SQColor.chipInk,
-                label: "Repartager",
-                action: onRepost
-            )
-            .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
-            Spacer(minLength: 0)
-            Button(action: onFavorite) {
-                Image(systemName: item.favoritedByMe ? "bookmark.fill" : "bookmark")
-                    .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.chipInk)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+        // droite. Plus de fond gris : la carte suffit à les regrouper. Quand
+        // tout ne tient pas sur une ligne (très grand texte), les deux groupes
+        // passent sur deux rangées plutôt que de couper les compteurs (F-24).
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.xs) {
+                leadingActions
+                Spacer(minLength: 0)
+                trailingActions
             }
-            .accessibilityLabel(item.favoritedByMe ? "Retirer des enregistrés" : "Enregistrer la publication")
-            .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
-            .sqLikePop(trigger: item.favoritedByMe)
-            Button(action: onShare) {
-                Image(systemName: "paperplane")
-                    .foregroundStyle(SQColor.chipInk)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: SQSpace.xs) { leadingActions }
+                HStack(spacing: SQSpace.xs) {
+                    Spacer(minLength: 0)
+                    trailingActions
+                }
             }
-            .accessibilityLabel("Partager")
         }
         .padding(.horizontal, -SQSpace.sm)
         .padding(.vertical, -SQSpace.xs)
@@ -396,6 +499,45 @@ struct CardActionsBar: View {
                 .zIndex(2)
             }
         }
+    }
+
+    @ViewBuilder
+    private var leadingActions: some View {
+        likeButton
+        actionButton(
+            count: item.commentsCount,
+            systemImage: "bubble.right",
+            label: "Commenter",
+            action: onComment
+        )
+        actionButton(
+            count: item.repostsCount,
+            systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath",
+            tint: item.repostedByMe ? SQColor.success : SQColor.chipInk,
+            label: "Repartager",
+            action: onRepost
+        )
+        .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var trailingActions: some View {
+        Button(action: onFavorite) {
+            Image(systemName: item.favoritedByMe ? "bookmark.fill" : "bookmark")
+                .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.chipInk)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(item.favoritedByMe ? "Retirer des enregistrés" : "Enregistrer la publication")
+        .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
+        .sqLikePop(trigger: item.favoritedByMe)
+        Button(action: onShare) {
+            Image(systemName: "paperplane")
+                .foregroundStyle(SQColor.chipInk)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Partager")
     }
 
     /// Bouton ❤️ : tap = like ; appui long = sélecteur de réactions animé.

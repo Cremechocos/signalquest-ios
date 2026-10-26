@@ -33,8 +33,8 @@ struct PhotoCardView: View {
                     isPinned: item.isPinned
                 )
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if let text = item.cardText {
+                    Text(text)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
@@ -129,8 +129,7 @@ struct PhotoCardView: View {
     private var photoAccessibilityLabel: String {
         // Le texte alternatif de l'auteur décrit mieux la photo que sa légende.
         if let alt = item.imageAttachments.first?.trimmedAltText { return alt }
-        let caption = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !caption.isEmpty { return String(localized: "Photo. \(caption)") }
+        if let caption = item.cardText { return String(localized: "Photo. \(caption)") }
         if let place = (item.signal?.city ?? item.readablePlaceLabel), !place.isEmpty {
             return String(localized: "Photo à \(place)")
         }

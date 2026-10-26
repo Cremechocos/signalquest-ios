@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Specialised feed card for `kind = validation`. Mirrors Android layout:
-/// Ident. / PCI / Cell / Band with the operator + tech badge.
+/// Specialised feed card for `kind = validation` : l'identifiant trouvé, la
+/// méthode et le nombre de confirmations. PCI, Cell, bande et secteurs restent dans le
+/// détail (lot F : résumé radio au fil, détail ailleurs).
 struct ValidationCardView: View {
     let item: UnifiedSocialFeedItem
     var onTap: () -> Void
@@ -47,29 +48,21 @@ struct ValidationCardView: View {
                 }
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
-                LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    SQMetricTile.wrapping(
-                        label: identifierTileLabel,
-                        value: signal?.identifierValue ?? signal?.cellId ?? "—",
-                        highlight: true
-                    )
-                    SQMetricTile.wrapping(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
-                    SQMetricTile.wrapping(label: "Cell", value: signal?.cellId ?? "—")
-                    SQMetricTile.wrapping(label: "Bande", value: signal?.band ?? "—")
-                }
+                FeedMetricGrid(metrics: metrics)
 
-                if let footer = footer {
-                    Text(footer)
+                if let count = signal?.validationCount, count > 0 {
+                    Text("\(count) confirmations")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if let text = item.cardText {
+                    Text(text)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 CardActionsBar(
@@ -86,10 +79,6 @@ struct ValidationCardView: View {
             .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
-    }
-
-    private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
     }
 
     private var validationHeading: some View {
@@ -133,17 +122,14 @@ struct ValidationCardView: View {
             .joined(separator: " · ")
     }
 
-    private var footer: String? {
-        var parts: [String] = []
-        // Ce qui a été identifié (eNB / gNB / PCI / cellule).
-        if signal?.identifierType != nil { parts.append(String(localized: "Type \(identifierTileLabel)")) }
-        // Méthode : auto-identifiée, déclarée manuellement, ou importée.
-        if let method = identifierMethodLabel { parts.append(method) }
-        if let sectors = signal?.sectors, !sectors.isEmpty {
-            let list = sectors.prefix(3).map(String.init).joined(separator: " / ")
-            parts.append(String(localized: "Secteurs \(list)"))
+    /// Identifiant, puis la méthode quand on la connaît.
+    private var metrics: [FeedMetricGrid.Metric] {
+        var metrics = [FeedMetricGrid.Metric(
+            label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true
+        )]
+        if let method = identifierMethodLabel {
+            metrics.append(.init(label: "Méthode", value: method))
         }
-        if let count = signal?.validationCount { parts.append(String(localized: "\(count) confirmations")) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        return metrics
     }
 }

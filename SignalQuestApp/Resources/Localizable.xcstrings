@@ -18092,6 +18092,23 @@
         }
       }
     },
+    "Signal de %lld à %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal from %lld to %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal de %lld à %@"
+          }
+        }
+      }
+    },
     "Signal le long du trajet" : {
       "localizations" : {
         "en" : {

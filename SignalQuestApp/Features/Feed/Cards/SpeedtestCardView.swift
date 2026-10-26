@@ -30,8 +30,8 @@ struct SpeedtestCardView: View {
                     isPinned: item.isPinned
                 )
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if let text = item.cardText {
+                    Text(text)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)

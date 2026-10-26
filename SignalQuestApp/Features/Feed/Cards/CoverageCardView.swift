@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Specialised feed card for `kind = coverage` (or `session`). Mirrors the
-/// Android session card: Distance / Durée / Points / Signal moy.
+/// Specialised feed card for `kind = coverage` (or `session`) : Distance /
+/// Durée / Mesures / Signal moy. Une mesure isolée montre sa techno et son
+/// signal ; Cell et PCI restent dans le détail (lot F).
 struct CoverageCardView: View {
     let item: UnifiedSocialFeedItem
     var onTap: () -> Void
@@ -66,33 +67,21 @@ struct CoverageCardView: View {
                 }
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
-                LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    if hasSessionAggregate {
-                        SQMetricTile.wrapping(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
-                        SQMetricTile.wrapping(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
-                        SQMetricTile.wrapping(label: "Points", value: signal?.pointsCount.map(String.init) ?? "—")
-                        // « moy. » ne reprend jamais un RSRP ponctuel : sans moyenne, le tiret.
-                        SQMetricTile.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm))
-                    } else {
-                        SQMetricTile.wrapping(label: "Tech", value: signal?.technology ?? "—", highlight: true)
-                        SQMetricTile.wrapping(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
-                        SQMetricTile.wrapping(label: "Cell", value: signal?.cellId ?? "—")
-                        SQMetricTile.wrapping(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
-                    }
-                }
+                FeedMetricGrid(metrics: metrics)
 
                 if let footer = footer {
                     Text(footer)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if let text = item.cardText {
+                    Text(text)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 CardActionsBar(
@@ -111,8 +100,21 @@ struct CoverageCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
-    private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+    private var metrics: [FeedMetricGrid.Metric] {
+        guard hasSessionAggregate else {
+            return [
+                .init(label: "Tech", value: signal?.technology ?? "—", highlight: true),
+                .init(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
+            ]
+        }
+        return [
+            .init(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true),
+            .init(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds)),
+            // Des points de mesure, pas des points de jeu (F-18).
+            .init(label: "Mesures", value: signal?.pointsCount.map(String.init) ?? "—"),
+            // « moy. » ne reprend jamais un RSRP ponctuel : sans moyenne, le tiret.
+            .init(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm))
+        ]
     }
 
     private var coverageHeading: some View {
@@ -128,10 +130,10 @@ struct CoverageCardView: View {
         }
     }
 
+    /// Mesures et distance sont déjà dans les tuiles : le sous-titre dit les
+    /// technologies rencontrées (F-18).
     private var subtitle: String {
         var parts: [String] = []
-        if let count = signal?.pointsCount, hasSessionAggregate { parts.append(String(localized: "\(count) pts")) }
-        if let distance = signal?.distanceMeters, hasSessionAggregate { parts.append(SignalFormatters.meters(distance)) }
         if !hasSessionAggregate {
             if let op = signal?.operator { parts.append(op) }
             if let tech = signal?.technology { parts.append(tech) }
@@ -144,7 +146,8 @@ struct CoverageCardView: View {
     private var footer: String? {
         var parts: [String] = []
         if let min = signal?.minSignalDbm, let max = signal?.maxSignalDbm {
-            parts.append(String(localized: "Signal \(SignalFormatters.dbm(min)) / \(SignalFormatters.dbm(max))"))
+            // « de -118 à -81 dBm » : le plus faible puis le plus fort (F-18).
+            parts.append(String(localized: "Signal de \(Int(min.rounded())) à \(SignalFormatters.dbm(max))"))
         } else if let avg = signal?.averageSignalDbm {
             parts.append(String(localized: "Signal \(SignalFormatters.dbm(avg))"))
         }

@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Feed card for `kind = rating` — une évaluation (note en étoiles) d'un signal.
-/// Héro = étoiles + tendance, puis contexte antenne (opérateur / eNB / bande /
-/// RSRP). N'affiche JAMAIS les notes texte (privées côté serveur).
+/// Héro = étoiles + tendance, puis contexte antenne (identifiant, RSRP ; la
+/// bande reste dans le détail, lot F). N'affiche JAMAIS les notes texte
+/// (privées côté serveur).
 struct RatingCardView: View {
     let item: UnifiedSocialFeedItem
     var onTap: () -> Void
@@ -14,7 +15,6 @@ struct RatingCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
     private var stars: Int { max(0, min(5, signal?.ratingStars ?? 0)) }
@@ -51,21 +51,20 @@ struct RatingCardView: View {
                 }
 
                 // Contexte antenne (le sujet noté).
-                LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    SQMetricTile.wrapping(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true)
-                    SQMetricTile.wrapping(label: "Bande", value: signal?.band ?? "—")
-                    SQMetricTile.wrapping(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
-                }
+                FeedMetricGrid(metrics: [
+                    .init(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true),
+                    .init(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
+                ])
 
                 if let footer = footer {
                     Text(footer)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if !item.text.isEmpty {
-                    Text(item.text)
+                if let text = item.cardText {
+                    Text(text)
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
@@ -85,10 +84,6 @@ struct RatingCardView: View {
             .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
-    }
-
-    private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
     }
 
     /// Libellé de la tuile identifiant selon le type d'identification.

@@ -70,8 +70,8 @@ struct SignalDetailSheet: View {
                         }
                         .accessibilityIdentifier("feed.detail.activityLink")
                     }
-                } else if !item.text.isEmpty {
-                    Text(item.text)
+                } else if let text = item.cardText {
+                    Text(text)
                         .font(SQFont.body(16, .regular, relativeTo: .body))
                         .lineSpacing(4)
                         .foregroundStyle(SQColor.label)
@@ -300,16 +300,18 @@ struct SignalDetailSheet: View {
                 // serveur la complète quand le résumé ne l'a pas.
                 ("Réception", signal.downloadMbps == nil
                     ? SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg) : ""),
-                ("Opérateur", signal.servingOperator ?? signal.operator ?? detail?.mobileOperator ?? ""),
+                // Opérateur, techno et latence du bloc de mesure ne s'y répètent pas (F-16) :
+                // le détail serveur ne les donne que quand le résumé ne les a pas.
+                ("Opérateur", (signal.servingOperator ?? signal.operator) == nil ? detail?.mobileOperator ?? "" : ""),
                 ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
-                ("Technologie", signal.technology ?? detail?.networkType ?? ""),
-                ("Latence min", SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)),
+                ("Technologie", signal.technology == nil ? detail?.networkType ?? "" : ""),
+                ("Latence min", latencyMinText(detail: detail, blockPing: signal.pingMs)),
                 ("Gigue", SignalFormatters.ms(detail?.jitter ?? signal.jitterMs))
             ]
         case "validation":
             return [
                 ("Identifiant", signal.identifierValue ?? ""),
-                ("Type", signal.identifierType?.uppercased() ?? ""),
+                ("Type", identifierTypeLabel(signal.identifierType)),
                 ("PCI", signal.pci.map(String.init) ?? ""),
                 ("Cell", signal.cellId ?? ""),
                 ("Bande", signal.band ?? ""),
@@ -324,14 +326,34 @@ struct SignalDetailSheet: View {
             return [
                 ("Distance", SignalFormatters.meters(signal.distanceMeters)),
                 ("Durée", SignalFormatters.duration(signal.durationSeconds)),
-                ("Points", signal.pointsCount.map(String.init) ?? ""),
+                ("Mesures", signal.pointsCount.map(String.init) ?? ""),
                 ("Signal moy.", SignalFormatters.dbm(signal.averageSignalDbm)),
                 ("Min / Max", rangeText(signal: signal)),
-                ("Techs", signal.detectedTechs.prefix(3).joined(separator: " / "))
-            ]
+                ("Techs", signal.detectedTechs.prefix(3).joined(separator: " / ")),
+                // Une mesure isolée : Cell et PCI quittent la carte pour le détail (lot F).
+                ("PCI", signal.pci.map(String.init) ?? "")
+            ] + radioPairs(for: signal)
         default:
             return radioPairs(for: signal)
         }
+    }
+
+    /// « eNB », « gNB », « PCI », « Cell » comme sur la carte, jamais « ENB ».
+    private func identifierTypeLabel(_ type: String?) -> String {
+        switch type?.lowercased() {
+        case "enb": return "eNB"
+        case "gnb": return "gNB"
+        case "pci": return "PCI"
+        case "cellid", "ci": return "Cell"
+        case let other: return other?.uppercased() ?? ""
+        }
+    }
+
+    /// Latence minimale du détail serveur, si le bloc de mesure n'affiche pas déjà la même.
+    private func latencyMinText(detail: SpeedtestDetail?, blockPing: Double?) -> String {
+        guard let min = detail?.pingMin ?? detail?.ping ?? blockPing else { return "" }
+        if let blockPing, Int(blockPing.rounded()) == Int(min.rounded()) { return "" }
+        return SignalFormatters.ms(min)
     }
 
     private func radioPairs(for signal: SocialSignalSummary) -> [(String, String)] {
