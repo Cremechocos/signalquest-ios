@@ -11,6 +11,7 @@ struct WeeklyRecapSheet: View {
     /// Appelé quand une nouvelle story vient d'être créée, pour que le fil l'affiche.
     var onPublished: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var stats: WeeklyRecapStats?
     @State private var isLoading = true
@@ -128,35 +129,59 @@ struct WeeklyRecapSheet: View {
     /// zéros ferait passer une semaine spécialisée pour une semaine ratée.
     @ViewBuilder
     private func metrics(_ stats: WeeklyRecapStats) -> some View {
-        let tiles: [(Int, LocalizedStringKey)] = [
-            (stats.speedtestCount, "speedtests"),
-            (stats.photoCount, "photos"),
-            (stats.validationCount, "validations"),
-            (stats.badgeCount, "badges")
-        ].filter { $0.0 > 0 }
+        let tiles = stats.secondaryMetrics
         if !tiles.isEmpty {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
-                    let (value, label) = tile
-                    VStack(spacing: 2) {
-                        Text(verbatim: "\(value)")
-                            .font(SQFont.display(22, .heavy, relativeTo: .title2))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.label)
-                        Text(label)
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+            // Jusqu'à sept chiffres : des rangées équilibrées de trois au plus
+            // (deux aux tailles d'accessibilité), jamais une tuile seule.
+            let rows = Self.metricRows(count: tiles.count, maxPerRow: dynamicTypeSize.isAccessibilitySize ? 2 : 3)
+            VStack(spacing: SQSpace.sm) {
+                ForEach(rows, id: \.lowerBound) { row in
+                    HStack(spacing: SQSpace.sm) {
+                        ForEach(row, id: \.self) { index in
+                            metricTile(tiles[index])
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SQSpace.md)
-                    .padding(.horizontal, SQSpace.xs)
-                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                    .accessibilityElement(children: .combine)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .accessibilityIdentifier("weeklyRecap.metrics")
         }
+    }
+
+    /// Découpe `count` tuiles en rangées de `maxPerRow` au plus, les plus
+    /// remplies d'abord, sans écart de plus d'une tuile : 7 → 3, 2, 2.
+    static func metricRows(count: Int, maxPerRow: Int) -> [Range<Int>] {
+        guard count > 0, maxPerRow > 0 else { return [] }
+        let rowCount = (count + maxPerRow - 1) / maxPerRow
+        var rows: [Range<Int>] = []
+        var start = 0
+        for row in 0..<rowCount {
+            let size = count / rowCount + (row < count % rowCount ? 1 : 0)
+            rows.append(start..<(start + size))
+            start += size
+        }
+        return rows
+    }
+
+    private func metricTile(_ tile: (value: String, label: String)) -> some View {
+        VStack(spacing: 2) {
+            Text(verbatim: tile.value)
+                .font(SQFont.display(22, .heavy, relativeTo: .title2))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+            Text(verbatim: tile.label)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        // Chiffres alignés en haut : une étiquette sur deux lignes ne les décale plus.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.vertical, SQSpace.md)
+        .padding(.horizontal, SQSpace.xs)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private struct ShareItem: Identifiable {

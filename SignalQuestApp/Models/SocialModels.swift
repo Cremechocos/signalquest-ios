@@ -208,6 +208,30 @@ struct NetworkPulseOperator: Decodable, Equatable {
     let avgRsrpDbm: Int?
     let medianDownloadMbps: Int?
     let sampleCount: Int
+
+    init(operatorKey: String, label: String, avgRsrpDbm: Int?, medianDownloadMbps: Int?, sampleCount: Int) {
+        self.operatorKey = operatorKey
+        self.label = label
+        self.avgRsrpDbm = avgRsrpDbm
+        self.medianDownloadMbps = medianDownloadMbps
+        self.sampleCount = sampleCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case operatorKey, label, avgRsrpDbm, medianDownloadMbps, sampleCount, measurementsCount
+    }
+
+    /// Le serveur en service n'envoie que `measurementsCount` par opérateur, sans
+    /// signal ni débit : exiger `sampleCount` vidait toute la liste (lot F, F-33).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        operatorKey = try c.decode(String.self, forKey: .operatorKey)
+        label = (try? c.decode(String.self, forKey: .label)) ?? operatorKey
+        avgRsrpDbm = try? c.decode(Int.self, forKey: .avgRsrpDbm)
+        medianDownloadMbps = try? c.decode(Int.self, forKey: .medianDownloadMbps)
+        sampleCount = (try? c.decode(Int.self, forKey: .sampleCount))
+            ?? (try? c.decode(Int.self, forKey: .measurementsCount)) ?? 0
+    }
 }
 
 /// Comparaison aux 30 jours précédant la fenêtre courante.
@@ -231,8 +255,8 @@ struct NetworkPulse: Decodable, Equatable {
     let measurementsCount: Int
     let bestOperator: String?
     let radiusMeters: Int?
-    /// Fenêtre agrégée par le serveur. Le contrat courant reste fixé à 7 jours ;
-    /// les zones rares élargissent leur rayon, pas leur ancienneté.
+    /// Fenêtre agrégée par le serveur, en jours. Le serveur en service agrège
+    /// 365 jours (`periodDays`).
     let windowDays: Int
     /// Date de la mesure la plus récente. Source de la fraîcheur affichée.
     let lastMeasuredAt: Date?
@@ -243,6 +267,16 @@ struct NetworkPulse: Decodable, Equatable {
 
     /// Rien à afficher tant qu'aucune mesure n'a été agrégée dans la zone.
     var hasData: Bool { measurementsCount > 0 }
+
+    /// « 7 derniers jours » … « 12 derniers mois » : la fenêtre en mots, pas « 365 jours ».
+    var windowLabel: String {
+        switch windowDays {
+        case ...7: return String(localized: "7 derniers jours")
+        case ...30: return String(localized: "30 derniers jours")
+        case ...90: return String(localized: "3 derniers mois")
+        default: return String(localized: "12 derniers mois")
+        }
+    }
 
     /// Le pouls décrit-il vraiment l'instant présent ? Sert à n'animer la pastille
     /// « live » que lorsqu'elle dit quelque chose de vrai.
@@ -284,7 +318,7 @@ struct NetworkPulse: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case avgRsrpDbm, medianDownloadMbps, measurementsCount, bestOperator, radiusMeters
-        case windowDays, lastMeasuredAt, operators, technologies, trend, reference
+        case windowDays, periodDays, lastMeasuredAt, operators, technologies, trend, reference
     }
 
     init(from decoder: Decoder) throws {
@@ -304,7 +338,8 @@ struct NetworkPulse: Decodable, Equatable {
         radiusMeters = intFlex(.radiusMeters)
         // Défaut 365 : un serveur qui n'enverrait pas le champ agrège l'année, comme
         // avant. Mieux vaut annoncer une fenêtre large que laisser croire au direct.
-        windowDays = intFlex(.windowDays) ?? 365
+        // Le serveur en service l'appelle `periodDays` (365 jours).
+        windowDays = intFlex(.windowDays) ?? intFlex(.periodDays) ?? 365
         // `SQDateParsing` est le décodeur de dates partagé du repo : il essaie ISO
         // avec puis sans fraction, etc. Pas de formateur ad hoc ici.
         lastMeasuredAt = ((try? c.decodeIfPresent(String.self, forKey: .lastMeasuredAt)) ?? nil)

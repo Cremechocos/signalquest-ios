@@ -23,6 +23,8 @@ final class E2EEReportQATests: XCTestCase {
         XCTAssertTrue(send.waitForExistence(timeout: 5))
         XCTAssertLessThan(notice.frame.minY, send.frame.minY, "L'avertissement vient avant l'envoi")
 
+        XCTAssertFalse(send.isEnabled, "Aucun motif choisi d'avance")
+        app.buttons["report.reason.spam"].tap()
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(send, in: app))
         send.tap()
         let sent = app.staticTexts["report.qa.sent"]
@@ -53,6 +55,7 @@ final class E2EEReportQATests: XCTestCase {
         XCTAssertTrue(notice.label.contains("moderation team"), notice.label)
 
         let send = app.buttons["report.send"]
+        app.buttons["report.reason.spam"].tap()
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(send, in: app))
         send.tap()
         let error = app.staticTexts["report.error"]

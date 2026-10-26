@@ -36,6 +36,34 @@ struct WeeklyRecapStats: Decodable, Equatable {
         return .none
     }
 
+    /// Les chiffres sous le titre, sauf celui qu'il montre déjà en grand. Les
+    /// sessions et les moments partagés ne s'affichaient jamais, et « 1 badges »
+    /// n'était pas accordé (lot F, F-34). Les zéros se taisent.
+    var secondaryMetrics: [(value: String, label: String)] {
+        let headline = headline
+        func count(_ value: Int, _ one: String, _ many: String) -> (value: String, label: String)? {
+            value > 0 ? (value.formatted(), value == 1 ? one : many) : nil
+        }
+        var metrics: [(value: String, label: String)?] = [
+            count(speedtestCount, String(localized: "speedtest"), String(localized: "speedtests"))
+        ]
+        if case .coverage = headline {} else {
+            metrics.append(count(sessionPoints, String(localized: "point de couverture"), String(localized: "points de couverture")))
+        }
+        if let km = sessionDistanceKm, km >= 0.1 {
+            metrics.append((km.formatted(.number.precision(.fractionLength(0...1))), String(localized: "km parcourus")))
+        }
+        if case .validations = headline {} else {
+            metrics.append(count(validationCount, String(localized: "validation"), String(localized: "validations")))
+        }
+        if case .photos = headline {} else {
+            metrics.append(count(photoCount, String(localized: "photo"), String(localized: "photos")))
+        }
+        metrics.append(count(badgeCount, String(localized: "badge"), String(localized: "badges")))
+        metrics.append(count(signalMomentsShared, String(localized: "moment partagé"), String(localized: "moments partagés")))
+        return metrics.compactMap { $0 }
+    }
+
     enum RecapHeadline: Equatable {
         case topSpeed(Double)
         case coverage(Int)

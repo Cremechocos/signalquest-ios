@@ -10,7 +10,10 @@ struct ReportSheet: View {
     private let submit: @MainActor (ReportReason, String?) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
-    @State private var reason: ReportReason
+    /// Aucun motif d'avance : « Spam » présélectionné partait sur un simple appui (F-38).
+    @State private var reason: ReportReason?
+    /// Libellés propres à certains motifs (post automatique : « mesure erronée »).
+    private let labels: [ReportReason: String]
     @State private var note: String = ""
     @State private var isBusy = false
     @State private var error: String?
@@ -21,19 +24,38 @@ struct ReportSheet: View {
         }
     }
 
+    /// Signalement d'une publication. Un post automatique (speedtest, session,
+    /// validation…) se trompe plutôt qu'il n'offense : son motif le plus
+    /// probable vient en tête, sous un libellé qui parle de mesure. Le serveur
+    /// ne connaît que six motifs : c'est `misleading` qui part (F-38).
+    init(post item: UnifiedSocialFeedItem, service: ReportsServicing) {
+        let target = ReportTarget.post(item.backendPostId)
+        let isAutomatic = item.generated == true || item.kind.lowercased() != "post"
+        let reasons: [ReportReason] = isAutomatic
+            ? [.misleading] + ReportReason.allCases.filter { $0 != .misleading }
+            : ReportReason.allCases
+        self.init(
+            reasons: reasons,
+            labels: isAutomatic ? [.misleading: String(localized: "Mesure ou information erronée")] : [:]
+        ) { reason, comment in
+            try await service.report(target, reason: reason, comment: comment)
+        }
+    }
+
     /// Signalement hors `/api/social/reports` (messages) : l'appelant fournit
     /// l'envoi, les motifs proposés et, au besoin, ce qu'il faut savoir avant.
     init(
         reasons: [ReportReason],
         notice: String? = nil,
         allowsComment: Bool = true,
+        labels: [ReportReason: String] = [:],
         submit: @escaping @MainActor (ReportReason, String?) async throws -> Void
     ) {
         self.reasons = reasons
         self.notice = notice
         self.allowsComment = allowsComment
+        self.labels = labels
         self.submit = submit
-        _reason = State(initialValue: reasons.first ?? .spam)
     }
 
     var body: some View {
@@ -86,7 +108,7 @@ struct ReportSheet: View {
                 GradientButton(String(localized: "Envoyer le signalement"), isBusy: isBusy) {
                     Task { await send() }
                 }
-                .disabled(isBusy)
+                .disabled(isBusy || reason == nil)
                 .accessibilityIdentifier("report.send")
             }
             .padding(SQSpace.lg)
@@ -105,7 +127,7 @@ struct ReportSheet: View {
                     reason = value
                 } label: {
                     HStack(spacing: SQSpace.md) {
-                        Text(value.label)
+                        Text(labels[value] ?? value.label)
                             .font(SQType.body(.semibold))
                             .foregroundStyle(SQColor.label)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,6 +149,7 @@ struct ReportSheet: View {
     }
 
     private func send() async {
+        guard let reason else { return }
         isBusy = true
         defer { isBusy = false }
         do {

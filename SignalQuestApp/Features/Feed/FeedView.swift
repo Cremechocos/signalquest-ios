@@ -973,7 +973,7 @@ struct FeedView: View {
                     onCommentDeleted: { model.commentDeleted(on: item) }
                 )
             case .report(let item):
-                ReportSheet(target: .post(item.backendPostId), service: services.reports)
+                ReportSheet(post: item, service: services.reports)
             case .share(let item):
                 PostShareSheet(
                     post: item,
@@ -1034,6 +1034,7 @@ struct FeedView: View {
         }
         .sheet(item: $composerRequest) { request in
             ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start, sharing: request.shared,
+                          trendingHashtags: model.trendingHashtags.map(\.tag),
                           onPublished: { Task { await model.load() } })
         }
         .sheet(isPresented: $isPulseExpanded) { pulseSheet }
@@ -1219,7 +1220,7 @@ struct FeedView: View {
                 SQIconPastille(systemImage: "waveform.path.ecg", size: 36,
                                tint: SQColor.accentInk, fill: SQColor.accentSoft)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Autour de toi · \(pulse.windowDays) jours")
+                    Text("Autour de toi · \(pulse.windowLabel)")
                         .font(SQType.subhead(.semibold))
                         .foregroundStyle(SQColor.label)
                         .accessibilityIdentifier("community.networkPulse.title")
@@ -1286,6 +1287,7 @@ struct FeedView: View {
                 }
                 if let pulse = model.pulse {
                     NetworkPulseHero(pulse: pulse)
+                    pulseMethod(pulse)
                 }
             }
             .padding(.horizontal, SQSpace.lg)
@@ -1295,6 +1297,31 @@ struct FeedView: View {
         .signalQuestBackground()
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    /// Ce que valent les chiffres : la feuille ne montrait que trois nombres
+    /// sans dire d'où ils venaient, ni sur quoi un opérateur passait « en tête »
+    /// (lot F, F-33). Règles du serveur (`/api/social/network-pulse`).
+    private func pulseMethod(_ pulse: NetworkPulse) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Comment c’est calculé")
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Signal moyen : la puissance reçue de l’antenne (RSRP), en moyenne sur les points de couverture partagés dans le rayon ; plus elle est proche de 0, mieux c’est.")
+                Text("Réception médiane : la moitié des speedtests publics du rayon font mieux, l’autre moitié moins bien.")
+                Text("En tête : le meilleur score, moitié signal moyen, moitié débit médian, parmi les opérateurs qui ont au moins 50 points de couverture.")
+                Text("Seules les mesures publiques comptent, et rien ne s’affiche tant que moins de 3 membres ont mesuré dans la zone.")
+            }
+            .font(SQType.subhead)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("community.networkPulse.method")
     }
 
     private var header: some View {
@@ -1605,7 +1632,7 @@ struct FeedView: View {
             // le `Label`, ils faisaient saturer le
             // vérificateur de types de ce bloc devenu long.
             let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
             let icon = muted ? "bell" : "bell.slash"
             Label(title, systemImage: icon)
         }

@@ -424,6 +424,22 @@
         }
       }
     },
+    "%lld %% par rapport aux 30 jours précédents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% compared with the previous 30 days"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %% par rapport aux 30 jours précédents"
+          }
+        }
+      }
+    },
     "%lld membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même." : {
       "localizations" : {
         "en" : {
@@ -453,6 +469,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld points gagnés"
+          }
+        }
+      }
+    },
+    "+%lld %% par rapport aux 30 jours précédents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld%% compared with the previous 30 days"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld %% par rapport aux 30 jours précédents"
           }
         }
       }
@@ -539,6 +571,38 @@
         }
       }
     },
+    "Comment c’est calculé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How it’s calculated"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment c’est calculé"
+          }
+        }
+      }
+    },
+    "En tête : le meilleur score, moitié signal moyen, moitié débit médian, parmi les opérateurs qui ont au moins 50 points de couverture." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the lead: the best score, half average signal and half median download, among operators with at least 50 coverage points."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En tête : le meilleur score, moitié signal moyen, moitié débit médian, parmi les opérateurs qui ont au moins 50 points de couverture."
+          }
+        }
+      }
+    },
     "Fulgurant" : {
       "localizations" : {
         "en" : {
@@ -584,6 +648,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le détail de ce test n’a pas pu être chargé. %@"
+          }
+        }
+      }
+    },
+    "Mesure ou information erronée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wrong measurement or information"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesure ou information erronée"
           }
         }
       }
@@ -722,6 +802,22 @@
         }
       }
     },
+    "Réception médiane : la moitié des speedtests publics du rayon font mieux, l’autre moitié moins bien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median download: half of the public speedtests within the radius do better, the other half worse."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception médiane : la moitié des speedtests publics du rayon font mieux, l’autre moitié moins bien."
+          }
+        }
+      }
+    },
     "Récompense obtenue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -735,6 +831,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Récompense obtenue"
+          }
+        }
+      }
+    },
+    "Référence %@ : %@ (%lld speedtests)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reference %1$@: %2$@ (%3$lld speedtests)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Référence %1$@ : %2$@ (%3$lld speedtests)"
           }
         }
       }
@@ -18143,6 +18255,22 @@
         }
       }
     },
+    "Seules les mesures publiques comptent, et rien ne s’affiche tant que moins de 3 membres ont mesuré dans la zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only public measurements count, and nothing is shown until at least 3 members have measured in the area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seules les mesures publiques comptent, et rien ne s’affiche tant que moins de 3 membres ont mesuré dans la zone."
+          }
+        }
+      }
+    },
     "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil." : {
       "localizations" : {
         "en" : {
@@ -18234,6 +18362,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signal le long du trajet"
+          }
+        }
+      }
+    },
+    "Signal moyen : la puissance reçue de l’antenne (RSRP), en moyenne sur les points de couverture partagés dans le rayon ; plus elle est proche de 0, mieux c’est." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average signal: the power received from the antenna (RSRP), averaged over the coverage points shared within the radius; the closer to 0, the better."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal moyen : la puissance reçue de l’antenne (RSRP), en moyenne sur les points de couverture partagés dans le rayon ; plus elle est proche de 0, mieux c’est."
           }
         }
       }
@@ -18700,6 +18844,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spécial"
+          }
+        }
+      }
+    },
+    "Stable par rapport aux 30 jours précédents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable compared with the previous 30 days"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable par rapport aux 30 jours précédents"
           }
         }
       }
@@ -22134,6 +22294,22 @@
         }
       }
     },
+    "badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "badge"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "badge"
+          }
+        }
+      }
+    },
     "bon" : {
       "localizations" : {
         "en" : {
@@ -22447,6 +22623,22 @@
         }
       }
     },
+    "en tête" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in the lead"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en tête"
+          }
+        }
+      }
+    },
     "environ %lld km de côté" : {
       "localizations" : {
         "en" : {
@@ -22675,6 +22867,22 @@
         }
       }
     },
+    "km parcourus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km travelled"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km parcourus"
+          }
+        }
+      }
+    },
     "meilleure famille" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22720,6 +22928,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mis à jour %@"
+          }
+        }
+      }
+    },
+    "moment partagé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "shared moment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moment partagé"
+          }
+        }
+      }
+    },
+    "moments partagés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "shared moments"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moments partagés"
           }
         }
       }
@@ -22838,6 +23078,22 @@
         }
       }
     },
+    "photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "photo"
+          }
+        }
+      }
+    },
     "plus %lld points" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22879,6 +23135,22 @@
         }
       }
     },
+    "point de couverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "coverage point"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "point de couverture"
+          }
+        }
+      }
+    },
     "rayon %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22912,6 +23184,22 @@
         }
       }
     },
+    "réception médiane (Mb/s)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "median download (Mb/s)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "réception médiane (Mb/s)"
+          }
+        }
+      }
+    },
     "résolu le %@" : {
       "localizations" : {
         "en" : {
@@ -22941,6 +23229,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sans limite"
+          }
+        }
+      }
+    },
+    "signal moyen (dBm)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "average signal (dBm)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "signal moyen (dBm)"
           }
         }
       }
@@ -23005,6 +23309,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sites opérationnels et projetés"
+          }
+        }
+      }
+    },
+    "speedtest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "speedtest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "speedtest"
           }
         }
       }
@@ -23115,6 +23435,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "un participant"
+          }
+        }
+      }
+    },
+    "validation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validation"
           }
         }
       }
@@ -69592,18 +69928,18 @@
         }
       }
     },
-    "RSRP moyen %lld dBm" : {
+    "signal moyen %lld dBm" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Average RSRP %lld dBm"
+            "value" : "average signal %lld dBm"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "RSRP moyen %lld dBm"
+            "value" : "signal moyen %lld dBm"
           }
         }
       }
@@ -85398,18 +85734,18 @@
         }
       }
     },
-    "débit médian %lld mégabits par seconde" : {
+    "réception médiane %lld mégabits par seconde" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "median throughput %lld megabits per second"
+            "value" : "median download %lld megabits per second"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "débit médian %lld mégabits par seconde"
+            "value" : "réception médiane %lld mégabits par seconde"
           }
         }
       }

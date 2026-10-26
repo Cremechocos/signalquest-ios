@@ -505,7 +505,7 @@ struct UserProfileView: View {
                               commentsCount: item.commentsCount,
                               onCommentPosted: { model.commentPosted(on: item) })
             case .report(let item):
-                ReportSheet(target: .post(item.backendPostId), service: services.reports)
+                ReportSheet(post: item, service: services.reports)
             case .share(let item):
                 PostShareSheet(
                     post: item,
@@ -1087,6 +1087,8 @@ struct UserProfileView: View {
                     // Même menu que dans le fil : appui long et bouton ⋯ de la carte.
                     .contextMenu { postMenu(for: item) }
                     .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
+                    // Un repartage garde son auteur : seul le membre du profil est implicite.
+                    .environment(\.feedCardShowsAuthor, item.author.id != model.userId)
                     .sqFadeUp()
                     .onAppear {
                         if item.id == model.items.last?.id {
@@ -1131,7 +1133,7 @@ struct UserProfileView: View {
         }
         Button { model.muteNotifications(item) } label: {
             let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
             let icon = muted ? "bell" : "bell.slash"
             Label(title, systemImage: icon)
         }

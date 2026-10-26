@@ -490,6 +490,8 @@ struct ComposerSheet: View {
     private let onPublished: () -> Void
     /// Photothèque ouverte d'emblée quand on arrive par le bouton Photo du fil.
     @State private var showStartPhotoPicker = false
+    /// Hashtags proposés sous le texte : tendances du fil d'abord.
+    private let quickHashtags: [String]
 
     /// `editing` bascule le composer en édition et précharge le post.
     init(
@@ -498,9 +500,11 @@ struct ComposerSheet: View {
         editing: UnifiedSocialFeedItem? = nil,
         startingWith: ComposerStartAttachment? = nil,
         sharing: ComposerSharedContent? = nil,
+        trendingHashtags: [String] = [],
         onPublished: @escaping () -> Void = {}
     ) {
         self.onPublished = onPublished
+        self.quickHashtags = Self.quickHashtags(trending: trendingHashtags)
         self.startingWith = editing == nil ? startingWith : nil
         // Créé une seule fois, dans l'autoclosure : la vue parente réévalue
         // cet init à chaque rendu, et un modèle neuf relit puis réécrit le
@@ -937,11 +941,27 @@ struct ComposerSheet: View {
             .accessibilityIdentifier("composer.remaining")
     }
 
+    /// Repli sans anglais quand le fil n'a pas de tendances (#coverage, F-36).
+    static let fallbackHashtags = ["#speedtest", "#5G", "#4G", "#couverture", "#antenne", "#signalquest"]
+
+    /// Six hashtags : les tendances du serveur, complétées par le repli, sans doublon.
+    static func quickHashtags(trending: [String]) -> [String] {
+        var tags: [String] = []
+        for raw in trending + fallbackHashtags {
+            let name = raw.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+            guard !name.isEmpty, !name.contains(" ") else { continue }
+            let tag = "#\(name)"
+            if !tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) { tags.append(tag) }
+            if tags.count == 6 { break }
+        }
+        return tags
+    }
+
     /// Suggestions de hashtags en petites pastilles discrètes.
     private var quickHashtagsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.xs2) {
-                ForEach(["#speedtest", "#5G", "#4G", "#signalquest", "#coverage", "#anfr"], id: \.self) { tag in
+                ForEach(quickHashtags, id: \.self) { tag in
                     Button {
                         let space = model.text.isEmpty || model.text.hasSuffix(" ") ? "" : " "
                         model.text += "\(space)\(tag) "

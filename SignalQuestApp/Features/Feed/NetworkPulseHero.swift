@@ -38,7 +38,8 @@ struct NetworkPulseHero: View {
                         ),
                         value: pulsing
                     )
-                Text("Pouls réseau · autour de toi")
+                // La feuille porte déjà le titre « Pouls réseau » (F-33).
+                Text("Autour de toi")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SQColor.onAccent)
                     .fixedSize(horizontal: false, vertical: true)
@@ -63,8 +64,10 @@ struct NetworkPulseHero: View {
                             .foregroundStyle(SQColor.onAccent)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    ForEach(Array(pulse.operators.prefix(3).enumerated()), id: \.element.operatorKey) { index, op in
-                        operatorRow(index: index, entry: op)
+                    // Sans numéro : le serveur range les opérateurs par nombre de
+                    // mesures, pas par qualité, et « 1. » passait pour un podium.
+                    ForEach(pulse.operators.prefix(6), id: \.operatorKey) { op in
+                        operatorRow(op)
                     }
                     if let technologyLine {
                         Text(technologyLine)
@@ -123,26 +126,17 @@ struct NetworkPulseHero: View {
     /// « 7 derniers jours · 214 mesures · il y a 12 min » — la ligne qui donne son
     /// sens aux trois nombres du dessous.
     private var contextLine: String {
-        var parts: [String] = [windowLabel, String(localized: "\(pulse.measurementsCount) mesure")]
+        var parts: [String] = [pulse.windowLabel, String(localized: "\(pulse.measurementsCount) mesure")]
         if let radius = pulse.radiusMeters { parts.append(String(localized: "rayon \(formatRadius(radius))")) }
         if let freshness = freshnessLabel { parts.append(freshness) }
         return parts.joined(separator: " · ")
     }
 
-    private var windowLabel: String {
-        switch pulse.windowDays {
-        case ...7: return String(localized: "7 derniers jours")
-        case ...30: return String(localized: "30 derniers jours")
-        case ...90: return String(localized: "3 derniers mois")
-        default: return String(localized: "12 derniers mois")
-        }
-    }
-
     private var trendText: String? {
         guard let trend = pulse.trend else { return nil }
-        if trend.deltaPercent > 2 { return String(localized: "+\(trend.deltaPercent) % vs 30 jours précédents") }
-        if trend.deltaPercent < -2 { return String(localized: "\(trend.deltaPercent) % vs 30 jours précédents") }
-        return String(localized: "Stable vs 30 jours précédents")
+        if trend.deltaPercent > 2 { return String(localized: "+\(trend.deltaPercent) % par rapport aux 30 jours précédents") }
+        if trend.deltaPercent < -2 { return String(localized: "\(trend.deltaPercent) % par rapport aux 30 jours précédents") }
+        return String(localized: "Stable par rapport aux 30 jours précédents")
     }
 
     private var technologyLine: String? {
@@ -155,7 +149,7 @@ struct NetworkPulseHero: View {
 
     private var referenceLine: String? {
         guard let reference = pulse.reference else { return nil }
-        return String(localized: "Référence \(reference.label) : \(SQUnits.throughput(mbps: Double(reference.medianDownloadMbps))) (\(reference.sampleCount) tests)")
+        return String(localized: "Référence \(reference.label) : \(SQUnits.throughput(mbps: Double(reference.medianDownloadMbps))) (\(reference.sampleCount) speedtests)")
     }
 
     private var hasDetails: Bool {
@@ -166,7 +160,7 @@ struct NetworkPulseHero: View {
         var values: [String] = []
         if let speed = op.medianDownloadMbps { values.append(SQUnits.throughput(mbps: Double(speed))) }
         if let rsrp = op.avgRsrpDbm { values.append("\(rsrp) dBm") }
-        values.append("n=\(op.sampleCount)")
+        values.append(String(localized: "\(op.sampleCount) mesures"))
         return values.joined(separator: " · ")
     }
 
@@ -207,35 +201,45 @@ struct NetworkPulseHero: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
         }
+        // Les libellés à deux lignes ne touchent pas les séparateurs.
+        .padding(.horizontal, SQSpace.xs)
         .frame(maxWidth: .infinity)
+    }
+
+    /// Un chiffre absent ne laisse pas de « — » : sa colonne disparaît.
+    private var statItems: [(value: String, label: String, compact: Bool)] {
+        var items: [(value: String, label: String, compact: Bool)] = []
+        if let rsrp = pulse.avgRsrpDbm { items.append(("\(rsrp)", "signal moyen (dBm)", false)) }
+        if let mbps = pulse.medianDownloadMbps { items.append(("\(mbps)", "réception médiane (Mb/s)", false)) }
+        items.append((operatorText, operatorLabel, hasOperator))
+        return items
     }
 
     @ViewBuilder
     private var stats: some View {
+        let items = statItems
         if dynamicTypeSize.isAccessibilitySize {
             VStack(spacing: SQSpace.sm) {
-                stat(value: rsrpText, label: "dBm moyen")
-                horizontalDivider
-                stat(value: mbpsText, label: "Mbit/s médian")
-                horizontalDivider
-                stat(value: operatorText, label: operatorLabel, compact: hasOperator)
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    if index > 0 { horizontalDivider }
+                    stat(value: item.value, label: item.label, compact: item.compact)
+                }
             }
         } else {
             HStack(spacing: 0) {
-                stat(value: rsrpText, label: "dBm moyen")
-                divider
-                stat(value: mbpsText, label: "Mbit/s médian")
-                divider
-                stat(value: operatorText, label: operatorLabel, compact: hasOperator)
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    if index > 0 { divider }
+                    stat(value: item.value, label: item.label, compact: item.compact)
+                }
             }
         }
     }
 
     @ViewBuilder
-    private func operatorRow(index: Int, entry op: NetworkPulseOperator) -> some View {
+    private func operatorRow(_ op: NetworkPulseOperator) -> some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(index + 1). \(op.label)")
+                Text(verbatim: op.label)
                 Text(operatorMetrics(op))
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -244,7 +248,7 @@ struct NetworkPulseHero: View {
             .foregroundStyle(SQColor.onAccent)
         } else {
             HStack(spacing: SQSpace.xs) {
-                Text("\(index + 1). \(op.label)")
+                Text(verbatim: op.label)
                 Spacer(minLength: SQSpace.xs)
                 Text(operatorMetrics(op))
             }
@@ -271,8 +275,6 @@ struct NetworkPulseHero: View {
         phase == .active && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
-    private var rsrpText: String { pulse.avgRsrpDbm.map { "\($0)" } ?? "—" }
-    private var mbpsText: String { pulse.medianDownloadMbps.map { "\($0)" } ?? "—" }
     private var hasOperator: Bool { pulse.bestOperator?.isEmpty == false }
 
     /// Meilleur opérateur si disponible, sinon repli sur le nombre de mesures.
@@ -281,7 +283,7 @@ struct NetworkPulseHero: View {
         return "\(pulse.measurementsCount)"
     }
     private var operatorLabel: String {
-        hasOperator ? String(localized: "meilleur op.") : String(localized: "mesures")
+        hasOperator ? String(localized: "en tête") : String(localized: "mesures")
     }
 
     private var accessibilitySummary: String {
@@ -290,12 +292,14 @@ struct NetworkPulseHero: View {
         // mi-anglais — le genre de défaut qu'aucune relecture de code ne
         // rattrape, seulement l'écoute ou un relevé des textes rendus.
         var parts: [String] = [String(localized: "Pouls réseau autour de toi")]
-        if let rsrp = pulse.avgRsrpDbm { parts.append(String(localized: "RSRP moyen \(rsrp) dBm")) }
-        if let mbps = pulse.medianDownloadMbps { parts.append(String(localized: "débit médian \(mbps) mégabits par seconde")) }
-        if hasOperator, let op = pulse.bestOperator { parts.append(String(localized: "meilleur opérateur \(op)")) }
+        // Les mêmes mots qu'à l'écran (F-33).
+        if let rsrp = pulse.avgRsrpDbm { parts.append(String(localized: "signal moyen \(rsrp) dBm")) }
+        if let mbps = pulse.medianDownloadMbps { parts.append(String(localized: "réception médiane \(mbps) mégabits par seconde")) }
+        if hasOperator, let op = pulse.bestOperator { parts.append(String(localized: "\(op) en tête")) }
         else { parts.append(String(localized: "\(pulse.measurementsCount) mesure")) }
         parts.append(contextLine)
         if let trendText { parts.append(trendText) }
+        parts += pulse.operators.prefix(6).map { "\($0.label) \(operatorMetrics($0))" }
         if let referenceLine { parts.append(referenceLine) }
         return parts.joined(separator: ", ")
     }

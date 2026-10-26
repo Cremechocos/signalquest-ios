@@ -529,7 +529,7 @@ struct ExploreView: View {
                               commentsCount: item.commentsCount,
                               onCommentPosted: { model.commentPosted(on: item) })
             case .report(let item):
-                ReportSheet(target: .post(item.backendPostId), service: services.reports)
+                ReportSheet(post: item, service: services.reports)
             case .share(let item):
                 PostShareSheet(
                     post: item,
@@ -622,7 +622,9 @@ struct ExploreView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             // Sans membre trouvé, l'en-tête restait seul au-dessus des lieux.
             if model.isSearching || !model.searchResults.isEmpty || !hasOtherSearchResults {
-                SQSectionHeader("Utilisateurs")
+                // « Membres », comme le champ de recherche ; un seul style de
+                // titre pour les trois sections (F-45).
+                sectionTitle("Membres")
             }
             if model.isSearching {
                 SQSpinner()
@@ -691,12 +693,8 @@ struct ExploreView: View {
                 if !model.searchPosts.isEmpty {
                     // Les publications trouvées : c'est la moitié de la
                     // recherche qui n'existait pas côté iOS.
-                    Text("Publications")
-                        .font(SQFont.archivo(13, .semibold))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    sectionTitle("Publications")
                         .padding(.top, SQSpace.md)
-                        .accessibilityAddTraits(.isHeader)
                     ForEach(model.searchPosts) { item in
                         exploreCard(item)
                     }
@@ -715,12 +713,8 @@ struct ExploreView: View {
     /// s'ouvrent sur la carte, comme depuis sa propre recherche.
     private var mapResultsSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Sur la carte")
-                .font(SQFont.archivo(13, .semibold))
-                .foregroundStyle(SQColor.labelSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            sectionTitle("Sur la carte")
                 .padding(.top, SQSpace.md)
-                .accessibilityAddTraits(.isHeader)
             ForEach(model.searchPlaces) { place in
                 mapResultRow(icon: "mappin.circle.fill", title: place.name, subtitle: place.subtitle,
                              id: "explore.map.place") {
@@ -980,7 +974,7 @@ struct ExploreView: View {
     private func exploreMenu(for item: UnifiedSocialFeedItem) -> some View {
         Button { model.muteNotifications(item) } label: {
             let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
             let icon = muted ? "bell" : "bell.slash"
             Label(title, systemImage: icon)
         }

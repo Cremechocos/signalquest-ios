@@ -187,6 +187,7 @@ struct CardHeader: View {
     var isPinned: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.feedCardMenu) private var menu
+    @Environment(\.feedCardShowsAuthor) private var showsAuthor
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
@@ -276,7 +277,15 @@ struct CardHeader: View {
     /// son auteur ni son heure (lot F, F-47) ; le profil reste une action nommée.
     @ViewBuilder
     private var authorContent: some View {
-            if let onAuthorTap {
+            if !showsAuthor {
+                // Le lieu et l'heure seuls ; VoiceOver garde le nom en tête,
+                // comme sur toute autre carte.
+                metadata
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: spokenAuthorLine))
+            } else if let onAuthorTap {
                 authorBlock
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -289,6 +298,12 @@ struct CardHeader: View {
                 authorBlock
                     .accessibilityElement(children: .combine)
             }
+    }
+
+    private var spokenAuthorLine: String {
+        [author.displayName, place, createdAt?.formatted(.sqRelative)]
+            .compactMap { $0 }
+            .joined(separator: ", ")
     }
 
     private var authorBlock: some View {
@@ -682,6 +697,10 @@ struct CardActionsBar: View {
 
 // MARK: - Contexte posé par l'écran du fil
 
+private struct FeedCardShowsAuthorKey: EnvironmentKey {
+    static var defaultValue: Bool { true }
+}
+
 private struct FeedCardMenuKey: EnvironmentKey {
     static var defaultValue: AnyView? { nil }
 }
@@ -700,6 +719,13 @@ extension EnvironmentValues {
     var feedCardMenu: AnyView? {
         get { self[FeedCardMenuKey.self] }
         set { self[FeedCardMenuKey.self] = newValue }
+    }
+
+    /// Faux sur le profil d'un membre : son nom et son avatar en tête de
+    /// chaque carte ne disaient rien de plus que la page (lot F, F-35).
+    var feedCardShowsAuthor: Bool {
+        get { self[FeedCardShowsAuthorKey.self] }
+        set { self[FeedCardShowsAuthorKey.self] = newValue }
     }
 
     /// Filtre le fil sur un hashtag touché dans une carte. Sans action, les

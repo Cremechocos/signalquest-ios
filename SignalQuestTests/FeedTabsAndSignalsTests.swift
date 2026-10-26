@@ -588,3 +588,98 @@ final class FeedReactionTests: XCTestCase {
         XCTAssertEqual(Set(FeedReaction.allCases.map(\.symbol)).count, FeedReaction.allCases.count)
     }
 }
+
+/// Lot F, F6 : les autres écrans du fil (pouls réseau, récap, composeur).
+final class FeedOtherScreensTests: XCTestCase {
+
+    /// Forme servie par `/api/social/network-pulse` : `periodDays` au lieu de
+    /// `windowDays`, et des opérateurs réduits à `measurementsCount`. Exiger
+    /// `sampleCount` vidait toute la liste en production (F-33).
+    func testNetworkPulseDecodesTheServedShape() throws {
+        let json = """
+        {"avgRsrpDbm":-94.4,"medianDownloadMbps":187,"measurementsCount":342,
+         "bestOperator":"Orange","radiusMeters":3000,"periodDays":365,"contributorsCount":12,
+         "operators":[{"operatorKey":"ORANGE","label":"Orange","measurementsCount":140},
+                      {"operatorKey":"FREE","measurementsCount":70}],
+         "belowPrivacyThreshold":false}
+        """
+        let pulse = try JSONDecoder().decode(NetworkPulse.self, from: Data(json.utf8))
+        XCTAssertEqual(pulse.avgRsrpDbm, -94)
+        XCTAssertEqual(pulse.windowDays, 365)
+        XCTAssertEqual(pulse.operators.map(\.sampleCount), [140, 70])
+        XCTAssertEqual(pulse.operators.map(\.label), ["Orange", "FREE"])
+        XCTAssertNil(pulse.operators.first?.avgRsrpDbm)
+        XCTAssertFalse(pulse.isLive(at: Date()))
+    }
+
+    func testPulseWindowLabelFollowsTheServedPeriod() {
+        func label(_ days: Int) -> String {
+            NetworkPulse(avgRsrpDbm: nil, medianDownloadMbps: nil, measurementsCount: 1,
+                         bestOperator: nil, radiusMeters: nil, windowDays: days).windowLabel
+        }
+        XCTAssertEqual(label(7), String(localized: "7 derniers jours"))
+        XCTAssertEqual(label(30), String(localized: "30 derniers jours"))
+        XCTAssertEqual(label(90), String(localized: "3 derniers mois"))
+        XCTAssertEqual(label(365), String(localized: "12 derniers mois"))
+    }
+
+    private func recap(
+        topMbps: Double? = nil, speedtests: Int = 0, points: Int = 0, km: Double? = nil,
+        validations: Int = 0, photos: Int = 0, badges: Int = 0, moments: Int = 0
+    ) -> WeeklyRecapStats {
+        WeeklyRecapStats(
+            weekStart: Date(timeIntervalSince1970: 1_753_000_000),
+            weekEnd: Date(timeIntervalSince1970: 1_753_604_800),
+            speedtestCount: speedtests, topDownloadMbps: topMbps,
+            topDownloadTech: nil, topDownloadOperator: nil,
+            sessionPoints: points, sessionDistanceKm: km,
+            validationCount: validations, photoCount: photos,
+            badgeCount: badges, signalMomentsShared: moments, topCity: nil
+        )
+    }
+
+    /// Sessions et moments partagés s'affichent enfin ; les zéros se taisent (F-34).
+    func testRecapShowsEveryNonZeroFigureInOrder() {
+        let metrics = recap(topMbps: 412, speedtests: 6, points: 640, km: 12.4,
+                            validations: 3, photos: 2, badges: 1, moments: 4).secondaryMetrics
+        XCTAssertEqual(metrics.map(\.label), [
+            String(localized: "speedtests"), String(localized: "points de couverture"),
+            String(localized: "km parcourus"), String(localized: "validations"),
+            String(localized: "photos"), String(localized: "badge"),
+            String(localized: "moments partagés"),
+        ])
+        XCTAssertTrue(recap(topMbps: 100, speedtests: 1).secondaryMetrics.map(\.label)
+            == [String(localized: "speedtest")])
+    }
+
+    /// Le chiffre déjà en titre ne se répète pas dans la grille.
+    func testRecapDoesNotRepeatTheHeadline() {
+        let labels = recap(points: 640, validations: 3).secondaryMetrics.map(\.label)
+        XCTAssertFalse(labels.contains(String(localized: "points de couverture")))
+        XCTAssertEqual(labels, [String(localized: "validations")])
+        XCTAssertTrue(recap(km: 0.05, photos: 2).secondaryMetrics.isEmpty)
+    }
+
+    /// Jamais une tuile seule : 7 → 3, 2, 2 ; 4 → 2, 2 ; 3 → 3.
+    func testRecapRowsAreBalanced() {
+        func sizes(_ count: Int, _ max: Int) -> [Int] {
+            WeeklyRecapSheet.metricRows(count: count, maxPerRow: max).map(\.count)
+        }
+        XCTAssertEqual(sizes(7, 3), [3, 2, 2])
+        XCTAssertEqual(sizes(4, 3), [2, 2])
+        XCTAssertEqual(sizes(3, 3), [3])
+        XCTAssertEqual(sizes(5, 2), [2, 2, 1])
+        XCTAssertEqual(sizes(0, 3), [])
+        XCTAssertEqual(WeeklyRecapSheet.metricRows(count: 7, maxPerRow: 3).flatMap { Array($0) }, Array(0..<7))
+    }
+
+    /// Tendances d'abord, puis le repli, sans doublon de casse ni tag à espaces.
+    func testComposerHashtagsPreferTrendsThenFallback() {
+        XCTAssertEqual(ComposerSheet.quickHashtags(trending: []), ComposerSheet.fallbackHashtags)
+        XCTAssertEqual(
+            ComposerSheet.quickHashtags(trending: ["grenoble", "#5g", "deux mots"]),
+            ["#grenoble", "#5g", "#speedtest", "#4G", "#couverture", "#antenne"]
+        )
+        XCTAssertEqual(ComposerSheet.quickHashtags(trending: (1...9).map { "t\($0)" }).count, 6)
+    }
+}
