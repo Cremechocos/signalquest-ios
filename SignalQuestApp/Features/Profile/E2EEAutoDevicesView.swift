@@ -275,7 +275,7 @@ struct E2EEAutoDevicesView: View {
             Task { await session.logout() }
         }
         .confirmationDialog(
-            rowToRevoke.map { String(localized: "Retirer \(platformName($0)) ?") } ?? "",
+            rowToRevoke.map { String(localized: "Retirer \(Self.platformName($0)) ?") } ?? "",
             isPresented: Binding(get: { rowToRevoke != nil }, set: { if !$0 { rowToRevoke = nil } }),
             titleVisibility: .visible,
             presenting: rowToRevoke
@@ -360,7 +360,7 @@ struct E2EEAutoDevicesView: View {
                             .frame(width: 44, height: 44)
                     }
                 }
-                .accessibilityLabel(String(localized: "Retirer \(platformName(row))"))
+                .accessibilityLabel(String(localized: "Retirer \(Self.platformName(row))"))
                 .disabled(model.isActing)
             }
         }
@@ -385,7 +385,7 @@ struct E2EEAutoDevicesView: View {
                         .font(SQFont.body(12, .bold, relativeTo: .caption))
                         .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.warning)
                 }
-                Text(addedText(row))
+                Text(Self.addedText(row))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -427,7 +427,7 @@ struct E2EEAutoDevicesView: View {
             }
             .scrollContentBackground(.hidden)
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(platformName(row))
+            .navigationTitle(Self.platformName(row))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -448,7 +448,7 @@ struct E2EEAutoDevicesView: View {
                     .font(SQFont.body(12, .bold, relativeTo: .caption))
                     .foregroundStyle(row.status == .revoked ? SQColor.labelSecondary : SQColor.warning)
             }
-            Text(addedText(row))
+            Text(Self.addedText(row))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }
@@ -469,7 +469,7 @@ struct E2EEAutoDevicesView: View {
 
     @ViewBuilder
     private func title(_ row: E2EEAutoDevicesViewModel.Row, stacked: Bool = false) -> some View {
-        Text(platformName(row))
+        Text(Self.platformName(row))
             .font(SQType.heading)
         if row.isCurrent {
             // En ligne, la pastille ne se coupe pas ; sous le nom, elle rétrécit un peu plutôt que de se couper.
@@ -492,7 +492,7 @@ struct E2EEAutoDevicesView: View {
         }
     }
 
-    private func platformName(_ row: E2EEAutoDevicesViewModel.Row) -> String {
+    static func platformName(_ row: E2EEAutoDevicesViewModel.Row) -> String {
         switch row.platform {
         case .android: return "Android"
         case .web: return String(localized: "Navigateur web")
@@ -515,7 +515,7 @@ struct E2EEAutoDevicesView: View {
         }
     }
 
-    private func addedText(_ row: E2EEAutoDevicesViewModel.Row) -> String {
+    static func addedText(_ row: E2EEAutoDevicesViewModel.Row) -> String {
         let added = Self.date(row.addedAtMs)
         if let revokedAtMs = row.revokedAtMs {
             return String(localized: "Ajouté le \(added) · retiré le \(Self.date(revokedAtMs))")
@@ -533,7 +533,7 @@ struct E2EEAutoDevicesView: View {
 /// `--qa-auto-devices-refused` (journal refusé).
 struct E2EEAutoDevicesQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
-    private static func model() -> E2EEAutoDevicesViewModel {
+    static func model() -> E2EEAutoDevicesViewModel {
         let userId = "user_alice_qa_01J7ABCD2345", ownId = "ios_device_qa_own_0000001"
         let hour: Int64 = 3_600_000
         let now = Int64(Date().timeIntervalSince1970 * 1_000)

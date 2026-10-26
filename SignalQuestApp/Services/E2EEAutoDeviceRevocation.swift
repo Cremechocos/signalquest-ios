@@ -203,11 +203,15 @@ extension E2EEAutoDeviceRevocation {
         ))
     }
 
-    /// Maillons relus, puis son propre compte jusqu'à la tête vérifiée.
+    /// Maillons relus, puis son propre compte jusqu'à la tête vérifiée. Les
+    /// appareils apparus depuis la lecture précédente partent comme avec
+    /// l'annuaire : rotation (§7) et alerte « Nouvel appareil » (§4.2).
     static func ownAccount(reader: E2EEAutoLogReader, userId: String) async -> E2EEAutoEnrollment.OwnAccount {
         do {
             if case .alert = try await reader.refreshLinks() { return .refused }
             guard case .success(let state)? = try await reader.account(userId) else { return .refused }
+            let added = await reader.takeAddedDevices()
+            if !added.isEmpty { E2EEAutoDeviceEvents.post(ownerScopeId: reader.ownerScopeId, added: added) }
             return .verified(state)
         } catch {
             return .inconclusive

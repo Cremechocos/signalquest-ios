@@ -468,6 +468,10 @@ final class AppServices: ObservableObject {
         let ownDeviceId = (try? E2EEV2DeviceIdentityStore().load(ownerNamespace: session.ownerNamespace))?.deviceId
         let ownAdded = (added[ownUserId] ?? []).subtracting(ownDeviceId.map { [$0] } ?? [])
         let contacts = Set(added.keys).subtracting([ownUserId])
+        // L'alerte « Nouvel appareil » ne dépend ni des conversations ni de la bascule.
+        if !ownAdded.isEmpty, session.isCurrent {
+            E2EEAutoNewDeviceAlerts().record(ownAdded, ownerNamespace: session.ownerNamespace)
+        }
         guard !ownAdded.isEmpty || !contacts.isEmpty,
               let conversations = try? await messages.conversations(), session.isCurrent else { return }
         let encrypted = conversations.filter { $0.e2eeV2 != nil && $0.request?.isIncomingPending != true }

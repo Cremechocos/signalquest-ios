@@ -341,4 +341,114 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         XCTAssertEqual(apple.confirmationMessage, String(localized: "Appareil retiré. Il ne reçoit plus tes messages.") + "\n\n" + advice)
         XCTAssertFalse(notMe.confirmationMessage?.contains(advice) ?? true, "pas pour un appareil Android")
     }
+
+    // MARK: Alerte « Nouvel appareil » (6b)
+
+    private func alertStore() -> E2EEAutoNewDeviceAlerts {
+        let suite = "e2ee-auto-new-device-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        addTeardownBlock { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+        return E2EEAutoNewDeviceAlerts(defaults: defaults)
+    }
+
+    func testNewDeviceQueueKeepsOrderAndForgetsResolvedDevices() {
+        let store = alertStore()
+        let changed = expectation(forNotification: E2EEAutoNewDeviceAlerts.didChange, object: nil)
+        store.record(["a", "b"], ownerNamespace: "ns")
+        wait(for: [changed], timeout: 1)
+        store.record(["b", "c"], ownerNamespace: "ns")
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), ["a", "b", "c"])
+        XCTAssertEqual(store.pending(ownerNamespace: "other"), [], "une file par compte")
+        store.resolve("b", ownerNamespace: "ns")
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), ["a", "c"])
+        store.record(Set((0..<30).map { "d\($0)" }), ownerNamespace: "ns")
+        XCTAssertEqual(store.pending(ownerNamespace: "ns").count, E2EEAutoNewDeviceAlerts.limit)
+        XCTAssertFalse(store.pending(ownerNamespace: "ns").contains("a"), "les plus anciens tombent")
+        for id in store.pending(ownerNamespace: "ns") { store.resolve(id, ownerNamespace: "ns") }
+        XCTAssertNil(store.defaults.object(forKey: "e2ee-auto-new-devices-v1:ns"))
+    }
+
+    @MainActor
+    func testNewDeviceAlertShowsOnlyLiveDevicesOfTheVerifiedAccount() async throws {
+        let store = alertStore()
+        let revokedId = "web_device_revoked_00000", unknownId = "web_device_unknown_00000"
+        store.record([revokedId, unknownId, otherId, ownId], ownerNamespace: "ns")
+        let verified = account([
+            ownState(), state(otherId, platform: .android),
+            state(revokedId, platform: .web, status: .revoked, revokedAtMs: 5, reason: .user),
+        ])
+        let coordinator = E2EEAutoNewDeviceAlertCoordinator(store: store)
+        await coordinator.refresh(ownerNamespace: "ns") { model(verified) }
+        XCTAssertEqual(coordinator.presented, .init(deviceId: otherId, ownerNamespace: "ns"))
+        XCTAssertEqual(coordinator.model?.rows.first(where: { $0.id == otherId })?.platform, .android)
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), [otherId], "retiré, inconnu ou cet appareil : rien à signaler")
+
+        coordinator.close(resolved: true)
+        XCTAssertNil(coordinator.presented)
+        XCTAssertNil(coordinator.model)
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), [])
+    }
+
+    @MainActor
+    func testNewDeviceAlertWaitsForAVerifiedLog() async {
+        let store = alertStore()
+        store.record([otherId], ownerNamespace: "ns")
+        let coordinator = E2EEAutoNewDeviceAlertCoordinator(store: store)
+        await coordinator.refresh(ownerNamespace: "ns") { model(nil) }
+        XCTAssertNil(coordinator.presented, "journal refusé : rien n'est montré")
+        let ownId = ownId
+        await coordinator.refresh(ownerNamespace: "ns") {
+            E2EEAutoDevicesViewModel(dependencies: .init(
+                ownDeviceId: { ownId }, readOwnAccount: { .inconclusive }, revoke: { _, _ in .retryLater }
+            ))
+        }
+        XCTAssertNil(coordinator.presented)
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), [otherId], "la file attend la prochaine lecture")
+    }
+
+    @MainActor
+    func testNewDeviceAlertLaterComesBackAtTheNextLaunch() async {
+        let store = alertStore()
+        store.record([otherId], ownerNamespace: "ns")
+        let verified = account([ownState(), state(otherId, platform: .web)])
+        let coordinator = E2EEAutoNewDeviceAlertCoordinator(store: store)
+        await coordinator.refresh(ownerNamespace: "ns") { model(verified) }
+        coordinator.close(resolved: false)
+        await coordinator.refresh(ownerNamespace: "ns") { model(verified) }
+        XCTAssertNil(coordinator.presented, "« Plus tard » : pas avant le prochain lancement")
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), [otherId])
+
+        let relaunched = E2EEAutoNewDeviceAlertCoordinator(store: store)
+        await relaunched.refresh(ownerNamespace: "ns") { model(verified) }
+        XCTAssertEqual(relaunched.presented?.deviceId, otherId)
+        relaunched.reset()
+        XCTAssertNil(relaunched.presented)
+        XCTAssertEqual(store.pending(ownerNamespace: "ns"), [otherId], "une déconnexion ne vaut pas réponse")
+    }
+
+    @MainActor
+    func testNewDeviceAlertNotMeRevokesUnderTheVerifiedGuard() async throws {
+        var reasons: [E2EEAutoLog.RevokeReason] = []
+        let hour: Int64 = 3_600_000, now: Int64 = 100 * 24 * hour
+        let old = model(account([ownState(addedAtMs: now - 30 * 24 * hour), state(otherId, platform: .web)]), nowMs: now) { _, reason in
+            reasons.append(reason)
+            return .revoked(ownDevice: false)
+        }
+        await old.load()
+        XCTAssertTrue(old.canRevokeOthers)
+        await old.revoke(try XCTUnwrap(old.rows.first { $0.id == otherId }), reason: .notMe)
+        XCTAssertEqual(reasons, [.notMe])
+        XCTAssertNotNil(old.confirmationMessage)
+
+        // Cet appareil-ci a moins de 24 h : l'alerte explique, rien n'est envoyé.
+        let recent = model(account([ownState(addedAtMs: now - 5 * hour), state(otherId, platform: .web)]), nowMs: now) { _, reason in
+            reasons.append(reason)
+            return .revoked(ownDevice: false)
+        }
+        await recent.load()
+        XCTAssertFalse(recent.canRevokeOthers)
+        XCTAssertEqual(recent.hoursBeforeRevokingOthers, 19)
+        await recent.revoke(try XCTUnwrap(recent.rows.first { $0.id == otherId }), reason: .notMe)
+        XCTAssertEqual(reasons, [.notMe])
+    }
 }

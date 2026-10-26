@@ -183,6 +183,14 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Alerte « Nouvel appareil » ; avec `--qa-auto-devices-recent`, sous la garde des 24 h.
+    static var showsAutoNewDeviceQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-new-device")
+        #else
+        false
+        #endif
+    }
     static var showsAutoDevicesQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-auto-devices") || hasArgument("--qa-auto-devices-recent")

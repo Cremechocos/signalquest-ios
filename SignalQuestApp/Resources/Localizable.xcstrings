@@ -98276,6 +98276,178 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Nouvel appareil sur ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New device on your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel appareil sur ton compte"
+          }
+        }
+      }
+    },
+    "SQFormal|Nouvel appareil sur ton compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel appareil sur votre compte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Il vient d’être ajouté à ton compte et reçoit désormais tes messages chiffrés. Si c’est toi, il n’y a rien à faire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It was just added to your account and now receives your encrypted messages. If it’s you, there’s nothing to do."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il vient d’être ajouté à ton compte et reçoit désormais tes messages chiffrés. Si c’est toi, il n’y a rien à faire."
+          }
+        }
+      }
+    },
+    "SQFormal|Il vient d’être ajouté à ton compte et reçoit désormais tes messages chiffrés. Si c’est toi, il n’y a rien à faire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il vient d’être ajouté à votre compte et reçoit désormais vos messages chiffrés. Si c’est vous, il n’y a rien à faire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Elle s’affiche aussi sur l’appareil, dans Réglages > Appareils, pour « Cet appareil »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It also shows on that device, in Settings > Devices, for “This device”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle s’affiche aussi sur l’appareil, dans Réglages > Appareils, pour « Cet appareil »."
+          }
+        }
+      }
+    },
+    "C’est moi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s me"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est moi"
+          }
+        }
+      }
+    },
+    "« Ce n’est pas moi » le retire tout de suite et ferme toutes tes autres sessions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“This wasn’t me” removes it right away and signs out all your other sessions."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Ce n’est pas moi » le retire tout de suite et ferme toutes tes autres sessions."
+          }
+        }
+      }
+    },
+    "SQFormal|« Ce n’est pas moi » le retire tout de suite et ferme toutes tes autres sessions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Ce n’est pas moi » le retire tout de suite et ferme toutes vos autres sessions."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago. If it isn’t you, remove the other one from an older device, or come back here in %lld h."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas vous, retirez l’autre depuis un appareil plus ancien, ou revenez ici dans %lld h."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it isn’t you, remove it from another of your devices, in Settings > Devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ce n’est pas vous, retirez-le depuis un autre de vos appareils, dans Réglages > Appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"
