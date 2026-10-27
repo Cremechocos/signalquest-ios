@@ -103379,6 +103379,86 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Test non disponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test non disponible"
+          }
+        }
+      }
+    },
+    "Télécharger l’image" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download image"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Télécharger l’image"
+          }
+        }
+      }
+    },
+    "Détail des tests" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détail des tests"
+          }
+        }
+      }
+    },
+    "Jeu et appels · app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaming and calls · app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu et appels · app"
+          }
+        }
+      }
+    },
+    "Jeu et appels · navigateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaming and calls · browser"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeu et appels · navigateur"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

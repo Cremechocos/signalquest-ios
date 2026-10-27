@@ -23,8 +23,13 @@ struct SignalDetailSheet: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var speedtestDetail: SpeedtestDetail?
-    /// Détail d'un test d'expérience : l'état de chaque test, et la ville pour l'auteur.
+    /// Détail d'un test d'expérience : les tests servis, et la ville pour l'auteur.
     @State private var experienceDetail: ExperienceTestDetail?
+    @State private var experienceState: ExperienceDetailState = .loading
+    /// Test du détail ouvert depuis la liste des tests.
+    @State private var openedExperienceTest: OpenedExperienceTest?
+    /// Image de partage, préparée pour l'auteur seul.
+    @State private var experienceShare: ExperienceShareInput?
     @State private var detailError: String?
     /// Le serveur a refusé le détail : test fait dans une zone privée de son auteur.
     @State private var detailsHiddenByServer = false
@@ -121,6 +126,20 @@ struct SignalDetailSheet: View {
         .fullScreenCover(item: $viewerImage) { target in
             MessageImageViewer(target: target)
         }
+        .sheet(item: $openedExperienceTest) { opened in
+            if let experienceDetail {
+                ScrollView {
+                    ExperienceDetailView(tests: experienceDetail.result, test: opened.test) {
+                        openedExperienceTest = nil
+                    }
+                    .padding(SQSpace.lg)
+                    .sqReadableWidth()
+                }
+                .presentationDetents([.large])
+                .sqSheet()
+            }
+        }
+        .sheet(item: $experienceShare) { ExperienceSharePreviewSheet(input: $0) }
     }
 
     // MARK: Header
@@ -180,11 +199,19 @@ struct SignalDetailSheet: View {
 
     // MARK: Experience
 
-    /// Les mêmes tuiles que la carte, la mesure du jeu, puis l'état de chaque test
-    /// dans « Détails ».
+    enum ExperienceDetailState: Equatable {
+        case loading, loaded, unavailable, failed(String)
+    }
+
+    struct OpenedExperienceTest: Identifiable {
+        let test: ExperienceTestKind
+        var id: String { test.rawValue }
+    }
+
+    /// Maquette validée le 27/10 : la note globale et les 4 usages, puis le détail de
+    /// chaque test servi par `GET /api/experience-tests/{id}`, pour tout lecteur du post.
     private func experienceSummary(_ experience: FeedExperience) -> some View {
-        let highlights = experienceDetail?.highlights ?? experience.highlights
-        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Test d’expérience")
                     .font(SQType.heading)
@@ -195,27 +222,119 @@ struct SignalDetailSheet: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
-            if !highlights.feedMetrics.isEmpty {
-                FeedMetricGrid(metrics: highlights.feedMetrics)
-            }
-            if let note = highlights.gameMethodNote {
-                Text(note)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if let experienceDetail {
+                experienceLoaded(experienceDetail)
+            } else {
+                // Avant le détail, ou sans lui : les valeurs du post.
+                if !experience.highlights.feedMetrics.isEmpty {
+                    FeedMetricGrid(metrics: experience.highlights.feedMetrics)
+                }
+                switch experienceState {
+                case .loading:
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("Chargement du test")
+                case .unavailable:
+                    // Post en « Amis » vu par un non-ami, ou test retiré : sans erreur (maquette).
+                    Text("Test non disponible")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("signal.detail.experience.unavailable")
+                case .failed(let message):
+                    SQNotice(message: message, tone: .warning)
+                case .loaded:
+                    EmptyView()
+                }
             }
         }
         .accessibilityIdentifier("signal.detail.experience")
     }
 
-    private var experiencePairs: [(String, String)] {
-        guard let experienceDetail else { return [] }
-        var pairs = experienceDetail.states.map { ($0.test.title, ExperienceTestKind.stateLabel($0.state)) }
-        // La ville n'est montrée qu'à l'auteur ; le serveur la retire déjà pour les autres.
-        if item.canManage, let city = experienceDetail.location?.city {
-            pairs.append(("Lieu", city))
+    @ViewBuilder
+    private func experienceLoaded(_ detail: ExperienceTestDetail) -> some View {
+        let scores = detail.scores
+        if !scores.isEmpty {
+            ExperienceUseScoresCard(scores: scores, result: detail.result)
         }
-        return pairs
+        if item.canManage, let input = experienceShareInput(detail) {
+            GradientButton("Télécharger l’image", systemImage: "square.and.arrow.down", style: .secondary) {
+                Haptics.selection()
+                experienceShare = input
+            }
+            .accessibilityIdentifier("signal.detail.experience.image")
+        }
+        let tests = ExperienceMethod.order.filter { detail.result.state(of: $0) != nil }
+        if !tests.isEmpty {
+            Text("Détail des tests")
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(tests, id: \.self) { test in
+                    experienceRow(test, detail: detail, scores: scores)
+                    if test != tests.last { Divider().padding(.leading, SQSpace.cardPadding) }
+                }
+            }
+            .sqCardBackground()
+        }
+        if let line = experienceUsageLine(detail) {
+            Text(verbatim: line)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func experienceRow(_ test: ExperienceTestKind, detail: ExperienceTestDetail, scores: ExperienceScores) -> some View {
+        let line: ExperienceResultText.Line = {
+            var line = ExperienceResultText.line(test, in: detail.result, failure: nil)
+            line.score = scores.score(for: test)
+            return line
+        }()
+        if detail.result.state(of: test) != .notTested {
+            Button {
+                Haptics.selection()
+                openedExperienceTest = OpenedExperienceTest(test: test)
+            } label: {
+                ExperienceResultRowContent(test: test, line: line, chevron: true)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint(Text("Ouvre le détail du test"))
+            .accessibilityIdentifier("signal.detail.experience.\(test.rawValue)")
+        } else {
+            ExperienceResultRowContent(test: test, line: line, chevron: false)
+                .accessibilityIdentifier("signal.detail.experience.\(test.rawValue)")
+        }
+    }
+
+    /// « Données utilisées : 81,9 Mo · durée 34 s », avec ce que le serveur a servi.
+    private func experienceUsageLine(_ detail: ExperienceTestDetail) -> String? {
+        switch (detail.bytesUsed, detail.durationMs) {
+        case let (bytes?, duration?):
+            String(localized: "Données utilisées : \(ExperienceResultText.megabytes(bytes)) · durée \(ExperienceResultText.duration(seconds: Int(duration / 1_000)))")
+        case let (bytes?, nil):
+            String(localized: "Données utilisées : \(ExperienceResultText.megabytes(bytes))")
+        default:
+            nil
+        }
+    }
+
+    /// L'image validée (PNG 1200 × 630), seulement quand un test est mesuré.
+    private func experienceShareInput(_ detail: ExperienceTestDetail) -> ExperienceShareInput? {
+        guard let measuredAt = detail.measuredAt,
+              ExperienceTestKind.allCases.contains(where: { detail.result.state(of: $0) == .measured }) else { return nil }
+        return ExperienceShareInput(
+            tests: ExperienceSubmission.tests(detail.result), scores: detail.scores, measuredAt: measuredAt,
+            connectionType: detail.network?.connectionType ?? "unknown",
+            technology: detail.network?.technology, operatorKey: detail.network?.operatorKey
+        )
+    }
+
+    private var experiencePairs: [(String, String)] {
+        // La ville n'est montrée qu'à l'auteur ; le serveur la retire déjà pour les autres.
+        guard item.canManage, let city = experienceDetail?.location?.city else { return [] }
+        return [("Lieu", city)]
     }
 
     // MARK: Metadata
@@ -589,8 +708,14 @@ struct SignalDetailSheet: View {
 
     private func loadExperienceDetailIfNeeded() async {
         guard let id = experience?.testId else { return }
-        // Le résumé du post suffit à la carte : sans détail, seules les lignes d'état manquent.
-        experienceDetail = try? await services.feed.experienceTest(id: id)
+        experienceState = .loading
+        do {
+            experienceDetail = try await services.feed.experienceTest(id: id)
+            experienceState = experienceDetail == nil ? .unavailable : .loaded
+        } catch {
+            guard !error.isCancellation else { return }
+            experienceState = .failed(String(localized: "Le détail de ce test n’a pas pu être chargé. \(error.userFacingMessage)"))
+        }
     }
 
     private func loadSpeedtestDetailIfNeeded() async {

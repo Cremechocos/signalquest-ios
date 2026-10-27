@@ -169,12 +169,25 @@ struct ExperienceTestDetail: Decodable, Equatable {
         let city: String?
     }
 
+    struct Network: Decodable, Equatable {
+        let connectionType: String?
+        let technology: String?
+        let operatorKey: String?
+    }
+
     let id: String
     let tests: [String: JSONValue]
     let highlights: ExperienceHighlights
     let location: Location?
+    let network: Network?
+    /// Moment de la mesure ; nil s'il manque ou s'il est mal formé.
+    let measuredAt: Date?
+    let durationMs: Int64?
+    let bytesUsed: Int64?
+    /// Les tests relus dans le modèle des fiches de résultat (contrat v1 §5).
+    let result: ExperienceTestsResult
 
-    enum CodingKeys: String, CodingKey { case id, tests, highlights, location }
+    enum CodingKeys: String, CodingKey { case id, tests, highlights, location, network, measuredAt, durationMs, bytesUsed }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -186,6 +199,24 @@ struct ExperienceTestDetail: Decodable, Equatable {
             highlights = ExperienceHighlights(tests: tests)
         }
         location = try? c.decodeIfPresent(Location.self, forKey: .location)
+        network = try? c.decodeIfPresent(Network.self, forKey: .network)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        measuredAt = (try? c.decodeIfPresent(String.self, forKey: .measuredAt)).flatMap { $0 }.flatMap(formatter.date(from:))
+        // Un nombre non entier ou négatif reste absent, jamais arrondi.
+        func count(_ key: CodingKeys) -> Int64? {
+            guard let value = (try? c.decodeIfPresent(Double.self, forKey: key)) ?? nil,
+                  value >= 0, value < 1e15, value.rounded() == value else { return nil }
+            return Int64(value)
+        }
+        durationMs = count(.durationMs)
+        bytesUsed = count(.bytesUsed)
+        result = ExperienceTestsResult(served: tests)
+    }
+
+    /// La note servie fait foi ; à défaut, le même barème sur les tests servis.
+    var scores: ExperienceScores {
+        highlights.scores ?? ExperienceScores(result)
     }
 
     /// État de chacun des cinq tests présents, dans l'ordre de l'écran. Un test non

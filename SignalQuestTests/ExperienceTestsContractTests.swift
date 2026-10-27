@@ -62,7 +62,6 @@ final class ExperienceTestsContractTests: XCTestCase {
         XCTAssertEqual(experience.networkContext, "Orange · 5G")
         XCTAssertEqual(experience.highlights.feedMetrics.map(\.label), ["Vidéo sans coupure", "Page web"])
         XCTAssertNil(experience.highlights.gameProbeMethod, "no method without a game value")
-        XCTAssertNil(experience.highlights.gameMethodNote)
         XCTAssertNil(item.cardText, "the French fallback text stays hidden")
         XCTAssertNil(FeedActivity(item: item))
     }
@@ -80,6 +79,37 @@ final class ExperienceTestsContractTests: XCTestCase {
         XCTAssertNil(detail.location)
         XCTAssertEqual(detail.states.map(\.test), [.webPage, .upload])
         XCTAssertEqual(detail.states.map(\.state), ["measured", "failed"])
+    }
+
+    /// La tuile du jeu dit sa méthode dans son libellé : plus de ligne sous les tuiles.
+    func testGameTileNamesItsMethod() {
+        let app = ExperienceHighlights(gameMedianMs: 41, gameProbeMethod: "tcp_connect")
+        let web = ExperienceHighlights(gameMedianMs: 112, gameProbeMethod: "http_round_trip")
+        XCTAssertEqual(app.feedMetrics.map(\.label), ["Jeu et appels · app"])
+        XCTAssertEqual(web.feedMetrics.map(\.label), ["Jeu et appels · navigateur"])
+    }
+
+    /// Le détail servi se relit dans le modèle des fiches : tests, notes, réseau,
+    /// moment, consommation ; une valeur non entière reste absente.
+    func testDetailReadsTheServedTestsForTheSheet() throws {
+        struct Response: Decodable { let experienceTest: ExperienceTestDetail? }
+        let response = try JSONDecoder().decode(Response.self, from: Data("""
+        {"experienceTest":{"id":"ckexp2","platform":"android","measuredAt":"2026-10-27T18:04:05.123Z",
+          "durationMs":250000,"bytesUsed":412.5,
+          "network":{"connectionType":"cellular","technology":"4G","operatorKey":"ORANGE"},
+          "tests":{"webPage":{"state":"measured","openings":[{"state":"measured","totalMs":2061}]},
+            "gameAndCalls":{"state":"not_tested","notTestedReason":"user_skipped"}},
+          "highlights":{"pageMedianMs":2061,"scoreScale":"experience-score-v1"}}}
+        """.utf8))
+        let detail = try XCTUnwrap(response.experienceTest)
+        XCTAssertEqual(detail.result.state(of: .webPage), .measured)
+        XCTAssertEqual(detail.result.state(of: .gameAndCalls), .notTested)
+        XCTAssertNil(detail.result.state(of: .upload))
+        XCTAssertEqual(detail.network?.operatorKey, "ORANGE")
+        XCTAssertEqual(detail.measuredAt?.timeIntervalSince1970 ?? 0, 1_793_124_245.123, accuracy: 0.001)
+        XCTAssertEqual(detail.durationMs, 250_000)
+        XCTAssertNil(detail.bytesUsed, "412,5 octets : mal formé, jamais arrondi")
+        XCTAssertNotNil(detail.scores.webPage, "sans notes servies, le même barème sur les tests servis")
     }
 
     func testWaitingTimeSwitchesToSecondsAboveOneSecond() {

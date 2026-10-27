@@ -56,13 +56,6 @@ struct ExperienceCardView: View {
                     FeedMetricGrid(metrics: metrics)
                 }
 
-                if let note = experience.highlights.gameMethodNote {
-                    Text(note)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
                 CardActionsBar(
                     item: item,
                     onLike: onLike,
@@ -127,19 +120,15 @@ extension ExperienceHighlights {
         if let videoMaxQualityLabel { metrics.append(.init(label: "Vidéo sans coupure", value: videoMaxQualityLabel)) }
         if let videoScore { metrics.append(.init(label: "Score vidéo", value: "\(videoScore)/100")) }
         if let pageMedianMs { metrics.append(.init(label: "Page web", value: Self.waitingTime(pageMedianMs))) }
-        if let gameMedianMs { metrics.append(.init(label: "Jeu et appels", value: "\(gameMedianMs) ms")) }
+        // Une ouverture TCP (apps) et un aller-retour HTTP (web) ne se comparent pas :
+        // la tuile dit de quelle mesure il s'agit (contrat, §4).
+        if let gameMedianMs {
+            let label = gameIsHTTPRoundTrip ? "Jeu et appels · navigateur" : "Jeu et appels · app"
+            metrics.append(.init(label: label, value: "\(gameMedianMs) ms"))
+        }
         if let uploadPhotoMs { metrics.append(.init(label: "Envoi photo", value: Self.waitingTime(uploadPhotoMs))) }
         if !metrics.isEmpty { metrics[0].highlight = true }
         return metrics
-    }
-
-    /// Une ouverture TCP (apps) et un aller-retour HTTP (web) ne se comparent pas :
-    /// la carte dit toujours de quelle mesure il s'agit (contrat, §4).
-    var gameMethodNote: String? {
-        guard gameMedianMs != nil else { return nil }
-        return gameIsHTTPRoundTrip
-            ? String(localized: "Jeu et appels : aller-retour web depuis un navigateur, à ne pas comparer à une mesure d’app.")
-            : String(localized: "Jeu et appels : temps d’ouverture d’une connexion vers un serveur de jeu.")
     }
 
     /// 850 ms, puis 2,1 s au-delà d'une seconde, arrondi demi vers le haut en entiers
@@ -170,5 +159,78 @@ extension ExperienceTestKind {
         case "interrupted": return String(localized: "Interrompu")
         default: return String(localized: "Échec")
         }
+    }
+}
+
+/// Note globale et note de chaque usage, avec sa jauge et la phrase de l'image de
+/// partage (méthode v3, §10) : le haut de la fiche d'un test ouvert depuis le fil.
+struct ExperienceUseScoresCard: View {
+    let scores: ExperienceScores
+    let result: ExperienceTestsResult
+
+    private var uses: [(use: ExperienceSharePhrases.Use, score: Int?)] {
+        [(.video, scores.video), (.webPage, scores.webPage), (.gameAndCalls, scores.gameAndCalls), (.upload, scores.upload)]
+            // Un usage dont aucun test n'a été lancé n'a pas de ligne.
+            .filter { ExperienceSharePhrases.state($0.use, tests: tests) != "not_tested" || $0.score != nil }
+    }
+
+    private var tests: [String: Any] { ExperienceSubmission.tests(result) }
+
+    var body: some View {
+        let language = ExperienceShareLanguage.current
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            if let overall = scores.overall {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Note globale")
+                        .sqKicker()
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(verbatim: "\(overall)")
+                            .font(SQFont.display(40, .heavy, relativeTo: .largeTitle))
+                            .foregroundStyle(SQColor.label)
+                            .monospacedDigit()
+                        Text(verbatim: "/100")
+                            .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Note globale \(overall) sur 100"))
+            }
+            ForEach(uses, id: \.use) { entry in
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                        Text(verbatim: entry.use.label(language))
+                            .font(SQType.subhead(.semibold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let score = entry.score {
+                            Text(verbatim: "\(score)/100")
+                                .font(SQType.subhead(.semibold))
+                                .foregroundStyle(SQColor.label)
+                                .monospacedDigit()
+                        }
+                    }
+                    if let score = entry.score {
+                        GeometryReader { proxy in
+                            Capsule(style: .continuous)
+                                .fill(SQColor.label)
+                                .frame(width: proxy.size.width * CGFloat(min(max(score, 0), 100)) / 100)
+                        }
+                        .frame(height: 6)
+                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    }
+                    Text(verbatim: ExperienceSharePhrases.phrase(entry.use, tests: tests, language: language))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("experience.use.\(entry.use.rawValue)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(SQSpace.cardPadding)
+        .sqCardBackground()
+        .accessibilityIdentifier("experience.use.scores")
     }
 }
