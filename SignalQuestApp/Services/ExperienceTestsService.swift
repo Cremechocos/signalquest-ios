@@ -243,11 +243,14 @@ enum ExperienceHistoryMerge {
               let tests = try? JSONDecoder().decode([String: JSONValue].self, from: testsData) else { return nil }
         var states: [ExperienceTestKind: ExperienceTestState] = [:]
         for kind in ExperienceTestKind.allCases { states[kind] = result.tests.state(of: kind) }
+        var highlights = ExperienceHighlights(tests: tests)
+        // Pas encore de note servie : celle du téléphone, sur le corps exact envoyé.
+        highlights.scores = ExperienceScores(tests: object["tests"] as? [String: Any] ?? [:])
         return ExperienceHistoryItem(
             id: record.serverId ?? record.clientSubmissionId, measuredAt: result.measuredAt, platform: result.platform,
             connectionType: result.network.connectionType, technology: result.network.technology,
             operatorKey: result.network.operatorKey, marketCode: result.network.marketCode, city: result.city,
-            highlights: ExperienceHighlights(tests: tests), states: states.compactMapValues { $0 },
+            highlights: highlights, states: states.compactMapValues { $0 },
             postId: record.postId, clientSubmissionId: record.clientSubmissionId, delivery: record.delivery
         )
     }

@@ -29,6 +29,14 @@ struct ExperienceHistoryRow: View {
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("experience.history.summary")
+                // Aux tailles d'accessibilité, la note passe sous le texte : à droite, elle couperait les mots.
+                if dynamicTypeSize.isAccessibilitySize, let overall = item.highlights.scores?.overall {
+                    Text(verbatim: String(localized: "Note globale \(overall) sur 100"))
+                        .font(SQFont.body(13, .bold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("experience.history.overall")
+                }
                 if let networkLine = item.networkLine {
                     Text(verbatim: networkLine)
                         .font(SQFont.body(12.5))
@@ -47,6 +55,23 @@ struct ExperienceHistoryRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            // La note globale, comme sur le résultat : servie, ou celle du téléphone avant l'envoi.
+            if !dynamicTypeSize.isAccessibilitySize, let overall = item.highlights.scores?.overall {
+                VStack(spacing: 0) {
+                    Text(verbatim: "\(overall)")
+                        .font(SQFont.display(20, .heavy, relativeTo: .title3))
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                    Text(verbatim: "/100")
+                        .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Note globale \(overall) sur 100"))
+                .accessibilityIdentifier("experience.history.overall")
+            }
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))

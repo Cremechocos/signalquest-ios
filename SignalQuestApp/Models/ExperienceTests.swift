@@ -19,6 +19,9 @@ struct ExperienceHighlights: Equatable {
     let gameProbeMethod: String?
     /// Médiane des envois de photo, en millisecondes.
     let uploadPhotoMs: Int?
+    /// Notes /100 (`experience-score-v1`, contrat v2) : servies par le serveur, ou calculées
+    /// sur le téléphone pour un test pas encore confirmé. Absentes d'un post antérieur au barème.
+    var scores: ExperienceScores?
 
     var isEmpty: Bool {
         videoMaxQuality == nil && videoScore == nil && pageMedianMs == nil
@@ -52,6 +55,10 @@ struct ExperienceHighlights: Equatable {
                   pageMedianMs: int("pageMedianMs"), gameMedianMs: int("gameMedianMs"),
                   gameProbeMethod: int("gameMedianMs") == nil ? nil : string("gameProbeMethod"),
                   uploadPhotoMs: int("uploadPhotoMs"))
+        // Un autre barème ferait d'autres notes : on ne les lit que sous le nôtre.
+        if string("scoreScale") == ExperienceScores.scale {
+            scores = ExperienceScores(served: object["scores"])
+        }
     }
 
     /// Les mêmes valeurs, calculées depuis `tests` selon le §4 du contrat. Sert au

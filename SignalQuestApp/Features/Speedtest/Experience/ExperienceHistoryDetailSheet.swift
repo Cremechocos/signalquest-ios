@@ -77,7 +77,7 @@ struct ExperienceHistoryDetailSheet: View {
                 }
             }
 
-            let scores = ExperienceScores(detail.result.tests)
+            let scores = scores(detail)
             if !scores.isEmpty {
                 ExperienceOverallScoreCard(scores: scores)
             }
@@ -109,9 +109,20 @@ struct ExperienceHistoryDetailSheet: View {
         }
     }
 
+    /// La note servie fait foi ; celle du téléphone seulement pour un test pas encore confirmé.
+    private func scores(_ detail: ExperienceHistoryEntryDetail) -> ExperienceScores {
+        item.highlights.scores ?? ExperienceScores(detail.result.tests)
+    }
+
+    private func line(_ test: ExperienceTestKind, detail: ExperienceHistoryEntryDetail) -> ExperienceResultText.Line {
+        var line = ExperienceResultText.line(test, in: detail.result.tests, failure: detail.failures[test])
+        line.score = scores(detail).score(for: test)
+        return line
+    }
+
     @ViewBuilder
     private func row(_ test: ExperienceTestKind, detail: ExperienceHistoryEntryDetail) -> some View {
-        let line = ExperienceResultText.line(test, in: detail.result.tests, failure: detail.failures[test])
+        let line = line(test, detail: detail)
         if detail.result.tests.state(of: test) != .notTested {
             Button {
                 Haptics.selection()

@@ -122,6 +122,8 @@ extension ExperienceHighlights {
     /// Une tuile par valeur mesurée, jamais de tiret : un test absent n'a pas de tuile.
     var feedMetrics: [FeedMetricGrid.Metric] {
         var metrics: [FeedMetricGrid.Metric] = []
+        // Seulement la note servie : un post antérieur au barème n'en a pas, et le fil ne recalcule rien.
+        if let overall = scores?.overall { metrics.append(.init(label: "Note globale", value: "\(overall)/100")) }
         if let videoMaxQualityLabel { metrics.append(.init(label: "Vidéo sans coupure", value: videoMaxQualityLabel)) }
         if let videoScore { metrics.append(.init(label: "Score vidéo", value: "\(videoScore)/100")) }
         if let pageMedianMs { metrics.append(.init(label: "Page web", value: Self.waitingTime(pageMedianMs))) }

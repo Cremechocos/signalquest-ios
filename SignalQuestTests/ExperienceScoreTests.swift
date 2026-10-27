@@ -63,6 +63,23 @@ final class ExperienceScoreTests: XCTestCase {
         XCTAssertTrue(scores.isEmpty)
     }
 
+    private func highlights(_ json: String) throws -> ExperienceHighlights {
+        ExperienceHighlights(served: try JSONDecoder().decode([String: JSONValue].self, from: Data(json.utf8)))
+    }
+
+    func testServedHighlightsCarryTheScoresOnlyUnderTheirScale() throws {
+        let scores = #""scores":{"videoLadder":40,"videoAdaptive":67,"video":54,"webPage":66,"gameAndCalls":83,"upload":65,"overall":67}"#
+        let served = try highlights(#"{"pageMedianMs":2061,\#(scores),"scoreScale":"experience-score-v1"}"#)
+        XCTAssertEqual(served.scores?.overall, 67)
+        XCTAssertEqual(served.scores?.video, 54)
+        XCTAssertEqual(served.feedMetrics.first?.value, "67/100", "la note globale ouvre la carte du fil")
+        XCTAssertNil(try highlights(#"{"pageMedianMs":2061,\#(scores),"scoreScale":"experience-score-v2"}"#).scores)
+        // Un post antérieur au barème : aucune note, et le fil ne la recalcule pas.
+        let old = try highlights(#"{"pageMedianMs":2061}"#)
+        XCTAssertNil(old.scores)
+        XCTAssertFalse(old.feedMetrics.contains { $0.value.hasSuffix("/100") })
+    }
+
     func testServedScoresAreReadStrictly() throws {
         let json = #"{"videoLadder":40,"videoAdaptive":null,"video":40,"webPage":101,"gameAndCalls":61.5,"upload":"65","overall":51}"#
         let value = try JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
