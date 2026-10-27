@@ -2334,6 +2334,7 @@ struct SettingsView: View {
                 .accessibilityHint("Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
                 .accessibilityIdentifier("settings.oled")
                 SQUnitsSettingRow(service: services.privacy)
+                SQDefaultMarketRow(service: services.privacy, markets: services.markets)
                 SQAddressFormRow()
                 SQSettingsMenuRow("Fond de carte", systemImage: "map", selection: Binding(
                     get: { MapBackdrop.resolve(mapBackdropRaw) },
@@ -2917,6 +2918,49 @@ struct SQUnitsSettingRow: View {
         .task {
             // Le modèle propage l'unité au reste de l'app via ce miroir.
             model.unitsStore = unitsStore
+            if !model.preferencesLoaded { await model.loadPreferences() }
+        }
+    }
+}
+
+/// « Mon pays » (`defaultMarket` du compte) : le pays de la carte quand la
+/// position n'est pas disponible, avant le dernier pays vu et la région de
+/// l'iPhone. « Automatique » revient au pays déduit.
+struct SQDefaultMarketRow: View {
+    @StateObject private var model: PrivacySettingsViewModel
+    @EnvironmentObject private var unitsStore: SQUnitsStore
+    let markets: MarketRegistryServicing
+    @State private var entries: [MarketRegistryEntry] = []
+
+    init(service: PrivacyServicing, markets: MarketRegistryServicing) {
+        _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
+        self.markets = markets
+    }
+
+    private static func code(_ entry: MarketRegistryEntry) -> String {
+        entry.marketCode.isEmpty ? entry.code : entry.marketCode
+    }
+
+    var body: some View {
+        let current = model.preferences.defaultMarket ?? ""
+        let selected = entries.first { Self.code($0).caseInsensitiveCompare(current) == .orderedSame }
+        SQSettingsMenuRow("Mon pays", systemImage: "globe.europe.africa", subtitle: model.preferencesError,
+                          selection: Binding(
+                              get: { selected.map(Self.code) ?? "" },
+                              set: { value in Task { await model.setDefaultMarket(value.isEmpty ? nil : value) } }
+                          ), valueLabel: selected.map(MapMarketNaming.name) ?? String(localized: "Automatique")) {
+            Text("Automatique").tag("")
+            ForEach(entries) { entry in
+                Text(MapMarketNaming.title(entry)).tag(Self.code(entry))
+            }
+        }
+        .disabled(!model.preferencesLoaded || entries.isEmpty || model.isLoadingPreferences
+                  || model.isSavingPreferences || !model.isSessionCurrent)
+        .accessibilityHint("Pays de la carte quand ta position n'est pas disponible. Le réglage suit ton compte.")
+        .accessibilityIdentifier("settings.defaultMarket")
+        .task {
+            model.unitsStore = unitsStore
+            if entries.isEmpty { entries = await markets.registry().markets.filter(\.publicSelectable) }
             if !model.preferencesLoaded { await model.loadPreferences() }
         }
     }

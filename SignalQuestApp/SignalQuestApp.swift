@@ -244,6 +244,7 @@ struct AppRootView: View {
                 if case .authenticated = session.state {
                     if let preferences = await addressStore.refresh(using: services.privacy) {
                         unitsStore.apply(preferences.unitsSystem)
+                        MapMarketStore.saveAccountDefault(preferences.defaultMarket)
                     }
                     addressStore.applyTone()
                     await AccountLocaleSync.sync(api: services.api, force: false)
@@ -267,6 +268,8 @@ struct AppRootView: View {
                 if authenticatedUserID(in: oldState) != authenticatedUserID(in: newState) {
                     services.resetAccountPresentationState()
                     addressStore.restart()
+                    // « Mon pays » appartient au compte précédent.
+                    MapMarketStore.saveAccountDefault(nil)
                 }
                 Task {
                     await registerPushIfAuthenticated(newState)
@@ -283,6 +286,7 @@ struct AppRootView: View {
                     Task {
                         if let preferences = await addressStore.refresh(using: services.privacy) {
                             unitsStore.apply(preferences.unitsSystem)
+                            MapMarketStore.saveAccountDefault(preferences.defaultMarket)
                         }
                         addressStore.applyTone()
                     }

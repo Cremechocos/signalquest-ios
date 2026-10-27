@@ -6,7 +6,8 @@ import MapKit
 @MainActor
 final class MapFilterSelectionTests: XCTestCase {
     private let preferenceKeys = [MapMarketStore.marketKey, MapMarketStore.operatorKey,
-                                  "map.manualMarket.v1", MapRegionStore.key, MapBandMatchStore.key, MapAzimuthStyleStore.key]
+                                  "map.manualMarket.v1", MapRegionStore.key, MapBandMatchStore.key, MapAzimuthStyleStore.key,
+                                  MapMarketStore.accountDefaultKey, MapMarketStore.deducedMarketKey]
     private var savedPreferences: [String: Any] = [:]
     override func setUp() {
         super.setUp()
@@ -170,6 +171,50 @@ final class MapFilterSelectionTests: XCTestCase {
                                             location: makeLocation(latitude: 45.5019, longitude: -73.5674))
         XCTAssertEqual(model.marketFilter, "CA")
         XCTAssertEqual(model.currentMarketEntry?.marketCode, "CA")
+    }
+
+    /// « Mon pays » passe après la position et avant le dernier pays ; il n'est pas « déduit ».
+    func testAccountCountryWinsOverTheLastCountryWithoutLocation() async throws {
+        MapMarketStore.save(market: "FR", operator: "SFR")
+        MapMarketStore.saveAccountDefault("CA")
+        let payload = try registry()
+        let model = makeModel(markets: LocatedFilterMarkets(payload: payload, locatedCode: "FR"))
+        let network = NetworkPathMonitor()
+        let denied = LocationService(manager: FilterLocationDriver(), makeOneShotManager: { FilterLocationDriver() })
+        defer { network.stop(); model.endInitialSelection() }
+        await model.resolveInitialSelection(networkPath: network, networkOperator: NoNetworkOperator(), location: denied)
+        XCTAssertEqual(model.marketFilter, "CA")
+        XCTAssertFalse(model.countryDeduced)
+    }
+
+    /// Sans position, réglage ni dernier pays : pays déduit, signalé jusqu'à la
+    /// réponse de l'utilisateur, même après réouverture.
+    func testAnInferredCountryIsFlaggedUntilKeptOrChanged() async throws {
+        let payload = try registry()
+        let markets = LocatedFilterMarkets(payload: payload, locatedCode: "FR")
+        let network = NetworkPathMonitor()
+        defer { network.stop() }
+        func open() async -> MapExplorerViewModel {
+            let model = makeModel(markets: markets)
+            model.registryMarkets = payload.markets
+            let denied = LocationService(manager: FilterLocationDriver(), makeOneShotManager: { FilterLocationDriver() })
+            await model.resolveInitialSelection(networkPath: network, networkOperator: NoNetworkOperator(), location: denied)
+            model.endInitialSelection()
+            return model
+        }
+        let first = await open()
+        XCTAssertTrue(first.countryDeduced)
+        let again = await open()
+        XCTAssertTrue(again.countryDeduced, "le dernier pays, encore déduit, reste signalé")
+        first.keepDeducedCountry()
+        let kept = await open()
+        XCTAssertFalse(kept.countryDeduced)
+        MapMarketStore.saveDeduced(kept.marketFilter)
+        let reopened = await open()
+        XCTAssertTrue(reopened.countryDeduced)
+        _ = try XCTUnwrap(reopened.applyFilterSelection(.defaults(market: "CA", operatorName: "BELL")))
+        XCTAssertFalse(reopened.countryDeduced)
+        XCTAssertNil(MapMarketStore.deducedMarket())
     }
 
     func testInitialGPSReplacesAnOldViewportFromAnotherCountry() async throws {

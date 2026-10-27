@@ -94,6 +94,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             guard checkSession(), preferencesLoadID == ticket else { return }
             preferences = value; preferencesLoaded = true
             unitsStore?.apply(value.unitsSystem)
+            MapMarketStore.saveAccountDefault(value.defaultMarket)
         } catch {
             guard checkSession(), preferencesLoadID == ticket, !error.isCancellation else { return }
             preferencesError = error.userFacingMessage
@@ -126,6 +127,12 @@ final class PrivacySettingsViewModel: ObservableObject {
         await updatePreferences(UserPreferencesPatch(unitsSystem: system))
     }
 
+    /// « Mon pays » : un code du registre, ou `nil` pour le pays déduit.
+    func setDefaultMarket(_ code: String?) async {
+        guard (code ?? "").caseInsensitiveCompare(preferences.defaultMarket ?? "") != .orderedSame else { return }
+        await updatePreferences(UserPreferencesPatch(defaultMarket: code ?? ""))
+    }
+
     func setShowHandleOnLeaderboard(_ value: Bool) async {
         guard value != preferences.showHandleOnLeaderboard else { return }
         await updatePreferences(UserPreferencesPatch(showHandleOnLeaderboard: value))
@@ -146,6 +153,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             preferences = value
             preferencesError = nil
             unitsStore?.apply(value.unitsSystem, chosen: patch.unitsSystem != nil)
+            MapMarketStore.saveAccountDefault(value.defaultMarket)
             Haptics.success()
         } catch {
             guard checkSession(), !error.isCancellation else { return }

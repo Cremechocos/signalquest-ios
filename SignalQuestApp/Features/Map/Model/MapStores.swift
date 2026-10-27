@@ -207,12 +207,38 @@ enum MapMarketStore {
     static let marketKey = "map.lastMarket.v1"
     static let operatorKey = "map.lastOperator.v1"
     static let manualMarketKey = "map.manualMarket.v1"
+    /// « Mon pays » du compte (`defaultMarket` des préférences), recopié au
+    /// chargement des préférences : la carte le lit sans attendre le réseau.
+    static let accountDefaultKey = "map.accountDefaultMarket.v1"
+    /// Pays déduit (SIM, région de l'iPhone ou France) que l'utilisateur n'a ni
+    /// changé ni gardé : le bandeau « pays déduit » reste jusqu'à sa réponse.
+    static let deducedMarketKey = "map.deducedMarket.v1"
 
     /// QA `--reset-map` : oublie le marché/opérateur pour rejouer la détection.
     static func reset() {
         UserDefaults.standard.removeObject(forKey: marketKey)
         UserDefaults.standard.removeObject(forKey: operatorKey)
         UserDefaults.standard.removeObject(forKey: manualMarketKey)
+        UserDefaults.standard.removeObject(forKey: deducedMarketKey)
+    }
+
+    static func saveAccountDefault(_ market: String?) {
+        let market = market?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if market.isEmpty { UserDefaults.standard.removeObject(forKey: accountDefaultKey) }
+        else { UserDefaults.standard.set(market, forKey: accountDefaultKey) }
+    }
+
+    static func accountDefaultMarket() -> String? {
+        UserDefaults.standard.string(forKey: accountDefaultKey)
+    }
+
+    static func saveDeduced(_ market: String?) {
+        if let market { UserDefaults.standard.set(market, forKey: deducedMarketKey) }
+        else { UserDefaults.standard.removeObject(forKey: deducedMarketKey) }
+    }
+
+    static func deducedMarket() -> String? {
+        UserDefaults.standard.string(forKey: deducedMarketKey)
     }
 
     static func save(market: String, operator op: String) {

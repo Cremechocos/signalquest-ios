@@ -130,6 +130,9 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var currentMarketEntry: MarketRegistryEntry?
     /// Bandeau « Marché : X » affiché 2 s après un changement automatique.
     @Published var marketSwitchNotice: String?
+    /// Pays choisi sans preuve (SIM, région de l'iPhone ou France par défaut) :
+    /// la carte propose de le changer.
+    @Published private(set) var countryDeduced = false
 
     let mapService: MapSnapshotServicing
     let antennasService: AntennasServicing
@@ -345,9 +348,18 @@ final class MapExplorerViewModel: ObservableObject {
             if resolved?.publicSelectable == true { entry = resolved; locatedCenter = loc.coordinate }
         }
         guard !Task.isCancelled, manualGeneration == manualSelectionGeneration else { return }
+        // « Mon pays » du compte : après la position, avant le dernier pays.
+        if entry == nil, let mine = MapMarketStore.accountDefaultMarket() {
+            entry = Self.marketEntry(mine, in: payload)
+        }
+        // Le dernier pays reste « déduit » tant que l'utilisateur ne l'a ni changé ni gardé.
+        var deduced = false
         if entry == nil, let previous = MapMarketStore.lastMarket() {
             entry = payload.markets.first { $0.publicSelectable && $0.marketCode.caseInsensitiveCompare(previous) == .orderedSame }
+            deduced = entry != nil && MapMarketStore.deducedMarket()?.caseInsensitiveCompare(previous) == .orderedSame
         }
+        // SIM, région de l'iPhone ou France : sans preuve du pays.
+        if entry == nil { deduced = true }
         networkPath.refreshNow()
         let status = networkPath.status
         // La SIM n'est qu'un repli lorsque la position est indisponible, jamais
@@ -356,7 +368,7 @@ final class MapExplorerViewModel: ObservableObject {
             entry = payload.markets.first { $0.publicSelectable && $0.mccs.contains(mcc) }
         }
         if entry == nil { entry = Self.localeMarketEntry(in: payload) }
-        if entry == nil { entry = payload.markets.first { $0.publicSelectable } }
+        if entry == nil { entry = Self.marketEntry("FR", in: payload) ?? payload.markets.first { $0.publicSelectable } }
         guard let entry else { return }
         let code = entry.marketCode.isEmpty ? entry.code : entry.marketCode
 
@@ -388,7 +400,23 @@ final class MapExplorerViewModel: ObservableObject {
         currentDromRegion = code.uppercased() == "DROM" ? dromRegion : nil
         marketFilter = code
         operatorFilter = selectedOperator
+        countryDeduced = deduced
+        MapMarketStore.saveDeduced(deduced ? code : nil)
         MapMarketStore.save(market: code, operator: selectedOperator)
+    }
+
+    /// L'utilisateur garde le pays déduit : le bandeau ne revient plus.
+    func keepDeducedCountry() {
+        countryDeduced = false
+        MapMarketStore.saveDeduced(nil)
+    }
+
+    private static func marketEntry(_ code: String, in payload: MarketRegistryPayload) -> MarketRegistryEntry? {
+        payload.markets.first {
+            $0.publicSelectable && ($0.marketCode.caseInsensitiveCompare(code) == .orderedSame
+                || $0.code.caseInsensitiveCompare(code) == .orderedSame
+                || $0.countryCode.caseInsensitiveCompare(code) == .orderedSame)
+        }
     }
 
     /// Caméra par défaut d'un marché : centre/zoom du registre quand ils sont
@@ -542,6 +570,8 @@ final class MapExplorerViewModel: ObservableObject {
     }
 
     private func invalidatePendingSelectionResolution() {
+        countryDeduced = false
+        MapMarketStore.saveDeduced(nil)
         manualSelectionGeneration = UUID()
         marketAlignmentGeneration = UUID()
         hasResolvedInitialSelection = true
@@ -2523,6 +2553,10 @@ struct MapExplorerView: View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
             marketSwitchNotice
+            if showsDeducedCountry {
+                deducedCountryBanner
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if showsZoneCompareTip {
                 zoneCompareTip
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2542,6 +2576,63 @@ struct MapExplorerView: View {
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsCoverageKey)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDisplayLimit)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsZoneCompareTip)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDeducedCountry)
+    }
+
+    private var showsDeducedCountry: Bool {
+        model.countryDeduced && model.currentMarketEntry != nil && !searchIsActive && !model.registryMarkets.isEmpty
+    }
+
+    /// Pays choisi sans position ni réglage (SIM, région de l'iPhone ou France) :
+    /// on le dit, et on propose de le changer sans passer par les filtres.
+    private var deducedCountryBanner: some View {
+        let name = model.currentMarketEntry.map(MapMarketNaming.name) ?? model.marketFilter
+        return HStack(spacing: SQSpace.sm) {
+            Image(systemName: "globe.europe.africa")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .accessibilityHidden(true)
+            Text("Pays déduit : \(name)")
+                .font(SQFont.body(14, .semibold))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                ForEach(model.registryMarkets) { entry in
+                    Button(MapMarketNaming.title(entry)) {
+                        var next = filterSelection
+                        next.market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
+                        _ = applyFilterSelection(next)
+                    }
+                }
+            } label: {
+                Text("Changer")
+                    .font(SQType.chip)
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityHint(Text("Choisit le pays affiché sur la carte."))
+            .accessibilityIdentifier("map.deducedCountry.change")
+            Button {
+                model.keepDeducedCountry()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Garder ce pays"))
+            .accessibilityIdentifier("map.deducedCountry.keep")
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.vertical, SQSpace.xxs)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqShadowCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("map.deducedCountry")
     }
 
     /// Rien ne signale l'appui long sur la carte : une astuce, une seule fois, dans tout pays

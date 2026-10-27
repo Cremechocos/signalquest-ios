@@ -72,6 +72,8 @@ struct UserPreferencesPatch: Encodable, Sendable {
     var showHandleOnLeaderboard: Bool? = nil
     var showHypothesisSystem: Bool? = nil
     var addressForm: SQAddressForm? = nil
+    /// « Mon pays » ; la chaîne vide revient au pays déduit (le serveur l'écrit `null`).
+    var defaultMarket: String? = nil
 }
 
 protocol PrivacyServicing: Sendable {
