@@ -99808,6 +99808,66 @@
           }
         }
       }
+    },
+    "Importer l’ancien historique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import older history"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer l’ancien historique"
+          }
+        }
+      }
+    },
+    "Ton mot de passe de chiffrement, différent de celui de ton compte, ouvre une dernière fois tes anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your encryption password, different from your account password, opens your older encrypted messages one last time to move them to the new encryption. It won’t be asked again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton mot de passe de chiffrement, différent de celui de ton compte, ouvre une dernière fois tes anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton mot de passe de chiffrement, différent de celui de ton compte, ouvre une dernière fois tes anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre mot de passe de chiffrement, différent de celui de votre compte, ouvre une dernière fois vos anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Importer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

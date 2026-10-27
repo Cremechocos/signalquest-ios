@@ -29,6 +29,9 @@ struct E2EEUnlockSheet: View {
     @State private var didAttemptBiometric = false
     /// Apparition douce du badge cadenas (scale 0.9 → 1, SQMotion.emphasized).
     @State private var badgeAppeared = false
+    /// Import des anciens messages (E2EE-AUTO §8) : la clé v1 s'ouvre une
+    /// dernière fois, sans création ni remplacement, et rien n'est mémorisé.
+    var importsHistory = false
     var onUnlock: () -> Void
 
     /// Création ou remplacement : un nouveau mot de passe, saisi deux fois.
@@ -53,14 +56,16 @@ struct E2EEUnlockSheet: View {
 
                 VStack(spacing: SQSpace.sm) {
                     badge
-                    Text(isReplacing ? "Nouvelle clé" : needsCreation ? "Créer ta clé" : "Déverrouiller")
+                    Text(importsHistory ? "Importer l’ancien historique" : isReplacing ? "Nouvelle clé" : needsCreation ? "Créer ta clé" : "Déverrouiller")
                         .font(SQFont.display(26, .bold, relativeTo: .title))
                         .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
                     // Deux mots de passe distincts : celui du compte et celui du
                     // chiffrement. Le texte le dit, pour qu'on ne les confonde pas.
-                    Text(isReplacing
+                    Text(importsHistory
+                         ? "Ton mot de passe de chiffrement, différent de celui de ton compte, ouvre une dernière fois tes anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé."
+                         : isReplacing
                          ? "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe."
                          : needsCreation
                          ? "Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles."
@@ -117,7 +122,7 @@ struct E2EEUnlockSheet: View {
                             .transition(.opacity)
                     }
 
-                    if !needsCreation {
+                    if !needsCreation, !importsHistory {
                         Button {
                             Haptics.selection()
                             startReplacing(!isReplacing)
@@ -135,7 +140,7 @@ struct E2EEUnlockSheet: View {
                 }
 
                 // Proposer la mémorisation biométrique (1re fois, pas en création).
-                if !choosesNewPassword, BiometricAuth.isAvailable, !E2EEBiometric.isEnabled {
+                if !choosesNewPassword, !importsHistory, BiometricAuth.isAvailable, !E2EEBiometric.isEnabled {
                     Toggle(isOn: $rememberWithBiometric) {
                         HStack(spacing: SQSpace.md) {
                             Image(systemName: BiometricAuth.kind.systemImage)
@@ -171,7 +176,7 @@ struct E2EEUnlockSheet: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: SQSpace.sm) {
                 GradientButton(
-                    isReplacing ? "Remplacer ma clé" : needsCreation ? "Créer et activer" : "Déverrouiller",
+                    importsHistory ? "Importer" : isReplacing ? "Remplacer ma clé" : needsCreation ? "Créer et activer" : "Déverrouiller",
                     systemImage: "key.fill",
                     isBusy: isBusy
                 ) {
@@ -363,6 +368,8 @@ struct E2EEUnlockSheet: View {
     private func checkExistingKey() async {
         if let bootstrap = try? await service.bootstrap() {
             needsCreation = !bootstrap.hasKey || bootstrap.key == nil
+            // Sans clé v1, il n'y a rien à importer : aucune clé ne se crée ici.
+            if importsHistory, needsCreation { dismiss() }
         }
     }
 
@@ -375,6 +382,9 @@ struct E2EEUnlockSheet: View {
             let bootstrap = try await service.bootstrap()
             if let key = bootstrap.key, bootstrap.hasKey {
                 try await service.unlock(userId: userId, password: password, bootstrapKey: key)
+            } else if importsHistory {
+                dismiss()
+                return
             } else {
                 try await service.generateAndRegisterKey(userId: userId, password: password)
             }

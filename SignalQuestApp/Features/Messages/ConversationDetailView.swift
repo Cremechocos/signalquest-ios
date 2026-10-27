@@ -116,6 +116,8 @@ struct ConversationDetailView: View {
     /// Messages v1 dont l'import est réglé ici (accepté, existant ou refusé).
     @State private var v2ImportSettled: Set<String> = []
     @State private var v2ImportRunning = false
+    /// Mot de passe v1 demandé une seule fois, pour importer l'ancien historique (§8).
+    @State private var showImportUnlock = false
     @State private var v2LoadInFlight = false
     @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
@@ -1017,6 +1019,7 @@ struct ConversationDetailView: View {
                 await loadLegacyHistory()
                 await loadV2()
                 guard !Task.isCancelled else { return }
+                askImportPasswordIfNeeded()
                 Task { await importLegacyHistoryIfNeeded() }
                 await refreshReceipts()
                 await markRead()
@@ -1098,6 +1101,17 @@ struct ConversationDetailView: View {
                 onFinish: { showV2Activation = false },
                 onLater: { showV2Activation = false }
             )
+        }
+        .sheet(isPresented: $showImportUnlock) {
+            if case .authenticated(let user) = session.state {
+                E2EEUnlockSheet(userId: user.id, service: e2ee ?? services.e2ee, importsHistory: true) {
+                    Task {
+                        v2LegacyReadings = await legacyReadings(of: v2Legacy)
+                        await loadV2()
+                        await importLegacyHistoryIfNeeded()
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showUnlockSheet) {
             if case .authenticated(let user) = session.state {
@@ -2990,6 +3004,18 @@ struct ConversationDetailView: View {
             if let text = try? await e2ee.decryptText(conversationId: conversation.id, message: item) { readings[item.id] = text }
         }
         return readings
+    }
+
+    /// Des messages v1 attendent un import et cet appareil ne les lit pas : le
+    /// mot de passe v1 est demandé, une seule fois pour le compte (E2EE-AUTO §8).
+    private func askImportPasswordIfNeeded() {
+        guard E2EEV2ServerGate.autoActive, usesV2, v2LegacyReadings.isEmpty,
+              v2Legacy.contains(where: { $0.isEncrypted && $0.deletedAt == nil && !v2ImportedV1Ids.contains($0.id) }),
+              let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
+        let key = "e2ee.auto.importPasswordAsked.\(scope)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        showImportUnlock = true
     }
 
     /// Importe en v2 les messages v1 lus ici qu'aucun import vérifié ne cite
