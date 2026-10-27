@@ -2465,6 +2465,27 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
     }
 
+    /// Contexte d'un test d'expérience, résolu comme celui d'un speedtest : opérateur
+    /// par IP/ASN (nul sous VPN), marché par la position, ville par le géocodeur.
+    struct ExperienceContext: Sendable {
+        let operatorKey: String?
+        let marketCode: String?
+        let city: String?
+        let ssid: String?
+    }
+
+    func experienceContext(pathStatus: NetworkPathStatus, location: Coordinates?) async -> ExperienceContext {
+        async let place = reverseGeocodedPlace(for: location)
+        async let ssid = currentWiFiSSID(for: pathStatus)
+        async let operatorContext = resolveCellularOperatorContext(pathStatus: pathStatus, location: location)
+        let context = await operatorContext
+        var marketCode = context.marketCode
+        if marketCode == nil, let location {
+            marketCode = await markets.marketForLocation(latitude: location.latitude, longitude: location.longitude)?.marketCode
+        }
+        return await ExperienceContext(operatorKey: context.operatorKey, marketCode: marketCode, city: place.city, ssid: ssid)
+    }
+
     // MARK: Persistence
 
     func save(_ result: SpeedtestRunResult) async throws {
