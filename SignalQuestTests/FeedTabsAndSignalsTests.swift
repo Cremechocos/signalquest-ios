@@ -266,6 +266,14 @@ final class FeedActivityTests: XCTestCase {
         """.utf8))
     }
 
+    /// feed-text-keys v4 (§4) : un post en zone privée de son auteur ne se partage à personne ;
+    /// champ absent ou autre valeur, partage inchangé.
+    func testAPrivateZonePostIsNotShareable() throws {
+        XCTAssertFalse(try item(kind: "validation", mine: true, #""authorOnlyReason":"private_zone""#).isShareable)
+        XCTAssertTrue(try item(kind: "validation", mine: true, #""authorOnlyReason":"other""#).isShareable)
+        XCTAssertTrue(try item(kind: "validation", #""activityType":"validation""#).isShareable)
+    }
+
     func testEachFamilyIsReadFromItsActivityType() throws {
         let level = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: "Niveau 12 atteint !",
             #""activityType":"level_up","newLevel":12,"points":10"#)))

@@ -661,6 +661,13 @@ extension UnifiedSocialFeedItem {
         if id.hasPrefix("post-") { return String(id.dropFirst("post-".count)) }
         return id
     }
+
+    /// Post en zone privée de son auteur (feed-text-keys v4, §4) : servi à lui seul, il ne se
+    /// partage à personne, ni en conversation, ni hors de l'app. Champ absent ou autre valeur :
+    /// partage inchangé.
+    var isShareable: Bool {
+        metadata?["authorOnlyReason"] != .string("private_zone")
+    }
 }
 
 // MARK: - Profil public

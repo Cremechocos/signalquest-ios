@@ -550,7 +550,7 @@ struct CardActionsBar: View {
                     Button(String(localized: "Réagir : \(reaction.name)")) { onReact(reaction.rawValue) }
                 }
             }
-            Button("Partager", action: onShare)
+            if item.isShareable { Button("Partager", action: onShare) }
             Button(favorite, action: onFavorite)
             Button(repost, action: onRepost)
             Button("Commenter", action: onComment)
@@ -604,13 +604,16 @@ struct CardActionsBar: View {
         .accessibilityLabel(item.favoritedByMe ? "Retirer des enregistrés" : "Enregistrer la publication")
         .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
         .sqLikePop(trigger: item.favoritedByMe)
-        Button(action: onShare) {
-            Image(systemName: "paperplane")
-                .foregroundStyle(SQColor.chipInk)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+        // Post en zone privée : rien ne le partage, sans mention à l'écran (v4, §4).
+        if item.isShareable {
+            Button(action: onShare) {
+                Image(systemName: "paperplane")
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Partager")
         }
-        .accessibilityLabel("Partager")
     }
 
     /// Bouton ❤️ : tap = like ; appui long = les six réactions.
