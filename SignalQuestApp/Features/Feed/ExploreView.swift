@@ -457,10 +457,12 @@ struct ExploreView: View {
                     if model.selectedHashtag != nil {
                         hashtagFeedSection
                     } else {
-                        ExploreRoomsSection(
-                            onOpenAll: { roomsRoute = .list },
-                            onOpen: { roomsRoute = .room($0) }
-                        )
+                        if RoomsLogic.isAvailable(market: RoomsLogic.userMarket) {
+                            ExploreRoomsSection(
+                                onOpenAll: { roomsRoute = .list },
+                                onOpen: { roomsRoute = .room($0) }
+                            )
+                        }
                         if !recentProfiles.isEmpty {
                             recentProfilesSection
                         }

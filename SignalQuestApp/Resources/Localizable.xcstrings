@@ -99992,6 +99992,50 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Identifiants d'appel manquants." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Call credentials missing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiants d'appel manquants."
+          }
+        }
+      }
+    },
+    "Cherche une adresse, une ville ou un site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for an address, a city or a site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cherche une adresse, une ville ou un site."
+          }
+        }
+      }
+    },
+    "SQFormal|Cherche une adresse, une ville ou un site." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cherchez une adresse, une ville ou un site."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

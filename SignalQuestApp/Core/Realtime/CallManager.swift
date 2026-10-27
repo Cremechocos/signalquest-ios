@@ -381,10 +381,10 @@ final class CallManager: NSObject, ObservableObject {
         case connectionEnded
         var errorDescription: String? {
             switch self {
-            case .missingCredentials: return "Identifiants d'appel manquants."
-            case .e2eeUnavailable: return "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil."
+            case .missingCredentials: return String(localized: "Identifiants d'appel manquants.")
+            case .e2eeUnavailable: return String(localized: "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil.")
             case .deviceLocked: return String(localized: "Déverrouille ton appareil pour rejoindre l’appel chiffré.")
-            case .untrustedE2EESession: return "La vérification du chiffrement de l’appel a échoué."
+            case .untrustedE2EESession: return String(localized: "La vérification du chiffrement de l’appel a échoué.")
             case .connectionFailed(let m): return String(localized: "Connexion à l'appel impossible : \(m)")
             case .connectionEnded: return String(localized: "L'appel s'est terminé pendant la connexion.")
             }

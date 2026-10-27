@@ -597,6 +597,19 @@ final class RoomsService: RoomsServicing {
 
 /// Les règles locales des salons, sans réseau ni position envoyée.
 enum RoomsLogic {
+    /// Les salons sont ceux de la France et des DROM : ailleurs, l'Explorer ne les
+    /// propose pas. Pays inconnu : la France, comme la carte.
+    static func isAvailable(market: String?) -> Bool {
+        guard let market = market?.uppercased(), !market.isEmpty, market != "UNKNOWN" else { return true }
+        return market == "FR" || market == "DROM"
+    }
+
+    /// Le pays de l'utilisateur : « Mon pays », sinon celui de la carte, sinon la
+    /// région de l'iPhone.
+    static var userMarket: String? {
+        MapMarketStore.accountDefaultMarket() ?? MapMarketStore.lastMarket() ?? Locale.current.region?.identifier
+    }
+
     /// Les quatre opérateurs métropolitains des salons de région et des salons nationaux.
     static let metroOperators = ["ORANGE", "SFR", "BOUYGUES", "FREE"]
 

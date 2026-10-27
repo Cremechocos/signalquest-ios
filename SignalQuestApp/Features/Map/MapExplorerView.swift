@@ -3290,7 +3290,9 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.label)
                 Text(model.searchFailed
                      ? "Vérifie ta connexion, puis réessaie."
-                     : "Cherche un numéro de support ANFR, une adresse ou une commune.")
+                     : ["FR", "DROM"].contains(model.marketFilter.uppercased())
+                        ? "Cherche un numéro de support ANFR, une adresse ou une commune."
+                        : "Cherche une adresse, une ville ou un site.")
                     .font(SQType.subhead(.regular))
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)

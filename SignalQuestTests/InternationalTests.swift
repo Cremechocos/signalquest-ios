@@ -59,4 +59,25 @@ final class InternationalTests: XCTestCase {
         XCTAssertEqual(attempts, 3)
         XCTAssertEqual(defaults.string(forKey: AccountLocaleSync.sentKey(ownerScopeId: "user:b")), "en")
     }
+
+    func testRoomsAreOfferedOnlyInFranceAndOverseas() {
+        XCTAssertTrue(RoomsLogic.isAvailable(market: "FR"))
+        XCTAssertTrue(RoomsLogic.isAvailable(market: "drom"))
+        XCTAssertTrue(RoomsLogic.isAvailable(market: nil), "pays inconnu : la France")
+        XCTAssertTrue(RoomsLogic.isAvailable(market: "UNKNOWN"))
+        XCTAssertFalse(RoomsLogic.isAvailable(market: "CA"))
+        XCTAssertFalse(RoomsLogic.isAvailable(market: "DE"))
+    }
+
+    func testUnitedStatesGetNorthAmericanBands() {
+        let bands = Set(MapFilterCatalog.bands(forMarket: "US").map(\.band))
+        XCTAssertTrue(bands.isSuperset(of: [2, 4, 66, 71]))
+        XCTAssertEqual(MapFilterCatalog.bands(forMarket: "US").map(\.band), MapFilterCatalog.bands(forMarket: "CA").map(\.band))
+    }
+
+    func testLegalPagesFollowTheAppLanguage() {
+        let french = Bundle.main.preferredLocalizations.first?.hasPrefix("fr") == true
+        XCTAssertEqual(AppConfig.current.termsURL.path, french ? "/terms" : "/en/terms")
+        XCTAssertEqual(AppConfig.current.legalURL.path, french ? "/legal" : "/en/legal")
+    }
 }

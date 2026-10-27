@@ -174,12 +174,21 @@ struct AppConfig: Equatable {
     // `/confidentialite` renvoyaient 404). Centralisés ici pour éviter toute
     // dérive et pour être testables.
 
+    // Une page par langue : `/en/terms`, `/en/privacy`, `/en/legal` pour l'app
+    // en anglais (servies depuis le 27/10), les pages françaises sinon. Le
+    // français fait foi.
+
     /// Conditions générales d'utilisation (EULA).
-    var termsURL: URL { appBaseURL.appendingPathComponent("terms") }
+    var termsURL: URL { legalBaseURL.appendingPathComponent("terms") }
     /// Politique de confidentialité (RGPD, App Store).
-    var privacyURL: URL { appBaseURL.appendingPathComponent("privacy") }
+    var privacyURL: URL { legalBaseURL.appendingPathComponent("privacy") }
     /// Mentions légales (éditeur, hébergeur, médiateur conso).
-    var legalURL: URL { appBaseURL.appendingPathComponent("legal") }
+    var legalURL: URL { legalBaseURL.appendingPathComponent("legal") }
+
+    private var legalBaseURL: URL {
+        Bundle.main.preferredLocalizations.first?.hasPrefix("fr") == true
+            ? appBaseURL : appBaseURL.appendingPathComponent("en")
+    }
     /// Adresse de contact pour la modération / l'exercice des droits RGPD.
     var contactEmail: String { "legal@signalquest.fr" }
     /// Lien `mailto:` prêt à l'emploi pour le contact modération/RGPD.

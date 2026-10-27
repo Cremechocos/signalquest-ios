@@ -29,7 +29,9 @@ enum MapFilterCatalog {
     static func bands(forMarket code: String) -> [BandOption] {
         switch normalize(code) {
         case "FR", "DROM": return franceBands
-        case "CA":         return canadaBands
+        // Les États-Unis partagent les bandes nord-américaines du Canada (B2, B4,
+        // B5, B12, B13, B66, B71, n71…) : le repli européen ne les avait pas.
+        case "CA", "US":   return canadaBands
         case "BE", "CH":   return defaultEuropean
         default:           return defaultEuropean
         }

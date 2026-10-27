@@ -411,7 +411,21 @@ struct MapLayersSheet: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("map.legend")
-            if let onOpenANFR {
+            // La carte et les statistiques ANFR ne couvrent que la France et les DROM ;
+            // le comparatif de zone sert dans tous les pays.
+            if let onOpenANFR, !["FR", "DROM"].contains(market.uppercased()) {
+                Divider().overlay(SQColor.separator)
+                Button {
+                    onOpenANFR(.zoneCompare)
+                    dismiss()
+                } label: {
+                    MapSheetRow(title: String(localized: "Comparer les opérateurs ici")) {
+                        Image(systemName: "chart.bar.doc.horizontal").font(.system(size: 16, weight: .medium))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("map.filters.anfr.zoneCompare")
+            } else if let onOpenANFR {
                 Divider().overlay(SQColor.separator)
                 Menu {
                     Button {

@@ -308,7 +308,9 @@ struct SignalQuestHomeView: View {
             case .outages: outagesModule
             case .latestTest: latestTestModule(size: entry.size)
             case .week: weekModule(size: entry.size)
-            case .evolutions: evolutionsModule
+            case .evolutions:
+                // Pas de prévisionnel dans ce pays : le module annoncerait « rien de nouveau ».
+                if marketEntry?.capabilities.previsionnel ?? true { evolutionsModule }
             case .community: communityModule
             case .followedSites:
                 HomeFollowedSitesModule(favorites: services.favoriteAntennas, registry: marketEntry)
@@ -1530,7 +1532,7 @@ struct SignalQuestHomeView: View {
         let wantsMeasures = has(.nearbyMeasures)
         let wantsOperators = has(.operators)
         let wantsOutages = has(.outages)
-        let wantsEvolutions = has(.evolutions)
+        let wantsEvolutions = has(.evolutions) && (market?.capabilities.previsionnel ?? true)
             && (forceFresh || evolutions == nil || Date().timeIntervalSince(lastEvolutionsRefreshAt) > 600)
 
         async let qualityTask: NearbyNetworkQuality? = wantsNetwork
