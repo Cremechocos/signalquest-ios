@@ -721,6 +721,8 @@ struct AuthPasswordInput: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // Cible de 44 pt, mais la rangée garde la hauteur de celle de l'e-mail.
+            .padding(.vertical, -11)
             .accessibilityLabel(revealed ? "Masquer le mot de passe" : "Afficher le mot de passe")
         }
     }
