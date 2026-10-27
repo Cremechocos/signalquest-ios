@@ -3672,6 +3672,63 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
         XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
     }
 
+    /// Le flux réel passe par le lecteur d'octets : les lignes vides ferment les
+    /// événements, `id:` est gardé, un battement `:` et un événement inconnu sont ignorés.
+    func testRuntimeStreamFramesDispatchLiveShareEvents() throws {
+        let stream = """
+        : keepalive
+
+        event: encrypted_update
+        id: update_0123456789abcdef
+        data: {"updateId":"update_0123456789abcdef","createdAt":"2026-08-26T12:00:00.000Z","expiresAt":"2026-08-26T12:15:00.000Z"}
+        
+        event: ping
+        data: {}
+
+        event:  Status
+        id: status-1
+        data: {"status":"stopped"}
+
+
+        """
+        var parser = SSEFrameParser(limit: E2EEV2LiveShareEventContract.maxFrameBytes)
+        let events = try stream.utf8.compactMap { try parser.append($0) }
+            .compactMap(E2EEV2LiveShareEventContract.parse(frame:))
+        XCTAssertEqual(events, [
+            .encryptedUpdate(
+                updateId: "update_0123456789abcdef",
+                createdAt: "2026-08-26T12:00:00.000Z",
+                expiresAt: "2026-08-26T12:15:00.000Z",
+                eventId: "update_0123456789abcdef"
+            ),
+            .status(value: "stopped", eventId: "status-1")
+        ])
+
+        var bounded = SSEFrameParser(limit: E2EEV2LiveShareEventContract.maxFrameBytes)
+        let oversized = "data: " + String(repeating: "x", count: 35 * 1_024)
+        XCTAssertThrowsError(try oversized.utf8.forEach { _ = try bounded.append($0) })
+    }
+
+    /// Un refus v2 arrive en échec de transport : il arrête la publication comme
+    /// un refus v1, et une panne passagère ne l'arrête pas.
+    @MainActor
+    func testV2PublishRefusalsAreTerminal() {
+        func v2(_ status: Int?, _ kind: E2EEV2TransportFailureKind) -> Error {
+            E2EEV2LiveShareRuntimeError.transport(E2EEV2TransportFailure(kind: kind, statusCode: status, message: ""))
+        }
+        for status in [400, 403, 404, 409, 410, 426] {
+            XCTAssertTrue(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(status, .permanent)), "\(status)")
+            XCTAssertTrue(ConversationLiveShareCoordinator.isTerminalPublishFailure(
+                APIError.http(status: status, code: nil, message: "", requestId: nil, retryAfter: nil)
+            ))
+        }
+        XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(503, .retryable)))
+        XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(nil, .retryable)))
+        XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(401, .authentication)))
+        XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(E2EEV2LiveShareRuntimeError.invalidPayload))
+        XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(URLError(.timedOut)))
+    }
+
     func testOpaquePushPreviewIsDerivedOnlyAfterDecryptionAndHonorsPrivacy() throws {
         let message = E2EEV2DecryptedMessage(
             epochNumber: 7,

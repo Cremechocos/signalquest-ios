@@ -198,11 +198,13 @@ final class SSEClient: Sendable {
 /// SSE framing must retain empty lines; AsyncBytes.lines omits them.
 /// The limit bounds both an unterminated line and accumulated event data.
 struct SSEFrameParser {
-    struct Frame: Equatable, Sendable { let event: String; let data: String }
+    /// `id` : champ `id:` de l'événement, pour un `Last-Event-ID` à la reconnexion.
+    struct Frame: Equatable, Sendable { let event: String; let data: String; var id: String? = nil }
     enum Failure: Error { case oversizedFrame }
     private var line: [UInt8] = []
     private var data: [String] = []
     private var event: String?
+    private var id: String?
     private var wasCR = false
     private var firstLine = true
     private var size = 0
@@ -223,8 +225,8 @@ struct SSEFrameParser {
             if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
         }
         if text.isEmpty {
-            let result = data.isEmpty ? nil : Frame(event: event?.isEmpty == false ? event! : "message", data: data.joined(separator: "\n"))
-            data.removeAll(keepingCapacity: true); event = nil; size = 0
+            let result = data.isEmpty ? nil : Frame(event: event?.isEmpty == false ? event! : "message", data: data.joined(separator: "\n"), id: id)
+            data.removeAll(keepingCapacity: true); event = nil; id = nil; size = 0
             return result
         }
         if text.hasPrefix(":") { return nil }
@@ -234,6 +236,7 @@ struct SSEFrameParser {
         if value.first == " " { value.removeFirst() }
         if field == "event" { event = value }
         else if field == "data" { data.append(value) }
+        else if field == "id", !value.contains("\0") { id = value.isEmpty ? nil : value }
         return nil
     }
 }

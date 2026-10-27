@@ -10346,6 +10346,17 @@ enum E2EEV2LiveShareEvent: Equatable, Sendable {
 enum E2EEV2LiveShareEventContract {
     private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
 
+    /// 32 Kio de `data`, plus les champs `event` et `id` de l'événement.
+    static let maxFrameBytes = 34 * 1_024
+
+    static func parse(frame: SSEFrameParser.Frame) -> E2EEV2LiveShareEvent? {
+        parse(
+            event: frame.event.trimmingCharacters(in: .whitespaces).lowercased(),
+            data: frame.data,
+            eventId: frame.id
+        )
+    }
+
     static func parse(event: String, data: String, eventId: String?) -> E2EEV2LiveShareEvent? {
         guard data.utf8.count <= 32 * 1_024,
               let raw = data.data(using: .utf8),
@@ -10465,35 +10476,19 @@ final class E2EEV2LiveShareEventClient: @unchecked Sendable {
                             retryAfter: nil
                         )
                     }
-                    var event = ""
-                    var identifier: String?
-                    var data = ""
-                    for try await line in bytes.lines {
-                        if Task.isCancelled { break }
-                        if line.hasPrefix(":" ) { continue }
-                        if line.hasPrefix("event:") {
-                            event = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces).lowercased()
-                        } else if line.hasPrefix("id:") {
-                            identifier = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                            if identifier?.isEmpty == true { identifier = nil }
-                        } else if line.hasPrefix("data:") {
-                            let chunk = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                            data = data.isEmpty ? chunk : data + "\n" + chunk
-                            guard data.utf8.count <= 32 * 1_024 else {
-                                throw E2EEV2LiveShareStateError.invalidRecord
-                            }
-                        } else if line.isEmpty {
-                            if let parsed = E2EEV2LiveShareEventContract.parse(
-                                event: event,
-                                data: data,
-                                eventId: identifier
-                            ) {
+                    // Octet par octet : `bytes.lines` omet les lignes vides qui ferment
+                    // chaque événement, et aucun n'arrivait jamais.
+                    var parser = SSEFrameParser(limit: E2EEV2LiveShareEventContract.maxFrameBytes)
+                    do {
+                        for try await byte in bytes {
+                            if Task.isCancelled { break }
+                            if let frame = try parser.append(byte),
+                               let parsed = E2EEV2LiveShareEventContract.parse(frame: frame) {
                                 continuation.yield(parsed)
                             }
-                            event = ""
-                            identifier = nil
-                            data = ""
                         }
+                    } catch SSEFrameParser.Failure.oversizedFrame {
+                        throw E2EEV2LiveShareStateError.invalidRecord
                     }
                     continuation.finish()
                 } catch is CancellationError {

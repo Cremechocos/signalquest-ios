@@ -24,6 +24,15 @@ final class SSEFrameParserTests: XCTestCase {
                        [.init(event: "update", data: " value  "), .init(event: "message", data: "")])
     }
 
+    /// Le partage en direct v2 reprend son flux avec `Last-Event-ID` : l'`id:` de
+    /// chaque événement est lu, et ne passe pas à l'événement suivant.
+    func testEventIdIsReadPerEvent() throws {
+        XCTAssertEqual(try parse("event: status\nid: status-1\ndata: {}\n\nid:\ndata: x\n\ndata: y\n\n"),
+                       [.init(event: "status", data: "{}", id: "status-1"),
+                        .init(event: "message", data: "x"),
+                        .init(event: "message", data: "y")])
+    }
+
     func testUnterminatedEventDoesNotLeakIntoAnotherConnection() throws {
         XCTAssertTrue(try parse("event: old\ndata: partial").isEmpty)
         XCTAssertEqual(try parse("data: current\n\n"), [.init(event: "message", data: "current")])
