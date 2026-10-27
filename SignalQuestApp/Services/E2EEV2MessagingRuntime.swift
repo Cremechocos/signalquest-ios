@@ -344,9 +344,17 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     struct CallMembers: Sendable {
         let devices: E2EEV2CertifiedDeviceSet
         let members: Set<String>
+        /// Navigateurs écartés de l'appel : conversation qui les exclut, ou
+        /// époque courante marquée (§7.3, révision 15).
         let excludesWeb: Bool
         let ownUserId: String
         let ownerNamespace: String
+    }
+
+    /// Sous une époque marquée, aucun appareil web n'appelle ni ne participe,
+    /// quel que soit `excludesWeb` (E2EE-AUTO §7.3, révision 15).
+    static func callExcludesWeb(stored: Bool, currentEpoch: E2EEV2ConversationStateStore.CurrentEpoch?) -> Bool {
+        stored || currentEpoch?.e2eeAuto == true
     }
 
     func callMembers(conversationId: String, synchronizing: Bool) async -> CallMembers? {
@@ -382,8 +390,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
             guard case .v2(_, let current, let excludesWeb) = parts.messaging.storedMembership(conversationId: conversationId)
             else { return nil }
             devices = try await parts.directory.devices(for: accounts(conversationId: conversationId, participantIds: current, parts: parts))
+            let epoch = try? parts.stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: parts.session.ownerNamespace)
             return CallMembers(
-                devices: devices, members: Set(current), excludesWeb: excludesWeb,
+                devices: devices, members: Set(current), excludesWeb: Self.callExcludesWeb(stored: excludesWeb, currentEpoch: epoch ?? nil),
                 ownUserId: String(parts.session.ownerScopeId.dropFirst("user:".count)),
                 ownerNamespace: parts.session.ownerNamespace
             )

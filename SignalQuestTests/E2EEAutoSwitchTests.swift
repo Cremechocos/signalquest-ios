@@ -115,6 +115,36 @@ final class E2EEAutoSwitchTests: XCTestCase {
         )
     }
 
+    /// Sous une époque marquée, aucun appareil web n'appelle ni ne participe,
+    /// quel que soit `excludesWeb` (§7.3, révision 15).
+    func testAMarkedEpochKeepsWebDevicesOutOfCalls() {
+        func epoch(_ auto: Bool?) -> E2EEV2ConversationStateStore.CurrentEpoch {
+            .init(
+                conversationId: "conv_01J7ABCD23456789", epochNumber: 2, membershipChangeNumber: 1, memberIds: [bruno],
+                recipientsDigest: "digest", excludesWeb: false, createdAtMs: 0, acceptedAtMs: 0, e2eeAuto: auto
+            )
+        }
+        XCTAssertTrue(E2EEV2MessagingRuntime.callExcludesWeb(stored: false, currentEpoch: epoch(true)))
+        XCTAssertTrue(E2EEV2MessagingRuntime.callExcludesWeb(stored: true, currentEpoch: epoch(nil)))
+        XCTAssertFalse(E2EEV2MessagingRuntime.callExcludesWeb(stored: false, currentEpoch: epoch(nil)))
+        XCTAssertFalse(E2EEV2MessagingRuntime.callExcludesWeb(stored: false, currentEpoch: nil))
+
+        let browser = remote(user: bruno, device: "device_web_01J7ABCD", platform: "web")
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        func members(excludesWeb: Bool) -> E2EEV2MessagingRuntime.CallMembers {
+            E2EEV2MessagingRuntime.CallMembers(
+                devices: E2EEV2CertifiedDeviceSet(devicesByUser: [bruno: [browser]], refusals: [:]),
+                members: [bruno], excludesWeb: excludesWeb, ownUserId: "user_own_01J7ABCD23456789", ownerNamespace: "test"
+            )
+        }
+        XCTAssertNotNil(E2EEV2CallRuntime.callSigningKey(deviceId: browser.deviceId, in: members(excludesWeb: false), nowMs: nowMs))
+        XCTAssertNil(E2EEV2CallRuntime.callSigningKey(
+            deviceId: browser.deviceId,
+            in: members(excludesWeb: E2EEV2MessagingRuntime.callExcludesWeb(stored: false, currentEpoch: epoch(true))),
+            nowMs: nowMs
+        ))
+    }
+
     // MARK: Outils
 
     private let key = Data((0..<32).map { UInt8($0) })
@@ -123,11 +153,11 @@ final class E2EEAutoSwitchTests: XCTestCase {
         try XCTUnwrap(try JSONSerialization.jsonObject(with: creation.body) as? [String: Any])
     }
 
-    private func remote(user: String, device: String) -> E2EEV2CertifiedDevice {
+    private func remote(user: String, device: String, platform: String = "android") -> E2EEV2CertifiedDevice {
         let agreement = P256.KeyAgreement.PrivateKey()
         let signing = P256.Signing.PrivateKey()
         return E2EEV2CertifiedDevice(
-            userId: user, deviceId: device, keyVersion: 1, platform: "android",
+            userId: user, deviceId: device, keyVersion: 1, platform: platform,
             identityKeyB64: agreement.publicKey.x963Representation.base64EncodedString(),
             signingKeyB64: signing.publicKey.x963Representation.base64EncodedString(),
             fingerprint: E2EEV2Canonical.deviceFingerprint(
