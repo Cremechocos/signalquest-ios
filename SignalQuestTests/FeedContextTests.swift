@@ -95,7 +95,7 @@ final class FeedContextTests: XCTestCase {
         let started = expectation(description: "pagination")
         let model = FeedViewModel(service: FeedContextFixture { cursor, _, tab in
             if cursor != nil { started.fulfill(); return try await gate.wait() }
-            return Self.page(tab == .forYou ? "first" : "current", cursor: tab == .forYou ? "next" : nil)
+            return tab == .forYou ? Self.page("first", cursor: "next", items: [Self.item("a")]) : Self.page("current")
         })
         await model.load()
         let old = Task { await model.loadMore() }
@@ -104,6 +104,46 @@ final class FeedContextTests: XCTestCase {
         await gate.finish(.success(Self.page("old-page"))); await old.value
         XCTAssertEqual(model.page?.requestId, "current"); XCTAssertNil(model.page?.nextCursor)
         XCTAssertFalse(model.isLoadingMore)
+    }
+
+    func testAnEmptyPageWithACursorChainsToTheNextOne() async {
+        // Le serveur découpe la page dans ce qu'il a lu : une page entièrement cachée
+        // revient vide avec une suite, et rien à l'écran ne demanderait la suivante.
+        let model = FeedViewModel(service: FeedContextFixture { cursor, _, _ in
+            switch cursor {
+            case nil: Self.page("first", cursor: "c1", items: [Self.item("a")])
+            case "c1": Self.page("hidden", cursor: "c2")
+            default: Self.page("last", items: [Self.item("b")])
+            }
+        })
+        await model.load()
+        await model.loadMore()
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "b"])
+        XCTAssertNil(model.page?.nextCursor)
+        XCTAssertFalse(model.isLoadingMore)
+    }
+
+    func testAnEmptyFirstPageWithACursorIsNotAnEmptyFeed() async {
+        let model = FeedViewModel(service: FeedContextFixture { cursor, _, _ in
+            cursor == nil ? Self.page("hidden", cursor: "c1") : Self.page("next", items: [Self.item("a")])
+        })
+        await model.load()
+        XCTAssertEqual(model.page?.items.map(\.id), ["a"])
+        XCTAssertFalse(model.isLoading)
+    }
+
+    func testEmptyPagesStopAfterAFewHopsAndKeepTheirCursor() async {
+        let calls = FeedCallCount()
+        let model = FeedViewModel(service: FeedContextFixture { cursor, _, _ in
+            let call = await calls.next()
+            return cursor == nil ? Self.page("first", cursor: "c0", items: [Self.item("a")]) : Self.page("hidden", cursor: "c\(call)")
+        })
+        await model.load()
+        await model.loadMore()
+        let next = await calls.next()
+        XCTAssertEqual(next, 2 + FeedViewModel.emptyPageHops, "1 page puis 5 pages vides, pas davantage")
+        XCTAssertNotNil(model.page?.nextCursor, "faire défiler relance la suite")
+        XCTAssertEqual(model.page?.items.map(\.id), ["a"])
     }
 
     func testReturnAfterStopIgnoresThePreviousLoad() async {

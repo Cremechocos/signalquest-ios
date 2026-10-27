@@ -222,6 +222,11 @@ final class FeedViewModel: ObservableObject {
                 let streamID = streamRevision
                 Task { [weak self] in await self?.refreshPending(context: context, streamID: streamID) }
             }
+            // Première page vide mais pas finie : la suite, plutôt qu'un fil vide.
+            if loaded.items.isEmpty, let cursor = loaded.nextCursor, !cursor.isEmpty {
+                isLoading = false
+                await loadMore()
+            }
         } catch {
             guard context == query, request == loadRevision, !error.isCancellation else { return }
             // Un rafraîchissement raté garde le fil affiché : seul un premier
@@ -234,20 +239,29 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Une page peut revenir vide avec une suite (posts cachés par le serveur, zones privées
+    /// comprises) : rien n'apparaît alors pour demander la suivante, on l'enchaîne aussitôt,
+    /// au plus quelques pages d'affilée.
+    static let emptyPageHops = 5
+
     func loadMore() async {
         guard !isLoading, !isLoadingMore, let current = page,
-              let cursor = current.nextCursor, !cursor.isEmpty, !AppEnvironment.usesDemoData else { return }
+              var cursor = current.nextCursor, !cursor.isEmpty, !AppEnvironment.usesDemoData else { return }
         let context = query, loading = loadRevision
         isLoadingMore = true
         defer { if context == query && loading == loadRevision { isLoadingMore = false } }
         do {
-            let next = try await service.loadFeed(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
-            guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
-            var seen = Set(current.items.map(\.id))
-            let appended = next.items.filter { seen.insert($0.id).inserted }
-            page = SocialFeedPage(items: current.items + appended, nextCursor: next.nextCursor,
-                stories: current.stories, trendingHashtags: current.trendingHashtags,
-                suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
+            for _ in 0..<Self.emptyPageHops {
+                let next = try await service.loadFeed(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
+                guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
+                var seen = Set(current.items.map(\.id))
+                let appended = next.items.filter { seen.insert($0.id).inserted }
+                page = SocialFeedPage(items: current.items + appended, nextCursor: next.nextCursor,
+                    stories: current.stories, trendingHashtags: current.trendingHashtags,
+                    suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
+                guard appended.isEmpty, let following = next.nextCursor, !following.isEmpty else { return }
+                cursor = following
+            }
         } catch {
             guard context == query, loading == loadRevision, !error.isCancellation else { return }
             // La page déjà lue reste affichée ; faire défiler relance la suite.
