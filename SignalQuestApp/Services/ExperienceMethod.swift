@@ -261,6 +261,138 @@ struct ExperienceTestsResult: Equatable, Sendable {
     }
 }
 
+extension ExperienceTestsResult {
+    /// Relit les `tests` que sert `GET /api/experience-tests/{id}` (contrat v1 §5) : la
+    /// forme exacte de l'envoi, pour l'auteur comme pour un autre lecteur. Un test dont
+    /// l'état est inconnu est laissé de côté, une valeur mal formée reste absente.
+    init(served: [String: JSONValue]) {
+        self.init()
+        typealias Reader = ExperienceServedReader
+        if let test = Reader.object(served[ExperienceTestKind.videoLadder.rawValue]), let state = Reader.state(test) {
+            videoLadder = ExperienceLadderResult(state: state, reason: Reader.reason(test), rungs: Reader.array(test["rungs"]).compactMap { item in
+                guard let quality = Reader.string(item["quality"]).flatMap(ExperienceVideoQuality.init(rawValue:)),
+                      let state = Reader.string(item["state"]).flatMap(ExperienceRung.State.init(rawValue:)) else { return nil }
+                return ExperienceRung(
+                    quality: quality, state: state, startupMs: Reader.int(item["startupMs"]), stalls: Reader.stalls(item["stalls"]) ?? [],
+                    bufferMinMs: Reader.int(item["bufferMinMs"]), bufferAvgMs: Reader.int(item["bufferAvgMs"]),
+                    receivedBps: Reader.int(item["receivedBps"]), bytes: Reader.int(item["bytes"])
+                )
+            })
+        }
+        if let test = Reader.object(served[ExperienceTestKind.videoAdaptive.rawValue]), let state = Reader.state(test) {
+            var timeByQualityMs: [ExperienceVideoQuality: Int64] = [:]
+            for (key, value) in Reader.object(test["timeByQualityMs"]) ?? [:] {
+                if let quality = ExperienceVideoQuality(rawValue: key), let ms = Reader.int(value) { timeByQualityMs[quality] = ms }
+            }
+            let score = Reader.object(test["score"]).flatMap { score -> ExperienceVideoScore? in
+                guard let total = Reader.int(score["total"]), let quality = Reader.int(score["quality"]),
+                      let smoothness = Reader.int(score["smoothness"]), let startup = Reader.int(score["startup"]) else { return nil }
+                return ExperienceVideoScore(total: Int(total), quality: Int(quality), smoothness: Int(smoothness), startup: Int(startup))
+            }
+            videoAdaptive = ExperienceAdaptiveResult(
+                state: state, reason: Reader.reason(test), playbackMs: Reader.int(test["playbackMs"]),
+                startupMs: Reader.int(test["startupMs"]), timeByQualityMs: timeByQualityMs,
+                switchesUp: Reader.int(test["switchesUp"]).map(Int.init), switchesDown: Reader.int(test["switchesDown"]).map(Int.init),
+                stalls: Reader.stalls(test["stalls"]), score: score
+            )
+        }
+        if let test = Reader.object(served[ExperienceTestKind.webPage.rawValue]), let state = Reader.state(test) {
+            webPage = ExperienceWebResult(
+                state: state, reason: Reader.reason(test), pageBytes: Reader.int(test["pageBytes"]),
+                parallelRequests: Reader.int(test["parallelRequests"]).map(Int.init),
+                openings: Reader.array(test["openings"]).map { item in
+                    ExperienceWebOpening(
+                        measured: Reader.string(item["state"]) == "measured", protocolName: Reader.string(item["protocol"]),
+                        freshConnection: Reader.bool(item["freshConnection"]), dnsMs: Reader.int(item["dnsMs"]),
+                        dnsCached: Reader.bool(item["dnsCached"]), connectMs: Reader.int(item["connectMs"]),
+                        tlsMs: Reader.int(item["tlsMs"]), firstByteMs: Reader.int(item["firstByteMs"]),
+                        contentMs: Reader.int(item["contentMs"]), totalMs: Reader.int(item["totalMs"])
+                    )
+                }
+            )
+        }
+        if let test = Reader.object(served[ExperienceTestKind.gameAndCalls.rawValue]), let state = Reader.state(test) {
+            let underLoad = Reader.object(test["underLoad"]).flatMap { load -> ExperienceUnderLoad? in
+                guard let idleMs = Reader.int(load["idleMs"]), let grade = Reader.string(load["grade"]),
+                      let deltaMs = Reader.int(load["deltaMs"]),
+                      let source = Reader.string(load["source"]).flatMap(ExperienceUnderLoad.Source.init(rawValue:)) else { return nil }
+                return ExperienceUnderLoad(
+                    idleMs: idleMs, loadedDownMs: Reader.int(load["loadedDownMs"]), loadedUpMs: Reader.int(load["loadedUpMs"]),
+                    grade: grade, deltaMs: deltaMs, source: source
+                )
+            }
+            gameAndCalls = ExperienceGameResult(
+                state: state, reason: Reader.reason(test), probeMethod: Reader.string(test["probeMethod"]),
+                medianMs: Reader.int(test["medianMs"]), jitterMs: Reader.number(test["jitterMs"]), maxMs: Reader.int(test["maxMs"]),
+                spikeCount: Reader.int(test["spikeCount"]).map(Int.init), spikeShare: Reader.number(test["spikeShare"]),
+                series: (Reader.values(test["series"]) ?? []).compactMap { Reader.int($0).map(Int.init) }, underLoad: underLoad
+            )
+        }
+        if let test = Reader.object(served[ExperienceTestKind.upload.rawValue]), let state = Reader.state(test) {
+            upload = ExperienceUploadResult(state: state, reason: Reader.reason(test), items: Reader.array(test["items"]).compactMap { item in
+                guard let kind = Reader.string(item["kind"]).flatMap(ExperienceUploadItem.Kind.init(rawValue:)),
+                      let bytes = Reader.int(item["bytes"]), let totalMs = Reader.int(item["totalMs"]) else { return nil }
+                return ExperienceUploadItem(kind: kind, bytes: bytes, totalMs: totalMs)
+            })
+        }
+    }
+}
+
+/// Lecture tolérante des valeurs servies : un entier JSON, une chaîne, un objet.
+private enum ExperienceServedReader {
+    static func object(_ value: JSONValue?) -> [String: JSONValue]? {
+        if case .object(let object)? = value { return object }
+        return nil
+    }
+
+    static func values(_ value: JSONValue?) -> [JSONValue]? {
+        if case .array(let array)? = value { return array }
+        return nil
+    }
+
+    static func array(_ value: JSONValue?) -> [[String: JSONValue]] {
+        (values(value) ?? []).compactMap { object($0) }
+    }
+
+    static func string(_ value: JSONValue?) -> String? {
+        if case .string(let string)? = value { return string }
+        return nil
+    }
+
+    static func bool(_ value: JSONValue?) -> Bool? {
+        if case .bool(let bool)? = value { return bool }
+        return nil
+    }
+
+    static func number(_ value: JSONValue?) -> Double? {
+        if case .number(let number)? = value, number.isFinite { return number }
+        return nil
+    }
+
+    /// Un entier exact seulement : 41.5 n'est pas une durée en ms.
+    static func int(_ value: JSONValue?) -> Int64? {
+        guard let number = number(value), number == number.rounded(), abs(number) < 9_007_199_254_740_992 else { return nil }
+        return Int64(number)
+    }
+
+    static func state(_ test: [String: JSONValue]) -> ExperienceTestState? {
+        string(test["state"]).flatMap(ExperienceTestState.init(rawValue:))
+    }
+
+    static func reason(_ test: [String: JSONValue]) -> ExperienceStopReason? {
+        string(test["notTestedReason"]).flatMap(ExperienceStopReason.init(rawValue:))
+    }
+
+    static func stalls(_ value: JSONValue?) -> [ExperienceStall]? {
+        values(value).map { items in
+            items.compactMap { object($0) }.compactMap { item in
+                guard let at = int(item["atPlaybackMs"]), let wait = int(item["waitMs"]) else { return nil }
+                return ExperienceStall(atPlaybackMs: at, waitMs: wait)
+            }
+        }
+    }
+}
+
 /// Le corps de `POST /api/experience-tests` (contrat v1 §5 et §6). `isPublic` et
 /// `isVisibleOnMap` ne sont jamais envoyés ; `observedPlmn` non plus (iOS ne l'a pas).
 struct ExperienceSubmission: Equatable, Sendable {

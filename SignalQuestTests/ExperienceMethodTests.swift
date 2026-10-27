@@ -242,6 +242,46 @@ final class ExperienceMethodTests: XCTestCase {
         try XCTUnwrap(JSONSerialization.jsonObject(with: submission.body()) as? [String: Any])
     }
 
+    /// Le test servi par `GET /api/experience-tests/{id}` a la forme de l'envoi : relu,
+    /// il redonne le résultat envoyé (jitter arrondi une fois, comme à l'envoi).
+    func testServedTestsReadBackAsTheSentResult() throws {
+        var tests = ExperienceTestsResult()
+        tests.videoLadder = ExperienceLadderResult(state: .measured, rungs: [
+            ExperienceRung(quality: .p480, state: .measured, startupMs: 640, bufferMinMs: 1_800, bufferAvgMs: 6_200, receivedBps: 3_600_000, bytes: 1_875_000),
+            ExperienceRung(quality: .p720, state: .abandoned, startupMs: 900, stalls: [.init(atPlaybackMs: 6_000, waitMs: 6_100)], bytes: 2_000_000),
+            ExperienceRung(quality: .p1080, state: .notTested)
+        ])
+        tests.videoAdaptive = ExperienceAdaptiveResult(state: .measured, playbackMs: 60_000, startupMs: 700,
+                                                       timeByQualityMs: [.p480: 4_000, .p1080: 56_000], switchesUp: 2, switchesDown: 1,
+                                                       stalls: [.init(atPlaybackMs: 8_000, waitMs: 500)],
+                                                       score: ExperienceVideoScore(total: 67, quality: 70, smoothness: -5, startup: 2))
+        tests.webPage = ExperienceWebResult(state: .measured, pageBytes: 2_300_000, parallelRequests: 6, openings: [
+            ExperienceWebOpening(measured: true, protocolName: "h2", freshConnection: true, dnsMs: 12, dnsCached: false, connectMs: 30,
+                                 tlsMs: 40, firstByteMs: 120, contentMs: 900, totalMs: 1_102),
+            ExperienceWebOpening(measured: false),
+            ExperienceWebOpening(measured: true, protocolName: "h3", freshConnection: false, totalMs: 1_800)
+        ])
+        tests.gameAndCalls = ExperienceGameResult(state: .measured, probeMethod: "tcp_connect", medianMs: 41, jitterMs: 6, maxMs: 180,
+                                                  spikeCount: 1, spikeShare: 0.25, series: [41, 39, 44, 180],
+                                                  underLoad: ExperienceUnderLoad(idleMs: 40, loadedDownMs: 90, loadedUpMs: nil, grade: "B",
+                                                                                 deltaMs: 50, source: .recentSpeedtest))
+        tests.upload = ExperienceUploadResult(state: .interrupted, reason: .networkChanged, items: [
+            ExperienceUploadItem(kind: .photo, bytes: 5_000_000, totalMs: 1_200)
+        ])
+        let sent = try JSONSerialization.data(withJSONObject: ExperienceSubmission.tests(tests))
+        let served = try JSONDecoder().decode([String: JSONValue].self, from: sent)
+        XCTAssertEqual(ExperienceTestsResult(served: served), tests)
+
+        // Un test d'état inconnu est laissé de côté, une valeur non entière reste absente.
+        let odd = try JSONDecoder().decode([String: JSONValue].self, from: Data("""
+        {"webPage":{"state":"cap"},"gameAndCalls":{"state":"measured","medianMs":41.5,"series":[41,"x",39]}}
+        """.utf8))
+        let read = ExperienceTestsResult(served: odd)
+        XCTAssertNil(read.webPage)
+        XCTAssertNil(read.gameAndCalls?.medianMs)
+        XCTAssertEqual(read.gameAndCalls?.series, [41, 39])
+    }
+
     func testBodyFollowsTheContract() throws {
         var tests = ExperienceTestsResult()
         tests.videoLadder = ExperienceLadderResult(state: .measured, rungs: [
