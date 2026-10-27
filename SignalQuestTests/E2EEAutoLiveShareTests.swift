@@ -190,6 +190,44 @@ final class E2EEAutoLiveShareTests: XCTestCase {
         XCTAssertEqual(try restored.claimCounter(ownerScopeId: owner, conversationId: conversation, sessionId: session, nowMs: 6), 43)
     }
 
+    /// Cycle de vie v2 servi (#789) : la session telle que Prisma la renvoie, sans
+    /// texte ni position, se lit à la création (demande et offre) et à l'acceptation.
+    func testServedV2LifecycleResponsesAreRead() throws {
+        let conversationId = "conversation_01J7ABCD23456789"
+        func session(_ id: String, status: String) -> [String: Any] {
+            [
+                "id": id, "conversationId": conversationId,
+                "requesterId": "user_alice_01J7ABCD23456789", "sharerId": "user_bruno_01J7ABCD2345678",
+                "status": status, "e2eeV2Required": true, "message": NSNull(), "lastPayload": NSNull(),
+                "lastLocation": NSNull(), "lastUpdateAt": NSNull(),
+                "acceptedAt": status == "active" ? "2026-10-27T20:40:00.000Z" : NSNull(), "endedAt": NSNull(),
+                "expiresAt": "2026-10-27T21:40:00.000Z", "purgeAfter": NSNull(), "endedById": NSNull(),
+                "createdAt": "2026-10-27T20:40:00.000Z", "updatedAt": "2026-10-27T20:40:00.000Z",
+            ]
+        }
+        for status in ["pending", "active"] {
+            let served = session("live_0123456789abcdef", status: status)
+            let created = try JSONSerialization.data(withJSONObject: [
+                "mode": "targeted", "createdCount": 1, "skippedCount": 0, "sessions": [served], "session": served,
+            ])
+            let sessions = try XCTUnwrap(E2EEV2LiveShareTransportClient.parseCreateResponseContractPreview(
+                created, expectedConversationId: conversationId
+            ), status)
+            XCTAssertEqual(sessions.map(\.status), [status])
+            XCTAssertEqual(try JSONDecoder.signalQuest.decode(LiveShareCreateResponse.self, from: created).sessions.first?.e2eeV2Required, true)
+        }
+        let accepted = try JSONSerialization.data(withJSONObject: ["session": session("live_0123456789abcdef", status: "active")])
+        XCTAssertNotNil(E2EEV2LiveShareTransportClient.parseAcceptResponseContractPreview(
+            accepted, expectedSessionId: "live_0123456789abcdef"
+        ))
+        // Une session qui porterait une position en clair n'est jamais lue.
+        var leaked = session("live_0123456789abcdef", status: "active")
+        leaked["lastLocation"] = "{\"lat\":48}"
+        XCTAssertNil(E2EEV2LiveShareTransportClient.parseAcceptResponseContractPreview(
+            try JSONSerialization.data(withJSONObject: ["session": leaked]), expectedSessionId: "live_0123456789abcdef"
+        ))
+    }
+
     /// Un refus n'est pas retenu par le serveur : l'enveloppe en attente est
     /// abandonnée ; réseau, cadence et erreurs serveur la gardent.
     func testRefusedPendingIsDroppedAndEpochRefusalsAreNotTerminal() {

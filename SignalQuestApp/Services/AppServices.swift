@@ -837,6 +837,8 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         }
     }
 
+    /// Vrai quand la demande est acceptée par le serveur.
+    @discardableResult
     func create(
         conversationId: String,
         e2eeEnabled: Bool,
@@ -846,8 +848,8 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         mode: String?,
         targetUserId: String?,
         targetUserIds: [String]
-    ) async {
-        guard !isBusy else { return }
+    ) async -> Bool {
+        guard !isBusy else { return false }
         let generation = activateAccount(currentUserId)
         isBusy = true
         defer { isBusy = false }
@@ -864,14 +866,16 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 mobileCountryCode: plmn.mcc,
                 mobileNetworkCode: plmn.mnc
             )
-            guard isCurrentAccount(currentUserId, generation: generation) else { return }
+            guard isCurrentAccount(currentUserId, generation: generation) else { return false }
             terminalPublishFailures.subtract(response.sessions.map(\.id))
             merge(response.sessions)
             errorMessage = nil
             syncRuntime()
+            return true
         } catch {
             errorMessage = error.userFacingMessage
             Haptics.error()
+            return false
         }
     }
 

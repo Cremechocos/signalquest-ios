@@ -777,7 +777,9 @@ struct ConversationDetailView: View {
                     coordinator: services.liveShare,
                     conversation: conversation,
                     currentUserId: currentUserId,
-                    subtitle: String(localized: "Ta position et ton réseau, en continu, dans \(conversationTitle).")
+                    subtitle: String(localized: "Ta position et ton réseau, en continu, dans \(conversationTitle)."),
+                    isV2: conversationIsV2,
+                    sendText: { await sendLiveShareText($0) }
                 )
             }
         }
@@ -3917,6 +3919,17 @@ struct ConversationDetailView: View {
         seedComposer(draftAutosaver?.text ?? "")
     }
 
+    /// Texte d'une demande de partage en conversation v2 : un message v2 à part,
+    /// envoyé après la demande (E2EE-AUTO §7.6), sans toucher au champ de saisie.
+    private func sendLiveShareText(_ text: String) async {
+        let localId = "local-\(UUID().uuidString)"
+        let ttl = ephemeralTTL
+        pendingSends[localId] = PendingSend(text: text, replyToId: nil, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
+        sendStatus[localId] = .sending
+        messages = Self.normalized(messages + [makeOptimisticMessage(id: localId, text: text, replyToId: nil, ttlSeconds: ttl)])
+        await performSend(localId: localId)
+    }
+
     private func send(_ rawText: String) async {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         // Des pièces jointes attendent : elles partent, le texte en légende.
@@ -5355,6 +5368,10 @@ private struct LiveShareManagementSheet: View {
     let conversation: MessageConversation
     let currentUserId: String
     let subtitle: String
+    /// Conversation v2 : la demande est signée et ne porte aucun texte ; il part en
+    /// message v2 après elle (§7.6).
+    let isV2: Bool
+    let sendText: (String) async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var message = ""
@@ -5366,12 +5383,16 @@ private struct LiveShareManagementSheet: View {
         coordinator: ConversationLiveShareCoordinator,
         conversation: MessageConversation,
         currentUserId: String,
-        subtitle: String
+        subtitle: String,
+        isV2: Bool,
+        sendText: @escaping (String) async -> Void
     ) {
         self.coordinator = coordinator
         self.conversation = conversation
         self.currentUserId = currentUserId
         self.subtitle = subtitle
+        self.isV2 = isV2
+        self.sendText = sendText
         let targets = conversation.participants.filter { $0.userId != currentUserId }
         _mode = State(initialValue: conversation.isGroup ? "broadcast" : "targeted")
         _selectedTargetId = State(initialValue: targets.first?.userId ?? "")
@@ -5530,18 +5551,21 @@ private struct LiveShareManagementSheet: View {
         let targetIds = conversation.isGroup && mode == "broadcast"
             ? Array(selectedBroadcastIds).sorted()
             : []
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
-            await coordinator.create(
+            let created = await coordinator.create(
                 conversationId: conversation.id,
-                e2eeEnabled: conversation.e2eeEnabled == true,
+                e2eeEnabled: conversation.e2eeEnabled == true || isV2,
                 currentUserId: currentUserId,
                 offerShare: offerShare,
-                message: message,
+                message: isV2 ? nil : text,
                 mode: conversation.isGroup ? mode : nil,
                 targetUserId: targetId,
                 targetUserIds: targetIds
             )
-            if coordinator.errorMessage == nil { message = "" }
+            guard created else { return }
+            message = ""
+            if isV2, !text.isEmpty { await sendText(text) }
         }
     }
 }
