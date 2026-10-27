@@ -9104,12 +9104,36 @@ enum E2EEV2HistoryMigrationContract {
               validOpaque(source.messageId),
               validOpaque(source.senderId),
               kinds.contains(source.kind),
-              source.content.count <= 256 * 1_024,
-              source.metadata.map({ $0.count <= 256 * 1_024 }) ?? true,
-              !source.createdAt.isEmpty,
-              source.replyToId.map(validOpaque) ?? true else {
+              // Longueurs en unités UTF-16, comme `length` côté serveur.
+              source.content.utf16.count <= 256 * 1_024,
+              source.metadata.map({ $0.utf16.count <= 256 * 1_024 }) ?? true,
+              isDate(source.createdAt),
+              source.editedAt.map(isDate) ?? true,
+              source.replyToId.map(validOpaque) ?? true,
+              source.expiresAt.map(isDate) ?? true else {
             throw E2EEV2MessageCryptoError.invalidContext
         }
+    }
+
+    /// Date ISO 8601 de 20 à 40 caractères, comme `isIsoDate` du serveur
+    /// (E2EE-AUTO §8, cas `sourceInvalid` de `history-import-v1`).
+    private static func isDate(_ value: String) -> Bool { date(value) != nil }
+
+    static func date(_ value: String) -> Date? {
+        guard (20...40).contains(value.utf16.count) else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    /// Pièces jointes que la source v1 décrit dans ses métadonnées riches.
+    static func attachmentCount(_ source: E2EEV2LegacyMessageSource) -> Int {
+        guard let metadata = source.metadata?.data(using: .utf8),
+              let binding = try? JSONDecoder().decode(RichMetadataAttachmentBinding.self, from: metadata),
+              binding.version == version else { return 0 }
+        return binding.attachments.count
     }
 
     private struct RichMetadataAttachmentBinding: Decodable {

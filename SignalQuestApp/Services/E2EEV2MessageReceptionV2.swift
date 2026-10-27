@@ -236,6 +236,8 @@ struct E2EEV2ReceivedMessageV2: Equatable, Sendable {
     let fk: Data
     /// Heure d'effacement d'un message éphémère, ou nil.
     let expiresAtMs: Int64?
+    /// E2EE-AUTO §8 : lecture d'un import, ou d'un message servi comme tel.
+    var historyImport: E2EEAutoHistoryImport.Record? = nil
 }
 
 enum E2EEV2MessageReceptionV2: Equatable, Sendable {
@@ -490,8 +492,11 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
                 ? counted(.unsupported(messageRef: messageRef, senderUserId: message.senderUserId))
                 : counted(.rejected("invalid-e2ee-payload"))
         }
-        // Compteur de la charge égal à celui de l'AAD ; jalon A : aucun blob.
-        guard payload.counter == envelope.counter, envelope.encryptedBlobIds.isEmpty else {
+        // Compteur de la charge égal à celui de l'AAD ; jalon A : aucun blob,
+        // sauf ceux d'un import, contrôlés avec lui (E2EE-AUTO §8).
+        let isImport: Bool
+        if case .historyImport = payload.body { isImport = true } else { isImport = false }
+        guard payload.counter == envelope.counter, isImport || envelope.encryptedBlobIds.isEmpty else {
             return counted(.rejected("invalid-e2ee-payload"))
         }
         // D.16 : `delivery` convient au `kind`, `notifyUserId` seulement pour un ADD.
@@ -507,7 +512,13 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
             payload: payload, payloadBytes: opened.payloadBytes, fk: opened.fk,
             // Horloge signée de l'émetteur seule : le serveur ne peut ni
             // prolonger ni effacer en silence un message éphémère.
-            expiresAtMs: ttlMs > 0 ? payload.sentAtMs + ttlMs : nil
+            expiresAtMs: ttlMs > 0 ? payload.sentAtMs + ttlMs : nil,
+            historyImport: E2EEAutoHistoryImport.record(
+                payload: payload, conversationId: context.conversationId,
+                importedFromMessageId: message.importedFromMessageId, encryptedBlobIds: envelope.encryptedBlobIds,
+                importerPlatform: context.devices.devicesByUser[message.senderUserId]?
+                    .first { $0.deviceId == message.senderDeviceId }?.platform
+            )
         )))
     }
 }
@@ -519,7 +530,7 @@ enum E2EEV2MessageAuthorization {
     static func allows(_ message: E2EEV2ReceivedMessageV2, targetAuthorUserId: String?) -> Bool {
         switch message.payload.body {
         // Une réaction vient de n'importe quel membre (D.16).
-        case .text, .reaction: return true
+        case .text, .reaction, .historyImport: return true
         case .edit, .delete: return targetAuthorUserId == message.senderUserId
         }
     }

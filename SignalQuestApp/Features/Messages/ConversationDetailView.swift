@@ -106,6 +106,7 @@ struct ConversationDetailView: View {
     @State private var v2Resolved = false
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
+    @State private var v2Imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
     @State private var v2LoadInFlight = false
     @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
@@ -472,6 +473,9 @@ struct ConversationDetailView: View {
                                         .padding(.vertical, SQSpace.sm)
                                         .accessibilityIdentifier("conversation.stamp")
                                 }
+                                if v2Imports[message.id]?.startsBlock == true {
+                                    E2EEAutoImportedHistoryHeader()
+                                }
                                 if let unreadDivider, unreadDivider.messageId == message.id {
                                     unreadDividerRow(unreadDivider)
                                 }
@@ -482,6 +486,9 @@ struct ConversationDetailView: View {
                                     isGroupEnd: isGroupEnd(message, next: next) || nextHasCalls,
                                     showsTime: showsTime(message, next: next) || nextHasCalls
                                 )
+                                if let label = v2Imports[message.id] {
+                                    E2EEAutoImportCaption(label: label, isMine: message.senderId == currentUserId)
+                                }
                                 if message.id == receiptMessageId {
                                     readReceiptFooter(for: message)
                                 }
@@ -2968,6 +2975,7 @@ struct ConversationDetailView: View {
             let next = confirmed.isEmpty ? merged : merged.filter { !confirmed.contains($0.id) }
             if next != messages { messages = next }
             v2Notices = presentation.notices
+            if v2Imports != presentation.imports { v2Imports = presentation.imports }
             v2LastIncomingEnvelopeId = presentation.lastIncomingEnvelopeId
             computeUnreadDividerIfNeeded()
             Task { await acknowledgeDelivery() }

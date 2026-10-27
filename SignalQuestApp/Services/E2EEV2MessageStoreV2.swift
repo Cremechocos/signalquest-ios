@@ -25,7 +25,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let serverTagB64: String
         let keyId: String
         let frankTagB64: String
-        /// `TEXT`, `EDIT`, `DELETE` ou `REACTION` ; seuls les `TEXT` s'affichent.
+        /// `TEXT`, `EDIT`, `DELETE`, `REACTION` ou `HISTORY_IMPORT` ; seuls les
+        /// `TEXT` et les imports s'affichent.
         let kind: String
         let targetRef: String?
         let replyToRef: String?
@@ -42,6 +43,9 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         /// Réaction (D.16) : son emoji et `ADD` ou `REMOVE`. Absents des fichiers plus anciens.
         var emoji: String? = nil
         var reactionAction: String? = nil
+        /// Import d'un message v1 (E2EE-AUTO §8) : sa source vérifiée, ou
+        /// « illisible ». Jamais de texte : l'import n'est pas un dernier message.
+        var historyImport: E2EEAutoHistoryImport.Record? = nil
     }
 
     struct Reaction: Equatable, Sendable {
@@ -59,6 +63,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         /// Réactions actives par message affiché non supprimé, dans l'ordre de leur ajout.
         var reactions: [String: [Reaction]] = [:]
     }
+
+    static let importKind = "HISTORY_IMPORT"
 
     /// Plafond d'emojis actifs par (utilisateur, cible) : un 21e `ADD` est ignoré (D.16).
     static let maxReactionsPerUser = 20
@@ -103,7 +109,10 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         // page suivante (relecture Android du 04/10).
         if file != stored { try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId) }
         let visible = file.messages.values
-            .filter { $0.kind == "TEXT" && !file.equivocal.contains($0.messageRef) && ($0.expiresAtMs.map { $0 > nowMs } ?? true) }
+            .filter {
+                ["TEXT", Self.importKind].contains($0.kind) && !file.equivocal.contains($0.messageRef)
+                    && ($0.expiresAtMs.map { $0 > nowMs } ?? true)
+            }
             .sorted { $0.sequence < $1.sequence }
         return Snapshot(
             cursor: file.cursor, messages: visible, equivocalRefs: file.equivocal,
@@ -174,17 +183,23 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             case .reaction(let ref, let emoji, let action):
                 (target, text) = (ref, nil)
                 reaction = (emoji, action.rawValue)
+            case .historyImport:
+                (target, text) = (nil, nil)
             }
+            // Un message servi comme import sans en être un reste un import, illisible.
+            let isImport = message.historyImport != nil
             file.messages[message.messageRef] = Stored(
                 messageRef: message.messageRef, envelopeId: message.envelopeId, sequence: message.sequence,
                 senderUserId: message.senderUserId, senderDeviceId: message.senderDeviceId,
                 clientRequestId: message.clientRequestId, epochNumber: message.epochNumber,
                 serverTimeMs: message.serverTimeMs, serverTagB64: message.serverTagB64, keyId: message.keyId,
-                frankTagB64: message.frankTagB64, kind: message.payload.body.kind, targetRef: target,
+                frankTagB64: message.frankTagB64, kind: isImport ? Self.importKind : message.payload.body.kind,
+                targetRef: isImport ? nil : target,
                 replyToRef: message.payload.replyToRef, sentAtMs: message.payload.sentAtMs,
                 expiresAtMs: message.expiresAtMs, payloadB64: message.payloadBytes.base64EncodedString(),
                 fkB64: message.fk.base64EncodedString(), text: text, editedAtMs: nil, deleted: false,
-                emoji: reaction?.emoji, reactionAction: reaction?.action
+                emoji: isImport ? nil : reaction?.emoji, reactionAction: isImport ? nil : reaction?.action,
+                historyImport: message.historyImport
             )
             touched.insert(target ?? message.messageRef)
         }
@@ -365,7 +380,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     private static func text(of message: E2EEV2ReceivedMessageV2) -> String? {
         switch message.payload.body {
         case .text(let value), .edit(_, let value): return value
-        case .delete, .reaction: return nil
+        case .delete, .reaction, .historyImport: return nil
         }
     }
 

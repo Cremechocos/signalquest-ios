@@ -1,0 +1,212 @@
+import XCTest
+@testable import SignalQuest
+
+/// E2EE-AUTO §8 : lecture d'un message v1 importé (`HISTORY_IMPORT`), vecteur
+/// `history-import-v1` ; place et mentions dans le fil.
+final class E2EEAutoHistoryImportTests: XCTestCase {
+    private func vector() throws -> [String: Any] {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/e2ee-auto/history-import-v1.json")
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    }
+
+    private func str(_ dictionary: [String: Any], _ key: String) throws -> String {
+        try XCTUnwrap(dictionary[key] as? String, "clé \(key)")
+    }
+
+    private func importBody(_ payload: E2EEV2ContentPayloadV2) -> E2EEV2HistoryImportBody? {
+        if case .historyImport(let body) = payload.body { return body }
+        return nil
+    }
+
+    func testValidImportsAreReadToTheByteAndVerified() throws {
+        let v = try vector()
+        let cases = try XCTUnwrap(v["valid"] as? [[String: Any]])
+        XCTAssertEqual(cases.map { $0["case"] as? String }, ["text", "attachment"])
+        for item in cases {
+            let name = try str(item, "case")
+            let bytes = Data(try str(item, "payloadUtf8").utf8)
+            let payload = try E2EEV2ContentPayloadV2.parse(bytes)
+            XCTAssertEqual(try payload.encoded(), bytes, "réencodé à l'octet : \(name)")
+            XCTAssertEqual(payload.body.kind, "HISTORY_IMPORT")
+            let body = try XCTUnwrap(importBody(payload), name)
+            XCTAssertEqual(body.sourceHash, try str(item, "sourceHash"), name)
+            let sourceData = try JSONSerialization.data(withJSONObject: try XCTUnwrap(item["source"]))
+            let expected = try JSONDecoder().decode(E2EEV2LegacyMessageSource.self, from: sourceData)
+            let source = E2EEAutoHistoryImport.verify(
+                body, conversationId: try str(item, "conversationId"),
+                importedFromMessageId: try str(item, "importedFromMessageId"),
+                encryptedBlobIds: body.attachments.map(\.blobId)
+            )
+            XCTAssertEqual(source, expected, name)
+            XCTAssertEqual(
+                try E2EEV2HistoryMigrationContract.clientRequestId(messageId: expected.messageId, sourceHash: body.sourceHash),
+                try str(item, "clientRequestId"), name
+            )
+        }
+    }
+
+    func testRefusalsAreMalformedOrUnreadableAsTheVectorSays() throws {
+        let v = try vector()
+        let cases = try XCTUnwrap(v["negative"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 13)
+        for item in cases {
+            let name = try str(item, "case")
+            let bytes = Data(try str(item, "payloadUtf8").utf8)
+            switch try str(item, "expected") {
+            case "MALFORMED":
+                XCTAssertThrowsError(try E2EEV2ContentPayloadV2.parse(bytes), name)
+                XCTAssertFalse(E2EEV2ContentPayloadV2.isUnsupported(bytes), "nature connue, forme refusée : \(name)")
+            case "UNREADABLE_IMPORT":
+                let body = try XCTUnwrap(importBody(try E2EEV2ContentPayloadV2.parse(bytes)), name)
+                XCTAssertNil(E2EEAutoHistoryImport.verify(
+                    body, conversationId: try str(item, "conversationId"),
+                    importedFromMessageId: try str(item, "importedFromMessageId"),
+                    encryptedBlobIds: body.attachments.map(\.blobId)
+                ), name)
+            default:
+                XCTFail("issue inconnue : \(name)")
+            }
+        }
+    }
+
+    /// Révision 16 : les blobs de l'enveloppe sont exactement les pièces citées.
+    func testEnvelopeBlobsMustMatchTheAttachments() throws {
+        let item = try XCTUnwrap((try vector()["valid"] as? [[String: Any]])?.last)
+        let body = try XCTUnwrap(importBody(try E2EEV2ContentPayloadV2.parse(Data(try str(item, "payloadUtf8").utf8))))
+        let verify = { (blobs: [String]) in
+            E2EEAutoHistoryImport.verify(
+                body, conversationId: try self.str(item, "conversationId"),
+                importedFromMessageId: try self.str(item, "importedFromMessageId"), encryptedBlobIds: blobs
+            )
+        }
+        XCTAssertNotNil(try verify(["opaque_blob_fixture_0123456789"]))
+        XCTAssertNil(try verify([]))
+        XCTAssertNil(try verify(["opaque_blob_fixture_0123456789", "opaque_blob_fixture_9876543210"]))
+        XCTAssertNil(E2EEAutoHistoryImport.verify(
+            body, conversationId: try str(item, "conversationId"), importedFromMessageId: nil,
+            encryptedBlobIds: ["opaque_blob_fixture_0123456789"]
+        ), "sans importedFromMessageId servi : illisible")
+    }
+
+    /// Un message ordinaire servi avec `importedFromMessageId` est illisible de même.
+    func testAnOrdinaryMessageServedAsAnImportIsUnreadable() throws {
+        let text = E2EEV2ContentPayloadV2(sentAtMs: 1, counter: 1, replyToRef: nil, mentions: [], body: .text("Salut"))
+        XCTAssertNil(E2EEAutoHistoryImport.record(
+            payload: text, conversationId: "conversation_1234567890", importedFromMessageId: nil,
+            encryptedBlobIds: [], importerPlatform: "ios"
+        ))
+        let served = try XCTUnwrap(E2EEAutoHistoryImport.record(
+            payload: text, conversationId: "conversation_1234567890", importedFromMessageId: "message_123456789012",
+            encryptedBlobIds: [], importerPlatform: "ios"
+        ))
+        XCTAssertNil(served.source)
+    }
+
+    // MARK: Fil
+
+    private let conversationId = "conversation_1234567890"
+    private let alice = MessageUser(id: "user_alice_01J7ABCD23456789", name: "Alice", email: "alice@example.test", avatarUrl: nil)
+    private let bruno = MessageUser(id: "user_bruno_01J7ABCD23456789", name: "Bruno", email: "bruno@example.test", avatarUrl: nil)
+
+    private func source(_ messageId: String, sender: String, createdAt: String, content: String, kind: String = "TEXT",
+                        replyTo: String? = nil) -> E2EEV2LegacyMessageSource {
+        E2EEV2LegacyMessageSource(
+            version: 1, conversationId: conversationId, messageId: messageId, senderId: sender, kind: kind,
+            content: content, metadata: nil, createdAt: createdAt, editedAt: nil, replyToId: replyTo, expiresAt: nil
+        )
+    }
+
+    private func stored(
+        _ ref: String, sequence: Int64, sender: String, text: String?, serverTimeMs: Int64,
+        historyImport: E2EEAutoHistoryImport.Record? = nil
+    ) -> E2EEV2MessageStoreV2.Stored {
+        E2EEV2MessageStoreV2.Stored(
+            messageRef: ref, envelopeId: "envelope_\(sequence)_0000000000", sequence: sequence, senderUserId: sender,
+            senderDeviceId: "device_\(sender)", clientRequestId: "message_\(sequence)_0000000000", epochNumber: 1,
+            serverTimeMs: serverTimeMs, serverTagB64: "", keyId: "server_tag_key_01J7ABCD",
+            frankTagB64: "", kind: historyImport == nil ? "TEXT" : "HISTORY_IMPORT", targetRef: nil, replyToRef: nil,
+            sentAtMs: serverTimeMs, expiresAtMs: nil, payloadB64: nil, fkB64: nil, text: text, editedAtMs: nil,
+            deleted: false, historyImport: historyImport
+        )
+    }
+
+    func testImportsFormABlockBeforeEveryOtherMessage() {
+        let genesis: Int64 = 1_790_000_000_000
+        let recent = stored("ref_recent_000000000000000000000000000001", sequence: 1, sender: alice.id, text: "Après la bascule",
+                            serverTimeMs: genesis)
+        // Arrivés après le message récent, dans le désordre de leurs dates d'origine.
+        let later = stored("ref_import_b_0000000000000000000000000002", sequence: 2, sender: bruno.id, text: nil,
+                           serverTimeMs: genesis + 5_000, historyImport: .init(
+                               source: source("message_v1_bbbbbbbbbbbb", sender: alice.id, createdAt: "2026-08-23T00:05:00.000Z",
+                                              content: "Réponse", replyTo: "message_v1_aaaaaaaaaaaa"),
+                               missingAttachments: 0, importerPlatform: "android"))
+        let earlier = stored("ref_import_a_0000000000000000000000000003", sequence: 3, sender: bruno.id, text: nil,
+                             serverTimeMs: genesis + 6_000, historyImport: .init(
+                                 source: source("message_v1_aaaaaaaaaaaa", sender: "user_gone_01J7ABCD234567890",
+                                                createdAt: "2026-08-23T00:00:00.000Z", content: "Bonjour"),
+                                 missingAttachments: 0, importerPlatform: "android"))
+        let unreadable = stored("ref_import_x_0000000000000000000000000004", sequence: 4, sender: bruno.id, text: nil,
+                                serverTimeMs: genesis + 7_000, historyImport: .init(
+                                    source: nil, missingAttachments: 0, importerPlatform: nil))
+        let attachment = stored("ref_import_c_0000000000000000000000000005", sequence: 5, sender: bruno.id, text: nil,
+                                serverTimeMs: genesis + 8_000, historyImport: .init(
+                                    source: source("message_v1_cccccccccccc", sender: bruno.id,
+                                                   createdAt: "2026-08-23T00:10:00.000Z", content: "", kind: "ATTACHMENT"),
+                                    missingAttachments: 1, importerPlatform: "ios"))
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 5, messages: [recent, later, earlier, unreadable, attachment], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:]
+        )
+        XCTAssertEqual(thread.messages.map(\.id), [earlier, later, attachment, unreadable, recent].map(\.messageRef))
+        XCTAssertEqual(thread.messages[0].content, "Bonjour")
+        XCTAssertEqual(thread.messages[0].sender?.displayName, "ancien membre", "jamais l'identifiant brut")
+        XCTAssertEqual(thread.messages[1].senderId, alice.id, "sous le nom du compte de la source")
+        XCTAssertEqual(thread.messages[1].replyToId, earlier.messageRef, "la réponse v1 vise l'import de sa cible")
+        XCTAssertEqual(thread.messages[2].content, "pièce jointe non importée")
+        XCTAssertEqual(thread.messages[3].content, "message importé illisible")
+        XCTAssertEqual(thread.messages[3].senderId, bruno.id)
+        // Le fil se trie par date : tout le bloc reste avant le premier message non importé.
+        let dates = thread.messages.compactMap(\.createdAt)
+        XCTAssertEqual(dates.count, 5)
+        XCTAssertTrue(dates.dropLast().allSatisfy { $0 < dates.last! })
+        XCTAssertEqual(thread.messages[0].createdAt, ISO8601DateFormatter().date(from: "2026-08-23T00:00:00Z"))
+
+        XCTAssertEqual(thread.imports.count, 4)
+        XCTAssertEqual(thread.imports[earlier.messageRef]?.importedBy, "importé par Bruno (Android)")
+        XCTAssertEqual(thread.imports[earlier.messageRef]?.startsBlock, true)
+        XCTAssertEqual(thread.imports[later.messageRef]?.startsBlock, false)
+        XCTAssertEqual(thread.imports[unreadable.messageRef]?.importedBy, "importé par Bruno (plateforme inconnue)")
+        XCTAssertEqual(thread.imports[attachment.messageRef]?.missingAttachments, false, "déjà dit dans la bulle")
+        XCTAssertNil(thread.imports[recent.messageRef])
+    }
+
+    /// Un import n'est jamais le dernier message de la liste (E2EE-AUTO §8).
+    func testTheStoreKeepsImportsWithoutText() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = E2EEV2MessageStoreV2(rootURL: root, keyStore: InMemoryTokenStore())
+        let item = try XCTUnwrap((try vector()["valid"] as? [[String: Any]])?.first)
+        let bytes = Data(try str(item, "payloadUtf8").utf8)
+        let payload = try E2EEV2ContentPayloadV2.parse(bytes)
+        let record = E2EEAutoHistoryImport.record(
+            payload: payload, conversationId: conversationId, importedFromMessageId: try str(item, "importedFromMessageId"),
+            encryptedBlobIds: [], importerPlatform: "web"
+        )
+        XCTAssertNotNil(record?.source)
+        let received = E2EEV2ReceivedMessageV2(
+            envelopeId: "envelope_import_0000000001", sequence: 1, messageRef: "ref_import_00000000000000000000000000001",
+            senderUserId: bruno.id, senderDeviceId: "device_bruno_0000000001", clientRequestId: try str(item, "clientRequestId"),
+            epochNumber: 1, frankTagB64: "", serverTagB64: "", serverTimeMs: 1_790_000_000_000, keyId: "server_tag_key_01J7ABCD",
+            payload: payload, payloadBytes: bytes, fk: Data(repeating: 1, count: 32), expiresAtMs: nil, historyImport: record
+        )
+        try store.apply([received], equivocal: [], cursor: 1, conversationId: conversationId, ownerScopeId: "user:me", nowMs: 1)
+        let snapshot = try store.snapshot(conversationId: conversationId, ownerScopeId: "user:me", nowMs: 1)
+        XCTAssertEqual(snapshot.messages.map(\.kind), ["HISTORY_IMPORT"])
+        XCTAssertNil(snapshot.messages.first?.text)
+        XCTAssertEqual(snapshot.messages.first?.historyImport, record)
+    }
+}

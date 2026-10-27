@@ -72,10 +72,12 @@ enum E2EEV2NotificationPresentationPolicy {
         case .edit: fullText = String(localized: "Message chiffré modifié")
         case .delete: fullText = String(localized: "Message chiffré supprimé")
         case .reaction: fullText = String(localized: "Nouvelle réaction chiffrée")
+        // Aucun push n'est envoyé pour un import (E2EE-AUTO §8) : jamais son contenu.
+        case .historyImport: fullText = String(localized: "Nouveau message chiffré")
         }
         var result = presentation(fullText: fullText, privacy: privacy, senderName: senderName)
         switch payload.body {
-        case .edit, .delete: result.playsSound = false
+        case .edit, .delete, .historyImport: result.playsSound = false
         case .text, .reaction: break
         }
         return result

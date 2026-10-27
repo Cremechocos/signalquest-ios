@@ -83,6 +83,18 @@ struct E2EEV2ThreadPresentation: Equatable {
     /// Tous les appareils des membres lisent les réactions chiffrées (D.16) :
     /// sinon ni bouton ni double tap, jamais de repli en clair.
     var reactionsAvailable = false
+    /// Messages v1 importés (E2EE-AUTO §8), par identifiant de `MessageItem`.
+    var imports: [String: ImportLabel] = [:]
+
+    /// Mentions d'un message importé, sous sa bulle.
+    struct ImportLabel: Equatable {
+        /// « importé par <nom> (<plateforme>) ».
+        let importedBy: String
+        /// Pièces de la source qui ne sont pas venues avec l'import.
+        let missingAttachments: Bool
+        /// Premier message du bloc « historique importé ».
+        let startsBlock: Bool
+    }
 }
 
 /// Taille de la fenêtre du fil v2 : les derniers messages d'abord, puis des pages de même taille.
@@ -108,11 +120,29 @@ enum E2EEV2ThreadPresenter {
         limit: Int? = nil,
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2ThreadPresentation {
+        // Les imports forment un bloc placé avant tout message non importé (E2EE-AUTO §8).
+        let ordered = importBlock(result.snapshot.messages) + result.snapshot.messages.filter { $0.historyImport == nil }
         // Le magasin garde jusqu'à des milliers de messages : seuls les derniers deviennent des
         // `MessageItem`, les précédents se présentent par pages (P03).
-        let shown = limit.map { Array(result.snapshot.messages.suffix($0)) } ?? result.snapshot.messages
-        let messages = shown.map { stored in
-            MessageItem(
+        let shown = limit.map { Array(ordered.suffix($0)) } ?? ordered
+        // Le fil se trie par date : le bloc reste avant le premier message non importé.
+        let blockEndMs = (result.snapshot.messages.filter { $0.historyImport == nil }.map(\.serverTimeMs).min() ?? .max) - 1
+        let importRefs = Dictionary(
+            result.snapshot.messages.compactMap { stored in stored.historyImport?.source.map { ($0.messageId, stored.messageRef) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
+        let messages = shown.map { stored -> MessageItem in
+            if let record = stored.historyImport {
+                imports[stored.messageRef] = importLabel(
+                    record, importer: members[stored.senderUserId], startsBlock: stored.messageRef == ordered.first?.messageRef
+                )
+                return importedItem(
+                    stored, record: record, conversationId: conversationId, members: members,
+                    importRefs: importRefs, blockEndMs: blockEndMs
+                )
+            }
+            return MessageItem(
                 id: stored.messageRef,
                 conversationId: conversationId,
                 senderId: stored.senderUserId,
@@ -179,7 +209,78 @@ enum E2EEV2ThreadPresenter {
             messages: messages, notices: notices,
             lastIncomingEnvelopeId: lastIncoming,
             clientRequestIds: Set(result.snapshot.messages.map(\.clientRequestId)),
-            hasOlder: shown.count < result.snapshot.messages.count
+            hasOlder: shown.count < result.snapshot.messages.count,
+            imports: imports
+        )
+    }
+
+    /// Les imports, triés par date de la source puis identifiant v1 ; les
+    /// illisibles à la suite, dans l'ordre du serveur.
+    private static func importBlock(_ stored: [E2EEV2MessageStoreV2.Stored]) -> [E2EEV2MessageStoreV2.Stored] {
+        let imports = stored.filter { $0.historyImport != nil }
+        let readable = imports.filter { $0.historyImport?.source != nil }.sorted { lhs, rhs in
+            let (l, r) = (lhs.historyImport!.source!, rhs.historyImport!.source!)
+            let (ld, rd) = (E2EEV2HistoryMigrationContract.date(l.createdAt), E2EEV2HistoryMigrationContract.date(r.createdAt))
+            return ld == rd ? l.messageId < r.messageId : (ld ?? .distantPast) < (rd ?? .distantPast)
+        }
+        return readable + imports.filter { $0.historyImport?.source == nil }
+    }
+
+    /// Un import sous la forme commune : sous le nom du compte de la source,
+    /// jamais son identifiant brut ; à sa date d'origine, gardée avant le
+    /// premier message non importé.
+    private static func importedItem(
+        _ stored: E2EEV2MessageStoreV2.Stored,
+        record: E2EEAutoHistoryImport.Record,
+        conversationId: String,
+        members: [String: MessageUser],
+        importRefs: [String: String],
+        blockEndMs: Int64
+    ) -> MessageItem {
+        let dateMs = min(blockEndMs, stored.serverTimeMs)
+        guard let source = record.source else {
+            return MessageItem(
+                id: stored.messageRef, conversationId: conversationId, senderId: stored.senderUserId, kind: "TEXT",
+                content: String(localized: "message importé illisible"), e2eeVersion: 2, e2eeIvB64: nil,
+                e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil, createdAt: date(dateMs), editedAt: nil,
+                deletedAt: nil, expiresAt: nil, replyToId: nil, threadReplyCount: nil,
+                sender: members[stored.senderUserId], attachments: [], reactions: []
+            )
+        }
+        let created = E2EEV2HistoryMigrationContract.date(source.createdAt).map { min($0, date(blockEndMs)) } ?? date(dateMs)
+        // Une pièce sans texte n'a plus rien à montrer que sa mention.
+        let attachmentOnly = source.kind == "ATTACHMENT"
+        let content = attachmentOnly && source.content.isEmpty
+            ? String(localized: "pièce jointe non importée") : source.content
+        return MessageItem(
+            id: stored.messageRef, conversationId: conversationId, senderId: source.senderId,
+            kind: attachmentOnly ? "TEXT" : source.kind, content: content, e2eeVersion: 2, e2eeIvB64: nil,
+            e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: attachmentOnly ? nil : source.metadata, createdAt: created,
+            editedAt: source.editedAt.flatMap(E2EEV2HistoryMigrationContract.date), deletedAt: nil, expiresAt: nil,
+            replyToId: source.replyToId.flatMap { importRefs[$0] }, threadReplyCount: nil,
+            sender: members[source.senderId]
+                ?? MessageUser(id: source.senderId, name: String(localized: "ancien membre"), email: "", avatarUrl: nil),
+            attachments: [], reactions: []
+        )
+    }
+
+    private static func importLabel(
+        _ record: E2EEAutoHistoryImport.Record, importer: MessageUser?, startsBlock: Bool
+    ) -> E2EEV2ThreadPresentation.ImportLabel {
+        let name = importer.map(\.displayName).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "ancien membre")
+        let platform: String
+        switch record.importerPlatform {
+        case "ios"?: platform = "iOS"
+        case "android"?: platform = "Android"
+        case "web"?: platform = "Web"
+        default: platform = String(localized: "plateforme inconnue")
+        }
+        let content = record.source?.content ?? ""
+        return .init(
+            importedBy: String(localized: "importé par \(name) (\(platform))"),
+            // Une pièce seule l'a déjà dit dans sa bulle.
+            missingAttachments: record.missingAttachments > 0 && !(record.source?.kind == "ATTACHMENT" && content.isEmpty),
+            startsBlock: startsBlock
         )
     }
 

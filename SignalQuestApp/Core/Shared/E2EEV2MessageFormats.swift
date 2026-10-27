@@ -81,6 +81,8 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
         case delete(targetRef: String)
         /// D.16 : toujours dans une enveloppe v3 en `annotation`.
         case reaction(targetRef: String, emoji: String, action: ReactionAction)
+        /// E2EE-AUTO §8 : un message v1 importé, sans réponse ni mention.
+        case historyImport(E2EEV2HistoryImportBody)
 
         var kind: String {
             switch self {
@@ -88,6 +90,7 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
             case .edit: return "EDIT"
             case .delete: return "DELETE"
             case .reaction: return "REACTION"
+            case .historyImport: return "HISTORY_IMPORT"
             }
         }
     }
@@ -109,6 +112,8 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
             bodyJSON = .object(["targetRef": .string(targetRef)])
         case .reaction(let targetRef, let emoji, let action):
             bodyJSON = .object(["targetRef": .string(targetRef), "emoji": .string(emoji), "action": .string(action.rawValue)])
+        case .historyImport(let value):
+            bodyJSON = value.json
         }
         return .object([
             "schema": .string(Self.schema),
@@ -134,7 +139,7 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
         guard data.count <= maxBytes, let root = (try? E2EEV2CanonicalJSON.parseCanonical(data))?.objectValue,
               root["schema"]?.stringValue == schema, let version = root["version"]?.stringValue,
               let kind = root["kind"]?.stringValue else { return false }
-        return version != "2" || !["TEXT", "EDIT", "DELETE", "REACTION"].contains(kind)
+        return version != "2" || !["TEXT", "EDIT", "DELETE", "REACTION", "HISTORY_IMPORT"].contains(kind)
     }
 
     static func parse(_ data: Data) throws -> E2EEV2ContentPayloadV2 {
@@ -196,10 +201,132 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
                 throw E2EEV2MessageV2Error.invalidPayload
             }
             body = .reaction(targetRef: ref, emoji: emoji, action: action)
+        case "HISTORY_IMPORT":
+            guard replyToRef == nil, mentions.isEmpty, let value = E2EEV2HistoryImportBody.parse(bodyObject) else {
+                throw E2EEV2MessageV2Error.invalidPayload
+            }
+            body = .historyImport(value)
         default:
             throw E2EEV2MessageV2Error.invalidPayload
         }
         return E2EEV2ContentPayloadV2(sentAtMs: sentAt, counter: counter, replyToRef: replyToRef, mentions: mentions, body: body)
+    }
+}
+
+/// E2EE-AUTO §8 : corps d'un `HISTORY_IMPORT`, à clés exactes. Seule sa forme
+/// est vérifiée ici ; la source ne l'est qu'à la lecture, contre la
+/// conversation et `importedFromMessageId` (« message importé illisible »).
+struct E2EEV2HistoryImportBody: Equatable, Sendable {
+    static let maxAttachments = 20
+
+    /// Octets canoniques de la source v1, en base64 standard avec remplissage.
+    let sourceB64: String
+    /// Leur SHA-256, en hexadécimal minuscule.
+    let sourceHash: String
+    let attachments: [E2EEV2HistoryImportAttachment]
+
+    var json: E2EEV2JSON {
+        .object([
+            "sourceB64": .string(sourceB64),
+            "sourceHash": .string(sourceHash),
+            "attachments": .array(attachments.map(\.json)),
+        ])
+    }
+
+    static func parse(_ object: [String: E2EEV2JSON]) -> E2EEV2HistoryImportBody? {
+        guard Set(object.keys) == ["sourceB64", "sourceHash", "attachments"],
+              let source = object["sourceB64"]?.stringValue, let data = Data(base64Encoded: source),
+              !data.isEmpty, data.base64EncodedString() == source,
+              let hash = object["sourceHash"]?.stringValue,
+              hash.range(of: #"^[a-f0-9]{64}\z"#, options: .regularExpression) != nil,
+              let items = object["attachments"]?.arrayValue, items.count <= maxAttachments else { return nil }
+        let attachments = items.compactMap { $0.objectValue.flatMap(E2EEV2HistoryImportAttachment.parse) }
+        guard attachments.count == items.count, Set(attachments.map(\.blobId)).count == attachments.count else { return nil }
+        return .init(sourceB64: source, sourceHash: hash, attachments: attachments)
+    }
+}
+
+/// Manifeste de blob privé A.5 d'une pièce importée : tous ses entiers en
+/// chaînes décimales canoniques, comme le reste de la charge v2.
+struct E2EEV2HistoryImportAttachment: Equatable, Sendable {
+    private static let maxMediaBytes: Int64 = 512 * 1_024 * 1_024
+
+    let blobId: String
+    let mediaKeyB64: String
+    let noncePrefixB64: String
+    let plaintextSize: Int64
+    let ciphertextSize: Int64
+    let plaintextSha256: String
+    let ciphertextSha256: String
+    let fileName: String?
+    let mimeType: String?
+    let width: Int?
+    let height: Int?
+    let durationMs: Int?
+
+    var json: E2EEV2JSON {
+        func optional(_ value: String?) -> E2EEV2JSON { value.map(E2EEV2JSON.string) ?? .null }
+        return .object([
+            "blobId": .string(blobId),
+            "algorithm": .string(E2EEV2BlobCrypto.algorithm),
+            "mediaKeyB64": .string(mediaKeyB64),
+            "noncePrefixB64": .string(noncePrefixB64),
+            "cryptoChunkSize": .string(String(E2EEV2BlobCrypto.cryptoChunkBytes)),
+            "plaintextSize": .string(String(plaintextSize)),
+            "ciphertextSize": .string(String(ciphertextSize)),
+            "plaintextSha256": .string(plaintextSha256),
+            "ciphertextSha256": .string(ciphertextSha256),
+            "fileName": optional(fileName),
+            "mimeType": optional(mimeType),
+            "width": optional(width.map(String.init)),
+            "height": optional(height.map(String.init)),
+            "durationMs": optional(durationMs.map(String.init)),
+        ])
+    }
+
+    static func parse(_ object: [String: E2EEV2JSON]) -> E2EEV2HistoryImportAttachment? {
+        let keys: Set<String> = [
+            "blobId", "algorithm", "mediaKeyB64", "noncePrefixB64", "cryptoChunkSize", "plaintextSize",
+            "ciphertextSize", "plaintextSha256", "ciphertextSha256", "fileName", "mimeType", "width", "height",
+            "durationMs",
+        ]
+        func decimal(_ value: E2EEV2JSON?, _ range: ClosedRange<Int64>) -> Int64? {
+            guard let number = value?.stringValue.flatMap(E2EEV2Canonical.safeInteger), range.contains(number) else { return nil }
+            return number
+        }
+        /// Absent (`null`) ou dans `range` ; `.some(nil)` pour `null`, `nil` si refusé.
+        func optionalDecimal(_ value: E2EEV2JSON?, _ range: ClosedRange<Int64>) -> Int?? {
+            if case .null? = value { return .some(nil) }
+            return decimal(value, range).map { .some(Int($0)) }
+        }
+        func optionalText(_ value: E2EEV2JSON?, max: Int) -> String?? {
+            if case .null? = value { return .some(nil) }
+            guard let text = value?.stringValue, text.utf16.count <= max else { return nil }
+            return .some(text)
+        }
+        let hash = #"^[a-f0-9]{64}\z"#
+        guard Set(object.keys) == keys,
+              let blobId = object["blobId"]?.stringValue, E2EEV2Canonical.isOpaque(blobId),
+              object["algorithm"]?.stringValue == E2EEV2BlobCrypto.algorithm,
+              let mediaKey = E2EEV2SignedMessageEnvelopeV2.base64(object["mediaKeyB64"], 32...32),
+              let noncePrefix = E2EEV2SignedMessageEnvelopeV2.base64(object["noncePrefixB64"], 8...8),
+              decimal(object["cryptoChunkSize"], Int64(E2EEV2BlobCrypto.cryptoChunkBytes)...Int64(E2EEV2BlobCrypto.cryptoChunkBytes)) != nil,
+              let plaintextSize = decimal(object["plaintextSize"], 0...maxMediaBytes),
+              let ciphertextSize = decimal(object["ciphertextSize"], 16...(maxMediaBytes + 64 * 1_024)),
+              let plaintextSha256 = object["plaintextSha256"]?.stringValue,
+              plaintextSha256.range(of: hash, options: .regularExpression) != nil,
+              let ciphertextSha256 = object["ciphertextSha256"]?.stringValue,
+              ciphertextSha256.range(of: hash, options: .regularExpression) != nil,
+              let fileName = optionalText(object["fileName"], max: 512),
+              let mimeType = optionalText(object["mimeType"], max: 255),
+              let width = optionalDecimal(object["width"], 1...100_000),
+              let height = optionalDecimal(object["height"], 1...100_000),
+              let durationMs = optionalDecimal(object["durationMs"], 0...86_400_000) else { return nil }
+        return .init(
+            blobId: blobId, mediaKeyB64: mediaKey, noncePrefixB64: noncePrefix, plaintextSize: plaintextSize,
+            ciphertextSize: ciphertextSize, plaintextSha256: plaintextSha256, ciphertextSha256: ciphertextSha256,
+            fileName: fileName, mimeType: mimeType, width: width, height: height, durationMs: durationMs
+        )
     }
 }
 
@@ -326,7 +453,7 @@ enum E2EEV2MessageCryptoV2 {
     /// qui notifier. Une enveloppe v2 est un `message` sans notification.
     static func checkDelivery(context: E2EEV2MessageContextV2, payload: E2EEV2ContentPayloadV2) throws {
         switch payload.body {
-        case .text:
+        case .text, .historyImport:
             guard context.delivery == .message else { throw E2EEV2MessageV2Error.invalidEnvelope }
         case .reaction:
             guard context.delivery == .annotation else { throw E2EEV2MessageV2Error.invalidEnvelope }
@@ -665,9 +792,12 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
     let serverTagB64: String
     let serverTimeMs: Int64
     let keyId: String
+    /// E2EE-AUTO §8 : le message v1 dont celui-ci est l'import, servi seulement
+    /// pour un `clientRequestId` `history:`. Absent d'un message ordinaire.
+    var importedFromMessageId: String? = nil
 
     static func parse(_ value: E2EEV2JSON) -> E2EEV2DeliveredMessageV2? {
-        guard let root = value.objectValue, Set(root.keys) == keys,
+        guard let root = value.objectValue, Set(root.keys).subtracting(["importedFromMessageId"]) == keys,
               let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
               let sequence = root["sequence"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger), sequence >= 1,
               let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
@@ -676,9 +806,15 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
               let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
+        var importedFrom: String?
+        if let served = root["importedFromMessageId"] {
+            guard let id = served.stringValue, E2EEV2Canonical.isOpaque(id) else { return nil }
+            importedFrom = id
+        }
         return .init(
             envelopeId: envelopeId, sequence: sequence, senderUserId: senderUserId, senderDeviceId: senderDeviceId,
-            signed: signed, serverTagB64: serverTag, serverTimeMs: serverTimeMs, keyId: keyId
+            signed: signed, serverTagB64: serverTag, serverTimeMs: serverTimeMs, keyId: keyId,
+            importedFromMessageId: importedFrom
         )
     }
 
