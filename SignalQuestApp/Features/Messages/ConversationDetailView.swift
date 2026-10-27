@@ -107,6 +107,9 @@ struct ConversationDetailView: View {
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
     @State private var v2Imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
+    /// Anciens messages v1 ou en clair d'une conversation passée en auto (E2EE-AUTO §8).
+    @State private var v2Legacy: [MessageItem] = []
+    @State private var v2LegacyCaptions: [String: String] = [:]
     @State private var v2LoadInFlight = false
     @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
@@ -265,7 +268,8 @@ struct ConversationDetailView: View {
         if let closeSplitDetail { closeSplitDetail() } else { dismiss() }
     }
 
-    private var isE2EE: Bool { conversation.e2eeEnabled == true }
+    /// Une conversation en clair passée en auto (E2EE-AUTO §8) est chiffrée dès sa genèse.
+    private var isE2EE: Bool { conversation.e2eeEnabled == true || conversationIsV2 }
     /// Réactions en clair hors chiffrement ; chiffrées en v2 quand tous les
     /// appareils les lisent (D.16) ; jamais dans une conversation v1 (SOC-07).
     private var reactionsAllowed: Bool { !isE2EE || (usesV2 && v2ReactionsAvailable) }
@@ -488,6 +492,9 @@ struct ConversationDetailView: View {
                                 )
                                 if let label = v2Imports[message.id] {
                                     E2EEAutoImportCaption(label: label, isMine: message.senderId == currentUserId)
+                                }
+                                if let caption = v2LegacyCaptions[message.id] {
+                                    E2EEAutoLegacyCaption(text: caption, isMine: message.senderId == currentUserId)
                                 }
                                 if message.id == receiptMessageId {
                                     readReceiptFooter(for: message)
@@ -983,8 +990,9 @@ struct ConversationDetailView: View {
         .task {
             conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
             // §14.2 : une conversation chiffrée v1 passe en v2 à son ouverture,
-            // si tous ses membres lisent le v2 (règle commune, v0.4.17).
-            if !conversationIsV2, conversation.e2eeEnabled == true {
+            // si tous ses membres lisent le v2 (règle commune, v0.4.17). Après la
+            // bascule, une conversation v1 ou en clair y passe sans attendre (E2EE-AUTO §8).
+            if !conversationIsV2, conversation.e2eeEnabled == true || E2EEV2ServerGate.autoActive {
                 switch await services.e2eeV2Messaging.migrateIfReady(conversation) {
                 case .v2: conversationIsV2 = true
                 case .membersNotActivated(let ids): membersNotActivated = ids
@@ -1000,6 +1008,7 @@ struct ConversationDetailView: View {
             await refreshSenderRequestState()
             await restoreDraftIfNeeded()
             if usesV2 {
+                await loadLegacyHistory()
                 await loadV2()
                 guard !Task.isCancelled else { return }
                 await refreshReceipts()
@@ -2139,7 +2148,7 @@ struct ConversationDetailView: View {
         // Pas de réactions en conversation chiffrée tant qu'elles n'y sont pas
         // chiffrées : la réaction s'affichait puis disparaissait avec une erreur
         // (SOC-07). En v2, elles le sont quand tous les appareils les lisent (D.16).
-        if reactionsAllowed {
+        if reactionsAllowed, !message.id.hasPrefix("local-") {
             if #available(iOS 17.0, *) {
                 ControlGroup { reactionMenuButtons(for: message) }
                     .controlGroupStyle(.palette)
@@ -2948,11 +2957,26 @@ struct ConversationDetailView: View {
         } while v2LoadAgain && !Task.isCancelled
     }
 
+    /// Anciens messages d'une conversation passée en auto, lus une fois par la
+    /// route v1 (E2EE-AUTO §8) : au plus 10 pages, du plus récent au plus ancien.
+    private func loadLegacyHistory() async {
+        guard E2EEV2ServerGate.autoActive, !AppEnvironment.usesDemoData else { return }
+        var loaded: [MessageItem] = []
+        var cursor: String?
+        for _ in 0..<10 {
+            guard let page = try? await service.messages(conversationId: conversation.id, cursor: cursor) else { break }
+            loaded = page.messages + loaded
+            guard page.hasMore ?? (page.nextCursor != nil), let next = page.nextCursor else { break }
+            cursor = next
+        }
+        v2Legacy = loaded
+    }
+
     private func loadV2Once() async {
         defer { hasLoadedOnce = true }
         switch await services.e2eeV2Messaging.thread(
             conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants,
-            limit: v2Limit
+            limit: v2Limit, legacy: v2Legacy
         ) {
         case .thread(let presentation):
             v2HasOlder = presentation.hasOlder
@@ -2976,6 +3000,7 @@ struct ConversationDetailView: View {
             if next != messages { messages = next }
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
+            if v2LegacyCaptions != presentation.legacyCaptions { v2LegacyCaptions = presentation.legacyCaptions }
             v2LastIncomingEnvelopeId = presentation.lastIncomingEnvelopeId
             computeUnreadDividerIfNeeded()
             Task { await acknowledgeDelivery() }
@@ -3931,6 +3956,18 @@ struct ConversationDetailView: View {
             // prévenu des réponses (TRX-01), une seule fois par appareil.
             Task { await services.notificationPriming.considerPriming(after: .messageSent) }
         } catch {
+            // Après la bascule, une écriture en clair ou v1 est refusée : la
+            // conversation passe en auto, puis le texte repart une fois en v2,
+            // sans la réponse, qui citait un message v1 (E2EE-AUTO §7.2, §8).
+            if case APIError.http(409, "E2EE_AUTO_REQUIRED"?, _, _, _) = error, !pending.text.isEmpty,
+               await adoptAutoEncryption() {
+                await service.discardPendingText(clientRequestId: pending.idempotencyKey)
+                pendingSends[localId] = PendingSend(
+                    text: pending.text, replyToId: nil, idempotencyKey: pending.idempotencyKey, ttlSeconds: pending.ttlSeconds
+                )
+                await performSend(localId: localId)
+                return
+            }
             // On conserve la bulle et les données de rejeu : l'utilisateur peut
             // réessayer d'un tap. Pas de bannière d'erreur globale ici — le
             // feedback est porté par la bulle elle-même, avec la cause.
@@ -3938,6 +3975,18 @@ struct ConversationDetailView: View {
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             Haptics.error()
         }
+    }
+
+    /// Genèse auto d'une conversation v1 ou en clair, demandée par le serveur :
+    /// vrai quand la conversation est v2 ici, son fil chargé.
+    private func adoptAutoEncryption() async -> Bool {
+        E2EEV2ServerGate.recordAutoActive()
+        guard await services.e2eeV2Messaging.migrateIfReady(conversation) == .v2 else { return false }
+        conversationIsV2 = true
+        guard usesV2 else { return false }
+        await loadLegacyHistory()
+        await loadV2()
+        return true
     }
 
     /// Construit une bulle locale en clair (jamais persistée) affichée le temps
@@ -4443,7 +4492,7 @@ struct ConversationDetailView: View {
     }
 
     private func toggleReaction(message: MessageItem, emoji: String) async {
-        guard reactionsAllowed else { return }
+        guard reactionsAllowed, !message.id.hasPrefix("local-") else { return }
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
         if usesV2 {
             await toggleV2Reaction(message: message, emoji: emoji, alreadyMine: alreadyMine)

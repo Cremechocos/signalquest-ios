@@ -85,6 +85,8 @@ struct E2EEV2ThreadPresentation: Equatable {
     var reactionsAvailable = false
     /// Messages v1 importés (E2EE-AUTO §8), par identifiant de `MessageItem`.
     var imports: [String: ImportLabel] = [:]
+    /// Anciens messages v1 ou en clair (E2EE-AUTO §8) : leur mention, par identifiant.
+    var legacyCaptions: [String: String] = [:]
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -118,21 +120,28 @@ enum E2EEV2ThreadPresenter {
         refusals: [String: E2EEV2IdentityVerification.Failure] = [:],
         ownUserId: String? = nil,
         limit: Int? = nil,
+        legacy: [MessageItem] = [],
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2ThreadPresentation {
         // Les imports forment un bloc placé avant tout message non importé (E2EE-AUTO §8).
-        let ordered = importBlock(result.snapshot.messages) + result.snapshot.messages.filter { $0.historyImport == nil }
+        let recent = result.snapshot.messages.filter { $0.historyImport == nil }
+        let ordered = importBlock(result.snapshot.messages) + recent
         // Le magasin garde jusqu'à des milliers de messages : seuls les derniers deviennent des
         // `MessageItem`, les précédents se présentent par pages (P03).
         let shown = limit.map { Array(ordered.suffix($0)) } ?? ordered
-        // Le fil se trie par date : le bloc reste avant le premier message non importé.
-        let blockEndMs = (result.snapshot.messages.filter { $0.historyImport == nil }.map(\.serverTimeMs).min() ?? .max) - 1
         let importRefs = Dictionary(
             result.snapshot.messages.compactMap { stored in stored.historyImport?.source.map { ($0.messageId, stored.messageRef) } },
             uniquingKeysWith: { first, _ in first }
         )
+        // Les anciens messages, entre le bloc et les messages v2, seulement quand
+        // la fenêtre remonte jusqu'à eux.
+        let old = shown.count >= recent.count
+            ? E2EEAutoLegacyHistory.present(legacy, importRefs: importRefs) : (messages: [], captions: [:])
+        // Le fil se trie par date : le bloc reste avant le premier message non importé.
+        let legacyStartMs = old.messages.compactMap(\.createdAt).map { Int64(($0.timeIntervalSince1970 * 1_000).rounded(.down)) }.min()
+        let blockEndMs = min(recent.map(\.serverTimeMs).min() ?? .max, legacyStartMs ?? .max) - 1
         var imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
-        let messages = shown.map { stored -> MessageItem in
+        let messages = old.messages + shown.map { stored -> MessageItem in
             if let record = stored.historyImport {
                 imports[stored.messageRef] = importLabel(
                     record, importer: members[stored.senderUserId], startsBlock: stored.messageRef == ordered.first?.messageRef
@@ -210,7 +219,8 @@ enum E2EEV2ThreadPresenter {
             lastIncomingEnvelopeId: lastIncoming,
             clientRequestIds: Set(result.snapshot.messages.map(\.clientRequestId)),
             hasOlder: shown.count < result.snapshot.messages.count,
-            imports: imports
+            imports: imports,
+            legacyCaptions: old.captions
         )
     }
 

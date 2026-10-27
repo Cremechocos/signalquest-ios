@@ -424,7 +424,10 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
 
     /// Relève la conversation, puis la présente : messages sous la forme
     /// commune, avis à poser dans le fil (identité changée, messages manquants…).
-    func thread(conversationId: String, isGroup: Bool, participants: [ConversationParticipant], limit: Int? = nil) async -> ThreadResult {
+    func thread(
+        conversationId: String, isGroup: Bool, participants: [ConversationParticipant], limit: Int? = nil,
+        legacy: [MessageItem] = []
+    ) async -> ThreadResult {
         guard readsEnabled else { return .failure(Self.closed) }
         guard let parts = current() else { return .failure(Self.noSession) }
         let participantIds = participants.map(\.userId)
@@ -456,7 +459,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 result, conversationId: conversationId, members: members, deviceOwners: owners,
                 refusals: used.refusals.filter { participantIds.contains($0.key) },
                 ownUserId: LocalAccountScope.currentUserId,
-                limit: limit
+                limit: limit, legacy: legacy
             )
             // Même règle que l'envoi (§12), sans l'exclusion des navigateurs :
             // dans le doute, le bouton reste masqué.
@@ -484,9 +487,10 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
 
     /// Migration d'une conversation chiffrée v1, à son ouverture ou au
     /// lancement (§14.2), selon la règle commune : tous les membres certifiés
-    /// et lisant le v2.
+    /// et lisant le v2. Après la bascule, genèse auto d'une conversation v1 ou
+    /// en clair, sans attendre les membres (E2EE-AUTO §8).
     func migrateIfReady(_ conversation: MessageConversation) async -> MigrationOutcome {
-        guard writesEnabled, conversation.e2eeEnabled == true else { return .v1 }
+        guard writesEnabled, conversation.e2eeEnabled == true || E2EEV2ServerGate.autoActive else { return .v1 }
         guard let parts = current(), !lacksV2Readiness(parts.session) else { return .v1 }
         let namespace = parts.session.ownerNamespace
         let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
@@ -497,30 +501,33 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         // époque vérifiées puis gardées) ; la genèse n'est tentée que si le
         // serveur répond qu'elle est encore v1.
         guard isV2 == false else { Self.traceV2("migration", "state_unreadable"); return .v1 }
-        let discovered: E2EEV2RefreshResultV2
-        do {
-            discovered = try await withDevices(
-                conversationId: conversation.id, participantIds: participantIds, parts: parts,
-                staleUserIds: { (result: E2EEV2RefreshResultV2) -> [String]? in
-                    if case .failure(let failure) = result { return Self.stale(failure) }
-                    return nil
-                }, { devices in
-                    await parts.messaging.refresh(
-                        conversationId: conversation.id, isGroup: conversation.isGroup, devices: devices,
-                        expectedOwnerScopeId: parts.session.ownerScopeId
-                    )
-                }
-            )
-        } catch {
-            Self.traceV2("migration", "discovery_directory", Self.directoryFailure(error))
-            return .v1
+        func discover() async -> E2EEV2RefreshResultV2? {
+            do {
+                return try await withDevices(
+                    conversationId: conversation.id, participantIds: participantIds, parts: parts,
+                    staleUserIds: { (result: E2EEV2RefreshResultV2) -> [String]? in
+                        if case .failure(let failure) = result { return Self.stale(failure) }
+                        return nil
+                    }, { devices in
+                        await parts.messaging.refresh(
+                            conversationId: conversation.id, isGroup: conversation.isGroup, devices: devices,
+                            expectedOwnerScopeId: parts.session.ownerScopeId
+                        )
+                    }
+                )
+            } catch {
+                Self.traceV2("migration", "discovery_directory", Self.directoryFailure(error))
+                return nil
+            }
         }
-        switch discovered {
-        case .refreshed:
+        switch await discover() {
+        case nil:
+            return .v1
+        case .refreshed?:
             return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true ? .v2 : .v1
-        case .failure(let failure) where failure.code == "E2EE_CONVERSATION_NOT_V2":
+        case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_NOT_V2":
             break
-        case .failure(let failure):
+        case .failure(let failure)?:
             // Rien de sûr sur son état : jamais de genèse sur un doute.
             Self.traceV2("migration", "discovery", failure)
             return .v1
@@ -548,6 +555,15 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         case .created?:
             Self.traceV2("migration", "created")
             return .v2
+        case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_ALREADY_V2" && E2EEV2ServerGate.autoActive:
+            // Perdant d'une genèse auto (§8) : la conversation se relit, et
+            // l'époque gagnante est adoptée si elle passe le §7.1.
+            Self.traceV2("migration", "genesis", failure)
+            if case .refreshed? = await discover(),
+               (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true {
+                return .v2
+            }
+            return .v1
         case .failure(let failure)?:
             Self.traceV2("migration", "genesis", failure)
             return .v1

@@ -184,6 +184,74 @@ final class E2EEAutoHistoryImportTests: XCTestCase {
         XCTAssertNil(thread.imports[recent.messageRef])
     }
 
+    private func legacy(_ id: String, sender: MessageUser, at iso: String, content: String?, encrypted: Bool,
+                        replyTo: String? = nil) -> MessageItem {
+        MessageItem(
+            id: id, conversationId: conversationId, senderId: sender.id, kind: "TEXT", content: content,
+            e2eeVersion: encrypted ? 1 : nil, e2eeIvB64: encrypted ? "AAAA" : nil, e2eeCiphertextB64: encrypted ? "AAAA" : nil,
+            e2eeAadB64: nil, metadata: nil, createdAt: ISO8601DateFormatter().date(from: iso), editedAt: nil, deletedAt: nil,
+            expiresAt: nil, replyToId: replyTo, threadReplyCount: nil, sender: sender, attachments: [], reactions: []
+        )
+    }
+
+    /// Anciens messages d'une conversation passée en auto (E2EE-AUTO §8) : après
+    /// le bloc, avant les messages v2 ; l'import vérifié cache sa source v1.
+    func testOlderMessagesFollowTheBlockWithTheirMention() {
+        let genesis: Int64 = 1_790_000_000_000
+        let recent = stored("ref_recent_000000000000000000000000000001", sequence: 1, sender: alice.id, text: "Après la bascule",
+                            serverTimeMs: genesis)
+        let imported = stored("ref_import_a_0000000000000000000000000002", sequence: 2, sender: bruno.id, text: nil,
+                              serverTimeMs: genesis + 5_000, historyImport: .init(
+                                  source: source("message_v1_aaaaaaaaaaaa", sender: alice.id,
+                                                 createdAt: "2026-08-23T00:00:00.000Z", content: "Bonjour"),
+                                  missingAttachments: 0, importerPlatform: "ios"))
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 2, messages: [recent, imported], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let older = [
+            // Plus ancien que l'import : il reste pourtant après le bloc.
+            legacy("message_v1_plain_00000001", sender: bruno, at: "2026-08-22T00:00:00Z", content: "En clair", encrypted: false),
+            legacy("message_v1_aaaaaaaaaaaa", sender: alice, at: "2026-08-23T00:00:00Z", content: nil, encrypted: true),
+            legacy("message_v1_dddddddddddd", sender: bruno, at: "2026-08-24T00:00:00Z", content: nil, encrypted: true,
+                   replyTo: "message_v1_aaaaaaaaaaaa"),
+        ]
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:],
+            legacy: older
+        )
+        let plainId = E2EEAutoLegacyHistory.idPrefix + "message_v1_plain_00000001"
+        let v1Id = E2EEAutoLegacyHistory.idPrefix + "message_v1_dddddddddddd"
+        let sorted = thread.messages.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
+        XCTAssertEqual(sorted.map(\.id), [imported.messageRef, plainId, v1Id, recent.messageRef])
+        XCTAssertEqual(sorted[1].content, "En clair")
+        XCTAssertEqual(sorted[2].content, "ancien message non importé")
+        XCTAssertFalse(sorted[2].isEncrypted)
+        XCTAssertEqual(sorted[2].replyToId, imported.messageRef, "la réponse vise l'import de sa cible")
+        XCTAssertEqual(thread.legacyCaptions, [plainId: "ancien message non chiffré"])
+
+        // Fenêtre arrêtée dans le bloc : les anciens messages suivent les récents, l'import attend qu'on remonte.
+        let window = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:],
+            limit: 1, legacy: older
+        )
+        XCTAssertEqual(Set(window.messages.map(\.id)), [plainId, v1Id, recent.messageRef])
+        XCTAssertTrue(window.hasOlder)
+        // Fenêtre arrêtée dans les messages v2 : les anciens messages attendent aussi.
+        let second = stored("ref_recent_000000000000000000000000000003", sequence: 3, sender: bruno.id, text: "Ensuite",
+                            serverTimeMs: genesis + 9_000)
+        let longer = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 3, messages: [recent, imported, second], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let recentOnly = E2EEV2ThreadPresenter.present(
+            longer, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:],
+            limit: 1, legacy: older
+        )
+        XCTAssertEqual(recentOnly.messages.map(\.id), [second.messageRef])
+        XCTAssertTrue(recentOnly.legacyCaptions.isEmpty)
+    }
+
     /// Un import n'est jamais le dernier message de la liste (E2EE-AUTO §8).
     func testTheStoreKeepsImportsWithoutText() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

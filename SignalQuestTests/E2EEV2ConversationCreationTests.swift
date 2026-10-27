@@ -300,6 +300,14 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: true, devices: all, nowMs: nowMs), .alreadyV2)
         let plain = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")], encrypted: false)
         XCTAssertEqual(E2EEV2ConversationMigration.decide(plain, isV2: false, devices: all, nowMs: nowMs), .notEncrypted)
+        // Genèse auto (E2EE-AUTO §8) : en clair comme en v1, sans attendre les membres ; jamais sur un doute.
+        for (conversation, devices) in [(group, partial), (group, notActivated), (plain, partial)] {
+            XCTAssertEqual(E2EEV2ConversationMigration.decide(
+                conversation, isV2: false, devices: devices, nowMs: nowMs, autoActive: true
+            ), .migrate)
+        }
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(plain, isV2: nil, devices: all, nowMs: nowMs, autoActive: true), .alreadyV2)
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(plain, isV2: true, devices: all, nowMs: nowMs, autoActive: true), .alreadyV2)
         // Règle commune iOS et Android (v0.4.17) : un appareil qui ne lit pas encore le v2 retient la migration.
         var silent = all.devicesByUser
         silent[carla] = silent[carla]?.map { device in

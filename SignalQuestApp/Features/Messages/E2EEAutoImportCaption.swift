@@ -39,3 +39,20 @@ struct E2EEAutoImportCaption: View {
         .accessibilityIdentifier("conversation.importCaption")
     }
 }
+
+/// Sous un ancien message resté hors du chiffrement (E2EE-AUTO §8).
+struct E2EEAutoLegacyCaption: View {
+    let text: String
+    let isMine: Bool
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(SQType.micro)
+            .foregroundStyle(SQColor.labelSecondary)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.top, 2)
+            .accessibilityIdentifier("conversation.legacyCaption")
+    }
+}

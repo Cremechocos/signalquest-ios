@@ -309,9 +309,13 @@ enum E2EEV2ConversationMigration {
         _ conversation: MessageConversation,
         isV2: Bool?,
         devices: E2EEV2CertifiedDeviceSet,
-        nowMs: Int64
+        nowMs: Int64,
+        autoActive: Bool = E2EEV2ServerGate.autoActive
     ) -> Decision {
         guard isV2 == false else { return .alreadyV2 }
+        // Genèse auto (E2EE-AUTO §8) : en clair comme en v1, sans attendre les
+        // membres ; ceux qui ne sont pas inscrits sont servis à leur inscription.
+        if autoActive { return .migrate }
         guard conversation.e2eeEnabled == true else { return .notEncrypted }
         let waiting = conversation.migrationMemberIds.filter { user in
             !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }

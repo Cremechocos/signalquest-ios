@@ -99760,6 +99760,38 @@
           }
         }
       }
+    },
+    "ancien message non chiffré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "older unencrypted message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ancien message non chiffré"
+          }
+        }
+      }
+    },
+    "ancien message non importé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "older message not imported"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ancien message non importé"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
