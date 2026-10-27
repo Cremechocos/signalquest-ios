@@ -396,9 +396,14 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         // Identifiant venu d'une notification : jamais hors du format opaque dans un chemin.
         guard E2EEV2Canonical.isOpaque(conversationId) else { return nil }
         struct Response: Decodable { let conversation: MessageConversation }
-        return try? await api.request(
+        let session = LocalAccountScope.sessionSnapshot()
+        let conversation = try? await api.request(
             APIEndpoint(path: "/api/messages/conversations/\(conversationId)"), as: Response.self
         ).conversation
+        if let conversation, let session, session.isCurrent {
+            E2EEAutoConversationMarkers().record([conversation], ownerScopeId: session.ownerScopeId)
+        }
+        return conversation
     }
 
     // MARK: Pour l'écran

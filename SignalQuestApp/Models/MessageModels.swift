@@ -321,6 +321,10 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     /// Demande de message (DM-REQ-1) : servie seulement aux clients qui déclarent
     /// `message_requests_v1`, et absente quand la conversation n'en est pas une.
     var request: MessageRequest? = nil
+    /// Numéro de la première époque marquée (E2EE-AUTO §7.2, révision 13), lu de
+    /// façon tolérante : servi avec `e2eeAuto: true` seulement, en chaîne décimale
+    /// canonique. Une paire fautive est ignorée pour cette conversation seule.
+    var firstAutoEpochNumber: Int? = nil
 
     /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
     /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
@@ -365,6 +369,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
         case directPeerUserId, e2eeV2, muted, mentionsMuted, shelved, shelvedAt, request
+        case e2eeAuto, firstAutoEpochNumber
     }
 
     init(
@@ -421,6 +426,11 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         shelved = ((try? c.decodeIfPresent(Bool.self, forKey: .shelved)) ?? nil) ?? (shelvedAt != nil)
         // Lecture tolérante : une demande illisible vaut « pas de demande ».
         request = (try? c.decodeIfPresent(MessageRequest.self, forKey: .request)) ?? nil
+        let e2eeAuto = (try? c.decodeIfPresent(Bool.self, forKey: .e2eeAuto)) ?? nil
+        let first = (try? c.decodeIfPresent(String.self, forKey: .firstAutoEpochNumber)) ?? nil
+        if e2eeAuto == true, let first, let number = E2EEAutoLog.decimal(first, in: 1...E2EEV2Canonical.maxSafeInteger) {
+            firstAutoEpochNumber = Int(number)
+        }
     }
 }
 

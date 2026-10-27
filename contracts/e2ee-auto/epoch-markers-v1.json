@@ -1,0 +1,346 @@
+{
+  "fixtureVersion": 1,
+  "note": "Contrat §7.2 et §11 (révision 14). markers : lecture du marqueur servi, tolérante pour la liste et le détail (marqueur et numéro de la conversation ignorés) ; strict (null = réponse mal formée) n’est utilisé par aucune réponse, à titre de référence. scenarios : numéro retenu = min(localRetained, served.firstAutoEpochNumber, markedEpochsRead…), jamais remonté, puis décision pour chaque époque lue, jugée après la lecture de la conversation. rawDecisionInputOnly : entrée de la seule fonction de décision, qu’aucun lecteur ne produit ; un rejeu parti du lecteur la saute.",
+  "decisions": {
+    "MARKED": "époque marquée : contrôle du manifeste face au journal (§7.1)",
+    "UNMARKED_READABLE": "époque non marquée lisible ; jamais adoptée pour l’envoi après la bascule",
+    "SECURITY_LINE": "ni lue ni adoptée : ligne de sécurité, et l’époque tourne"
+  },
+  "markers": [
+    {
+      "name": "aucun des deux champs",
+      "conversation": {
+        "id": "conv_a"
+      },
+      "strict": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      },
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "marquée depuis l’époque 3",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": "3"
+      },
+      "strict": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 3
+      },
+      "tolerant": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 3
+      }
+    },
+    {
+      "name": "marquée depuis l’époque 1",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": "1"
+      },
+      "strict": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 1
+      },
+      "tolerant": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 1
+      }
+    },
+    {
+      "name": "e2eeAuto sans numéro",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro sans e2eeAuto",
+      "conversation": {
+        "id": "conv_a",
+        "firstAutoEpochNumber": "3"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "e2eeAuto false, jamais servi",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": false
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "e2eeAuto false avec numéro",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": "3"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "e2eeAuto en chaîne",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": "true",
+        "firstAutoEpochNumber": "3"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro en nombre JSON",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 3
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro avec zéro de tête",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": "03"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro 0",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": "0"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro signé",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": "+3"
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    },
+    {
+      "name": "numéro null",
+      "conversation": {
+        "id": "conv_a",
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": null
+      },
+      "strict": null,
+      "tolerant": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "non marquée avant et après la première époque marquée",
+      "localRetained": null,
+      "served": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 5
+      },
+      "markedEpochsRead": [
+        5,
+        6
+      ],
+      "retained": 5,
+      "reads": [
+        {
+          "epochNumber": 4,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        },
+        {
+          "epochNumber": 5,
+          "marked": true,
+          "expect": "MARKED"
+        },
+        {
+          "epochNumber": 5,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        },
+        {
+          "epochNumber": 7,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    },
+    {
+      "name": "servie e2eeAuto = true sans époque marquée connue",
+      "rawDecisionInputOnly": true,
+      "localRetained": null,
+      "served": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": null
+      },
+      "markedEpochsRead": [],
+      "retained": null,
+      "reads": [
+        {
+          "epochNumber": 3,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    },
+    {
+      "name": "conversation non auto, appareil sans mémoire",
+      "localRetained": null,
+      "served": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      },
+      "markedEpochsRead": [],
+      "retained": null,
+      "reads": [
+        {
+          "epochNumber": 7,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        }
+      ]
+    },
+    {
+      "name": "numéro servi plus grand : la garde ne remonte pas",
+      "localRetained": 4,
+      "served": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 9
+      },
+      "markedEpochsRead": [],
+      "retained": 4,
+      "reads": [
+        {
+          "epochNumber": 3,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        },
+        {
+          "epochNumber": 6,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    },
+    {
+      "name": "numéro servi plus petit : la garde s’abaisse",
+      "localRetained": 6,
+      "served": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 3
+      },
+      "markedEpochsRead": [],
+      "retained": 3,
+      "reads": [
+        {
+          "epochNumber": 2,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        },
+        {
+          "epochNumber": 4,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    },
+    {
+      "name": "marqueur absent ou ignoré après une époque marquée vue",
+      "localRetained": 5,
+      "served": {
+        "e2eeAuto": false,
+        "firstAutoEpochNumber": null
+      },
+      "markedEpochsRead": [],
+      "retained": 5,
+      "reads": [
+        {
+          "epochNumber": 4,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        },
+        {
+          "epochNumber": 7,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    },
+    {
+      "name": "époque marquée lue sous le numéro servi",
+      "localRetained": null,
+      "served": {
+        "e2eeAuto": true,
+        "firstAutoEpochNumber": 8
+      },
+      "markedEpochsRead": [
+        6
+      ],
+      "retained": 6,
+      "reads": [
+        {
+          "epochNumber": 5,
+          "marked": false,
+          "expect": "UNMARKED_READABLE"
+        },
+        {
+          "epochNumber": 7,
+          "marked": false,
+          "expect": "SECURITY_LINE"
+        }
+      ]
+    }
+  ]
+}

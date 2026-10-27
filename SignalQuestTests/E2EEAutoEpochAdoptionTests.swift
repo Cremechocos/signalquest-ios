@@ -114,6 +114,10 @@ final class E2EEAutoEpochAdoptionTests: XCTestCase {
         }
         XCTAssertEqual(alert.code, "UNMARKED_EPOCH")
         XCTAssertEqual(alert.epochNumber, 6)
+        guard case .readOnly(let same?) = use(epochNumber: 4, firstAuto: 4, autoActive: true) else {
+            return XCTFail("Non marquée au numéro retenu : ligne de sécurité (epoch-markers-v1)")
+        }
+        XCTAssertEqual(same.epochNumber, 4)
     }
 
     // MARK: Rotation et état gardé

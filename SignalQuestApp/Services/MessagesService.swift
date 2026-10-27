@@ -608,6 +608,7 @@ final class MessagesService: MessagesServicing {
     /// notification d'un appel chiffré n'en porte plus (spec §10.5).
     private func rememberForCalls(_ conversations: [MessageConversation], session: LocalAccountSession?) {
         guard let session, session.isCurrent else { return }
+        E2EEAutoConversationMarkers().record(conversations, ownerScopeId: session.ownerScopeId)
         // Les conversations protégées déjà connues passent à l'extension de notification.
         ProtectedConversationList.update(
             adding: ConversationSecretPolicyCache.protectedConversationIds(ownerScopeId: session.ownerScopeId)

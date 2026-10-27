@@ -323,7 +323,10 @@ enum E2EEV2EpochVerifierV2 {
         }
         guard served.accepted.e2eeAuto else {
             guard autoActive else { return .success(.send) }
-            let downgrade = firstAutoEpochNumber.map { manifest.epochNumber > $0 } ?? false
+            // Le numéro reçu ici est déjà le plus petit entre la mémoire locale et la conversation servie.
+            let downgrade = E2EEAutoConversationMarkers.decide(
+                epochNumber: manifest.epochNumber, marked: false, retained: firstAutoEpochNumber, servedAuto: false
+            ) == .securityLine
             return .success(.readOnly(alert: downgrade
                 ? alert("UNMARKED_EPOCH", userId: manifest.creatorUserId, deviceId: manifest.creatorDeviceId)
                 : nil))
@@ -621,6 +624,9 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
               case .notRecipient(let witnessed?) = E2EEV2EpochVerifierV2.open(
                   served, conversationId: conversationId, ownUserId: ownUserId, ownDeviceId: ownDeviceId, genesis: genesis,
                   previousMembershipChangeNumber: nil, devices: devices, membershipAt: membershipAt,
+                  firstAutoEpochNumber: E2EEAutoConversationMarkers().guardNumber(
+                      local: nil, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
+                  ),
                   nowMs: Int64(now().timeIntervalSince1970 * 1_000), unwrap: { _ in throw NoKey() }
               ) else { return nil }
         return witnessed
@@ -654,7 +660,10 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         switch E2EEV2EpochVerifierV2.open(
             served, conversationId: conversationId, ownUserId: ownUserId, ownDeviceId: ownDeviceId, genesis: genesis,
             previousMembershipChangeNumber: current.membershipChangeNumber, devices: devices,
-            membershipAt: membershipAt, firstAutoEpochNumber: current.firstAutoEpochNumber,
+            membershipAt: membershipAt,
+            firstAutoEpochNumber: E2EEAutoConversationMarkers().guardNumber(
+                local: current.firstAutoEpochNumber, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
+            ),
             nowMs: Int64(now().timeIntervalSince1970 * 1_000),
             unwrap: { [identityStore] in try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: session.ownerNamespace) }
         ) {

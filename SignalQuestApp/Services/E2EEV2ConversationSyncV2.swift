@@ -243,7 +243,10 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 epoch, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
                 ownDeviceId: device.deviceId, genesis: genesis,
                 previousMembershipChangeNumber: previous?.membershipChangeNumber, devices: devices,
-                membershipAt: membershipAt, firstAutoEpochNumber: previous?.firstAutoEpochNumber,
+                membershipAt: membershipAt,
+                firstAutoEpochNumber: E2EEAutoConversationMarkers().guardNumber(
+                    local: previous?.firstAutoEpochNumber, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
+                ),
                 nowMs: Int64(self.now().timeIntervalSince1970 * 1_000),
                 unwrap: { [identityStore = self.identityStore] in
                     try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: ownerNamespace)
