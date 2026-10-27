@@ -14,6 +14,7 @@ enum E2EEV2MessageComposerV2 {
         fk: Data,
         nonce: Data,
         notifyUserId: String = "",
+        marked: Bool = false,
         sign: (Data) throws -> Data
     ) throws -> E2EEV2SignedMessageEnvelopeV2 {
         let parsed = try E2EEV2ContentPayloadV2.parse(payload)
@@ -23,7 +24,8 @@ enum E2EEV2MessageComposerV2 {
               let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData) else {
             throw E2EEV2MessageV2Error.invalidContext
         }
-        // Une réaction part en v3, en annotation (D.16) ; le reste en v2.
+        // Une réaction part en v3, en annotation (D.16) ; le reste en v2, sauf
+        // sous une époque marquée : tout en v3, en `message` (E2EE-AUTO §7.3, révision 15).
         var context = E2EEV2MessageContextV2(
             conversationId: conversationId, epochNumber: epoch.epochNumber, senderDeviceId: device.deviceId,
             clientRequestId: clientRequestId, counter: parsed.counter, ttlSeconds: ttlSeconds, encryptedBlobIds: []
@@ -32,6 +34,9 @@ enum E2EEV2MessageComposerV2 {
             context.envelopeVersion = E2EEV2MessageCryptoV2.annotationEnvelopeVersion
             context.delivery = .annotation
             context.notifyUserId = notifyUserId
+        } else if marked {
+            context.envelopeVersion = E2EEV2MessageCryptoV2.annotationEnvelopeVersion
+            context.delivery = .message
         }
         let envelope = try E2EEV2MessageCryptoV2.encrypt(
             payload: payload, fk: fk, epochKey: epoch.epochKey, nonce: nonce, context: context
@@ -161,8 +166,10 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
             current: current, membership: membership, devices: devices, nowMs: nowMs, messageCount: messageCount
         ).isEmpty else { return .needsRotation }
         // §12 : l'émetteur n'envoie pas ce que l'intersection ne contient pas.
-        let missing = Self.missingCapabilities(draft, devices: devices, members: membership.members,
-                                               excludesWeb: membership.excludesWeb, nowMs: nowMs)
+        // Sous une époque marquée, la version minimale en tient lieu (E2EE-AUTO §7.3).
+        let missing = current.e2eeAuto == true ? [] : Self.missingCapabilities(
+            draft, devices: devices, members: membership.members, excludesWeb: membership.excludesWeb, nowMs: nowMs
+        )
         guard missing.isEmpty else { return .capabilityMissing(missing) }
 
         // Préparé sous verrou : deux appels pour un même message ne signent
@@ -299,7 +306,7 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
                 payload: payload, fk: fk, counter: known.counter, ttlSeconds: known.ttlSeconds,
                 conversationId: conversationId, clientRequestId: clientRequestId, epochNumber: current.epochNumber,
                 device: device, ownerNamespace: ownerNamespace, createdAtMs: known.createdAtMs,
-                notifyUserId: known.notifyUserId ?? ""
+                notifyUserId: known.notifyUserId ?? "", marked: current.e2eeAuto == true
             ))
         }
         // La charge canonique doit tenir dans sa borne (D.7), échappements
@@ -328,7 +335,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         return .pending(try prepare(
             payload: payload, fk: fk, counter: counter, ttlSeconds: draft.ttlSeconds, conversationId: conversationId,
             clientRequestId: clientRequestId, epochNumber: current.epochNumber, device: device,
-            ownerNamespace: ownerNamespace, createdAtMs: nowMs, notifyUserId: draft.notifyUserId
+            ownerNamespace: ownerNamespace, createdAtMs: nowMs, notifyUserId: draft.notifyUserId,
+            marked: current.e2eeAuto == true
         ))
     }
 
@@ -344,7 +352,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         device: E2EEV2DeviceDescriptor,
         ownerNamespace: String,
         createdAtMs: Int64,
-        notifyUserId: String
+        notifyUserId: String,
+        marked: Bool
     ) throws -> E2EEV2ConversationStateStore.PendingSend {
         guard var epoch = try E2EEV2VerifiedEpochKeys.exact(
             conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace,
@@ -354,7 +363,7 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         let signed = try E2EEV2MessageComposerV2.compose(
             payload: payload, conversationId: conversationId, clientRequestId: clientRequestId, ttlSeconds: ttlSeconds,
             epoch: epoch, device: device, fk: fk, nonce: E2EEV2MessageComposerV2.randomBytes(12),
-            notifyUserId: notifyUserId
+            notifyUserId: notifyUserId, marked: marked
         ) { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) }
         let pending = E2EEV2ConversationStateStore.PendingSend(
             conversationId: conversationId, clientRequestId: clientRequestId, deviceId: device.deviceId,
