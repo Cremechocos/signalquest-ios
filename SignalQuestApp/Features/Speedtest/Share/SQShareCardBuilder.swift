@@ -385,7 +385,7 @@ enum SQShareCardBuilder {
     }
 
     /// « 19 octobre 2026 à 14:32 », « October 19, 2026 at 2:32 PM » — heure locale.
-    private static func dateText(_ date: Date, locale: Locale) -> String {
+    static func dateText(_ date: Date, locale: Locale) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.dateStyle = .long

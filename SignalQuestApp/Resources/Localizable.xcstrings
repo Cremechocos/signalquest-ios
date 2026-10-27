@@ -103313,6 +103313,86 @@
           }
         }
       }
+    },
+    "Les notes et les résultats restent visibles. Désactive les détails que tu ne souhaites pas publier." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scores and results remain visible. Turn off any details you do not want to publish."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notes et les résultats restent visibles. Désactive les détails que tu ne souhaites pas publier."
+          }
+        }
+      }
+    },
+    "SQFormal|Les notes et les résultats restent visibles. Désactive les détails que tu ne souhaites pas publier." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notes et les résultats restent visibles. Désactivez les détails que vous ne souhaitez pas publier."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aperçu de l’image du test d’expérience à partager" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview of the experience test image to share"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperçu de l’image du test d’expérience à partager"
+          }
+        }
+      }
+    },
+    "Test d’expérience SignalQuest · note globale %lld/100" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest experience test · overall score %lld/100"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test d’expérience SignalQuest · note globale %lld/100"
+          }
+        }
+      }
+    },
+    "Test d’expérience SignalQuest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest experience test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test d’expérience SignalQuest"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

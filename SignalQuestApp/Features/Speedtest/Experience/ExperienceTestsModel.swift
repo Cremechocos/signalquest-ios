@@ -82,6 +82,8 @@ struct ExperienceFinished: Identifiable, Sendable {
     let selected: Set<ExperienceTestKind>
     let endedAt: Date
     let network: ExperienceNetworkDisplay
+    /// Opérateur du lancement, pour l'image de partage.
+    var operatorKey: String?
     /// Âge du speedtest dont les latences sous charge ont été reprises ; nil sans reprise.
     let reusedSpeedtestAge: TimeInterval?
     var save: ExperienceSaveState
@@ -322,7 +324,7 @@ final class ExperienceTestsModel: ObservableObject {
         live = nil
         finished = ExperienceFinished(
             run: run, finish: ExperienceFinish(run.stop), selected: selection, endedAt: endedAt, network: display,
-            reusedSpeedtestAge: reusedAge, save: saving ? .saving : .none
+            operatorKey: context.operatorKey, reusedSpeedtestAge: reusedAge, save: saving ? .saving : .none
         )
         page = .home
         guard saving else { return }

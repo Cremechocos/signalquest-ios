@@ -220,26 +220,26 @@ struct SQShareCardModel {
 /// tout le texte remonte de plusieurs points.
 enum SQShareCardRenderer {
 
-    private static let exportScale: CGFloat = 2
+    static let exportScale: CGFloat = 2
 
     // Palette unique de A : une image publiée n'a pas à suivre le thème de l'app.
-    private static let paper = UIColor(hex: 0xF4F2EC)
-    private static let ink = UIColor(hex: 0x1C201E)
-    private static let ink2 = UIColor(hex: 0x3C443F)
-    private static let muted = UIColor(hex: 0x636B66)
-    private static let brand = UIColor(hex: 0xA8123A)
-    private static let rule = UIColor(hex: 0x1C201E, alpha: 0.09)
+    static let paper = UIColor(hex: 0xF4F2EC)
+    static let ink = UIColor(hex: 0x1C201E)
+    static let ink2 = UIColor(hex: 0x3C443F)
+    static let muted = UIColor(hex: 0x636B66)
+    static let brand = UIColor(hex: 0xA8123A)
+    static let rule = UIColor(hex: 0x1C201E, alpha: 0.09)
     private static let leaderDot = UIColor(hex: 0x1C201E, alpha: 0.34)
 
     // Cotes logiques de la référence.
-    private static let pagePadX: CGFloat = 48
-    private static let pagePadY: CGFloat = 40
-    private static let sectionGap: CGFloat = 22
-    private static let headerHeight: CGFloat = 28
-    private static let footerHeight: CGFloat = 16
-    private static let cardPadX: CGFloat = 40
-    private static let cardPadY: CGFloat = 32
-    private static let columnGap: CGFloat = 40
+    static let pagePadX: CGFloat = 48
+    static let pagePadY: CGFloat = 40
+    static let sectionGap: CGFloat = 22
+    static let headerHeight: CGFloat = 28
+    static let footerHeight: CGFloat = 16
+    static let cardPadX: CGFloat = 40
+    static let cardPadY: CGFloat = 32
+    static let columnGap: CGFloat = 40
     private static let rowGap: CGFloat = 22
     /// 80 sans bloc radio (spécification v11) ; 92 auparavant.
     private static let graphHeight: CGFloat = 80
@@ -267,6 +267,11 @@ enum SQShareCardRenderer {
     // MARK: En-tête et pied
 
     private static func drawHeader(_ cg: CGContext, model: SQShareCardModel) {
+        drawMasthead(cg, title: String(localized: "Speedtest"), dateText: model.dateText, width: model.width)
+    }
+
+    /// « signal◆quest » à gauche, « Titre · date » à droite : commun aux images de partage.
+    static func drawMasthead(_ cg: CGContext, title: String, dateText: String?, width pageWidth: CGFloat) {
         let top = pagePadY
         // « signal◆quest » : le losange est une boîte de 11 tournée de 45°.
         let logoFont = SQShareFonts.display(size: 28, weight: 800)
@@ -288,9 +293,8 @@ enum SQShareCardRenderer {
         let dateAttrs = attributes(tabular(SQShareFonts.display(size: 16, weight: 600)), muted)
         let lineTop = top + (headerHeight - 16) / 2
         let base = baseline(top: lineTop, height: 16, font: titleAttrs.font)
-        let title = String(localized: "Speedtest")
-        let date = model.dateText.map { " · \($0)" } ?? ""
-        let right = model.width - pagePadX
+        let date = dateText.map { " · \($0)" } ?? ""
+        let right = pageWidth - pagePadX
         let dateX = right - width(date, dateAttrs)
         draw(date, attrs: dateAttrs, x: dateX, baseline: base)
         draw(title, attrs: titleAttrs, x: dateX - width(title, titleAttrs), baseline: base)
@@ -315,17 +319,7 @@ enum SQShareCardRenderer {
     // MARK: Cartouche
 
     private static func drawCard(_ cg: CGContext, model: SQShareCardModel) {
-        let cardTop = pagePadY + headerHeight + sectionGap
-        let cardBottom = model.height - pagePadY - footerHeight - sectionGap
-        let card = CGRect(x: pagePadX, y: cardTop, width: model.width - 2 * pagePadX, height: cardBottom - cardTop)
-        let cardPath = UIBezierPath(roundedRect: card, cornerRadius: 28).cgPath
-        cg.saveGState()
-        cg.setShadow(offset: CGSize(width: 0, height: 4), blur: 20, color: UIColor(hex: 0x1C201E, alpha: 0.08).cgColor)
-        UIColor.white.setFill()
-        cg.addPath(cardPath)
-        cg.fillPath()
-        cg.restoreGState()
-
+        let card = drawCardShape(cg, width: model.width, height: model.height)
         let content = card.insetBy(dx: cardPadX, dy: cardPadY)
         // Grille 1,1fr | 1 | 1fr, écart 40 — la colonne de droite fait 449 de large,
         // la largeur exacte des courbes de la référence.
@@ -365,6 +359,21 @@ enum SQShareCardRenderer {
         if !model.rows.isEmpty {
             drawRows(cg, model.rows, rect: CGRect(x: rightX, y: content.maxY - rightHeight, width: rightWidth, height: rightHeight))
         }
+    }
+
+    /// Cartouche blanc entre l'en-tête et le pied, ombre portée de la référence.
+    static func drawCardShape(_ cg: CGContext, width: CGFloat, height: CGFloat) -> CGRect {
+        let cardTop = pagePadY + headerHeight + sectionGap
+        let cardBottom = height - pagePadY - footerHeight - sectionGap
+        let card = CGRect(x: pagePadX, y: cardTop, width: width - 2 * pagePadX, height: cardBottom - cardTop)
+        let cardPath = UIBezierPath(roundedRect: card, cornerRadius: 28).cgPath
+        cg.saveGState()
+        cg.setShadow(offset: CGSize(width: 0, height: 4), blur: 20, color: UIColor(hex: 0x1C201E, alpha: 0.08).cgColor)
+        UIColor.white.setFill()
+        cg.addPath(cardPath)
+        cg.fillPath()
+        cg.restoreGState()
+        return card
     }
 
     // MARK: Descendant
@@ -603,7 +612,7 @@ enum SQShareCardRenderer {
 
     /// Rubrique « ↓ DESCENDANT » : flèche de 12 tracée (et non un glyphe,
     /// absent de Sora), 7 d'écart, capitales espacées de 0,18 em.
-    private static func drawKicker(_ text: String, arrow: SQShareCardModel.Arrow?, x: CGFloat, top: CGFloat) {
+    static func drawKicker(_ text: String, arrow: SQShareCardModel.Arrow?, x: CGFloat, top: CGFloat) {
         var textX = x
         if let arrow {
             drawArrow(arrow, x: x, top: top, color: muted)
@@ -633,14 +642,14 @@ enum SQShareCardRenderer {
         path.stroke()
     }
 
-    private static func fillRule(_ cg: CGContext, _ rect: CGRect) {
+    static func fillRule(_ cg: CGContext, _ rect: CGRect) {
         rule.setFill()
         cg.fill(rect)
     }
 
     // MARK: Texte
 
-    private static func attributes(_ font: UIFont, _ color: UIColor, kernEm: CGFloat = 0) -> [NSAttributedString.Key: Any] {
+    static func attributes(_ font: UIFont, _ color: UIColor, kernEm: CGFloat = 0) -> [NSAttributedString.Key: Any] {
         var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
         // La référence exprime l'espacement en em ; `kern` l'attend en points.
         if kernEm != 0 { attrs[.kern] = kernEm * font.pointSize }
@@ -648,7 +657,7 @@ enum SQShareCardRenderer {
     }
 
     /// Chiffres à chasse fixe (`tnum`), comme `font-variant-numeric: tabular-nums`.
-    private static func tabular(_ font: UIFont) -> UIFont {
+    static func tabular(_ font: UIFont) -> UIFont {
         let descriptor = font.fontDescriptor.addingAttributes([
             .featureSettings: [[
                 UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
@@ -659,17 +668,17 @@ enum SQShareCardRenderer {
     }
 
     /// Ligne de base d'un texte centré dans une boîte `line-height` de `height`.
-    private static func baseline(top: CGFloat, height: CGFloat, font: UIFont) -> CGFloat {
+    static func baseline(top: CGFloat, height: CGFloat, font: UIFont) -> CGFloat {
         top + (height - (font.ascender - font.descender)) / 2 + font.ascender
     }
 
-    private static func width(_ text: String, _ attrs: [NSAttributedString.Key: Any]) -> CGFloat {
+    static func width(_ text: String, _ attrs: [NSAttributedString.Key: Any]) -> CGFloat {
         (text as NSString).size(withAttributes: attrs).width
     }
 
     /// Dessine à partir de la LIGNE DE BASE et renvoie l'avance horizontale.
     @discardableResult
-    private static func draw(_ text: String, attrs: [NSAttributedString.Key: Any], x: CGFloat, baseline: CGFloat) -> CGFloat {
+    static func draw(_ text: String, attrs: [NSAttributedString.Key: Any], x: CGFloat, baseline: CGFloat) -> CGFloat {
         guard let font = attrs[.font] as? UIFont else { return 0 }
         (text as NSString).draw(at: CGPoint(x: x, y: baseline - font.ascender), withAttributes: attrs)
         return width(text, attrs)

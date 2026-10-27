@@ -9,6 +9,7 @@ struct ExperienceHistoryDetailSheet: View {
     @State private var detail: ExperienceHistoryEntryDetail?
     @State private var errorMessage: String?
     @State private var openedTest: ExperienceTestKind?
+    @State private var shareInput: ExperienceShareInput?
     @Environment(\.dismiss) private var dismiss
 
     private static let topAnchor = "experience.history.detail.top"
@@ -22,6 +23,17 @@ struct ExperienceHistoryDetailSheet: View {
                             dismiss()
                         }
                         Spacer()
+                        if let detail, openedTest == nil,
+                           ExperienceTestKind.allCases.contains(where: { detail.result.tests.state(of: $0) == .measured }) {
+                            MapChipIconButton(systemImage: "square.and.arrow.up", label: "Partager",
+                                              identifier: "experience.history.detail.share") {
+                                shareInput = ExperienceShareInput(
+                                    tests: ExperienceSubmission.tests(detail.result.tests), scores: scores(detail),
+                                    measuredAt: detail.result.measuredAt, connectionType: detail.result.network.connectionType,
+                                    technology: detail.result.network.technology, operatorKey: detail.result.network.operatorKey
+                                )
+                            }
+                        }
                     }
                     .id(Self.topAnchor)
                     if let detail {
@@ -52,6 +64,7 @@ struct ExperienceHistoryDetailSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("experience.history.detail")
+        .sheet(item: $shareInput) { ExperienceSharePreviewSheet(input: $0) }
         .task { await loadDetail() }
     }
 

@@ -362,6 +362,7 @@ private struct ExperienceRunningView: View {
 private struct ExperienceResultView: View {
     @ObservedObject var model: ExperienceTestsModel
     let finished: ExperienceFinished
+    @State private var shareInput: ExperienceShareInput?
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -383,9 +384,21 @@ private struct ExperienceResultView: View {
 
             usageLine
             saveLine
+            if ExperienceTestKind.allCases.contains(where: { finished.run.tests.state(of: $0) == .measured }) {
+                GradientButton("Partager le résultat", systemImage: "square.and.arrow.up", style: .secondary) {
+                    Haptics.light()
+                    shareInput = ExperienceShareInput(
+                        tests: ExperienceSubmission.tests(finished.run.tests), scores: ExperienceScores(finished.run.tests),
+                        measuredAt: finished.endedAt, connectionType: finished.network.connectionType,
+                        technology: finished.network.technology?.rawValue, operatorKey: finished.operatorKey
+                    )
+                }
+                .accessibilityIdentifier("experience.share")
+            }
             actionButton
         }
         .accessibilityIdentifier("experience.result")
+        .sheet(item: $shareInput) { ExperienceSharePreviewSheet(input: $0) }
     }
 
     private var tests: [ExperienceTestKind] { ExperienceMethod.order.filter(finished.selected.contains) }
