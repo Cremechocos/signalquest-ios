@@ -3167,7 +3167,9 @@ struct ConversationDetailView: View {
     private func computeUnreadDividerIfNeeded() {
         guard !unreadDividerComputed, messages.contains(where: { !$0.id.hasPrefix("local-") }) else { return }
         unreadDividerComputed = true
-        unreadDivider = UnreadDivider.make(messages: messages, lastReadAt: conversation.lastReadAt, currentUserId: currentUserId)
+        unreadDivider = UnreadDivider.make(
+            messages: messages, lastReadAt: conversation.lastReadAt, currentUserId: currentUserId, imports: Set(v2Imports.keys)
+        )
     }
 
     private func load() async {

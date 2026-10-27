@@ -236,8 +236,9 @@ enum E2EEV2ThreadPresenter {
             notices.append(.missing(senderName: userId.flatMap { members[$0]?.displayName }, count: count))
         }
         if !result.unsupported.isEmpty { notices.append(.unsupported(count: result.unsupported.count)) }
+        // Un import ne déplace aucun marqueur (E2EE-AUTO §8) : il n'est pas accusé « distribué ».
         let lastIncoming = ownUserId.flatMap { own in
-            result.snapshot.messages.last { $0.senderUserId != own && !$0.deleted }?.envelopeId
+            result.snapshot.messages.last { $0.senderUserId != own && !$0.deleted && $0.historyImport == nil }?.envelopeId
         }
         return E2EEV2ThreadPresentation(
             messages: messages, notices: notices,

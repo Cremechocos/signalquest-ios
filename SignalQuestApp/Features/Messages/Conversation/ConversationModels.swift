@@ -45,10 +45,13 @@ struct UnreadDivider: Equatable {
     static let scrollsToDividerFrom = 7
 
     /// `messages` dans l'ordre du fil. Rien sans date de dernière lecture : tout paraîtrait nouveau.
-    static func make(messages: [MessageItem], lastReadAt: Date?, currentUserId: String?) -> UnreadDivider? {
+    /// `imports` : messages v1 importés, jamais comptés comme non lus (E2EE-AUTO §8).
+    static func make(
+        messages: [MessageItem], lastReadAt: Date?, currentUserId: String?, imports: Set<String> = []
+    ) -> UnreadDivider? {
         guard let lastReadAt, let currentUserId else { return nil }
         let unread = messages.filter {
-            !$0.id.hasPrefix("local-") && $0.deletedAt == nil && $0.senderId != currentUserId
+            !$0.id.hasPrefix("local-") && !imports.contains($0.id) && $0.deletedAt == nil && $0.senderId != currentUserId
                 && ($0.createdAt ?? .distantPast) > lastReadAt
         }
         guard let first = unread.first else { return nil }

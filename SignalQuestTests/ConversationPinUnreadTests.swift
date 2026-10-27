@@ -513,6 +513,9 @@ final class ConversationPinUnreadTests: XCTestCase {
 
         let divider = UnreadDivider.make(messages: thread, lastReadAt: read, currentUserId: "me")
         XCTAssertEqual(divider, UnreadDivider(messageId: "new-1", count: 2))
+        // Un message v1 importé n'est jamais compté comme non lu (E2EE-AUTO §8).
+        XCTAssertEqual(UnreadDivider.make(messages: thread, lastReadAt: read, currentUserId: "me", imports: ["new-1"]),
+                       UnreadDivider(messageId: "new-2", count: 1))
         XCTAssertNil(UnreadDivider.make(messages: thread, lastReadAt: nil, currentUserId: "me"), "Sans date de lecture, tout paraîtrait nouveau")
         XCTAssertNil(UnreadDivider.make(messages: Array(thread.prefix(2)), lastReadAt: read, currentUserId: "me"))
     }

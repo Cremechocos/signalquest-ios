@@ -86,6 +86,18 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         )
         XCTAssertEqual(thread.lastIncomingEnvelopeId, incoming.envelopeId)
         XCTAssertNil(E2EEV2ThreadPresenter.present(result, conversationId: conversationId, members: [:], deviceOwners: [:]).lastIncomingEnvelopeId)
+
+        // Un import arrivé après ne déplace pas l'accusé « distribué » (E2EE-AUTO §8).
+        var imported = stored("ref_imp_0000000000000000000000000000004", sequence: 4, sender: bruno.id, text: nil,
+                              serverTimeMs: 1_790_000_040_000)
+        imported.historyImport = .init(source: nil, missingAttachments: 0, importerPlatform: nil)
+        let withImport = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 4, messages: [incoming, mine, deleted, imported], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        XCTAssertEqual(E2EEV2ThreadPresenter.present(
+            withImport, conversationId: conversationId, members: [:], deviceOwners: [:], ownUserId: carla.id
+        ).lastIncomingEnvelopeId, incoming.envelopeId)
     }
 
     /// AF-MSG-01 : le fil v2 présenté se lit et s'écrit à l'écran. Le
