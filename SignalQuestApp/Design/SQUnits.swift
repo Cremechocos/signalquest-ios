@@ -36,12 +36,29 @@ enum SQUnitsSystem: String, Codable, CaseIterable, Sendable {
 enum SQUnits {
     /// Clé de persistance. Publique au module : `SQUnitsStore` l'écrit.
     static let defaultsKey = "fr.signalquest.ios.unitsSystem"
+    /// Unités choisies dans l'app. Le serveur rend « metric » aussi pour un compte
+    /// qui n'a rien choisi : sans ce drapeau, la région de l'iPhone ne
+    /// s'appliquerait jamais.
+    static let chosenKey = "fr.signalquest.ios.unitsSystemChosen"
 
     static var current: SQUnitsSystem {
         guard let raw = UserDefaults.standard.string(forKey: defaultsKey),
               let system = SQUnitsSystem(rawValue: raw)
-        else { return .metric }
+        else { return regionDefault() }
         return system
+    }
+
+    /// Unités de la région de l'iPhone : impériales aux États-Unis et au
+    /// Royaume-Uni (routes en miles), métriques ailleurs.
+    static func regionDefault(_ locale: Locale = .current) -> SQUnitsSystem {
+        locale.measurementSystem == .metric ? .metric : .imperial
+    }
+
+    /// Unités effectives : la valeur du compte quand elle a été choisie (dans
+    /// l'app, ou impériale, qui n'est jamais la valeur par défaut du serveur),
+    /// sinon celle de la région.
+    static func effective(account: SQUnitsSystem, chosen: Bool, region: SQUnitsSystem) -> SQUnitsSystem {
+        chosen || account == .imperial ? account : region
     }
 
     private static let metersPerMile = 1609.344
@@ -200,8 +217,14 @@ final class SQUnitsStore: ObservableObject {
         WidgetSharedStore.saveImperialUnits(system == .imperial)
     }
 
-    /// Applique une valeur venue du serveur (ou choisie par l'utilisateur).
-    func apply(_ system: SQUnitsSystem) {
+    /// Applique la valeur du compte (`chosen` quand l'utilisateur vient de la
+    /// choisir ici) : sans choix, la région de l'iPhone l'emporte sur le
+    /// « metric » par défaut du serveur.
+    func apply(_ account: SQUnitsSystem, chosen: Bool = false, region: SQUnitsSystem = SQUnits.regionDefault()) {
+        if chosen { UserDefaults.standard.set(true, forKey: SQUnits.chosenKey) }
+        let system = SQUnits.effective(
+            account: account, chosen: UserDefaults.standard.bool(forKey: SQUnits.chosenKey), region: region
+        )
         guard system != self.system || UserDefaults.standard.string(forKey: SQUnits.defaultsKey) == nil else { return }
         UserDefaults.standard.set(system.rawValue, forKey: SQUnits.defaultsKey)
         if system != self.system {

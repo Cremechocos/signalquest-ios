@@ -201,14 +201,17 @@ final class SQAddressStore: ObservableObject {
     }
 
     /// Relit le ton du compte. Un échec (réseau, route absente) garde le ton courant
-    /// et ne pose pas la question.
-    func refresh(using service: PrivacyServicing) async {
-        guard let session = LocalAccountScope.sessionSnapshot() else { return }
+    /// et ne pose pas la question. Rend les préférences lues, que la racine
+    /// applique aussi aux unités et au pays.
+    @discardableResult
+    func refresh(using service: PrivacyServicing) async -> UserPreferences? {
+        guard let session = LocalAccountScope.sessionSnapshot() else { return nil }
         do {
             let preferences = try await service.scoped(to: session).preferences()
-            guard session.isCurrent else { return }
+            guard session.isCurrent else { return nil }
             apply(preferences, ownerScopeId: session.ownerScopeId)
-        } catch {}
+            return preferences
+        } catch { return nil }
     }
 
     /// Enregistre le choix. Vrai quand le serveur l'a accepté ; sinon `saveError`

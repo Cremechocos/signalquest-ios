@@ -116,7 +116,13 @@ final class PrivacySettingsViewModel: ObservableObject {
     }
 
     func setUnits(_ system: SQUnitsSystem) async {
-        guard system != preferences.unitsSystem else { return }
+        guard checkSession(), preferencesLoaded else { return }
+        // Le compte garde déjà cette valeur (souvent le « metric » par défaut, que
+        // la région de l'iPhone remplace) : le choix se retient sans appel serveur.
+        guard system != preferences.unitsSystem else {
+            unitsStore?.apply(system, chosen: true)
+            return
+        }
         await updatePreferences(UserPreferencesPatch(unitsSystem: system))
     }
 
@@ -139,7 +145,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             guard checkSession() else { return }
             preferences = value
             preferencesError = nil
-            unitsStore?.apply(value.unitsSystem)
+            unitsStore?.apply(value.unitsSystem, chosen: patch.unitsSystem != nil)
             Haptics.success()
         } catch {
             guard checkSession(), !error.isCancellation else { return }

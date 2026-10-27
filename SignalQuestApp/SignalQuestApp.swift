@@ -242,8 +242,11 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = session.state {
-                    await addressStore.refresh(using: services.privacy)
+                    if let preferences = await addressStore.refresh(using: services.privacy) {
+                        unitsStore.apply(preferences.unitsSystem)
+                    }
                     addressStore.applyTone()
+                    await AccountLocaleSync.sync(api: services.api, force: false)
                 }
                 // La présence est indépendante des coordonnées : le mode local
                 // pilote seulement l'ajout de la position au heartbeat.
@@ -278,9 +281,20 @@ struct AppRootView: View {
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
                     Task {
-                        await addressStore.refresh(using: services.privacy)
+                        if let preferences = await addressStore.refresh(using: services.privacy) {
+                            unitsStore.apply(preferences.unitsSystem)
+                        }
                         addressStore.applyTone()
                     }
+                    // Langue du compte : envoyée à chaque connexion (le compte a pu en
+                    // changer sur le site), sinon seulement quand celle de l'app change.
+                    let signedIn: Bool = {
+                        switch oldState {
+                        case .loggedOut, .requires2FA: return true
+                        default: return false
+                        }
+                    }()
+                    Task { await AccountLocaleSync.sync(api: services.api, force: signedIn) }
                     Task {
                         await services.livePresence.refreshSharingSettings()
                         if case .authenticated(let user) = newState {

@@ -226,6 +226,7 @@
 		40EDCD4DBF17A497DE3D0110 /* E2EEBrowserExclusionQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2031C432D600793868E41EC6 /* E2EEBrowserExclusionQATests.swift */; };
 		40F6CFECF662089321A4F2E5 /* E2EEAutoEnrollment.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59DC9809ADBAB596135C2BD /* E2EEAutoEnrollment.swift */; };
 		410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */; };
+		4148DB1B1B8F2896859A4B56 /* InternationalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C917F21DE1EEDB7822C844 /* InternationalTests.swift */; };
 		4149DEB9094ABCA8284F4972 /* CallDescriptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA09C22CDA05CC8388C3907 /* CallDescriptorTests.swift */; };
 		4155ED18B181CDA43F529A5A /* E2EEAutoSafetyCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501022A463668DFE8197EF81 /* E2EEAutoSafetyCodeView.swift */; };
 		416E530A51D50131F275D2E4 /* FeedContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDCE02F16F705D9A8F45953 /* FeedContextTests.swift */; };
@@ -495,6 +496,7 @@
 		8B4D481EAB5B3A87D1416B21 /* SentinelleAlertSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */; };
 		8B5AA79D90888D52BC8E5796 /* AuthFieldLabelsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C58966E2E435E922D292908 /* AuthFieldLabelsQATests.swift */; };
 		8B777D7880EC065DBD663E7B /* ConversationMentionsAndMediaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6A12942B016C8427340B63 /* ConversationMentionsAndMediaTests.swift */; };
+		8BC9781C3E4ABFE13EFF6E88 /* AccountLocaleSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30ABD283B34B3E101F97077F /* AccountLocaleSync.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
 		8CB966AA0923A81D556EBC26 /* CommunityOutageDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620E0D0FEC057F410C4DC0D4 /* CommunityOutageDetailSheet.swift */; };
 		8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5D954E6102D732D621D8E6 /* SessionModels.swift */; };
@@ -1079,6 +1081,7 @@
 		2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQRadius.swift; sourceTree = "<group>"; };
 		2FC6A2458D5BCC866A93A543 /* ANFRDromStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRDromStatsTests.swift; sourceTree = "<group>"; };
 		3056A68877A1B770824E2F2E /* CarPlayMapController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapController.swift; sourceTree = "<group>"; };
+		30ABD283B34B3E101F97077F /* AccountLocaleSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLocaleSync.swift; sourceTree = "<group>"; };
 		30EFB586826CF2A6A011E18D /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorNumbering.swift; sourceTree = "<group>"; };
 		31424F4F8C76280C3D0AC98B /* RadioLogsFilterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsFilterSheet.swift; sourceTree = "<group>"; };
@@ -1363,6 +1366,7 @@
 		8057CE38296284A6ABDE6B60 /* SpeedtestPublicationSettingsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestPublicationSettingsQATests.swift; sourceTree = "<group>"; };
 		80688E358C9C44A9F57C5A15 /* E2EEAutoDeviceRevocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoDeviceRevocation.swift; sourceTree = "<group>"; };
 		808A687924991326F85D1C6F /* OutageReportDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageReportDraftStore.swift; sourceTree = "<group>"; };
+		80C917F21DE1EEDB7822C844 /* InternationalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternationalTests.swift; sourceTree = "<group>"; };
 		81DBD896295D1CABACD61CEC /* LiveKitCallSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitCallSettingsTests.swift; sourceTree = "<group>"; };
 		81FB8B7245C8C64D14F46655 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		8285E18A8C25FEC98790A174 /* PhotosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosView.swift; sourceTree = "<group>"; };
@@ -2731,6 +2735,7 @@
 		D86F581A5B0D860A74A434D6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				30ABD283B34B3E101F97077F /* AccountLocaleSync.swift */,
 				3B2B510928CA997F314547B3 /* ANFRService.swift */,
 				01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */,
 				FB24C8F6F0931F6D99B18115 /* AntennasService.swift */,
@@ -2965,6 +2970,7 @@
 				896071B7533980CBAF23DA8A /* ICMPPingerLiveCallbackTests.swift */,
 				EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
+				80C917F21DE1EEDB7822C844 /* InternationalTests.swift */,
 				16C9E5FDD182F8B718FA3F0A /* JSONDateParsingTests.swift */,
 				6C417B0E3A5B8BAEA89F18C7 /* LastSpeedtestResultIntentTests.swift */,
 				B9A16EBE21BA07C588250672 /* LeaderboardRequestOrderingTests.swift */,
@@ -3602,6 +3608,7 @@
 				DF096DA80BE358FA48F3E8C4 /* APIClient.swift in Sources */,
 				BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */,
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
+				8BC9781C3E4ABFE13EFF6E88 /* AccountLocaleSync.swift in Sources */,
 				EB44A3D8FD41548A92D24D29 /* AccountSpeedtestRow.swift in Sources */,
 				2ACC1A07393B28E170732031 /* ActivityCardView.swift in Sources */,
 				E255A40A100134664CABBBAB /* AndroidDataPresence.swift in Sources */,
@@ -4286,6 +4293,7 @@
 				69FED86790884C42156C03F6 /* HiddenStoryAuthorsStoreTests.swift in Sources */,
 				4C052575B1B6C1C04E37F62D /* ICMPPingerLiveCallbackTests.swift in Sources */,
 				E7CE9DC50F6EB2A39D1FB723 /* ICMPPingerTests.swift in Sources */,
+				4148DB1B1B8F2896859A4B56 /* InternationalTests.swift in Sources */,
 				4E5AFE32AFF929E8AE4E94D7 /* JSONDateParsingTests.swift in Sources */,
 				C5E03A6DD21C83DD18C57E47 /* LastSpeedtestResultIntentTests.swift in Sources */,
 				E283DEFD873FF58AD753DF08 /* LeaderboardRequestOrderingTests.swift in Sources */,

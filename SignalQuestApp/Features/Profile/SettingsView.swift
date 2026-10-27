@@ -2900,7 +2900,8 @@ struct SQUnitsSettingRow: View {
     }
 
     var body: some View {
-        let current = model.preferencesLoaded ? model.preferences.unitsSystem : unitsStore.system
+        // Les unités effectives : celles du compte, ou de la région sans choix.
+        let current = unitsStore.system
         SQSettingsMenuRow("Unités", systemImage: "ruler", subtitle: model.preferencesError,
                           selection: Binding(
                               get: { current },
