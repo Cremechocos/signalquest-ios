@@ -1,3 +1,4 @@
+import Combine
 import CoreLocation
 import Foundation
 
@@ -189,6 +190,7 @@ final class ExperienceTestsModel: ObservableObject {
     private var engine: (any ExperienceSuiteRunning)?
     private var stopRequested = false
     private var generation = 0
+    private var pathSubscription: AnyCancellable?
 
     init(environment: Environment) {
         self.environment = environment
@@ -213,6 +215,16 @@ final class ExperienceTestsModel: ObservableObject {
         if !selectionTouched, !running, finished == nil {
             selected = ExperienceBudget.defaultSelection(onMobileData: network.isMobile)
         }
+    }
+
+    /// Suit le réseau actif : sélection par défaut, « Pas de connexion », arrêt sur changement.
+    func bind(to path: NetworkPathMonitor) {
+        update(status: path.status, online: path.isOnline)
+        pathSubscription = Publishers.CombineLatest(path.$status, path.$isOnline)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status, online in
+                MainActor.assumeIsolated { self?.update(status: status, online: online) }
+            }
     }
 
     func setForeground(_ foreground: Bool) {
@@ -254,6 +266,7 @@ final class ExperienceTestsModel: ObservableObject {
         running = true
 
         let context = await environment.context(startStatus)
+        guard generation == current else { return }
         let startedAt = environment.now()
         // Reprise des latences d'un speedtest récent du MÊME réseau prouvé, sinon courte charge.
         var reuse: ExperienceUnderLoad?
@@ -274,7 +287,7 @@ final class ExperienceTestsModel: ObservableObject {
                 self.live = update
             }
         }
-        self.engine = nil
+        if generation == current { self.engine = nil }
         await finish(run, selection: selection, display: display, context: context, reusedAge: reusedAge, generation: current)
     }
 
@@ -285,10 +298,24 @@ final class ExperienceTestsModel: ObservableObject {
         engine?.requestStop(.userStopped)
     }
 
+    /// Changement de compte : le test en cours s'arrête et rien n'est enregistré dans le suivant.
+    func discard() {
+        generation &+= 1
+        engine?.requestStop(.userStopped)
+        engine = nil
+        running = false
+        live = nil
+        finished = nil
+        offlineAtStart = false
+        lastTest = nil
+        page = .home
+    }
+
     private func finish(
         _ run: ExperienceRun, selection: Set<ExperienceTestKind>, display: ExperienceNetworkDisplay,
         context: LaunchContext, reusedAge: TimeInterval?, generation current: Int
     ) async {
+        guard generation == current else { return }
         let endedAt = environment.now()
         let saving = ExperienceTestKind.allCases.contains { run.tests.state(of: $0) == .measured }
         running = false

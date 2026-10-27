@@ -11,6 +11,7 @@
 		00F65D8517A5F39DBC8F3627 /* SQMapKitDotsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650653A7B6FF5FCF914EA06D /* SQMapKitDotsOverlay.swift */; };
 		0172A2931556007F32F840D0 /* RadioLogIdentifyPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F86F356FE7B0E322F9B79A /* RadioLogIdentifyPicker.swift */; };
 		01762986753232489C41F432 /* E2EEAutoHistoryImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB2D54B6F4D8077F7837E9D /* E2EEAutoHistoryImportTests.swift */; };
+		019BDBFC5EB0DC2A9D370F15 /* ExperienceTestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */; };
 		01CA0252CB25A0F8AFCDB2E6 /* E2EEV2JalonAVectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */; };
 		02593AF0CFF83B2C69D9F79A /* SentinelleCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0421A119135C490C2075C09 /* SentinelleCharts.swift */; };
 		027E3130C3FF0E1E4C1FC6FC /* E2EEV2ThreadPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FD7F46C63A1733CA825E36 /* E2EEV2ThreadPresentationTests.swift */; };
@@ -1686,6 +1687,7 @@
 		D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodeTests.swift; sourceTree = "<group>"; };
 		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D755436C239643387D984492 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceTestsView.swift; sourceTree = "<group>"; };
 		D78631EFAA5BDFD941C21AB9 /* MapHTTPFixtureAdmissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapHTTPFixtureAdmissionTests.swift; sourceTree = "<group>"; };
 		D79BA1E3773815C05B91DA4C /* ExperienceTestsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceTestsModel.swift; sourceTree = "<group>"; };
 		D7F8D58CD984CD0C83B72A68 /* PasswordResetPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetPresentationTests.swift; sourceTree = "<group>"; };
@@ -2586,6 +2588,7 @@
 			children = (
 				CB04A4F099E380E7AD6EB352 /* ExperienceResultText.swift */,
 				D79BA1E3773815C05B91DA4C /* ExperienceTestsModel.swift */,
+				D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */,
 			);
 			path = Experience;
 			sourceTree = "<group>";
@@ -3836,6 +3839,7 @@
 				29375BEFDC98A7C620329C56 /* ExperienceTestsJournal.swift in Sources */,
 				E7574EA0357A0473763283EF /* ExperienceTestsModel.swift in Sources */,
 				64ED0D522FBEACC4E8B0CDD1 /* ExperienceTestsService.swift in Sources */,
+				019BDBFC5EB0DC2A9D370F15 /* ExperienceTestsView.swift in Sources */,
 				25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */,
 				1AEAB77F8A0E0AD0655997F4 /* FavoriteAntenna.swift in Sources */,
 				935A4C8A912D8AF9FB0A4798 /* FavoriteAntennasLocalStore.swift in Sources */,

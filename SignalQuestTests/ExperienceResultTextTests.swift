@@ -126,8 +126,11 @@ final class ExperienceResultTextTests: XCTestCase {
 
     func testUnits() {
         XCTAssertEqual(ExperienceResultText.megabytes(109_000_000), "109,0 Mo")
-        XCTAssertEqual(ExperienceResultText.duration(seconds: 159), "2 min 39 s")
-        XCTAssertEqual(ExperienceResultText.duration(seconds: 58), "58 s")
+        XCTAssertEqual(ExperienceResultText.duration(seconds: 159), "2\u{00A0}min\u{00A0}39\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.duration(seconds: 58), "58\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.about(seconds: 150), "environ 2\u{00A0}min\u{00A0}30")
+        XCTAssertEqual(ExperienceResultText.about(seconds: 125), "environ 2\u{00A0}min\u{00A0}05")
+        XCTAssertEqual(ExperienceResultText.about(seconds: 50), "environ 50\u{00A0}s")
         XCTAssertEqual(ExperienceResultText.stalls(1), "1 coupure")
         XCTAssertEqual(ExperienceResultText.waiting(850), "850 ms")
         XCTAssertEqual(ExperienceVideoQuality.p2160.label, "4K")

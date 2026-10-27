@@ -149,6 +149,16 @@ final class AppServices: ObservableObject {
     /// à jour forcée, sans plus rien pour l'arrêter : GPS, tests, Live Activity
     /// et écran allumé continuaient.
     lazy var driveTest = DriveTestViewModel(services: self)
+    /// Session des tests d'expérience, détenue ici comme le Drive Test : un test lancé
+    /// survit au changement d'onglet, l'arrière-plan et le changement de compte l'arrêtent.
+    private(set) var experienceSessionIfCreated: ExperienceTestsModel?
+    var experienceSession: ExperienceTestsModel {
+        if let experienceSessionIfCreated { return experienceSessionIfCreated }
+        let session = ExperienceTestsModel(environment: .live(services: self))
+        session.bind(to: networkPath)
+        experienceSessionIfCreated = session
+        return session
+    }
     /// Renvoi groupé des envois en attente, au retour du réseau et au premier plan.
     lazy var pendingQueues: PendingQueueFlusher = makePendingQueues()
 
@@ -539,6 +549,7 @@ final class AppServices: ObservableObject {
     func stopMeasurementSessions() {
         driveTest.shutDown()
         driveTest = DriveTestViewModel(services: self)
+        experienceSessionIfCreated?.discard()
     }
 
     // MARK: - Amorçage partagé
@@ -657,6 +668,8 @@ final class AppServices: ObservableObject {
         // même pendant un drive test ou un appel, sinon le dernier lot meurt
         // avec l'app. C'est un seul POST, sans incidence sur la batterie.
         Task { [feedSignals] in await feedSignals.flushNow() }
+        // Méthode v3 : un test d'expérience ne se poursuit jamais en arrière-plan.
+        experienceSessionIfCreated?.setForeground(false)
         // Envois restés en attente : iOS réveillera l'app pour les renvoyer.
         PendingQueueBackgroundTasks.schedule()
         // Le live-share de conversation est volontairement « premier plan » :
@@ -681,6 +694,7 @@ final class AppServices: ObservableObject {
     /// Retour au premier plan : la diffusion reprend si les réglages de partage
     /// et le mode l'autorisent (`reevaluate()` tranche).
     func enterForeground() {
+        experienceSessionIfCreated?.setForeground(true)
         if networkPath.isOnline {
             epochRotations.resume()
             pendingQueues.flush()

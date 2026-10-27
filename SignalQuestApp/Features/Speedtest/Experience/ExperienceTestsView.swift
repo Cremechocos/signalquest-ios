@@ -1,0 +1,552 @@
+import SwiftUI
+
+/// Mode « Expérience » de l'onglet Speedtest (maquette v3 du 26/10) : l'entrée avec les
+/// cinq tests, le direct pendant la mesure, puis le résultat ou l'état de fin.
+/// Aucun plafond : en données mobiles, un avertissement dit seulement la consommation.
+struct ExperienceTestsView: View {
+    @ObservedObject var model: ExperienceTestsModel
+
+    var body: some View {
+        VStack(spacing: SQSpace.lg) {
+            if model.running {
+                ExperienceRunningView(model: model)
+            } else if let finished = model.finished {
+                ExperienceResultView(model: model, finished: finished)
+            } else {
+                ExperienceEntryView(model: model)
+            }
+        }
+        .task { await model.refreshLastTest() }
+    }
+}
+
+extension ExperienceTestKind {
+    /// Ce que mesure le test, sous son titre à l'entrée.
+    var entrySubtitle: String {
+        switch self {
+        case .videoLadder: String(localized: "480p à 4K")
+        case .videoAdaptive: String(localized: "30 s · note /100")
+        case .webPage: String(localized: "3 ouvertures")
+        case .gameAndCalls: String(localized: "30 s + charge")
+        case .upload: String(localized: "Photo 5 Mo · vidéo 30 Mo")
+        }
+    }
+
+    /// Libellé court de la frise du direct.
+    var shortTitle: String {
+        switch self {
+        case .videoLadder: String(localized: "Échelle")
+        case .videoAdaptive: String(localized: "Adaptatif")
+        case .webPage: String(localized: "Web")
+        case .gameAndCalls: String(localized: "Jeu")
+        case .upload: String(localized: "Envoi")
+        }
+    }
+}
+
+extension ExperienceNetworkDisplay {
+    /// « 4G », « 5G NSA », « Wi-Fi » ; rien quand le lien n'est pas connu.
+    var label: String? {
+        switch connection {
+        case .wifi: String(localized: "Wi-Fi")
+        case .wired: String(localized: "Ethernet")
+        case .cellular: technology?.rawValue ?? String(localized: "Réseau mobile")
+        default: nil
+        }
+    }
+}
+
+// MARK: - Entrée
+
+private struct ExperienceEntryView: View {
+    @ObservedObject var model: ExperienceTestsModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        VStack(spacing: SQSpace.md) {
+            if model.offlineAtStart {
+                offlineCard
+            }
+            VStack(spacing: 0) {
+                ForEach(ExperienceMethod.order, id: \.self) { test in
+                    row(test)
+                    if test != ExperienceMethod.order.last {
+                        Divider().padding(.leading, 52)
+                    }
+                }
+            }
+            .sqCardBackground()
+
+            budgetCard
+            launchButton
+            if let last = model.lastTest {
+                ExperienceLastTestLine(item: last)
+            }
+        }
+    }
+
+    private func row(_ test: ExperienceTestKind) -> some View {
+        let isOn = model.selected.contains(test)
+        let megabytes = ExperienceBudget.megabytesCeil(ExperienceBudget.maxBytes(test))
+        let seconds = ExperienceEstimate.durationSeconds(test)
+        return Button {
+            Haptics.selection()
+            model.toggle(test)
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isOn ? SQColor.accent : SQColor.labelTertiary)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(LocalizedStringKey(test.title))
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: test.entrySubtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    // Tailles AX : la colonne de droite cassait les titres au milieu des mots.
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text(verbatim: "\(String(localized: "≤ \(megabytes) Mo")) · \(String(localized: "≈ \(seconds) s"))")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.label)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("≤ \(megabytes) Mo")
+                            .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                            .foregroundStyle(SQColor.label)
+                        Text("≈ \(seconds) s")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .monospacedDigit()
+                }
+            }
+            .padding(.horizontal, SQSpace.cardPadding)
+            .padding(.vertical, SQSpace.sm2)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityIdentifier("experience.test.\(test.rawValue)")
+    }
+
+    private var budgetCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            if let network = model.network.label {
+                Text("Réseau mesuré : \(network)")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            Text("Consommation maximale \(model.maxMegabytes) Mo · \(ExperienceResultText.about(seconds: model.estimatedSeconds))")
+                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.label)
+                .monospacedDigit()
+            if model.network.isMobile, !model.selected.isEmpty {
+                Label {
+                    Text("Données mobiles : jusqu’à \(model.maxMegabytes) Mo décomptés du forfait")
+                } icon: {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("experience.mobileDataWarning")
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(SQSpace.cardPadding)
+        .sqCardBackground(SQColor.surfaceMuted)
+    }
+
+    private var launchButton: some View {
+        let count = model.selected.count
+        return Button {
+            Haptics.light()
+            Task { await model.start() }
+        } label: {
+            Text(count == 0 ? String(localized: "Choisir au moins un test") : String(localized: "Lancer \(count) tests"))
+                .font(SQFont.body(15, .bold, relativeTo: .headline))
+                .foregroundStyle(count == 0 ? SQColor.labelSecondary : SQColor.onInk)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(count == 0 ? SQColor.chip : SQColor.label, in: Capsule(style: .continuous))
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .disabled(count == 0)
+        .accessibilityIdentifier("experience.start")
+    }
+
+    private var offlineCard: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SQColor.dangerInk)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pas de connexion")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                Text("Rien n’a été consommé.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Réessayer") {
+                Haptics.light()
+                Task { await model.start() }
+            }
+            .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.lg)
+            .frame(minHeight: 44)
+            .background(SQColor.chip, in: Capsule(style: .continuous))
+            .buttonStyle(SQPressButtonStyle())
+        }
+        .padding(SQSpace.cardPadding)
+        .sqCardBackground(SQColor.dangerSoft)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("experience.offline")
+    }
+}
+
+/// « Dernier test · hier 18:42 » et ses valeurs, comme la carte du fil.
+private struct ExperienceLastTestLine: View {
+    let item: ExperienceHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Dernier test · \(item.measuredAt.formatted(.relative(presentation: .named, unitsStyle: .wide)))")
+                .font(SQFont.body(9.5, .bold, relativeTo: .caption2))
+                .tracking(9.5 * 0.18)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+            Text(verbatim: summary)
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .sqCardBackground()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("experience.lastTest")
+    }
+
+    private var summary: String {
+        item.highlights.feedMetrics
+            .map { "\(String(localized: String.LocalizationValue($0.label))) \($0.value)" }
+            .joined(separator: " · ")
+    }
+}
+
+// MARK: - En cours
+
+private struct ExperienceRunningView: View {
+    @ObservedObject var model: ExperienceTestsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(rankTitle)
+                        .font(SQFont.body(10, .bold, relativeTo: .caption))
+                        .tracking(10 * 0.16)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Text(LocalizedStringKey(model.live?.test.title ?? "Préparation"))
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    Haptics.light()
+                    model.stop()
+                } label: {
+                    Text("Arrêter")
+                        .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
+                        .background(SQColor.chip, in: Capsule(style: .continuous))
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityIdentifier("experience.stop")
+            }
+
+            if let live = model.live {
+                FeedMetricGrid(metrics: Self.metrics(live))
+            } else {
+                HStack(spacing: SQSpace.sm) {
+                    ProgressView()
+                    Text("Préparation du test")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 64)
+            }
+
+            timeline
+
+            Text("Données utilisées : \(ExperienceResultText.megabytes(model.live?.bytesUsed ?? 0)) sur \(model.maxMegabytes) au maximum")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SQSpace.lg)
+        .sqCardBackground()
+        .accessibilityIdentifier("experience.running")
+    }
+
+    private var rankTitle: String {
+        if let rank = model.liveRank {
+            return String(localized: "Test d’expérience · \(rank.index) sur \(rank.total)")
+        }
+        return String(localized: "Test d’expérience")
+    }
+
+    /// Frise des tests lancés : faits, en cours, à venir.
+    private var timeline: some View {
+        let order = ExperienceMethod.order.filter(model.selected.contains)
+        let current = model.liveRank.map { $0.index - 1 } ?? -1
+        return HStack(spacing: SQSpace.xs) {
+            ForEach(Array(order.enumerated()), id: \.element) { index, test in
+                Text(verbatim: test.shortTitle)
+                    .font(SQFont.body(11.5, index == current ? .bold : .semibold, relativeTo: .caption))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(index == current ? SQColor.onAccent : index < current ? SQColor.label : SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .background(index == current ? SQColor.accent : index < current ? SQColor.accentSoft : SQColor.chip,
+                                in: Capsule(style: .continuous))
+                    .accessibilityLabel(Text(verbatim: test.shortTitle) + Text(verbatim: ", ")
+                        + Text(index == current ? "en cours" : index < current ? "fini" : "à venir"))
+            }
+        }
+    }
+
+    /// Ce que le moteur mesure à l'instant ; jamais de valeur inventée avant la première mesure.
+    static func metrics(_ live: ExperienceLive) -> [FeedMetricGrid.Metric] {
+        switch live.test {
+        case .videoLadder, .videoAdaptive:
+            var metrics: [FeedMetricGrid.Metric] = []
+            if let quality = live.quality { metrics.append(.init(label: "Qualité", value: quality.label, highlight: true)) }
+            metrics.append(.init(label: "Tampon", value: ExperienceResultText.waiting(live.bufferAheadMs)))
+            metrics.append(.init(label: "Coupures vidéo", value: "\(live.stallCount)"))
+            if live.test == .videoAdaptive {
+                let total = ExperienceMethod.adaptivePlaybackMs / 1_000
+                metrics.append(.init(label: "Lecture", value: "\(max(0, live.playedMs) / 1_000) s / \(total) s"))
+            }
+            return metrics
+        case .webPage:
+            return [.init(label: "Ouverture", value: "\(live.step) / \(ExperienceMethod.webOpenings)", highlight: true)]
+        case .gameAndCalls:
+            // Sondes finies : courte charge montante et descendante, sans valeur intermédiaire.
+            if live.step >= ExperienceMethod.gameProbeSlots {
+                return [.init(label: "Latence sous charge", value: String(localized: "Mesure en cours"), highlight: true)]
+            }
+            var metrics: [FeedMetricGrid.Metric] = []
+            if let rtt = live.latestRttMs { metrics.append(.init(label: "Latence", value: "\(rtt) ms", highlight: true)) }
+            metrics.append(.init(label: "Mesures", value: "\(live.step) / \(ExperienceMethod.gameProbeSlots)"))
+            return metrics
+        case .upload:
+            let value = live.step <= 1 ? String(localized: "Photo · 5 Mo") : String(localized: "Vidéo · 30 Mo")
+            return [.init(label: "Envoi", value: value, highlight: true)]
+        }
+    }
+}
+
+// MARK: - Résultat
+
+private struct ExperienceResultView: View {
+    @ObservedObject var model: ExperienceTestsModel
+    let finished: ExperienceFinished
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            header
+            if finished.finish != .completed {
+                stopBanner
+            }
+            VStack(spacing: 0) {
+                ForEach(tests, id: \.self) { test in
+                    resultRow(test)
+                    if test != tests.last { Divider().padding(.leading, SQSpace.cardPadding) }
+                }
+            }
+            .sqCardBackground()
+
+            usageLine
+            saveLine
+            actionButton
+        }
+        .accessibilityIdentifier("experience.result")
+    }
+
+    private var tests: [ExperienceTestKind] { ExperienceMethod.order.filter(finished.selected.contains) }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Test d’expérience · \(finished.endedAt.formatted(date: .omitted, time: .shortened))")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let network = finished.network.label {
+                Text(verbatim: network)
+                    .font(SQFont.body(12.5, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(SQColor.chipInk)
+                    .padding(.horizontal, SQSpace.sm2)
+                    .padding(.vertical, SQSpace.xs)
+                    .background(SQColor.chip, in: Capsule(style: .continuous))
+            }
+        }
+    }
+
+    /// Fin avant terme : la cause, et la garantie que les mesures finies sont gardées.
+    private var stopBanner: some View {
+        let title: String = switch finished.finish {
+        case .userStopped: String(localized: "Test arrêté")
+        case .networkChanged: String(localized: "Réseau changé pendant le test")
+        case .background: String(localized: "App passée en arrière-plan pendant le test")
+        case .offline: String(localized: "Connexion perdue pendant le test")
+        case .completed: ""
+        }
+        return HStack(alignment: .top, spacing: SQSpace.md) {
+            Image(systemName: finished.finish == .userStopped ? "stop.circle" : "exclamationmark.triangle")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title)
+                    .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                Text("Mesures finies gardées")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(SQSpace.cardPadding)
+        .sqCardBackground(SQColor.warningSoft)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("experience.stopBanner")
+    }
+
+    private func resultRow(_ test: ExperienceTestKind) -> some View {
+        let line = ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test])
+        return HStack(alignment: .top, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(LocalizedStringKey(test.title))
+                    .font(SQFont.body(10, .bold, relativeTo: .caption))
+                    .tracking(10 * 0.12)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SQColor.labelSecondary)
+                Text(verbatim: line.headline)
+                    .font(SQFont.body(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                if let detail = line.detail {
+                    Text(verbatim: detail)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let score = line.score {
+                VStack(spacing: 0) {
+                    Text(verbatim: "\(score)")
+                        .font(SQFont.display(24, .heavy, relativeTo: .title2))
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: "/100")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Note \(score) sur 100"))
+            }
+        }
+        .padding(SQSpace.cardPadding)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("experience.result.\(test.rawValue)")
+    }
+
+    private var usageLine: some View {
+        HStack(spacing: SQSpace.lg) {
+            ExperienceFigure(label: "Données utilisées", value: ExperienceResultText.megabytes(finished.run.bytesUsed))
+            ExperienceFigure(label: "Durée", value: ExperienceResultText.duration(seconds: Int(finished.run.durationMs / 1_000)))
+        }
+    }
+
+    @ViewBuilder
+    private var saveLine: some View {
+        let text: String? = switch finished.save {
+        case .none: String(localized: "Rien n’a été mesuré : rien n’est enregistré.")
+        case .saving: String(localized: "Enregistrement…")
+        case .queued: String(localized: "Enregistré · envoi au compte en attente")
+        case .localOnly: String(localized: "Enregistré sur cet appareil, sans compte")
+        case .keptOnPhone: String(localized: "Gardé sur cet appareil seulement")
+        }
+        if let text {
+            Label {
+                Text(verbatim: text)
+            } icon: {
+                Image(systemName: finished.save == .none ? "xmark.circle" : "checkmark.circle")
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("experience.saveState")
+        }
+    }
+
+    /// Interrompu par l'extérieur : « Relancer » ; sinon « Nouveau test ».
+    private var actionButton: some View {
+        let relaunch = finished.finish == .networkChanged || finished.finish == .background || finished.finish == .offline
+        return Button {
+            Haptics.light()
+            model.newTest()
+            if relaunch { Task { await model.start() } }
+        } label: {
+            Text(relaunch ? "Relancer" : "Nouveau test")
+                .font(SQFont.body(15, .bold, relativeTo: .headline))
+                .foregroundStyle(SQColor.onInk)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(SQColor.label, in: Capsule(style: .continuous))
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityIdentifier("experience.newTest")
+    }
+}
+
+/// Un chiffre et son libellé, sous le résultat.
+private struct ExperienceFigure: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(LocalizedStringKey(label))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            Text(verbatim: value)
+                .font(SQFont.body(16, .bold, relativeTo: .headline))
+                .foregroundStyle(SQColor.label)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : \(value)"))
+    }
+}

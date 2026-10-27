@@ -210,8 +210,15 @@ enum ExperienceResultText {
         return String(localized: "\(value) Mo")
     }
 
-    /// « 2 min 39 s », « 58 s ».
+    /// Durée annoncée avant le lancement : « environ 2 min 30 », « environ 50 s ».
+    static func about(seconds: Int) -> String {
+        guard seconds >= 60 else { return String(localized: "environ \(seconds) s") }
+        let rest = seconds % 60 < 10 ? "0\(seconds % 60)" : "\(seconds % 60)"
+        return String(localized: "environ \(seconds / 60) min \(rest)")
+    }
+
+    /// « 2 min 39 s », « 58 s », sans coupure de ligne au milieu.
     static func duration(seconds: Int) -> String {
-        seconds < 60 ? "\(seconds) s" : String(localized: "\(seconds / 60) min \(seconds % 60) s")
+        seconds < 60 ? "\(seconds)\u{00A0}s" : String(localized: "\(seconds / 60) min \(seconds % 60) s")
     }
 }

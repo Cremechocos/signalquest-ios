@@ -35,6 +35,8 @@ struct SpeedtestView: View {
     /// Les anciens speedtests cellulaires sont publiés à leur tour (hors zones
     /// privées) : on le dit une fois, au-dessus de l'historique où l'on masque un test.
     @AppStorage("speedtest_map_publication_notice_seen_v1") private var mapPublicationNoticeSeen = false
+    /// Débit (speedtest) ou Expérience (vidéo, pages, jeu, envoi) : maquette v3 du 26/10.
+    @State private var mode: SpeedtestMode = .throughput
     @State private var phase: SpeedtestPhase = .idle
     /// Hauteur visible de l'écran : sur iPhone SE ou 8, le cadran pleine taille
     /// repoussait « Lancer le test » sous la barre d'onglets (UI-01).
@@ -309,66 +311,78 @@ struct SpeedtestView: View {
                 }
             }
 
-            if isVPNActive {
-                alertCard(
-                    title: "VPN actif",
-                    message: String(localized: "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."),
-                    systemImage: "lock.shield",
-                    tone: .warning
-                )
+            SpeedtestModePicker(mode: $mode, experience: services.experienceSession, speedtestRunning: isRunning)
+
+            if mode == .experience {
+                ExperienceTestsView(model: services.experienceSession)
+            } else {
+                throughputContent
             }
-
-            stage
-
-            if let burstSummary {
-                burstSummaryCard(burstSummary)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
-            if let runErrorMessage {
-                runErrorCard(runErrorMessage)
-                    .transition(.opacity)
-            }
-
-            // Le message brut du serveur (« not found »…) ne dit rien à
-            // l'utilisateur : la carte dit ce qui arrive au résultat.
-            if errorMessage != nil {
-                alertCard(
-                    title: "Speedtest non synchronisé",
-                    message: String(localized: "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra."),
-                    systemImage: "exclamationmark.icloud",
-                    tone: .danger,
-                    actionTitle: "Réessayer",
-                    actionStyle: .secondary,
-                    isBusy: isRetryingPendingSave
-                ) {
-                    guard !isRetryingPendingSave else { return }
-                    isRetryingPendingSave = true
-                    Task {
-                        defer { isRetryingPendingSave = false }
-                        do {
-                            try await services.speedtest.retryPendingSavesReporting()
-                            self.errorMessage = nil
-                        } catch {
-                            self.errorMessage = error.userFacingMessage
-                        }
-                        history = await services.speedtest.history()
-                        pendingHistoryIds = await services.speedtest.pendingClientIds()
-                    }
-                }
-                .transition(.opacity)
-            }
-
-            historySection
-                .id(Self.historyAnchor)
-                // La refonte a supprimé le titre « Historique » : l'ancre
-                // remplace ce libellé pour les tests UI.
-                .accessibilityIdentifier("speedtest.history")
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.top, SQSpace.sm)
         .padding(.bottom, SQSpace.huge + SQSpace.huge)
         .sqReadableWidth()
+    }
+
+    /// Le speedtest : GO, mesure, résultat, puis l'historique.
+    @ViewBuilder
+    private var throughputContent: some View {
+        if isVPNActive {
+            alertCard(
+                title: "VPN actif",
+                message: String(localized: "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."),
+                systemImage: "lock.shield",
+                tone: .warning
+            )
+        }
+
+        stage
+
+        if let burstSummary {
+            burstSummaryCard(burstSummary)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+
+        if let runErrorMessage {
+            runErrorCard(runErrorMessage)
+                .transition(.opacity)
+        }
+
+        // Le message brut du serveur (« not found »…) ne dit rien à
+        // l'utilisateur : la carte dit ce qui arrive au résultat.
+        if errorMessage != nil {
+            alertCard(
+                title: "Speedtest non synchronisé",
+                message: String(localized: "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra."),
+                systemImage: "exclamationmark.icloud",
+                tone: .danger,
+                actionTitle: "Réessayer",
+                actionStyle: .secondary,
+                isBusy: isRetryingPendingSave
+            ) {
+                guard !isRetryingPendingSave else { return }
+                isRetryingPendingSave = true
+                Task {
+                    defer { isRetryingPendingSave = false }
+                    do {
+                        try await services.speedtest.retryPendingSavesReporting()
+                        self.errorMessage = nil
+                    } catch {
+                        self.errorMessage = error.userFacingMessage
+                    }
+                    history = await services.speedtest.history()
+                    pendingHistoryIds = await services.speedtest.pendingClientIds()
+                }
+            }
+            .transition(.opacity)
+        }
+
+        historySection
+            .id(Self.historyAnchor)
+            // La refonte a supprimé le titre « Historique » : l'ancre
+            // remplace ce libellé pour les tests UI.
+            .accessibilityIdentifier("speedtest.history")
     }
 
     private static let historyAnchor = "speedtest.history.anchor"
@@ -619,15 +633,17 @@ struct SpeedtestView: View {
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .sqHeader()
-            if !isRunning, let result {
+            if mode == .throughput, !isRunning, let result {
                 headerButton(systemImage: "square.and.arrow.up", label: "Partager le résultat") {
                     Haptics.light()
                     sharePreviewResult = result
                 }
                 .accessibilityIdentifier("speedtest.share")
             }
-            headerButton(systemImage: "clock.arrow.circlepath", label: "Historique", action: showHistory)
-                .accessibilityIdentifier("speedtest.historyButton")
+            if mode == .throughput {
+                headerButton(systemImage: "clock.arrow.circlepath", label: "Historique", action: showHistory)
+                    .accessibilityIdentifier("speedtest.historyButton")
+            }
             Menu {
                 Button { showDriveTest = true } label: {
                     Label("Drive Test", systemImage: "location.north.line.fill")
@@ -1880,6 +1896,31 @@ private struct AlertCardSurface: ViewModifier {
             content.sqCardBackground()
         } else {
             content
+        }
+    }
+}
+
+/// Mode de l'onglet Speedtest.
+enum SpeedtestMode: Hashable {
+    case throughput, experience
+}
+
+/// « Débit | Expérience », caché pendant une mesure : on ne lance pas un test dans
+/// l'autre mode tant que le premier tourne.
+private struct SpeedtestModePicker: View {
+    @Binding var mode: SpeedtestMode
+    @ObservedObject var experience: ExperienceTestsModel
+    let speedtestRunning: Bool
+
+    var body: some View {
+        if !speedtestRunning, !experience.running {
+            SQSegmentedFilter(selection: $mode, options: [
+                (value: .throughput, label: "Débit", icon: nil),
+                (value: .experience, label: "Expérience", icon: nil),
+            ])
+            // Le filtre porte sa propre marge : aligné sur le titre, comme les autres listes.
+            .padding(.horizontal, -SQSpace.lg)
+            .accessibilityIdentifier("speedtest.mode")
         }
     }
 }

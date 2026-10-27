@@ -182,6 +182,35 @@ final class ExperienceTestsModelTests: XCTestCase {
         XCTAssertEqual(recorder.engines.first?.stopReasons, [.background])
     }
 
+    func testDiscardOnAccountChangeStopsTheRunAndSavesNothing() async throws {
+        let recorder = Recorder()
+        var resume: CheckedContinuation<Void, Never>?
+        let model = model(recorder: recorder, beforeContext: {
+            await withCheckedContinuation { resume = $0 }
+        })
+        model.update(status: status(.wifi), online: true)
+        let task = Task { await model.start() }
+        while resume == nil { await Task.yield() }
+        model.discard()
+        XCTAssertFalse(model.running)
+        resume?.resume()
+        await task.value
+        XCTAssertTrue(recorder.engines.isEmpty, "pas de moteur lancé après le changement de compte")
+        XCTAssertTrue(recorder.submissions.isEmpty)
+        XCTAssertNil(model.finished)
+
+        let running = Recorder()
+        let other = self.model(recorder: running, onRun: { try? await Task.sleep(nanoseconds: 20_000_000) })
+        other.update(status: status(.wifi), online: true)
+        let second = Task { await other.start() }
+        while running.engines.isEmpty { await Task.yield() }
+        other.discard()
+        await second.value
+        XCTAssertEqual(running.engines.first?.stopReasons, [.userStopped])
+        XCTAssertTrue(running.submissions.isEmpty, "le résultat de l'ancien compte n'est pas enregistré")
+        XCTAssertNil(other.finished)
+    }
+
     // MARK: Reprise d'un speedtest récent
 
     func testRecentSpeedtestOnTheSameWiFiIsReused() async throws {
