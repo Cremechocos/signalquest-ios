@@ -459,48 +459,11 @@ private struct ExperienceResultView: View {
     }
 
     private func resultRowContent(_ test: ExperienceTestKind, chevron: Bool) -> some View {
-        let line = ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test])
-        return HStack(alignment: .top, spacing: SQSpace.md) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(LocalizedStringKey(test.title))
-                    .font(SQFont.body(10, .bold, relativeTo: .caption))
-                    .tracking(10 * 0.12)
-                    .textCase(.uppercase)
-                    .foregroundStyle(SQColor.labelSecondary)
-                Text(verbatim: line.headline)
-                    .font(SQFont.body(15, .semibold, relativeTo: .body))
-                    .foregroundStyle(SQColor.label)
-                if let detail = line.detail {
-                    Text(verbatim: detail)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if let score = line.score {
-                VStack(spacing: 0) {
-                    Text(verbatim: "\(score)")
-                        .font(SQFont.display(24, .heavy, relativeTo: .title2))
-                        .foregroundStyle(SQColor.label)
-                    Text(verbatim: "/100")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text("Note \(score) sur 100"))
-            }
-            if chevron {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .padding(.top, 2)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(SQSpace.cardPadding)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        ExperienceResultRowContent(
+            test: test,
+            line: ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test]),
+            chevron: chevron
+        )
     }
 
     private var usageLine: some View {
@@ -629,5 +592,57 @@ private struct ExperienceFigure: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : \(value)"))
+    }
+}
+
+/// Une ligne du résultat : le test, sa phrase, sa note vidéo à part. Partagée avec la fiche
+/// d'un test de l'historique.
+struct ExperienceResultRowContent: View {
+    let test: ExperienceTestKind
+    let line: ExperienceResultText.Line
+    let chevron: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(LocalizedStringKey(test.title))
+                    .font(SQFont.body(10, .bold, relativeTo: .caption))
+                    .tracking(10 * 0.12)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SQColor.labelSecondary)
+                Text(verbatim: line.headline)
+                    .font(SQFont.body(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                if let detail = line.detail {
+                    Text(verbatim: detail)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let score = line.score {
+                VStack(spacing: 0) {
+                    Text(verbatim: "\(score)")
+                        .font(SQFont.display(24, .heavy, relativeTo: .title2))
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: "/100")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Note \(score) sur 100"))
+            }
+            if chevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(SQSpace.cardPadding)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

@@ -159,6 +159,9 @@ final class AppServices: ObservableObject {
         experienceSessionIfCreated = session
         return session
     }
+    /// Historique des tests d'expérience (téléphone + serveur) de la liste commune du Speedtest :
+    /// gardé ici pour ne pas retirer la première page à chaque changement de mode.
+    lazy var experienceHistory = ExperienceHistoryModel(environment: .live(experienceTests))
     /// Renvoi groupé des envois en attente, au retour du réseau et au premier plan.
     lazy var pendingQueues: PendingQueueFlusher = makePendingQueues()
 

@@ -3,13 +3,17 @@ import SwiftUI
 /// Détail d'un test du résultat (maquette v3, « Détail ») : chaque valeur mesurée, ce qui ne
 /// l'est pas, la consommation du test et la méthode. Rien n'est recalculé ni estimé ici.
 struct ExperienceDetailView: View {
-    @ObservedObject var model: ExperienceTestsModel
-    let finished: ExperienceFinished
+    let tests: ExperienceTestsResult
+    var failure: ExperienceFailureCause?
+    var usage: ExperienceTestUsage?
+    /// Âge du speedtest dont les latences sous charge ont été reprises, quand on le connaît.
+    var reusedSpeedtestAge: TimeInterval?
     let test: ExperienceTestKind
+    let back: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            ExperienceBackBar(model: model, title: test.title)
+            ExperienceBackBar(title: test.title, action: back)
             Text(verbatim: line.headline)
                 .font(SQType.title)
                 .foregroundStyle(SQColor.label)
@@ -18,7 +22,7 @@ struct ExperienceDetailView: View {
 
             content
 
-            if let usage = finished.run.usage[test] {
+            if let usage {
                 Text("Données utilisées : \(ExperienceResultText.megabytes(usage.bytes)) · durée \(ExperienceResultText.duration(seconds: Int(usage.durationMs / 1_000)))")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -31,12 +35,11 @@ struct ExperienceDetailView: View {
     }
 
     private var line: ExperienceResultText.Line {
-        ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test])
+        ExperienceResultText.line(test, in: tests, failure: failure)
     }
 
     @ViewBuilder
     private var content: some View {
-        let tests = finished.run.tests
         switch test {
         case .videoLadder: if let result = tests.videoLadder { ladder(result) }
         case .videoAdaptive: if let result = tests.videoAdaptive { adaptive(result) }
@@ -217,7 +220,7 @@ struct ExperienceDetailView: View {
                           value: value.loadedDownMs.map { "\($0) ms" } ?? String(localized: "Non mesurée"))
                 ExperienceFactRow(label: "Pendant un envoi",
                           value: value.loadedUpMs.map { "\($0) ms" } ?? String(localized: "Non mesurée"))
-                Text(verbatim: ExperienceResultText.underLoadSource(value.source, reusedAge: finished.reusedSpeedtestAge))
+                Text(verbatim: ExperienceResultText.underLoadSource(value.source, reusedAge: reusedSpeedtestAge))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -251,6 +254,14 @@ struct ExperienceDetailView: View {
     }
 }
 
+extension ExperienceDetailView {
+    /// Le test qu'on vient de lancer.
+    init(model: ExperienceTestsModel, finished: ExperienceFinished, test: ExperienceTestKind) {
+        self.init(tests: finished.run.tests, failure: finished.run.failures[test], usage: finished.run.usage[test],
+                  reusedSpeedtestAge: finished.reusedSpeedtestAge, test: test, back: { model.back() })
+    }
+}
+
 // MARK: - Consommation et durée
 
 struct ExperienceUsageView: View {
@@ -259,7 +270,7 @@ struct ExperienceUsageView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            ExperienceBackBar(model: model, title: "Consommation et durée")
+            ExperienceBackBar(title: "Consommation et durée") { model.back() }
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(ExperienceResultText.megabytes(finished.run.bytesUsed)) utilisés")
                     .font(SQType.title)
@@ -297,14 +308,14 @@ struct ExperienceUsageView: View {
 
 /// « ‹ Résultat » et le titre de la page.
 private struct ExperienceBackBar: View {
-    @ObservedObject var model: ExperienceTestsModel
     let title: String
+    let action: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             Button {
                 Haptics.selection()
-                model.back()
+                action()
             } label: {
                 Label("Résultat", systemImage: "chevron.left")
                     .font(SQFont.body(14, .semibold, relativeTo: .subheadline))

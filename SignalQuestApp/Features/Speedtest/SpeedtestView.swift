@@ -67,6 +67,8 @@ struct SpeedtestView: View {
     @State private var pendingHistoryIds: Set<UUID> = []
     /// Derniers tests du compte, tous appareils (UI-12). Vide en invité.
     @State private var accountHistory: [SocialShareableSpeedtest] = []
+    /// « Tous · Speedtests · Expérience » ; visible seulement avec un test d'expérience.
+    @State private var historyKind: HistoryKind = .all
     /// Dernière page chargée des tests du compte, et s'il en reste après.
     @State private var accountPage = 1
     @State private var accountHasMore = false
@@ -281,10 +283,15 @@ struct SpeedtestView: View {
             history = await services.speedtest.history()
             pendingHistoryIds = await services.speedtest.pendingClientIds()
             await loadAccountHistory()
+            await services.experienceHistory.refresh()
             await runQASpeedtestIfNeeded()
         }
         .onReceive(services.networkPath.$status) { status in
             handleNetworkStatusUpdate(status)
+        }
+        // Un test d'expérience enregistré rejoint l'historique commun.
+        .onReceive(services.experienceSession.$lastTest.dropFirst()) { _ in
+            Task { await services.experienceHistory.refresh() }
         }
         .onChangeCompat(of: scenePhase) { _, newValue in
             // Le test CONTINUE en arrière-plan (assertion `beginBackgroundTask`).
@@ -295,6 +302,7 @@ struct SpeedtestView: View {
                 Task {
                     history = await services.speedtest.history()
                     pendingHistoryIds = await services.speedtest.pendingClientIds()
+                    await services.experienceHistory.refresh()
                 }
             }
         }
@@ -1103,7 +1111,27 @@ struct SpeedtestView: View {
         SpeedtestAccountHistory.accountOnly(accountHistory, local: history)
     }
 
+    /// Speedtests et tests d'expérience : le sélecteur n'apparaît qu'avec un test d'expérience.
     private var historySection: some View {
+        UnifiedHistorySection(
+            experience: services.experienceHistory,
+            kind: $historyKind,
+            local: history,
+            pendingIds: pendingHistoryIds,
+            account: accountHistory,
+            accountOnly: accountOnlyHistory,
+            accountHasMore: accountHasMore,
+            loadingMoreAccount: loadingMoreAccountHistory,
+            openLocal: { detailResult = $0 },
+            openAccount: { selectedAccountTest = $0 },
+            loadMoreAccount: { await loadMoreAccountHistory() },
+            loadDetail: { [services] in try await services.experienceTests.entryDetail($0) }
+        ) {
+            speedtestHistory
+        }
+    }
+
+    private var speedtestHistory: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             if !guestMode, !history.isEmpty, !mapPublicationNoticeSeen {
                 mapPublicationNotice

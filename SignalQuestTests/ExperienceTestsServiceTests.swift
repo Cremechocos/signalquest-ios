@@ -326,6 +326,34 @@ final class ExperienceTestsServiceTests: XCTestCase {
         XCTAssertEqual(detail.result?.tests, measuredTests())
     }
 
+    func testHistoryDetailReadsThePhoneFirstWithUsageAndCauses() async throws {
+        let server = FakeServer { _ in throw APIError.transport("offline") }
+        let service = service(server, root: temporaryRoot())
+        _ = await service.save(submission(measuredTests()), run: run(failures: [.webPage: .serverBusy]))
+        let items = await service.localItems()
+        let item = try XCTUnwrap(items.first)
+        let before = server.sent.count
+        let detail = try await service.entryDetail(item)
+        XCTAssertEqual(server.sent.count, before, "le téléphone suffit")
+        XCTAssertEqual(detail.result.tests, measuredTests())
+        XCTAssertEqual(detail.usage[.videoLadder], ExperienceTestUsage(bytes: 3_875_000, durationMs: 20_000))
+        XCTAssertEqual(detail.failures[.webPage], .serverBusy)
+    }
+
+    func testHistoryDetailOfAnotherDeviceComesFromTheServer() async throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: try submission(measuredTests()).body()) as? [String: Any])
+        object["id"] = "srv-1"
+        let data = try JSONSerialization.data(withJSONObject: ["experienceTest": object])
+        let server = FakeServer { _ in data }
+        let service = service(server, root: temporaryRoot())
+        let item = ExperienceHistoryItem(id: "srv-1", measuredAt: Date(), platform: "android", connectionType: "wifi",
+                                         highlights: ExperienceHighlights(), states: [:])
+        let detail = try await service.entryDetail(item)
+        XCTAssertEqual(server.sent.map(\.path), ["/api/experience-tests/srv-1"])
+        XCTAssertEqual(detail.result.tests, measuredTests())
+        XCTAssertTrue(detail.usage.isEmpty, "le serveur ne garde pas la consommation par test")
+    }
+
     // MARK: Suppression
 
     func testDeletingAnUnsentTestStaysLocal() async throws {

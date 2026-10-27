@@ -82,6 +82,40 @@ struct ExperienceDetail: Equatable, Sendable {
     let postVisibility: String?
 }
 
+/// La fiche d'un test de l'historique : le résultat et, pour un test de ce téléphone, sa
+/// consommation par test et ses causes d'échec (le serveur ne garde ni l'une ni les autres).
+struct ExperienceHistoryEntryDetail: Equatable, Sendable {
+    let result: ExperienceStoredResult
+    var usage: [ExperienceTestKind: ExperienceTestUsage] = [:]
+    var failures: [ExperienceTestKind: ExperienceFailureCause] = [:]
+
+    init(result: ExperienceStoredResult, usage: [ExperienceTestKind: ExperienceTestUsage] = [:],
+         failures: [ExperienceTestKind: ExperienceFailureCause] = [:]) {
+        self.result = result
+        self.usage = usage
+        self.failures = failures
+    }
+
+    /// Depuis le journal du téléphone ; nil si le corps gardé est illisible.
+    init?(record: ExperienceJournalRecord) {
+        guard let result = record.result else { return nil }
+        var usage: [ExperienceTestKind: ExperienceTestUsage] = [:]
+        for (key, value) in record.usage {
+            if let kind = ExperienceTestKind(rawValue: key) { usage[kind] = ExperienceTestUsage(bytes: value.bytes, durationMs: value.durationMs) }
+        }
+        var failures: [ExperienceTestKind: ExperienceFailureCause] = [:]
+        for (key, value) in record.failureCauses {
+            guard let kind = ExperienceTestKind(rawValue: key) else { continue }
+            failures[kind] = switch value {
+            case "serverBusy": .serverBusy
+            case "routeChanged": .routeChanged
+            default: .generic
+            }
+        }
+        self.init(result: result, usage: usage, failures: failures)
+    }
+}
+
 /// Filtres de l'historique, ceux de `GET /api/user/speedtests`.
 struct ExperienceHistoryQuery: Equatable, Sendable {
     var period = "30d"
@@ -373,6 +407,16 @@ final class ExperienceTestsService {
         let data = try await send(APIEndpoint(path: "\(ExperienceAPIMapping.endpoint)/\(Self.pathSegment(id))"))
         guard let detail = ExperienceAPIMapping.parseDetail(data) else { throw APIError.decoding("experience-detail") }
         return detail
+    }
+
+    /// Fiche d'une ligne de l'historique : le journal du téléphone d'abord, sinon le serveur.
+    func entryDetail(_ item: ExperienceHistoryItem) async throws -> ExperienceHistoryEntryDetail {
+        let records = await localRecords()
+        let record = item.clientSubmissionId.flatMap { id in records.first { $0.clientSubmissionId == id } }
+            ?? records.first { $0.serverId == item.id }
+        if let record, let detail = ExperienceHistoryEntryDetail(record: record) { return detail }
+        guard let result = try await detail(id: item.id).result else { throw APIError.decoding("experience-detail") }
+        return ExperienceHistoryEntryDetail(result: result)
     }
 
     // MARK: Suppression

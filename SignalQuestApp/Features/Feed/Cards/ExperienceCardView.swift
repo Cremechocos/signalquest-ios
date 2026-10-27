@@ -122,7 +122,7 @@ extension ExperienceHighlights {
     /// Une tuile par valeur mesurée, jamais de tiret : un test absent n'a pas de tuile.
     var feedMetrics: [FeedMetricGrid.Metric] {
         var metrics: [FeedMetricGrid.Metric] = []
-        if let videoMaxQuality { metrics.append(.init(label: "Vidéo sans coupure", value: videoMaxQuality)) }
+        if let videoMaxQualityLabel { metrics.append(.init(label: "Vidéo sans coupure", value: videoMaxQualityLabel)) }
         if let videoScore { metrics.append(.init(label: "Score vidéo", value: "\(videoScore)/100")) }
         if let pageMedianMs { metrics.append(.init(label: "Page web", value: Self.waitingTime(pageMedianMs))) }
         if let gameMedianMs { metrics.append(.init(label: "Jeu et appels", value: "\(gameMedianMs) ms")) }
