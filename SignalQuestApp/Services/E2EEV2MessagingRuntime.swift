@@ -335,6 +335,26 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// Partage en direct refusé sur son époque (E2EE-AUTO §7.6) : une époque
+    /// périmée se relit, une époque non marquée tourne après la bascule. Vrai
+    /// quand la position courante peut repartir une fois, rechiffrée.
+    func refreshLiveShareEpoch(conversationId: String, after failure: E2EEV2TransportFailure) async -> Bool {
+        switch failure.code {
+        case "E2EE_EPOCH_STALE":
+            return await callMembers(conversationId: conversationId, synchronizing: true) != nil
+        case "E2EE_AUTO_REQUIRED":
+            _ = Self.stale(failure)
+            if case .failure = await rotate(conversationId: conversationId) { return false }
+            return true
+        case "E2EE_EPOCH_ENVELOPE_NOT_FOUND":
+            // L'appareil relit l'époque ; s'il n'en est pas destinataire, il attend la suivante, sans renvoi.
+            _ = await callMembers(conversationId: conversationId, synchronizing: true)
+            return false
+        default:
+            return false
+        }
+    }
+
     // MARK: Pour les appels
 
     /// Membres d'une conversation v2 gardée et leurs appareils certifiés, pour

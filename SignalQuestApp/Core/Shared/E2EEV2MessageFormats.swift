@@ -331,10 +331,12 @@ struct E2EEV2HistoryImportAttachment: Equatable, Sendable {
 }
 
 /// D.16 : ce que l'enveloppe v3 dit au serveur. `message` est affiché ;
-/// `annotation` modifie un message existant sans en être un.
+/// `annotation` modifie un message existant sans en être un ; `live_share`
+/// est une position de partage en direct (E2EE-AUTO §7.6), jamais un message.
 enum E2EEV2Delivery: String, Equatable, Sendable {
     case message
     case annotation
+    case liveShare = "live_share"
 }
 
 struct E2EEV2MessageContextV2: Equatable, Sendable {
@@ -452,6 +454,8 @@ enum E2EEV2MessageCryptoV2 {
     /// caché en annotation est rejeté), et seul un `ADD` de réaction nomme
     /// qui notifier. Une enveloppe v2 est un `message` sans notification.
     static func checkDelivery(context: E2EEV2MessageContextV2, payload: E2EEV2ContentPayloadV2) throws {
+        // Une position de partage n'a pas de contenu de message (§7.6).
+        guard context.delivery != .liveShare else { throw E2EEV2MessageV2Error.invalidEnvelope }
         switch payload.body {
         case .text, .historyImport:
             guard context.delivery == .message else { throw E2EEV2MessageV2Error.invalidEnvelope }
@@ -658,12 +662,14 @@ struct E2EEV2SignedMessageEnvelopeV2: Equatable, Sendable {
 
     /// Corps d'envoi : en JCS, à l'octet (D.7). Imbriquée dans une réponse,
     /// l'enveloppe se relit avec `parse(_: E2EEV2JSON)`, sans exigence de forme.
-    static func parse(_ data: Data) -> E2EEV2SignedMessageEnvelopeV2? {
+    /// `live_share` n'est lu que par le partage en direct (`allowLiveShare`) :
+    /// ailleurs, une telle enveloppe est refusée (E2EE-AUTO §7.6, refus croisé).
+    static func parse(_ data: Data, allowLiveShare: Bool = false) -> E2EEV2SignedMessageEnvelopeV2? {
         guard data.count <= maxWireBytes, let value = try? E2EEV2CanonicalJSON.parseCanonical(data) else { return nil }
-        return parse(value)
+        return parse(value, allowLiveShare: allowLiveShare)
     }
 
-    static func parse(_ value: E2EEV2JSON) -> E2EEV2SignedMessageEnvelopeV2? {
+    static func parse(_ value: E2EEV2JSON, allowLiveShare: Bool = false) -> E2EEV2SignedMessageEnvelopeV2? {
         guard let root = value.objectValue else { return nil }
         let envelopeVersion: Int, delivery: E2EEV2Delivery, notifyUserId: String
         switch root["envelopeVersion"]?.stringValue {
@@ -673,6 +679,7 @@ struct E2EEV2SignedMessageEnvelopeV2: Equatable, Sendable {
         case String(E2EEV2MessageCryptoV2.annotationEnvelopeVersion)?:
             guard Set(root.keys) == keysV3,
                   let parsed = root["delivery"]?.stringValue.flatMap(E2EEV2Delivery.init(rawValue:)),
+                  allowLiveShare == (parsed == .liveShare),
                   let notify = root["notifyUserId"]?.stringValue,
                   notify.isEmpty || (parsed == .annotation && E2EEV2Canonical.isOpaque(notify)) else { return nil }
             (envelopeVersion, delivery, notifyUserId) = (E2EEV2MessageCryptoV2.annotationEnvelopeVersion, parsed, notify)
@@ -802,7 +809,7 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
               let sequence = root["sequence"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger), sequence >= 1,
               let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
               let senderDeviceId = root["senderDeviceId"]?.stringValue, E2EEV2Canonical.isOpaque(senderDeviceId),
-              let signed = root["envelope"].flatMap(E2EEV2SignedMessageEnvelopeV2.parse),
+              let signed = root["envelope"].flatMap { E2EEV2SignedMessageEnvelopeV2.parse($0) },
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
               let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }

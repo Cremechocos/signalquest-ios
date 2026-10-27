@@ -9528,6 +9528,111 @@ enum E2EEV2MessageDeliveryFailure: Error, Equatable {
 
 // MARK: - E2EE v2 Live Share transport (dormant)
 
+/// E2EE-AUTO §7.6 (révision 18) : sous une époque marquée, une position part en
+/// enveloppe v3 `live_share`, sans personne à notifier. Le clair reste le contenu
+/// v1 LIVE_LOCATION ; le compteur est celui de la session sur cet appareil, à part
+/// des messages, et ne repart pas après une rotation.
+enum E2EEV2LiveShareEnvelopeV3 {
+    static func context(
+        conversationId: String,
+        epochNumber: Int,
+        senderDeviceId: String,
+        clientRequestId: String,
+        counter: Int64,
+        ttlSeconds: Int
+    ) -> E2EEV2MessageContextV2 {
+        .init(
+            conversationId: conversationId, epochNumber: epochNumber, senderDeviceId: senderDeviceId,
+            clientRequestId: clientRequestId, counter: counter, ttlSeconds: ttlSeconds, encryptedBlobIds: [],
+            envelopeVersion: E2EEV2MessageCryptoV2.annotationEnvelopeVersion, delivery: .liveShare, notifyUserId: ""
+        )
+    }
+
+    /// `payload` : le contenu v1 déjà encodé, tel qu'il sera chiffré.
+    static func compose(
+        payload: Data,
+        conversationId: String,
+        clientRequestId: String,
+        counter: Int64,
+        ttlSeconds: Int,
+        epoch: E2EEV2StoredEpochKey,
+        device: E2EEV2DeviceDescriptor,
+        fk: Data,
+        nonce: Data,
+        sign: (Data) throws -> Data
+    ) throws -> E2EEV2SignedMessageEnvelopeV2 {
+        guard let content = E2EEV2ContentContract.parse(payload),
+              content["kind"] as? String == "LIVE_LOCATION",
+              epoch.conversationId == conversationId,
+              try E2EEV2EpochCrypto.keyCommitment(epoch.epochKey) == epoch.keyCommitmentB64,
+              let publicKeyData = Data(base64Encoded: device.publicSigningKeyB64),
+              let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData) else {
+            throw E2EEV2MessageV2Error.invalidContext
+        }
+        let context = context(
+            conversationId: conversationId, epochNumber: epoch.epochNumber, senderDeviceId: device.deviceId,
+            clientRequestId: clientRequestId, counter: counter, ttlSeconds: ttlSeconds
+        )
+        let envelope = try E2EEV2MessageCryptoV2.encrypt(
+            payload: payload, fk: fk, epochKey: epoch.epochKey, nonce: nonce, context: context
+        )
+        var canonical = try E2EEV2MessageCryptoV2.signatureCanonical(context: context, envelope: envelope)
+        defer { canonical.resetBytes(in: 0..<canonical.count) }
+        let signatureB64 = try sign(canonical).base64EncodedString()
+        try E2EEV2MessageCryptoV2.verifySignature(
+            context: context, envelope: envelope, signatureDerB64: signatureB64, senderSigningKey: publicKey
+        )
+        return .init(envelope: envelope, senderSignatureB64: signatureB64)
+    }
+
+    /// Lecture : signature de l'appareil émetteur, puis déchiffrement et
+    /// `frankTag`, puis le contenu v1 LIVE_LOCATION.
+    static func open(
+        _ signed: E2EEV2SignedMessageEnvelopeV2,
+        conversationId: String,
+        senderDeviceId: String,
+        senderSigningKey: P256.Signing.PublicKey,
+        epochKey: Data
+    ) throws -> [String: Any] {
+        let context = signed.context(conversationId: conversationId, senderDeviceId: senderDeviceId)
+        guard context.envelopeVersion == E2EEV2MessageCryptoV2.annotationEnvelopeVersion,
+              context.delivery == .liveShare, context.notifyUserId.isEmpty,
+              context.encryptedBlobIds.isEmpty else {
+            throw E2EEV2MessageV2Error.invalidEnvelope
+        }
+        try E2EEV2MessageCryptoV2.verifySignature(
+            context: context, envelope: signed.envelope,
+            signatureDerB64: signed.senderSignatureB64, senderSigningKey: senderSigningKey
+        )
+        var (fk, payload) = try E2EEV2MessageCryptoV2.openFranked(
+            envelope: signed.envelope, epochKey: epochKey, context: context
+        )
+        defer {
+            fk.resetBytes(in: 0..<fk.count)
+            payload.resetBytes(in: 0..<payload.count)
+        }
+        guard let content = E2EEV2ContentContract.parse(payload),
+              content["kind"] as? String == "LIVE_LOCATION" else {
+            throw E2EEV2MessageV2Error.invalidEnvelope
+        }
+        return content
+    }
+}
+
+/// Ce qui part sur la route du partage : v1 sous une époque non marquée, v3
+/// `live_share` sous une époque marquée (§7.6).
+enum E2EEV2LiveSharePreparedEnvelope: Equatable, Sendable {
+    case v1(E2EEV2SignedMessageEnvelope)
+    case v3(E2EEV2SignedMessageEnvelopeV2)
+
+    var clientRequestId: String {
+        switch self {
+        case .v1(let envelope): envelope.clientRequestId
+        case .v3(let envelope): envelope.envelope.clientRequestId
+        }
+    }
+}
+
 struct E2EEV2LiveSharePublishInput {
     let ownerScopeId: String
     let sessionId: String
@@ -9585,7 +9690,33 @@ enum E2EEV2LiveShareLifecycleResult {
 struct E2EEV2LiveSharePendingEnvelope: Codable, Equatable, Sendable {
     let clientRequestId: String
     let sendDeadlineAtMs: Int64
-    let envelope: E2EEV2SignedMessageEnvelope
+    /// Une enveloppe v1, ou (`envelopeV3`) le corps JCS d'une enveloppe v3.
+    let envelope: E2EEV2SignedMessageEnvelope?
+    let envelopeV3: Data?
+
+    init(clientRequestId: String, sendDeadlineAtMs: Int64, envelope: E2EEV2SignedMessageEnvelope) {
+        self.clientRequestId = clientRequestId
+        self.sendDeadlineAtMs = sendDeadlineAtMs
+        self.envelope = envelope
+        envelopeV3 = nil
+    }
+
+    init(clientRequestId: String, sendDeadlineAtMs: Int64, prepared: E2EEV2LiveSharePreparedEnvelope) {
+        self.clientRequestId = clientRequestId
+        self.sendDeadlineAtMs = sendDeadlineAtMs
+        switch prepared {
+        case .v1(let value): (envelope, envelopeV3) = (value, nil)
+        case .v3(let value): (envelope, envelopeV3) = (nil, value.encoded)
+        }
+    }
+
+    var prepared: E2EEV2LiveSharePreparedEnvelope? {
+        switch (envelope, envelopeV3) {
+        case (let value?, nil): .v1(value)
+        case (nil, let data?): E2EEV2SignedMessageEnvelopeV2.parse(data, allowLiveShare: true).map { .v3($0) }
+        default: nil
+        }
+    }
 }
 
 private struct E2EEV2LiveShareStateRecord: Codable {
@@ -9594,6 +9725,8 @@ private struct E2EEV2LiveShareStateRecord: Codable {
     let conversationId: String
     let sessionId: String
     var nextSequence: Int
+    /// Compteur v3 suivant (§7.6) ; absent d'un état antérieur, il vaut 1.
+    var nextCounter: Int64?
     var pending: E2EEV2LiveSharePendingEnvelope?
     var updatedAtMs: Int64
 }
@@ -9641,6 +9774,52 @@ final class E2EEV2LiveShareStateStore: @unchecked Sendable {
         }
     }
 
+    /// Compteur v3 de la session sur cet appareil : jamais réutilisé, les trous
+    /// sont permis (§7.6). L'état existe déjà : `claimSequence` le crée.
+    func claimCounter(
+        ownerScopeId: String,
+        conversationId: String,
+        sessionId: String,
+        nowMs: Int64
+    ) throws -> Int64 {
+        try lock.withLock {
+            guard var record = try load(ownerScopeId: ownerScopeId, sessionId: sessionId),
+                  record.ownerScopeId == ownerScopeId,
+                  record.conversationId == conversationId,
+                  record.sessionId == sessionId else {
+                throw E2EEV2LiveShareStateError.invalidRecord
+            }
+            let counter = record.nextCounter ?? 1
+            guard (1..<Int64(E2EEV2Canonical.maxSequenceNumber)).contains(counter) else {
+                throw E2EEV2LiveShareStateError.sequenceExhausted
+            }
+            record.nextCounter = counter + 1
+            record.updatedAtMs = max(0, nowMs)
+            try save(record)
+            return counter
+        }
+    }
+
+    /// `409 E2EE_LIVE_SHARE_COUNTER_STALE` : le serveur a déjà vu `lastCounter`.
+    func raiseCounter(
+        ownerScopeId: String,
+        sessionId: String,
+        above lastCounter: Int64,
+        nowMs: Int64
+    ) throws {
+        try lock.withLock {
+            guard var record = try load(ownerScopeId: ownerScopeId, sessionId: sessionId),
+                  record.ownerScopeId == ownerScopeId,
+                  lastCounter >= 0, lastCounter < Int64(E2EEV2Canonical.maxSequenceNumber) else {
+                throw E2EEV2LiveShareStateError.invalidRecord
+            }
+            guard (record.nextCounter ?? 1) <= lastCounter else { return }
+            record.nextCounter = lastCounter + 1
+            record.updatedAtMs = max(0, nowMs)
+            try save(record)
+        }
+    }
+
     func pending(
         ownerScopeId: String,
         conversationId: String,
@@ -9668,9 +9847,8 @@ final class E2EEV2LiveShareStateStore: @unchecked Sendable {
     ) throws {
         try lock.withLock {
             guard pending.sendDeadlineAtMs > nowMs,
-                  pending.envelope.clientRequestId == pending.clientRequestId,
-                  pending.envelope.ttlSeconds > 0,
-                  pending.envelope.encryptedBlobIds.isEmpty,
+                  let prepared = pending.prepared,
+                  Self.isPublishable(prepared, clientRequestId: pending.clientRequestId),
                   var record = try load(ownerScopeId: ownerScopeId, sessionId: sessionId),
                   record.ownerScopeId == ownerScopeId,
                   record.conversationId == conversationId,
@@ -9700,6 +9878,17 @@ final class E2EEV2LiveShareStateStore: @unchecked Sendable {
         }
     }
 
+    private static func isPublishable(_ prepared: E2EEV2LiveSharePreparedEnvelope, clientRequestId: String) -> Bool {
+        switch prepared {
+        case .v1(let value):
+            value.clientRequestId == clientRequestId
+                && value.ttlSeconds > 0 && value.encryptedBlobIds.isEmpty
+        case .v3(let value):
+            value.envelope.clientRequestId == clientRequestId
+                && value.envelope.ttlSeconds > 0 && value.envelope.encryptedBlobIds.isEmpty
+        }
+    }
+
     private func loadOrCreate(
         ownerScopeId: String,
         conversationId: String,
@@ -9721,6 +9910,7 @@ final class E2EEV2LiveShareStateStore: @unchecked Sendable {
             conversationId: conversationId,
             sessionId: sessionId,
             nextSequence: 0,
+            nextCounter: nil,
             pending: nil,
             updatedAtMs: max(0, nowMs)
         )
@@ -9801,14 +9991,17 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
     private let epochStore: E2EEV2EpochKeyStore
+    private let conversationStateStore: E2EEV2ConversationStateStore
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        epochStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore()
+        epochStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        conversationStateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
     ) {
         self.identityStore = identityStore
         self.epochStore = epochStore
+        self.conversationStateStore = conversationStateStore
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
     }
 
@@ -9874,20 +10067,91 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         }
     }
 
+    /// E2EE-AUTO §7.6 : la version suit le marquage de l'époque courante vérifiée,
+    /// v3 `live_share` (avec le compteur de la session) sous une époque marquée,
+    /// v1 sinon.
+    func prepareRuntime(
+        _ preparation: E2EEV2MessagePreparationInput,
+        ownerScopeId: String,
+        claimCounter: () throws -> Int64
+    ) -> Result<E2EEV2LiveSharePreparedEnvelope, E2EEV2LiveShareRuntimeError> {
+        guard E2EEV2RuntimeWriteGate.enabled else {
+            return .failure(.preparationBlocked("e2ee-v2-security-review-required"))
+        }
+        guard LocalAccountScope.currentUserId != nil,
+              LocalAccountScope.currentOwnerScopeId == ownerScopeId else {
+            return .failure(.preparationBlocked("e2ee-v2-local-state-unavailable"))
+        }
+        let ownerNamespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        let current: E2EEV2ConversationStateStore.CurrentEpoch?
+        do {
+            current = try conversationStateStore.currentEpoch(
+                conversationId: preparation.conversationId, ownerNamespace: ownerNamespace
+            )
+        } catch {
+            return .failure(.preparationBlocked("invalid-e2ee-v2-local-state"))
+        }
+        guard let current, current.e2eeAuto == true else {
+            switch E2EEV2MessageComposer.prepareRuntime(
+                input: preparation, identityStore: identityStore, epochStore: epochStore,
+                stateStore: conversationStateStore
+            ) {
+            case .blocked(let reason): return .failure(.preparationBlocked(reason))
+            case .prepared(let envelope): return .success(.v1(envelope))
+            }
+        }
+        do {
+            guard let device = try identityStore.load(ownerNamespace: ownerNamespace),
+                  var epoch = try E2EEV2VerifiedEpochKeys.exact(
+                    conversationId: preparation.conversationId, epochNumber: current.epochNumber,
+                    ownerNamespace: ownerNamespace, keyStore: epochStore, stateStore: conversationStateStore
+                  ) else {
+                return .failure(.preparationBlocked("e2ee-v2-local-state-unavailable"))
+            }
+            var payload = try E2EEV2ContentContract.encode(preparation.content)
+            var fk = try E2EEV2MessageComposerV2.randomBytes(32)
+            defer {
+                epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count)
+                payload.resetBytes(in: 0..<payload.count)
+                fk.resetBytes(in: 0..<fk.count)
+            }
+            let envelope = try E2EEV2LiveShareEnvelopeV3.compose(
+                payload: payload, conversationId: preparation.conversationId,
+                clientRequestId: preparation.clientRequestId, counter: claimCounter(),
+                ttlSeconds: preparation.ttlSeconds, epoch: epoch, device: device, fk: fk,
+                nonce: E2EEV2MessageComposerV2.randomBytes(12)
+            ) { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) }
+            return .success(.v3(envelope))
+        } catch {
+            return .failure(.preparationBlocked("invalid-e2ee-v2-local-state"))
+        }
+    }
+
     func publishPreparedRuntime(
         ownerScopeId: String,
         sessionId: String,
-        envelope: E2EEV2SignedMessageEnvelope
+        envelope prepared: E2EEV2LiveSharePreparedEnvelope
     ) async -> E2EEV2LiveSharePublishResult {
         guard E2EEV2RuntimeWriteGate.enabled else {
             return .failure(Self.activationFailure())
         }
+        let body: Data?
+        let isPublishable: Bool
+        switch prepared {
+        case .v1(let envelope):
+            body = try? JSONEncoder().encode(envelope)
+            isPublishable = envelope.ttlSeconds > 0 && envelope.encryptedBlobIds.isEmpty
+        case .v3(let envelope):
+            // Corps JCS, à l'octet de ce qui est signé (D.7).
+            body = envelope.encoded
+            isPublishable = envelope.envelope.ttlSeconds > 0 && envelope.envelope.encryptedBlobIds.isEmpty
+                && envelope.envelope.delivery == .liveShare
+        }
         guard Self.matches(ownerScopeId, Self.ownerPattern),
               Self.matches(sessionId, Self.opaquePattern),
-              Self.matches(envelope.clientRequestId, Self.requestPattern),
-              envelope.ttlSeconds > 0,
-              envelope.encryptedBlobIds.isEmpty,
-              let body = try? JSONEncoder().encode(envelope) else {
+              Self.matches(prepared.clientRequestId, Self.requestPattern),
+              isPublishable,
+              let body else {
             return .failure(Self.localFailure("invalid-e2ee-v2-live-share-envelope"))
         }
         let path = "/api/e2ee/v2/live-share/sessions/\(sessionId)/updates"
@@ -9902,7 +10166,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
             guard let update = Self.parsePublishResponseContractPreview(
                 data,
                 expectedSessionId: sessionId,
-                expectedClientRequestId: envelope.clientRequestId,
+                expectedClientRequestId: prepared.clientRequestId,
                 transportIdempotentReplay: replay
             ) else {
                 return .failure(Self.localFailure("invalid-e2ee-v2-live-share-publish-response"))
@@ -10172,12 +10436,33 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         publicExpiresAt: Date,
         now: Date
     ) -> E2EEV2ReceivedLiveShareUpdate? {
+        validateDecryptedContent(
+            updateId: updateId,
+            expectedSessionId: expectedSessionId,
+            content: message.content,
+            ttlSeconds: message.ttlSeconds,
+            encryptedBlobIds: message.encryptedBlobIds,
+            publicExpiresAt: publicExpiresAt,
+            now: now
+        )
+    }
+
+    /// Même portée privée pour un clair relu d'une enveloppe v1 ou v3.
+    static func validateDecryptedContent(
+        updateId: String,
+        expectedSessionId: String,
+        content: [String: Any],
+        ttlSeconds: Int,
+        encryptedBlobIds: [String],
+        publicExpiresAt: Date,
+        now: Date
+    ) -> E2EEV2ReceivedLiveShareUpdate? {
         guard matches(updateId, opaquePattern),
               matches(expectedSessionId, opaquePattern),
-              message.ttlSeconds > 0,
-              message.encryptedBlobIds.isEmpty,
-              message.content["kind"] as? String == "LIVE_LOCATION",
-              let body = message.content["body"] as? [String: Any],
+              ttlSeconds > 0,
+              encryptedBlobIds.isEmpty,
+              content["kind"] as? String == "LIVE_LOCATION",
+              let body = content["body"] as? [String: Any],
               body["sessionId"] as? String == expectedSessionId,
               let sequence = integer(body["sequence"]), sequence >= 0,
               let observedAt = body["observedAt"] as? String,
@@ -10192,7 +10477,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
             sequence: sequence,
             observedAt: observedAt,
             expiresAt: expiresAt,
-            content: message.content
+            content: content
         )
     }
 
@@ -10218,7 +10503,8 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
                 expectedEnvelopeId: updateId,
                 expectedConversationId: input.conversationId,
                 expectedRecipientDeviceId: identity.deviceId,
-                allowServerBoundedExpiry: true
+                allowServerBoundedExpiry: true,
+                allowsLiveShareV3: true
               ),
               delivery.encryptedBlobs.isEmpty,
               let publicExpiresAt = delivery.expiresAt,
@@ -10259,17 +10545,48 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
                   epoch.keyCommitmentB64 == delivery.epoch.keyCommitmentB64 else {
                 return .failure(localFailure("e2ee-v2-delivered-epoch-mismatch"))
             }
-            let message = try E2EEV2MessageReceiver.decryptContractPreview(
-                input: delivery.incoming,
-                epoch: epoch
-            )
-            guard let update = validateDecryptedUpdateContractPreview(
-                updateId: updateId,
-                expectedSessionId: input.sessionId,
-                message: message,
-                publicExpiresAt: publicExpiry,
-                now: now
-            ) else {
+            let received: E2EEV2ReceivedLiveShareUpdate?
+            if envelope["envelopeVersion"] is String {
+                // v3 `live_share` (§7.6) : relue par l'analyseur strict, jamais comme un message.
+                guard let signed = E2EEV2SignedMessageEnvelopeV2.parse(
+                        delivery.incoming.envelopeData, allowLiveShare: true
+                      ),
+                      signed.envelope.epochNumber == epoch.epochNumber,
+                      signed.envelope.keyCommitmentB64 == epoch.keyCommitmentB64,
+                      let keyData = Data(base64Encoded: delivery.incoming.senderPublicSigningKeyB64),
+                      let senderKey = try? P256.Signing.PublicKey(x963Representation: keyData) else {
+                    return .failure(localFailure("invalid-or-untrusted-e2ee-v2-live-share-delivery"))
+                }
+                let content = try E2EEV2LiveShareEnvelopeV3.open(
+                    signed,
+                    conversationId: input.conversationId,
+                    senderDeviceId: delivery.incoming.senderDeviceId,
+                    senderSigningKey: senderKey,
+                    epochKey: epoch.epochKey
+                )
+                received = validateDecryptedContent(
+                    updateId: updateId,
+                    expectedSessionId: input.sessionId,
+                    content: content,
+                    ttlSeconds: signed.envelope.ttlSeconds,
+                    encryptedBlobIds: signed.envelope.encryptedBlobIds,
+                    publicExpiresAt: publicExpiry,
+                    now: now
+                )
+            } else {
+                let message = try E2EEV2MessageReceiver.decryptContractPreview(
+                    input: delivery.incoming,
+                    epoch: epoch
+                )
+                received = validateDecryptedUpdateContractPreview(
+                    updateId: updateId,
+                    expectedSessionId: input.sessionId,
+                    message: message,
+                    publicExpiresAt: publicExpiry,
+                    now: now
+                )
+            }
+            guard let update = received else {
                 return .failure(localFailure("invalid-e2ee-v2-live-share-private-content"))
             }
             return .success(update)
@@ -10332,6 +10649,8 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
 enum E2EEV2LiveShareRuntimeError: Error, Equatable {
     case invalidSession
     case invalidPayload
+    /// `409 E2EE_LIVE_SHARE_COUNTER_STALE` : compteur relevé, un renvoi (§7.6).
+    case counterStale
     case preparationBlocked(String)
     case transport(E2EEV2TransportFailure)
 }
@@ -10542,6 +10861,9 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
             throw E2EEV2LiveShareRuntimeError.invalidSession
         }
         let nowMs = Int64(now.timeIntervalSince1970 * 1_000)
+        // §7.6 : après `E2EE_LIVE_SHARE_COUNTER_STALE`, un seul renvoi depuis
+        // `lastCounter + 1` ; au second refus, fin du partage.
+        var counterResends = 1
         if let pending = try stateStore.pending(
             ownerScopeId: ownerScopeId,
             conversationId: session.conversationId,
@@ -10555,15 +10877,45 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
                     nowMs: nowMs
                 )
             } else {
-                try await sendPending(
-                    pending,
-                    ownerScopeId: ownerScopeId,
-                    sessionId: session.id,
-                    nowMs: nowMs
-                )
+                do {
+                    try await sendPending(
+                        pending,
+                        ownerScopeId: ownerScopeId,
+                        sessionId: session.id,
+                        nowMs: nowMs
+                    )
+                } catch E2EEV2LiveShareRuntimeError.counterStale {
+                    // Compteur relevé : la position courante part ci-dessous, c'est le renvoi.
+                    counterResends = 0
+                }
             }
         }
 
+        while true {
+            do {
+                return try await publishCurrent(session: session, payload: payload, ownerScopeId: ownerScopeId, now: now)
+            } catch E2EEV2LiveShareRuntimeError.counterStale {
+                guard counterResends > 0 else {
+                    throw E2EEV2LiveShareRuntimeError.transport(.init(
+                        kind: .permanent, statusCode: 409, code: Self.counterStaleCode,
+                        message: "e2ee-v2-live-share-counter-stale"
+                    ))
+                }
+                counterResends -= 1
+            }
+        }
+    }
+
+    /// Chiffre la position courante sous un nouveau `clientRequestId`, la garde
+    /// en attente, puis l'envoie.
+    private func publishCurrent(
+        session: LiveShareSession,
+        payload: LiveSharePayload,
+        ownerScopeId: String,
+        now: Date
+    ) async throws {
+        guard let expiresAt = session.expiresAt else { throw E2EEV2LiveShareRuntimeError.invalidSession }
+        let nowMs = Int64(now.timeIntervalSince1970 * 1_000)
         let sequence = try stateStore.claimSequence(
             ownerScopeId: ownerScopeId,
             conversationId: session.conversationId,
@@ -10589,18 +10941,24 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
             encryptedBlobIds: [],
             content: content
         )
-        let envelope: E2EEV2SignedMessageEnvelope
-        switch E2EEV2MessageComposer.prepareRuntime(input: preparation) {
-        case .blocked(let reason):
-            throw E2EEV2LiveShareRuntimeError.preparationBlocked(reason)
-        case .prepared(let value): envelope = value
+        let envelope: E2EEV2LiveSharePreparedEnvelope
+        switch client.prepareRuntime(preparation, ownerScopeId: ownerScopeId, claimCounter: { [stateStore] in
+            try stateStore.claimCounter(
+                ownerScopeId: ownerScopeId,
+                conversationId: session.conversationId,
+                sessionId: session.id,
+                nowMs: nowMs
+            )
+        }) {
+        case .failure(let error): throw error
+        case .success(let value): envelope = value
         }
         let sessionExpiryMs = Int64(expiresAt.timeIntervalSince1970 * 1_000)
         let sendDeadlineAtMs = min(sessionExpiryMs, nowMs + 60_000)
         let pending = E2EEV2LiveSharePendingEnvelope(
             clientRequestId: clientRequestId,
             sendDeadlineAtMs: sendDeadlineAtMs,
-            envelope: envelope
+            prepared: envelope
         )
         try stateStore.storePending(
             ownerScopeId: ownerScopeId,
@@ -10638,18 +10996,46 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
         }
     }
 
+    private static let counterStaleCode = "E2EE_LIVE_SHARE_COUNTER_STALE"
+
+    /// Un refus n'est pas retenu par le serveur (§7.6) : renvoyer la même
+    /// enveloppe n'y changerait rien. Seuls un réseau coupé, une cadence (429)
+    /// ou une erreur du serveur gardent l'enveloppe pour un renvoi à l'identique.
+    static func dropsPending(_ failure: E2EEV2TransportFailure) -> Bool {
+        guard let status = failure.statusCode else { return false }
+        return (400..<500).contains(status) && ![401, 408, 429].contains(status)
+    }
+
     private func sendPending(
         _ pending: E2EEV2LiveSharePendingEnvelope,
         ownerScopeId: String,
         sessionId: String,
         nowMs: Int64
     ) async throws {
+        guard let prepared = pending.prepared else {
+            try stateStore.complete(
+                ownerScopeId: ownerScopeId, sessionId: sessionId, clientRequestId: pending.clientRequestId, nowMs: nowMs
+            )
+            throw E2EEV2LiveShareRuntimeError.invalidPayload
+        }
         switch await client.publishPreparedRuntime(
             ownerScopeId: ownerScopeId,
             sessionId: sessionId,
-            envelope: pending.envelope
+            envelope: prepared
         ) {
-        case .failure(let failure): throw E2EEV2LiveShareRuntimeError.transport(failure)
+        case .failure(let failure):
+            if Self.dropsPending(failure) {
+                try stateStore.complete(
+                    ownerScopeId: ownerScopeId, sessionId: sessionId, clientRequestId: pending.clientRequestId, nowMs: nowMs
+                )
+            }
+            if failure.statusCode == 409, failure.code == Self.counterStaleCode,
+               case .string(let text)? = failure.details?["lastCounter"],
+               E2EEV2Canonical.isDecimal(text), let lastCounter = Int64(text) {
+                try stateStore.raiseCounter(ownerScopeId: ownerScopeId, sessionId: sessionId, above: lastCounter, nowMs: nowMs)
+                throw E2EEV2LiveShareRuntimeError.counterStale
+            }
+            throw E2EEV2LiveShareRuntimeError.transport(failure)
         case .success:
             try stateStore.complete(
                 ownerScopeId: ownerScopeId,

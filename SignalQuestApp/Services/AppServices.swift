@@ -244,10 +244,12 @@ final class AppServices: ObservableObject {
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService
+        let liveShareMessaging = e2eeV2Messaging
         liveShare = ConversationLiveShareCoordinator(
             service: messagesService,
             location: location,
-            networkPath: networkPath
+            networkPath: networkPath,
+            refreshE2eeEpoch: { await liveShareMessaging.refreshLiveShareEpoch(conversationId: $0, after: $1) }
         )
         leaderboards = LeaderboardService(api: api)
         let sessionsService = SessionsService(api: api)
@@ -762,6 +764,9 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     private let service: MessagesServicing
     private let location: LocationService
     private let networkPath: NetworkPathMonitor
+    /// Relit ou fait tourner l'époque d'une conversation après un refus v2 ;
+    /// vrai quand la position courante peut repartir une fois (§7.6).
+    private let refreshE2eeEpoch: (_ conversationId: String, _ failure: E2EEV2TransportFailure) async -> Bool
 
     private var currentUserId: String?
     private var accountGeneration = 0
@@ -778,10 +783,16 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     /// les 20 secondes. Un rechargement ou une nouvelle action le réessaiera.
     private var terminalPublishFailures: Set<String> = []
 
-    init(service: MessagesServicing, location: LocationService, networkPath: NetworkPathMonitor) {
+    init(
+        service: MessagesServicing,
+        location: LocationService,
+        networkPath: NetworkPathMonitor,
+        refreshE2eeEpoch: @escaping (_ conversationId: String, _ failure: E2EEV2TransportFailure) async -> Bool = { _, _ in false }
+    ) {
         self.service = service
         self.location = location
         self.networkPath = networkPath
+        self.refreshE2eeEpoch = refreshE2eeEpoch
     }
 
     func sessions(for conversationId: String) -> [LiveShareSession] {
@@ -1172,7 +1183,15 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             )
             do {
                 if session.e2eeV2Required == true {
-                    try await service.updateE2eeLiveShare(session: session, payload: payload)
+                    do {
+                        try await service.updateE2eeLiveShare(session: session, payload: payload)
+                    } catch E2EEV2LiveShareRuntimeError.transport(let failure) {
+                        // La position refusée n'est pas gardée : rechiffrée sous l'époque relue, un renvoi.
+                        guard await refreshE2eeEpoch(session.conversationId, failure) else {
+                            throw E2EEV2LiveShareRuntimeError.transport(failure)
+                        }
+                        try await service.updateE2eeLiveShare(session: session, payload: payload)
+                    }
                 } else {
                     let updated = try await service.updateLiveShare(
                         sessionId: session.id,
@@ -1207,7 +1226,9 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         switch error {
         case APIError.http(let code, _, _, _, _): status = code
         case E2EEV2LiveShareRuntimeError.transport(let failure):
-            if ["E2EE_EPOCH_STALE", "E2EE_AUTO_REQUIRED"].contains(failure.code ?? "") { return false }
+            if ["E2EE_EPOCH_STALE", "E2EE_AUTO_REQUIRED", "E2EE_EPOCH_ENVELOPE_NOT_FOUND"].contains(failure.code ?? "") {
+                return false
+            }
             status = failure.statusCode
         default: status = nil
         }

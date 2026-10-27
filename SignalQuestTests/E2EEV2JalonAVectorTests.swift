@@ -397,7 +397,7 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         for neg in try XCTUnwrap(v["wireNegative"] as? [[String: Any]]) {
             let data = try b64(neg, "wireJsonB64")
             XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(data), caseName(neg))
-            XCTAssertNil((try? E2EEV2CanonicalJSON.parseStrict(data)).flatMap(E2EEV2SignedMessageEnvelopeV2.parse), caseName(neg))
+            XCTAssertNil((try? E2EEV2CanonicalJSON.parseStrict(data)).flatMap { E2EEV2SignedMessageEnvelopeV2.parse($0) }, caseName(neg))
         }
         // JSON valide hors JCS : refusé comme corps d'envoi, relu une fois imbriqué.
         for neg in try XCTUnwrap(v["wireNonCanonical"] as? [[String: Any]]) {

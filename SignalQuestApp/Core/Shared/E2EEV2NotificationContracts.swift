@@ -1817,14 +1817,27 @@ enum E2EEV2MessageDeliveryContract {
     private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
     private static let sha256Pattern = #"^[a-f0-9]{64}\z"#
     private static let statuses: Set<String> = ["active", "retired", "compromised"]
+    private static let keys: Set<String> = [
+        "id", "conversationId", "senderId", "senderDevice", "epoch", "envelopeVersion",
+        "clientRequestId", "algorithm", "contentType", "ttlSeconds", "encryptedBlobIds",
+        "nonceB64", "aadB64", "ciphertextB64", "senderSignatureB64", "encryptedBlobs",
+        "createdAt", "expiresAt",
+    ]
+    /// E2EE-AUTO §7.6 : une mise à jour v3 `live_share` ajoute ces quatre clés,
+    /// entiers en chaînes décimales.
+    private static let liveShareV3Keys = keys.union(["counter", "frankTagB64", "delivery", "notifyUserId"])
 
+    /// `allowsLiveShareV3` : la route `updates/latest` du partage en direct, seule
+    /// à lire une enveloppe v3 `live_share` (`incoming.envelopeData` est alors
+    /// son JCS, à relire avec `E2EEV2SignedMessageEnvelopeV2.parse(_:allowLiveShare:)`).
     static func parseAndVerify(
         _ data: Data,
         ownerScopeId: String,
         expectedEnvelopeId: String,
         expectedConversationId: String,
         expectedRecipientDeviceId: String,
-        allowServerBoundedExpiry: Bool = false
+        allowServerBoundedExpiry: Bool = false,
+        allowsLiveShareV3: Bool = false
     ) -> E2EEV2VerifiedMessageDelivery? {
         guard data.count <= 768 * 1_024,
               ownerScopeId.range(
@@ -1837,12 +1850,7 @@ enum E2EEV2MessageDeliveryContract {
               let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               exactKeys(root, ["envelope"]),
               let value = root["envelope"] as? [String: Any],
-              exactKeys(value, [
-                "id", "conversationId", "senderId", "senderDevice", "epoch", "envelopeVersion",
-                "clientRequestId", "algorithm", "contentType", "ttlSeconds", "encryptedBlobIds",
-                "nonceB64", "aadB64", "ciphertextB64", "senderSignatureB64", "encryptedBlobs",
-                "createdAt", "expiresAt",
-              ]),
+              exactKeys(value, allowsLiveShareV3 && value["envelopeVersion"] is String ? liveShareV3Keys : keys),
               value["id"] as? String == expectedEnvelopeId,
               value["conversationId"] as? String == expectedConversationId,
               let senderId = value["senderId"] as? String, validOpaqueId(senderId),
@@ -1962,9 +1970,16 @@ enum E2EEV2MessageDeliveryContract {
             ))
         }
 
+        let isLiveShareV3 = value["counter"] != nil
+        let ttlValue: Int?
+        if isLiveShareV3 {
+            ttlValue = (value["ttlSeconds"] as? String).flatMap { E2EEV2Canonical.isDecimal($0) ? Int($0) : nil }
+        } else {
+            ttlValue = integer(value["ttlSeconds"])
+        }
         guard let createdAt = value["createdAt"] as? String,
               let createdDate = E2EEV2PortableInventoryContract.parseInstant(createdAt),
-              let ttlSeconds = integer(value["ttlSeconds"]),
+              let ttlSeconds = ttlValue,
               (0...(30 * 24 * 60 * 60)).contains(ttlSeconds) else { return nil }
         let expiresAt: String?
         if value["expiresAt"] is NSNull {
@@ -1983,6 +1998,52 @@ enum E2EEV2MessageDeliveryContract {
             return nil
         }
 
+        let envelopeData: Data
+        if isLiveShareV3 {
+            // Forme exacte et chaînes relues par l'analyseur strict de l'enveloppe v3.
+            var fields: [String: E2EEV2JSON] = [
+                "epochNumber": .string(String(epochNumber)),
+                "keyCommitmentB64": .string(keyCommitment),
+                "ttlSeconds": .string(String(ttlSeconds)),
+                "encryptedBlobIds": .array(blobIds.map(E2EEV2JSON.string)),
+            ]
+            for key in [
+                "envelopeVersion", "clientRequestId", "counter", "algorithm", "contentType", "frankTagB64",
+                "nonceB64", "aadB64", "ciphertextB64", "senderSignatureB64", "delivery", "notifyUserId",
+            ] {
+                guard let text = value[key] as? String else { return nil }
+                fields[key] = .string(text)
+            }
+            guard let signed = E2EEV2SignedMessageEnvelopeV2.parse(.object(fields), allowLiveShare: true) else {
+                return nil
+            }
+            envelopeData = signed.encoded
+        } else {
+            guard let v1 = v1EnvelopeData(value, epochNumber: epochNumber, keyCommitment: keyCommitment,
+                                          ttlSeconds: ttlSeconds, blobIds: blobIds) else { return nil }
+            envelopeData = v1
+        }
+        return .init(
+            id: expectedEnvelopeId,
+            senderId: senderId,
+            incoming: .init(
+                ownerScopeId: ownerScopeId,
+                conversationId: expectedConversationId,
+                senderDeviceId: senderDeviceId,
+                senderPublicSigningKeyB64: senderPublicKey,
+                envelopeData: envelopeData
+            ),
+            epoch: .init(epochId: epochId, epochNumber: epochNumber, keyCommitmentB64: keyCommitment),
+            epochDelivery: epochDelivery,
+            encryptedBlobs: blobs,
+            createdAt: createdAt,
+            expiresAt: expiresAt
+        )
+    }
+
+    private static func v1EnvelopeData(
+        _ value: [String: Any], epochNumber: Int, keyCommitment: String, ttlSeconds: Int, blobIds: [String]
+    ) -> Data? {
         guard let envelopeVersion = integer(value["envelopeVersion"]),
               let clientRequestId = value["clientRequestId"] as? String,
               let algorithm = value["algorithm"] as? String,
@@ -2008,23 +2069,7 @@ enum E2EEV2MessageDeliveryContract {
             envelope: unsigned,
             senderSignatureB64: senderSignatureB64
         )
-        guard let envelopeData = try? JSONEncoder().encode(signed) else { return nil }
-        return .init(
-            id: expectedEnvelopeId,
-            senderId: senderId,
-            incoming: .init(
-                ownerScopeId: ownerScopeId,
-                conversationId: expectedConversationId,
-                senderDeviceId: senderDeviceId,
-                senderPublicSigningKeyB64: senderPublicKey,
-                envelopeData: envelopeData
-            ),
-            epoch: .init(epochId: epochId, epochNumber: epochNumber, keyCommitmentB64: keyCommitment),
-            epochDelivery: epochDelivery,
-            encryptedBlobs: blobs,
-            createdAt: createdAt,
-            expiresAt: expiresAt
-        )
+        return try? JSONEncoder().encode(signed)
     }
 
     private static func exactKeys(_ value: [String: Any], _ expected: Set<String>) -> Bool {
