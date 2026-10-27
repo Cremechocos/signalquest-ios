@@ -456,7 +456,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         case "migrate":
             let conversation = try await detail(conversationId)
             XCTAssertEqual(conversation.e2eeEnabled, true, "Conversation chiffrée v1 attendue")
-            let migrated = await session.messaging.migrateIfReady(conversation) == .v2
+            let migrated = await session.messaging.migrateIfReady(conversation, trigger: .opening(holdsV1Key: true)) == .v2
             report["migrated"] = migrated
             XCTAssertTrue(migrated, "Migration v1 → v2 à l'ouverture (§14.2)")
         default:

@@ -524,11 +524,12 @@ final class AppServices: ObservableObject {
         migrationSweepRunning = true
         defer { migrationSweepRunning = false }
         guard let conversations = try? await messages.conversations() else { return }
+        let holdsV1Key = await e2ee.isUnlocked()
         for conversation in conversations where conversation.e2eeEnabled == true
             && conversation.request?.isIncomingPending != true
             && !EncryptedConversationSurfaces.isV2(conversation) {
             guard LocalAccountScope.sessionSnapshot() == session, !Task.isCancelled else { return }
-            _ = await e2eeV2Messaging.migrateIfReady(conversation)
+            _ = await e2eeV2Messaging.migrateIfReady(conversation, trigger: .opening(holdsV1Key: holdsV1Key))
         }
     }
 

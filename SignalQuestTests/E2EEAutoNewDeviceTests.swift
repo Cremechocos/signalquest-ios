@@ -44,8 +44,38 @@ final class E2EEAutoNewDeviceTests: XCTestCase {
         XCTAssertFalse(E2EEV2ServerGate.reactionsOpen)
         E2EEV2ServerGate.autoActiveOverrideForTesting = true
         XCTAssertTrue(E2EEV2ServerGate.messagingOpen)
-        XCTAssertTrue(E2EEV2ServerGate.callsOpen)
+        XCTAssertFalse(E2EEV2ServerGate.callsOpen, "Les appels gardent la capacité serveur (§7.3, révision 16)")
         XCTAssertTrue(E2EEV2ServerGate.reactionsOpen)
+        E2EEV2ServerGate.overrideForTesting = [E2EEV2ServerGate.verifiedCallsCapability]
+        XCTAssertTrue(E2EEV2ServerGate.callsOpen)
+    }
+
+    /// Avant la bascule, la porte des appels reste l'ensemble des capacités v2.
+    func testBeforeTheSwitchCallsNeedEveryV2Capability() {
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
+        E2EEV2ServerGate.overrideForTesting = [E2EEV2ServerGate.verifiedCallsCapability]
+        XCTAssertFalse(E2EEV2ServerGate.callsOpen)
+        E2EEV2ServerGate.overrideForTesting = E2EEV2ServerGate.callCapabilities
+        XCTAssertTrue(E2EEV2ServerGate.callsOpen)
+    }
+
+    /// E2EE-AUTO §8 (révision 16) : à l'ouverture, seul le détenteur de la clé v1
+    /// d'une conversation chiffrée v1 pose la genèse ; sinon, au premier envoi.
+    func testOnceSwitchedOnOpeningPosesTheGenesisOnlyWithTheV1Key() {
+        func conversation(encrypted: Bool) -> MessageConversation {
+            MessageConversation(
+                id: "conv_a", title: nil, isGroup: false, e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,
+                updatedAt: nil, lastMessageAt: nil, lastReadAt: nil, pinnedAt: nil, participants: [], lastMessage: nil
+            )
+        }
+        typealias Runtime = E2EEV2MessagingRuntime
+        let v1 = conversation(encrypted: true), clear = conversation(encrypted: false)
+        XCTAssertTrue(Runtime.allowsGenesis(v1, trigger: .opening(holdsV1Key: true), autoActive: true))
+        XCTAssertFalse(Runtime.allowsGenesis(v1, trigger: .opening(holdsV1Key: false), autoActive: true))
+        XCTAssertFalse(Runtime.allowsGenesis(clear, trigger: .opening(holdsV1Key: true), autoActive: true), "En clair : au premier envoi")
+        XCTAssertTrue(Runtime.allowsGenesis(clear, trigger: .firstSend, autoActive: true))
+        XCTAssertTrue(Runtime.allowsGenesis(v1, trigger: .firstSend, autoActive: true))
+        XCTAssertTrue(Runtime.allowsGenesis(v1, trigger: .opening(holdsV1Key: false), autoActive: false), "Avant la bascule : §14.2 inchangé")
     }
 
     // MARK: Appareils ajoutés

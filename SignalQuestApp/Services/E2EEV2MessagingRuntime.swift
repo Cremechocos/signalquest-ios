@@ -485,11 +485,31 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         case membersNotActivated([String])
     }
 
+    /// Ce qui demande la genèse d'une conversation.
+    enum GenesisTrigger: Equatable, Sendable {
+        /// Ouverture ou tournée au lancement.
+        case opening(holdsV1Key: Bool)
+        /// Premier envoi refusé par `409 E2EE_AUTO_REQUIRED` (§7.2).
+        case firstSend
+    }
+
+    /// Après la bascule, la genèse auto à l'ouverture revient au détenteur de la
+    /// clé v1 d'une conversation chiffrée v1, qui en importe ensuite l'historique ;
+    /// sans elle, la genèse attend le premier envoi (E2EE-AUTO §8, révision 16).
+    /// Avant la bascule, la règle §14.2 ne change pas.
+    static func allowsGenesis(_ conversation: MessageConversation, trigger: GenesisTrigger, autoActive: Bool) -> Bool {
+        guard autoActive else { return true }
+        switch trigger {
+        case .firstSend: return true
+        case .opening(let holdsV1Key): return conversation.e2eeEnabled == true && holdsV1Key
+        }
+    }
+
     /// Migration d'une conversation chiffrée v1, à son ouverture ou au
     /// lancement (§14.2), selon la règle commune : tous les membres certifiés
     /// et lisant le v2. Après la bascule, genèse auto d'une conversation v1 ou
-    /// en clair, sans attendre les membres (E2EE-AUTO §8).
-    func migrateIfReady(_ conversation: MessageConversation) async -> MigrationOutcome {
+    /// en clair, sans attendre les membres (E2EE-AUTO §8), selon `allowsGenesis`.
+    func migrateIfReady(_ conversation: MessageConversation, trigger: GenesisTrigger) async -> MigrationOutcome {
         guard writesEnabled, conversation.e2eeEnabled == true || E2EEV2ServerGate.autoActive else { return .v1 }
         guard let parts = current(), !lacksV2Readiness(parts.session) else { return .v1 }
         let namespace = parts.session.ownerNamespace
@@ -526,7 +546,10 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         case .refreshed?:
             return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true ? .v2 : .v1
         case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_NOT_V2":
-            break
+            guard Self.allowsGenesis(conversation, trigger: trigger, autoActive: E2EEV2ServerGate.autoActive) else {
+                Self.traceV2("migration", "genesis_deferred")
+                return .v1
+            }
         case .failure(let failure)?:
             // Rien de sûr sur son état : jamais de genèse sur un doute.
             Self.traceV2("migration", "discovery", failure)

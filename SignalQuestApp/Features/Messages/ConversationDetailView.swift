@@ -1001,7 +1001,8 @@ struct ConversationDetailView: View {
             // si tous ses membres lisent le v2 (règle commune, v0.4.17). Après la
             // bascule, une conversation v1 ou en clair y passe sans attendre (E2EE-AUTO §8).
             if !conversationIsV2, conversation.e2eeEnabled == true || E2EEV2ServerGate.autoActive {
-                switch await services.e2eeV2Messaging.migrateIfReady(conversation) {
+                let holdsV1Key = conversation.e2eeEnabled == true ? await (e2ee ?? services.e2ee).isUnlocked() : false
+                switch await services.e2eeV2Messaging.migrateIfReady(conversation, trigger: .opening(holdsV1Key: holdsV1Key)) {
                 case .v2: conversationIsV2 = true
                 case .membersNotActivated(let ids): membersNotActivated = ids
                 case .v1: break
@@ -1117,6 +1118,9 @@ struct ConversationDetailView: View {
             if case .authenticated(let user) = session.state {
                 E2EEUnlockSheet(userId: user.id, service: e2ee ?? services.e2ee) {
                     Task {
+                        // Après la bascule, la clé v1 tout juste déverrouillée pose la
+                        // genèse auto, puis l'historique s'importe (E2EE-AUTO §8).
+                        if await adoptAutoEncryptionAfterUnlock() { return }
                         await load()
                         await shareKeyIfNeeded()
                         await loadPinned()
@@ -4051,11 +4055,27 @@ struct ConversationDetailView: View {
         }
     }
 
+    /// Conversation chiffrée v1 ouverte avant de tenir sa clé : déverrouillée, elle
+    /// passe en auto comme à une ouverture par le détenteur de la clé (§8).
+    private func adoptAutoEncryptionAfterUnlock() async -> Bool {
+        guard E2EEV2ServerGate.autoActive, !conversationIsV2, conversation.e2eeEnabled == true,
+              await services.e2eeV2Messaging.migrateIfReady(conversation, trigger: .opening(holdsV1Key: true)) == .v2 else {
+            return false
+        }
+        conversationIsV2 = true
+        guard usesV2 else { return false }
+        await loadLegacyHistory()
+        await loadV2()
+        v2LegacyReadings = await legacyReadings(of: v2Legacy)
+        await importLegacyHistoryIfNeeded()
+        return true
+    }
+
     /// Genèse auto d'une conversation v1 ou en clair, demandée par le serveur :
     /// vrai quand la conversation est v2 ici, son fil chargé.
     private func adoptAutoEncryption() async -> Bool {
         E2EEV2ServerGate.recordAutoActive()
-        guard await services.e2eeV2Messaging.migrateIfReady(conversation) == .v2 else { return false }
+        guard await services.e2eeV2Messaging.migrateIfReady(conversation, trigger: .firstSend) == .v2 else { return false }
         conversationIsV2 = true
         guard usesV2 else { return false }
         await loadLegacyHistory()

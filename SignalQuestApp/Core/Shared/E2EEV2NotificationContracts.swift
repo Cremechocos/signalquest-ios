@@ -1289,7 +1289,7 @@ enum E2EEV2ServerGate {
     static let messagingCapabilities: Set<String> = [
         E2EEV2ProtocolWire.deviceIdentityCapability, E2EEV2ProtocolWire.messageEnvelopeCapability,
     ]
-    static let callCapabilities = messagingCapabilities.union(["e2ee_verified_calls_v2"])
+    static let callCapabilities = messagingCapabilities.union([verifiedCallsCapability])
     /// Réactions chiffrées (D.16) : publiée quand le serveur accepte l'enveloppe v3.
     static let reactionsCapability = "e2ee_message_envelope_v3"
 
@@ -1303,9 +1303,13 @@ enum E2EEV2ServerGate {
     #endif
 
     // Une fois la bascule faite, la version minimale tient lieu de capacités :
-    // toute app à jour sait tout faire (E2EE-AUTO §7).
+    // toute app à jour sait tout faire (E2EE-AUTO §7). Sauf la porte des appels,
+    // qui garde la capacité serveur `e2ee_verified_calls_v2` (§7.3, révision 16).
+    static let verifiedCallsCapability = "e2ee_verified_calls_v2"
     static var messagingOpen: Bool { autoActive || messagingCapabilities.isSubset(of: published) }
-    static var callsOpen: Bool { autoActive || callCapabilities.isSubset(of: published) }
+    static var callsOpen: Bool {
+        published.contains(verifiedCallsCapability) && (autoActive || callCapabilities.isSubset(of: published))
+    }
     static var reactionsOpen: Bool { autoActive || messagingCapabilities.union([reactionsCapability]).isSubset(of: published) }
     /// Une fois la lecture ouverte, les conversations déjà v2 restent lisibles
     /// même si le serveur referme sa porte : elles ne repassent jamais en v1.
