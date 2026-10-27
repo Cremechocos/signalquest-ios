@@ -293,6 +293,39 @@ final class CarPlayNavigationTests: XCTestCase {
         XCTAssertEqual(ManeuverMapper.symbolName(for: "Continuez tout droit"), "arrow.up")
     }
 
+    /// MapKit écrit dans la langue de l'iPhone (INT-iOS-21) : allemand, espagnol,
+    /// italien, néerlandais et portugais, sans flèche lue dans le nom de la voie.
+    func testOtherEuropeanLanguagesGetTheirArrow() {
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Rechts abbiegen auf Linkstraße"), "arrow.turn.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Leicht links halten"), "arrow.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Im Kreisverkehr die zweite Ausfahrt nehmen"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Wenden"), "arrow.uturn.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Gira a la izquierda hacia Calle Derecha"), "arrow.turn.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Ha llegado a su destino"), "mappin.and.ellipse")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Mantente a la derecha"), "arrow.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Svolta a destra in Via Sinistra"), "arrow.turn.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Alla rotatoria prendi la seconda uscita"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Sla linksaf naar de Rechtstraat"), "arrow.turn.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Houd rechts aan"), "arrow.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Vire à direita para a Rua da Esquerda"), "arrow.turn.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Na rotunda, saia na segunda saída"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.instructionVariants(for: "Rechts abbiegen auf Linkstraße"), ["Rechts abbiegen auf Linkstraße", "Rechts abbiegen"])
+    }
+
+    /// Consigne MapKit dans une autre langue que l'app : distance seule, dans la
+    /// locale de la consigne, sans préfixe traduit.
+    func testAForeignInstructionIsPrecededByTheDistanceAlone() {
+        let foreign = VoiceAnnouncementPolicy.spokenText(instruction: "Rechts abbiegen", threshold: 300,
+                                                         appLanguage: "en", instructionLanguage: "de-DE")
+        XCTAssertTrue(foreign.hasSuffix(", Rechts abbiegen"))
+        XCTAssertFalse(foreign.contains("In "))
+        let same = VoiceAnnouncementPolicy.spokenText(instruction: "Turn right", threshold: 300,
+                                                      appLanguage: "en", instructionLanguage: "en-GB")
+        XCTAssertNotEqual(same, foreign)
+        XCTAssertTrue(VoiceAnnouncementPolicy.sameLanguage("fr", "fr-CA"))
+        XCTAssertFalse(VoiceAnnouncementPolicy.sameLanguage("en", "de-DE"))
+    }
+
     /// Le rond-point et l'arrivée l'emportent sur la direction qu'ils mentionnent.
     func testRoundaboutAndArrivalBeatTheDirectionTheyMention() {
         XCTAssertEqual(ManeuverMapper.symbolName(for: "Au rond-point, prenez la deuxième sortie à droite"), "arrow.triangle.turn.up.right.circle")

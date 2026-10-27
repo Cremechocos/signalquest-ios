@@ -27,12 +27,34 @@ enum VoiceAnnouncementPolicy {
         return crossed
     }
 
+    /// Langue des consignes MapKit : la première langue du processus, celle de
+    /// l'iPhone ou celle choisie pour l'app dans Réglages, que l'app la parle ou non.
+    static var instructionLanguage: String {
+        Locale.preferredLanguages.first ?? AVSpeechSynthesisVoice.currentLanguageCode()
+    }
+
     /// Texte prononcé. La distance précède l'instruction : « Dans 300 mètres,
-    /// tournez à droite » — l'ordre inverse ferait agir trop tôt.
-    static func spokenText(instruction: String, threshold: CLLocationDistance) -> String {
+    /// tournez à droite » — l'ordre inverse ferait agir trop tôt. Quand MapKit
+    /// écrit dans une autre langue que l'app (iPhone en allemand, app en
+    /// anglais), la distance seule précède la consigne : « 300 m, Rechts
+    /// abbiegen », lu d'une seule voix, sans mélange de langues.
+    static func spokenText(
+        instruction: String,
+        threshold: CLLocationDistance,
+        appLanguage: String = Bundle.main.preferredLocalizations.first ?? "fr",
+        instructionLanguage: String = instructionLanguage
+    ) -> String {
         guard threshold > 50 else { return instruction }
+        guard sameLanguage(appLanguage, instructionLanguage) else {
+            let distance = SQUnits.distance(meters: threshold, locale: Locale(identifier: instructionLanguage))
+            return "\(distance), \(instruction)"
+        }
         let distance = SQUnits.distance(meters: threshold)
         return String(localized: "Dans \(distance), \(instruction)")
+    }
+
+    nonisolated static func sameLanguage(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.lowercased().prefix { $0.isLetter } == rhs.lowercased().prefix { $0.isLetter }
     }
 }
 
@@ -80,10 +102,11 @@ final class CarPlayVoiceGuide: NSObject, AVSpeechSynthesizerDelegate {
         ) else { return }
 
         lastAnnouncedThreshold = threshold
+        // La consigne est dans la langue de MapKit : la voix aussi.
         speak(VoiceAnnouncementPolicy.spokenText(
             instruction: plan.steps[progress.stepIndex].instruction,
             threshold: threshold
-        ))
+        ), language: VoiceAnnouncementPolicy.instructionLanguage)
     }
 
     func announceArrival() {
@@ -105,13 +128,17 @@ final class CarPlayVoiceGuide: NSObject, AVSpeechSynthesizerDelegate {
         releaseSession()
     }
 
-    private func speak(_ text: String) {
+    /// `language` : celle du texte quand il ne vient pas des traductions de l'app
+    /// (consignes MapKit) ; sinon la voix suit la langue de l'app.
+    private func speak(_ text: String, language: String? = nil) {
         activateDuckedSession()
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: Self.voiceLanguage(
+        let appVoice = Self.voiceLanguage(
             appLanguage: Bundle.main.preferredLocalizations.first ?? "fr",
             deviceLanguage: AVSpeechSynthesisVoice.currentLanguageCode()
-        ))
+        )
+        utterance.voice = language.flatMap { AVSpeechSynthesisVoice(language: $0) }
+            ?? AVSpeechSynthesisVoice(language: appVoice)
         pendingUtterances.insert(ObjectIdentifier(utterance))
         synthesizer.speak(utterance)
     }

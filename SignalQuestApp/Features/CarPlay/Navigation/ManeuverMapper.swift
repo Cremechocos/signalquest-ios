@@ -51,9 +51,10 @@ enum ManeuverMapper {
         guard !trimmed.isEmpty else { return [String(localized: "Continuez")] }
         // « Tournez à droite sur la rue de Rivoli » → « Tournez à droite »,
         // « Turn right onto Main Street » → « Turn right » (MapKit parle la
-        // langue de l'appareil).
-        for separator in [" sur ", " onto "] {
-            guard let range = trimmed.range(of: separator) else { continue }
+        // langue de l'appareil, qui peut ne pas être celle de l'app).
+        for separator in [" sur ", " onto ", " auf ", " in die ", " in den ", " hacia ", " in via ",
+                          " su ", " naar ", " op ", " para a ", " para o ", " em direção a "] {
+            guard let range = trimmed.range(of: separator, options: .caseInsensitive) else { continue }
             let short = String(trimmed[trimmed.startIndex..<range.lowerBound])
             if short.count >= 4 { return [trimmed, short] }
         }
@@ -66,9 +67,10 @@ enum ManeuverMapper {
         UIImage(systemName: symbolName(for: instruction))
     }
 
-    /// Mots-clés français ET anglais : MapKit rédige les consignes dans la
-    /// langue de l'appareil, et un iPhone en anglais n'avait que la flèche
-    /// neutre (CAR-04).
+    /// Mots-clés français, anglais, allemands, espagnols, italiens, néerlandais
+    /// et portugais : MapKit rédige les consignes dans la langue de l'appareil,
+    /// sans type de manœuvre public, et un iPhone dans une autre langue n'avait
+    /// que la flèche neutre (CAR-04, INT-iOS-21).
     ///
     /// Mots entiers, et seulement avant le nom de la voie : « Turn left onto
     /// Wright Street » ne doit pas afficher une flèche à droite.
@@ -79,23 +81,43 @@ enum ManeuverMapper {
             .filter { !$0.isEmpty }
         let text = " " + words.joined(separator: " ") + " "
         func mentions(_ phrases: String...) -> Bool { phrases.contains { text.contains(" \($0) ") } }
+        // Demi-tour, rond-point et arrivée se lisent dans toute la consigne : la
+        // coupe avant le nom de voie tombe parfois avant eux (« Ha llegado a su
+        // destino »). Seules les directions s'arrêtent avant le nom de la voie.
+        let fullWords = instruction.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { !$0.isEmpty }
+        let fullText = " " + fullWords.joined(separator: " ") + " "
+        func states(_ phrases: String...) -> Bool { phrases.contains { fullText.contains(" \($0) ") } }
         switch true {
-        case mentions("demi tour", "faites demi", "u turn"):
+        case states("demi tour", "faites demi", "u turn", "wenden", "kehrtwende", "cambio de sentido",
+                      "media vuelta", "gira en u", "inversione", "keer om", "omkeren", "u bocht",
+                      "retorno", "inversão de marcha", "meia volta"):
             return "arrow.uturn.left"
         // Rond-point et arrivée avant les virages : « Au rond-point, prenez la
         // deuxième sortie à droite » reste un rond-point, « Votre destination est
         // à droite » reste l'arrivée.
-        case mentions("rond point", "giratoire", "roundabout"):
+        case states("rond point", "giratoire", "roundabout", "kreisverkehr", "rotonda", "glorieta",
+                      "rotatoria", "rotonde", "rotunda", "rotatória"):
             return "arrow.triangle.turn.up.right.circle"
-        case words.contains(where: { $0.hasPrefix("arriv") }), mentions("destination"):
+        case fullWords.contains(where: { $0.hasPrefix("arriv") }),
+             states("destination", "ziel", "destino", "llegada", "llegado", "destinazione", "bestemming", "chegada"):
             return "mappin.and.ellipse"
-        case mentions("légèrement à droite", "serrez à droite", "slight right", "keep right", "bear right"):
+        case mentions("légèrement à droite", "serrez à droite", "slight right", "keep right", "bear right",
+                      "leicht rechts", "rechts halten", "ligeramente a la derecha", "mantente a la derecha",
+                      "manténgase a la derecha", "leggermente a destra", "mantieni la destra", "tieniti a destra",
+                      "flauwe bocht naar rechts", "rechts aanhouden", "houd rechts aan",
+                      "ligeiramente à direita", "mantenha se à direita", "mantenha a direita"):
             return "arrow.up.right"
-        case mentions("légèrement à gauche", "serrez à gauche", "slight left", "keep left", "bear left"):
+        case mentions("légèrement à gauche", "serrez à gauche", "slight left", "keep left", "bear left",
+                      "leicht links", "links halten", "ligeramente a la izquierda", "mantente a la izquierda",
+                      "manténgase a la izquierda", "leggermente a sinistra", "mantieni la sinistra", "tieniti a sinistra",
+                      "flauwe bocht naar links", "links aanhouden", "houd links aan",
+                      "ligeiramente à esquerda", "mantenha se à esquerda", "mantenha a esquerda"):
             return "arrow.up.left"
-        case mentions("droite", "right"):
+        case mentions("droite", "right", "rechts", "rechtsaf", "derecha", "destra", "direita"):
             return "arrow.turn.up.right"
-        case mentions("gauche", "left"):
+        case mentions("gauche", "left", "links", "linksaf", "izquierda", "sinistra", "esquerda"):
             return "arrow.turn.up.left"
         default:
             return "arrow.up"
