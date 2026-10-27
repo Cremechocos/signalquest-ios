@@ -999,8 +999,10 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             return false
         }
         sessionsByID = retained
-        let retainedIDs = Set(retained.keys)
-        payloadsBySessionID = payloadsBySessionID.filter { retainedIDs.contains($0.key) }
+        // Une session v2 ne porte jamais sa position côté serveur : celle déjà
+        // déchiffrée ou envoyée reste, sinon le bandeau la perdait jusqu'au relevé suivant.
+        let keptIDs = Set(retained.keys).union(incoming.filter { $0.e2eeV2Required == true }.map(\.id))
+        payloadsBySessionID = payloadsBySessionID.filter { keptIDs.contains($0.key) }
         merge(incoming)
     }
 
@@ -1116,10 +1118,12 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     private func requestPublish(force: Bool) {
         guard appIsActive, !publishableSessions.isEmpty else { return }
         let now = Date()
-        if !force, let lastPublishedAt {
+        if let lastPublishedAt {
             let elapsed = now.timeIntervalSince(lastPublishedAt)
+            // Battement compris : le serveur v2 refuse deux positions à moins de 2 s (429).
+            if elapsed < 2 { return }
             let distance = lastPublishedLocation.map { lastObservedLocation?.distance(from: $0) ?? 0 } ?? .greatestFiniteMagnitude
-            if elapsed < 5 || (distance < 8 && elapsed < 20) { return }
+            if !force, elapsed < 5 || (distance < 8 && elapsed < 20) { return }
         }
         publishRequested = true
         guard publishTask == nil else { return }
@@ -1127,14 +1131,28 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             guard let self else { return }
             while self.publishRequested, !Task.isCancelled {
                 self.publishRequested = false
+                // Un relevé arrivé pendant l'envoi relance la boucle : elle attend les 2 s du serveur v2.
+                if let lastPublishedAt = self.lastPublishedAt {
+                    let wait = 2 - Date().timeIntervalSince(lastPublishedAt)
+                    if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+                }
                 await self.publishSnapshot(location: self.lastObservedLocation ?? self.location.lastLocation)
             }
             self.publishTask = nil
         }
     }
 
-    private func publishSnapshot(location currentLocation: CLLocation?) async {
+    private func publishSnapshot(location observedLocation: CLLocation?) async {
         guard appIsActive else { return }
+        var currentLocation = observedLocation
+        // Immobile, le suivi (filtre de 8 m) ne livre plus de relevé : en v2, où une
+        // position est exigée, en redemander une fraîche plutôt que ne rien envoyer.
+        if publishableSessions.contains(where: { $0.e2eeV2Required == true }),
+           currentLocation.map({ !location.isUsable($0, maxAge: 30) }) ?? true,
+           let fresh = await location.currentLocation(timeoutSeconds: 8, maxAge: 30) {
+            lastObservedLocation = fresh
+            currentLocation = fresh
+        }
         networkPath.refreshNow()
         let status = networkPath.status
         let sim = networkPath.simPLMN()

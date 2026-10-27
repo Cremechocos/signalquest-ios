@@ -626,7 +626,7 @@ struct ConversationDetailView: View {
                 }
             }
 
-            if !isE2EE, let currentUserId {
+            if EncryptedConversationSurfaces.allowsLiveShare(isE2EE: isE2EE, isV2: conversationIsV2), let currentUserId {
                 LiveShareConversationBar(
                     coordinator: services.liveShare,
                     conversation: conversation,
@@ -1045,7 +1045,7 @@ struct ConversationDetailView: View {
             guard !Task.isCancelled else { return }
             await shareKeyIfNeeded()
             await loadPinned()
-            if let currentUserId, !isE2EE {
+            if let currentUserId, EncryptedConversationSurfaces.allowsLiveShare(isE2EE: isE2EE, isV2: conversationIsV2) {
                 await services.liveShare.load(
                     conversationId: conversation.id,
                     currentUserId: currentUserId
@@ -1416,6 +1416,7 @@ struct ConversationDetailView: View {
                 isSharingLocation: isSharingLocation,
                 isE2EE: isE2EE,
                 canSchedule: EncryptedConversationSurfaces.allowsScheduling(isV2: conversationIsV2),
+                canLiveShare: EncryptedConversationSurfaces.allowsLiveShare(isE2EE: isE2EE, isV2: conversationIsV2),
                 isEditing: editTarget != nil,
                 hasStagedAttachments: !stagedAttachments.isEmpty && editTarget == nil,
                 seedText: composerSeed,

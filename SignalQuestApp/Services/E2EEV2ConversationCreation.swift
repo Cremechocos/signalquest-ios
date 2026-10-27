@@ -754,7 +754,10 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             epochKey: epochKey, accepted: accepted, conversationId: prepared.conversationId,
             commitment: manifest.keyCommitmentB64, membership: genesis, recipients: prepared.recipients,
             createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(now().timeIntervalSince1970 * 1_000),
-            session: context.session, keyStore: keyStore, stateStore: stateStore
+            session: context.session, keyStore: keyStore, stateStore: stateStore,
+            // Genèse marquée par le serveur (E2EE-AUTO §7.2) : sans le marqueur,
+            // le créateur publierait en v1 sous une époque marquée (426).
+            e2eeAuto: accepted.e2eeAuto
         ) else { throw E2EEV2ConversationStateStore.Failure.invalidRecord }
     }
 

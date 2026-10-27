@@ -152,15 +152,17 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
     }
 
     /// Reçu de création proposé par iOS (E.2).
-    static func receipt(for body: [String: Any], recipientCount: Int) throws -> Data {
-        try receipt(conversationId: try XCTUnwrap(body["conversationId"] as? String), recipientCount: recipientCount)
+    static func receipt(for body: [String: Any], recipientCount: Int, e2eeAuto: Bool = false) throws -> Data {
+        try receipt(conversationId: try XCTUnwrap(body["conversationId"] as? String), recipientCount: recipientCount, e2eeAuto: e2eeAuto)
     }
 
-    /// Entiers en chaînes (D.0).
-    static func receipt(conversationId: String, recipientCount: Int) throws -> Data {
-        try JSONSerialization.data(withJSONObject: [
+    /// Entiers en chaînes (D.0). `e2eeAuto` n'est servi qu'à `true` (§7.2).
+    static func receipt(conversationId: String, recipientCount: Int, e2eeAuto: Bool = false) throws -> Data {
+        var epoch: [String: Any] = ["id": "epoch_" + conversationId, "epochNumber": "1", "status": "active", "createdAt": "2026-10-01T05:40:00.000Z"]
+        if e2eeAuto { epoch["e2eeAuto"] = true }
+        return try JSONSerialization.data(withJSONObject: [
             "conversationId": conversationId,
-            "epoch": ["id": "epoch_" + conversationId, "epochNumber": "1", "status": "active", "createdAt": "2026-10-01T05:40:00.000Z"],
+            "epoch": epoch,
             "recipientCount": String(recipientCount),
         ])
     }

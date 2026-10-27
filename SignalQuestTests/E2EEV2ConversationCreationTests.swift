@@ -190,6 +190,33 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
                        "Le créateur accuse sa première époque, une fois la clé gardée (v0.4.26)")
     }
 
+    /// Genèse marquée par le serveur (E2EE-AUTO §7.2) : le créateur garde le
+    /// marqueur, sinon il publierait en v1 sous une époque marquée (426).
+    func testCreatorKeepsTheMarkerOfAGenesisTheServerMarked() async throws {
+        for marked in [false, true] {
+            let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+            let devices = fixture.deviceSet(adding: [remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android").device])
+            let creator = E2EEV2ConversationCreator(
+                api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+                expectedSession: fixture.session
+            )
+            MockURLProtocol.requestHandler = { request in
+                if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+                let body = try E2EEV2AccountFixture.body(request)
+                let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+                return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(
+                    for: body, recipientCount: envelopes.count, e2eeAuto: marked
+                ))
+            }
+            guard case .created(let conversationId, _) = await creator.create(
+                participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false, devices: devices,
+                expectedOwnerScopeId: fixture.session.ownerScopeId
+            ) else { return XCTFail("Création refusée") }
+            let current = try XCTUnwrap(try fixture.states.currentEpoch(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
+            XCTAssertEqual(current.e2eeAuto == true, marked)
+        }
+    }
+
     // MARK: - Demandes de message (DM-REQ-1)
 
     private func receiptJSON(request: String?, extra: String = "") -> Data {

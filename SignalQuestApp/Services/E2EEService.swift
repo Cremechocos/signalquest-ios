@@ -10864,31 +10864,21 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
         // §7.6 : après `E2EE_LIVE_SHARE_COUNTER_STALE`, un seul renvoi depuis
         // `lastCounter + 1` ; au second refus, fin du partage.
         var counterResends = 1
+        // Le serveur ne sert que la dernière position et le compteur admet les
+        // trous : une enveloppe restée en attente est dépassée par la position
+        // courante. La renvoyer d'abord faisait partir la courante dans les 2 s
+        // (429), gardée à son tour : le destinataire avait toujours la précédente.
         if let pending = try stateStore.pending(
             ownerScopeId: ownerScopeId,
             conversationId: session.conversationId,
             sessionId: session.id
         ) {
-            if pending.sendDeadlineAtMs <= nowMs {
-                try stateStore.complete(
-                    ownerScopeId: ownerScopeId,
-                    sessionId: session.id,
-                    clientRequestId: pending.clientRequestId,
-                    nowMs: nowMs
-                )
-            } else {
-                do {
-                    try await sendPending(
-                        pending,
-                        ownerScopeId: ownerScopeId,
-                        sessionId: session.id,
-                        nowMs: nowMs
-                    )
-                } catch E2EEV2LiveShareRuntimeError.counterStale {
-                    // Compteur relevé : la position courante part ci-dessous, c'est le renvoi.
-                    counterResends = 0
-                }
-            }
+            try stateStore.complete(
+                ownerScopeId: ownerScopeId,
+                sessionId: session.id,
+                clientRequestId: pending.clientRequestId,
+                nowMs: nowMs
+            )
         }
 
         while true {
@@ -10998,9 +10988,9 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
 
     private static let counterStaleCode = "E2EE_LIVE_SHARE_COUNTER_STALE"
 
-    /// Un refus n'est pas retenu par le serveur (§7.6) : renvoyer la même
-    /// enveloppe n'y changerait rien. Seuls un réseau coupé, une cadence (429)
-    /// ou une erreur du serveur gardent l'enveloppe pour un renvoi à l'identique.
+    /// Un refus n'est pas retenu par le serveur (§7.6) : l'enveloppe est effacée
+    /// tout de suite. Un réseau coupé, une cadence (429) ou une erreur du serveur
+    /// la laissent jusqu'à la publication suivante, qui la remplace par la position courante.
     static func dropsPending(_ failure: E2EEV2TransportFailure) -> Bool {
         guard let status = failure.statusCode else { return false }
         return (400..<500).contains(status) && ![401, 408, 429].contains(status)

@@ -58,6 +58,12 @@ enum EncryptedConversationSurfaces {
         !isV2
     }
 
+    /// Partage en direct (E2EE-AUTO §7.6) : en clair, ou dans une conversation v2
+    /// par ses routes signées. Une conversation v1 chiffrée n'en a aucune.
+    static func allowsLiveShare(isE2EE: Bool, isV2: Bool) -> Bool {
+        !isE2EE || isV2
+    }
+
     /// Transférer un message (U01) : une cible chiffrée est toujours sûre puisque l'envoi y
     /// chiffre ; seul « chiffré vers clair » est interdit, il ferait sortir un texte lisible
     /// d'une conversation chiffrée.

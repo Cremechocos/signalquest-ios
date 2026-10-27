@@ -14,6 +14,8 @@ struct MessageComposerBar: View {
     let isE2EE: Bool
     /// Faux dans une conversation v2 (§13) : « Programmer l'envoi » disparaît.
     var canSchedule = true
+    /// Vrai en clair et dans une conversation v2 : « Partager en direct » reste au menu.
+    var canLiveShare = true
     /// Vrai pendant la modification d'un message : une photo jointe partirait
     /// comme un message à part, sans rapport avec l'édition.
     var isEditing = false
@@ -172,6 +174,8 @@ struct MessageComposerBar: View {
                     Button { onShareLocation() } label: {
                         Label("Partager ma position", systemImage: "location.fill")
                     }
+                }
+                if canLiveShare {
                     Button { onLiveShare() } label: {
                         Label("Partager en direct", systemImage: "dot.radiowaves.left.and.right")
                     }

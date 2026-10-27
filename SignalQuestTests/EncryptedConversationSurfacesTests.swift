@@ -25,6 +25,9 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
     func testScheduledMessagesAreClosedInAV2Conversation() {
         XCTAssertFalse(EncryptedConversationSurfaces.allowsScheduling(isV2: true))
         XCTAssertTrue(EncryptedConversationSurfaces.allowsScheduling(isV2: false))
+        XCTAssertTrue(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: false, isV2: false), "En clair")
+        XCTAssertTrue(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: true, isV2: true), "v2 : routes signées")
+        XCTAssertFalse(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: true, isV2: false), "v1 chiffrée")
     }
 
     func testTheAppSwitcherNeverShowsDecryptedContent() {
