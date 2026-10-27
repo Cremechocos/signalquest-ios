@@ -498,6 +498,7 @@
 		8A6126B52BAAEF60158FCB2C /* E2EEV2MessageReceiverV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 529164AC3282F6AC5AA5AEAD /* E2EEV2MessageReceiverV2Tests.swift */; };
 		8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */; };
 		8A79A6193F12C524B36E046F /* FeedTextKeysContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513F70A15505AFF1865BF9E4 /* FeedTextKeysContractTests.swift */; };
+		8A81354248FEF893FAC516D6 /* ExperienceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF81D11D7564FA4B5B73B21C /* ExperienceDetailView.swift */; };
 		8A9BA3041BDCFBAA5AB6FB82 /* SSEFrameParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D44DAFE7F9710386A49F29C /* SSEFrameParserTests.swift */; };
 		8A9E4F0BAF7ACD8DDD8B61FA /* DromRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB55790C931377A64C3D3477 /* DromRegion.swift */; };
 		8AFF1F02B919852DDF269451 /* SessionsListPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFAA91C0353BEF6068A368 /* SessionsListPaginationTests.swift */; };
@@ -1708,6 +1709,7 @@
 		DD2BBB2FC1142CC65081EA76 /* MapContextControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContextControls.swift; sourceTree = "<group>"; };
 		DD60066B1E713E61E7749EF1 /* E2EEV2Canonical.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2Canonical.swift; sourceTree = "<group>"; };
 		DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
+		DF81D11D7564FA4B5B73B21C /* ExperienceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceDetailView.swift; sourceTree = "<group>"; };
 		DFDCF405C41F61A45C664C0D /* ANFRBandsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRBandsViewModelTests.swift; sourceTree = "<group>"; };
 		E03FBD9147DB71215729DD82 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
 		E0B975ADACD15B14BF001583 /* SentinelleFollowing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleFollowing.swift; sourceTree = "<group>"; };
@@ -2586,6 +2588,7 @@
 		A3BE969831178B68CA15C84D /* Experience */ = {
 			isa = PBXGroup;
 			children = (
+				DF81D11D7564FA4B5B73B21C /* ExperienceDetailView.swift */,
 				CB04A4F099E380E7AD6EB352 /* ExperienceResultText.swift */,
 				D79BA1E3773815C05B91DA4C /* ExperienceTestsModel.swift */,
 				D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */,
@@ -3830,6 +3833,7 @@
 				B25F8DF080BF4D57E0A077C7 /* EncryptedConversationSurfaces.swift in Sources */,
 				696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */,
 				5A91B5EC6BCC8324C74BC6DD /* ExperienceCardView.swift in Sources */,
+				8A81354248FEF893FAC516D6 /* ExperienceDetailView.swift in Sources */,
 				F730A378FDA86BC2F12FD116 /* ExperienceEngine.swift in Sources */,
 				6892B2A9907095297A350A62 /* ExperienceMeasures.swift in Sources */,
 				62C84C66105727F1811E6F41 /* ExperienceMethod.swift in Sources */,

@@ -112,6 +112,82 @@ final class ExperienceResultTextTests: XCTestCase {
                        .init(headline: "Interrompu", detail: "test arrêté"))
     }
 
+    // MARK: Détail
+
+    func testLadderDetailSaysMarginStallsAndMissingRungs() {
+        var held = rung(.p1440, startupMs: 1_400)
+        held.bufferMinMs = 700
+        held.bufferAvgMs = 2_300
+        held.receivedBps = 18_000_000
+        XCTAssertEqual(ExperienceResultText.margin(held), "× 1,5")
+        XCTAssertEqual(ExperienceResultText.rungVerdict(held), "Tient · × 1,5")
+        XCTAssertEqual(ExperienceResultText.rungDetail(held), "démarrage 1,4 s · tampon 0,7 / 2,3 s · reçu 18 Mb/s")
+        let stalled = rung(.p2160, stalls: 4)
+        XCTAssertEqual(ExperienceResultText.rungVerdict(stalled), "4 coupures")
+        XCTAssertEqual(ExperienceResultText.rungDetail(stalled), "1,2 s d’attente")
+        XCTAssertEqual(ExperienceResultText.stallTimes(stalled.stalls), "2 · 4 · 6 · 8\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.rungVerdict(ExperienceRung(quality: .p2160, state: .notTested)), "Non testé")
+        XCTAssertNil(ExperienceResultText.rungDetail(ExperienceRung(quality: .p2160, state: .abandoned)), "rien d'inventé")
+    }
+
+    func testAdaptiveScoreExplainsEachPart() {
+        let stalls = [ExperienceStall(atPlaybackMs: 21_000, waitMs: 200)]
+        XCTAssertEqual(ExperienceResultText.smoothnessFormula(stalls, result: 29), "40 − 10 (1 coupure) − 1 (200 ms d’attente) = 29")
+        XCTAssertEqual(ExperienceResultText.smoothnessFormula([ExperienceStall(atPlaybackMs: 4_000, waitMs: 1_300)], result: 24),
+                       "40 − 10 (1 coupure) − 6,5 (1,3 s d’attente) = 24")
+        XCTAssertEqual(ExperienceResultText.smoothnessFormula([], result: 40), "40, sans coupure")
+        XCTAssertEqual(ExperienceResultText.startupRule(500), "500 ms : ≤ 1\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.startupRule(1_001), "1,0 s : ≤ 2\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.startupRule(4_100), "4,1 s : > 4\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.qualityPoints([.p480: 10_000, .p720: 10_000, .p1080: 10_000, .p2160: 0]), "480p 8 · 720p 18 · 1080p 28")
+        XCTAssertEqual(ExperienceResultText.switches(up: 3, down: 1), "3 montées · 1 descente")
+    }
+
+    func testWebSpreadIsAPartOfTheMedian() throws {
+        let stats = try XCTUnwrap(ExperienceResultText.webStats(.init(state: .measured, openings: [opening(2_062), opening(1_890), opening(2_352)])))
+        XCTAssertEqual(ExperienceResultText.webSpread(stats), "462 ms · 22 %")
+    }
+
+    func testUsageVerdictListsEachCriterionAgainstItsThreshold() {
+        let competitive = ExperienceResultText.criteria(.competitiveGaming, medianMs: 41, jitterMs: 8.1, spikeCount: 4)
+        XCTAssertEqual(competitive.map(\.met), [true, true, false], "4 à-coups : aucun toléré")
+        XCTAssertEqual(competitive.map(\.value), ["41 ms", "8,1 ms", "4"])
+        XCTAssertEqual(competitive.map(\.threshold), ["≤ 50 ms", "≤ 10 ms", "aucun toléré"])
+        // Même règle que le verdict du résultat : gigue arrondie une fois, 10,5 ms dépasse 10 ms.
+        XCTAssertFalse(ExperienceResultText.criteria(.competitiveGaming, medianMs: 40, jitterMs: 10.5, spikeCount: 0)[1].met)
+        XCTAssertTrue(ExperienceResultText.criteria(.competitiveGaming, medianMs: 40, jitterMs: 10.4, spikeCount: 0).allSatisfy(\.met))
+        XCTAssertEqual(ExperienceResultText.criteria(.audioCall, medianMs: 300, jitterMs: nil, spikeCount: nil).map(\.met), [true],
+                       "seuil inclusif, la latence seule compte")
+        XCTAssertEqual(ExperienceResultText.criteria(.hdVideoCall, medianMs: 120, jitterMs: nil, spikeCount: 0).map(\.met), [true, false],
+                       "gigue non mesurée : le critère n'est pas tenu")
+        for usage in ExperienceGameStats.Usage.allCases {
+            for (median, jitter, spikes) in [(41, 8.1, 4), (120, 12.0, 0), (250, 40.0, 9), (45, 10.5, 0), (150, 30.4, 1)] {
+                XCTAssertEqual(
+                    ExperienceResultText.criteria(usage, medianMs: Int64(median), jitterMs: jitter, spikeCount: spikes).allSatisfy(\.met),
+                    ExperienceGameStats.suits(usage, medianMs: Int64(median), jitterMs: ExperienceSubmission.roundHalfUp(jitter), spikeCount: spikes),
+                    "le détail et le verdict disent la même chose"
+                )
+            }
+        }
+        XCTAssertEqual(ExperienceResultText.spikes(count: 4, share: 4.0 / 300), "4 · 1,3 % du temps")
+        XCTAssertEqual(ExperienceResultText.spikes(count: 0, share: 0), "0", "pas de « 0,0 % du temps »")
+    }
+
+    func testUnderLoadSourceAndUploadRatio() {
+        XCTAssertEqual(ExperienceResultText.underLoadSource(.recentSpeedtest, reusedAge: 230),
+                       "Reprise d’un speedtest d’il y a 4 min, du même réseau")
+        XCTAssertEqual(ExperienceResultText.underLoadSource(.shortLoad, reusedAge: nil), "Courte charge de 5 s par sens")
+        XCTAssertEqual(ExperienceResultText.uploadRealTimeRatio(.init(kind: .video, bytes: 30_000_000, totalMs: 27_300)), "× 1,1")
+        XCTAssertNil(ExperienceResultText.uploadRealTimeRatio(.init(kind: .photo, bytes: 5_000_000, totalMs: 4_600)))
+    }
+
+    func testUsageSaysUsedOverMaximumAndDuration() {
+        XCTAssertEqual(ExperienceResultText.usage(.init(bytes: 53_100_000, durationMs: 58_400), maxBytes: ExperienceMethod.ladderMaxBytes),
+                       "53,1 / 54 Mo · 58\u{00A0}s")
+        XCTAssertEqual(ExperienceResultText.usage(.init(bytes: 900_000, durationMs: 30_000), maxBytes: ExperienceMethod.gameMaxBytes),
+                       "0,9 / 41 Mo · 30\u{00A0}s")
+    }
+
     // MARK: États et unités
 
     func testUnselectedOrUnmeasuredTestsSayNotMeasured() {

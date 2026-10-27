@@ -5,17 +5,24 @@ import SwiftUI
 /// Aucun plafond : en données mobiles, un avertissement dit seulement la consommation.
 struct ExperienceTestsView: View {
     @ObservedObject var model: ExperienceTestsModel
+    /// Remonte en haut de l'onglet : une page de détail s'ouvre depuis le bas du résultat.
+    var scrollToTop: () -> Void = {}
 
     var body: some View {
         VStack(spacing: SQSpace.lg) {
             if model.running {
                 ExperienceRunningView(model: model)
             } else if let finished = model.finished {
-                ExperienceResultView(model: model, finished: finished)
+                switch model.page {
+                case .home: ExperienceResultView(model: model, finished: finished)
+                case .detail(let test): ExperienceDetailView(model: model, finished: finished, test: test)
+                case .usage: ExperienceUsageView(model: model, finished: finished)
+                }
             } else {
                 ExperienceEntryView(model: model)
             }
         }
+        .onChangeCompat(of: model.page) { _, _ in scrollToTop() }
         .task { await model.refreshLastTest() }
     }
 }
@@ -29,6 +36,17 @@ extension ExperienceTestKind {
         case .webPage: String(localized: "3 ouvertures")
         case .gameAndCalls: String(localized: "30 s + charge")
         case .upload: String(localized: "Photo 5 Mo · vidéo 30 Mo")
+        }
+    }
+
+    /// Pictogramme du test : liste d'entrée et étapes du direct.
+    var systemImage: String {
+        switch self {
+        case .videoLadder: "chart.bar.fill"
+        case .videoAdaptive: "play.rectangle.fill"
+        case .webPage: "globe"
+        case .gameAndCalls: "gamecontroller.fill"
+        case .upload: "arrow.up.doc.fill"
         }
     }
 
@@ -71,7 +89,7 @@ private struct ExperienceEntryView: View {
                 ForEach(ExperienceMethod.order, id: \.self) { test in
                     row(test)
                     if test != ExperienceMethod.order.last {
-                        Divider().padding(.leading, 52)
+                        Divider().padding(.leading, SQSpace.cardPadding + 38 + SQSpace.md)
                     }
                 }
             }
@@ -94,11 +112,9 @@ private struct ExperienceEntryView: View {
             model.toggle(test)
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(isOn ? SQColor.accent : SQColor.labelTertiary)
-                    .frame(width: 28)
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: test.systemImage, size: 38,
+                               tint: isOn ? SQColor.accentInk : SQColor.labelSecondary,
+                               fill: isOn ? SQColor.accentSoft : SQColor.chip)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey(test.title))
                         .font(SQType.heading)
@@ -125,10 +141,14 @@ private struct ExperienceEntryView: View {
                     }
                     .monospacedDigit()
                 }
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isOn ? SQColor.accent : SQColor.labelTertiary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, SQSpace.cardPadding)
             .padding(.vertical, SQSpace.sm2)
-            .frame(minHeight: 56)
+            .frame(minHeight: 60)
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
@@ -167,18 +187,12 @@ private struct ExperienceEntryView: View {
 
     private var launchButton: some View {
         let count = model.selected.count
-        return Button {
-            Haptics.light()
+        return GradientButton(
+            verbatim: count == 0 ? String(localized: "Choisir au moins un test") : String(localized: "Lancer \(count) tests"),
+            systemImage: count == 0 ? nil : "play.fill"
+        ) {
             Task { await model.start() }
-        } label: {
-            Text(count == 0 ? String(localized: "Choisir au moins un test") : String(localized: "Lancer \(count) tests"))
-                .font(SQFont.body(15, .bold, relativeTo: .headline))
-                .foregroundStyle(count == 0 ? SQColor.labelSecondary : SQColor.onInk)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(count == 0 ? SQColor.chip : SQColor.label, in: Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(SQPressButtonStyle())
         .disabled(count == 0)
         .accessibilityIdentifier("experience.start")
     }
@@ -267,20 +281,9 @@ private struct ExperienceRunningView: View {
                         .accessibilityAddTraits(.isHeader)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                    Haptics.light()
-                    model.stop()
-                } label: {
-                    Text("Arrêter")
-                        .font(SQFont.body(14, .bold, relativeTo: .subheadline))
-                        .foregroundStyle(SQColor.label)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
-                        .background(SQColor.chip, in: Capsule(style: .continuous))
-                        .contentShape(Capsule(style: .continuous))
+                if let test = model.live?.test {
+                    SQIconPastille(systemImage: test.systemImage, size: 44, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                 }
-                .buttonStyle(SQPressButtonStyle())
-                .accessibilityIdentifier("experience.stop")
             }
 
             if let live = model.live {
@@ -295,13 +298,21 @@ private struct ExperienceRunningView: View {
                 .frame(maxWidth: .infinity, minHeight: 64)
             }
 
-            timeline
+            ExperienceSteps(
+                order: ExperienceMethod.order.filter(model.selected.contains),
+                current: model.liveRank.map { $0.index - 1 } ?? -1
+            )
 
             Text("Données utilisées : \(ExperienceResultText.megabytes(model.live?.bytesUsed ?? 0)) sur \(model.maxMegabytes) au maximum")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
+
+            GradientButton("Arrêter", systemImage: "stop.fill", style: .secondary) {
+                model.stop()
+            }
+            .accessibilityIdentifier("experience.stop")
         }
         .padding(SQSpace.lg)
         .sqCardBackground()
@@ -313,26 +324,6 @@ private struct ExperienceRunningView: View {
             return String(localized: "Test d’expérience · \(rank.index) sur \(rank.total)")
         }
         return String(localized: "Test d’expérience")
-    }
-
-    /// Frise des tests lancés : faits, en cours, à venir.
-    private var timeline: some View {
-        let order = ExperienceMethod.order.filter(model.selected.contains)
-        let current = model.liveRank.map { $0.index - 1 } ?? -1
-        return HStack(spacing: SQSpace.xs) {
-            ForEach(Array(order.enumerated()), id: \.element) { index, test in
-                Text(verbatim: test.shortTitle)
-                    .font(SQFont.body(11.5, index == current ? .bold : .semibold, relativeTo: .caption))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .foregroundStyle(index == current ? SQColor.onAccent : index < current ? SQColor.label : SQColor.labelSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 30)
-                    .background(index == current ? SQColor.accent : index < current ? SQColor.accentSoft : SQColor.chip,
-                                in: Capsule(style: .continuous))
-                    .accessibilityLabel(Text(verbatim: test.shortTitle) + Text(verbatim: ", ")
-                        + Text(index == current ? "en cours" : index < current ? "fini" : "à venir"))
-            }
-        }
     }
 
     /// Ce que le moteur mesure à l'instant ; jamais de valeur inventée avant la première mesure.
@@ -443,7 +434,31 @@ private struct ExperienceResultView: View {
         .accessibilityIdentifier("experience.stopBanner")
     }
 
+    /// Un test lancé qui a produit quelque chose (mesuré, interrompu ou en échec) ouvre son détail.
+    private func hasDetail(_ test: ExperienceTestKind) -> Bool {
+        guard let state = finished.run.tests.state(of: test) else { return false }
+        return state != .notTested
+    }
+
+    @ViewBuilder
     private func resultRow(_ test: ExperienceTestKind) -> some View {
+        if hasDetail(test) {
+            Button {
+                Haptics.selection()
+                model.openDetail(test)
+            } label: {
+                resultRowContent(test, chevron: true)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint(Text("Ouvre le détail du test"))
+            .accessibilityIdentifier("experience.result.\(test.rawValue)")
+        } else {
+            resultRowContent(test, chevron: false)
+                .accessibilityIdentifier("experience.result.\(test.rawValue)")
+        }
+    }
+
+    private func resultRowContent(_ test: ExperienceTestKind, chevron: Bool) -> some View {
         let line = ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test])
         return HStack(alignment: .top, spacing: SQSpace.md) {
             VStack(alignment: .leading, spacing: 3) {
@@ -475,17 +490,39 @@ private struct ExperienceResultView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text("Note \(score) sur 100"))
             }
+            if chevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(SQSpace.cardPadding)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("experience.result.\(test.rawValue)")
     }
 
     private var usageLine: some View {
-        HStack(spacing: SQSpace.lg) {
-            ExperienceFigure(label: "Données utilisées", value: ExperienceResultText.megabytes(finished.run.bytesUsed))
-            ExperienceFigure(label: "Durée", value: ExperienceResultText.duration(seconds: Int(finished.run.durationMs / 1_000)))
+        Button {
+            Haptics.selection()
+            model.openUsage()
+        } label: {
+            HStack(spacing: SQSpace.lg) {
+                ExperienceFigure(label: "Données utilisées", value: ExperienceResultText.megabytes(finished.run.bytesUsed))
+                ExperienceFigure(label: "Durée", value: ExperienceResultText.duration(seconds: Int(finished.run.durationMs / 1_000)))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text("Ouvre la consommation par test"))
+        .accessibilityIdentifier("experience.usageLine")
     }
 
     @ViewBuilder
@@ -513,20 +550,64 @@ private struct ExperienceResultView: View {
     /// Interrompu par l'extérieur : « Relancer » ; sinon « Nouveau test ».
     private var actionButton: some View {
         let relaunch = finished.finish == .networkChanged || finished.finish == .background || finished.finish == .offline
-        return Button {
-            Haptics.light()
+        return GradientButton(relaunch ? "Relancer" : "Nouveau test", systemImage: relaunch ? "arrow.clockwise" : "arrow.counterclockwise") {
             model.newTest()
             if relaunch { Task { await model.start() } }
-        } label: {
-            Text(relaunch ? "Relancer" : "Nouveau test")
-                .font(SQFont.body(15, .bold, relativeTo: .headline))
-                .foregroundStyle(SQColor.onInk)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(SQColor.label, in: Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(SQPressButtonStyle())
         .accessibilityIdentifier("experience.newTest")
+    }
+}
+
+/// Étapes du lancement, reliées : faites (coche), en cours (pictogramme sur brique),
+/// à venir (pictogramme discret). Aux tailles AX, les pastilles seules : le titre dit le test.
+private struct ExperienceSteps: View {
+    let order: [ExperienceTestKind]
+    let current: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(order.enumerated()), id: \.element) { index, test in
+                VStack(spacing: SQSpace.xs) {
+                    ZStack {
+                        HStack(spacing: 0) {
+                            link(visible: index > 0, done: index <= current)
+                            link(visible: index < order.count - 1, done: index < current)
+                        }
+                        dot(index, test)
+                    }
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Text(verbatim: test.shortTitle)
+                            .font(SQFont.body(11, index == current ? .bold : .medium, relativeTo: .caption2))
+                            .foregroundStyle(index == current ? SQColor.label : SQColor.labelSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: test.shortTitle) + Text(verbatim: ", ")
+                    + Text(index == current ? "en cours" : index < current ? "fini" : "à venir"))
+            }
+        }
+    }
+
+    private func link(visible: Bool, done: Bool) -> some View {
+        Capsule(style: .continuous)
+            .fill(visible ? (done ? SQColor.accentSoft : SQColor.chip) : Color.clear)
+            .frame(height: 3)
+    }
+
+    private func dot(_ index: Int, _ test: ExperienceTestKind) -> some View {
+        let isCurrent = index == current, isDone = index < current
+        return Image(systemName: isDone ? "checkmark" : test.systemImage)
+            .font(.system(size: isCurrent ? 15 : 13, weight: .bold))
+            .foregroundStyle(isCurrent ? SQColor.onAccent : isDone ? SQColor.accentInk : SQColor.labelSecondary)
+            .frame(width: isCurrent ? 38 : 32, height: isCurrent ? 38 : 32)
+            .background(isCurrent ? SQColor.accent : isDone ? SQColor.accentSoft : SQColor.chip, in: Circle())
+            .shadow(color: isCurrent ? SQColor.accent.opacity(0.28) : .clear, radius: 6, y: 3)
+            // Même hauteur pour toutes les étapes : les libellés restent sur une ligne.
+            .frame(width: 38, height: 38)
     }
 }
 

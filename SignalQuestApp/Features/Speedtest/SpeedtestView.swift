@@ -310,11 +310,14 @@ struct SpeedtestView: View {
                     scrollProxy.scrollTo(Self.historyAnchor, anchor: .top)
                 }
             }
+            .id(Self.topAnchor)
 
             SpeedtestModePicker(mode: $mode, experience: services.experienceSession, speedtestRunning: isRunning)
 
             if mode == .experience {
-                ExperienceTestsView(model: services.experienceSession)
+                ExperienceTestsView(model: services.experienceSession) {
+                    scrollProxy.scrollTo(Self.topAnchor, anchor: .top)
+                }
             } else {
                 throughputContent
             }
@@ -386,6 +389,7 @@ struct SpeedtestView: View {
     }
 
     private static let historyAnchor = "speedtest.history.anchor"
+    private static let topAnchor = "speedtest.top.anchor"
 
     /// GO au repos, anneau pendant la mesure, résultat une fois le test fini.
     @ViewBuilder
@@ -1906,21 +1910,58 @@ enum SpeedtestMode: Hashable {
 }
 
 /// « Débit | Expérience », caché pendant une mesure : on ne lance pas un test dans
-/// l'autre mode tant que le premier tourne.
+/// l'autre mode tant que le premier tourne. Capsule pleine largeur, pictogramme
+/// brique sur le mode actif et pastille qui glisse d'un mode à l'autre.
 private struct SpeedtestModePicker: View {
     @Binding var mode: SpeedtestMode
     @ObservedObject var experience: ExperienceTestsModel
     let speedtestRunning: Bool
+    @Namespace private var thumb
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if !speedtestRunning, !experience.running {
-            SQSegmentedFilter(selection: $mode, options: [
-                (value: .throughput, label: "Débit", icon: nil),
-                (value: .experience, label: "Expérience", icon: nil),
-            ])
-            // Le filtre porte sa propre marge : aligné sur le titre, comme les autres listes.
-            .padding(.horizontal, -SQSpace.lg)
+            HStack(spacing: 0) {
+                segment(.throughput, title: "Débit", systemImage: "speedometer")
+                segment(.experience, title: "Expérience", systemImage: "play.rectangle.on.rectangle")
+            }
+            .padding(SQSpace.xs)
+            .background(SQColor.segTrack, in: Capsule(style: .continuous))
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("speedtest.mode")
         }
+    }
+
+    private func segment(_ value: SpeedtestMode, title: LocalizedStringKey, systemImage: String) -> some View {
+        let isSelected = mode == value
+        return Button {
+            guard !isSelected else { return }
+            Haptics.selection()
+            withAnimation(reduceMotion ? nil : SQMotion.snappy) { mode = value }
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isSelected ? SQColor.accent : SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background {
+                if isSelected {
+                    Capsule(style: .continuous)
+                        .fill(SQColor.segThumb)
+                        .shadow(color: SQColor.shadowSoft, radius: 4, y: 1)
+                        .matchedGeometryEffect(id: "thumb", in: thumb)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

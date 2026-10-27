@@ -249,6 +249,26 @@ final class ExperienceTestsModelTests: XCTestCase {
         XCTAssertNil(model.live, "plus de direct une fois fini")
     }
 
+    // MARK: Navigation
+
+    func testDetailAndUsagePagesOpenOnlyOnAResult() async {
+        let model = model(recorder: Recorder())
+        model.openDetail(.webPage)
+        model.openUsage()
+        XCTAssertEqual(model.page, .home, "rien à détailler avant un résultat")
+        model.update(status: status(.wifi), online: true)
+        await model.start()
+        model.openDetail(.webPage)
+        XCTAssertEqual(model.page, .detail(.webPage))
+        model.back()
+        XCTAssertEqual(model.page, .home)
+        model.openUsage()
+        XCTAssertEqual(model.page, .usage)
+        model.newTest()
+        XCTAssertEqual(model.page, .home)
+        XCTAssertNil(model.finished)
+    }
+
     // MARK: Ville
 
     func testCityIsKeptOnlyOutsideAnActivePrivateZone() {
