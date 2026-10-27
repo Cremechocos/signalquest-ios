@@ -89,6 +89,7 @@ final class AppServices: ObservableObject {
     let favoriteAntennas: FavoriteAntennasService
     /// Création de sites pointés à la main (dont ceux déduits de cellules observées).
     let customSites: CustomSitesServicing
+    let experienceTests: ExperienceTestsService
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
     /// Catalogue des POPs iPerf3 servi par l'API : permet de corriger un POP mort
@@ -161,6 +162,7 @@ final class AppServices: ObservableObject {
             { [weak self] in await self?.messages.retryPendingAttachments() },
             { [weak self] in await self?.retryPendingV2Sends() },
             { [weak self] in await self?.customSites.retryPending() },
+            { [weak self] in await self?.experienceTests.retryPending() },
             { [weak self] in await self?.bugReports.retryPending() },
         ])
     }
@@ -215,6 +217,7 @@ final class AppServices: ObservableObject {
             api: api,
             currentUserId: { authService.cachedUser()?.id }
         )
+        experienceTests = ExperienceTestsService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService

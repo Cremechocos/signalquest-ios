@@ -1426,6 +1426,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let resolvedPlace = info.place
         let wifiSSID = info.wifiSSID
         let operatorContext = info.operatorContext
+        // Latences reprises par « Jeu et appels » d'un test d'expérience lancé sur le même réseau.
+        if m.pingMs > 0, let path = ExperienceRecentLatency.path(
+            connection: pathStatus.connection, ssid: wifiSSID, carrierOperatorKey: operatorContext.operatorKey
+        ) {
+            ExperienceRecentLatency.record(.init(
+                measuredAt: Date(), path: path, idleMs: m.pingMs, loadedDownMs: m.pingDlMs, loadedUpMs: m.pingUlMs
+            ))
+        }
         let trace = SpeedtestTraceScope.current?.snapshot(retainingUpload: m.uploadAverageMbps != nil)
 
         let result = SpeedtestRunResult(
