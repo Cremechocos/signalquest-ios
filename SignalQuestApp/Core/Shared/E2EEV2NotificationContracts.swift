@@ -1748,13 +1748,49 @@ struct E2EEV2DeliveredBlob: Equatable, Sendable {
 }
 
 struct E2EEV2VerifiedMessageDelivery: Equatable, Sendable {
+    /// L'époque qui a chiffré le message, enveloppe de l'appareil comprise ou non.
+    struct Epoch: Equatable, Sendable {
+        let epochId: String
+        let epochNumber: Int
+        let keyCommitmentB64: String
+    }
+
     let id: String
     let senderId: String
     let incoming: E2EEV2IncomingMessageInput
-    let epochDelivery: E2EEV2EpochDelivery
+    let epoch: Epoch
+    /// nil : l'appareil a déjà accusé cette époque, le serveur ne garde plus sa clé
+    /// enveloppée (spec v2 §2.6) ; seule la clé gardée par l'appareil la déchiffre.
+    let epochDelivery: E2EEV2EpochDelivery?
     let encryptedBlobs: [E2EEV2DeliveredBlob]
     let createdAt: String
     let expiresAt: String?
+
+    init(
+        id: String, senderId: String, incoming: E2EEV2IncomingMessageInput, epoch: Epoch,
+        epochDelivery: E2EEV2EpochDelivery?, encryptedBlobs: [E2EEV2DeliveredBlob], createdAt: String, expiresAt: String?
+    ) {
+        self.id = id
+        self.senderId = senderId
+        self.incoming = incoming
+        self.epoch = epoch
+        self.epochDelivery = epochDelivery
+        self.encryptedBlobs = encryptedBlobs
+        self.createdAt = createdAt
+        self.expiresAt = expiresAt
+    }
+
+    init(
+        id: String, senderId: String, incoming: E2EEV2IncomingMessageInput, epochDelivery: E2EEV2EpochDelivery,
+        encryptedBlobs: [E2EEV2DeliveredBlob], createdAt: String, expiresAt: String?
+    ) {
+        self.init(
+            id: id, senderId: senderId, incoming: incoming,
+            epoch: .init(epochId: epochDelivery.epochId, epochNumber: epochDelivery.epochNumber,
+                         keyCommitmentB64: epochDelivery.keyCommitmentB64),
+            epochDelivery: epochDelivery, encryptedBlobs: encryptedBlobs, createdAt: createdAt, expiresAt: expiresAt
+        )
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
@@ -1764,6 +1800,7 @@ struct E2EEV2VerifiedMessageDelivery: Equatable, Sendable {
             && lhs.incoming.senderDeviceId == rhs.incoming.senderDeviceId
             && lhs.incoming.senderPublicSigningKeyB64 == rhs.incoming.senderPublicSigningKeyB64
             && lhs.incoming.envelopeData == rhs.incoming.envelopeData
+            && lhs.epoch == rhs.epoch
             && lhs.epochDelivery == rhs.epochDelivery
             && lhs.encryptedBlobs == rhs.encryptedBlobs
             && lhs.createdAt == rhs.createdAt
@@ -1831,62 +1868,68 @@ enum E2EEV2MessageDeliveryContract {
               ["INITIAL", "DEVICE_ADDED", "DEVICE_REVOKED", "MEMBER_ADDED", "MEMBER_REMOVED", "RECOVERY", "IDENTITY_RESET", "MANUAL"].contains(reason),
               let epochStatus = epoch["status"] as? String, statuses.contains(epochStatus),
               let epochCreatedAt = epoch["createdAt"] as? String,
-              E2EEV2PortableInventoryContract.parseInstant(epochCreatedAt) != nil,
-              let recipient = epoch["recipientEnvelope"] as? [String: Any],
-              exactKeys(recipient, [
-                "recipientDeviceId", "senderDeviceId", "wrapAlgorithm", "ephemeralPublicKeyB64",
-                "wrappedEpochKeyB64", "nonceB64", "aadB64", "signatureB64",
-                "senderPublicSigningKeyB64", "senderSigningKeyAlgorithm", "senderKeyVersion",
-              ]),
-              recipient["recipientDeviceId"] as? String == expectedRecipientDeviceId,
-              let epochSenderDeviceId = recipient["senderDeviceId"] as? String,
-              validOpaqueId(epochSenderDeviceId),
-              let epochSenderPublicKey = recipient["senderPublicSigningKeyB64"] as? String,
-              decodedBase64(epochSenderPublicKey)?.count == 65,
-              recipient["senderSigningKeyAlgorithm"] as? String == E2EEV2DeviceAlgorithms.signingKeyAlgorithm,
-              integer(recipient["senderKeyVersion"]) == 1,
-              let wrapAlgorithm = recipient["wrapAlgorithm"] as? String,
-              let ephemeralPublicKeyB64 = recipient["ephemeralPublicKeyB64"] as? String,
-              let wrappedEpochKeyB64 = recipient["wrappedEpochKeyB64"] as? String,
-              let epochNonceB64 = recipient["nonceB64"] as? String,
-              let epochAADB64 = recipient["aadB64"] as? String,
-              let epochSignatureB64 = recipient["signatureB64"] as? String else { return nil }
+              E2EEV2PortableInventoryContract.parseInstant(epochCreatedAt) != nil else { return nil }
+        // Époque déjà accusée par cet appareil : pas d'enveloppe, la clé gardée déchiffre.
+        var epochDelivery: E2EEV2EpochDelivery?
+        if !(epoch["recipientEnvelope"] is NSNull) {
+            guard let recipient = epoch["recipientEnvelope"] as? [String: Any],
+                  exactKeys(recipient, [
+                    "recipientDeviceId", "senderDeviceId", "wrapAlgorithm", "ephemeralPublicKeyB64",
+                    "wrappedEpochKeyB64", "nonceB64", "aadB64", "signatureB64",
+                    "senderPublicSigningKeyB64", "senderSigningKeyAlgorithm", "senderKeyVersion",
+                  ]),
+                  recipient["recipientDeviceId"] as? String == expectedRecipientDeviceId,
+                  let epochSenderDeviceId = recipient["senderDeviceId"] as? String,
+                  validOpaqueId(epochSenderDeviceId),
+                  let epochSenderPublicKey = recipient["senderPublicSigningKeyB64"] as? String,
+                  decodedBase64(epochSenderPublicKey)?.count == 65,
+                  recipient["senderSigningKeyAlgorithm"] as? String == E2EEV2DeviceAlgorithms.signingKeyAlgorithm,
+                  // Une clé tournée garde sa version suivante (§2.6) : comme `keyVersion` plus haut.
+                  integer(recipient["senderKeyVersion"]).map({ (1...1_000_000).contains($0) }) == true,
+                  let wrapAlgorithm = recipient["wrapAlgorithm"] as? String,
+                  let ephemeralPublicKeyB64 = recipient["ephemeralPublicKeyB64"] as? String,
+                  let wrappedEpochKeyB64 = recipient["wrappedEpochKeyB64"] as? String,
+                  let epochNonceB64 = recipient["nonceB64"] as? String,
+                  let epochAADB64 = recipient["aadB64"] as? String,
+                  let epochSignatureB64 = recipient["signatureB64"] as? String else { return nil }
 
-        let epochResponse: [String: Any] = [
-            "protocolVersion": 2,
-            "conversationId": expectedConversationId,
-            "epoch": [
-                "epochId": epochId,
-                "epochNumber": epochNumber,
-                "algorithm": "AES_256_GCM_HKDF_SHA256",
-                "keyCommitmentB64": keyCommitment,
-                "reason": reason,
-                "status": epochStatus,
-                "createdAt": epochCreatedAt,
-            ],
-            "senderDevice": [
-                "deviceId": epochSenderDeviceId,
-                "publicSigningKeyB64": epochSenderPublicKey,
-            ],
-            "envelope": [
-                "recipientDeviceId": expectedRecipientDeviceId,
-                "wrapAlgorithm": wrapAlgorithm,
-                "ephemeralPublicKeyB64": ephemeralPublicKeyB64,
-                "wrappedEpochKeyB64": wrappedEpochKeyB64,
-                "nonceB64": epochNonceB64,
-                "aadB64": epochAADB64,
-                "signatureB64": epochSignatureB64,
-            ],
-        ]
-        guard JSONSerialization.isValidJSONObject(epochResponse),
-              let epochData = try? JSONSerialization.data(withJSONObject: epochResponse),
-              let epochDelivery = E2EEV2EpochDeliveryContract.parseAndVerify(
-                epochData,
-                expectedConversationId: expectedConversationId,
-                expectedRecipientDeviceId: expectedRecipientDeviceId,
-                allowedStatuses: statuses
-              ),
-              let rawBlobIds = value["encryptedBlobIds"] as? [Any], rawBlobIds.count <= 20 else {
+            let epochResponse: [String: Any] = [
+                "protocolVersion": 2,
+                "conversationId": expectedConversationId,
+                "epoch": [
+                    "epochId": epochId,
+                    "epochNumber": epochNumber,
+                    "algorithm": "AES_256_GCM_HKDF_SHA256",
+                    "keyCommitmentB64": keyCommitment,
+                    "reason": reason,
+                    "status": epochStatus,
+                    "createdAt": epochCreatedAt,
+                ],
+                "senderDevice": [
+                    "deviceId": epochSenderDeviceId,
+                    "publicSigningKeyB64": epochSenderPublicKey,
+                ],
+                "envelope": [
+                    "recipientDeviceId": expectedRecipientDeviceId,
+                    "wrapAlgorithm": wrapAlgorithm,
+                    "ephemeralPublicKeyB64": ephemeralPublicKeyB64,
+                    "wrappedEpochKeyB64": wrappedEpochKeyB64,
+                    "nonceB64": epochNonceB64,
+                    "aadB64": epochAADB64,
+                    "signatureB64": epochSignatureB64,
+                ],
+            ]
+            guard JSONSerialization.isValidJSONObject(epochResponse),
+                  let epochData = try? JSONSerialization.data(withJSONObject: epochResponse),
+                  let verified = E2EEV2EpochDeliveryContract.parseAndVerify(
+                    epochData,
+                    expectedConversationId: expectedConversationId,
+                    expectedRecipientDeviceId: expectedRecipientDeviceId,
+                    allowedStatuses: statuses
+                  ) else { return nil }
+            epochDelivery = verified
+        }
+        guard let rawBlobIds = value["encryptedBlobIds"] as? [Any], rawBlobIds.count <= 20 else {
             return nil
         }
         let blobIds = rawBlobIds.compactMap { $0 as? String }
@@ -1976,6 +2019,7 @@ enum E2EEV2MessageDeliveryContract {
                 senderPublicSigningKeyB64: senderPublicKey,
                 envelopeData: envelopeData
             ),
+            epoch: .init(epochId: epochId, epochNumber: epochNumber, keyCommitmentB64: keyCommitment),
             epochDelivery: epochDelivery,
             encryptedBlobs: blobs,
             createdAt: createdAt,

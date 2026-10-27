@@ -3735,6 +3735,24 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
         XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(URLError(.timedOut)))
     }
 
+    /// Le flux d'un partage v2 ne s'arrête que sur une fin annoncée ; un 429 ou une
+    /// panne se rattrapent en se reconnectant (E2EE-AUTO §7.6).
+    func testV2LiveShareStreamEndsOnlyOnTerminalCodes() {
+        func http(_ status: Int, _ code: String?) -> Error {
+            APIError.http(status: status, code: code, message: "", requestId: nil, retryAfter: nil)
+        }
+        for code in ["LIVE_SHARE_INACTIVE", "LIVE_SHARE_ENDED", "LIVE_SHARE_NOT_FOUND", "FORBIDDEN"] {
+            XCTAssertTrue(MessagesService.endsLiveShareStream(http(409, code)), code)
+        }
+        for status in [403, 404, 410] {
+            XCTAssertTrue(MessagesService.endsLiveShareStream(http(status, nil)), "\(status)")
+        }
+        XCTAssertFalse(MessagesService.endsLiveShareStream(http(429, "RATE_LIMITED")))
+        XCTAssertFalse(MessagesService.endsLiveShareStream(http(404, "E2EE_EPOCH_ENVELOPE_NOT_FOUND")))
+        XCTAssertFalse(MessagesService.endsLiveShareStream(http(503, nil)))
+        XCTAssertFalse(MessagesService.endsLiveShareStream(URLError(.networkConnectionLost)))
+    }
+
     func testOpaquePushPreviewIsDerivedOnlyAfterDecryptionAndHonorsPrivacy() throws {
         let message = E2EEV2DecryptedMessage(
             epochNumber: 7,
@@ -4040,7 +4058,7 @@ final class E2EEV2PortableExportTests: XCTestCase {
             expectedConversationId: conversationId,
             expectedRecipientDeviceId: recipientDeviceId
         ))
-        XCTAssertEqual(delivery.epochDelivery.reason, "IDENTITY_RESET")
+        XCTAssertEqual(delivery.epochDelivery?.reason, "IDENTITY_RESET")
         let message = try E2EEV2MessageReceiver.decryptContractPreview(
             input: delivery.incoming, epoch: fixture.epoch
         )
@@ -4049,6 +4067,45 @@ final class E2EEV2PortableExportTests: XCTestCase {
             "Export portable vérifié"
         )
         epoch["reason"] = "RESET"
+        envelope["epoch"] = epoch
+        response["envelope"] = envelope
+        XCTAssertNil(E2EEV2MessageDeliveryContract.parseAndVerify(
+            try JSONSerialization.data(withJSONObject: response),
+            ownerScopeId: ownerScopeId,
+            expectedEnvelopeId: fixture.envelopeId,
+            expectedConversationId: conversationId,
+            expectedRecipientDeviceId: recipientDeviceId
+        ))
+    }
+
+    /// Une époque déjà accusée arrive sans enveloppe (`recipientEnvelope: null`) : la
+    /// livraison reste lisible avec la clé gardée, et seule la clé manque au parseur.
+    func testAcknowledgedEpochDeliveryKeepsEpochWithoutEnvelope() throws {
+        let fixture = try signedDeliveryFixture()
+        var response = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: fixture.response) as? [String: Any]
+        )
+        var envelope = try XCTUnwrap(response["envelope"] as? [String: Any])
+        var epoch = try XCTUnwrap(envelope["epoch"] as? [String: Any])
+        epoch["recipientEnvelope"] = NSNull()
+        envelope["epoch"] = epoch
+        response["envelope"] = envelope
+        let delivery = try XCTUnwrap(E2EEV2MessageDeliveryContract.parseAndVerify(
+            JSONSerialization.data(withJSONObject: response),
+            ownerScopeId: ownerScopeId,
+            expectedEnvelopeId: fixture.envelopeId,
+            expectedConversationId: conversationId,
+            expectedRecipientDeviceId: recipientDeviceId
+        ))
+        XCTAssertNil(delivery.epochDelivery)
+        XCTAssertEqual(delivery.epoch.epochNumber, fixture.epoch.epochNumber)
+        XCTAssertEqual(delivery.epoch.keyCommitmentB64, fixture.epoch.keyCommitmentB64)
+        let message = try E2EEV2MessageReceiver.decryptContractPreview(
+            input: delivery.incoming, epoch: fixture.epoch
+        )
+        XCTAssertEqual(message.content["kind"] as? String, "TEXT")
+
+        epoch.removeValue(forKey: "recipientEnvelope")
         envelope["epoch"] = epoch
         response["envelope"] = envelope
         XCTAssertNil(E2EEV2MessageDeliveryContract.parseAndVerify(

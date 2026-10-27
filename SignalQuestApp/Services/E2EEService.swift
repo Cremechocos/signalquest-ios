@@ -10233,27 +10233,30 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
             let epoch: E2EEV2StoredEpochKey
             if let stored = try loadEpoch(
                 input.conversationId,
-                delivery.epochDelivery.epochNumber
+                delivery.epoch.epochNumber
             ) {
                 epoch = stored
-            } else {
-                ephemeralKey = try unwrapEpoch(delivery.epochDelivery)
+            } else if let epochDelivery = delivery.epochDelivery {
+                ephemeralKey = try unwrapEpoch(epochDelivery)
                 guard ephemeralKey.count == 32,
                       try E2EEV2EpochCrypto.keyCommitment(ephemeralKey)
-                        == delivery.epochDelivery.keyCommitmentB64 else {
+                        == epochDelivery.keyCommitmentB64 else {
                     return .failure(localFailure("e2ee-v2-epoch-unwrapping-failed"))
                 }
                 epoch = .init(
-                    conversationId: delivery.epochDelivery.conversationId,
-                    epochId: delivery.epochDelivery.epochId,
-                    epochNumber: delivery.epochDelivery.epochNumber,
-                    keyCommitmentB64: delivery.epochDelivery.keyCommitmentB64,
+                    conversationId: epochDelivery.conversationId,
+                    epochId: epochDelivery.epochId,
+                    epochNumber: epochDelivery.epochNumber,
+                    keyCommitmentB64: epochDelivery.keyCommitmentB64,
                     epochKey: ephemeralKey
                 )
+            } else {
+                // Époque accusée sans clé gardée : état local perdu, on attend la suivante (§7.6).
+                return .failure(localFailure("e2ee-v2-acknowledged-epoch-key-missing"))
             }
-            guard epoch.epochId == delivery.epochDelivery.epochId,
-                  epoch.epochNumber == delivery.epochDelivery.epochNumber,
-                  epoch.keyCommitmentB64 == delivery.epochDelivery.keyCommitmentB64 else {
+            guard epoch.epochId == delivery.epoch.epochId,
+                  epoch.epochNumber == delivery.epoch.epochNumber,
+                  epoch.keyCommitmentB64 == delivery.epoch.keyCommitmentB64 else {
                 return .failure(localFailure("e2ee-v2-delivered-epoch-mismatch"))
             }
             let message = try E2EEV2MessageReceiver.decryptContractPreview(
@@ -10468,12 +10471,19 @@ final class E2EEV2LiveShareEventClient: @unchecked Sendable {
                           (200..<300).contains(http.statusCode),
                           http.value(forHTTPHeaderField: "Content-Type")?
                             .lowercased().hasPrefix("text/event-stream") == true else {
+                        // Le refus se juge à son `code` (E2EE-AUTO §7.6) : on lit le corps, borné.
+                        var body = Data()
+                        for try await byte in bytes {
+                            body.append(byte)
+                            if body.count >= E2EEV2LiveShareEventContract.maxFrameBytes { break }
+                        }
+                        let http = response as? HTTPURLResponse
                         throw APIError.http(
-                            status: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                            code: nil,
+                            status: http?.statusCode ?? 0,
+                            code: (try? JSONDecoder().decode(BackendErrorResponse.self, from: body))?.code,
                             message: "Flux Live Share E2EE v2 refusé",
                             requestId: nil,
-                            retryAfter: nil
+                            retryAfter: http?.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init)
                         )
                     }
                     // Octet par octet : `bytes.lines` omet les lignes vides qui ferment
@@ -11192,8 +11202,8 @@ private final class E2EEV2PortableArchiveWriter {
               E2EEV2PortableInventoryContract.validOpaqueId(delivery.incoming.conversationId),
               E2EEV2PortableInventoryContract.validOpaqueId(delivery.incoming.senderDeviceId),
               delivery.incoming.ownerScopeId == ownerScopeId,
-              delivery.epochDelivery.conversationId == delivery.incoming.conversationId,
-              delivery.epochDelivery.epochNumber == delivered.message.epochNumber else {
+              delivery.epochDelivery.map({ $0.conversationId == delivery.incoming.conversationId }) ?? true,
+              delivery.epoch.epochNumber == delivered.message.epochNumber else {
             throw E2EEV2PortableExportError(reason: "invalid-e2ee-v2-portable-message-scope")
         }
         let orderKey = "\(delivery.createdAt)\n\(delivery.id)"

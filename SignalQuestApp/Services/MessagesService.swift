@@ -1052,7 +1052,9 @@ final class MessagesService: MessagesServicing {
                 let ownerScopeId = LocalAccountScope.currentOwnerScopeId
                 var lastEventId: String?
                 var lastUpdateId: String?
+                var backoff = 1.5
                 while !Task.isCancelled {
+                    var lastError: Error?
                     do {
                         var terminal = false
                         for try await event in e2eeV2LiveShareEventsClient.eventsRuntime(
@@ -1060,6 +1062,8 @@ final class MessagesService: MessagesServicing {
                             sessionId: session.id,
                             lastEventId: lastEventId
                         ) {
+                            // Le flux répond : la prochaine coupure repart du délai court.
+                            backoff = 1.5
                             switch event {
                             case .status(let status, let eventId):
                                 lastEventId = eventId ?? lastEventId
@@ -1085,18 +1089,31 @@ final class MessagesService: MessagesServicing {
                         if terminal { break }
                     } catch is CancellationError {
                         break
-                    } catch APIError.http(let status, _, _, _, _)
-                        where status == 403 || status == 404 || status == 410 {
+                    } catch where Self.endsLiveShareStream(error) {
                         break
                     } catch {
-                        // Reconnexion bornée ci-dessous ; aucune interrogation périodique.
+                        // Reconnexion ci-dessous ; aucune interrogation périodique.
+                        lastError = error
                     }
-                    try? await Task.sleep(for: .seconds(1.5))
+                    // Une fermeture sans statut final n'arrête pas le partage : délai croissant,
+                    // `Retry-After` d'abord (E2EE-AUTO §7.6). L'ouverture renvoie la dernière mise à jour.
+                    try? await Task.sleep(for: .seconds(SSEClient.reconnectDelay(backoff: backoff, after: lastError)))
+                    backoff = min(backoff * 2, 30)
                 }
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// Refus qui terminent le flux d'un partage v2, jugés au `code` (E2EE-AUTO §7.6) ;
+    /// sans code, 403, 404 et 410 comme avant. Le reste se rattrape en se reconnectant.
+    static func endsLiveShareStream(_ error: Error) -> Bool {
+        guard case APIError.http(let status, let code, _, _, _) = error else { return false }
+        if let code {
+            return ["LIVE_SHARE_INACTIVE", "LIVE_SHARE_ENDED", "LIVE_SHARE_NOT_FOUND", "FORBIDDEN"].contains(code)
+        }
+        return [403, 404, 410].contains(status)
     }
 
     private static func parseLiveShareInstant(_ value: String) -> Date? {
