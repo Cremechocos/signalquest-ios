@@ -103211,6 +103211,108 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Note globale" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overall score"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note globale"
+          }
+        }
+      }
+    },
+    "Note globale à partir de 2 usages notés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overall score from 2 rated uses"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note globale à partir de 2 usages notés"
+          }
+        }
+      }
+    },
+    "Moyenne des 4 usages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average of all 4 uses"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne des 4 usages"
+          }
+        }
+      }
+    },
+    "Moyenne des %lld usages notés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average of %lld rated uses"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne des %lld usages notés"
+          }
+        }
+      }
+    },
+    "Note globale %lld sur 100" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overall score %lld out of 100"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note globale %lld sur 100"
+          }
+        }
+      }
+    },
+    "%@ : %lld sur 100" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$lld out of 100"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ : %2$lld sur 100"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -11,18 +11,21 @@ enum ExperienceResultText {
     struct Line: Equatable {
         let headline: String
         var detail: String?
-        /// Note vidéo /100, affichée à part.
+        /// Note du test /100 (`experience-score-v1`), affichée à part.
         var score: Int?
     }
 
     static func line(_ test: ExperienceTestKind, in tests: ExperienceTestsResult, failure: ExperienceFailureCause? = nil) -> Line {
-        switch test {
+        var line = switch test {
         case .videoLadder: tests.videoLadder.map(ladder) ?? notMeasured
         case .videoAdaptive: tests.videoAdaptive.map(adaptive) ?? notMeasured
         case .webPage: tests.webPage.map { web($0, failure: failure) } ?? notMeasured
         case .gameAndCalls: tests.gameAndCalls.map { game($0, failure: failure) } ?? notMeasured
         case .upload: tests.upload.map { upload($0, failure: failure) } ?? notMeasured
         }
+        // Seul un test mesuré a une note : un test interrompu ou en échec n'en a pas.
+        line.score = ExperienceScores(tests).score(for: test)
+        return line
     }
 
     static let notMeasured = Line(headline: String(localized: "Non mesuré"))

@@ -140,10 +140,12 @@ extension ExperienceHighlights {
             : String(localized: "Jeu et appels : temps d’ouverture d’une connexion vers un serveur de jeu.")
     }
 
-    /// 850 ms, puis 2,1 s au-delà d'une seconde.
+    /// 850 ms, puis 2,1 s au-delà d'une seconde, arrondi demi vers le haut en entiers
+    /// comme l'image de partage (méthode §10) : 1 250 ms → 1,3 s.
     static func waitingTime(_ ms: Int) -> String {
         guard ms >= 1000 else { return "\(ms) ms" }
-        return "\((Double(ms) / 1000).formatted(.number.precision(.fractionLength(1)))) s"
+        let tenths = (ms + 50) / 100
+        return "\((Double(tenths) / 10).formatted(.number.precision(.fractionLength(1)))) s"
     }
 }
 

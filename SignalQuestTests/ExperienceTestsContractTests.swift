@@ -86,4 +86,13 @@ final class ExperienceTestsContractTests: XCTestCase {
         XCTAssertEqual(ExperienceHighlights.waitingTime(850), "850 ms")
         XCTAssertTrue(ExperienceHighlights.waitingTime(2061).hasSuffix(" s"))
     }
+
+    func testWaitingTimeRoundsHalfUpLikeTheShareImage() {
+        // Méthode §10 : d = (ms + 50) ÷ 100, en entiers ; un arrondi au pair donnerait 1,2 s.
+        let decimal = Locale.current.decimalSeparator ?? ","
+        XCTAssertEqual(ExperienceHighlights.waitingTime(1_250), "1\(decimal)3 s")
+        XCTAssertEqual(ExperienceHighlights.waitingTime(12_449), "12\(decimal)4 s")
+        XCTAssertEqual(ExperienceHighlights.waitingTime(9_960), "10\(decimal)0 s")
+        XCTAssertEqual(ExperienceHighlights.waitingTime(990), "990 ms")
+    }
 }

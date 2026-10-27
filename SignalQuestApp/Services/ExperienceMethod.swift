@@ -334,7 +334,7 @@ struct ExperienceSubmission: Equatable, Sendable {
         stalls.map { ["atPlaybackMs": $0.atPlaybackMs, "waitMs": $0.waitMs] }
     }
 
-    private static func tests(_ tests: ExperienceTestsResult) -> [String: Any] {
+    static func tests(_ tests: ExperienceTestsResult) -> [String: Any] {
         var object: [String: Any] = [:]
         if let ladder = tests.videoLadder {
             var test = base(ladder.state, ladder.reason)

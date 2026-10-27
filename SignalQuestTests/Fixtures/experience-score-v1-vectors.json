@@ -1,0 +1,708 @@
+{
+  "scoreScale": "experience-score-v1",
+  "description": "Notes sur 100 servies dans metadata.experience.highlights.scores (révision v1.1 du contrat), calculées depuis `tests` (forme du contrat v1) selon docs/experience-tests-v3-method.md §9. Une note n'existe que pour un test `measured`, sinon null. Arrondi d'une note : r = floor(x × 1e6 + 0.5) / 1e6, puis floor(r + 0.5), une seule fois. video = moyenne entière (floor((2 × somme + n) / (2 × n))) de videoLadder et videoAdaptive non nuls ; overall = même moyenne sur les usages video, webPage, gameAndCalls, upload non nuls, null si moins de 2. Figé le 27/10 (révision 9, accord d'Android, iOS et du web).",
+  "cases": [
+    {
+      "name": "les cinq tests notés (cas courant 4G)",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 6000,
+                  "waitMs": 1200
+                }
+              ]
+            },
+            {
+              "quality": "1440p",
+              "requiredBps": 12000000,
+              "state": "abandoned"
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "score": {
+            "total": 67,
+            "quality": 21,
+            "smoothness": 40,
+            "startup": 15
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2061
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "measured",
+              "totalMs": 1800
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 41,
+          "jitterMs": 6,
+          "spikeShare": 0.02,
+          "underLoad": {
+            "grade": "C"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 12000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": 40,
+        "videoAdaptive": 67,
+        "webPage": 66,
+        "gameAndCalls": 83,
+        "upload": 65,
+        "video": 54,
+        "overall": 67
+      }
+    },
+    {
+      "name": "bornes hautes : tout à 100",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured"
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "requiredBps": 12000000,
+              "state": "measured"
+            },
+            {
+              "quality": "2160p",
+              "requiredBps": 20000000,
+              "state": "measured"
+            }
+          ]
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 400
+            },
+            {
+              "state": "measured",
+              "totalMs": 1000
+            },
+            {
+              "state": "measured",
+              "totalMs": 1200
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 20,
+          "jitterMs": 5,
+          "spikeShare": 0,
+          "underLoad": {
+            "grade": "A"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 2400
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": 100,
+        "videoAdaptive": null,
+        "webPage": 100,
+        "gameAndCalls": 100,
+        "upload": 100,
+        "video": 100,
+        "overall": 100
+      }
+    },
+    {
+      "name": "bornes basses : tout à 0 mais noté",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 800
+                }
+              ]
+            }
+          ]
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 6000
+            },
+            {
+              "state": "measured",
+              "totalMs": 9000
+            },
+            {
+              "state": "measured",
+              "totalMs": 7000
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 300,
+          "jitterMs": 50,
+          "spikeShare": 0.1,
+          "underLoad": {
+            "grade": "F"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 3000000,
+              "totalMs": 24000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": 0,
+        "videoAdaptive": null,
+        "webPage": 0,
+        "gameAndCalls": 0,
+        "upload": 0,
+        "video": 0,
+        "overall": 0
+      }
+    },
+    {
+      "name": "demi pile en flottant : page à 59,5 (100 × 2975 / 5000)",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured"
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured"
+            }
+          ]
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 3025
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": 60,
+        "videoAdaptive": null,
+        "webPage": 60,
+        "gameAndCalls": null,
+        "upload": null,
+        "video": 60,
+        "overall": 60
+      }
+    },
+    {
+      "name": "latence sous charge absente : trois composantes ramenées sur 100 ; note globale à 51,5",
+      "tests": {
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "http_round_trip",
+          "medianMs": 160,
+          "jitterMs": 23,
+          "spikeShare": 0.05
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 24000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": null,
+        "gameAndCalls": 53,
+        "upload": 50,
+        "video": null,
+        "overall": 52
+      }
+    },
+    {
+      "name": "un seul usage noté (web) : pas de note globale",
+      "tests": {
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 1500
+            },
+            {
+              "state": "measured",
+              "totalMs": 1700
+            },
+            {
+              "state": "measured",
+              "totalMs": 1600
+            }
+          ]
+        },
+        "upload": {
+          "state": "failed"
+        },
+        "videoAdaptive": {
+          "state": "interrupted",
+          "notTestedReason": "background"
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": 88,
+        "gameAndCalls": null,
+        "upload": null,
+        "video": null,
+        "overall": null
+      }
+    },
+    {
+      "name": "ouvertures en échec, adaptatif en échec, envoi de la photo seule",
+      "tests": {
+        "videoAdaptive": {
+          "state": "failed"
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 1200
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            }
+          ]
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 4000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": 66,
+        "gameAndCalls": null,
+        "upload": 50,
+        "video": null,
+        "overall": 58
+      }
+    },
+    {
+      "name": "envoi agrégé : trois vidéos, 6 Mb/s au total (échelle log) ; jeu sans gigue ni à-coups",
+      "tests": {
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 48000
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 24000
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 48000
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 34,
+          "underLoad": {
+            "grade": "B"
+          }
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": null,
+        "gameAndCalls": 88,
+        "upload": 39,
+        "video": null,
+        "overall": 64
+      }
+    },
+    {
+      "name": "deux tests vidéo, un seul usage : Vidéo à 22,5 → 23, pas de note globale",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 4000,
+                  "waitMs": 300
+                }
+              ]
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "abandoned"
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "score": {
+            "total": 45,
+            "quality": 8,
+            "smoothness": 17,
+            "startup": 20
+          }
+        }
+      },
+      "expected": {
+        "videoLadder": 0,
+        "videoAdaptive": 45,
+        "webPage": null,
+        "gameAndCalls": null,
+        "upload": null,
+        "video": 23,
+        "overall": null
+      }
+    },
+    {
+      "name": "aucun test mesuré",
+      "tests": {
+        "webPage": {
+          "state": "failed",
+          "openings": [
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "interrupted",
+          "notTestedReason": "background"
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": null,
+        "gameAndCalls": null,
+        "upload": null,
+        "video": null,
+        "overall": null
+      }
+    },
+    {
+      "name": "verrou de l'arrondi intermédiaire : Vidéo 73,5 → 74, globale 72,5 → 73 (sans arrondi intermédiaire : 72)",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured"
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "requiredBps": 12000000,
+              "state": "measured"
+            },
+            {
+              "quality": "2160p",
+              "requiredBps": 20000000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 4000,
+                  "waitMs": 500
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "score": {
+            "total": 67,
+            "quality": 21,
+            "smoothness": 31,
+            "startup": 15
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2300
+            },
+            {
+              "state": "measured",
+              "totalMs": 2400
+            },
+            {
+              "state": "measured",
+              "totalMs": 2500
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "tcp_connect",
+          "medianMs": 48,
+          "jitterMs": 5,
+          "spikeShare": 0,
+          "underLoad": {
+            "grade": "D"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 13187
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": 80,
+        "videoAdaptive": 67,
+        "webPage": 72,
+        "gameAndCalls": 81,
+        "upload": 63,
+        "video": 74,
+        "overall": 73
+      }
+    },
+    {
+      "name": "un seul des deux tests vidéo : la Vidéo prend sa note ; note E = 0",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "requiredBps": 1500000,
+              "state": "measured"
+            },
+            {
+              "quality": "720p",
+              "requiredBps": 3000000,
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "requiredBps": 6000000,
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 400
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "failed"
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "probeMethod": "http_round_trip",
+          "medianMs": 90,
+          "jitterMs": 14,
+          "spikeShare": 0.03,
+          "underLoad": {
+            "grade": "E"
+          }
+        }
+      },
+      "expected": {
+        "videoLadder": 40,
+        "videoAdaptive": null,
+        "webPage": null,
+        "gameAndCalls": 61,
+        "upload": null,
+        "video": 40,
+        "overall": 51
+      }
+    },
+    {
+      "name": "échelle et adaptatif absents : Vidéo non notée, hors du minimum de 2 ; élément sans durée ignoré",
+      "tests": {
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 1100
+            }
+          ]
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "video",
+              "bytes": 30000000
+            },
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 2000
+            }
+          ]
+        }
+      },
+      "expected": {
+        "videoLadder": null,
+        "videoAdaptive": null,
+        "webPage": 98,
+        "gameAndCalls": null,
+        "upload": 65,
+        "video": null,
+        "overall": 82
+      }
+    }
+  ]
+}

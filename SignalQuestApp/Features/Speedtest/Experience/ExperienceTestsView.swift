@@ -369,6 +369,10 @@ private struct ExperienceResultView: View {
             if finished.finish != .completed {
                 stopBanner
             }
+            let scores = ExperienceScores(finished.run.tests)
+            if !scores.isEmpty {
+                ExperienceOverallScoreCard(scores: scores)
+            }
             VStack(spacing: 0) {
                 ForEach(tests, id: \.self) { test in
                     resultRow(test)
@@ -644,5 +648,94 @@ struct ExperienceResultRowContent: View {
         .padding(SQSpace.cardPadding)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Note globale /100 (`experience-score-v1`) : moyenne des usages notés, chacun du même
+/// poids (choix d'Alexandre), puis la note de chaque usage noté. Partagée avec la fiche
+/// d'un test de l'historique.
+struct ExperienceOverallScoreCard: View {
+    let scores: ExperienceScores
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var uses: [(title: String, score: Int)] {
+        [("Vidéo", scores.video), ("Web", scores.webPage), ("Jeu et appels", scores.gameAndCalls), ("Envoi", scores.upload)]
+            .compactMap { use in use.1.map { (use.0, $0) } }
+    }
+
+    /// « Moyenne des 4 usages », ou ce qui manque pour avoir une note globale.
+    private var caption: String {
+        switch (scores.overall, scores.ratedUses) {
+        case (nil, _): String(localized: "Note globale à partir de 2 usages notés")
+        case (_, 4): String(localized: "Moyenne des 4 usages")
+        case (_, let count): String(localized: "Moyenne des \(count) usages notés")
+        }
+    }
+
+    var body: some View {
+        // Aux tailles d'accessibilité, la note passe au-dessus du titre : « Note globale » ne se coupe pas.
+        let header = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.xs))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.md))
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            header {
+                if let overall = scores.overall {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(verbatim: "\(overall)")
+                            .font(SQFont.display(40, .heavy, relativeTo: .largeTitle))
+                            .foregroundStyle(SQColor.label)
+                            .monospacedDigit()
+                        Text(verbatim: "/100")
+                            .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Note globale")
+                        .font(SQFont.body(15, .bold, relativeTo: .headline))
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: caption)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !uses.isEmpty {
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
+                    : AnyLayout(HStackLayout(alignment: .top, spacing: SQSpace.sm))
+                layout {
+                    // La note d'abord : les chiffres restent alignés quand un libellé passe à la ligne.
+                    ForEach(uses, id: \.title) { use in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: "\(use.score)")
+                                .font(SQFont.body(18, .bold, relativeTo: .headline))
+                                .foregroundStyle(SQColor.label)
+                                .monospacedDigit()
+                            Text(LocalizedStringKey(use.title))
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+        .padding(SQSpace.cardPadding)
+        .sqCardBackground()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: accessibilityText))
+        .accessibilityIdentifier("experience.overallScore")
+    }
+
+    private var accessibilityText: String {
+        var parts: [String] = []
+        if let overall = scores.overall { parts.append(String(localized: "Note globale \(overall) sur 100")) }
+        parts.append(caption)
+        parts += uses.map { String(localized: "\(String(localized: String.LocalizationValue($0.title))) : \($0.score) sur 100") }
+        return parts.joined(separator: ". ")
     }
 }

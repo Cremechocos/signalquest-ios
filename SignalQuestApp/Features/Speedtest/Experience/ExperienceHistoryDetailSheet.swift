@@ -77,6 +77,11 @@ struct ExperienceHistoryDetailSheet: View {
                 }
             }
 
+            let scores = ExperienceScores(detail.result.tests)
+            if !scores.isEmpty {
+                ExperienceOverallScoreCard(scores: scores)
+            }
+
             VStack(spacing: 0) {
                 ForEach(tests, id: \.self) { test in
                     row(test, detail: detail)
