@@ -99496,6 +99496,174 @@
           }
         }
       }
+    },
+    "Le journal des appareils de %@ ne correspond pas : rien ne lui est envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@’s device log doesn’t match: nothing is sent to them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal des appareils de %@ ne correspond pas : rien ne lui est envoyé."
+          }
+        }
+      }
+    },
+    "Le journal des appareils d’un membre ne correspond pas : rien ne lui est envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member’s device log doesn’t match: nothing is sent to them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal des appareils d’un membre ne correspond pas : rien ne lui est envoyé."
+          }
+        }
+      }
+    },
+    "Le journal annonce un changement de tes appareils que le serveur ne montre pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The log records a change to your devices that the server doesn’t show."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal annonce un changement de tes appareils que le serveur ne montre pas."
+          }
+        }
+      }
+    },
+    "SQFormal|Le journal annonce un changement de tes appareils que le serveur ne montre pas." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal annonce un changement de vos appareils que le serveur ne montre pas."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Entrée du journal absente" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log entry missing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrée du journal absente"
+          }
+        }
+      }
+    },
+    "Alerte du journal d’un contact (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact log alert (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alerte du journal d’un contact (%@)"
+          }
+        }
+      }
+    },
+    "Envoi du signalement…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending report…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi du signalement…"
+          }
+        }
+      }
+    },
+    "Le signalement n’est pas parti. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The report wasn’t sent. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement n’est pas parti. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Le signalement n’est pas parti. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement n’est pas parti. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le signalement contient l’écart (entrée du journal absente), son maillon (%@), la version de l’app et le modèle de cet appareil. Aucun message ni contact n’est envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The report contains the gap (log entry missing), its link (%@), the app version and this device’s model. No message or contact is sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement contient l’écart (entrée du journal absente), son maillon (%@), la version de l’app et le modèle de cet appareil. Aucun message ni contact n’est envoyé."
+          }
+        }
+      }
+    },
+    "Signaler cet écart à l’équipe ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report this mismatch to the team?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler cet écart à l’équipe ?"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

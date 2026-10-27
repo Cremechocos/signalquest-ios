@@ -191,11 +191,20 @@ enum AppEnvironment {
         false
         #endif
     }
-    /// Alerte de fourche ; `--qa-auto-log-alert-rollback`, `-invalid` ou `-sent` pour ses états.
+    /// Alerte de fourche ; `--qa-auto-log-alert-rollback`, `-invalid`, `-missing` ou `-sent` pour ses états.
     static var showsAutoLogAlertQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-auto-log-alert") || hasArgument("--qa-auto-log-alert-rollback") || hasArgument("--qa-auto-log-alert-invalid")
-            || hasArgument("--qa-auto-log-alert-sent") || hasArgument("--qa-auto-log-alert-banner")
+            || hasArgument("--qa-auto-log-alert-missing") || hasArgument("--qa-auto-log-alert-sent")
+            || hasArgument("--qa-auto-log-alert-banner")
+        #else
+        false
+        #endif
+    }
+    /// Ligne « le journal de X ne correspond pas » ; `--qa-auto-log-mismatch-sent` après le signalement.
+    static var showsAutoLogMismatchQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-log-mismatch") || hasArgument("--qa-auto-log-mismatch-sent")
         #else
         false
         #endif

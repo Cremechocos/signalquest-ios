@@ -28,6 +28,9 @@ struct E2EEV2ThreadPresentation: Equatable {
         case keyUnverified
         /// Un appareil a été ajouté chez un membre (E2EE-AUTO §3.5), dans les 7 derniers jours.
         case devicesChanged(userId: String, name: String?)
+        /// Le journal des appareils d'un membre a un maillon sans entrée (E2EE-AUTO
+        /// §3.5 point 5) : rien ne lui est envoyé, l'avis mène au signalement.
+        case logMismatch(userId: String, name: String?)
 
         var text: String {
             switch self {
@@ -59,6 +62,10 @@ struct E2EEV2ThreadPresentation: Equatable {
                 return String(localized: "Les appareils de \(name) ont changé.")
             case .devicesChanged(_, nil):
                 return String(localized: "Les appareils d’un membre ont changé.")
+            case .logMismatch(_, let name?):
+                return String(localized: "Le journal des appareils de \(name) ne correspond pas : rien ne lui est envoyé.")
+            case .logMismatch(_, nil):
+                return String(localized: "Le journal des appareils d’un membre ne correspond pas : rien ne lui est envoyé.")
             }
         }
     }
@@ -133,9 +140,11 @@ enum E2EEV2ThreadPresenter {
         }
         var notices: [E2EEV2ThreadPresentation.Notice] = refusals.keys.sorted().map { userId in
             let name = members[userId]?.displayName
-            return refusals[userId] == .uikChanged
-                ? .identityChanged(userId: userId, name: name)
-                : .identityUnverified(userId: userId, name: name)
+            switch refusals[userId] {
+            case .uikChanged?: return .identityChanged(userId: userId, name: name)
+            case .logEntryMissing?: return .logMismatch(userId: userId, name: name)
+            default: return .identityUnverified(userId: userId, name: name)
+            }
         }
         // Une ligne par appareil refusé, la plus récente gardée.
         var refusedDevices = Set<String>()

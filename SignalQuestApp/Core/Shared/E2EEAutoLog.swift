@@ -587,6 +587,9 @@ enum E2EEAutoLog {
 
     enum AccountError: String, Error, Sendable {
         case accountLinkMissing = "ACCOUNT_LINK_MISSING"
+        /// Sel `null` alors que le maillon `ACCOUNT` du compte existe sous la tête :
+        /// le serveur tait le compte entier (§3.5 point 5).
+        case accountWithheld = "ACCOUNT_WITHHELD"
         case accountSalt = "ACCOUNT_SALT"
         case entryFormat = "ENTRY_FORMAT"
         case entryNotInChain = "ENTRY_NOT_IN_CHAIN"
@@ -611,6 +614,10 @@ enum E2EEAutoLog {
     struct AccountFailure: Error, Equatable, Sendable {
         let error: AccountError
         let seq: Int64?
+
+        /// Un maillon du compte sans son entrée (§3.5 point 5) : le seul échec
+        /// d'un compte qui alerte (révision 13), les autres le rendent illisible sans alerte.
+        var isMissingLink: Bool { error == .entryMissing || error == .accountWithheld }
     }
 
     /// Vérifie le journal complet d'un compte contre la chaîne publique déjà

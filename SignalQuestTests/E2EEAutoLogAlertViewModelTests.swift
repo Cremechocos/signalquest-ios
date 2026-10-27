@@ -14,6 +14,7 @@ final class E2EEAutoLogAlertViewModelTests: XCTestCase {
         var reportId: String?
         var resets = 0
         var failsSubmit = false
+        var reported: E2EEAutoLogStore.Alert?
     }
 
     private func model(_ calls: Calls, alert: E2EEAutoLogStore.Alert = .init(error: "FORK", seq: 42)) -> E2EEAutoLogAlertViewModel {
@@ -63,6 +64,46 @@ final class E2EEAutoLogAlertViewModelTests: XCTestCase {
         XCTAssertEqual(model.kind, .rollback)
         XCTAssertEqual(model.report, .sent)
         XCTAssertEqual(self.model(Calls(), alert: .init(error: "CHAIN_INVALID", seq: 3)).kind, .chainInvalid)
+        XCTAssertEqual(self.model(Calls(), alert: .init(error: "ENTRY_MISSING", seq: 3)).kind, .entryMissing)
+        XCTAssertEqual(self.model(Calls(), alert: .init(error: "ACCOUNT_WITHHELD", seq: 3)).kind, .entryMissing)
+    }
+
+    /// Chez un contact : l'écart et son maillon, jamais le contact (§3.5 point 5).
+    func testContactAlertReportShowsItsContentsAndSendsOnce() async throws {
+        let calls = Calls()
+        let alert = E2EEAutoLogStore.Alert(error: "ENTRY_MISSING", seq: 1_284)
+        let model = E2EEAutoAccountAlertReportModel(dependencies: .init(
+            alert: { alert },
+            submit: { submission in
+                if calls.failsSubmit { throw URLError(.notConnectedToInternet) }
+                calls.submitted.append(submission)
+                return "bug_\(calls.submitted.count)"
+            },
+            reportId: { _ in calls.reportId },
+            setReported: { id, reported in
+                calls.reportId = id
+                calls.reported = reported
+            },
+            device: { self.device }
+        ))
+        XCTAssertEqual(model.report, .idle)
+        XCTAssertTrue(model.contents.contains("1284") || model.contents.contains("1 284") || model.contents.contains("1\u{202F}284"))
+
+        calls.failsSubmit = true
+        await model.send()
+        XCTAssertEqual(model.report, .failed)
+        calls.failsSubmit = false
+        await model.send()
+        XCTAssertEqual(model.report, .sent)
+        await model.send()
+        XCTAssertEqual(calls.submitted.count, 1, "un seul signalement")
+        XCTAssertEqual(calls.reportId, "bug_1")
+        XCTAssertEqual(calls.reported, alert)
+
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(calls.submitted[0])) as? [String: Any])
+        XCTAssertEqual(object["description"] as? String, "E2EE-AUTO contact log alert: ENTRY_MISSING at seq 1284")
+        XCTAssertEqual(object["severity"] as? String, "critical")
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(calls.submitted[0]), as: UTF8.self).contains("user_"))
     }
 
     /// Ni contenu ni identifiant d'appareil du journal : l'écart, son maillon et l'appareil.

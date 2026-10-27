@@ -38,12 +38,15 @@ final class E2EEAutoLogAlertViewModel: ObservableObject {
         case rollback
         /// Révision 13 : liste signée contraire aux règles du journal, traitée comme une fourche.
         case chainInvalid
+        /// Un maillon de son propre compte sans son entrée (§3.5 point 5).
+        case entryMissing
     }
 
     var kind: Kind {
         switch alert.error {
         case E2EEAutoLog.ChainError.rollback.rawValue: return .rollback
         case E2EEAutoLog.ChainError.chainInvalid.rawValue: return .chainInvalid
+        case E2EEAutoLog.AccountError.entryMissing.rawValue, E2EEAutoLog.AccountError.accountWithheld.rawValue: return .entryMissing
         default: return .fork
         }
     }
@@ -197,6 +200,8 @@ struct E2EEAutoLogAlertView: View {
                     Text("Le serveur montre une version plus ancienne de la liste des appareils que celle que cet appareil a déjà vérifiée.")
                 case .chainInvalid:
                     Text("Le serveur a signé une liste des appareils qui ne respecte pas les règles du journal.")
+                case .entryMissing:
+                    Text("Le journal annonce un changement de tes appareils que le serveur ne montre pas.")
                 }
             }
             .font(SQType.body)
@@ -214,6 +219,7 @@ struct E2EEAutoLogAlertView: View {
         case .fork: return String(localized: "Deux versions du journal")
         case .rollback: return String(localized: "Retour en arrière")
         case .chainInvalid: return String(localized: "Liste signée hors des règles")
+        case .entryMissing: return String(localized: "Entrée du journal absente")
         }
     }
 
@@ -383,7 +389,8 @@ struct E2EEAutoLogAlertBannerContent: View {
 
 /// Banc visuel (simulateur Debug) : `--qa-auto-log-alert`, `--qa-auto-log-alert-rollback`
 /// pour un retour en arrière, `--qa-auto-log-alert-invalid` pour une chaîne
-/// invalide, `--qa-auto-log-alert-sent` après le signalement,
+/// invalide, `--qa-auto-log-alert-missing` pour un maillon de son compte sans
+/// entrée, `--qa-auto-log-alert-sent` après le signalement,
 /// `--qa-auto-log-alert-banner` pour le bandeau de la Messagerie.
 struct E2EEAutoLogAlertQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
@@ -394,7 +401,8 @@ struct E2EEAutoLogAlertQAScreen: View {
         return E2EEAutoLogAlertViewModel(
             alert: .init(
                 error: arguments.contains("--qa-auto-log-alert-rollback") ? "ROLLBACK"
-                    : arguments.contains("--qa-auto-log-alert-invalid") ? "CHAIN_INVALID" : "FORK",
+                    : arguments.contains("--qa-auto-log-alert-invalid") ? "CHAIN_INVALID"
+                    : arguments.contains("--qa-auto-log-alert-missing") ? "ENTRY_MISSING" : "FORK",
                 seq: 1_284
             ),
             dependencies: .init(

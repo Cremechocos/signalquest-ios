@@ -186,6 +186,9 @@ enum E2EEV2IdentityVerification {
         /// a été vu, un serveur ne le fait pas disparaître pour forcer le v1
         /// (E.1, v0.4.19). Traité comme un paquet refusé.
         case identityWithdrawn
+        /// Un maillon du journal de ce compte sans son entrée (E2EE-AUTO §3.5
+        /// point 5) : alerte gardée, rien ne lui est envoyé, ligne de sécurité.
+        case logEntryMissing
     }
 
     struct Outcome: Equatable, Sendable {

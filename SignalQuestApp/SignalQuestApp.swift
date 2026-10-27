@@ -570,6 +570,8 @@ struct RootView: View {
                 E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
             } else if AppEnvironment.showsAutoLogAlertQA {
                 E2EEAutoLogAlertQAScreen()
+            } else if AppEnvironment.showsAutoLogMismatchQA {
+                E2EEAutoAccountAlertQAScreen()
             } else if AppEnvironment.showsAutoSafetyCodeQA {
                 E2EEAutoSafetyCodeQAScreen()
             } else if AppEnvironment.showsAutoNewDeviceQA {

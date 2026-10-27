@@ -43,8 +43,8 @@ enum E2EEAutoDeviceDirectory {
                 devices[userId] = account.activeDevices.map { certifiedDevice(userId: userId, device: $0) }
                 logSeqs[userId] = account.lastSeq
                 logAccounts[userId] = account
-            case .failure?:
-                refusals[userId] = .invalidDeviceList
+            case .failure(let failure)?:
+                refusals[userId] = failure.isMissingLink ? .logEntryMissing : .invalidDeviceList
             case nil:
                 refusals[userId] = .notFound
             }

@@ -510,7 +510,7 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         server.accounts[alice] = (nil, [])
         let withheld = try await reader.account(alice)
         guard case .failure(let failure)? = withheld else { return XCTFail("compte tu : \(String(describing: withheld))") }
-        XCTAssertEqual(failure.error, .accountLinkMissing)
+        XCTAssertEqual(failure.error, .accountWithheld)
     }
 
     func testAccountPagesAreStrict() async throws {
@@ -573,6 +573,73 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         }
         let withoutDave = E2EEV2CertifiedDeviceSet(devicesByUser: set.devicesByUser, refusals: [:])
         XCTAssertNotNil(withoutDave.capabilityIntersection(nowMs: reference.headNowMs, excludesWeb: false))
+    }
+
+    // MARK: Maillon sans entrée (§3.5 point 5, révision 13)
+
+    /// Chez un contact : une alerte pour lui seul, gardée sans relecture, que la
+    /// lecture suivante des maillons ne perd pas et que seul l'oubli du journal lève.
+    func testAContactLinkWithoutItsEntryAlertsForThatContactAndIsKept() async throws {
+        let reference = try reference(), server = Server(reference), store = makeStore()
+        let bob = "user_bob_0000000000002"
+        let full = try XCTUnwrap(reference.accounts[bob])
+        let lastSeq = try XCTUnwrap(full.entries.last.flatMap { E2EEAutoLog.parseEntry($0)?.entry.seq })
+        server.accounts[bob] = (full.salt, Array(full.entries.dropLast()))
+        let reader = makeReader(reference, server: server, store: store, nowMs: reference.headNowMs)
+        _ = try await reader.refreshLinks()
+
+        let read = try await reader.account(bob)
+        XCTAssertEqual(read, .failure(.init(error: .entryMissing, seq: lastSeq)))
+        let expected = E2EEAutoLogStore.Alert(error: "ENTRY_MISSING", seq: lastSeq)
+        XCTAssertEqual(try store.anchor(ownerScopeId: Self.owner)?.accountAlerts, [bob: expected])
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert, "les autres conversations continuent")
+        XCTAssertEqual(E2EEAutoDeviceDirectory.deviceSet(accounts: [bob: read]).refusals, [bob: .logEntryMissing])
+
+        server.accounts[bob] = (full.salt, full.entries)
+        let asked = server.accountAfters.count
+        guard case .current = try await reader.refreshLinks() else { return XCTFail("maillons courants") }
+        let reread = try await reader.account(bob)
+        XCTAssertEqual(reread, read, "jamais réparé seul")
+        XCTAssertEqual(server.accountAfters.count, asked, "ni relu")
+        XCTAssertEqual(try store.anchor(ownerScopeId: Self.owner)?.accountAlerts, [bob: expected])
+
+        let alerts = E2EEAutoLogAlerts(store: store, defaults: UserDefaults(suiteName: "account-alert-\(UUID().uuidString)")!)
+        XCTAssertEqual(alerts.accountAlert(userId: bob, ownerScopeId: Self.owner), expected)
+        alerts.setAccountReported("bug_7", for: expected, userId: bob, ownerScopeId: Self.owner)
+        XCTAssertEqual(alerts.accountReportId(for: expected, userId: bob, ownerScopeId: Self.owner), "bug_7")
+        XCTAssertNil(alerts.accountReportId(for: expected, userId: "user_carol_00000000003", ownerScopeId: Self.owner))
+        try alerts.reset(ownerScopeId: Self.owner)
+        XCTAssertNil(alerts.accountAlert(userId: bob, ownerScopeId: Self.owner))
+        XCTAssertNil(alerts.accountReportId(for: expected, userId: bob, ownerScopeId: Self.owner))
+    }
+
+    /// Sur son propre compte : l'alerte globale, comme une fourche.
+    func testOwnAccountWithheldRaisesTheGlobalAlert() async throws {
+        let reference = try reference(), server = Server(reference), store = makeStore()
+        server.accounts["user_alice_00000000001"] = (nil, [])
+        let reader = makeReader(reference, server: server, store: store, nowMs: reference.headNowMs)
+        _ = try await reader.refreshLinks()
+        guard case .failure(let failure)? = try await reader.account("user_alice_00000000001") else { return XCTFail("compte tu") }
+        XCTAssertEqual(failure.error, .accountWithheld)
+        let alert = try XCTUnwrap(try store.anchor(ownerScopeId: Self.owner)?.alert)
+        XCTAssertEqual(alert, .init(error: "ACCOUNT_WITHHELD", seq: try XCTUnwrap(failure.seq)))
+        let status = try await reader.refreshLinks()
+        XCTAssertEqual(status, .alert(alert))
+    }
+
+    /// Les autres échecs d'un compte le rendent illisible, sans alerte (révision 13).
+    func testOtherAccountFailuresRaiseNoAlert() async throws {
+        let reference = try reference(), server = Server(reference), store = makeStore()
+        let alice = "user_alice_00000000001", bob = "user_bob_0000000000002"
+        let full = try XCTUnwrap(reference.accounts[bob])
+        server.accounts[bob] = (reference.accounts[alice]?.salt, full.entries)
+        let reader = makeReader(reference, server: server, store: store, nowMs: reference.headNowMs)
+        _ = try await reader.refreshLinks()
+        guard case .failure(let failure)? = try await reader.account(bob) else { return XCTFail("sel d'un autre compte") }
+        XCTAssertFalse(failure.isMissingLink)
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.accountAlerts)
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert)
+        XCTAssertEqual(E2EEAutoDeviceDirectory.deviceSet(accounts: [bob: .failure(failure)]).refusals, [bob: .invalidDeviceList])
     }
 
     // MARK: Clés de production

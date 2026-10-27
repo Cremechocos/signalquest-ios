@@ -154,4 +154,20 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         ], "L'envoi les attend : ils passent en tête")
         XCTAssertTrue(thread.notices[0].text.contains("Bruno"))
     }
+
+    /// Maillon sans entrée chez un membre (E2EE-AUTO §3.5 point 5) : sa ligne de sécurité, en tête.
+    func testAMemberWithAMissingLogEntryGetsTheMismatchLine() {
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 1, messages: [], equivocalRefs: []), unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [bruno.id: bruno], deviceOwners: [:],
+            refusals: [bruno.id: .logEntryMissing, carla.id: .logEntryMissing]
+        )
+        XCTAssertEqual(thread.notices, [
+            .logMismatch(userId: bruno.id, name: "Bruno"),
+            .logMismatch(userId: carla.id, name: nil),
+        ])
+        XCTAssertTrue(thread.notices[0].text.contains("Bruno"))
+    }
 }

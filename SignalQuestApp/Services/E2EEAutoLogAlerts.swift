@@ -31,6 +31,7 @@ struct E2EEAutoLogAlerts {
     func reset(ownerScopeId: String) throws {
         try store.purge(ownerScopeId: ownerScopeId)
         defaults.removeObject(forKey: key(ownerScopeId))
+        defaults.removeObject(forKey: accountKey(ownerScopeId))
         NotificationCenter.default.post(name: Self.didChange, object: nil)
     }
 
@@ -47,10 +48,51 @@ struct E2EEAutoLogAlerts {
         )
     }
 
+    // MARK: Maillon d'un contact sans entrée (§3.5 point 5)
+
+    func accountAlert(userId: String, ownerScopeId: String) -> E2EEAutoLogStore.Alert? {
+        (try? store.anchor(ownerScopeId: ownerScopeId))?.accountAlerts?[userId]
+    }
+
+    func accountReportId(for alert: E2EEAutoLogStore.Alert, userId: String, ownerScopeId: String) -> String? {
+        (defaults.dictionary(forKey: accountKey(ownerScopeId)) as? [String: String])?[Self.tag(alert, userId: userId)]
+    }
+
+    func setAccountReported(_ reportId: String, for alert: E2EEAutoLogStore.Alert, userId: String, ownerScopeId: String) {
+        var stored = defaults.dictionary(forKey: accountKey(ownerScopeId)) as? [String: String] ?? [:]
+        stored[Self.tag(alert, userId: userId)] = reportId
+        defaults.set(stored, forKey: accountKey(ownerScopeId))
+    }
+
+    /// Le maillon suffit à l'équipe pour retrouver le compte dans le journal
+    /// public : ni le contact ni ses appareils ne partent.
+    static func accountSubmission(_ alert: E2EEAutoLogStore.Alert, device: BugReportDevice) -> BugReportSubmission {
+        BugReportSubmission(
+            category: .data,
+            title: String(localized: "Alerte du journal d’un contact (\(alert.error))"),
+            description: "E2EE-AUTO contact log alert: \(alert.error) at seq \(alert.seq)",
+            severity: .critical,
+            steps: nil, expectedResult: nil, images: [], device: device,
+            speedtest: nil, location: nil
+        )
+    }
+
     private static func tag(_ alert: E2EEAutoLogStore.Alert) -> String { "\(alert.error):\(alert.seq)" }
 
+    private static func tag(_ alert: E2EEAutoLogStore.Alert, userId: String) -> String {
+        let digest = SHA256.hash(data: Data(userId.utf8)).map { String(format: "%02x", $0) }.joined()
+        return "\(digest):\(tag(alert))"
+    }
+
     private func key(_ ownerScopeId: String) -> String {
-        let digest = SHA256.hash(data: Data(ownerScopeId.utf8)).map { String(format: "%02x", $0) }.joined()
-        return "e2ee-auto-log-alert-report-v1:\(digest)"
+        "e2ee-auto-log-alert-report-v1:\(Self.digest(ownerScopeId))"
+    }
+
+    private func accountKey(_ ownerScopeId: String) -> String {
+        "e2ee-auto-account-alert-report-v1:\(Self.digest(ownerScopeId))"
+    }
+
+    private static func digest(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

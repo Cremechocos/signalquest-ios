@@ -415,6 +415,8 @@ struct ConversationDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("conversation.v2Notice.safetyNumber")
+                            } else if case .logMismatch(let userId, _) = notice {
+                                E2EEAutoAccountAlertReportRow(notice: notice, userId: userId)
                             } else {
                                 v2NoticeLabel(notice, detail: nil)
                                     .accessibilityIdentifier("conversation.v2Notice")
@@ -2921,23 +2923,7 @@ struct ConversationDetailView: View {
     }
 
     private func v2NoticeLabel(_ notice: E2EEV2ThreadPresentation.Notice, detail: String?) -> some View {
-        Label {
-            VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                Text(notice.text)
-                if let detail {
-                    Text(detail)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(SQColor.accentInk)
-                }
-            }
-        } icon: {
-            Image(systemName: "lock.trianglebadge.exclamationmark")
-        }
-        .font(SQType.caption)
-        .foregroundStyle(SQColor.labelSecondary)
-        .frame(maxWidth: .infinity, minHeight: detail == nil ? nil : 44, alignment: .leading)
-        .padding(.vertical, SQSpace.xs)
-        .contentShape(Rectangle())
+        E2EEV2NoticeLabel(notice: notice, detail: detail)
     }
 
     /// Relève v2 : chaîne, époques, liste vérifiée, puis le fil présenté. Les

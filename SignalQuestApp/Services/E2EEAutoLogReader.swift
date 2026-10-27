@@ -80,6 +80,9 @@ final class E2EEAutoLogStore: @unchecked Sendable {
         let linkHash: String
         let headCreatedAtMs: Int64
         var alert: Alert?
+        /// Maillon d'un contact sans son entrée, par `userId` : ce contact seul ne
+        /// reçoit plus rien, et rien ne lève l'alerte seul (§3.5 point 5).
+        var accountAlerts: [String: Alert]?
         /// Dernière comparaison avec la tête de la sonde (§3.7), une fois par jour au plus.
         var probeCheckedAtMs: Int64?
     }
@@ -492,7 +495,10 @@ actor E2EEAutoLogReader {
             }
             try store.save(file, ownerScopeId: ownerScopeId)
             try store.saveAnchor(
-                .init(seq: head.seq, linkHash: head.linkHash, headCreatedAtMs: head.createdAtMs, probeCheckedAtMs: anchor?.probeCheckedAtMs),
+                .init(
+                    seq: head.seq, linkHash: head.linkHash, headCreatedAtMs: head.createdAtMs,
+                    accountAlerts: anchor?.accountAlerts, probeCheckedAtMs: anchor?.probeCheckedAtMs
+                ),
                 ownerScopeId: ownerScopeId
             )
             chain = chainState
@@ -525,19 +531,39 @@ actor E2EEAutoLogReader {
 
     private func raise(_ failure: E2EEAutoLog.ChainFailure, anchor: E2EEAutoLogStore.Anchor?) throws -> Status {
         let alert = E2EEAutoLogStore.Alert(error: failure.error.rawValue, seq: failure.seq)
+        try keep(anchor) { $0.alert = alert }
+        return .alert(alert)
+    }
+
+    private func keep(_ anchor: E2EEAutoLogStore.Anchor?, _ change: (inout E2EEAutoLogStore.Anchor) -> Void) throws {
         var kept = anchor ?? .init(seq: 0, linkHash: E2EEAutoLog.genesisHash, headCreatedAtMs: 0)
-        kept.alert = alert
+        change(&kept)
         try store.saveAnchor(kept, ownerScopeId: ownerScopeId)
         NotificationCenter.default.post(name: E2EEAutoLogAlerts.didChange, object: nil)
-        return .alert(alert)
+    }
+
+    /// Maillon sans entrée (§3.5 point 5) : sur son propre compte, l'alerte
+    /// globale de la fourche ; chez un contact, une alerte pour lui seul.
+    private func raiseAccount(_ failure: E2EEAutoLog.AccountFailure, userId: String) throws {
+        let alert = E2EEAutoLogStore.Alert(error: failure.error.rawValue, seq: failure.seq ?? 0)
+        let anchor = try store.anchor(ownerScopeId: ownerScopeId)
+        if ownerScopeId == "user:\(userId)" {
+            try keep(anchor) { $0.alert = alert }
+        } else {
+            try keep(anchor) { $0.accountAlerts = ($0.accountAlerts ?? [:]).merging([userId: alert]) { kept, _ in kept } }
+        }
     }
 
     // MARK: Comptes
 
     /// Le journal vérifié d'un compte, sur les maillons de la dernière lecture.
-    /// nil : compte non servi (404). Un refus n'écrit rien.
+    /// nil : compte non servi (404). Un refus n'écrit rien, sauf un maillon sans
+    /// entrée, gardé jusqu'à ce que l'utilisateur oublie le journal (§3.5 point 5).
     func account(_ userId: String) async throws -> Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>? {
         guard let chain else { throw Failure.linksNotRead }
+        if let alert = try store.anchor(ownerScopeId: ownerScopeId)?.accountAlerts?[userId] {
+            return .failure(.init(error: E2EEAutoLog.AccountError(rawValue: alert.error) ?? .entryMissing, seq: alert.seq))
+        }
         try checkQuotas(Quota.allCases)
         var file = store.load(ownerScopeId: ownerScopeId)
         let kept = file.accounts[userId]
@@ -581,9 +607,12 @@ actor E2EEAutoLogReader {
                 result = E2EEAutoLog.verifyAccount(userId: userId, accountSaltB64: salt, entries: entries, links: linksBySeq, chain: chain)
             } else if let link = chain.accounts[E2EEAutoLog.accountId(userId: userId)] {
                 // Le maillon `ACCOUNT` existe, le serveur tait le compte.
-                result = .failure(.init(error: .accountLinkMissing, seq: link.seq))
+                result = .failure(.init(error: .accountWithheld, seq: link.seq))
             } else {
                 return .success(E2EEAutoLog.AccountState(userId: userId, accountSaltB64: Self.emptySalt))
+            }
+            if case .failure(let failure) = result, failure.isMissingLink {
+                try raiseAccount(failure, userId: userId)
             }
             if case .success = result {
                 file.accounts[userId] = .init(accountSaltB64: salt, entries: entries)
