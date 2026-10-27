@@ -344,6 +344,45 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(stored.epochKey, Data(repeating: 0x33, count: 32))
     }
 
+    /// Une époque non marquée en ligne de sécurité n'est ni lue ni adoptée (E2EE-AUTO §7.2) :
+    /// l'état avance pour qu'elle tourne, sans clé. Un manifeste refusé (§7.1) reste lisible.
+    func testAnUnmarkedSecurityLineEpochKeepsNoKey() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        let namespace = fixture.session.ownerNamespace
+        func keep(_ number: Int, code: String) throws -> Bool {
+            let key = Data(repeating: UInt8(number), count: 32)
+            return E2EEV2EpochVerifierV2.keep(
+                epochKey: key,
+                accepted: .init(epochId: "epoch_line_\(number)_0123456789", epochNumber: number, createdAt: "2026-10-01T07:00:00.000Z"),
+                conversationId: seeded.conversationId, commitment: try E2EEV2EpochCrypto.keyCommitment(key),
+                membership: seeded.genesis, recipients: ["ligne"], createdAtMs: 0, acceptedAtMs: 0,
+                session: fixture.session, keyStore: fixture.keys, stateStore: fixture.states,
+                use: .readOnly(alert: .init(code: code, userId: bruno, deviceId: "d", epochNumber: number, atMs: 1))
+            )
+        }
+        func storedKey(_ number: Int) throws -> E2EEV2StoredEpochKey? {
+            try fixture.keys.loadEpoch(
+                conversationId: seeded.conversationId, epochNumber: number, ownerNamespace: namespace, includeRestored: false
+            )
+        }
+        XCTAssertTrue(try keep(3, code: "REVOKED"))
+        XCTAssertNotNil(try storedKey(3), "manifeste refusé : lisible")
+        XCTAssertTrue(try keep(4, code: "UNMARKED_EPOCH"))
+        XCTAssertNil(try storedKey(4), "non marquée en ligne de sécurité : aucune clé")
+        let current = try XCTUnwrap(try fixture.states.currentEpoch(conversationId: seeded.conversationId, ownerNamespace: namespace))
+        XCTAssertEqual(current.epochNumber, 4)
+        XCTAssertEqual(current.readOnly, true, "elle tourne avant le prochain envoi")
+        XCTAssertNil(try E2EEV2VerifiedEpochKeys.current(
+            conversationId: seeded.conversationId, ownerNamespace: namespace, keyStore: fixture.keys, stateStore: fixture.states
+        ), "rien ne s'envoie sous elle")
+        XCTAssertEqual(
+            try fixture.states.securityAlerts(conversationId: seeded.conversationId, ownerNamespace: namespace).map(\.code),
+            ["REVOKED", "UNMARKED_EPOCH"]
+        )
+    }
+
     func testTheLastEpochNumberNeverOverflows() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")

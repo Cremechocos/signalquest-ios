@@ -390,6 +390,9 @@ enum E2EEV2EpochVerifierV2 {
                 ),
                 ownerNamespace: session.ownerNamespace
             ) {
+                // Non marquée en ligne de sécurité (§7.2) : ni lue ni adoptée, sa clé n'est pas
+                // rangée. Un manifeste refusé (§7.1) garde la sienne : l'époque reste lisible.
+                if case .readOnly(let alert?) = use, alert.code == "UNMARKED_EPOCH" { return }
                 guard try keyStore.put(
                     recordInput: .init(
                         conversationId: conversationId, epochId: accepted.epochId,
