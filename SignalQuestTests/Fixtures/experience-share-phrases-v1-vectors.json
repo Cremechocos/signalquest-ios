@@ -1,6 +1,6 @@
 {
   "version": "experience-share-phrases-v1",
-  "description": "Phrases courtes de l'image de partage d'un test d'expérience (docs/experience-tests-v3-method.md §10), une par usage, en français et en anglais. Espaces : U+00A0 entre un nombre et son unité, U+202F comme séparateur de milliers en français, virgule en anglais. Durée : < 1 000 ms en ms, sinon en secondes à une décimale, arrondie demi vers le haut. 60 caractères au plus ; jamais de « … ». Figé le 27/10 (révision 9, accord d'Android, iOS et du web).",
+  "description": "Phrases courtes de l'image de partage d'un test d'expérience (docs/experience-tests-v3-method.md §10), une par usage, en français et en anglais. Espaces : U+00A0 entre un nombre et son unité, U+202F comme séparateur de milliers en français, virgule en anglais. Durée : < 1 000 ms en ms, sinon en secondes à une décimale, arrondie demi vers le haut. 60 caractères au plus ; jamais de « … ». Figé le 27/10 (révision 9, accord d'Android, iOS et du web) ; 6ᵉ cas ajouté le 27/10 (révision 10, pluriels au singulier, demande d'iOS).",
   "cases": [
     {
       "name": "cas courant : quatre usages",
@@ -579,6 +579,103 @@
           "webPage": "Test failed",
           "gameAndCalls": "130 ms, enough for an HD video call",
           "upload": "Not run"
+        }
+      }
+    },
+    {
+      "name": "un seul échec et une seule coupure : pluriels au singulier (web : EN suit {o}, FR suit {f} ; vidéo : {n} dans les deux langues)",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 4000,
+                  "waitMs": 400
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [
+            {
+              "atPlaybackMs": 8000,
+              "waitMs": 500
+            }
+          ],
+          "timeByQualityMs": {
+            "1080p": 20000,
+            "1440p": 10000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2100
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "measured",
+              "totalMs": 2100
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 41,
+          "jitterMs": 6,
+          "spikeCount": 0
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 9840
+            }
+          ]
+        }
+      },
+      "expected": {
+        "fr": {
+          "video": "Jusqu’en 1080p sans coupure, 1 coupure en lecture",
+          "webPage": "Pages ouvertes en 2,1 s, 1 ouverture sur 3 en échec",
+          "gameAndCalls": "41 ms, fluide en jeu comme en appel",
+          "upload": "Vidéo de 30 s envoyée en 9,8 s, photo en 1,2 s"
+        },
+        "en": {
+          "video": "Up to 1080p with no stalls, 1 stall in playback",
+          "webPage": "Pages opened in 2.1 s, 1 of 3 openings failed",
+          "gameAndCalls": "41 ms, smooth for games and calls",
+          "upload": "30 s video sent in 9.8 s, photo in 1.2 s"
         }
       }
     }

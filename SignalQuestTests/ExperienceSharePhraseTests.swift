@@ -15,7 +15,7 @@ final class ExperienceSharePhraseTests: XCTestCase {
 
     func testSharedPhraseVectors() throws {
         let cases = try vectors()
-        XCTAssertEqual(cases.count, 5)
+        XCTAssertEqual(cases.count, 6)
         for vector in cases {
             let name = vector["name"] as? String ?? "?"
             let tests = vector["tests"] as? [String: Any] ?? [:]
