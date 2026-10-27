@@ -379,6 +379,42 @@ final class AppServices: ObservableObject {
         }
     }
 
+    /// Texte chiffré v2 écrit hors du fil (réponse depuis une notification, Siri) : gardé dans la
+    /// file durable avant l'envoi, comme depuis le fil (B02). Un échec passager repart avec la
+    /// reprise et revient en bulle « Non envoyé » ; rien ne part jamais en clair.
+    func sendV2TextOutsideThread(
+        _ text: String, to conversation: MessageConversation, ttlSeconds: Int,
+        store: MessageDraftStore = .shared
+    ) async -> E2EEV2MessageSendResultV2 {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent, e2eeV2Messaging.writesEnabled else {
+            return .failure(E2EEV2TransportFailure(kind: .activationBlocked, message: "e2ee-v2-outside-thread-unavailable"))
+        }
+        let pending = MessageDraftStore.PendingV2Send(
+            clientRequestId: UUID().uuidString, conversationId: conversation.id, isGroup: conversation.isGroup,
+            participantIds: conversation.participants.map(\.userId), text: text, replyToRef: nil,
+            ttlSeconds: ttlSeconds, createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
+        )
+        try? await store.stageV2Send(pending, ownerScopeId: session.ownerScopeId)
+        let result = await e2eeV2Messaging.send(
+            .init(body: .text(text), replyToRef: nil, mentions: [], ttlSeconds: ttlSeconds),
+            clientRequestId: pending.clientRequestId, conversationId: conversation.id,
+            isGroup: conversation.isGroup, participantIds: pending.participantIds
+        )
+        switch result {
+        case .sent, .alreadyAccepted:
+            await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
+        case .failure(let failure) where MessageRequestLimitError.isPending(failure):
+            await store.markV2SendFailed(
+                clientRequestId: pending.clientRequestId,
+                reason: String(localized: "Ta demande de message n’a pas encore été acceptée."),
+                ownerScopeId: session.ownerScopeId
+            )
+        default:
+            break
+        }
+        return result
+    }
+
     /// Valeur du badge de l'icône : les conversations non lues du compte connecté,
     /// 0 sans session (M16).
     nonisolated static func iconBadgeCount(unreadConversations: Int, isSignedIn: Bool) -> Int {
@@ -1149,8 +1185,10 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 lastSentLocation = admissibleLocation
             } catch {
                 errorMessage = String(localized: "Partage en direct interrompu : \(error.userFacingMessage)")
+                // 409/426 : la conversation n'accepte plus de position en clair (passée en v2,
+                // ou chiffrement automatique allumé, E2EE-AUTO §7.2) ; réessayer ne change rien.
                 if case APIError.http(let status, _, _, _, _) = error,
-                   status == 400 || status == 403 || status == 404 {
+                   [400, 403, 404, 409, 426].contains(status) {
                     terminalPublishFailures.insert(session.id)
                 }
             }

@@ -7175,22 +7175,6 @@
         }
       }
     },
-    "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This conversation is encrypted: SignalQuest does not send messages to it from Siri or Shortcuts."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis."
-          }
-        }
-      }
-    },
     "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire." : {
       "localizations" : {
         "en" : {
@@ -8744,22 +8728,6 @@
         }
       }
     },
-    "Conversation non chiffrée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unencrypted conversation"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conversation non chiffrée"
-          }
-        }
-      }
-    },
     "Conversation protégée" : {
       "localizations" : {
         "en" : {
@@ -10232,34 +10200,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Envoi en attente : votre publication partira automatiquement dès que possible."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Envoie un message texte dans une conversation non chiffrée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sends a text message in an unencrypted conversation."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoie un message texte dans une conversation non chiffrée."
-          }
-        }
-      }
-    },
-    "SQFormal|Envoie un message texte dans une conversation non chiffrée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoyez un message texte dans une conversation non chiffrée."
           }
         }
       },
@@ -103393,6 +103333,52 @@
           }
         }
       }
+    },
+    "Cette conversation chiffrée s’ouvre dans SignalQuest : ouvre-la pour y écrire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This encrypted conversation opens in SignalQuest: open it there to write."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation chiffrée s’ouvre dans SignalQuest : ouvre-la pour y écrire."
+          }
+        }
+      }
+    },
+    "Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sends a text message to a conversation, encrypted on the iPhone when the conversation is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est."
+          }
+        }
+      }
+    },
+    "SQFormal|Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyez un message texte dans une conversation, chiffré sur l’iPhone si elle l’est."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

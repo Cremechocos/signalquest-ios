@@ -184,9 +184,9 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             content.userInfo["conversationId"] = prepared.conversationId
             content.userInfo["e2eeNotificationSessionId"] = prepared.sessionId
             content.userInfo["privacy"] = prepared.presentation.privacy.rawValue
-            // The encrypted category only offers "mark as read": no direct reply.
+            // Reply is encrypted by the app on this device; a protected conversation only offers "mark as read".
             content.userInfo["isE2EE"] = "1"
-            content.categoryIdentifier = MessageNotificationCategory.encrypted
+            content.categoryIdentifier = MessageNotificationCategory.v2Category(conversationId: prepared.conversationId)
             if !prepared.presentation.playsSound { content.sound = nil }
         }
         delivery.completion(content)

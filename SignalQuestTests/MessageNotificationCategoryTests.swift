@@ -98,6 +98,39 @@ final class MessageNotificationCategoryTests: XCTestCase {
         XCTAssertTrue(plain.actions.contains { $0.identifier == MessageNotificationCategory.markReadAction })
 
         XCTAssertEqual(encrypted.actions.map(\.identifier), [MessageNotificationCategory.markReadAction])
+
+        // v2 : la réponse est chiffrée sur l'appareil, et demande aussi le déverrouillage.
+        let encryptedReply = try XCTUnwrap(categories.first { $0.identifier == MessageNotificationCategory.encryptedReply })
+        XCTAssertEqual(
+            encryptedReply.actions.map(\.identifier),
+            [MessageNotificationCategory.replyAction, MessageNotificationCategory.markReadAction]
+        )
+        XCTAssertTrue(try XCTUnwrap(encryptedReply.actions.first).options.contains(.authenticationRequired))
+    }
+
+    func testV2NotificationsOfferReplyExceptInProtectedConversations() {
+        XCTAssertEqual(
+            MessageNotificationCategory.v2Category(conversationId: "c-open", isProtected: { $0 == "c-protected" }),
+            MessageNotificationCategory.encryptedReply
+        )
+        XCTAssertEqual(
+            MessageNotificationCategory.v2Category(conversationId: "c-protected", isProtected: { $0 == "c-protected" }),
+            MessageNotificationCategory.encrypted
+        )
+    }
+
+    /// Réseau ou époque à synchroniser : la file reprend la réponse sans alerte ; un refus
+    /// qui attend l'utilisateur le dit sur l'écran verrouillé.
+    func testV2ReplyWarnsOnlyWhenItWaitsForTheUser() {
+        func failure(_ kind: E2EEV2TransportFailureKind) -> E2EEV2MessageSendResultV2 {
+            .failure(E2EEV2TransportFailure(kind: kind, message: "test"))
+        }
+        XCTAssertFalse(PushNotificationService.replyNeedsFailureNotice(.alreadyAccepted(messageRef: "r")))
+        XCTAssertFalse(PushNotificationService.replyNeedsFailureNotice(.needsEpoch))
+        XCTAssertFalse(PushNotificationService.replyNeedsFailureNotice(.needsRotation))
+        XCTAssertFalse(PushNotificationService.replyNeedsFailureNotice(failure(.retryable)))
+        XCTAssertTrue(PushNotificationService.replyNeedsFailureNotice(failure(.activationBlocked)))
+        XCTAssertTrue(PushNotificationService.replyNeedsFailureNotice(failure(.authentication)))
     }
 
     /// U04 : une réponse refusée par le serveur prévient, et le toucher mène au fil.

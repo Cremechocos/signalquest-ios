@@ -547,8 +547,8 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         content.title = presentation.title
         content.body = presentation.body
         content.sound = playSound ? .default : nil
-        // Aucune action de réponse directe héritée : le contenu v2 n'est disponible
-        // qu'après vérification et déchiffrement local par un appareil approuvé.
+        // Les actions ne viennent qu'avec une conversation vérifiée : le contenu v2 n'est
+        // disponible qu'après vérification et déchiffrement local par un appareil approuvé.
         content.threadIdentifier = conversationId ?? "e2ee-v2"
         var info: [String: Any] = [
             "type": "e2ee_v2_envelope",
@@ -558,9 +558,10 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         ]
         if let conversationId {
             info["conversationId"] = conversationId
-            // « Marquer comme lu » seulement, comme dans l'extension.
+            // « Répondre » chiffre sur l'appareil ; une conversation protégée n'a que
+            // « Marquer comme lu », comme dans l'extension.
             info["isE2EE"] = "1"
-            content.categoryIdentifier = MessageNotificationCategory.encrypted
+            content.categoryIdentifier = MessageNotificationCategory.v2Category(conversationId: conversationId)
         }
         content.userInfo = info
         let center = UNUserNotificationCenter.current()
@@ -924,9 +925,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             let reply = (response as? UNTextInputNotificationResponse)?.userText
             let messageId = Self.string(info, "messageId", "message_id")
             let encrypted = MessageNotificationCategory.isEncrypted(info)
+            let v2 = type?.lowercased() == "e2ee_v2_envelope"
             Task { [weak self] in
                 await self?.performMessageAction(
-                    action, conversationId: conversationId, messageId: messageId, reply: reply, encrypted: encrypted
+                    action, conversationId: conversationId, messageId: messageId, reply: reply, encrypted: encrypted, v2: v2
                 )
                 completion()
             }
@@ -965,12 +967,16 @@ extension PushNotificationService {
     /// sans réseau, elle repart plus tard, comme depuis la conversation.
     @MainActor
     func performMessageAction(
-        _ action: String, conversationId: String?, messageId: String?, reply: String?, encrypted: Bool
+        _ action: String, conversationId: String?, messageId: String?, reply: String?, encrypted: Bool, v2: Bool = false
     ) async {
         guard let conversationId else { return }
         let messages = AppServicesHolder.services.messages
-        if action == MessageNotificationCategory.replyAction {
-            guard !encrypted, let text = reply?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+        if action == MessageNotificationCategory.replyAction, encrypted {
+            // v1 : jamais de réponse rapide. v2 : chiffrée sur l'appareil, comme depuis le fil.
+            guard v2, let text = reply?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+            await replyEncrypted(text, conversationId: conversationId)
+        } else if action == MessageNotificationCategory.replyAction {
+            guard let text = reply?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
             // La conversation à jour quand le réseau répond ; sinon l'identifiant
             // suffit à la file, et le serveur refuse tout texte en clair dans
             // une conversation chiffrée.
@@ -1003,11 +1009,46 @@ extension PushNotificationService {
         // Répondre vaut lecture, comme dans les messageries courantes.
         if let messageId {
             try? await messages.markRead(conversationId: conversationId, lastMessageId: messageId)
-        } else if action == MessageNotificationCategory.markReadAction {
+        } else if action == MessageNotificationCategory.markReadAction || v2 {
             // Notification v2 : pas d'identifiant de message v1 à donner.
             try? await messages.markReadToLatest(conversationId: conversationId)
         }
         await AppServicesHolder.services.refreshInboxBadge(force: true)
+    }
+
+    /// Réponse dans une conversation chiffrée v2. Chiffrer demande ses membres à jour : sans
+    /// réseau, rien ne part, et l'écran verrouillé le dit plutôt que de garder un texte en clair.
+    @MainActor
+    private func replyEncrypted(_ text: String, conversationId: String) async {
+        let services = AppServicesHolder.services
+        guard let conversation = try? await services.messages.conversation(id: conversationId),
+              EncryptedConversationSurfaces.isV2(conversation) else {
+            await Self.postReplyFailureNotice(conversationId: conversationId, conversationTitle: nil)
+            return
+        }
+        let title = conversation.displayTitle(excluding: LocalAccountScope.currentUserId)
+        let policy = await ConversationSecretPolicyCache.resolved(conversationId: conversationId, service: services.messages)
+        guard policy?.isProtectedFromOutsideApp != true else {
+            await Self.postReplyFailureNotice(conversationId: conversationId, conversationTitle: nil)
+            return
+        }
+        let result = await services.sendV2TextOutsideThread(
+            text, to: conversation, ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0
+        )
+        if Self.replyNeedsFailureNotice(result) {
+            await Self.postReplyFailureNotice(conversationId: conversationId, conversationTitle: title)
+        }
+    }
+
+    /// Réseau ou époque à synchroniser : la file reprend la réponse plus tard, comme en clair.
+    /// Tout autre refus (membre à vérifier ou à mettre à jour, demande en attente) attend
+    /// l'utilisateur : le texte revient « Non envoyé » dans le fil, et l'écran verrouillé le dit.
+    nonisolated static func replyNeedsFailureNotice(_ result: E2EEV2MessageSendResultV2) -> Bool {
+        switch result {
+        case .sent, .alreadyAccepted, .needsEpoch, .needsRotation: return false
+        case .failure(let failure) where failure.kind == .retryable && !MessageRequestLimitError.isPending(failure): return false
+        default: return true
+        }
     }
 }
 
@@ -1063,7 +1104,8 @@ extension MessageNotificationCategory {
         let markRead = UNNotificationAction(identifier: markReadAction, title: String(localized: "Marquer comme lu"), options: [])
         return [
             UNNotificationCategory(identifier: plain, actions: [reply, markRead], intentIdentifiers: [], options: []),
-            UNNotificationCategory(identifier: encrypted, actions: [markRead], intentIdentifiers: [], options: [])
+            UNNotificationCategory(identifier: encrypted, actions: [markRead], intentIdentifiers: [], options: []),
+            UNNotificationCategory(identifier: encryptedReply, actions: [reply, markRead], intentIdentifiers: [], options: [])
         ]
     }
 }

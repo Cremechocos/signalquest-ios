@@ -938,7 +938,8 @@ extension E2EEV2NotificationProcessorTests {
         XCTAssertFalse(try presentation(.delete(targetRef: "ref")).playsSound)
     }
 
-    func testEncryptedNotificationsOfferOnlyMarkAsRead() throws {
+    /// v2 : « Répondre » chiffre sur l'appareil ; une conversation protégée n'a que « Marquer comme lu ».
+    func testEncryptedNotificationsTakeTheV2Category() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -948,9 +949,9 @@ extension E2EEV2NotificationProcessorTests {
         let push = try String(contentsOf: repository.appendingPathComponent(
             "SignalQuestApp/Core/Push/PushNotificationService.swift"
         ))
-        XCTAssertTrue(extensionSource.contains("content.categoryIdentifier = MessageNotificationCategory.encrypted"))
+        XCTAssertTrue(extensionSource.contains("content.categoryIdentifier = MessageNotificationCategory.v2Category(conversationId: prepared.conversationId)"))
         XCTAssertTrue(extensionSource.contains("if !prepared.presentation.playsSound { content.sound = nil }"))
-        XCTAssertTrue(push.contains("content.categoryIdentifier = MessageNotificationCategory.encrypted"))
+        XCTAssertTrue(push.contains("content.categoryIdentifier = MessageNotificationCategory.v2Category(conversationId: conversationId)"))
         // Sans identifiant de message v1, « Marquer comme lu » lit jusqu'au plus récent.
         XCTAssertTrue(push.contains("try? await messages.markReadToLatest(conversationId: conversationId)"))
     }

@@ -5,11 +5,13 @@ import UserNotifications
 ///
 /// L'extension de notification pose la catégorie ; l'app déclare les actions
 /// et les exécute. Dans une conversation normale : « Répondre » et « Marquer
-/// comme lu ». Dans une conversation chiffrée, une réponse partirait en clair :
-/// seul « Marquer comme lu » est proposé.
+/// comme lu ». Dans une conversation chiffrée v1, une réponse partirait en clair :
+/// seul « Marquer comme lu » est proposé. En v2, la réponse est chiffrée sur
+/// l'appareil : « Répondre » revient, sauf pour une conversation protégée.
 enum MessageNotificationCategory {
     static let plain = "fr.signalquest.message"
     static let encrypted = "fr.signalquest.message.encrypted"
+    static let encryptedReply = "fr.signalquest.message.encrypted.reply"
     static let replyAction = "fr.signalquest.message.reply"
     static let markReadAction = "fr.signalquest.message.markRead"
 
@@ -21,6 +23,14 @@ enum MessageNotificationCategory {
         case "message_mention": return plain
         default: return nil
         }
+    }
+
+    /// Catégorie d'une notification v2 : « Marquer comme lu » seulement pour une conversation protégée.
+    static func v2Category(
+        conversationId: String,
+        isProtected: (String) -> Bool = { ProtectedConversationList.contains($0) }
+    ) -> String {
+        isProtected(conversationId) ? encrypted : encryptedReply
     }
 
     /// Le serveur envoie `isE2EE: "1"` ; un booléen est accepté aussi.

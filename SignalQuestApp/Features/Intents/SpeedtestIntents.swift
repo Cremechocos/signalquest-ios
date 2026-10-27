@@ -110,10 +110,11 @@ struct ConversationEntityQuery: EntityStringQuery {
     }
 }
 
-/// Conversation non chiffrée, seule cible possible d'un message envoyé par Siri
-/// ou Raccourcis : les conversations chiffrées n'y figurent pas.
+/// Cible d'un message envoyé par Siri ou Raccourcis. Une conversation chiffrée se choisit
+/// par son nom sans être proposée d'office ; le texte y est chiffré sur l'appareil (v2).
+/// Le nom du type reste celui des raccourcis déjà enregistrés.
 struct PlainConversationEntity: AppEntity {
-    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Conversation non chiffrée"
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Conversation"
     static let defaultQuery = PlainConversationEntityQuery()
 
     let id: String
@@ -130,21 +131,18 @@ struct PlainConversationEntity: AppEntity {
 }
 
 struct PlainConversationEntityQuery: EntityStringQuery {
-    private func plainItems() -> [SQConversationIntentDirectory.Item] {
-        SQConversationIntentDirectory.items().filter { !$0.isEncrypted }
-    }
-
     func entities(for identifiers: [PlainConversationEntity.ID]) async throws -> [PlainConversationEntity] {
-        let items = plainItems()
+        let items = SQConversationIntentDirectory.items()
         return identifiers.compactMap { id in items.first { $0.id == id }.map(PlainConversationEntity.init) }
     }
 
     func entities(matching string: String) async throws -> [PlainConversationEntity] {
-        SQConversationIntentDirectory.matching(plainItems(), name: string).map(PlainConversationEntity.init)
+        SQConversationIntentDirectory.matching(SQConversationIntentDirectory.items(), name: string).map(PlainConversationEntity.init)
     }
 
+    /// Les conversations chiffrées se choisissent par leur nom, sans être proposées d'office.
     func suggestedEntities() async throws -> [PlainConversationEntity] {
-        plainItems().map(PlainConversationEntity.init)
+        SQConversationIntentDirectory.items().filter { !$0.isEncrypted }.map(PlainConversationEntity.init)
     }
 }
 
@@ -170,6 +168,7 @@ enum SendMessageIntentError: Error, CustomLocalizedStringResourceConvertible {
     case signedOut
     case encryptedConversation
     case protectedConversation
+    case notSent(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -178,18 +177,22 @@ enum SendMessageIntentError: Error, CustomLocalizedStringResourceConvertible {
         case .signedOut:
             return "Connecte-toi à SignalQuest pour envoyer un message."
         case .encryptedConversation:
-            return "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis."
+            return "Cette conversation chiffrée s’ouvre dans SignalQuest : ouvre-la pour y écrire."
         case .protectedConversation:
             return "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire."
+        case .notSent(let reason):
+            // Déjà traduit par l'app (raison d'un envoi v2 refusé).
+            return LocalizedStringResource(stringLiteral: reason)
         }
     }
 }
 
-/// « Envoyer un message » : un texte vers une conversation NON chiffrée. Une
-/// conversation chiffrée est refusée, même si elle a été choisie autrement.
+/// « Envoyer un message » : un texte vers une conversation. Dans une conversation
+/// chiffrée v2, il est chiffré sur l'appareil ; une conversation v1 est refusée,
+/// sa clé ne s'ouvre que dans l'app.
 struct SendMessageIntent: AppIntent {
     static let title: LocalizedStringResource = "Envoyer un message"
-    static let description = IntentDescription("Envoie un message texte dans une conversation non chiffrée.")
+    static let description = IntentDescription("Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est.")
     static let openAppWhenRun = false
 
     /// Depuis iOS 17, l'envoi demande de déverrouiller l'appareil : pas de message écran verrouillé.
@@ -210,14 +213,23 @@ struct SendMessageIntent: AppIntent {
         let service = AppServicesHolder.services.messages
         // L'état réel de la conversation, pas celui de l'annuaire local.
         let target = try await service.conversation(id: conversation.id)
-        guard target.e2eeEnabled != true else { throw SendMessageIntentError.encryptedConversation }
+        let isV2 = EncryptedConversationSurfaces.isV2(target)
+        guard target.e2eeEnabled != true || isV2 else { throw SendMessageIntentError.encryptedConversation }
         // Une conversation protégée ne s'écrit que dans l'app ; une éphémère garde sa durée.
         let policy = await ConversationSecretPolicyCache.resolved(conversationId: target.id, service: service)
         guard policy?.isProtectedFromOutsideApp != true else { throw SendMessageIntentError.protectedConversation }
-        _ = try await service.sendText(
-            trimmed, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString,
-            ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0
-        )
+        let ttlSeconds = policy?.backgroundSendTTLSeconds ?? 0
+        if isV2 {
+            // Gardé dans la file s'il ne part pas : il revient « Non envoyé » dans le fil.
+            let result = await AppServicesHolder.services.sendV2TextOutsideThread(trimmed, to: target, ttlSeconds: ttlSeconds)
+            if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result) {
+                throw SendMessageIntentError.notSent(failure)
+            }
+        } else {
+            _ = try await service.sendText(
+                trimmed, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: ttlSeconds
+            )
+        }
         return .result(dialog: IntentDialog(stringLiteral: String(localized: "Message envoyé à \(conversation.name).")))
     }
 }
