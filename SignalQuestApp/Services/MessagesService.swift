@@ -1064,7 +1064,7 @@ final class MessagesService: MessagesServicing {
                             case .status(let status, let eventId):
                                 lastEventId = eventId ?? lastEventId
                                 continuation.yield(.status(status))
-                                terminal = ["stopped", "expired", "declined", "revoked"]
+                                terminal = ["stopped", "expired", "declined", "cancelled", "revoked"]
                                     .contains(status)
                             case .encryptedUpdate(let updateId, _, _, let eventId):
                                 lastEventId = eventId ?? lastEventId

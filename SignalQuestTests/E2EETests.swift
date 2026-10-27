@@ -3722,6 +3722,12 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
                 APIError.http(status: status, code: nil, message: "", requestId: nil, retryAfter: nil)
             ))
         }
+        // Une époque à relire ou à tourner n'arrête rien : le code prime sur le statut.
+        for code in ["E2EE_EPOCH_STALE", "E2EE_AUTO_REQUIRED"] {
+            XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(
+                E2EEV2LiveShareRuntimeError.transport(.init(kind: .permanent, statusCode: 409, code: code, message: ""))
+            ), code)
+        }
         XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(503, .retryable)))
         XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(nil, .retryable)))
         XCTAssertFalse(ConversationLiveShareCoordinator.isTerminalPublishFailure(v2(401, .authentication)))

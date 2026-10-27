@@ -1200,12 +1200,15 @@ final class ConversationLiveShareCoordinator: ObservableObject {
 
     /// Refus que réessayer ne change pas. 409/426 : la conversation n'accepte plus
     /// de position en clair (passée en v2, ou chiffrement automatique allumé,
-    /// E2EE-AUTO §7.2). En v2 le refus arrive en échec de transport, pas en `APIError`.
+    /// E2EE-AUTO §7.2). En v2 le refus arrive en échec de transport, pas en `APIError`,
+    /// et se juge à son code : une époque à relire ou à tourner se rattrape.
     nonisolated static func isTerminalPublishFailure(_ error: Error) -> Bool {
         let status: Int?
         switch error {
         case APIError.http(let code, _, _, _, _): status = code
-        case E2EEV2LiveShareRuntimeError.transport(let failure): status = failure.statusCode
+        case E2EEV2LiveShareRuntimeError.transport(let failure):
+            if ["E2EE_EPOCH_STALE", "E2EE_AUTO_REQUIRED"].contains(failure.code ?? "") { return false }
+            status = failure.statusCode
         default: status = nil
         }
         return status.map([400, 403, 404, 409, 410, 426].contains) ?? false
