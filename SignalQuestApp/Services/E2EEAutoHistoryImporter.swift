@@ -13,6 +13,9 @@ enum E2EEAutoHistoryImporter {
         let source: E2EEV2LegacyMessageSource
         let body: E2EEV2HistoryImportBody
         let clientRequestId: String
+        /// Source éphémère : reste jusqu'à `source.expiresAt`, en secondes
+        /// arrondies au supérieur (§8) ; 0 pour un message permanent.
+        let ttlSeconds: Int
     }
 
     enum Outcome: Equatable, Sendable {
@@ -35,21 +38,32 @@ enum E2EEAutoHistoryImporter {
 
     /// Source d'un message v1 déchiffré, ou nil s'il ne s'importe pas : sans
     /// pièce jointe tant que le serveur ne transporte pas les blobs, ni
-    /// éphémère, ni supprimé, et sous la limite de 80 Kio du vecteur.
-    static func source(_ item: MessageItem, text: String, conversationId: String) -> E2EEV2LegacyMessageSource? {
-        guard item.isEncrypted, item.deletedAt == nil, item.expiresAt == nil, item.attachments.isEmpty,
+    /// supprimé, ni éphémère déjà passé, et sous la limite de 80 Kio du vecteur.
+    /// L'échéance d'un éphémère reprend celle que sert la route v1 (révision 16).
+    static func source(
+        _ item: MessageItem, text: String, conversationId: String, now: Date = Date()
+    ) -> E2EEV2LegacyMessageSource? {
+        guard item.isEncrypted, item.deletedAt == nil, item.attachments.isEmpty,
+              item.expiresAt.map({ $0 > now }) ?? true,
               let senderId = item.senderId, let createdAt = item.createdAt else { return nil }
         let source = E2EEV2LegacyMessageSource(
             version: E2EEV2HistoryMigrationContract.version, conversationId: conversationId, messageId: item.id,
             senderId: senderId, kind: item.kind, content: text, metadata: item.metadata, createdAt: iso(createdAt),
-            editedAt: item.editedAt.map(iso), replyToId: item.replyToId, expiresAt: nil
+            editedAt: item.editedAt.map(iso), replyToId: item.replyToId, expiresAt: item.expiresAt.map(iso)
         )
         guard (try? E2EEV2HistoryMigrationContract.canonicalSource(source)) != nil,
               E2EEV2HistoryMigrationContract.attachmentCount(source) == 0 else { return nil }
         return source
     }
 
-    static func candidate(_ source: E2EEV2LegacyMessageSource) -> Candidate? {
+    static func candidate(_ source: E2EEV2LegacyMessageSource, now: Date = Date()) -> Candidate? {
+        var ttlSeconds = 0
+        if let expiresAt = source.expiresAt {
+            guard let expiry = E2EEV2PortableInventoryContract.parseInstant(expiresAt) else { return nil }
+            let remaining = Int(expiry.timeIntervalSince(now).rounded(.up))
+            guard remaining >= 1 else { return nil }
+            ttlSeconds = min(remaining, maxTTLSeconds)
+        }
         guard let bytes = try? E2EEV2HistoryMigrationContract.canonicalSource(source),
               let hash = try? E2EEV2HistoryMigrationContract.sourceHash(source),
               let clientRequestId = try? E2EEV2HistoryMigrationContract.clientRequestId(
@@ -57,8 +71,23 @@ enum E2EEAutoHistoryImporter {
               ) else { return nil }
         return Candidate(
             source: source, body: .init(sourceB64: bytes.base64EncodedString(), sourceHash: hash, attachments: []),
-            clientRequestId: clientRequestId
+            clientRequestId: clientRequestId, ttlSeconds: ttlSeconds
         )
+    }
+
+    /// Borne du `ttlSeconds` d'une enveloppe (30 jours).
+    static let maxTTLSeconds = 2_592_000
+
+    /// Échéance de lecture d'un import : la plus proche de celle de l'enveloppe
+    /// signée et de `source.expiresAt` (§8).
+    static func expiresAtMs(signedMs: Int64?, source: E2EEV2LegacyMessageSource?) -> Int64? {
+        let sourceMs = source?.expiresAt
+            .flatMap(E2EEV2PortableInventoryContract.parseInstant)
+            .map { Int64(($0.timeIntervalSince1970 * 1_000).rounded()) }
+        switch (signedMs, sourceMs) {
+        case let (signed?, source?): return min(signed, source)
+        default: return signedMs ?? sourceMs
+        }
     }
 
     static func outcome(_ result: E2EEV2MessageSendResultV2) -> Outcome {

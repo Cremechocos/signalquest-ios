@@ -60,6 +60,50 @@ final class E2EEAutoHistoryImporterTests: XCTestCase {
         XCTAssertNotNil(E2EEAutoHistoryImporter.source(v1("message_123456789018"), text: "a", conversationId: conversationId))
     }
 
+    /// Révision 16 : la route v1 sert `expiresAt`. Un éphémère encore valable
+    /// s'importe avec son échéance dans la source et un TTL jusqu'à elle, arrondi
+    /// au supérieur ; un éphémère passé ne s'importe pas.
+    func testEphemeralSourcesCarryTheirExpiry() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter.withFractions.date(from: "2026-10-27T20:00:00.000Z"))
+        let expiry = now.addingTimeInterval(90.2)
+        let source = try XCTUnwrap(E2EEAutoHistoryImporter.source(
+            v1("message_123456789019", expiresAt: expiry), text: "a", conversationId: conversationId, now: now
+        ))
+        XCTAssertEqual(source.expiresAt, "2026-10-27T20:01:30.200Z")
+        let candidate = try XCTUnwrap(E2EEAutoHistoryImporter.candidate(source, now: now))
+        XCTAssertEqual(candidate.ttlSeconds, 91)
+        XCTAssertEqual(E2EEAutoHistoryImport.verify(
+            candidate.body, conversationId: conversationId, importedFromMessageId: "message_123456789019", encryptedBlobIds: []
+        ), source)
+
+        XCTAssertNil(E2EEAutoHistoryImporter.source(
+            v1("message_123456789020", expiresAt: now), text: "a", conversationId: conversationId, now: now
+        ))
+        XCTAssertNil(E2EEAutoHistoryImporter.candidate(source, now: expiry))
+        let far = try XCTUnwrap(E2EEAutoHistoryImporter.source(
+            v1("message_123456789021", expiresAt: now.addingTimeInterval(40 * 86_400)), text: "a",
+            conversationId: conversationId, now: now
+        ))
+        XCTAssertEqual(E2EEAutoHistoryImporter.candidate(far, now: now)?.ttlSeconds, 2_592_000)
+        let permanent = try XCTUnwrap(E2EEAutoHistoryImporter.source(v1("message_123456789022"), text: "a", conversationId: conversationId))
+        XCTAssertEqual(E2EEAutoHistoryImporter.candidate(permanent)?.ttlSeconds, 0)
+    }
+
+    /// Le lecteur masque un import à la plus proche des deux échéances.
+    func testAnImportExpiresAtTheNearestDeadline() {
+        let source = E2EEV2LegacyMessageSource(
+            version: 1, conversationId: conversationId, messageId: "message_123456789019", senderId: alice.id,
+            kind: "TEXT", content: "a", metadata: nil, createdAt: "2026-10-27T19:00:00.000Z", editedAt: nil,
+            replyToId: nil, expiresAt: "2026-10-27T20:01:30.200Z"
+        )
+        let sourceMs: Int64 = 1_793_131_290_200
+        XCTAssertEqual(E2EEAutoHistoryImporter.expiresAtMs(signedMs: sourceMs + 800, source: source), sourceMs)
+        XCTAssertEqual(E2EEAutoHistoryImporter.expiresAtMs(signedMs: sourceMs - 1, source: source), sourceMs - 1)
+        XCTAssertEqual(E2EEAutoHistoryImporter.expiresAtMs(signedMs: nil, source: source), sourceMs)
+        XCTAssertEqual(E2EEAutoHistoryImporter.expiresAtMs(signedMs: 5, source: nil), 5)
+        XCTAssertNil(E2EEAutoHistoryImporter.expiresAtMs(signedMs: nil, source: nil))
+    }
+
     func testServerAnswersBecomeOutcomes() {
         func failure(_ status: Int, _ code: String, _ kind: E2EEV2TransportFailureKind = .permanent) -> E2EEV2MessageSendResultV2 {
             .failure(.init(kind: kind, statusCode: status, code: code, message: ""))

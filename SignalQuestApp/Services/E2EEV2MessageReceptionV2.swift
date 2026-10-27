@@ -504,6 +504,12 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
             return counted(.rejected("invalid-e2ee-payload"))
         }
         let ttlMs = Int64(envelope.ttlSeconds) * 1_000
+        let historyImport = E2EEAutoHistoryImport.record(
+            payload: payload, conversationId: context.conversationId,
+            importedFromMessageId: message.importedFromMessageId, encryptedBlobIds: envelope.encryptedBlobIds,
+            importerPlatform: context.devices.devicesByUser[message.senderUserId]?
+                .first { $0.deviceId == message.senderDeviceId }?.platform
+        )
         return counted(.received(E2EEV2ReceivedMessageV2(
             envelopeId: message.envelopeId, sequence: message.sequence, messageRef: messageRef,
             senderUserId: message.senderUserId, senderDeviceId: message.senderDeviceId,
@@ -511,14 +517,12 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
             serverTagB64: message.serverTagB64, serverTimeMs: message.serverTimeMs, keyId: message.keyId,
             payload: payload, payloadBytes: opened.payloadBytes, fk: opened.fk,
             // Horloge signée de l'émetteur seule : le serveur ne peut ni
-            // prolonger ni effacer en silence un message éphémère.
-            expiresAtMs: ttlMs > 0 ? payload.sentAtMs + ttlMs : nil,
-            historyImport: E2EEAutoHistoryImport.record(
-                payload: payload, conversationId: context.conversationId,
-                importedFromMessageId: message.importedFromMessageId, encryptedBlobIds: envelope.encryptedBlobIds,
-                importerPlatform: context.devices.devicesByUser[message.senderUserId]?
-                    .first { $0.deviceId == message.senderDeviceId }?.platform
-            )
+            // prolonger ni effacer en silence un message éphémère. Un import
+            // éphémère s'efface aussi à l'échéance de sa source (§8).
+            expiresAtMs: E2EEAutoHistoryImporter.expiresAtMs(
+                signedMs: ttlMs > 0 ? payload.sentAtMs + ttlMs : nil, source: historyImport?.source
+            ),
+            historyImport: historyImport
         )))
     }
 }

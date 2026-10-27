@@ -3040,7 +3040,7 @@ struct ConversationDetailView: View {
         let participantIds = conversation.participants.map(\.userId)
         let report = await E2EEAutoHistoryImporter.run(candidates) { candidate in
             await messaging.send(
-                .init(body: .historyImport(candidate.body), replyToRef: nil, mentions: [], ttlSeconds: 0),
+                .init(body: .historyImport(candidate.body), replyToRef: nil, mentions: [], ttlSeconds: candidate.ttlSeconds),
                 clientRequestId: candidate.clientRequestId, conversationId: conversationId, isGroup: isGroup,
                 participantIds: participantIds
             )
