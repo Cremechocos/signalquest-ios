@@ -25,6 +25,10 @@ struct E2EEAutoImportCaption: View {
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 2) {
             Text(verbatim: label.importedBy)
+            if label.contested {
+                Text(verbatim: String(localized: "import contesté"))
+                    .foregroundStyle(SQColor.dangerInk)
+            }
             if label.missingAttachments {
                 Text(verbatim: String(localized: "pièce jointe non importée"))
             }

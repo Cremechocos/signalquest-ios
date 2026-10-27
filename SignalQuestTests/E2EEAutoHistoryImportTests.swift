@@ -252,6 +252,46 @@ final class E2EEAutoHistoryImportTests: XCTestCase {
         XCTAssertTrue(recentOnly.legacyCaptions.isEmpty)
     }
 
+    /// La lecture v1 de cet appareil s'affiche tant qu'aucun import ne la
+    /// remplace ; un import dont la source en diffère est contesté, et la
+    /// lecture v1 reste affichée (E2EE-AUTO §8).
+    func testTheLocalV1ReadingStaysShownAgainstAContestedImport() {
+        let genesis: Int64 = 1_790_000_000_000
+        let recent = stored("ref_recent_000000000000000000000000000001", sequence: 1, sender: alice.id, text: "Après la bascule",
+                            serverTimeMs: genesis)
+        let forged = stored("ref_import_a_0000000000000000000000000002", sequence: 2, sender: bruno.id, text: nil,
+                            serverTimeMs: genesis + 5_000, historyImport: .init(
+                                source: source("message_v1_aaaaaaaaaaaa", sender: alice.id,
+                                               createdAt: "2026-08-23T00:00:00.000Z", content: "Texte forgé"),
+                                missingAttachments: 0, importerPlatform: "web"))
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 2, messages: [recent, forged], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let older = [
+            legacy("message_v1_aaaaaaaaaaaa", sender: alice, at: "2026-08-23T00:00:00Z", content: nil, encrypted: true),
+            legacy("message_v1_bbbbbbbbbbbb", sender: alice, at: "2026-08-23T00:01:00Z", content: nil, encrypted: true),
+        ]
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:],
+            legacy: older, legacyReadings: ["message_v1_aaaaaaaaaaaa": "Bonjour", "message_v1_bbbbbbbbbbbb": "Ça va ?"]
+        )
+        let contents = Dictionary(uniqueKeysWithValues: thread.messages.map { ($0.id, $0.content) })
+        XCTAssertEqual(contents[E2EEAutoLegacyHistory.idPrefix + "message_v1_aaaaaaaaaaaa"], "Bonjour")
+        XCTAssertEqual(contents[E2EEAutoLegacyHistory.idPrefix + "message_v1_bbbbbbbbbbbb"], "Ça va ?")
+        XCTAssertEqual(contents[forged.messageRef], "Texte forgé")
+        XCTAssertEqual(thread.imports[forged.messageRef]?.contested, true)
+        XCTAssertEqual(thread.importedV1Ids, ["message_v1_aaaaaaaaaaaa"])
+
+        // Même source qu'ici : l'import remplace la lecture v1.
+        let agreed = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:],
+            legacy: older, legacyReadings: ["message_v1_aaaaaaaaaaaa": "Texte forgé"]
+        )
+        XCTAssertFalse(agreed.messages.contains { $0.id == E2EEAutoLegacyHistory.idPrefix + "message_v1_aaaaaaaaaaaa" })
+        XCTAssertEqual(agreed.imports[forged.messageRef]?.contested, false)
+    }
+
     /// Un import n'est jamais le dernier message de la liste (E2EE-AUTO §8).
     func testTheStoreKeepsImportsWithoutText() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

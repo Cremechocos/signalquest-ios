@@ -426,7 +426,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     /// commune, avis à poser dans le fil (identité changée, messages manquants…).
     func thread(
         conversationId: String, isGroup: Bool, participants: [ConversationParticipant], limit: Int? = nil,
-        legacy: [MessageItem] = []
+        legacy: [MessageItem] = [], legacyReadings: [String: String] = [:]
     ) async -> ThreadResult {
         guard readsEnabled else { return .failure(Self.closed) }
         guard let parts = current() else { return .failure(Self.noSession) }
@@ -459,7 +459,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 result, conversationId: conversationId, members: members, deviceOwners: owners,
                 refusals: used.refusals.filter { participantIds.contains($0.key) },
                 ownUserId: LocalAccountScope.currentUserId,
-                limit: limit, legacy: legacy
+                limit: limit, legacy: legacy, legacyReadings: legacyReadings
             )
             // Même règle que l'envoi (§12), sans l'exclusion des navigateurs :
             // dans le doute, le bouton reste masqué.

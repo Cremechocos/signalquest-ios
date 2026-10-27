@@ -87,6 +87,8 @@ struct E2EEV2ThreadPresentation: Equatable {
     var imports: [String: ImportLabel] = [:]
     /// Anciens messages v1 ou en clair (E2EE-AUTO §8) : leur mention, par identifiant.
     var legacyCaptions: [String: String] = [:]
+    /// Messages v1 qu'un import vérifié cite : l'importeur ne les renvoie pas.
+    var importedV1Ids: Set<String> = []
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -96,6 +98,8 @@ struct E2EEV2ThreadPresentation: Equatable {
         let missingAttachments: Bool
         /// Premier message du bloc « historique importé ».
         let startsBlock: Bool
+        /// Sa source diffère de la lecture v1 de cet appareil (§8).
+        var contested = false
     }
 }
 
@@ -121,6 +125,7 @@ enum E2EEV2ThreadPresenter {
         ownUserId: String? = nil,
         limit: Int? = nil,
         legacy: [MessageItem] = [],
+        legacyReadings: [String: String] = [:],
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2ThreadPresentation {
         // Les imports forment un bloc placé avant tout message non importé (E2EE-AUTO §8).
@@ -133,10 +138,29 @@ enum E2EEV2ThreadPresenter {
             result.snapshot.messages.compactMap { stored in stored.historyImport?.source.map { ($0.messageId, stored.messageRef) } },
             uniquingKeysWith: { first, _ in first }
         )
+        // Import contesté : la lecture v1 de cet appareil en diffère (§8).
+        let importedHashes = Dictionary(
+            result.snapshot.messages.compactMap { stored in
+                stored.historyImport?.source.flatMap { source in
+                    (try? E2EEV2HistoryMigrationContract.sourceHash(source)).map { (source.messageId, $0) }
+                }
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let localHashes = Dictionary(
+            legacy.compactMap { item in
+                legacyReadings[item.id]
+                    .flatMap { E2EEAutoHistoryImporter.source(item, text: $0, conversationId: conversationId) }
+                    .flatMap { source in (try? E2EEV2HistoryMigrationContract.sourceHash(source)).map { (item.id, $0) } }
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let contested = E2EEAutoHistoryImporter.contested(local: localHashes, imported: importedHashes)
         // Les anciens messages, entre le bloc et les messages v2, seulement quand
         // la fenêtre remonte jusqu'à eux.
         let old = shown.count >= recent.count
-            ? E2EEAutoLegacyHistory.present(legacy, importRefs: importRefs) : (messages: [], captions: [:])
+            ? E2EEAutoLegacyHistory.present(legacy, importRefs: importRefs, readings: legacyReadings, contested: contested)
+            : (messages: [], captions: [:])
         // Le fil se trie par date : le bloc reste avant le premier message non importé.
         let legacyStartMs = old.messages.compactMap(\.createdAt).map { Int64(($0.timeIntervalSince1970 * 1_000).rounded(.down)) }.min()
         let blockEndMs = min(recent.map(\.serverTimeMs).min() ?? .max, legacyStartMs ?? .max) - 1
@@ -146,6 +170,7 @@ enum E2EEV2ThreadPresenter {
                 imports[stored.messageRef] = importLabel(
                     record, importer: members[stored.senderUserId], startsBlock: stored.messageRef == ordered.first?.messageRef
                 )
+                imports[stored.messageRef]?.contested = record.source.map { contested.contains($0.messageId) } ?? false
                 return importedItem(
                     stored, record: record, conversationId: conversationId, members: members,
                     importRefs: importRefs, blockEndMs: blockEndMs
@@ -220,7 +245,8 @@ enum E2EEV2ThreadPresenter {
             clientRequestIds: Set(result.snapshot.messages.map(\.clientRequestId)),
             hasOlder: shown.count < result.snapshot.messages.count,
             imports: imports,
-            legacyCaptions: old.captions
+            legacyCaptions: old.captions,
+            importedV1Ids: Set(importRefs.keys)
         )
     }
 

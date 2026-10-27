@@ -99792,6 +99792,22 @@
           }
         }
       }
+    },
+    "import contesté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "disputed import"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "import contesté"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

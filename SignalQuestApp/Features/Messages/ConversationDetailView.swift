@@ -110,6 +110,12 @@ struct ConversationDetailView: View {
     /// Anciens messages v1 ou en clair d'une conversation passée en auto (E2EE-AUTO §8).
     @State private var v2Legacy: [MessageItem] = []
     @State private var v2LegacyCaptions: [String: String] = [:]
+    /// Lecture v1 de cet appareil, par identifiant v1 : affichée, puis importée.
+    @State private var v2LegacyReadings: [String: String] = [:]
+    @State private var v2ImportedV1Ids: Set<String> = []
+    /// Messages v1 dont l'import est réglé ici (accepté, existant ou refusé).
+    @State private var v2ImportSettled: Set<String> = []
+    @State private var v2ImportRunning = false
     @State private var v2LoadInFlight = false
     @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
@@ -1011,6 +1017,7 @@ struct ConversationDetailView: View {
                 await loadLegacyHistory()
                 await loadV2()
                 guard !Task.isCancelled else { return }
+                Task { await importLegacyHistoryIfNeeded() }
                 await refreshReceipts()
                 await markRead()
                 // Relève en direct (événements du serveur, relevé périodique) et
@@ -2970,13 +2977,53 @@ struct ConversationDetailView: View {
             cursor = next
         }
         v2Legacy = loaded
+        v2LegacyReadings = await legacyReadings(of: loaded)
+    }
+
+    /// Texte des messages v1 que cet appareil sait encore lire : clé de
+    /// conversation gardée ou session v1 ouverte (E2EE-AUTO §8).
+    private func legacyReadings(of legacy: [MessageItem]) async -> [String: String] {
+        let encrypted = legacy.filter { $0.isEncrypted && $0.deletedAt == nil }
+        guard !encrypted.isEmpty, let e2ee, await e2ee.isConversationUnlocked(conversationId: conversation.id) else { return [:] }
+        var readings: [String: String] = [:]
+        for item in encrypted {
+            if let text = try? await e2ee.decryptText(conversationId: conversation.id, message: item) { readings[item.id] = text }
+        }
+        return readings
+    }
+
+    /// Importe en v2 les messages v1 lus ici qu'aucun import vérifié ne cite
+    /// encore (E2EE-AUTO §8), par lots de 5, puis relit le fil.
+    private func importLegacyHistoryIfNeeded() async {
+        guard !v2ImportRunning, usesV2, E2EEV2ServerGate.autoActive else { return }
+        let candidates = v2Legacy.compactMap { item -> E2EEAutoHistoryImporter.Candidate? in
+            guard !v2ImportedV1Ids.contains(item.id), !v2ImportSettled.contains(item.id),
+                  let text = v2LegacyReadings[item.id],
+                  let source = E2EEAutoHistoryImporter.source(item, text: text, conversationId: conversation.id) else { return nil }
+            return E2EEAutoHistoryImporter.candidate(source)
+        }
+        guard !candidates.isEmpty else { return }
+        v2ImportRunning = true
+        defer { v2ImportRunning = false }
+        let messaging = services.e2eeV2Messaging
+        let (conversationId, isGroup) = (conversation.id, conversation.isGroup)
+        let participantIds = conversation.participants.map(\.userId)
+        let report = await E2EEAutoHistoryImporter.run(candidates) { candidate in
+            await messaging.send(
+                .init(body: .historyImport(candidate.body), replyToRef: nil, mentions: [], ttlSeconds: 0),
+                clientRequestId: candidate.clientRequestId, conversationId: conversationId, isGroup: isGroup,
+                participantIds: participantIds
+            )
+        }
+        v2ImportSettled.formUnion(report.outcomes.filter { $0.value != .retry }.keys)
+        await loadV2()
     }
 
     private func loadV2Once() async {
         defer { hasLoadedOnce = true }
         switch await services.e2eeV2Messaging.thread(
             conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants,
-            limit: v2Limit, legacy: v2Legacy
+            limit: v2Limit, legacy: v2Legacy, legacyReadings: v2LegacyReadings
         ) {
         case .thread(let presentation):
             v2HasOlder = presentation.hasOlder
@@ -3001,6 +3048,7 @@ struct ConversationDetailView: View {
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
             if v2LegacyCaptions != presentation.legacyCaptions { v2LegacyCaptions = presentation.legacyCaptions }
+            v2ImportedV1Ids = presentation.importedV1Ids
             v2LastIncomingEnvelopeId = presentation.lastIncomingEnvelopeId
             computeUnreadDividerIfNeeded()
             Task { await acknowledgeDelivery() }
@@ -3986,6 +4034,7 @@ struct ConversationDetailView: View {
         guard usesV2 else { return false }
         await loadLegacyHistory()
         await loadV2()
+        Task { await importLegacyHistoryIfNeeded() }
         return true
     }
 
