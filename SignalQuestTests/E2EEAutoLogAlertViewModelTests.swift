@@ -33,7 +33,7 @@ final class E2EEAutoLogAlertViewModelTests: XCTestCase {
     func testResetWaitsForTheReport() async {
         let calls = Calls()
         let model = model(calls)
-        XCTAssertTrue(model.isFork)
+        XCTAssertEqual(model.kind, .fork)
         XCTAssertEqual(model.report, .idle)
 
         await model.reset()
@@ -60,8 +60,9 @@ final class E2EEAutoLogAlertViewModelTests: XCTestCase {
         let calls = Calls()
         calls.reportId = "bug_9"
         let model = model(calls, alert: .init(error: "ROLLBACK", seq: 16))
-        XCTAssertFalse(model.isFork)
+        XCTAssertEqual(model.kind, .rollback)
         XCTAssertEqual(model.report, .sent)
+        XCTAssertEqual(self.model(Calls(), alert: .init(error: "CHAIN_INVALID", seq: 3)).kind, .chainInvalid)
     }
 
     /// Ni contenu ni identifiant d'appareil du journal : l'écart, son maillon et l'appareil.

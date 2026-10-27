@@ -99464,6 +99464,38 @@
           }
         }
       }
+    },
+    "Le serveur a signé une liste des appareils qui ne respecte pas les règles du journal." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server signed a device list that doesn’t follow the log’s rules."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur a signé une liste des appareils qui ne respecte pas les règles du journal."
+          }
+        }
+      }
+    },
+    "Liste signée hors des règles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signed list outside the rules"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste signée hors des règles"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

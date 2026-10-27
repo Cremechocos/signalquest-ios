@@ -33,7 +33,20 @@ final class E2EEAutoLogAlertViewModel: ObservableObject {
         report = dependencies.reportId() == nil ? .idle : .sent
     }
 
-    var isFork: Bool { alert.error == E2EEAutoLog.ChainError.fork.rawValue }
+    enum Kind: Equatable {
+        case fork
+        case rollback
+        /// Révision 13 : liste signée contraire aux règles du journal, traitée comme une fourche.
+        case chainInvalid
+    }
+
+    var kind: Kind {
+        switch alert.error {
+        case E2EEAutoLog.ChainError.rollback.rawValue: return .rollback
+        case E2EEAutoLog.ChainError.chainInvalid.rawValue: return .chainInvalid
+        default: return .fork
+        }
+    }
 
     func sendReport() async {
         guard report != .sending, report != .sent else { return }
@@ -177,10 +190,13 @@ struct E2EEAutoLogAlertView: View {
                 .accessibilityAddTraits(.isHeader)
                 .fixedSize(horizontal: false, vertical: true)
             Group {
-                if model.isFork {
+                switch model.kind {
+                case .fork:
                     Text("Le serveur montre une autre version de la liste des appareils que celle que cet appareil a déjà vérifiée.")
-                } else {
+                case .rollback:
                     Text("Le serveur montre une version plus ancienne de la liste des appareils que celle que cet appareil a déjà vérifiée.")
+                case .chainInvalid:
+                    Text("Le serveur a signé une liste des appareils qui ne respecte pas les règles du journal.")
                 }
             }
             .font(SQType.body)
@@ -193,13 +209,21 @@ struct E2EEAutoLogAlertView: View {
         }
     }
 
+    private var gapText: String {
+        switch model.kind {
+        case .fork: return String(localized: "Deux versions du journal")
+        case .rollback: return String(localized: "Retour en arrière")
+        case .chainInvalid: return String(localized: "Liste signée hors des règles")
+        }
+    }
+
     private var reportCard: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Ce que contient le signalement")
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
                 .accessibilityAddTraits(.isHeader)
-            row(String(localized: "Écart"), model.isFork ? String(localized: "Deux versions du journal") : String(localized: "Retour en arrière"))
+            row(String(localized: "Écart"), gapText)
             row(String(localized: "Maillon"), String(model.alert.seq))
             row(String(localized: "App"), model.device.appVersion)
             row(String(localized: "Appareil"), "\(model.device.model), \(model.device.osVersion)")
@@ -358,7 +382,8 @@ struct E2EEAutoLogAlertBannerContent: View {
 }
 
 /// Banc visuel (simulateur Debug) : `--qa-auto-log-alert`, `--qa-auto-log-alert-rollback`
-/// pour un retour en arrière, `--qa-auto-log-alert-sent` après le signalement,
+/// pour un retour en arrière, `--qa-auto-log-alert-invalid` pour une chaîne
+/// invalide, `--qa-auto-log-alert-sent` après le signalement,
 /// `--qa-auto-log-alert-banner` pour le bandeau de la Messagerie.
 struct E2EEAutoLogAlertQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
@@ -367,7 +392,11 @@ struct E2EEAutoLogAlertQAScreen: View {
     private static func model() -> E2EEAutoLogAlertViewModel {
         let arguments = ProcessInfo.processInfo.arguments
         return E2EEAutoLogAlertViewModel(
-            alert: .init(error: arguments.contains("--qa-auto-log-alert-rollback") ? "ROLLBACK" : "FORK", seq: 1_284),
+            alert: .init(
+                error: arguments.contains("--qa-auto-log-alert-rollback") ? "ROLLBACK"
+                    : arguments.contains("--qa-auto-log-alert-invalid") ? "CHAIN_INVALID" : "FORK",
+                seq: 1_284
+            ),
             dependencies: .init(
                 submit: { _ in
                     try await Task.sleep(nanoseconds: 600_000_000)

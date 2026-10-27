@@ -412,6 +412,9 @@ enum E2EEAutoLog {
         case logKeyNotPinned = "LOG_KEY_NOT_PINNED"
         case rollback = "ROLLBACK"
         case fork = "FORK"
+        /// Alerte de la révision 13 : maillons enchaînés jusqu'à une tête
+        /// vérifiée, mais contraires au §3.3. Traitée comme une fourche.
+        case chainInvalid = "CHAIN_INVALID"
     }
 
     struct ChainFailure: Error, Equatable, Sendable {
@@ -423,24 +426,34 @@ enum E2EEAutoLog {
     /// les entrées complètes jointes aux maillons dont le `tag` vaut `-` (§3.5),
     /// par `seq`. Rend le nouvel état ou la première erreur, sans toucher à `state`.
     static func extendChain(_ state: ChainState, links: [String], logKeyEntries: [Int64: String]) -> Result<ChainState, ChainFailure> {
+        let extended = extendChainPartially(state, links: links, logKeyEntries: logKeyEntries)
+        if let failure = extended.failure { return .failure(failure) }
+        return .success(extended.state)
+    }
+
+    /// Comme `extendChain`, mais rend aussi l'état au dernier maillon admis :
+    /// la clé du journal en vigueur avant la faute juge la tête (révision 13).
+    static func extendChainPartially(
+        _ state: ChainState, links: [String], logKeyEntries: [Int64: String]
+    ) -> (state: ChainState, failure: ChainFailure?) {
         var state = state
         for text in links {
             let expectedSeq = state.seq + 1
-            guard let link = parseLink(text) else { return .failure(ChainFailure(error: .linkFormat, seq: expectedSeq)) }
-            guard link.seq == expectedSeq else { return .failure(ChainFailure(error: .linkSeq, seq: link.seq)) }
-            guard link.prevLinkHash == state.linkHash else { return .failure(ChainFailure(error: .linkPrevHash, seq: link.seq)) }
+            guard let link = parseLink(text) else { return (state, ChainFailure(error: .linkFormat, seq: expectedSeq)) }
+            guard link.seq == expectedSeq else { return (state, ChainFailure(error: .linkSeq, seq: link.seq)) }
+            guard link.prevLinkHash == state.linkHash else { return (state, ChainFailure(error: .linkPrevHash, seq: link.seq)) }
 
             if link.genesis && (state.genesisClosed || link.isLogKey) {
-                return .failure(ChainFailure(error: .genesisAfterClose, seq: link.seq))
+                return (state, ChainFailure(error: .genesisAfterClose, seq: link.seq))
             }
             if !link.genesis && !link.isLogKey { state.genesisClosed = true }
 
             if link.kind == .account {
-                guard state.accounts[link.tag] == nil else { return .failure(ChainFailure(error: .duplicateAccount, seq: link.seq)) }
+                guard state.accounts[link.tag] == nil else { return (state, ChainFailure(error: .duplicateAccount, seq: link.seq)) }
                 state.accounts[link.tag] = AccountLink(seq: link.seq, saltCommitment: link.hash)
             } else if link.isLogKey {
                 guard let entryText = logKeyEntries[link.seq] else {
-                    return .failure(ChainFailure(error: .logKeyEntryMissing, seq: link.seq))
+                    return (state, ChainFailure(error: .logKeyEntryMissing, seq: link.seq))
                 }
                 guard let parsed = parseEntry(entryText), parsed.entry.op == .logKey, parsed.entry.seq == link.seq,
                       digest(entryText) == link.hash,
@@ -450,11 +463,11 @@ enum E2EEAutoLog {
                         payload: Payload.logKey(seq: link.seq, oldLogKeyId: logKeyId(state.logKeyB64), newLogKeyB64: newLogKeyB64),
                         signatureB64: signatureB64
                       ) else {
-                    return .failure(ChainFailure(error: .logKeyEntryInvalid, seq: link.seq))
+                    return (state, ChainFailure(error: .logKeyEntryInvalid, seq: link.seq))
                 }
                 // Une ancienne clé volée ne doit pas pouvoir en installer une autre (§3.4, v2).
                 guard newLogKeyB64 == state.nextLogKeysB64.first else {
-                    return .failure(ChainFailure(error: .logKeyNotPinned, seq: link.seq))
+                    return (state, ChainFailure(error: .logKeyNotPinned, seq: link.seq))
                 }
                 state.logKeyB64 = newLogKeyB64
                 state.nextLogKeysB64.removeFirst()
@@ -462,7 +475,15 @@ enum E2EEAutoLog {
             state.seq = link.seq
             state.linkHash = digest(text)
         }
-        return .success(state)
+        return (state, nil)
+    }
+
+    /// Chaînage lu avant le format (révision 13) : la 4ᵉ ligne du texte coupé
+    /// sur `\n`, si c'est un condensat. nil rompt le chaînage : non concluant.
+    static func chainedPrevLinkHash(_ text: String) -> String? {
+        let lines = text.components(separatedBy: "\n")
+        guard lines.count >= 4, isDigest(lines[3]) else { return nil }
+        return lines[3]
     }
 
     enum HeadComparison: Equatable, Sendable {

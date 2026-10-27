@@ -354,9 +354,12 @@ final class E2EEAutoLogReaderTests: XCTestCase {
             XCTAssertNil(anchor?.alert, message)
         }
 
+        // Révision 13 : une entrée `LOG_KEY` en trop sous une tête vérifiée qui termine des
+        // maillons intacts n'est plus non concluante, c'est l'alerte « chaîne invalide ».
         let extraEntry = Server(reference)
         extraEntry.logKeyEntries[5] = reference.logKeyEntries[13]
-        try await expectInconclusive(extraEntry, store: makeStore(), keptSeq: nil, "entrée LOG_KEY en trop")
+        let extra = try await makeReader(reference, server: extraEntry, store: makeStore(), nowMs: reference.headNowMs).refreshLinks()
+        XCTAssertEqual(extra, .alert(.init(error: "CHAIN_INVALID", seq: 5)), "entrée LOG_KEY en trop")
 
         let shortHead = Server(reference)
         (shortHead.headText, shortHead.headSignatureB64) = boundary
@@ -611,5 +614,215 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         XCTAssertNil(account(["userId": "user_a", "accountSaltB64": NSNull(), "entries": ["e"], "hasMore": false]),
                      "sans sel, aucune entrée")
         XCTAssertNil(account(["userId": "user_a", "entries": [], "hasMore": false]), "sel absent, pas null")
+    }
+
+    // MARK: Révision 13
+
+    /// Petit journal signé par une clé tirée ici : maillons, entrées `LOG_KEY` et tête au choix.
+    private struct Signed {
+        let key = P256.Signing.PrivateKey()
+        var pinnedB64: String { key.publicKey.x963Representation.base64EncodedString() }
+
+        static func link(seq: Int64, prev: String, kind: String = "ENTRY", tag: String, genesis: Bool = false) -> String {
+            ["SQ-E2EE-AUTO-LOG-LINK", "1", String(seq), prev, kind, tag, E2EEAutoLog.digest("entrée \(seq)"), genesis ? "1" : "0"]
+                .joined(separator: "\n")
+        }
+
+        /// Maillons enchaînés sur le texte entier, quel qu'en soit le format.
+        static func chained(_ make: [(String) -> String]) -> [String] {
+            var prev = E2EEAutoLog.genesisHash
+            return make.map { build in
+                let text = build(prev)
+                prev = E2EEAutoLog.digest(text)
+                return text
+            }
+        }
+
+        func head(over links: [String], createdAtMs: Int64) throws -> (text: String, signatureB64: String) {
+            let text = [
+                "SQ-E2EE-AUTO-LOG-HEAD", "2", String(links.count), links.last.map(E2EEAutoLog.digest) ?? E2EEAutoLog.genesisHash,
+                E2EEAutoLog.logKeyId(pinnedB64), String(createdAtMs),
+            ].joined(separator: "\n")
+            return (text, try E2EEV2LowS.sign(Data(text.utf8), with: key).base64EncodedString())
+        }
+    }
+
+    private static let nowMs: Int64 = 1_790_036_000_000
+    private static let accountTag = E2EEAutoLog.digest("compte")
+
+    private func signedServer(_ signed: Signed, links: [String], headCreatedAtMs: Int64 = nowMs) throws -> Server {
+        let server = Server(try reference())
+        server.links = links
+        server.logKeyEntries = [:]
+        server.accounts = [:]
+        (server.headText, server.headSignatureB64) = try signed.head(over: links, createdAtMs: headCreatedAtMs)
+        return server
+    }
+
+    private func signedReader(_ signed: Signed, server: Server, store: E2EEAutoLogStore, nowMs: Int64 = nowMs) -> E2EEAutoLogReader {
+        E2EEAutoLogReader(
+            ownerScopeId: Self.owner, pinnedLogKeyB64: signed.pinnedB64, nextLogKeysB64: [], store: store,
+            fetchLinks: { after in (server.linksPage(after: after), nil) },
+            fetchAccount: { userId, after, upTo in server.accountPage(userId: userId, after: after, upTo: upTo) },
+            now: { Date(timeIntervalSince1970: TimeInterval(nowMs) / 1_000) },
+            defaults: UserDefaults(suiteName: "e2ee-auto-log-\(UUID().uuidString)")!
+        )
+    }
+
+    /// Maillons enchaînés jusqu'à une tête vérifiée mais contraires au §3.3 :
+    /// alerte « chaîne invalide », gardée comme une fourche, même sur plusieurs pages.
+    func testChainedButInvalidLinksUnderAVerifiedHeadRaiseTheAlert() async throws {
+        let signed = Signed(), tag = Self.accountTag
+        let cases: [(String, [(String) -> String], Int64)] = [
+            ("deuxième ACCOUNT", [
+                { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+                { Signed.link(seq: 2, prev: $0, tag: tag) },
+                { Signed.link(seq: 3, prev: $0, kind: "ACCOUNT", tag: tag) },
+            ], 3),
+            ("genesis après un 0", [
+                { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+                { Signed.link(seq: 2, prev: $0, tag: tag, genesis: true) },
+            ], 2),
+            ("maillon hors format", [
+                { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+                { Signed.link(seq: 2, prev: $0, tag: tag).replacingOccurrences(of: "SQ-E2EE-AUTO-LOG-LINK", with: "SQ-E2EE-AUTO-LOG-LINX") },
+            ], 2),
+            ("maillon hors suite", [
+                { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+                { Signed.link(seq: 7, prev: $0, tag: tag) },
+            ], 7),
+            ("LOG_KEY sans entrée", [
+                { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+                { Signed.link(seq: 2, prev: $0, tag: E2EEAutoLog.none) },
+            ], 2),
+        ]
+        for (name, make, seq) in cases {
+            let server = try signedServer(signed, links: Signed.chained(make)), store = makeStore()
+            server.pageSize = 1
+            let status = try await signedReader(signed, server: server, store: store).refreshLinks()
+            XCTAssertEqual(status, .alert(.init(error: "CHAIN_INVALID", seq: seq)), name)
+            let again = try await signedReader(signed, server: server, store: store).refreshLinks()
+            XCTAssertEqual(again, status, "\(name) : l'alerte ne se lève pas seule")
+        }
+
+        // Une entrée `LOG_KEY` en trop, sur une chaîne par ailleurs valide.
+        let links = Signed.chained([
+            { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) },
+            { Signed.link(seq: 2, prev: $0, tag: tag) },
+        ])
+        let server = try signedServer(signed, links: links)
+        server.logKeyEntries = [2: "entrée en trop"]
+        let status = try await signedReader(signed, server: server, store: makeStore()).refreshLinks()
+        XCTAssertEqual(status, .alert(.init(error: "CHAIN_INVALID", seq: 2)))
+    }
+
+    /// Le chaînage se lit avant le format : rompu, la tête ne prouve rien, non
+    /// concluant et sans alerte. Une tête pas à jour n'engage rien non plus.
+    func testBrokenLinkageOrStaleHeadIsInconclusive() async throws {
+        let signed = Signed(), tag = Self.accountTag
+        let valid: (String) -> String = { Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: tag) }
+        let broken: [(String, [String])] = [
+            ("moins de 4 lignes", Signed.chained([valid, { _ in "SQ-E2EE-AUTO-LOG-LINK\n1\n2" }])),
+            ("4ᵉ ligne qui n'est pas un condensat", Signed.chained([valid, { _ in
+                Signed.link(seq: 2, prev: "pas-un-condensat", tag: tag)
+            }])),
+            ("autre condensat", Signed.chained([valid, { _ in Signed.link(seq: 2, prev: E2EEAutoLog.digest("ailleurs"), tag: tag) }])),
+        ]
+        for (name, links) in broken {
+            let store = makeStore()
+            let reader = signedReader(signed, server: try signedServer(signed, links: links), store: store)
+            let result = await status(reader)
+            guard case .failure(let error) = result, case .invalidChain(let failure) = error as? E2EEAutoLogReader.Failure, failure == .init(error: .linkPrevHash, seq: 2) else {
+                XCTFail("\(name) : \(result)"); continue
+            }
+            XCTAssertNil(try store.anchor(ownerScopeId: Self.owner), name)
+        }
+
+        let invalid = Signed.chained([valid, { Signed.link(seq: 2, prev: $0, kind: "ACCOUNT", tag: tag) }])
+        let store = makeStore()
+        let stale = try signedServer(signed, links: invalid, headCreatedAtMs: Self.nowMs - 2 * E2EEAutoLog.headMaxAgeMs)
+        let result = await status(signedReader(signed, server: stale, store: store))
+        guard case .failure(let error) = result, case .invalidChain(let failure) = error as? E2EEAutoLogReader.Failure, failure == .init(error: .duplicateAccount, seq: 2) else {
+            return XCTFail("tête pas à jour : \(result)")
+        }
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner))
+
+        // Et une chaîne valide sous la même clé passe.
+        let ok = try await signedReader(signed, server: try signedServer(signed, links: Signed.chained([valid])), store: makeStore()).refreshLinks()
+        guard case .current = ok else { return XCTFail("\(ok)") }
+    }
+
+    /// `429` : non concluant, plus aucun appel avant `Retry-After` (ou une heure),
+    /// le quota de comptes ne retient que `log/accounts` ; persistant d'un lecteur à l'autre.
+    func testRateLimitsHoldFurtherReads() async throws {
+        let signed = Signed()
+        let links = Signed.chained([{ Signed.link(seq: 1, prev: $0, kind: "ACCOUNT", tag: Self.accountTag) }])
+        let server = try signedServer(signed, links: links)
+        let suite = "e2ee-auto-log-\(UUID().uuidString)"
+        final class Calls: @unchecked Sendable { var links = 0, accounts = 0, linksFailure: Error?, accountFailure: Error? }
+        let calls = Calls()
+        func reader(at nowMs: Int64) -> E2EEAutoLogReader {
+            E2EEAutoLogReader(
+                ownerScopeId: Self.owner, pinnedLogKeyB64: signed.pinnedB64, nextLogKeysB64: [], store: makeStore(),
+                fetchLinks: { after in
+                    calls.links += 1
+                    if let failure = calls.linksFailure { calls.linksFailure = nil; throw failure }
+                    return (server.linksPage(after: after), nil)
+                },
+                fetchAccount: { userId, after, upTo in
+                    calls.accounts += 1
+                    if let failure = calls.accountFailure { calls.accountFailure = nil; throw failure }
+                    return server.accountPage(userId: userId, after: after, upTo: upTo)
+                },
+                now: { Date(timeIntervalSince1970: TimeInterval(nowMs) / 1_000) },
+                defaults: UserDefaults(suiteName: suite)!
+            )
+        }
+        func isRateLimited(_ call: () async throws -> Void) async -> Bool {
+            do { try await call(); return false } catch { return error as? E2EEAutoLogReader.Failure == .rateLimited }
+        }
+
+        calls.linksFailure = E2EEV2TransportFailure(kind: .retryable, statusCode: 429, message: "e2ee-http-429", retryAfterSeconds: 120)
+        let first = reader(at: Self.nowMs)
+        let firstLimited = await isRateLimited { _ = try await first.refreshLinks() }
+        XCTAssertTrue(firstLimited)
+        let retryAt = await first.retryAtMs(.reads)
+        XCTAssertEqual(retryAt, Self.nowMs + 120_000)
+        let during = reader(at: Self.nowMs + 119_000)
+        let duringLimited = await isRateLimited { _ = try await during.refreshLinks() }
+        XCTAssertTrue(duringLimited)
+        XCTAssertEqual(calls.links, 1, "aucun appel avant Retry-After")
+        let after = reader(at: Self.nowMs + 120_001)
+        let status = try await after.refreshLinks()
+        guard case .current = status else { return XCTFail("\(status)") }
+
+        // Quota de comptes, sans Retry-After : une heure, et seulement log/accounts.
+        calls.accountFailure = E2EEV2TransportFailure(kind: .retryable, statusCode: 429, code: "E2EE_AUTO_ACCOUNT_QUOTA", message: "quota")
+        let accountLimited = await isRateLimited { _ = try await after.account("user_alice_00000000001") }
+        XCTAssertTrue(accountLimited)
+        let accountsRetry = await after.retryAtMs(.accounts)
+        XCTAssertEqual(accountsRetry, Self.nowMs + 120_001 + 3_600_000)
+        let readsRetry = await after.retryAtMs(.reads)
+        XCTAssertNil(readsRetry)
+        let later = reader(at: Self.nowMs + 600_000)
+        _ = try await later.refreshLinks()
+        let laterLimited = await isRateLimited { _ = try await later.account("user_alice_00000000001") }
+        XCTAssertTrue(laterLimited)
+        XCTAssertEqual(calls.accounts, 1)
+
+        // Les autres erreurs passent telles quelles, sans attente.
+        calls.linksFailure = E2EEV2TransportFailure(kind: .retryable, statusCode: 503, message: "e2ee-http-503")
+        let other = reader(at: Self.nowMs + 700_000)
+        let otherLimited = await isRateLimited { _ = try await other.refreshLinks() }
+        XCTAssertFalse(otherLimited)
+        let otherRetry = await other.retryAtMs(.reads)
+        XCTAssertNil(otherRetry)
+    }
+
+    func testOnlyTheCodedNotFoundIsDecisive() {
+        XCTAssertTrue(E2EEAutoLogReader.isAccountNotFound(.init(kind: .permanent, statusCode: 404, code: "E2EE_AUTO_ACCOUNT_NOT_FOUND", message: "x")))
+        XCTAssertFalse(E2EEAutoLogReader.isAccountNotFound(.init(kind: .permanent, statusCode: 404, message: "x")))
+        XCTAssertFalse(E2EEAutoLogReader.isAccountNotFound(.init(kind: .permanent, statusCode: 404, code: "NOT_FOUND", message: "x")))
+        XCTAssertFalse(E2EEAutoLogReader.isAccountNotFound(.init(kind: .permanent, statusCode: 410, code: "E2EE_AUTO_ACCOUNT_NOT_FOUND", message: "x")))
     }
 }
