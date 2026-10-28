@@ -120,9 +120,9 @@ enum DefaultPostVisibilityText {
             "Your automatic posts already online will also become private, except those whose audience you changed."
         ),
         "choice.closeNote": (
-            "Si tu fermes sans choisir, tes prochaines publications seront privées. Tu pourras changer ce choix dans Réglages › Confidentialité.",
-            "Si vous fermez sans choisir, vos prochaines publications seront privées. Vous pourrez changer ce choix dans Réglages › Confidentialité.",
-            "If you close without choosing, your next posts will be private. You can change this later in Settings › Privacy."
+            "Si tu fermes sans choisir, tes prochaines publications seront privées. Tu pourras changer ce choix plus tard dans les Réglages.",
+            "Si vous fermez sans choisir, vos prochaines publications seront privées. Vous pourrez changer ce choix plus tard dans les Réglages.",
+            "If you close without choosing, your next posts will be private. You can change this later in Settings."
         ),
         "error.applyRetry": (
             "La mise à jour de tes publications a pris trop de temps. Rien n'a changé : réessaie.",
