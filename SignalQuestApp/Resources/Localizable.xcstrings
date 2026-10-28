@@ -628,6 +628,102 @@
         }
       }
     },
+    "Cette fonction demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This feature needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette fonction demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "Le partage en direct demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live sharing needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le partage en direct demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "Le partage d'une session demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing a session needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le partage d'une session demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "L'envoi de la couverture demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending coverage needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'envoi de la couverture demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "L'import d'une session de couverture demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importing a coverage session needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'import d'une session de couverture demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "L'identification d'un site demande une carte SIM d'un opérateur pris en charge." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifying a site needs a SIM card from a supported carrier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'identification d'un site demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
     "a ajouté %@ sur la carte" : {
       "localizations" : {
         "en" : {

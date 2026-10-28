@@ -1,0 +1,46 @@
+{
+  "contract": "supported-network-required-v1",
+  "status": 403,
+  "code": "SUPPORTED_NETWORK_REQUIRED",
+  "meaning": "le réseau mobile (MCC/MNC) du membre n'est pas pris en charge pour cette fonction ; ex. simulateur sans SIM",
+  "additive": "le corps historique ne change pas (error, message, allowedOperators, requiredMCC, allowedMNC, allowedDromCodes) ; code et feature sont ajoutés",
+  "feature": {
+    "optional": true,
+    "values": ["live_share", "session_share", "coverage", "coverage_import", "identify"],
+    "unknownValue": "afficher le message générique, ne jamais échouer"
+  },
+  "routes": {
+    "POST /api/live-share/requests": "live_share",
+    "POST /api/live-share/sessions/{id}/update": "live_share",
+    "POST /api/sessions/share": "session_share",
+    "POST /api/coverage/submit": "coverage",
+    "POST /api/coverage/session/import": "coverage_import",
+    "POST /api/android/map/identify/direct": "identify"
+  },
+  "notToConfuseWith": {
+    "code": "OPERATOR_REQUIRED",
+    "status": 400,
+    "meaning": "FAV-1 : favori sans opérateur déterminable (site partagé ou inconnu), préciser l'opérateur ; aucun rapport avec la SIM"
+  },
+  "labels": {
+    "rule": "référence de sens et de ton ; chaque app traduit dans ses langues",
+    "generic": {
+      "fr-tu": "Cette fonction demande une carte SIM d'un opérateur pris en charge.",
+      "fr-vous": "Cette fonction demande une carte SIM d'un opérateur pris en charge.",
+      "en": "This feature needs a SIM card from a supported carrier."
+    },
+    "live_share": {
+      "fr-tu": "Le partage en direct demande une carte SIM d'un opérateur pris en charge.",
+      "fr-vous": "Le partage en direct demande une carte SIM d'un opérateur pris en charge.",
+      "en": "Live sharing needs a SIM card from a supported carrier."
+    }
+  },
+  "example": {
+    "code": "SUPPORTED_NETWORK_REQUIRED",
+    "feature": "live_share",
+    "error": "Accès réservé aux utilisateurs des réseaux pris en charge",
+    "message": "L'accès à le partage live Drive Test est réservé aux utilisateurs des réseaux SFR (…).",
+    "allowedOperators": ["SFR", "Bouygues Télécom", "Orange", "Free Mobile"],
+    "requiredMCC": 208
+  }
+}

@@ -209,6 +209,14 @@ enum APIError: Error, LocalizedError, Equatable {
         // Discussion d'un site (`/api/site-threads/comments`) : limites des comptes récents.
         "LINKS_NOT_ALLOWED_YET": String(localized: "Les liens sont possibles une fois ton compte âgé de 7 jours. Retire le lien pour publier."),
         "NEW_ACCOUNT_DAILY_LIMIT": String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."),
+
+        // Réseau mobile non pris en charge (SUPPORTED_NETWORK_REQUIRED, 403), par fonction.
+        "SUPPORTED_NETWORK_REQUIRED": String(localized: "Cette fonction demande une carte SIM d'un opérateur pris en charge."),
+        "SUPPORTED_NETWORK_REQUIRED.LIVE_SHARE": String(localized: "Le partage en direct demande une carte SIM d'un opérateur pris en charge."),
+        "SUPPORTED_NETWORK_REQUIRED.SESSION_SHARE": String(localized: "Le partage d'une session demande une carte SIM d'un opérateur pris en charge."),
+        "SUPPORTED_NETWORK_REQUIRED.COVERAGE": String(localized: "L'envoi de la couverture demande une carte SIM d'un opérateur pris en charge."),
+        "SUPPORTED_NETWORK_REQUIRED.COVERAGE_IMPORT": String(localized: "L'import d'une session de couverture demande une carte SIM d'un opérateur pris en charge."),
+        "SUPPORTED_NETWORK_REQUIRED.IDENTIFY": String(localized: "L'identification d'un site demande une carte SIM d'un opérateur pris en charge."),
     ]
 }
 
@@ -219,6 +227,23 @@ struct BackendErrorResponse: Codable {
     let details: [String: JSONValue]?
     /// Raison d'un `403 E2EE_DEVICE_REVOKED` (E2EE-AUTO §4.3), au premier niveau.
     let reason: String?
+    /// Fonction refusée d'un `403 SUPPORTED_NETWORK_REQUIRED`
+    /// (`contracts/errors/supported-network-required-v1.json`).
+    let feature: String?
+
+    /// Code retenu par l'app. Un refus « réseau non pris en charge » porte la
+    /// fonction concernée (`SUPPORTED_NETWORK_REQUIRED.LIVE_SHARE`) pour que le
+    /// message la nomme ; une fonction inconnue garde le code nu, donc le
+    /// message générique. À ne pas confondre avec `OPERATOR_REQUIRED` (FAV-1).
+    var appCode: String? {
+        guard code == Self.supportedNetworkRequired,
+              let feature = feature?.lowercased(),
+              Self.supportedNetworkFeatures.contains(feature) else { return code }
+        return "\(Self.supportedNetworkRequired).\(feature.uppercased())"
+    }
+
+    static let supportedNetworkRequired = "SUPPORTED_NETWORK_REQUIRED"
+    static let supportedNetworkFeatures: Set<String> = ["live_share", "session_share", "coverage", "coverage_import", "identify"]
 }
 
 extension Error {

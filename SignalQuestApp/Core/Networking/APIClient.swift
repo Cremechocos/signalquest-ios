@@ -830,7 +830,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         if let decoded = try? decoder.decode(BackendErrorResponse.self, from: data) {
             return .http(
                 status: response.statusCode,
-                code: decoded.code,
+                code: decoded.appCode,
                 message: decoded.error ?? HTTPURLResponse.localizedString(forStatusCode: response.statusCode),
                 requestId: decoded.requestId ?? headerRequestId,
                 retryAfter: retryAfter
