@@ -122,6 +122,42 @@ final class MediaLocationStripperTests: XCTestCase {
         Data(bigEndian ? [0x88, 0x25, 0x00, 0x04] : [0x25, 0x88, 0x04, 0x00])
     }
 
+    /// GIF de `frames` images 8 × 6, 0,1 s chacune.
+    private func gif(frames: Int) throws -> Data {
+        let output = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(output, UTType.gif.identifier as CFString, frames, nil))
+        let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 6, bitsPerComponent: 8, bytesPerRow: 0,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.1]] as CFDictionary
+        for index in 0..<frames {
+            context.setFillColor(CGColor(red: CGFloat(index) / CGFloat(max(1, frames)), green: 0.2, blue: 0.4, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 6))
+            CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), delay)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return output as Data
+    }
+
+    /// Un GIF animé part tel quel (images et délais intacts) au lieu d'un JPEG fixe ;
+    /// un GIF fixe ou une autre image reste sur le chemin JPEG.
+    func testAnimatedGIFKeepsItsFrames() throws {
+        let animated = try gif(frames: 3)
+        let result = try XCTUnwrap(MediaLocationStripper.animatedGIF(animated))
+        XCTAssertEqual(result.width, 8)
+        XCTAssertEqual(result.height, 6)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(result.data as CFData, nil))
+        XCTAssertEqual(CGImageSourceGetType(source) as String?, UTType.gif.identifier)
+        XCTAssertEqual(CGImageSourceGetCount(source), 3)
+        let frame = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 1, nil) as? [CFString: Any])
+        let gifProperties = try XCTUnwrap(frame[kCGImagePropertyGIFDictionary] as? [CFString: Any])
+        XCTAssertEqual(gifProperties[kCGImagePropertyGIFDelayTime] as? Double ?? 0, 0.1, accuracy: 0.001)
+        XCTAssertFalse(MediaLocationStripper.hasLocation(result.data))
+
+        XCTAssertNil(MediaLocationStripper.animatedGIF(try gif(frames: 1)))
+        XCTAssertNil(MediaLocationStripper.animatedGIF(Data("bonjour".utf8)))
+    }
+
     /// Ce qui n'est pas une image (un PDF, du texte) passe tel quel.
     func testNonImageDataIsUntouched() {
         let text = Data("bonjour".utf8)

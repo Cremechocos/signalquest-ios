@@ -4364,14 +4364,14 @@ struct ConversationDetailView: View {
         }
         if isImage {
             guard let prepared = await Task.detached(priority: .userInitiated, operation: {
-                Self.preparedJPEG(from: data)
+                Self.preparedImage(from: data)
             }).value, MessageAttachmentOutboxStore.fits(prepared.data.count) else {
                 showActionError(String(localized: "Image illisible."))
                 Haptics.error()
                 return
             }
             stagedAttachments.append(StagedAttachment(
-                data: prepared.data, filename: "photo.jpg", mimeType: "image/jpeg", kind: "IMAGE",
+                data: prepared.data, filename: prepared.filename, mimeType: prepared.mimeType, kind: "IMAGE",
                 width: prepared.width, height: prepared.height
             ))
         } else {
@@ -4480,7 +4480,7 @@ struct ConversationDetailView: View {
         // Décodage/redimensionnement/encodage hors du main thread pour ne pas
         // geler l'UI pendant l'envoi (image plein format).
         guard let prepared = await Task.detached(priority: .userInitiated, operation: {
-            Self.preparedJPEG(from: raw)
+            Self.preparedImage(from: raw)
         }).value else {
             showActionError(String(localized: "Image illisible."))
             Haptics.error()
@@ -4489,7 +4489,7 @@ struct ConversationDetailView: View {
         let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
         await queueAttachment(
             PendingAttachmentSend(
-                data: prepared.data, filename: "photo.jpg", mimeType: "image/jpeg", kind: "IMAGE",
+                data: prepared.data, filename: prepared.filename, mimeType: prepared.mimeType, kind: "IMAGE",
                 caption: caption, width: prepared.width, height: prepared.height,
                 replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
             )
@@ -4621,6 +4621,15 @@ struct ConversationDetailView: View {
         where record.contentSha256 == digest {
             await service.discardPendingAttachment(clientRequestId: record.clientRequestId)
         }
+    }
+
+    /// Image prête à l'envoi : un GIF animé part tel quel, sans lieu, pour garder son
+    /// animation (s'il tient dans les 10 Mo) ; toute autre image part en JPEG.
+    nonisolated private static func preparedImage(from data: Data) -> (data: Data, width: Int, height: Int, filename: String, mimeType: String)? {
+        if let gif = MediaLocationStripper.animatedGIF(data), MessageAttachmentOutboxStore.fits(gif.data.count) {
+            return (gif.data, gif.width, gif.height, "image.gif", "image/gif")
+        }
+        return preparedJPEG(from: data).map { ($0.data, $0.width, $0.height, "photo.jpg", "image/jpeg") }
     }
 
     /// Recompresse l'image en JPEG ≤ 1280 px qualité 0,85 (HEIC converti

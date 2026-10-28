@@ -36,6 +36,19 @@ enum MediaLocationStripper {
         return rewritten as Data
     }
 
+    /// GIF animé sans lieu, ses images et leurs délais intacts, avec la taille de sa
+    /// première image ; `nil` pour un GIF fixe ou une autre image, qui partent en JPEG.
+    static func animatedGIF(_ data: Data) -> (data: Data, width: Int, height: Int)? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              (CGImageSourceGetType(source) as String?) == UTType.gif.identifier,
+              CGImageSourceGetCount(source) > 1,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              let clean = strippedImage(data) else { return nil }
+        return (clean, width, height)
+    }
+
     /// L'image porte des coordonnées GPS (EXIF ou XMP).
     static func hasLocation(_ data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
