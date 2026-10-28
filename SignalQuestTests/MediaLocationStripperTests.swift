@@ -48,7 +48,7 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertEqual(tracks.count, 1)
     }
 
-    private func geotaggedJPEG() throws -> Data {
+    private func geotaggedImage(_ type: UTType) throws -> Data {
         let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 6, bitsPerComponent: 8, bytesPerRow: 0,
                                               space: CGColorSpaceCreateDeviceRGB(),
                                               bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
@@ -56,7 +56,7 @@ final class MediaLocationStripperTests: XCTestCase {
         context.fill(CGRect(x: 0, y: 0, width: 8, height: 6))
         let image = try XCTUnwrap(context.makeImage())
         let data = NSMutableData()
-        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil))
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil))
         let gps: [CFString: Any] = [
             kCGImagePropertyGPSLatitude: 48.8566, kCGImagePropertyGPSLatitudeRef: "N",
             kCGImagePropertyGPSLongitude: 2.3522, kCGImagePropertyGPSLongitudeRef: "E",
@@ -66,8 +66,28 @@ final class MediaLocationStripperTests: XCTestCase {
         return data as Data
     }
 
+    /// ImageIO ne retire le GPS sans réencoder que du JPEG : le HEIC et le PNG
+    /// passent par la réécriture, vérifiée ici aussi.
+    func testHEICAndPNGLoseTheirGPSToo() throws {
+        for type in [UTType.heic, .png] {
+            let original = try geotaggedImage(type)
+            XCTAssertTrue(MediaLocationStripper.hasLocation(original), "\(type)")
+            XCTAssertTrue(containsGPSPointer(original), "\(type)")
+            let clean = try XCTUnwrap(MediaLocationStripper.strippedImage(original), "\(type)")
+            XCTAssertFalse(MediaLocationStripper.hasLocation(clean), "\(type)")
+            XCTAssertFalse(containsGPSPointer(clean), "\(type)")
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(clean as CFData, nil))
+            let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+            XCTAssertEqual(properties[kCGImagePropertyPixelWidth] as? Int, 8, "\(type)")
+        }
+    }
+
+    private func containsGPSPointer(_ data: Data) -> Bool {
+        data.range(of: Data([0x88, 0x25])) != nil || data.range(of: Data([0x25, 0x88])) != nil
+    }
+
     func testImageLosesItsGPSButKeepsItsPixels() throws {
-        let original = try geotaggedJPEG()
+        let original = try geotaggedImage(.jpeg)
         XCTAssertTrue(MediaLocationStripper.hasLocation(original))
 
         let clean = try XCTUnwrap(MediaLocationStripper.strippedImage(original))

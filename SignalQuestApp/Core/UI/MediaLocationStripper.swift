@@ -14,14 +14,26 @@ enum MediaLocationStripper {
     static func strippedImage(_ data: Data) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let type = CGImageSourceGetType(source) else { return data }
-        let output = NSMutableData()
-        if let destination = CGImageDestinationCreateWithData(output, type, CGImageSourceGetCount(source), nil) {
-            let options = [kCGImageMetadataShouldExcludeGPS: true] as CFDictionary
-            if CGImageDestinationCopyImageSource(destination, source, options, nil) {
-                return output as Data
-            }
+        guard hasLocation(data) else { return data }
+        let count = CGImageSourceGetCount(source)
+        // 1. Copie sans réencodage. ImageIO ne retire le GPS ainsi que du JPEG : le
+        //    HEIC et le PNG le gardent, d'où la vérification du résultat.
+        let copied = NSMutableData()
+        if let destination = CGImageDestinationCreateWithData(copied, type, count, nil),
+           CGImageDestinationCopyImageSource(destination, source, [kCGImageMetadataShouldExcludeGPS: true] as CFDictionary, nil),
+           !hasLocation(copied as Data) {
+            return copied as Data
         }
-        return hasLocation(data) ? nil : data
+        // 2. Réécriture image par image, sans dictionnaire GPS ni XMP.
+        let rewritten = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(rewritten, type, count, nil) else { return nil }
+        for index in 0..<count {
+            let properties: [CFString: Any] = [kCGImagePropertyGPSDictionary: kCFNull as Any,
+                                               kCGImageDestinationLossyCompressionQuality: 0.95]
+            CGImageDestinationAddImageFromSource(destination, source, index, properties as CFDictionary)
+        }
+        guard CGImageDestinationFinalize(destination), !hasLocation(rewritten as Data) else { return nil }
+        return rewritten as Data
     }
 
     /// L'image porte des coordonnées GPS (EXIF ou XMP).
