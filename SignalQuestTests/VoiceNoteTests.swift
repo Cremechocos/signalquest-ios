@@ -165,4 +165,24 @@ final class VoiceNoteTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         XCTAssertNil(recorder.takeFinished())
     }
+
+    // MARK: Lecture
+
+    /// Un vocal WebM/Opus (enregistré par certains navigateurs) n'est pas lisible
+    /// par AVAudioPlayer : la bulle doit le dire au lieu de ne rien faire.
+    @MainActor
+    func testUnreadableNoteIsMarkedUnplayable() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voice-\(UUID().uuidString).webm")
+        // En-tête EBML d'un WebM, suivi d'octets sans flux audio exploitable.
+        try Data([0x1A, 0x45, 0xDF, 0xA3] + [UInt8](repeating: 0x42, count: 64)).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let player = VoiceNotePlayer.shared
+        XCTAssertFalse(player.isUnplayable(url))
+        player.toggle(url: url)
+        XCTAssertTrue(player.isUnplayable(url))
+        XCTAssertFalse(player.isActive(url))
+        XCTAssertEqual(String(localized: "Format non pris en charge"), "Format non pris en charge")
+    }
 }

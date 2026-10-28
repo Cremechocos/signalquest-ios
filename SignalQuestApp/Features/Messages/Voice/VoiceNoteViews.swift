@@ -163,7 +163,8 @@ struct VoiceNoteBubble: View {
     @ObservedObject private var player = VoiceNotePlayer.shared
 
     private var summary: String {
-        player.isActive(url)
+        if player.isUnplayable(url) { return String(localized: "Format non pris en charge") }
+        return player.isActive(url)
             ? String(localized: "\(VoiceNotePlayer.formatted(player.elapsed)) sur \(VoiceNotePlayer.formatted(player.duration))")
             : VoiceNotePlayer.formatted(duration)
     }
@@ -211,10 +212,18 @@ struct VoiceNoteBubble: View {
                 }
             }
 
-            Text(VoiceNotePlayer.formatted(active ? player.elapsed : duration))
-                .font(SQType.micro)
-                .monospacedDigit()
-                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+            if player.isUnplayable(url) {
+                Text("Format non pris en charge")
+                    .font(SQType.micro)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("voiceNote.unplayable")
+            } else {
+                Text(VoiceNotePlayer.formatted(active ? player.elapsed : duration))
+                    .font(SQType.micro)
+                    .monospacedDigit()
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+            }
 
             if active {
                 Button {

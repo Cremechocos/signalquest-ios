@@ -74,6 +74,10 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
     @Published private(set) var progress: Double = 0
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var rate: Float = 1
+    /// Notes que le système n'a pas su ouvrir (format non pris en charge, comme le
+    /// WebM/Opus enregistré par certains navigateurs) : la bulle le dit au lieu de
+    /// rester muette.
+    @Published private(set) var unplayableURLs: Set<URL> = []
 
     /// Les notes du fil ouvert, posées par la conversation ; vide hors d'un fil.
     var sequence: [SequenceItem] = []
@@ -101,6 +105,9 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
     /// La note est au premier plan, qu'elle joue ou soit en pause.
     func isActive(_ url: URL) -> Bool { playingURL == url }
 
+    /// La note n'a pas pu être ouverte par le lecteur du système.
+    func isUnplayable(_ url: URL) -> Bool { unplayableURLs.contains(url) }
+
     /// La note joue réellement (au premier plan et pas en pause).
     func isPlaying(_ url: URL) -> Bool { playingURL == url && !isPaused }
 
@@ -126,7 +133,13 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
             if !CallManager.isCallInProgress {
                 audioSession = try VoiceNoteAudioSession.begin(category: .playback, mode: .spokenAudio)
             }
-            let player = try AVAudioPlayer(contentsOf: url)
+            let player: AVAudioPlayer
+            do {
+                player = try AVAudioPlayer(contentsOf: url)
+            } catch {
+                unplayableURLs.insert(url)
+                throw error
+            }
             player.delegate = self
             player.enableRate = true
             player.rate = rate

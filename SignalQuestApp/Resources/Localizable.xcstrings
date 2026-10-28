@@ -1046,6 +1046,22 @@
         }
       }
     },
+    "Format non pris en charge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unsupported format"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format non pris en charge"
+          }
+        }
+      }
+    },
     "Fulgurant" : {
       "localizations" : {
         "en" : {
