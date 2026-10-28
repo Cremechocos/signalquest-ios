@@ -105,6 +105,7 @@
 		1B116A111A1CC99607DB968E /* MessageSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */; };
 		1B46DD506F06F337F9743269 /* SectorEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58605C20828352068B1EE /* SectorEditSheet.swift */; };
 		1BB03AB4E7D3BC673870E038 /* TaPlausibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F29083EB3B03A129AE89B1 /* TaPlausibilityTests.swift */; };
+		1BC4AB188A4696FADCD58628 /* geotagged-mdta.mov in Resources */ = {isa = PBXBuildFile; fileRef = A7DEC153CB635E3EAD378372 /* geotagged-mdta.mov */; };
 		1BD2371CF7FB602E991C6782 /* BricolageGrotesque-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B4D1C18861E6114F7226BF02 /* BricolageGrotesque-Bold.ttf */; };
 		1C744EEAA9F72DD8C2F0D163 /* ExperienceMethodTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91C94888BEA4E1D4CAB367 /* ExperienceMethodTests.swift */; };
 		1C8AA28EE4CFA6F012C5B69F /* DiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8487B690EEC1DAED017BE3 /* DiskCache.swift */; };
@@ -1557,6 +1558,7 @@
 		A50BE5F5832649C4447D8FDE /* MapFeedResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFeedResult.swift; sourceTree = "<group>"; };
 		A5C7F0DAC41E77828173A282 /* MapBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBackdrop.swift; sourceTree = "<group>"; };
 		A6E1EF0479FCED5DDDEC9CBB /* SignalQuest.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SignalQuest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A7DEC153CB635E3EAD378372 /* geotagged-mdta.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = "geotagged-mdta.mov"; sourceTree = "<group>"; };
 		A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendLiveSheet.swift; sourceTree = "<group>"; };
 		A80E425FE1268C53612C0FF2 /* E2EEAutoConversationMarkersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoConversationMarkersTests.swift; sourceTree = "<group>"; };
 		A84A348D80B0B5882E1A9AC9 /* DesignTokenContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokenContrastTests.swift; sourceTree = "<group>"; };
@@ -2143,6 +2145,7 @@
 			children = (
 				10D993FDAA16B4D1D3F9F529 /* experience-score-v1-vectors.json */,
 				AD40E40884652EE217E447D3 /* experience-share-phrases-v1-vectors.json */,
+				A7DEC153CB635E3EAD378372 /* geotagged-mdta.mov */,
 				53043E8410BD4D6EF71540B8 /* geotagged.mov */,
 				BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */,
 				B00505763DEC4E4F66E41B76 /* privacy-current-contract.json */,
@@ -3596,6 +3599,7 @@
 			files = (
 				3D21B9B2DCFFC76B6EE496E4 /* experience-score-v1-vectors.json in Resources */,
 				6B3D56845A344A9E4AC01CC6 /* experience-share-phrases-v1-vectors.json in Resources */,
+				1BC4AB188A4696FADCD58628 /* geotagged-mdta.mov in Resources */,
 				4FB32C72F5EB1EB842A8A5F3 /* geotagged.mov in Resources */,
 				D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */,
 				5CDD6292D24E705BDB251D86 /* privacy-current-contract.json in Resources */,
@@ -4672,7 +4676,7 @@
 			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -4731,7 +4735,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestShare/SignalQuestShare.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestShare/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -4753,7 +4757,7 @@
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -4861,7 +4865,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestShare/SignalQuestShare.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestShare/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -4884,7 +4888,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -4906,7 +4910,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -4929,7 +4933,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -4969,7 +4973,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestShare/SignalQuestShare.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestShare/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -4993,7 +4997,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5014,7 +5018,7 @@
 			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -5054,7 +5058,7 @@
 			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -5138,7 +5142,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5196,7 +5200,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5218,7 +5222,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestShare/SignalQuestShare.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestShare/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -5241,7 +5245,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5264,7 +5268,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 180;
+				CURRENT_PROJECT_VERSION = 181;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
