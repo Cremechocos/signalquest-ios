@@ -644,6 +644,38 @@
         }
       }
     },
+    "Impossible de retirer le lieu de prise de vue de cette vidéo." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t remove where this video was taken."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de retirer le lieu de prise de vue de cette vidéo."
+          }
+        }
+      }
+    },
+    "Impossible de retirer le lieu de prise de vue de cette image." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t remove where this image was taken."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de retirer le lieu de prise de vue de cette image."
+          }
+        }
+      }
+    },
     "Le partage en direct demande une carte SIM d'un opérateur pris en charge." : {
       "localizations" : {
         "en" : {
