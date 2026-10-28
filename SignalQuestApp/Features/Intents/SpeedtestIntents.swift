@@ -192,7 +192,7 @@ enum SendMessageIntentError: Error, CustomLocalizedStringResourceConvertible {
 /// sa clé ne s'ouvre que dans l'app.
 struct SendMessageIntent: AppIntent {
     static let title: LocalizedStringResource = "Envoyer un message"
-    static let description = IntentDescription("Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est.")
+    static let description = IntentDescription("Envoie un message texte dans une conversation, chiffré sur l’appareil si elle l’est.")
     static let openAppWhenRun = false
 
     /// Depuis iOS 17, l'envoi demande de déverrouiller l'appareil : pas de message écran verrouillé.

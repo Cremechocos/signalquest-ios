@@ -103375,35 +103375,6 @@
         }
       }
     },
-    "Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sends a text message to a conversation, encrypted on the iPhone when the conversation is."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est."
-          }
-        }
-      }
-    },
-    "SQFormal|Envoie un message texte dans une conversation, chiffré sur l’iPhone si elle l’est." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoyez un message texte dans une conversation, chiffré sur l’iPhone si elle l’est."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Test non disponible" : {
       "localizations" : {
         "en" : {
@@ -104167,6 +104138,35 @@
           }
         }
       }
+    },
+    "Envoie un message texte dans une conversation, chiffré sur l’appareil si elle l’est." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sends a text message to a conversation, encrypted on the device when the conversation is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoie un message texte dans une conversation, chiffré sur l’appareil si elle l’est."
+          }
+        }
+      }
+    },
+    "SQFormal|Envoie un message texte dans une conversation, chiffré sur l’appareil si elle l’est." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyez un message texte dans une conversation, chiffré sur l’appareil si elle l’est."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"
