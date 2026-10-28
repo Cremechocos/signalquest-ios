@@ -304,6 +304,60 @@ final class FeedComposerTests: XCTestCase {
 }
 
 private enum ComposerFixtureError: Error { case unused }
+/// §8 côté composer : brouillon, choix du menu et modification gardent leur audience.
+@MainActor
+final class ComposerDefaultAudienceTests: XCTestCase {
+    private var textKey: String { "ComposerSheet.draftText.\(LocalAccountScope.storageNamespace)" }
+    private var visibilityKey: String { "ComposerSheet.draftVisibility.\(LocalAccountScope.storageNamespace)" }
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: textKey)
+        UserDefaults.standard.removeObject(forKey: visibilityKey)
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: textKey)
+        UserDefaults.standard.removeObject(forKey: visibilityKey)
+        super.tearDown()
+    }
+
+    func testNewPostStartsFromTheDefaultAudience() {
+        let model = ComposerViewModel(service: ComposerFeedFixture())
+        XCTAssertEqual(model.visibility, .friends)
+        model.applyDefaultAudience(.privateOnly)
+        XCTAssertEqual(model.visibility, .privateOnly)
+    }
+
+    func testADraftKeepsItsAudienceAcrossReopening() {
+        let draft = ComposerViewModel(service: ComposerFeedFixture())
+        draft.text = "Brouillon"
+        draft.chooseVisibility(.publicWorld)
+        let reopened = ComposerViewModel(service: ComposerFeedFixture())
+        XCTAssertEqual(reopened.text, "Brouillon")
+        XCTAssertEqual(reopened.visibility, .publicWorld, "L'audience du brouillon était réécrite en amis à la relecture")
+        reopened.applyDefaultAudience(.privateOnly)
+        XCTAssertEqual(reopened.visibility, .publicWorld, "Un brouillon garde son audience")
+    }
+
+    func testAMenuChoiceWinsOverALateDefault() {
+        let model = ComposerViewModel(service: ComposerFeedFixture())
+        model.chooseVisibility(.publicWorld)
+        model.applyDefaultAudience(.privateOnly)
+        XCTAssertEqual(model.visibility, .publicWorld)
+    }
+
+    func testClearingTheDraftReturnsToTheDefaultAudience() {
+        let model = ComposerViewModel(service: ComposerFeedFixture())
+        model.applyDefaultAudience(.privateOnly)
+        model.text = "Brouillon"
+        model.chooseVisibility(.publicWorld)
+        model.clearDraft()
+        XCTAssertEqual(model.visibility, .privateOnly)
+        XCTAssertEqual(ComposerViewModel(service: ComposerFeedFixture()).text, "")
+    }
+}
+
 private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendable {
     let handler: @Sendable (String?, String?, FeedTab?) async throws -> SocialFeedPage
     init() { self.handler = { _, _, _ in throw ComposerFixtureError.unused } }

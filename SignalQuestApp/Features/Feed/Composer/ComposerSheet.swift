@@ -98,6 +98,14 @@ final class ComposerViewModel: ObservableObject {
             saveDraft()
         }
     }
+    /// Audience par défaut du compte (PRIVACY-DPV v1, §8) : amis tant qu'elle
+    /// n'est pas connue.
+    private var defaultAudience: SocialVisibility = .friends
+    /// Un brouillon, ou un choix fait dans le menu, garde son audience.
+    private var keepsAudience = false
+    /// Relire le brouillon n'écrit rien : chaque `didSet` réenregistrait l'état
+    /// à moitié relu.
+    private var isRestoringDraft = false
     @Published var selectedItem: PhotosPickerItem?
     @Published var previewImage: UIImage?
     /// Données brutes de la photo choisie : `publishPost` les ré-encode (1600 px,
@@ -182,7 +190,7 @@ final class ComposerViewModel: ObservableObject {
     /// SwiftUI, et réécrire le brouillon qu'on vient de lire relançait la vue
     /// parente en boucle.
     private func saveDraft() {
-        guard !isEditing else { return }
+        guard !isEditing, !isRestoringDraft else { return }
         let defaults = UserDefaults.standard
         if defaults.string(forKey: draftTextKey) != text {
             defaults.set(text, forKey: draftTextKey)
@@ -192,21 +200,43 @@ final class ComposerViewModel: ObservableObject {
         }
     }
 
+    /// Texte et audience sont lus ensemble, sans rien réécrire : le `didSet` du
+    /// texte enregistrait l'audience courante et effaçait celle du brouillon.
+    /// Sans texte, il n'y a pas de brouillon : un nouveau post part de
+    /// l'audience par défaut (§8).
     private func loadDraft() {
-        if let savedText = UserDefaults.standard.string(forKey: draftTextKey) {
-            self.text = savedText
-        }
-        if let savedVisibilityRaw = UserDefaults.standard.string(forKey: draftVisibilityKey),
-           let savedVisibility = SocialVisibility(rawValue: savedVisibilityRaw) {
+        let defaults = UserDefaults.standard
+        let savedText = defaults.string(forKey: draftTextKey) ?? ""
+        let savedVisibility = defaults.string(forKey: draftVisibilityKey).flatMap(SocialVisibility.init(rawValue:))
+        isRestoringDraft = true
+        defer { isRestoringDraft = false }
+        if !savedText.isEmpty, let savedVisibility {
+            keepsAudience = true
             self.visibility = savedVisibility
         }
+        if !savedText.isEmpty { self.text = savedText }
     }
 
     func clearDraft() {
         UserDefaults.standard.removeObject(forKey: draftTextKey)
         UserDefaults.standard.removeObject(forKey: draftVisibilityKey)
+        keepsAudience = false
         self.text = ""
-        self.visibility = .friends
+        self.visibility = defaultAudience
+    }
+
+    /// Choix fait dans le menu du composer : il prime sur l'audience par défaut.
+    func chooseVisibility(_ value: SocialVisibility) {
+        keepsAudience = true
+        visibility = value
+    }
+
+    /// Préremplit un nouveau post avec l'audience par défaut du compte (§8).
+    /// Une modification, un brouillon ou un choix déjà fait gardent la leur.
+    func applyDefaultAudience(_ value: SocialVisibility) {
+        defaultAudience = value
+        guard !isEditing, !keepsAudience, visibility != value else { return }
+        visibility = value
     }
 
     private var draftTextKey: String {
@@ -483,6 +513,8 @@ struct ComposerSheet: View {
     /// Éditeur « Flouter » de la photo jointe (plan 3, vague 1).
     @State private var showBlurEditor = false
     @State private var confirmsClearDraft = false
+    /// Feuille de l'audience par défaut, ouverte depuis le menu de l'audience.
+    @State private var editingDefaultAudience: DefaultPostVisibility?
     @FocusState private var isInputFocused: Bool
     private let startingWith: ComposerStartAttachment?
     /// Appelé à la fermeture si une publication (ou une modification) a eu lieu,
@@ -708,6 +740,12 @@ struct ComposerSheet: View {
         .task {
             await model.loadUserProfile()
         }
+        .task { await applyDefaultAudience() }
+        .sheet(item: $editingDefaultAudience) { current in
+            DefaultPostVisibilitySheet(mode: .settings(current: current)) { saved in
+                model.applyDefaultAudience(saved.composerVisibility)
+            }
+        }
         .task {
             if startingWith == .speedtest { await model.attachLatestSpeedtest() }
         }
@@ -740,6 +778,18 @@ struct ComposerSheet: View {
             if model.didPublish || model.isQueued { onPublished() }
         }
         .sqSheet()
+    }
+
+    /// §8 : la valeur connue d'abord, puis celle du serveur si rien n'est encore
+    /// lu ; hors ligne ou ancien serveur, le post reste sur amis.
+    private func applyDefaultAudience() async {
+        let store = services.defaultPostVisibility
+        model.applyDefaultAudience(store.composerPrefill())
+        guard !model.isEditing, store.state() == nil, !store.isUnsupported(),
+              let owner = LocalAccountScope.sessionSnapshot(),
+              (try? await services.privacy.scoped(to: owner).get()) != nil,
+              LocalAccountScope.sessionSnapshot() == owner else { return }
+        model.applyDefaultAudience(store.composerPrefill())
     }
 
     /// Fermer à gauche ; « Aperçu » et « Publier » à droite.
@@ -826,10 +876,20 @@ struct ComposerSheet: View {
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                 Menu {
-                    Picker("Visibilité", selection: $model.visibility) {
+                    Picker("Visibilité", selection: Binding(get: { model.visibility }, set: { model.chooseVisibility($0) })) {
                         ForEach(SocialVisibility.allCases) { value in
                             Label(value.label, systemImage: value.icon).tag(value)
                         }
+                    }
+                    // Le réglage n'est proposé que si le serveur le sert (§6).
+                    if !model.isEditing, let state = services.defaultPostVisibility.state() {
+                        Divider()
+                        Button {
+                            editingDefaultAudience = state.value
+                        } label: {
+                            Label("Audience par défaut…", systemImage: "gearshape")
+                        }
+                        .accessibilityIdentifier("composer.defaultAudience")
                     }
                 } label: {
                     HStack(spacing: SQSpace.xs) {

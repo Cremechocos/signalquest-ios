@@ -37,6 +37,11 @@ struct SocialPrivacy: Codable, Equatable, Sendable {
     /// l'expose pas (clé absente), ce qui n'est pas la même chose que « faux » :
     /// l'écran ne propose le réglage que s'il est connu.
     var hideFollowLists: Bool? = nil
+    /// Audience par défaut des nouveaux posts (PRIVACY-DPV v1), servie avec
+    /// `include=posts`. `nil` = ancien serveur : ni page de choix, ni lien.
+    var defaultPostVisibility: DefaultPostVisibility? = nil
+    /// Le membre n'a pas encore répondu : la page de choix s'ouvre sur le fil.
+    var defaultPostVisibilityPending: Bool? = nil
 }
 
 // Le serveur a retiré cette ancienne préférence, puis rétabli une clé de
@@ -53,6 +58,11 @@ extension SocialPrivacy {
         lastSeenVisibility = try values.decode(LastSeenVisibility.self, forKey: .lastSeenVisibility)
         messageRequestPolicy = try values.decode(MessageRequestPolicy.self, forKey: .messageRequestPolicy)
         hideFollowLists = try? values.decodeIfPresent(Bool.self, forKey: .hideFollowLists)
+        // Une valeur inconnue vaut absence : jamais de page ouverte sur une donnée mal lue.
+        let visibility = (try? values.decodeIfPresent(String.self, forKey: .defaultPostVisibility)).flatMap { $0 }
+        defaultPostVisibility = visibility.flatMap(DefaultPostVisibility.init(rawValue:))
+        defaultPostVisibilityPending = defaultPostVisibility == nil
+            ? nil : (try? values.decodeIfPresent(Bool.self, forKey: .defaultPostVisibilityPending)).flatMap { $0 }
     }
 }
 
@@ -65,6 +75,20 @@ struct UpdatePrivacyRequest: Codable, Sendable {
     var lastSeenVisibility: LastSeenVisibility? = nil
     var messageRequestPolicy: MessageRequestPolicy? = nil
     var hideFollowLists: Bool? = nil
+}
+
+/// Réponse de `/api/social/privacy` (GET et PATCH).
+struct PrivacySettingsResponse: Decodable {
+    let settings: SocialPrivacy
+    /// PRIVACY-DPV v1 : à la racine, à côté de `settings`, seulement si la case
+    /// était cochée (§7).
+    let appliedToExistingPosts: Int?
+}
+
+struct DefaultPostVisibilityPatch: Encodable, Sendable {
+    let defaultPostVisibility: DefaultPostVisibility
+    /// Absent sauf case cochée : `false` ne servirait à rien.
+    var applyToExistingPosts: Bool? = nil
 }
 
 struct UserPreferencesPatch: Encodable, Sendable {
@@ -82,6 +106,9 @@ protocol PrivacyServicing: Sendable {
     func scoped(to session: LocalAccountSession) -> any PrivacyServicing
     func get() async throws -> SocialPrivacy
     func update(_ patch: UpdatePrivacyRequest) async throws -> SocialPrivacy
+    /// PRIVACY-DPV v1 : choisit l'audience par défaut, et l'applique aux
+    /// publications automatiques déjà en ligne si la case est cochée.
+    func setDefaultPostVisibility(_ value: DefaultPostVisibility, applyToExistingPosts: Bool) async throws -> DefaultPostVisibilityUpdate
     /// Préférences de compte (unités, affichage du `@` dans les classements).
     /// Elles vivent hors de `/social/privacy` côté serveur, mais relèvent du même
     /// écran pour l'utilisateur.
@@ -95,22 +122,32 @@ protocol PrivacyServicing: Sendable {
     func deleteZone(id: String) async throws
 }
 
+extension PrivacyServicing {
+    func setDefaultPostVisibility(_ value: DefaultPostVisibility, applyToExistingPosts: Bool) async throws -> DefaultPostVisibilityUpdate {
+        throw APIError.decoding("default-post-visibility-unsupported")
+    }
+}
+
 final class PrivacyService: PrivacyServicing {
     private let api: APIClient
     private let owner: LocalAccountSession?
     private let credentialSessionID: UUID?
     private let invalidatePublicMap: @Sendable () async -> Void
+    /// Reçoit chaque réglage servi avec `include=posts`, et le compte qui l'a lu.
+    private let recordSettings: @Sendable (SocialPrivacy, String) async -> Void
     init(api: APIClient, owner: LocalAccountSession? = nil, credentialSessionID: UUID? = nil,
-         invalidatePublicMap: @escaping @Sendable () async -> Void = {}) {
+         invalidatePublicMap: @escaping @Sendable () async -> Void = {},
+         recordSettings: @escaping @Sendable (SocialPrivacy, String) async -> Void = { _, _ in }) {
         self.api = api
         self.owner = owner
         self.credentialSessionID = credentialSessionID
         self.invalidatePublicMap = invalidatePublicMap
+        self.recordSettings = recordSettings
     }
 
     func scoped(to session: LocalAccountSession) -> any PrivacyServicing {
         PrivacyService(api: api, owner: session, credentialSessionID: api.credentials.snapshot().sessionID,
-            invalidatePublicMap: invalidatePublicMap)
+            invalidatePublicMap: invalidatePublicMap, recordSettings: recordSettings)
     }
 
     func preferences() async throws -> UserPreferences {
@@ -156,24 +193,42 @@ final class PrivacyService: PrivacyServicing {
         }
     }
 
+    /// `include=profile` ajoute `hideFollowLists`, `include=posts` l'audience par
+    /// défaut ; sans eux la réponse est inchangée. Le paramètre est RÉPÉTÉ : un
+    /// ancien serveur comparait la valeur entière et ignorait « profile,posts ».
+    /// Le PATCH porte les mêmes : sa réponse passe par la même fonction.
+    static let settingsQuery = [URLQueryItem(name: "include", value: "profile"), URLQueryItem(name: "include", value: "posts")]
+
     func get() async throws -> SocialPrivacy {
         struct Response: Decodable { let settings: SocialPrivacy }
-        return try await request(
-            // `include=profile` ajoute `hideFollowLists` ; sans lui la réponse est inchangée.
-            APIEndpoint(path: "/api/social/privacy", query: [URLQueryItem(name: "include", value: "profile")]),
+        let settings = try await request(
+            APIEndpoint(path: "/api/social/privacy", query: Self.settingsQuery),
             as: Response.self
         ).settings
+        await recordSettings(settings, recordingOwner)
+        return settings
     }
 
     func update(_ patch: UpdatePrivacyRequest) async throws -> SocialPrivacy {
-        struct Response: Decodable { let settings: SocialPrivacy }
-        let response: Response = try await requestJSON(
-            "/api/social/privacy",
-            method: .patch,
-            body: patch
-        )
-        return response.settings
+        try await patchSettings(patch).settings
     }
+
+    func setDefaultPostVisibility(_ value: DefaultPostVisibility, applyToExistingPosts: Bool) async throws -> DefaultPostVisibilityUpdate {
+        // Sans la case, le corps ne porte que la valeur : c'est aussi le geste
+        // de fermeture de la page de choix (§6), au champ près.
+        let response = try await patchSettings(DefaultPostVisibilityPatch(
+            defaultPostVisibility: value, applyToExistingPosts: applyToExistingPosts ? true : nil))
+        return DefaultPostVisibilityUpdate(settings: response.settings, appliedToExistingPosts: response.appliedToExistingPosts)
+    }
+
+    private func patchSettings<Body: Encodable>(_ body: Body) async throws -> PrivacySettingsResponse {
+        let response = try await request(APIEndpoint(path: "/api/social/privacy", method: .patch, query: Self.settingsQuery,
+            headers: ["Content-Type": "application/json"], body: JSONEncoder.signalQuest.encode(body)), as: PrivacySettingsResponse.self)
+        await recordSettings(response.settings, recordingOwner)
+        return response
+    }
+
+    private var recordingOwner: String { owner?.ownerScopeId ?? LocalAccountScope.currentOwnerScopeId }
 
     private struct ZoneDeletionResponse: Decodable { let success: Bool }
 

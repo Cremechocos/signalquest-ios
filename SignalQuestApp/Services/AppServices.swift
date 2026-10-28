@@ -70,6 +70,8 @@ final class AppServices: ObservableObject {
     let stories: StoriesServicing
     let reports: ReportsServicing
     let privacy: PrivacyServicing
+    /// Audience par défaut des posts (PRIVACY-DPV v1), lue par le fil, le composer et les réglages.
+    let defaultPostVisibility: DefaultPostVisibilityStore
     let map: MapSnapshotServicing
     let markets: MarketRegistryServicing
     let antennas: AntennasServicing
@@ -213,7 +215,10 @@ final class AppServices: ObservableObject {
         reports = ReportsService(api: api)
         let mapService = MapSnapshotService(api: api)
         map = mapService
-        let privacyService = PrivacyService(api: api, invalidatePublicMap: { await mapService.invalidateTiles() })
+        let defaultPostVisibilityStore = DefaultPostVisibilityStore()
+        defaultPostVisibility = defaultPostVisibilityStore
+        let privacyService = PrivacyService(api: api, invalidatePublicMap: { await mapService.invalidateTiles() },
+            recordSettings: { settings, owner in await defaultPostVisibilityStore.record(settings, owner: owner) })
         privacy = privacyService
         livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
         versionPolicy = VersionPolicyService(api: api)

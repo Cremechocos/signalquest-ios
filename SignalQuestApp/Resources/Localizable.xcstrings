@@ -103459,6 +103459,226 @@
           }
         }
       }
+    },
+    "Qui voit tes prochaines publications ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who sees your next posts?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui voit tes prochaines publications ?"
+          }
+        }
+      }
+    },
+    "SQFormal|Qui voit tes prochaines publications ?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui voit vos prochaines publications ?"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Audience par défaut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default audience"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audience par défaut"
+          }
+        }
+      }
+    },
+    "Audience par défaut…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default audience…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audience par défaut…"
+          }
+        }
+      }
+    },
+    "Appliquer aussi à mes publications déjà en ligne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also apply to my posts already online"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appliquer aussi à mes publications déjà en ligne"
+          }
+        }
+      }
+    },
+    "Fermer sans choisir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close without choosing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer sans choisir"
+          }
+        }
+      }
+    },
+    "Selon le type : sites, photos et pannes en public, le reste pour tes amis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By type: sites, photos and outages are public, everything else is for your friends."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selon le type : sites, photos et pannes en public, le reste pour tes amis."
+          }
+        }
+      }
+    },
+    "SQFormal|Selon le type : sites, photos et pannes en public, le reste pour tes amis." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selon le type : sites, photos et pannes en public, le reste pour vos amis."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tout le monde peut les voir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everyone can see them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout le monde peut les voir."
+          }
+        }
+      }
+    },
+    "Seulement tes amis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only your friends."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement tes amis."
+          }
+        }
+      }
+    },
+    "SQFormal|Seulement tes amis." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement vos amis."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Toi seul." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toi seul."
+          }
+        }
+      }
+    },
+    "SQFormal|Toi seul." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous seul."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce choix s’applique à tes nouvelles publications : celles que tu écris et celles que SignalQuest crée pour toi, comme tes speedtests ou tes badges." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This choice applies to your new posts: the ones you write and the ones SignalQuest creates for you, like your speed tests or badges."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce choix s’applique à tes nouvelles publications : celles que tu écris et celles que SignalQuest crée pour toi, comme tes speedtests ou tes badges."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce choix s’applique à tes nouvelles publications : celles que tu écris et celles que SignalQuest crée pour toi, comme tes speedtests ou tes badges." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce choix s’applique à vos nouvelles publications : celles que vous écrivez et celles que SignalQuest crée pour vous, comme vos speedtests ou vos badges."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

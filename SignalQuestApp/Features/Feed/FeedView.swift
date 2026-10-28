@@ -625,6 +625,8 @@ struct FeedView: View {
     /// neuf ? ». Porté par la présentation : lu dans une feuille `isPresented`,
     /// l'état voisin arrivait encore à son ancienne valeur.
     @State private var composerRequest: ComposerRequest?
+    /// Page de choix de l'audience par défaut (PRIVACY-DPV v1, §6).
+    @State private var showsDefaultVisibilityChoice = false
     /// Remonte en tête du fil (filtre par hashtag touché plus bas).
     @State private var scrollTopRequest = UUID()
     @State private var showExplore = false
@@ -858,6 +860,7 @@ struct FeedView: View {
             await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
             presentMessagesIfNeeded()
+            await askDefaultPostVisibilityIfNeeded()
         }
         .onDisappear { isFeedVisible = false; model.stopStream() }
         .onChangeCompat(of: scenePhase) { _, phase in
@@ -1075,6 +1078,9 @@ struct FeedView: View {
                           onPublished: { Task { await model.load() } })
         }
         .sheet(isPresented: $isPulseExpanded) { pulseSheet }
+        .sheet(isPresented: $showsDefaultVisibilityChoice) {
+            DefaultPostVisibilitySheet(mode: .firstChoice)
+        }
         .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
             hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
         }
@@ -1201,6 +1207,24 @@ struct FeedView: View {
         guard router.openPostComposer else { return }
         router.openPostComposer = false
         composerRequest = ComposerRequest(start: nil)
+    }
+
+    /// PRIVACY-DPV v1, §6 : un GET frais par lancement, jamais le cache ; la page
+    /// ne s'ouvre que si le serveur dit « à demander », jamais avec un ancien
+    /// serveur (champ absent). Une autre feuille ouverte la remet à plus tard.
+    private func askDefaultPostVisibilityIfNeeded() async {
+        guard !AppEnvironment.usesDemoData, let owner = LocalAccountScope.sessionSnapshot(),
+              services.defaultPostVisibility.needsLaunchCheck(owner: owner.ownerScopeId),
+              let settings = try? await services.privacy.scoped(to: owner).get(),
+              LocalAccountScope.sessionSnapshot() == owner, isFeedVisible else { return }
+        guard settings.defaultPostVisibilityPending == true else {
+            services.defaultPostVisibility.markLaunchChecked(owner: owner.ownerScopeId)
+            return
+        }
+        guard presentedSheet == nil, composerRequest == nil, editingPost == nil, !showRecap,
+              !showStoryComposer, presentedStoryStart == nil, !isPulseExpanded else { return }
+        services.defaultPostVisibility.markLaunchChecked(owner: owner.ownerScopeId)
+        showsDefaultVisibilityChoice = true
     }
 
     private func presentMessagesIfNeeded() {

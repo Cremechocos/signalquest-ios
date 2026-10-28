@@ -1,0 +1,413 @@
+{
+  "version": "privacy-dpv-v1",
+  "description": "Visibilité par défaut des nouveaux posts (docs/default-post-visibility-contract.md). Figé le 27/10/2026, relu par Web, iOS et Android. Rejoué par apps/api/app/api/social/privacy/default-post-visibility.route.test.ts.",
+  "endpoint": "GET | PATCH /api/social/privacy",
+  "include": {
+    "rule": "Tous les paramètres include sont lus, chacun découpé aux virgules ; un jeton inconnu est ignoré, jamais de 400. Sans le jeton posts, la réponse ne change pas.",
+    "cases": [
+      {
+        "query": "",
+        "profile": false,
+        "posts": false
+      },
+      {
+        "query": "include=posts",
+        "profile": false,
+        "posts": true
+      },
+      {
+        "query": "include=profile",
+        "profile": true,
+        "posts": false
+      },
+      {
+        "query": "include=profile&include=posts",
+        "profile": true,
+        "posts": true
+      },
+      {
+        "query": "include=profile,posts",
+        "profile": true,
+        "posts": true
+      },
+      {
+        "query": "include=posts&include=unknown",
+        "profile": false,
+        "posts": true
+      },
+      {
+        "query": "include=unknown",
+        "profile": false,
+        "posts": false
+      }
+    ]
+  },
+  "served": {
+    "rule": "Avec include=posts : settings.defaultPostVisibility (valeur effective) et settings.defaultPostVisibilityPending (booléen, jamais null).",
+    "cases": [
+      {
+        "name": "jamais répondu (aucune ligne)",
+        "stored": null,
+        "defaultPostVisibility": "auto",
+        "defaultPostVisibilityPending": true
+      },
+      {
+        "name": "jamais répondu (ligne sans le champ)",
+        "stored": "absent",
+        "defaultPostVisibility": "auto",
+        "defaultPostVisibilityPending": true
+      },
+      {
+        "name": "corrompu",
+        "stored": "Private",
+        "defaultPostVisibility": "auto",
+        "defaultPostVisibilityPending": true
+      },
+      {
+        "name": "auto choisi",
+        "stored": "auto",
+        "defaultPostVisibility": "auto",
+        "defaultPostVisibilityPending": false
+      },
+      {
+        "name": "public",
+        "stored": "public",
+        "defaultPostVisibility": "public",
+        "defaultPostVisibilityPending": false
+      },
+      {
+        "name": "friends",
+        "stored": "friends",
+        "defaultPostVisibility": "friends",
+        "defaultPostVisibilityPending": false
+      },
+      {
+        "name": "private",
+        "stored": "private",
+        "defaultPostVisibility": "private",
+        "defaultPostVisibilityPending": false
+      },
+      {
+        "name": "compte neuf (signup, Apple)",
+        "stored": "private",
+        "defaultPostVisibility": "private",
+        "defaultPostVisibilityPending": false
+      }
+    ],
+    "officialAccount": {
+      "rule": "OFFICIAL_NETMONSTER_USER_ID : toujours auto et Pending=false, quelle que soit la valeur stockée ; ses posts ne suivent jamais le réglage.",
+      "defaultPostVisibility": "auto",
+      "defaultPostVisibilityPending": false
+    }
+  },
+  "patch": {
+    "rule": "Un refus 400 PRIVACY_SETTING_INVALID n'écrit rien, ni ce champ ni les autres du même corps.",
+    "cases": [
+      {
+        "body": {
+          "defaultPostVisibility": "auto"
+        },
+        "status": 200
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "public"
+        },
+        "status": 200
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "friends"
+        },
+        "status": 200
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "private"
+        },
+        "status": 200
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "private",
+          "applyToExistingPosts": false
+        },
+        "status": 200
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "private",
+          "applyToExistingPosts": true
+        },
+        "status": 200,
+        "appliedToExistingPosts": true
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "Private"
+        },
+        "status": 400,
+        "code": "PRIVACY_SETTING_INVALID"
+      },
+      {
+        "body": {
+          "defaultPostVisibility": null
+        },
+        "status": 400,
+        "code": "PRIVACY_SETTING_INVALID"
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "",
+          "lastSeenVisibility": "friends"
+        },
+        "status": 400,
+        "code": "PRIVACY_SETTING_INVALID"
+      },
+      {
+        "body": {
+          "applyToExistingPosts": true
+        },
+        "status": 400,
+        "code": "PRIVACY_SETTING_INVALID"
+      },
+      {
+        "body": {
+          "defaultPostVisibility": "private",
+          "applyToExistingPosts": "true"
+        },
+        "status": 400,
+        "code": "PRIVACY_SETTING_INVALID"
+      }
+    ]
+  },
+  "kindDefaults": {
+    "rule": "Audience d'un nouveau post sans visibilité choisie par le client : réglage s'il n'est pas auto, sinon ce défaut. Un post composé à la main sans visibilité : friends. Le compte officiel garde toujours ce défaut.",
+    "cases": [
+      {
+        "sourceType": "activity",
+        "kind": "site",
+        "default": "public"
+      },
+      {
+        "sourceType": "activity",
+        "kind": "speedtest",
+        "default": "friends"
+      },
+      {
+        "sourceType": "activity",
+        "kind": "session",
+        "default": "friends"
+      },
+      {
+        "sourceType": "activity",
+        "kind": "validation",
+        "default": "friends"
+      },
+      {
+        "sourceType": "activity",
+        "kind": "badge",
+        "default": "friends"
+      },
+      {
+        "sourceType": "photo",
+        "kind": "photo",
+        "default": "public"
+      },
+      {
+        "sourceType": "custom_site_photo",
+        "kind": "photo",
+        "default": "public"
+      },
+      {
+        "sourceType": "site_outage",
+        "kind": "outage",
+        "default": "public"
+      },
+      {
+        "sourceType": "signal_rating",
+        "kind": "rating",
+        "default": "friends"
+      },
+      {
+        "sourceType": "experience_test",
+        "kind": "experience",
+        "default": "friends"
+      },
+      {
+        "sourceType": null,
+        "kind": "post",
+        "default": "friends"
+      }
+    ],
+    "priority": [
+      "zone privée active (à la lecture)",
+      "visibilité envoyée par le composer",
+      "réglage s'il n'est pas auto",
+      "défaut du kind"
+    ]
+  },
+  "applyToExistingPosts": {
+    "rule": "Posts du membre, non supprimés, générés (sourceType non nul), dont l'audience vaut encore le défaut de leur kind → cible. Idempotent : relancé, 0. Avec auto : 0.",
+    "posts": [
+      {
+        "id": "site-public",
+        "sourceType": "activity",
+        "kind": "site",
+        "visibility": "public",
+        "status": "active"
+      },
+      {
+        "id": "speedtest-friends",
+        "sourceType": "activity",
+        "kind": "speedtest",
+        "visibility": "friends",
+        "status": "active"
+      },
+      {
+        "id": "speedtest-changed",
+        "sourceType": "activity",
+        "kind": "speedtest",
+        "visibility": "public",
+        "status": "active"
+      },
+      {
+        "id": "photo-public",
+        "sourceType": "photo",
+        "kind": "photo",
+        "visibility": "public",
+        "status": "active"
+      },
+      {
+        "id": "rating-hidden",
+        "sourceType": "signal_rating",
+        "kind": "rating",
+        "visibility": "friends",
+        "status": "hidden"
+      },
+      {
+        "id": "outage-deleted",
+        "sourceType": "site_outage",
+        "kind": "outage",
+        "visibility": "public",
+        "status": "deleted"
+      },
+      {
+        "id": "composer",
+        "sourceType": null,
+        "kind": "post",
+        "visibility": "friends",
+        "status": "active"
+      }
+    ],
+    "cases": [
+      {
+        "target": "private",
+        "appliedToExistingPosts": 4,
+        "changed": [
+          "site-public",
+          "speedtest-friends",
+          "photo-public",
+          "rating-hidden"
+        ],
+        "note": "speedtest-changed, outage-deleted et composer gardent leur audience"
+      },
+      {
+        "target": "friends",
+        "appliedToExistingPosts": 2,
+        "changed": [
+          "site-public",
+          "photo-public"
+        ]
+      },
+      {
+        "target": "public",
+        "appliedToExistingPosts": 2,
+        "changed": [
+          "speedtest-friends",
+          "rating-hidden"
+        ]
+      },
+      {
+        "target": "auto",
+        "appliedToExistingPosts": 0,
+        "changed": []
+      }
+    ],
+    "response": "appliedToExistingPosts est à la racine du corps (à côté de settings), présent dès que le corps porte applyToExistingPosts:true, avec ou sans include=posts ; 0 si rien n'a changé ; absent sinon.",
+    "timeout": {
+      "status": 503,
+      "code": "PRIVACY_APPLY_RETRY",
+      "headers": {
+        "Retry-After": "5"
+      },
+      "effect": "Transaction annulée : ni le réglage ni les posts. Les apps ne relancent pas seules (texte error.applyRetry)."
+    },
+    "casesStartFrom": "chaque cas part de l'état initial de posts"
+  },
+  "texts": {
+    "rule": "Repris octet pour octet. note.existingApplied.* remplace note.existingKept quand la case est cochée ; auto n'a pas de phrase. Android traduit ses autres langues depuis en, mêmes clés.",
+    "locales": [
+      "fr-tu",
+      "fr-vous",
+      "en"
+    ],
+    "entries": {
+      "audience.auto": {
+        "fr-tu": "Automatique",
+        "fr-vous": "Automatique",
+        "en": "Automatic"
+      },
+      "audience.public": {
+        "fr-tu": "Public",
+        "fr-vous": "Public",
+        "en": "Public"
+      },
+      "audience.friends": {
+        "fr-tu": "Amis",
+        "fr-vous": "Amis",
+        "en": "Friends"
+      },
+      "audience.private": {
+        "fr-tu": "Privé",
+        "fr-vous": "Privé",
+        "en": "Private"
+      },
+      "note.privateZone": {
+        "fr-tu": "Dans une zone privée active, tes posts restent visibles de toi seul.",
+        "fr-vous": "Dans une zone privée active, vos posts restent visibles de vous seul.",
+        "en": "In an active private zone, your posts stay visible only to you."
+      },
+      "note.existingKept": {
+        "fr-tu": "Tes publications déjà en ligne gardent leur audience.",
+        "fr-vous": "Vos publications déjà en ligne gardent leur audience.",
+        "en": "Your posts already online keep their audience."
+      },
+      "note.existingApplied.public": {
+        "fr-tu": "Tes publications automatiques déjà en ligne passeront aussi en public, sauf celles dont tu as changé l'audience.",
+        "fr-vous": "Vos publications automatiques déjà en ligne passeront aussi en public, sauf celles dont vous avez changé l'audience.",
+        "en": "Your automatic posts already online will also become public, except those whose audience you changed."
+      },
+      "note.existingApplied.friends": {
+        "fr-tu": "Tes publications automatiques déjà en ligne seront aussi réservées à tes amis, sauf celles dont tu as changé l'audience.",
+        "fr-vous": "Vos publications automatiques déjà en ligne seront aussi réservées à vos amis, sauf celles dont vous avez changé l'audience.",
+        "en": "Your automatic posts already online will also be limited to your friends, except those whose audience you changed."
+      },
+      "note.existingApplied.private": {
+        "fr-tu": "Tes publications automatiques déjà en ligne passeront aussi en privé, sauf celles dont tu as changé l'audience.",
+        "fr-vous": "Vos publications automatiques déjà en ligne passeront aussi en privé, sauf celles dont vous avez changé l'audience.",
+        "en": "Your automatic posts already online will also become private, except those whose audience you changed."
+      },
+      "choice.closeNote": {
+        "fr-tu": "Si tu fermes sans choisir, tes prochaines publications seront privées. Tu pourras changer ce choix dans Réglages › Confidentialité.",
+        "fr-vous": "Si vous fermez sans choisir, vos prochaines publications seront privées. Vous pourrez changer ce choix dans Réglages › Confidentialité.",
+        "en": "If you close without choosing, your next posts will be private. You can change this later in Settings › Privacy."
+      },
+      "error.applyRetry": {
+        "fr-tu": "La mise à jour de tes publications a pris trop de temps. Rien n'a changé : réessaie.",
+        "fr-vous": "La mise à jour de vos publications a pris trop de temps. Rien n'a changé : réessayez.",
+        "en": "Updating your posts took too long. Nothing changed: try again."
+      }
+    }
+  }
+}

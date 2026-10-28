@@ -33,6 +33,10 @@ struct PrivacySettingsView: View {
             if model.isLoadingPrivacy && !model.loaded {
                 Section { ProgressView("Chargement des partages…") }.listRowBackground(SQColor.surface)
             }
+            // En tête (PRIVACY-DPV v1) : le réglage lu avec les autres, seulement si
+            // le serveur le sert.
+            DefaultPostVisibilitySettingsSection(store: services.defaultPostVisibility)
+                .disabled(!model.isSessionCurrent)
             if let error = model.privacyError {
                 Section {
                     loadError(error, hasPrevious: model.loaded) { await model.loadPrivacy() }
@@ -376,6 +380,44 @@ struct PrivacySettingsView: View {
                     .accessibilityIdentifier(retryID)
             } else {
                 Button("Réessayer") { Task { await retry() } }
+            }
+        }
+    }
+}
+
+/// Audience par défaut des nouveaux posts : la valeur, et une feuille pour la
+/// changer avec la case « Appliquer aussi… » (§7).
+private struct DefaultPostVisibilitySettingsSection: View {
+    @ObservedObject var store: DefaultPostVisibilityStore
+    @State private var editing: DefaultPostVisibility?
+
+    var body: some View {
+        if let state = store.state() {
+            Section {
+                Button { editing = state.value } label: {
+                    SQSettingsRowLabel("Audience par défaut", systemImage: state.value.icon,
+                                       value: state.value.label, showsChevron: true)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Audience par défaut")
+                .accessibilityValue(Text(verbatim: state.value.label))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("privacy.defaultPostVisibility")
+            } header: {
+                Text("Publications").sqKicker()
+            } footer: {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(verbatim: DefaultPostVisibilityText.text("note.privateZone"))
+                    Text(verbatim: DefaultPostVisibilityText.text("note.existingKept"))
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            }
+            .listRowBackground(SQColor.surface)
+            .sheet(item: $editing) { current in
+                DefaultPostVisibilitySheet(mode: .settings(current: current))
             }
         }
     }

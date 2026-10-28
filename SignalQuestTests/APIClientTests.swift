@@ -1058,7 +1058,8 @@ final class APIClientTests: XCTestCase {
 
         let service = PrivacyService(api: client)
         let read = try await service.get()
-        XCTAssertEqual(getQuery, "include=profile")
+        // PRIVACY-DPV v1 : le réglage des posts est demandé avec le profil.
+        XCTAssertEqual(getQuery, "include=profile&include=posts")
         XCTAssertEqual(read.hideFollowLists, true)
 
         _ = try await service.update(UpdatePrivacyRequest(hideFollowLists: false))
