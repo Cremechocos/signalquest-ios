@@ -1143,6 +1143,28 @@ final class SpeedtestTests: XCTestCase {
     /// L'edge Cloudflare refuse `__down` avec un 403 dès `bytes >= 1e8`
     /// (limite vérifiée en ligne). Une taille au-delà fait échouer TOUTES les
     /// requêtes du download → « serveurs injoignables » trompeur.
+    /// Un réseau qui bloque toutes les sondes TCP vers :443 garde son débit :
+    /// la latence est absente, jamais 0 ms (même correction qu'Android).
+    func testIdleLatencyWithoutAnyAnswerIsAbsentNotZero() {
+        let none = IdleLatencySummary([])
+        XCTAssertNil(none.averageMs)
+        XCTAssertNil(none.medianMs)
+        XCTAssertNil(none.minMs)
+        XCTAssertNil(none.maxMs)
+        XCTAssertNil(none.jitterMs)
+
+        let one = IdleLatencySummary([24])
+        XCTAssertEqual(one.averageMs, 24)
+        XCTAssertNil(one.jitterMs)
+
+        let some = IdleLatencySummary([20, 30, 22])
+        XCTAssertEqual(some.averageMs ?? 0, 24, accuracy: 0.001)
+        XCTAssertEqual(some.medianMs, 22)
+        XCTAssertEqual(some.minMs, 20)
+        XCTAssertEqual(some.maxMs, 30)
+        XCTAssertEqual(some.jitterMs, 9)
+    }
+
     func testCloudflareDownloadRequestStaysUnderEndpointCap() {
         XCTAssertLessThan(
             CloudflareSpeedtestConfig.downloadBytesPerRequest,

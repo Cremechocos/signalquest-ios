@@ -1405,6 +1405,24 @@ enum SpeedtestPhase: Equatable {
     case failed(String)
 }
 
+/// Latence au repos d'un moteur dont les sondes peuvent toutes échouer : sans
+/// réponse, chaque valeur est absente plutôt qu'à 0 ms.
+struct IdleLatencySummary: Equatable {
+    let averageMs: Double?
+    let medianMs: Double?
+    let minMs: Double?
+    let maxMs: Double?
+    let jitterMs: Double?
+
+    init(_ values: [Double]) {
+        averageMs = values.isEmpty ? nil : SpeedMetricCalculator.average(values)
+        medianMs = SpeedMetricCalculator.median(values)
+        minMs = values.min()
+        maxMs = values.max()
+        jitterMs = SpeedMetricCalculator.jitter(values)
+    }
+}
+
 struct SpeedMetricCalculator {
     static func mbps(bytes: Int, seconds: TimeInterval) -> Double {
         guard seconds > 0 else { return 0 }

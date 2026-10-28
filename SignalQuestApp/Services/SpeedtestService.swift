@@ -1358,7 +1358,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let engineFallbackReason: String?
         let requestedServerId: String?
         let pingProtocol: String
-        let pingMs: Double
+        /// Absente quand aucune sonde n'a répondu (Cloudflare seulement).
+        let pingMs: Double?
         let pingMedianMs: Double?
         let pingMinMs: Double?
         let pingMaxMs: Double?
@@ -1427,11 +1428,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let wifiSSID = info.wifiSSID
         let operatorContext = info.operatorContext
         // Latences reprises par « Jeu et appels » d'un test d'expérience lancé sur le même réseau.
-        if m.pingMs > 0, let path = ExperienceRecentLatency.path(
+        if let idleMs = m.pingMs, idleMs > 0, let path = ExperienceRecentLatency.path(
             connection: pathStatus.connection, ssid: wifiSSID, carrierOperatorKey: operatorContext.operatorKey
         ) {
             ExperienceRecentLatency.record(.init(
-                measuredAt: Date(), path: path, idleMs: m.pingMs, loadedDownMs: m.pingDlMs, loadedUpMs: m.pingUlMs
+                measuredAt: Date(), path: path, idleMs: idleMs, loadedDownMs: m.pingDlMs, loadedUpMs: m.pingUlMs
             ))
         }
         let trace = SpeedtestTraceScope.current?.snapshot(retainingUpload: m.uploadAverageMbps != nil)
@@ -1612,13 +1613,16 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             notice: notice
         ))
 
-        // 1. Ping HTTPS (TTFB sur __down?bytes=0).
-        let pingValues = try await measureCloudflarePings(serverName: serverName, progress: progress)
-        let pingValue = SpeedMetricCalculator.average(pingValues)
-        let pingMedianValue = SpeedMetricCalculator.median(pingValues)
-        let pingMinValue = pingValues.min()
-        let pingMaxValue = pingValues.max()
-        let jitterValue = SpeedMetricCalculator.jitter(pingValues)
+        // 1. Ping HTTPS (TTFB sur __down?bytes=0). Facultatif : un réseau qui
+        // bloque ces sondes garde son débit, sans latence (jamais 0 ms) ni
+        // latence sous charge, comme Android.
+        let idleLatency = IdleLatencySummary(await measureCloudflarePings(serverName: serverName, progress: progress))
+        let pingValue = idleLatency.averageMs
+        let pingMedianValue = idleLatency.medianMs
+        let pingMinValue = idleLatency.minMs
+        let pingMaxValue = idleLatency.maxMs
+        let jitterValue = idleLatency.jitterMs
+        let measuresLoadedLatency = idleLatency.averageMs != nil
 
         // 2. Download.
         progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName, stage: "preparation", usefulElapsedSeconds: 0))
@@ -1629,7 +1633,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let dlLoadedDeadline = speedtestMonotonicSeconds() + (usefulDuration + 1)
         let cfLoadedProbe = tcpProbe
         let dlLoadedTask = Task.detached(priority: .utility) {
-            await SpeedtestService.collectIPerfLoadedPings(
+            guard measuresLoadedLatency else { return [Double]() }
+            return await SpeedtestService.collectIPerfLoadedPings(
                 host: CloudflareSpeedtestConfig.host,
                 port: CloudflareSpeedtestConfig.httpsPort,
                 deadline: dlLoadedDeadline,
@@ -1705,7 +1710,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         let ulLoadedDeadline = speedtestMonotonicSeconds() + (usefulDuration + 1)
         let ulLoadedTask = Task.detached(priority: .utility) {
-            await SpeedtestService.collectIPerfLoadedPings(
+            guard measuresLoadedLatency else { return [Double]() }
+            return await SpeedtestService.collectIPerfLoadedPings(
                 host: CloudflareSpeedtestConfig.host,
                 port: CloudflareSpeedtestConfig.httpsPort,
                 deadline: ulLoadedDeadline,
@@ -1834,16 +1840,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func measureCloudflarePings(
         serverName: String,
         progress: SpeedtestProgressHandler?
-    ) async throws -> [Double] {
-        let result = await measureTcpPings(
+    ) async -> [Double] {
+        await measureTcpPings(
             host: CloudflareSpeedtestConfig.host,
             port: CloudflareSpeedtestConfig.httpsPort,
             serverName: serverName,
             progress: progress,
             minimumValidSamples: 2
-        )
-        guard !result.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
-        return result.values
+        ).values
     }
 
 
