@@ -129,6 +129,17 @@ protocol IdentifyServicing: Sendable {
     /// `includeRelated` ajoute les lignes PCI/Cell ID en plus des nœuds eNB/gNB.
     func mine(includeRelated: Bool) async throws -> [MyIdentification]
 
+    /// Une page de « Mes identifications » v2 (`?v=2`) : nœuds du plus récent au plus
+    /// ancien, puis cellules orphelines. `cursor` est le `nextCursor` de la page
+    /// précédente, renvoyé avec les mêmes filtres ; `conflictOnly` filtre côté serveur
+    /// les nœuds en conflit (`conflict=only`).
+    func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage
+
+    /// Déplace un nœud vers le support du consensus, recalculé par le serveur.
+    /// `toSiteId` est le support AFFICHÉ au membre : s'il ne correspond plus,
+    /// `409 CONSENSUS_TARGET_CHANGED` plutôt qu'un déplacement vers un support non vu.
+    func adoptConsensus(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?) async throws -> EditSiteResult
+
     /// Retrait (soft) d'une identification de l'utilisateur. Idempotent.
     func withdraw(
         siteId: String,
@@ -179,6 +190,16 @@ protocol IdentifyServicing: Sendable {
         marketCode: String?,
         sectors: [Int]
     ) async throws -> EditSectorsResult
+}
+
+extension IdentifyServicing {
+    func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage {
+        throw APIError.cancelled
+    }
+
+    func adoptConsensus(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?) async throws -> EditSiteResult {
+        throw APIError.cancelled
+    }
 }
 
 final class IdentifyService: IdentifyServicing {
@@ -248,6 +269,33 @@ final class IdentifyService: IdentifyServicing {
             as: MyIdentificationsResponse.self
         )
         return response.identifications
+    }
+
+    func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage {
+        var query = [URLQueryItem(name: "v", value: "2")]
+        if includeRelated { query.append(URLQueryItem(name: "include", value: "related")) }
+        if conflictOnly { query.append(URLQueryItem(name: "conflict", value: "only")) }
+        if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return try await api.request(
+            APIEndpoint(path: "/api/android/map/identify/mine", query: query),
+            as: MyIdentificationsPage.self
+        )
+    }
+
+    func adoptConsensus(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?) async throws -> EditSiteResult {
+        struct Body: Encodable {
+            let fromSiteId: String
+            let toSiteId: String
+            let enb: String?
+            let gnb: String?
+            let adoptConsensus = true
+        }
+        return try await api.requestJSON(
+            "/api/android/map/identify/edit-site",
+            method: .post,
+            body: Body(fromSiteId: fromSiteId, toSiteId: toSiteId, enb: enb, gnb: gnb)
+        )
     }
 
     func withdraw(

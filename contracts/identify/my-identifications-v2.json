@@ -1,0 +1,563 @@
+{
+  "contract": "my-identifications-v2",
+  "doc": "docs/my-identifications-v2-contract.md",
+  "route": "GET /api/android/map/identify/mine?v=2",
+  "query": {
+    "include": [
+      "include=related",
+      "include=posts,related",
+      "include=posts&include=related"
+    ],
+    "limit": {
+      "default": 200,
+      "max": 400,
+      "invalid": [
+        "0",
+        "-1",
+        "1.5",
+        "abc"
+      ],
+      "invalidCode": "INVALID_LIMIT"
+    },
+    "cursor": {
+      "invalid": "pas-un-curseur",
+      "invalidCode": "INVALID_CURSOR",
+      "note": "valable seulement avec les mêmes operator, marketCode, include et conflict ; sinon INVALID_CURSOR"
+    },
+    "conflict": {
+      "values": [
+        "only",
+        "contested"
+      ],
+      "invalidCode": "INVALID_FILTER",
+      "note": "nœuds seulement, jamais d'orphelines"
+    }
+  },
+  "response": {
+    "v1": [
+      "identifications",
+      "truncated"
+    ],
+    "v2": [
+      "identifications",
+      "nextCursor",
+      "truncated",
+      "restartAdvised",
+      "checks",
+      "totals"
+    ],
+    "relatedMaxPerPage": 4000,
+    "order": "createdAt décroissant puis id décroissant (createdAt ne change jamais ; lastValidated si)",
+    "checks": {
+      "conflict": [
+        "ok",
+        "unavailable"
+      ],
+      "cellConflict": [
+        "ok",
+        "unavailable"
+      ],
+      "sectorCheck": [
+        "ok",
+        "unavailable"
+      ]
+    },
+    "totals": {
+      "firstPageOnly": true,
+      "keys": [
+        "nodes",
+        "enb",
+        "gnb",
+        "cellRows",
+        "orphanRows",
+        "conflicts",
+        "contested"
+      ],
+      "nullable": [
+        "conflicts",
+        "contested"
+      ],
+      "ignoresConflictFilter": true,
+      "rows": "cellRows et orphanRows comptent des LIGNES servies, pas des cellules distinctes : une app qui fusionne pci et cellid d'une même cellule affiche moins d'entrées et étiquette en conséquence. cellRows exclut les orphelines ; cellRows + orphanRows = toutes les lignes pci/cellid."
+    },
+    "lineFlags": {
+      "orphan": "cellule sans ligne nœud active du membre (pages finales)",
+      "cellsTruncated": "nœud dont seules les 4 000 cellules les plus récentes sont servies",
+      "conflictStatus": "nœuds, v1 et v2 : ok | unavailable"
+    },
+    "orphanPages": {
+      "ignoresLimit": true,
+      "maxRows": 4000
+    }
+  },
+  "example": {
+    "identifications": [
+      {
+        "id": "…",
+        "siteId": "799050",
+        "type": "enb",
+        "value": "1043648",
+        "operator": "ORANGE",
+        "sectors": [],
+        "conflict": false,
+        "contested": {
+          "otherSites": [
+            {
+              "siteId": "2603829",
+              "validations": 1
+            }
+          ],
+          "reason": "tie"
+        },
+        "conflictStatus": "ok"
+      },
+      {
+        "id": "…",
+        "siteId": "799050",
+        "type": "cellid",
+        "value": "267173891",
+        "enb": "1043648",
+        "cellId": "3",
+        "ci": "267173891",
+        "operator": "ORANGE",
+        "sectors": [
+          1
+        ],
+        "sectorCheck": {
+          "expected": 2,
+          "status": "mismatch",
+          "basis": "leader"
+        },
+        "source": "auto_capture"
+      }
+    ],
+    "nextCursor": null,
+    "truncated": false,
+    "restartAdvised": false,
+    "checks": {
+      "conflict": "ok",
+      "cellConflict": "ok",
+      "sectorCheck": "ok"
+    },
+    "totals": {
+      "nodes": 2,
+      "enb": 2,
+      "gnb": 0,
+      "cellRows": 3,
+      "orphanRows": 1,
+      "conflicts": 0,
+      "contested": 1
+    }
+  },
+  "sectorCheck": {
+    "status": [
+      "match",
+      "mismatch",
+      "not_applicable",
+      "unknown"
+    ],
+    "basis": [
+      "line",
+      "leader",
+      "none"
+    ],
+    "cases": [
+      {
+        "label": "799050 : Orange sous leader SFR prouvé, N=2",
+        "operator": "ORANGE",
+        "cid": 3,
+        "stored": 1,
+        "sectorCount": 2,
+        "zbLeader": "SFR",
+        "leaderSectorCount": 2,
+        "nodeOperators": [
+          "ORANGE",
+          "FREE"
+        ],
+        "expected": 2,
+        "status": "mismatch",
+        "basis": "leader"
+      },
+      {
+        "label": "même ligne sans preuve du nœud du leader",
+        "operator": "ORANGE",
+        "cid": 3,
+        "stored": 1,
+        "sectorCount": 2,
+        "zbLeader": "SFR",
+        "leaderSectorCount": 2,
+        "nodeOperators": [
+          "ORANGE"
+        ],
+        "expected": null,
+        "status": "unknown",
+        "basis": "none"
+      },
+      {
+        "label": "Bouygues sous leader SFR : même indice",
+        "operator": "BOUYGUES",
+        "cid": 1,
+        "stored": 2,
+        "sectorCount": 2,
+        "zbLeader": "SFR",
+        "leaderSectorCount": 2,
+        "nodeOperators": [
+          "SFR"
+        ],
+        "expected": null,
+        "status": "match",
+        "basis": "leader"
+      },
+      {
+        "label": "2506127 : Bouygues sous leader Free",
+        "operator": "BOUYGUES",
+        "cid": 3,
+        "stored": 1,
+        "sectorCount": 3,
+        "zbLeader": "FREE",
+        "leaderSectorCount": 3,
+        "nodeOperators": [
+          "FREE",
+          "BOUYGUES"
+        ],
+        "expected": 3,
+        "status": "mismatch",
+        "basis": "leader"
+      },
+      {
+        "label": "hors ZB, SFR base 0",
+        "operator": "SFR",
+        "cid": 4,
+        "stored": 1,
+        "sectorCount": 3,
+        "zbLeader": null,
+        "leaderSectorCount": null,
+        "nodeOperators": [
+          "SFR"
+        ],
+        "expected": null,
+        "status": "match",
+        "basis": "line"
+      },
+      {
+        "label": "N inconnu",
+        "operator": "ORANGE",
+        "cid": 3,
+        "stored": 3,
+        "sectorCount": null,
+        "zbLeader": null,
+        "leaderSectorCount": null,
+        "nodeOperators": [
+          "ORANGE"
+        ],
+        "expected": null,
+        "status": "unknown",
+        "basis": "line"
+      },
+      {
+        "label": "Free hors règle (dernier chiffre 6)",
+        "operator": "FREE",
+        "cid": 6,
+        "stored": 3,
+        "sectorCount": 3,
+        "zbLeader": null,
+        "leaderSectorCount": null,
+        "nodeOperators": [
+          "FREE"
+        ],
+        "expected": null,
+        "status": "not_applicable",
+        "basis": "line"
+      }
+    ],
+    "expectedRule": "expected est non nul seulement pour status mismatch ; même numérotation que sectors (SFR base 0, autres base 1)",
+    "presence": "v2, lignes pci et cellid seulement, toujours présent si checks.sectorCheck = ok ; jamais sur les nœuds",
+    "mismatchAction": "bouton « Corriger les secteurs » prérempli avec expected ; le membre reste libre (décision d'Alexandre)"
+  },
+  "adoptConsensus": {
+    "route": "POST /api/android/map/identify/edit-site",
+    "body": {
+      "fromSiteId": "…",
+      "enb": "…",
+      "adoptConsensus": true
+    },
+    "errors": {
+      "NO_CONSENSUS_CONFLICT": 409,
+      "CONSENSUS_TARGET_CHANGED": 409,
+      "IDENTIFICATION_NOT_FOUND": 404,
+      "MISSING_NODE": 400
+    },
+    "clientRule": "toujours envoyer toSiteId = le support affiché (sinon un déplacement vers un support non vu)"
+  },
+  "cellConflict": {
+    "reason": [
+      "other_site",
+      "pci_mismatch"
+    ]
+  },
+  "labels": {
+    "contested.tie": {
+      "fr-tu": "Ce nœud est aussi déclaré sur un autre support, à égalité de validations.",
+      "fr-vous": "Ce nœud est aussi déclaré sur un autre support, à égalité de validations.",
+      "en": "This node is also reported on another site, with as many validations."
+    },
+    "contested.minority_elsewhere": {
+      "fr-tu": "Ce nœud est aussi déclaré ailleurs, mais ton support reste le plus validé.",
+      "fr-vous": "Ce nœud est aussi déclaré ailleurs, mais votre support reste le plus validé.",
+      "en": "This node is also reported elsewhere, but your site has the most validations."
+    },
+    "cellConflict.other_site": {
+      "fr-tu": "Cette cellule est déclarée sur un autre support.",
+      "fr-vous": "Cette cellule est déclarée sur un autre support.",
+      "en": "This cell is reported on another site."
+    },
+    "cellConflict.pci_mismatch": {
+      "fr-tu": "Sur ce support, cette cellule est aussi déclarée avec un autre PCI ({pci}).",
+      "fr-vous": "Sur ce support, cette cellule est aussi déclarée avec un autre PCI ({pci}).",
+      "en": "On this site, this cell is also reported with another PCI ({pci})."
+    },
+    "sectorCheck.mismatch": {
+      "fr-tu": "D'après la règle de l'opérateur, cette cellule serait le secteur {expected}.",
+      "fr-vous": "D'après la règle de l'opérateur, cette cellule serait le secteur {expected}.",
+      "en": "According to the operator's rule, this cell would be sector {expected}."
+    },
+    "sectorCheck.unknown": {
+      "fr-tu": "Le secteur ne peut pas encore être vérifié pour ce support.",
+      "fr-vous": "Le secteur ne peut pas encore être vérifié pour ce support.",
+      "en": "The sector cannot be checked for this site yet."
+    },
+    "orphan": {
+      "fr-tu": "Cellules sans nœud",
+      "fr-vous": "Cellules sans nœud",
+      "en": "Cells without a node"
+    },
+    "cellsTruncated": {
+      "fr-tu": "Seules les 4 000 cellules les plus récentes de ce nœud sont affichées.",
+      "fr-vous": "Seules les 4 000 cellules les plus récentes de ce nœud sont affichées.",
+      "en": "Only the 4,000 most recent cells of this node are shown."
+    },
+    "restartAdvised": {
+      "fr-tu": "Ta liste a changé pendant le chargement. Recharge-la pour tout voir.",
+      "fr-vous": "Votre liste a changé pendant le chargement. Rechargez-la pour tout voir.",
+      "en": "Your list changed while loading. Reload it to see everything."
+    },
+    "checkUnavailable": {
+      "fr-tu": "Vérification indisponible pour le moment.",
+      "fr-vous": "Vérification indisponible pour le moment.",
+      "en": "Check unavailable right now."
+    },
+    "error.CONSENSUS_TARGET_CHANGED": {
+      "fr-tu": "Le support le plus validé a changé. Recharge la liste avant de déplacer.",
+      "fr-vous": "Le support le plus validé a changé. Rechargez la liste avant de déplacer.",
+      "en": "The most validated site has changed. Reload the list before moving."
+    },
+    "error.NO_CONSENSUS_CONFLICT": {
+      "fr-tu": "Aucun autre support n'est plus validé : rien à déplacer.",
+      "fr-vous": "Aucun autre support n'est plus validé : rien à déplacer.",
+      "en": "No other site has more validations: nothing to move."
+    }
+  },
+  "examples": {
+    "orphanPage": {
+      "identifications": [
+        {
+          "id": "ex-orphan",
+          "type": "cellid",
+          "value": "267173891",
+          "enb": "1043648",
+          "gnb": null,
+          "cellId": "3",
+          "pci": null,
+          "ci": "267173891",
+          "sectors": [
+            1
+          ],
+          "siteId": "799050",
+          "operator": "ORANGE",
+          "operatorMcc": 208,
+          "operatorMnc": 1,
+          "marketCode": "FR",
+          "tech": "4G",
+          "band": null,
+          "validations": 1,
+          "source": "auto_capture",
+          "createdAt": "2026-10-27T21:00:00.000Z",
+          "lastValidated": "2026-10-27T21:00:00.000Z",
+          "orphan": true,
+          "sectorCheck": {
+            "expected": null,
+            "status": "unknown",
+            "basis": "none"
+          }
+        }
+      ],
+      "nextCursor": null,
+      "truncated": false,
+      "restartAdvised": false,
+      "checks": {
+        "conflict": "ok",
+        "cellConflict": "ok",
+        "sectorCheck": "ok"
+      },
+      "totals": null
+    },
+    "cellsTruncatedNode": {
+      "identifications": [
+        {
+          "id": "ex-big",
+          "type": "enb",
+          "value": "1043648",
+          "enb": "1043648",
+          "gnb": null,
+          "cellId": null,
+          "pci": null,
+          "ci": null,
+          "sectors": [],
+          "siteId": "799050",
+          "operator": "ORANGE",
+          "operatorMcc": 208,
+          "operatorMnc": 1,
+          "marketCode": "FR",
+          "tech": "4G",
+          "band": null,
+          "validations": 1,
+          "source": "manual",
+          "createdAt": "2026-10-27T21:00:00.000Z",
+          "lastValidated": "2026-10-27T21:00:00.000Z",
+          "conflict": false,
+          "conflictStatus": "ok",
+          "cellsTruncated": true
+        },
+        {
+          "id": "ex-big-c1",
+          "type": "cellid",
+          "value": "267173891",
+          "enb": "1043648",
+          "gnb": null,
+          "cellId": "3",
+          "pci": null,
+          "ci": "267173891",
+          "sectors": [
+            1
+          ],
+          "siteId": "799050",
+          "operator": "ORANGE",
+          "operatorMcc": 208,
+          "operatorMnc": 1,
+          "marketCode": "FR",
+          "tech": "4G",
+          "band": null,
+          "validations": 1,
+          "source": "manual",
+          "createdAt": "2026-10-27T21:00:00.000Z",
+          "lastValidated": "2026-10-27T21:00:00.000Z",
+          "sectorCheck": {
+            "expected": 2,
+            "status": "mismatch",
+            "basis": "leader"
+          }
+        }
+      ],
+      "nextCursor": "eyJwIjoibiJ9",
+      "truncated": true,
+      "restartAdvised": false,
+      "checks": {
+        "conflict": "ok",
+        "cellConflict": "ok",
+        "sectorCheck": "ok"
+      },
+      "totals": {
+        "nodes": 3,
+        "enb": 3,
+        "gnb": 0,
+        "cellRows": 4001,
+        "orphanRows": 0,
+        "conflicts": 0,
+        "contested": 0
+      },
+      "note": "cellules réduites à une pour l'exemple ; en réalité 4 000"
+    },
+    "restartAdvisedPage": {
+      "identifications": [
+        {
+          "id": "ex-next",
+          "type": "enb",
+          "value": "1043648",
+          "enb": "1043648",
+          "gnb": null,
+          "cellId": null,
+          "pci": null,
+          "ci": null,
+          "sectors": [],
+          "siteId": "799050",
+          "operator": "ORANGE",
+          "operatorMcc": 208,
+          "operatorMnc": 1,
+          "marketCode": "FR",
+          "tech": "4G",
+          "band": null,
+          "validations": 1,
+          "source": "manual",
+          "createdAt": "2026-10-27T21:00:00.000Z",
+          "lastValidated": "2026-10-27T21:00:00.000Z",
+          "conflict": false,
+          "conflictStatus": "ok"
+        }
+      ],
+      "nextCursor": null,
+      "truncated": false,
+      "restartAdvised": true,
+      "checks": {
+        "conflict": "ok",
+        "cellConflict": "ok",
+        "sectorCheck": "ok"
+      },
+      "totals": null
+    },
+    "conflictUnavailablePage": {
+      "identifications": [
+        {
+          "id": "ex-unavail",
+          "type": "enb",
+          "value": "1043648",
+          "enb": "1043648",
+          "gnb": null,
+          "cellId": null,
+          "pci": null,
+          "ci": null,
+          "sectors": [],
+          "siteId": "799050",
+          "operator": "ORANGE",
+          "operatorMcc": 208,
+          "operatorMnc": 1,
+          "marketCode": "FR",
+          "tech": "4G",
+          "band": null,
+          "validations": 1,
+          "source": "manual",
+          "createdAt": "2026-10-27T21:00:00.000Z",
+          "lastValidated": "2026-10-27T21:00:00.000Z",
+          "conflictStatus": "unavailable"
+        }
+      ],
+      "nextCursor": null,
+      "truncated": false,
+      "restartAdvised": false,
+      "checks": {
+        "conflict": "unavailable",
+        "cellConflict": "ok",
+        "sectorCheck": "ok"
+      },
+      "totals": {
+        "nodes": 1,
+        "enb": 1,
+        "gnb": 0,
+        "cellRows": 0,
+        "orphanRows": 0,
+        "conflicts": null,
+        "contested": null
+      }
+    }
+  },
+  "labelsRule": "référence de SENS et de TON, pas source à copier : chaque app traduit dans ses propres langues"
+}

@@ -13,11 +13,15 @@ final class SectorEditViewModel: ObservableObject {
     @Published private(set) var savedAwaitingClose = false
 
     let item: MyIdentification
+    /// Secteur proposé par la règle de l'opérateur (`sectorCheck.expected`), dans la
+    /// numérotation stockée ; présélectionné à la place du secteur enregistré.
+    let prefilledSector: Int?
     private let antennas: AntennasServicing
     private let identify: IdentifyServicing
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing) {
+    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, prefilledSector: Int? = nil) {
         self.item = item
+        self.prefilledSector = prefilledSector
         self.antennas = antennas
         self.identify = identify
     }
@@ -49,9 +53,9 @@ final class SectorEditViewModel: ObservableObject {
         let unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
             .sorted()
         azimuths = unique
-        // Pré-sélection sur le secteur déjà enregistré, selon la convention de
+        // Pré-sélection sur le secteur proposé par la règle, sinon sur celui enregistré, selon la convention de
         // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
-        if let first = item.sectors.first {
+        if let first = prefilledSector ?? item.sectors.first {
             selectedIndex = SectorNumbering.index(
                 forStoredValue: first, azimuthCount: unique.count, mccMnc: mccMnc, operatorName: item.operatorName
             )
@@ -115,8 +119,10 @@ struct SectorEditSheet: View {
     @StateObject private var model: SectorEditViewModel
     let onDone: () -> Void
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, onDone: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: SectorEditViewModel(item: item, antennas: antennas, identify: identify))
+    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing,
+         prefilledSector: Int? = nil, onDone: @escaping () -> Void) {
+        _model = StateObject(wrappedValue: SectorEditViewModel(item: item, antennas: antennas, identify: identify,
+                                                               prefilledSector: prefilledSector))
         self.onDone = onDone
     }
 

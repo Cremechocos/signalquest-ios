@@ -4028,9 +4028,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "**%lld identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifiez-la ou retirez-la."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifiez-la ou retirez-la."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identifications en conflit** : d’autres sites ont plus de validations sur ces antennes. Vérifiez-les ou retirez-les."
+                }
+              }
+            }
           }
         }
       },
@@ -11408,9 +11420,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il reste %lld messages non envoyés : ils seront supprimés de cet iPhone si vous vous déconnectez. Annulez pour leur laisser le temps de partir."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il reste %lld message non envoyé : il sera supprimé de cet iPhone si vous vous déconnectez. Annulez pour lui laisser le temps de partir."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il reste %lld messages non envoyés : ils seront supprimés de cet iPhone si vous vous déconnectez. Annulez pour leur laisser le temps de partir."
+                }
+              }
+            }
           }
         }
       },
@@ -103679,6 +103703,470 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Vérification des conflits indisponible pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conflict check unavailable right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification des conflits indisponible pour le moment."
+          }
+        }
+      }
+    },
+    "Seules les 4 000 cellules les plus récentes de ce nœud sont affichées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the 4,000 most recent cells of this node are shown."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seules les 4 000 cellules les plus récentes de ce nœud sont affichées."
+          }
+        }
+      }
+    },
+    "Afficher seulement les conflits" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show conflicts only"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher seulement les conflits"
+          }
+        }
+      }
+    },
+    "Seulement les antennes en conflit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only antennas in conflict"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement les antennes en conflit"
+          }
+        }
+      }
+    },
+    "Ta liste a changé pendant le chargement. Recharge-la pour tout voir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your list changed while loading. Reload it to see everything."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta liste a changé pendant le chargement. Recharge-la pour tout voir."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta liste a changé pendant le chargement. Recharge-la pour tout voir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre liste a changé pendant le chargement. Rechargez-la pour tout voir."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Recharger" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recharger"
+          }
+        }
+      }
+    },
+    "Chargement de la suite" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement de la suite"
+          }
+        }
+      }
+    },
+    "Contesté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contested"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contesté"
+          }
+        }
+      }
+    },
+    "Secteur à vérifier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check sector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secteur à vérifier"
+          }
+        }
+      }
+    },
+    "Autre support" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre support"
+          }
+        }
+      }
+    },
+    "Autre PCI" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other PCI"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre PCI"
+          }
+        }
+      }
+    },
+    "Le support le plus validé a changé. Recharge la liste avant de déplacer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The most validated site has changed. Reload the list before moving."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le support le plus validé a changé. Recharge la liste avant de déplacer."
+          }
+        }
+      }
+    },
+    "SQFormal|Le support le plus validé a changé. Recharge la liste avant de déplacer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le support le plus validé a changé. Rechargez la liste avant de déplacer."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucun autre support n’est plus validé : rien à déplacer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No other site has more validations: nothing to move."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun autre support n’est plus validé : rien à déplacer."
+          }
+        }
+      }
+    },
+    "D’après la règle de l’opérateur, cette cellule serait le secteur %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "According to the operator’s rule, this cell would be sector %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’après la règle de l’opérateur, cette cellule serait le secteur %lld."
+          }
+        }
+      }
+    },
+    "Ce nœud est aussi déclaré sur un autre support, à égalité de validations." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also reported on another site, with as many validations."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi déclaré sur un autre support, à égalité de validations."
+          }
+        }
+      }
+    },
+    "Ce nœud est aussi déclaré ailleurs, mais ton support reste le plus validé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also reported elsewhere, but your site has the most validations."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi déclaré ailleurs, mais ton support reste le plus validé."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce nœud est aussi déclaré ailleurs, mais ton support reste le plus validé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi déclaré ailleurs, mais votre support reste le plus validé."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce nœud est aussi déclaré sur un autre support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also reported on another site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi déclaré sur un autre support."
+          }
+        }
+      }
+    },
+    "Cette cellule est déclarée sur un autre support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This cell is reported on another site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette cellule est déclarée sur un autre support."
+          }
+        }
+      }
+    },
+    "Sur ce support, cette cellule est aussi déclarée avec un autre PCI (%@)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this site, this cell is also reported with another PCI (%@)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur ce support, cette cellule est aussi déclarée avec un autre PCI (%@)."
+          }
+        }
+      }
+    },
+    "Sur ce support, cette cellule est aussi déclarée avec un autre PCI." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this site, this cell is also reported with another PCI."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur ce support, cette cellule est aussi déclarée avec un autre PCI."
+          }
+        }
+      }
+    },
+    "Vérification des doublons indisponible pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate check unavailable right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification des doublons indisponible pour le moment."
+          }
+        }
+      }
+    },
+    "Vérification du secteur indisponible pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sector check unavailable right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification du secteur indisponible pour le moment."
+          }
+        }
+      }
+    },
+    "Le secteur ne peut pas encore être vérifié pour ce support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sector cannot be checked for this site yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le secteur ne peut pas encore être vérifié pour ce support."
+          }
+        }
+      }
+    },
+    "Aucune de tes identifications de nœud actives ne porte cette cellule." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of your active node identifications carries this cell."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune de tes identifications de nœud actives ne porte cette cellule."
+          }
+        }
+      }
+    },
+    "SQFormal|Aucune de tes identifications de nœud actives ne porte cette cellule." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune de vos identifications de nœud actives ne porte cette cellule."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Manuelle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manual"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manuelle"
+          }
+        }
+      }
+    },
+    "Capture automatique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic capture"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture automatique"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -40,12 +40,26 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     let conflictSiteValidations: Int?
     let conflictSiteLat: Double?
     let conflictSiteLng: Double?
+    /// Nœuds, v1 et v2 : `unavailable` quand le contrôle de conflit a échoué. Lu
+    /// avant `conflict`, qui reste `false` en v1 : on ne conclut jamais « aucun conflit ».
+    let conflictStatus: IdentificationCheckStatus?
+    /// v2, nœuds : porté ailleurs par le même opérateur, sans y être majoritaire. Signal seul.
+    let contested: IdentificationContested?
+    /// v2, cellules avec ECI/NCI : la même cellule déclarée ailleurs, ou avec un autre PCI.
+    let cellConflict: IdentificationCellConflict?
+    /// v2, lignes pci et cellid : secteur stocké comparé à la règle de l'opérateur.
+    let sectorCheck: IdentificationSectorCheck?
+    /// v2 : cellule qu'aucune ligne nœud active du membre ne porte (pages finales).
+    let orphan: Bool
+    /// v2 : nœud dont seules les 4 000 cellules les plus récentes sont servies.
+    let cellsTruncated: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, siteId, type, enb, gnb, cellId, pci, ci, tech, band
         case `operator`, operatorMcc, operatorMnc, marketCode, sectors, validations, source
         case createdAt, lastValidated, conflict
         case conflictSiteId, conflictSiteAddress, conflictSiteValidations, conflictSiteLat, conflictSiteLng
+        case conflictStatus, contested, cellConflict, sectorCheck, orphan, cellsTruncated
     }
 
     init(from decoder: Decoder) throws {
@@ -76,7 +90,16 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         conflictSiteValidations = try? c.decodeIfPresent(Int.self, forKey: .conflictSiteValidations)
         conflictSiteLat = try? c.decodeIfPresent(Double.self, forKey: .conflictSiteLat)
         conflictSiteLng = try? c.decodeIfPresent(Double.self, forKey: .conflictSiteLng)
+        conflictStatus = c.decodeFlexibleString(forKey: .conflictStatus).flatMap(IdentificationCheckStatus.init(rawValue:))
+        contested = (try? c.decodeIfPresent(IdentificationContested.self, forKey: .contested)) ?? nil
+        cellConflict = (try? c.decodeIfPresent(IdentificationCellConflict.self, forKey: .cellConflict)) ?? nil
+        sectorCheck = (try? c.decodeIfPresent(IdentificationSectorCheck.self, forKey: .sectorCheck)) ?? nil
+        orphan = (try? c.decodeIfPresent(Bool.self, forKey: .orphan)) ?? false
+        cellsTruncated = (try? c.decodeIfPresent(Bool.self, forKey: .cellsTruncated)) ?? false
     }
+
+    /// Le contrôle de conflit de ce nœud n'a pas pu être fait.
+    var conflictCheckUnavailable: Bool { conflictStatus == .unavailable }
 
     /// iOS écrit « 4G »/« 5G », Android et le serveur peuvent renvoyer « LTE »/« NR » :
     /// on ramène les deux vocabulaires à la génération, pour le filtre et le groupement.
@@ -151,6 +174,9 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
     let validations: Int
     let sectorsUnion: [Int]
     let conflict: Bool
+    /// Ligne nœud « contestée » (signal seul, jamais avec `conflict`).
+    let contested: Bool
+    let cellsTruncated: Bool
 
     var title: String {
         kind == .unassigned ? String(localized: "Cellules sans nœud") : "\(kind.rawValue) \(nodeValue)"
@@ -170,12 +196,19 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             var validations = 0
             var sectors = Set<Int>()
             var conflict = false
+            var contested = false
+            var cellsTruncated = false
+            var order = 0
         }
 
         var values: [String: Acc] = [:]
         for item in items {
             let node: (IdentifiedNodeKind, String)
-            if item.techLabel.uppercased().contains("5G"), let gnb = item.gnb?.nilIfBlank {
+            if item.orphan {
+                // Orpheline (v2) : aucune ligne nœud active ne la porte, même si
+                // elle garde son eNB/gNB. Elle rejoint « Cellules sans nœud ».
+                node = (.unassigned, "")
+            } else if item.techLabel.uppercased().contains("5G"), let gnb = item.gnb?.nilIfBlank {
                 node = (.gnb, gnb)
             } else if let enb = item.enb?.nilIfBlank {
                 node = (.enb, enb)
@@ -186,7 +219,7 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             }
             let (kind, nodeValue) = node
             let key = "\(kind.rawValue):\(nodeValue)"
-            var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item)
+            var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item, order: values.count)
             // La ligne du NŒUD (eNB/gNB) représente le groupe dès qu'elle existe :
             // la plus récente pouvait être une cellule PCI, et toucher le nœud ouvrait
             // alors cette cellule, que « Retirer » retirait seule (AF-RAD-15).
@@ -201,6 +234,8 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             acc.validations = max(acc.validations, item.validations)
             acc.sectors.formUnion(item.sectors)
             acc.conflict = acc.conflict || item.conflict
+            acc.contested = acc.contested || item.contested != nil
+            acc.cellsTruncated = acc.cellsTruncated || item.cellsTruncated
             if kind == .unassigned || item.kind == .pci || item.kind == .cellid || item.pciValue != nil || item.ci != nil || item.cellId != nil {
                 // Sans nœud commun, deux cellules de même PCI peuvent venir de sites
                 // différents : la ligne elle-même les distingue.
@@ -224,7 +259,7 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             values[key] = acc
         }
 
-        return values.map { key, acc in
+        let groups = values.sorted { $0.value.order < $1.value.order }.map { key, acc in
             IdentifiedNodeGroup(
                 id: key,
                 kind: acc.kind,
@@ -233,15 +268,15 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
                 cells: acc.cells.sorted { $0.label < $1.label },
                 validations: acc.validations,
                 sectorsUnion: acc.sectors.sorted(),
-                conflict: acc.conflict
+                conflict: acc.conflict,
+                contested: acc.contested,
+                cellsTruncated: acc.cellsTruncated
             )
         }
-        .sorted {
-            // Les cellules sans nœud ferment la liste.
-            if ($0.kind == .unassigned) != ($1.kind == .unassigned) { return $1.kind == .unassigned }
-            return ($0.representative.lastValidated ?? $0.representative.createdAt ?? .distantPast) >
-            ($1.representative.lastValidated ?? $1.representative.createdAt ?? .distantPast)
-        }
+        // Ordre du serveur (createdAt décroissant, stable d'une page à l'autre) :
+        // retrier sur `lastValidated` ferait sauter les nœuds pendant le défilement.
+        // Les cellules sans nœud ferment la liste.
+        return groups.filter { $0.kind != .unassigned } + groups.filter { $0.kind == .unassigned }
     }
 }
 
@@ -254,6 +289,179 @@ struct MyIdentificationsResponse: Decodable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         identifications = c.decodeLossyArray([MyIdentification].self, forKey: .identifications)
+    }
+}
+
+/// État explicite d'un contrôle v2 (`checks`, `conflictStatus`).
+enum IdentificationCheckStatus: String, Decodable, Equatable, Sendable {
+    case ok, unavailable
+}
+
+/// `contested` d'un nœud : signal seul, aucune action proposée.
+struct IdentificationContested: Decodable, Equatable, Sendable {
+    struct OtherSite: Decodable, Equatable, Sendable {
+        let siteId: String
+        let validations: Int
+
+        enum CodingKeys: String, CodingKey { case siteId, validations }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            siteId = c.decodeFlexibleString(forKey: .siteId) ?? ""
+            validations = (try? c.decodeIfPresent(Int.self, forKey: .validations)) ?? 0
+        }
+    }
+
+    enum Reason: String, Equatable, Sendable { case tie, minorityElsewhere = "minority_elsewhere" }
+
+    let otherSites: [OtherSite]
+    /// `nil` pour une raison inconnue : le signal reste, sans phrase précise.
+    let reason: Reason?
+
+    enum CodingKeys: String, CodingKey { case otherSites, reason }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        otherSites = c.decodeLossyArray([OtherSite].self, forKey: .otherSites).filter { !$0.siteId.isEmpty }
+        reason = c.decodeFlexibleString(forKey: .reason).flatMap(Reason.init(rawValue:))
+    }
+}
+
+/// `cellConflict` d'une cellule : même opérateur, lignes retirées ignorées.
+struct IdentificationCellConflict: Decodable, Equatable, Sendable {
+    enum Reason: String, Equatable, Sendable { case otherSite = "other_site", pciMismatch = "pci_mismatch" }
+
+    let reason: Reason
+    let siteId: String?
+    let pci: String?
+
+    enum CodingKeys: String, CodingKey { case reason, siteId, pci }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let reason = c.decodeFlexibleString(forKey: .reason).flatMap(Reason.init(rawValue:)) else {
+            throw DecodingError.dataCorruptedError(forKey: .reason, in: c, debugDescription: "raison inconnue")
+        }
+        self.reason = reason
+        siteId = c.decodeFlexibleString(forKey: .siteId)
+        pci = c.decodeFlexibleString(forKey: .pci)
+    }
+}
+
+/// `sectorCheck` d'une cellule. `expected` n'existe que pour `mismatch`, dans la
+/// numérotation stockée (SFR en base 0, les autres en base 1), comme `sectors`.
+struct IdentificationSectorCheck: Decodable, Equatable, Sendable {
+    enum Status: String, Equatable, Sendable {
+        case match, mismatch, notApplicable = "not_applicable", unknown
+    }
+
+    let status: Status
+    let expected: Int?
+
+    enum CodingKeys: String, CodingKey { case status, expected }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let status = c.decodeFlexibleString(forKey: .status).flatMap(Status.init(rawValue:)) else {
+            throw DecodingError.dataCorruptedError(forKey: .status, in: c, debugDescription: "statut inconnu")
+        }
+        // Un écart sans secteur attendu n'a rien à proposer : on le lit comme inconnu.
+        let expected = status == .mismatch ? (try? c.decodeIfPresent(Int.self, forKey: .expected)) ?? nil : nil
+        self.status = status == .mismatch && expected == nil ? .unknown : status
+        self.expected = expected
+    }
+}
+
+/// `checks` d'une page v2. Absent ou illisible vaut `unavailable` : sans état
+/// explicite, l'app ne conclut jamais « rien à signaler ».
+struct IdentificationChecks: Decodable, Equatable, Sendable {
+    var conflict: IdentificationCheckStatus
+    var cellConflict: IdentificationCheckStatus
+    var sectorCheck: IdentificationCheckStatus
+
+    static let unavailable = IdentificationChecks(conflict: .unavailable, cellConflict: .unavailable, sectorCheck: .unavailable)
+
+    init(conflict: IdentificationCheckStatus, cellConflict: IdentificationCheckStatus, sectorCheck: IdentificationCheckStatus) {
+        self.conflict = conflict
+        self.cellConflict = cellConflict
+        self.sectorCheck = sectorCheck
+    }
+
+    enum CodingKeys: String, CodingKey { case conflict, cellConflict, sectorCheck }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func read(_ key: CodingKeys) -> IdentificationCheckStatus {
+            c.decodeFlexibleString(forKey: key).flatMap(IdentificationCheckStatus.init(rawValue:)) ?? .unavailable
+        }
+        conflict = read(.conflict)
+        cellConflict = read(.cellConflict)
+        sectorCheck = read(.sectorCheck)
+    }
+
+    /// Plusieurs pages : un contrôle indisponible sur l'une l'est pour la liste.
+    func merged(with other: IdentificationChecks) -> IdentificationChecks {
+        func worst(_ a: IdentificationCheckStatus, _ b: IdentificationCheckStatus) -> IdentificationCheckStatus {
+            a == .unavailable || b == .unavailable ? .unavailable : .ok
+        }
+        return IdentificationChecks(
+            conflict: worst(conflict, other.conflict),
+            cellConflict: worst(cellConflict, other.cellConflict),
+            sectorCheck: worst(sectorCheck, other.sectorCheck)
+        )
+    }
+}
+
+/// `totals` de la première page : sur toutes les lignes des filtres operator /
+/// marketCode, jamais sur la page, et sans tenir compte de `conflict`.
+struct IdentificationTotals: Decodable, Equatable, Sendable {
+    let nodes: Int
+    let enb: Int
+    let gnb: Int
+    /// Des LIGNES pci/cellid, pas des cellules distinctes.
+    let cellRows: Int
+    let orphanRows: Int
+    /// `nil` : le consensus n'a pas pu être calculé.
+    let conflicts: Int?
+    let contested: Int?
+
+    enum CodingKeys: String, CodingKey { case nodes, enb, gnb, cellRows, orphanRows, conflicts, contested }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        nodes = try c.decode(Int.self, forKey: .nodes)
+        enb = (try? c.decodeIfPresent(Int.self, forKey: .enb)) ?? 0
+        gnb = (try? c.decodeIfPresent(Int.self, forKey: .gnb)) ?? 0
+        cellRows = (try? c.decodeIfPresent(Int.self, forKey: .cellRows)) ?? 0
+        orphanRows = (try? c.decodeIfPresent(Int.self, forKey: .orphanRows)) ?? 0
+        conflicts = (try? c.decodeIfPresent(Int.self, forKey: .conflicts)) ?? nil
+        contested = (try? c.decodeIfPresent(Int.self, forKey: .contested)) ?? nil
+    }
+}
+
+/// Une page de `GET /api/android/map/identify/mine?v=2` (contrat « Mes
+/// identifications » v2, `docs/my-identifications-v2-contract.md`).
+struct MyIdentificationsPage: Decodable {
+    let identifications: [MyIdentification]
+    /// `nil` en fin de liste.
+    let nextCursor: String?
+    let truncated: Bool
+    /// La liste a changé pendant le parcours : proposer de recharger.
+    let restartAdvised: Bool
+    let checks: IdentificationChecks
+    /// Première page seulement.
+    let totals: IdentificationTotals?
+
+    enum CodingKeys: String, CodingKey { case identifications, nextCursor, truncated, restartAdvised, checks, totals }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        identifications = c.decodeLossyArray([MyIdentification].self, forKey: .identifications)
+        nextCursor = c.decodeFlexibleString(forKey: .nextCursor)
+        truncated = (try? c.decodeIfPresent(Bool.self, forKey: .truncated)) ?? false
+        restartAdvised = (try? c.decodeIfPresent(Bool.self, forKey: .restartAdvised)) ?? false
+        checks = (try? c.decodeIfPresent(IdentificationChecks.self, forKey: .checks)) ?? .unavailable
+        totals = (try? c.decodeIfPresent(IdentificationTotals.self, forKey: .totals)) ?? nil
     }
 }
 

@@ -116,6 +116,10 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(String(localized: "Autour de toi · \(count) jours", bundle: formal), "Autour de vous · 3 jours")
         // Sans variante, la chaîne française d'origine.
         XCTAssertEqual(String(localized: "Tutoiement", bundle: formal), "Tutoiement")
+        // Une variante au vous garde les formes plurielles de l'original.
+        let conflicts = 2
+        XCTAssertEqual(String(AttributedString(localized: "**\(conflicts) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la.", bundle: formal).characters),
+                       "2 identifications en conflit : d’autres sites ont plus de validations sur ces antennes. Vérifiez-les ou retirez-les.")
     }
 
     /// En français, le vouvoiement actif s'applique aussi aux phrases construites
@@ -129,5 +133,8 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(String(localized: "\(name) partage avec toi"), "Alex partage avec toi")
         SQAddress.setFormal(true)
         XCTAssertEqual(String(localized: "\(name) partage avec toi"), "Alex partage avec vous")
+        let count = 1
+        XCTAssertEqual(String(AttributedString(localized: "**\(count) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la.").characters),
+                       "1 identification en conflit : un autre site a plus de validations sur cette antenne. Vérifiez-la ou retirez-la.")
     }
 }

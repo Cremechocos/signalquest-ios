@@ -8,6 +8,20 @@ final class MyIdentificationsViewModel: ObservableObject {
     @Published var withdrawingId: String?
     @Published var filter: Filter = .all { didSet { rebuild() } }
     @Published var toast: String?
+    /// Filtre serveur `conflict=only` : seulement les nœuds en conflit.
+    @Published private(set) var conflictOnly = false
+    /// Page suivante (`nil` en fin de liste).
+    @Published private(set) var nextCursor: String?
+    @Published private(set) var isLoadingMore = false
+    @Published private(set) var loadMoreError: String?
+    /// Change à chaque page reçue : relance la demande de la suite même quand une
+    /// première page rechargée a le même nombre de lignes.
+    @Published private(set) var pagesReceived = 0
+    /// La liste a changé pendant le parcours : on propose de recharger.
+    @Published private(set) var restartAdvised = false
+    /// Totaux de la première page : sur toute la liste, pas sur les pages chargées.
+    @Published private(set) var totals: IdentificationTotals?
+    @Published private(set) var checks = IdentificationChecks.unavailable
 
     enum Filter: String, CaseIterable, Identifiable {
         case all, lte, nr
@@ -22,9 +36,14 @@ final class MyIdentificationsViewModel: ObservableObject {
     }
 
     private let service: IdentifyServicing
+    /// Une réponse d'un chargement remplacé (filtre changé, rechargement) est ignorée.
+    private var generation = 0
+    /// Une reprise automatique sur curseur périmé a eu lieu sans page réussie depuis.
+    private var restartedForInvalidCursor = false
     init(service: IdentifyServicing) { self.service = service }
 
     var filtered: [MyIdentification] { items(for: filter) }
+    var hasMore: Bool { nextCursor != nil }
 
     private func items(for filter: Filter) -> [MyIdentification] {
         switch filter {
@@ -42,29 +61,102 @@ final class MyIdentificationsViewModel: ObservableObject {
     /// bascule de filtre, et plusieurs fois par passe (la liste ET son état vide
     /// le lisent).
     @Published private(set) var filteredGroups: [IdentifiedNodeGroup] = []
-    @Published private(set) var conflictCount = 0
     /// Nombre d'antennes par filtre, affiché dans le segment (« 4G · 9 »).
     @Published private(set) var counts: [Filter: Int] = [:]
 
+    /// Conflits de toute la liste ; `nil` quand la vérification est indisponible.
+    var conflictCount: Int? {
+        guard checks.conflict == .ok else { return nil }
+        if let totals { return totals.conflicts }
+        // Sans totaux, seule la liste entièrement chargée permet de compter.
+        return hasMore ? nil : items.filter { $0.conflict }.count
+    }
+
+    /// Le contrôle de conflit a échoué : on le dit, sans jamais conclure « aucun conflit ».
+    var conflictCheckUnavailable: Bool {
+        checks.conflict == .unavailable || (totals != nil && totals?.conflicts == nil)
+    }
+
     private func rebuild() {
         filteredGroups = IdentifiedNodeGroup.group(filtered)
-        conflictCount = items.filter(\.conflict).count
-        counts = Dictionary(uniqueKeysWithValues: Filter.allCases.map { filter in
-            (filter, IdentifiedNodeGroup.group(items(for: filter)).count)
-        })
+        if let totals, !conflictOnly {
+            // Les totaux du serveur comptent toute la liste, même avant la dernière page.
+            counts = [.all: totals.nodes, .lte: totals.enb, .nr: totals.gnb]
+        } else if !hasMore {
+            counts = Dictionary(uniqueKeysWithValues: Filter.allCases.map { filter in
+                (filter, IdentifiedNodeGroup.group(items(for: filter)).filter { $0.kind != .unassigned }.count)
+            })
+        } else {
+            counts = [:]
+        }
     }
 
     func load() async {
+        generation += 1
+        let current = generation
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        loadMoreError = nil
+        defer { if current == generation { isLoading = false } }
         do {
-            let result = try await service.mine(includeRelated: true)
-            items = result.sorted { ($0.lastValidated ?? $0.createdAt ?? .distantPast) > ($1.lastValidated ?? $1.createdAt ?? .distantPast) }
+            let page = try await service.minePage(cursor: nil, conflictOnly: conflictOnly, includeRelated: true, limit: nil)
+            guard current == generation else { return }
+            items = page.identifications
+            nextCursor = page.nextCursor
+            totals = page.totals
+            checks = page.checks
+            restartAdvised = page.restartAdvised
+            pagesReceived += 1
             rebuild()
         } catch {
+            guard current == generation else { return }
             if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
+    }
+
+    /// Page suivante, demandée quand la fin de la liste apparaît.
+    func loadMore() async {
+        guard let cursor = nextCursor, !isLoadingMore, !isLoading else { return }
+        let current = generation
+        isLoadingMore = true
+        loadMoreError = nil
+        defer { if current == generation { isLoadingMore = false } }
+        do {
+            let page = try await service.minePage(cursor: cursor, conflictOnly: conflictOnly, includeRelated: true, limit: nil)
+            guard current == generation else { return }
+            let known = Set(items.map(\.id))
+            items += page.identifications.filter { !known.contains($0.id) }
+            nextCursor = page.nextCursor
+            checks = checks.merged(with: page.checks)
+            restartAdvised = restartAdvised || page.restartAdvised
+            restartedForInvalidCursor = false
+            pagesReceived += 1
+            rebuild()
+        } catch APIError.http(400, "INVALID_CURSOR"?, _, _, _) {
+            guard current == generation else { return }
+            // Curseur périmé : on repart une fois de la première page, sans message. Un
+            // second refus juste après la reprise s'affiche, pour ne pas boucler.
+            guard !restartedForInvalidCursor else {
+                loadMoreError = String(localized: "Impossible de charger la suite")
+                return
+            }
+            restartedForInvalidCursor = true
+            isLoadingMore = false
+            await load()
+        } catch {
+            guard current == generation, !error.isCancellation else { return }
+            loadMoreError = error.userFacingMessage
+        }
+    }
+
+    /// Bascule le filtre serveur des conflits et recharge depuis la première page.
+    func setConflictOnly(_ value: Bool) async {
+        guard value != conflictOnly else { return }
+        conflictOnly = value
+        items = []
+        nextCursor = nil
+        rebuild()
+        await load()
     }
 
     func withdraw(_ item: MyIdentification) async {
@@ -156,11 +248,21 @@ struct MyIdentificationsView: View {
                 .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: -SQSpace.lg, bottom: SQSpace.xs, trailing: -SQSpace.lg))
                 .listRowBackground(Color.clear)
 
-                if model.conflictCount > 0 {
-                    conflictNote
-                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
-                        .listRowBackground(Color.clear)
+                Group {
+                    if model.conflictOnly {
+                        conflictFilterNote
+                    } else if let count = model.conflictCount, count > 0 {
+                        conflictNote(count)
+                    } else if model.conflictCheckUnavailable && !model.items.isEmpty {
+                        notice(String(localized: "Vérification des conflits indisponible pour le moment."),
+                               systemImage: "questionmark.circle", identifier: "identifications.conflictsUnavailable")
+                    }
+                    if model.restartAdvised {
+                        restartNote
+                    }
                 }
+                .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                .listRowBackground(Color.clear)
             }
             .listRowSeparator(.hidden)
 
@@ -227,6 +329,14 @@ struct MyIdentificationsView: View {
                                 }
                         }
 
+                        if group.cellsTruncated {
+                            Text("Seules les 4 000 cellules les plus récentes de ce nœud sont affichées.")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .padding(.leading, IdentificationNodeRow.textInset)
+                                .listRowBackground(SQColor.surface)
+                        }
+
                         if group.cells.isEmpty {
                             Text("Aucun identifiant de cellule (PCI/CI) associé à cette antenne.")
                                 .font(SQType.caption)
@@ -240,6 +350,12 @@ struct MyIdentificationsView: View {
                         }
                     }
                 }
+            }
+
+            if model.hasMore || model.loadMoreError != nil {
+                loadMoreRow
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
 
             if let errorMessage = model.errorMessage, !model.filteredGroups.isEmpty {
@@ -278,6 +394,7 @@ struct MyIdentificationsView: View {
         .sheet(item: $selected) { item in
             IdentificationDetailSheet(
                 item: item,
+                checks: model.checks,
                 isWithdrawing: model.withdrawingId == item.id,
                 onWithdraw: {
                     Task {
@@ -294,7 +411,8 @@ struct MyIdentificationsView: View {
                 onChanged: {
                     selected = nil
                     Task { await model.load() }
-                }
+                },
+                onStale: { Task { await model.load() } }
             )
         }
         .overlay(alignment: .bottom) {
@@ -340,22 +458,129 @@ struct MyIdentificationsView: View {
         return "\(filter.label) · \(count.formatted())"
     }
 
-    private var conflictNote: some View {
-        HStack(alignment: .top, spacing: SQSpace.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
+    /// Compte tous les conflits (totaux du serveur) ; le toucher n'affiche qu'eux.
+    private func conflictNote(_ count: Int) -> some View {
+        Button {
+            Haptics.selection()
+            Task { await model.setConflictOnly(true) }
+        } label: {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(OutageTint.degradedInk)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    // AttributedString : le gras d'une variante plurielle n'est pas interprété par Text.
+                    Text(AttributedString(localized: "**\(count) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la."))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Afficher seulement les conflits")
+                        .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("identifications.conflicts")
+    }
+
+    /// Filtre des conflits actif : on le dit, et on permet d'en sortir.
+    private var conflictFilterNote: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
                 .foregroundStyle(OutageTint.degradedInk)
                 .accessibilityHidden(true)
-            // AttributedString : le gras d'une variante plurielle n'est pas interprété par Text.
-            Text(AttributedString(localized: "**\(model.conflictCount) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la."))
+            Text("Seulement les antennes en conflit")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Tout afficher") {
+                Haptics.selection()
+                Task { await model.setConflictOnly(false) }
+            }
+            .font(SQFont.body(13, .semibold, relativeTo: .caption))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("identifications.showAll")
         }
-        .padding(SQSpace.md)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("identifications.conflicts")
+        .accessibilityIdentifier("identifications.conflictFilter")
+    }
+
+    /// La liste a bougé pendant le chargement : rien n'est perdu, mais il faut recharger.
+    private var restartNote: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "arrow.clockwise.circle")
+                .foregroundStyle(SQColor.accentInk)
+                .accessibilityHidden(true)
+            Text("Ta liste a changé pendant le chargement. Recharge-la pour tout voir.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Recharger") {
+                Task { await model.load() }
+            }
+            .font(SQFont.body(13, .semibold, relativeTo: .caption))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("identifications.restart")
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.md, elevation: .rest)
+    }
+
+    private func notice(_ text: String, systemImage: String, identifier: String) -> some View {
+        Label {
+            Text(verbatim: text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: systemImage).accessibilityHidden(true)
+        }
+        .font(SQType.caption)
+        .foregroundStyle(SQColor.labelSecondary)
+        .padding(.horizontal, SQSpace.xs)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// Fin de liste : la page suivante se charge dès que cette ligne apparaît.
+    @ViewBuilder
+    private var loadMoreRow: some View {
+        if let error = model.loadMoreError {
+            VStack(spacing: SQSpace.xs) {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                Button("Réessayer") { Task { await model.loadMore() } }
+                    .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("identifications.loadMoreRetry")
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            SQSpinner()
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .accessibilityLabel(Text("Chargement de la suite"))
+                .accessibilityIdentifier("identifications.loadMore")
+                .task(id: model.pagesReceived) { await model.loadMore() }
+        }
     }
 
     private var emptyState: some View {
@@ -389,13 +614,16 @@ private struct GenerationTile: View {
     }
 }
 
-/// Pastille « Conflit » : point de couleur et mot, comme les statuts du lot.
-private struct ConflictPill: View {
+/// Pastille de signal (« Conflit », « Contesté »…) : point de couleur et mot,
+/// comme les statuts du lot.
+private struct SignalPill: View {
+    let text: LocalizedStringKey
+
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(SQColor.warning).frame(width: 7, height: 7)
                 .accessibilityHidden(true)
-            Text("Conflit")
+            Text(text)
         }
         .font(SQFont.body(12, .bold, relativeTo: .caption))
         .foregroundStyle(OutageTint.degradedInk)
@@ -424,7 +652,11 @@ private struct IdentificationNodeRow: View {
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
                         .sqSingleLine()
-                    if group.conflict { ConflictPill() }
+                    if group.conflict {
+                        SignalPill(text: "Conflit")
+                    } else if group.contested {
+                        SignalPill(text: "Contesté")
+                    }
                 }
                 Text(group.subtitle)
                     .font(SQType.caption)
@@ -488,10 +720,20 @@ private struct IdentificationCellRow: View {
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(cell.label)
-                    .font(SQFont.body(14, .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
+                HStack(spacing: SQSpace.sm) {
+                    Text(cell.label)
+                        .font(SQFont.body(14, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                    if cell.source.sectorCheck?.status == .mismatch {
+                        SignalPill(text: "Secteur à vérifier")
+                    } else if let conflict = cell.source.cellConflict {
+                        switch conflict.reason {
+                        case .otherSite: SignalPill(text: "Autre support")
+                        case .pciMismatch: SignalPill(text: "Autre PCI")
+                        }
+                    }
+                }
                 if let detail {
                     detail
                         .font(SQType.micro)
@@ -515,10 +757,14 @@ private struct IdentificationCellRow: View {
 /// Fiche détaillée d'une identification : tous les identifiants radio + retrait.
 private struct IdentificationDetailSheet: View {
     let item: MyIdentification
+    /// Contrôles de la liste : un contrôle indisponible ne vaut jamais « rien à signaler ».
+    let checks: IdentificationChecks
     let isWithdrawing: Bool
     let onWithdraw: () -> Void
     var onDelete: () -> Void = {}
     var onChanged: () -> Void = {}
+    /// Le consensus a bougé : la liste se recharge, la fiche reste ouverte avec le message.
+    var onStale: () -> Void = {}
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -526,6 +772,8 @@ private struct IdentificationDetailSheet: View {
     @State private var confirmingDelete = false
     @State private var showRemap = false
     @State private var showSector = false
+    /// Secteur proposé à l'ouverture de « Corriger le secteur » (écart de règle).
+    @State private var sectorPrefill: Int?
     @State private var adoptBusy = false
     @State private var adoptError: String?
 
@@ -543,6 +791,7 @@ private struct IdentificationDetailSheet: View {
                 if item.conflict {
                     conflictSection
                 }
+                signalsSection
                 detailsCard
                 editSection
                 withdrawBlock
@@ -566,6 +815,7 @@ private struct IdentificationDetailSheet: View {
                 item: item,
                 antennas: services.antennas,
                 identify: services.identify,
+                prefilledSector: sectorPrefill,
                 onDone: { onChanged(); dismiss() }
             )
         }
@@ -645,9 +895,10 @@ private struct IdentificationDetailSheet: View {
         adoptError = nil
         defer { adoptBusy = false }
         do {
-            let result = try await services.identify.editSite(
+            // Le serveur recalcule le consensus ; `toSiteId` est celui affiché ici.
+            let result = try await services.identify.adoptConsensus(
                 fromSiteId: item.siteId, toSiteId: toSiteId,
-                enb: item.enb, gnb: item.gnb, reason: "adopt-consensus"
+                enb: item.enb, gnb: item.gnb
             )
             if result.success || result.moved > 0 || result.noop {
                 Haptics.success()
@@ -657,10 +908,132 @@ private struct IdentificationDetailSheet: View {
                 adoptError = String(localized: "Adoption non appliquée.")
                 Haptics.error()
             }
+        } catch APIError.http(409, "CONSENSUS_TARGET_CHANGED"?, _, _, _) {
+            adoptError = String(localized: "Le support le plus validé a changé. Recharge la liste avant de déplacer.")
+            Haptics.error()
+            onStale()
+        } catch APIError.http(409, "NO_CONSENSUS_CONFLICT"?, _, _, _) {
+            adoptError = String(localized: "Aucun autre support n’est plus validé : rien à déplacer.")
+            Haptics.error()
+            onStale()
         } catch {
             adoptError = error.userFacingMessage
             Haptics.error()
         }
+    }
+
+    private var isNode: Bool { item.kind == .enb || item.kind == .gnb }
+
+    /// Signaux v2 : contrôle indisponible, support contesté, cellule déclarée
+    /// ailleurs, secteur à vérifier, nœud tronqué. Chacun en une phrase.
+    @ViewBuilder
+    private var signalsSection: some View {
+        let notes = signalNotes
+        if !notes.isEmpty || sectorMismatch != nil {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                ForEach(notes, id: \.self) { text in
+                    HStack(alignment: .top, spacing: SQSpace.sm) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityHidden(true)
+                        Text(verbatim: text)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                if let expected = sectorMismatch {
+                    HStack(alignment: .top, spacing: SQSpace.sm) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(OutageTint.degradedInk)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            Text("D’après la règle de l’opérateur, cette cellule serait le secteur \(expected).")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.label)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button {
+                                // Prérempli avec la règle ; le membre reste libre de choisir autre chose.
+                                sectorPrefill = expected
+                                showSector = true
+                            } label: {
+                                Text("Corriger le secteur")
+                                    .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                                    .padding(.horizontal, SQSpace.md)
+                                    .frame(minHeight: 44)
+                                    .foregroundStyle(SQColor.onAccent)
+                                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                            }
+                            .buttonStyle(SQPressButtonStyle())
+                            .accessibilityIdentifier("identification.sectorMismatch")
+                        }
+                    }
+                }
+            }
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .accessibilityIdentifier("identification.signals")
+        }
+    }
+
+    /// Secteur attendu par la règle, seulement sur un écart.
+    private var sectorMismatch: Int? {
+        guard canEditSector, checks.sectorCheck == .ok, item.sectorCheck?.status == .mismatch else { return nil }
+        return item.sectorCheck?.expected
+    }
+
+    private var signalNotes: [String] {
+        var notes: [String] = []
+        if isNode, !item.conflict, checks.conflict == .unavailable || item.conflictCheckUnavailable {
+            notes.append(String(localized: "Vérification des conflits indisponible pour le moment."))
+        }
+        if isNode, let contested = item.contested {
+            switch contested.reason {
+            case .tie:
+                notes.append(String(localized: "Ce nœud est aussi déclaré sur un autre support, à égalité de validations."))
+            case .minorityElsewhere:
+                notes.append(String(localized: "Ce nœud est aussi déclaré ailleurs, mais ton support reste le plus validé."))
+            case nil:
+                notes.append(String(localized: "Ce nœud est aussi déclaré sur un autre support."))
+            }
+            for site in contested.otherSites {
+                notes.append("\(String(localized: "Support \(site.siteId)")) · \(String(localized: "\(site.validations) validations"))")
+            }
+        }
+        if isNode, item.cellsTruncated {
+            notes.append(String(localized: "Seules les 4 000 cellules les plus récentes de ce nœud sont affichées."))
+        }
+        if canEditSector {
+            // Le contrôle des doublons ne porte que sur les cellules avec ECI/NCI.
+            if checks.cellConflict == .unavailable, item.ci != nil {
+                notes.append(String(localized: "Vérification des doublons indisponible pour le moment."))
+            } else if let conflict = item.cellConflict {
+                switch conflict.reason {
+                case .otherSite:
+                    notes.append(String(localized: "Cette cellule est déclarée sur un autre support."))
+                    if let siteId = conflict.siteId {
+                        notes.append(String(localized: "Support \(siteId)"))
+                    }
+                case .pciMismatch:
+                    if let pci = conflict.pci {
+                        notes.append(String(localized: "Sur ce support, cette cellule est aussi déclarée avec un autre PCI (\(pci))."))
+                    } else {
+                        notes.append(String(localized: "Sur ce support, cette cellule est aussi déclarée avec un autre PCI."))
+                    }
+                }
+            }
+            if checks.sectorCheck == .unavailable {
+                notes.append(String(localized: "Vérification du secteur indisponible pour le moment."))
+            } else if item.sectorCheck?.status == .unknown {
+                notes.append(String(localized: "Le secteur ne peut pas encore être vérifié pour ce support."))
+            }
+        }
+        if item.orphan {
+            notes.append(String(localized: "Aucune de tes identifications de nœud actives ne porte cette cellule."))
+        }
+        return notes
     }
 
     @ViewBuilder
@@ -686,7 +1059,7 @@ private struct IdentificationDetailSheet: View {
                             subtitle: "Toucher le bon secteur sur le radar",
                             icon: "dot.radiowaves.right",
                             identifier: "identification.sector"
-                        ) { showSector = true }
+                        ) { sectorPrefill = nil; showSector = true }
                     }
                 }
                 .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
@@ -763,12 +1136,18 @@ private struct IdentificationDetailSheet: View {
         return "\(mcc) / \(mnc)"
     }
 
-    /// « iPhone » / « Android » plutôt que la valeur brute du serveur.
+    /// « iPhone », « Manuelle »… plutôt que la valeur brute du serveur. La source se
+    /// lit sur chaque ligne : un nœud peut porter des cellules de sources différentes.
     private var sourceLabel: String? {
         guard let source = item.source, !source.isEmpty else { return nil }
         switch source.lowercased() {
         case "ios", "iphone": return "iPhone"
         case "android": return "Android"
+        case "manual", "manuel": return String(localized: "Manuelle")
+        case "auto": return String(localized: "Automatique")
+        case "auto_capture": return String(localized: "Capture automatique")
+        // Imports de logs externes (NetMonster, eNB Analytics…) : provenance honnête.
+        case let value where value.contains("sync") || value.contains("import"): return "Import"
         default: return source
         }
     }

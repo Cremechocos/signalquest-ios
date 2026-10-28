@@ -738,7 +738,10 @@ struct ProfileView: View {
                 guard let page = try? await sessions.sessions(offset: 0, limit: 1) else { return nil }
                 return page.pagination?.total ?? page.sessions.count
             },
-            identifications: { (try? await identify.mine(includeRelated: false))?.count },
+            identifications: {
+                guard let page = try? await identify.minePage(cursor: nil, conflictOnly: false, includeRelated: false, limit: 1) else { return nil }
+                return page.totals?.nodes ?? page.identifications.count
+            },
             hasLocalLogs: { !radioLogs.cachedSnapshot().entries.isEmpty }
         )
     }

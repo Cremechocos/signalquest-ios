@@ -299,6 +299,13 @@ extension String {
     }
 }
 
+/// Même aiguillage pour `AttributedString(localized:)` (texte en gras, pluriels).
+extension AttributedString {
+    init(localized value: String.LocalizationValue) {
+        self.init(localized: value, bundle: SQAddress.lookupBundle)
+    }
+}
+
 extension SQAddress {
     /// Paquet où chercher une chaîne : celui du vouvoiement s'il s'applique.
     static var lookupBundle: Bundle {
