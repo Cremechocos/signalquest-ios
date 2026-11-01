@@ -16,7 +16,13 @@ final class SessionDetailViewModel: ObservableObject {
     /// Change à chaque lot de points reçu : la carte ne se redessine que là.
     @Published var renderVersion = UUID()
     /// Tous les points sont là : revenir sur l'écran ne recharge rien.
-    private var hasAllPoints = false
+    private var hasAllPoints = false {
+        didSet { if hasAllPoints, !oldValue, let detail { onComplete?(detail) } }
+    }
+    /// Première page déjà reçue (session d'un autre membre ouverte depuis le fil).
+    private var preloaded: CoverageSessionDetail?
+    /// Appelé une fois, quand tous les points sont reçus.
+    var onComplete: ((CoverageSessionDetail) -> Void)?
 
     let session: CoverageSession
     /// Première page petite pour un affichage rapide, les suivantes plus grosses.
@@ -25,6 +31,17 @@ final class SessionDetailViewModel: ObservableObject {
     nonisolated static let antennaRefreshPageLimit = 100
 
     init(session: CoverageSession) { self.session = session }
+
+    /// `complete` : la session entière, gardée en mémoire, ne relance aucune requête.
+    init(preloaded detail: CoverageSessionDetail, complete: Bool) {
+        session = detail.session
+        if complete {
+            self.detail = detail
+            hasAllPoints = true
+        } else {
+            preloaded = detail
+        }
+    }
 
     struct GenerationShare: Identifiable {
         let generation: String
@@ -161,11 +178,16 @@ final class SessionDetailViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         let first: CoverageSessionDetail
-        do {
-            first = try await service.sessionDetail(id: session.id, pageLimit: Self.firstPageLimit)
-        } catch {
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
-            return
+        if let preloaded {
+            first = preloaded
+            self.preloaded = nil
+        } else {
+            do {
+                first = try await service.sessionDetail(id: session.id, pageLimit: Self.firstPageLimit)
+            } catch {
+                if !error.isCancellation { errorMessage = error.userFacingMessage }
+                return
+            }
         }
         detail = first
         renderVersion = UUID()
@@ -343,6 +365,14 @@ struct SessionDetailView: View {
 
     init(session: CoverageSession) {
         _model = StateObject(wrappedValue: SessionDetailViewModel(session: session))
+    }
+
+    init(preloaded detail: CoverageSessionDetail, complete: Bool, onComplete: @escaping (CoverageSessionDetail) -> Void) {
+        _model = StateObject(wrappedValue: {
+            let model = SessionDetailViewModel(preloaded: detail, complete: complete)
+            model.onComplete = onComplete
+            return model
+        }())
     }
 
     private var title: String {
@@ -1651,5 +1681,118 @@ private struct SessionTraceFullScreen: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("sessionDetail.fullMap.point")
+    }
+}
+
+// MARK: - Session d'un autre membre (« Voir la session » du fil)
+
+/// Sessions déjà ouvertes depuis le fil, gardées le temps de la navigation :
+/// rouvrir le détail ne relance aucune requête. Chaque lecture de la session d'un
+/// autre membre compte dans la limite du serveur, un 304 compris. Clé par compte,
+/// vidée au changement de compte.
+@MainActor
+final class SharedSessionMemory {
+    static let shared = SharedSessionMemory()
+    private var entries: [(key: String, detail: CoverageSessionDetail)] = []
+    private let capacity = 4
+
+    private static func key(_ sessionId: String) -> String? {
+        LocalAccountScope.sessionSnapshot().map { "\($0.ownerScopeId)|\($0.sessionId)|\(sessionId)" }
+    }
+
+    func detail(for sessionId: String) -> CoverageSessionDetail? {
+        guard let key = Self.key(sessionId) else { return nil }
+        return entries.first { $0.key == key }?.detail
+    }
+
+    func remember(_ detail: CoverageSessionDetail, for sessionId: String) {
+        guard let key = Self.key(sessionId) else { return }
+        entries.removeAll { $0.key == key }
+        entries.append((key, detail))
+        if entries.count > capacity { entries.removeFirst(entries.count - capacity) }
+    }
+
+    func removeAll() { entries.removeAll() }
+}
+
+/// Détail d'une session ouverte par son identifiant (`metadata.sessionId` du post).
+/// 404 : la session n'est plus publique ; 429 : limite de lecture, sans rejeu
+/// automatique, le bouton revient après le délai donné par le serveur.
+struct SharedSessionDetailView: View {
+    let sessionId: String
+    @EnvironmentObject private var services: AppServices
+    @Environment(\.dismiss) private var dismiss
+    @State private var loaded: (detail: CoverageSessionDetail, complete: Bool)?
+    @State private var failure: String?
+    @State private var retryAt: Date?
+
+    var body: some View {
+        if let loaded {
+            SessionDetailView(preloaded: loaded.detail, complete: loaded.complete) { [sessionId] detail in
+                SharedSessionMemory.shared.remember(detail, for: sessionId)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessionDetail.back") { dismiss() }
+                if let failure {
+                    ErrorStateView(
+                        title: String(localized: "Session indisponible"),
+                        message: failure,
+                        retry: retryAt == nil ? { Task { await load() } } : nil
+                    )
+                    .accessibilityIdentifier("sharedSession.error")
+                } else {
+                    SQSpinner().tint(SQColor.brandRed)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(SQColor.bg.ignoresSafeArea())
+            .task { await load() }
+            .task(id: retryAt) {
+                guard let retryAt else { return }
+                try? await Task.sleep(nanoseconds: UInt64(max(0, retryAt.timeIntervalSinceNow) * 1_000_000_000))
+                if !Task.isCancelled { self.retryAt = nil }
+            }
+        }
+    }
+
+    private func load() async {
+        if let remembered = SharedSessionMemory.shared.detail(for: sessionId) {
+            loaded = (remembered, true)
+            return
+        }
+        failure = nil
+        do {
+            let first = try await services.sessions.sessionDetail(id: sessionId, pageLimit: SessionDetailViewModel.firstPageLimit)
+            loaded = (first, false)
+        } catch {
+            guard !error.isCancellation else { return }
+            failure = Self.message(for: error)
+            if case APIError.http(429, _, _, _, let retryAfter)? = error as? APIError {
+                retryAt = Date().addingTimeInterval(TimeInterval(retryAfter ?? 60))
+            }
+        }
+    }
+
+    nonisolated static func message(for error: Error) -> String {
+        guard let api = error as? APIError, case .http(let status, _, _, _, let retryAfter) = api else {
+            return error.userFacingMessage
+        }
+        switch status {
+        case 404:
+            return String(localized: "Cette session n’est plus publique.")
+        case 429:
+            let seconds = retryAfter ?? 60
+            if seconds < 90 { return String(localized: "Trop de sessions ouvertes. Réessaie dans \(max(seconds, 1)) s.") }
+            if seconds < 90 * 60 { return String(localized: "Trop de sessions ouvertes. Réessaie dans \((seconds + 59) / 60) min.") }
+            // Plafond du jour : un délai en heures ne dit rien de plus.
+            return String(localized: "Trop de sessions ouvertes aujourd’hui. Réessaie plus tard.")
+        default:
+            return error.userFacingMessage
+        }
     }
 }

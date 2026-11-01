@@ -471,6 +471,7 @@ final class AppServices: ObservableObject {
         favoriteRefreshTask = nil
         favoriteAntennas.resetForAccountChange()
         refreshFavoritesForCurrentAccount()
+        SharedSessionMemory.shared.removeAll()
     }
 
     /// Activation à la connexion (20/10) : la preuve tout juste donnée établit le

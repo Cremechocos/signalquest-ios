@@ -176,4 +176,43 @@ final class SessionDetailProgressiveLoadingTests: XCTestCase {
         XCTAssertNil(SessionDetailViewModel.sample(for: detail.servingAntennas[1], in: points),
                      "Jamais le premier point radio d'un autre nœud")
     }
+
+    /// « Voir la session » : la première page déjà reçue n'est pas redemandée, la session
+    /// entière part en mémoire, et rouverte depuis la mémoire elle ne coûte aucune requête.
+    func testASharedSessionReusesItsFirstPageAndIsRememberedWhole() async throws {
+        let first = try JSONDecoder().decode(CoverageSessionDetail.self, from: Data(Self.firstPage([Self.point("p1")], cursor: "c1").utf8))
+        let service = PagedSessions(firstPages: [Self.firstPage([], cursor: nil)],
+                                    nextPages: ["c1": .success(Self.nextPage([Self.point("p2")], cursor: nil))])
+        var remembered: CoverageSessionDetail?
+        let model = SessionDetailViewModel(preloaded: first, complete: false)
+        model.onComplete = { remembered = $0 }
+        await model.load(service: service)
+
+        XCTAssertEqual(service.firstPageLimits, [], "première page reçue avant d'ouvrir le détail")
+        XCTAssertEqual(service.requestedCursors, ["c1"])
+        XCTAssertEqual(remembered?.points.map(\.id), ["p1", "p2"])
+
+        let reopened = SessionDetailViewModel(preloaded: try XCTUnwrap(remembered), complete: true)
+        await reopened.load(service: service)
+        XCTAssertEqual(service.firstPageLimits, [])
+        XCTAssertEqual(service.requestedCursors, ["c1"], "rien de redemandé")
+        XCTAssertEqual(reopened.detail?.points.count, 2)
+    }
+
+    /// 404 et limite de lecture se disent différemment : un membre à la limite ne doit pas
+    /// lire « plus publique » et croire la session supprimée.
+    func testSharedSessionErrorsTellNotPublicFromRateLimit() {
+        func http(_ status: Int, _ retryAfter: Int?) -> APIError {
+            .http(status: status, code: nil, message: "", requestId: nil, retryAfter: retryAfter)
+        }
+        let notPublic = SharedSessionDetailView.message(for: http(404, nil))
+        XCTAssertEqual(notPublic, String(localized: "Cette session n’est plus publique."))
+        let seconds = SharedSessionDetailView.message(for: http(429, 20))
+        XCTAssertEqual(seconds, String(localized: "Trop de sessions ouvertes. Réessaie dans \(20) s."))
+        XCTAssertEqual(SharedSessionDetailView.message(for: http(429, 300)),
+                       String(localized: "Trop de sessions ouvertes. Réessaie dans \(5) min."))
+        XCTAssertEqual(SharedSessionDetailView.message(for: http(429, 40_000)),
+                       String(localized: "Trop de sessions ouvertes aujourd’hui. Réessaie plus tard."))
+        XCTAssertNotEqual(notPublic, seconds)
+    }
 }

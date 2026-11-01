@@ -38,6 +38,10 @@ struct SignalDetailSheet: View {
     @State private var firstComment: SocialComment?
     /// Photo de la publication ouverte en plein écran.
     @State private var viewerImage: MessageImageTarget?
+    /// Session ouverte par « Voir la session ».
+    @State private var openedSession: OpenedSession?
+
+    private struct OpenedSession: Identifiable { let id: String }
 
     private var signal: SocialSignalSummary? { item.signal }
     private var detailsHidden: Bool { signal?.detailsHidden == true || detailsHiddenByServer }
@@ -140,6 +144,10 @@ struct SignalDetailSheet: View {
             }
         }
         .sheet(item: $experienceShare) { ExperienceSharePreviewSheet(input: $0) }
+        .fullScreenCover(item: $openedSession) { opened in
+            SharedSessionDetailView(sessionId: opened.id)
+                .environmentObject(services)
+        }
     }
 
     // MARK: Header
@@ -696,6 +704,14 @@ struct SignalDetailSheet: View {
                     .accessibilityElement()
                     .accessibilityLabel(Text("Carte du parcours"))
                     .accessibilityIdentifier("signal.detail.trace")
+                // Seulement avec un tracé : sans point, la session n'a rien de plus à montrer.
+                if let sessionId = metaString("sessionId") {
+                    GradientButton("Voir la session", systemImage: "point.topleft.down.to.point.bottomright.curvepath", style: .secondary) {
+                        Haptics.selection()
+                        openedSession = OpenedSession(id: sessionId)
+                    }
+                    .accessibilityIdentifier("signal.detail.openSession")
+                }
             }
         } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {

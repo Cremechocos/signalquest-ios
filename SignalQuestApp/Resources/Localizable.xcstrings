@@ -676,6 +676,22 @@
         }
       }
     },
+    "Cette session n’est plus publique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This session is no longer public."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’est plus publique."
+          }
+        }
+      }
+    },
     "En charge" : {
       "localizations" : {
         "en" : {
@@ -981,6 +997,22 @@
         }
       }
     },
+    "Session indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session indisponible"
+          }
+        }
+      }
+    },
     "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution »." : {
       "localizations" : {
         "en" : {
@@ -1009,6 +1041,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "consommés"
+          }
+        }
+      }
+    },
+    "SQFormal|Trop de sessions ouvertes aujourd’hui. Réessaie plus tard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes aujourd’hui. Réessayez plus tard."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Trop de sessions ouvertes. Réessaie dans %lld min." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes. Réessayez dans %lld min."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Trop de sessions ouvertes. Réessaie dans %lld s." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes. Réessayez dans %lld s."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Trop de sessions ouvertes aujourd’hui. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many sessions opened today. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes aujourd’hui. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "Trop de sessions ouvertes. Réessaie dans %lld min." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many sessions opened. Try again in %lld min."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes. Réessaie dans %lld min."
+          }
+        }
+      }
+    },
+    "Trop de sessions ouvertes. Réessaie dans %lld s." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many sessions opened. Try again in %lld s."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop de sessions ouvertes. Réessaie dans %lld s."
+          }
+        }
+      }
+    },
+    "Voir la session" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View session"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir la session"
           }
         }
       }
