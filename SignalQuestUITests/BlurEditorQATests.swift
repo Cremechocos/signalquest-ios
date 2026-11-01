@@ -5,14 +5,16 @@ import XCTest
 @MainActor
 final class BlurEditorQATests: XCTestCase {
     func testDrawingRemovingAndApplyingAnArea() {
-        run(locale: "fr", noFace: "Aucun visage repéré", oneArea: "Zones à flouter : 1", remove: "Retirer la zone 1")
+        run(locale: "fr", noFace: "Aucun visage repéré", oneArea: "Zones à flouter : 1", remove: "Retirer la zone 1",
+            done: "Valider", keepEditing: "Continuer")
     }
 
     func testEnglishDrawingRemovingAndApplyingAnArea() {
-        run(locale: "en", noFace: "No faces found", oneArea: "Areas to blur: 1", remove: "Remove area 1")
+        run(locale: "en", noFace: "No faces found", oneArea: "Areas to blur: 1", remove: "Remove area 1",
+            done: "Done", keepEditing: "Keep editing")
     }
 
-    private func run(locale: String, noFace: String, oneArea: String, remove: String) {
+    private func run(locale: String, noFace: String, oneArea: String, remove: String, done: String, keepEditing: String) {
         continueAfterFailure = false
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-blur-editor"], locale: locale)
@@ -22,6 +24,7 @@ final class BlurEditorQATests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 20), "Éditeur « Flouter » introuvable")
         XCTAssertTrue(waitForLabel(of: status, startingWith: noFace), "Aucun visage sur l'image de recette : \(status.label)")
         let apply = app.buttons["photoEditor.done"]
+        XCTAssertEqual(apply.label, done)
         XCTAssertTrue(app.buttons["photoEditor.tool.blur"].isSelected, "L'éditeur s'ouvre sur Flouter")
 
         drawArea(in: app)
@@ -53,6 +56,13 @@ final class BlurEditorQATests: XCTestCase {
         add(crop)
         app.buttons["photoEditor.tool.blur"].tap()
         XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea), "La zone floutée survit au recadrage")
+
+        // Annuler avec des modifications : on peut reprendre la retouche.
+        app.buttons["photoEditor.cancel"].tap()
+        let keep = app.buttons[keepEditing]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "« \(keepEditing) » attendu")
+        keep.tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "L'éditeur reste ouvert")
         apply.tap()
         XCTAssertTrue(status.waitForNonExistence(timeout: 5), "« Valider » doit refermer l'éditeur")
     }

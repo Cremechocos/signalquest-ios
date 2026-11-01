@@ -86,7 +86,7 @@ struct PhotoEditorView: View {
         edits: PhotoEdits = PhotoEdits(),
         fixedAspect: CGFloat? = nil,
         initialTool: Tool = .crop,
-        confirmTitle: LocalizedStringKey = "Valider",
+        confirmTitle: LocalizedStringKey = "photoEditor.done",
         blurConfirmTitle: LocalizedStringKey? = nil,
         onDone: @escaping (UIImage, PhotoEdits) -> Void
     ) {
@@ -149,9 +149,11 @@ struct PhotoEditorView: View {
                     .accessibilityIdentifier("photoEditor.done")
                 }
             }
-            .confirmationDialog("Abandonner les modifications ?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            // Alerte plutôt que feuille d'actions : les iOS récents y masquent le bouton
+            // d'annulation, et « Continuer » doit toujours se lire à côté de « Abandonner ».
+            .alert("Abandonner les modifications ?", isPresented: $confirmDiscard) {
                 Button("Abandonner", role: .destructive) { dismiss() }
-                Button("Continuer", role: .cancel) {}
+                Button("photoEditor.keepEditing", role: .cancel) {}
             }
             .interactiveDismissDisabled(hasChanges)
             .task(id: tool) {
