@@ -763,4 +763,21 @@ final class FeedDecodingRobustnessTests: XCTestCase {
             XCTAssertTrue((0...1).contains(point.x) && (0...1).contains(point.y), "\(point)")
         }
     }
+
+    /// Un plan qui ne revient jamais (MapKit muet, même après annulation) est abandonné au
+    /// délai, et le tour est rendu : le rendu suivant passe au lieu de geler tout le fil.
+    @MainActor
+    func testSilentMapIsAbandonedAndReleasesTheQueue() async {
+        let cache = RouteSnapshotCache.shared
+        let started = Date()
+        let silent = await cache.inTurn(key: "test-silent-\(UUID())") {
+            await RouteSnapshotCache.render(timeout: 0.3, start: { _ in }, cancel: {})
+        }
+        XCTAssertNil(silent)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        let next = await cache.inTurn(key: "test-next-\(UUID())") {
+            await RouteSnapshotCache.render(timeout: 5, start: { done in done(UIImage(systemName: "map")) }, cancel: {})
+        }
+        XCTAssertNotNil(next)
+    }
 }

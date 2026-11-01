@@ -256,8 +256,14 @@ private struct CoverageRouteThumbnail: View {
     }
 }
 
+/// `MKMapSnapshotter` n'est pas `Sendable` ; `start` et `cancel` sont sûrs depuis tout fil.
+private final class SnapshotterBox: @unchecked Sendable {
+    let value: MKMapSnapshotter
+    init(_ value: MKMapSnapshotter) { self.value = value }
+}
+
 /// Termine une seule fois l'attente d'un plan, depuis n'importe quel fil.
-private final class SnapshotOutcome: @unchecked Sendable {
+final class SnapshotOutcome: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock<(CheckedContinuation<UIImage?, Never>?, Bool)>(initialState: (nil, false))
 
     func attach(_ continuation: CheckedContinuation<UIImage?, Never>) {
@@ -331,11 +337,6 @@ final class RouteSnapshotCache {
 
     func background(of rect: MKMapRect, size: CGSize, scale: CGFloat, dark: Bool, key: String) async -> UIImage? {
         guard !skipsBackground else { return nil }
-        await takeTurn()
-        defer { endTurn() }
-        // Carte sortie de l'écran pendant l'attente : rien à rendre.
-        guard !Task.isCancelled else { return nil }
-        if let image = cached(key) { return image }
         let options = MKMapSnapshotter.Options()
         options.mapRect = rect
         options.size = size
@@ -343,27 +344,46 @@ final class RouteSnapshotCache {
         options.mapType = .mutedStandard
         options.pointOfInterestFilter = .excludingAll
         options.traitCollection = UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
-        let snapshotter = MKMapSnapshotter(options: options)
-        // Reprise unique, quel que soit l'événement qui arrive le premier : plan rendu, délai de
-        // 15 s dépassé (réseau muet, la file ne doit pas rester bloquée) ou carte sortie de
-        // l'écran. MapKit ne promet pas de rappeler après une annulation.
+        return await inTurn(key: key) {
+            let snapshotter = SnapshotterBox(MKMapSnapshotter(options: options))
+            return await Self.render(timeout: 15,
+                                     start: { done in snapshotter.value.start(with: .main) { snapshot, _ in done(snapshot?.image) } },
+                                     cancel: { snapshotter.value.cancel() })
+        }
+    }
+
+    /// Un rendu à la fois sur tout le fil ; le tour est rendu quoi qu'il arrive au rendu.
+    func inTurn(key: String, _ work: () async -> UIImage?) async -> UIImage? {
+        await takeTurn()
+        defer { endTurn() }
+        // Carte sortie de l'écran pendant l'attente : rien à rendre.
+        guard !Task.isCancelled else { return nil }
+        if let image = cached(key) { return image }
+        guard let image = await work(), !Task.isCancelled else { return nil }
+        images.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.scale * image.size.height * image.scale * 4))
+        return image
+    }
+
+    /// Reprise unique, quel que soit l'événement qui arrive le premier : plan rendu, délai
+    /// dépassé (réseau muet : la file ne doit pas rester bloquée) ou carte sortie de l'écran.
+    /// MapKit ne promet pas de rappeler après une annulation : on n'attend jamais son rappel.
+    static func render(timeout: TimeInterval,
+                       start: @MainActor (@escaping @Sendable (UIImage?) -> Void) -> Void,
+                       cancel: @escaping @Sendable () -> Void) async -> UIImage? {
         let outcome = SnapshotOutcome()
-        let rendered = await withTaskCancellationHandler {
+        return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
                 outcome.attach(continuation)
-                snapshotter.start(with: .main) { snapshot, _ in outcome.finish(snapshot?.image) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
-                    snapshotter.cancel()
+                MainActor.assumeIsolated { start { outcome.finish($0) } }
+                DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+                    cancel()
                     outcome.finish(nil)
                 }
             }
         } onCancel: {
-            snapshotter.cancel()
+            cancel()
             outcome.finish(nil)
         }
-        guard let image = rendered, !Task.isCancelled else { return nil }
-        images.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.scale * image.size.height * image.scale * 4))
-        return image
     }
 
     private func takeTurn() async {
