@@ -554,6 +554,22 @@
         }
       }
     },
+    "%lld ms de plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ms more"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ms de plus"
+          }
+        }
+      }
+    },
     "%lld nouvelles antennes" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -640,6 +656,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette fonction demande une carte SIM d'un opérateur pris en charge."
+          }
+        }
+      }
+    },
+    "En charge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Under load"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En charge"
           }
         }
       }
@@ -945,6 +977,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution »."
+          }
+        }
+      }
+    },
+    "consommés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "used"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "consommés"
           }
         }
       }

@@ -355,24 +355,23 @@ struct SpeedtestResultSummary: View {
                     tab: .latency, delay: 0.26, identifier: "speedtest.result.latency"
                 )
             }
-            if let load = figures.underLoad {
-                let readings = [load.receivingMs.map { "↓ \(Int($0.rounded()).formatted())" }, load.sendingMs.map { "↑ \(Int($0.rounded()).formatted())" }]
-                let spoken = [load.receivingMs.map { String(localized: "en réception \(Int($0.rounded())) ms") },
-                              load.sendingMs.map { String(localized: "en envoi \(Int($0.rounded())) ms") }]
+            // Un seul chiffre par cadre, de même taille que les autres : la pire latence pendant
+            // le téléchargement ou l’envoi, et son écart au repos.
+            if let load = figures.underLoad, let worst = [load.receivingMs, load.sendingMs].compactMap({ $0 }).max() {
+                let worstMs = Int(worst.rounded())
+                let extra = figures.latencyMs.map { max(0, worstMs - Int($0.rounded())) }
                 tile(
-                    title: String(localized: "Sous charge"), grade: load.grade,
-                    value: readings.compactMap { $0 }.joined(separator: " · "), unit: "ms",
-                    detail: nil,
-                    tab: .latency, delay: 0.32, identifier: "speedtest.result.underLoad",
-                    spoken: ([String(localized: "Sous charge")] + [load.grade.map { String(localized: "note \($0.letter)") }] + spoken)
-                        .compactMap { $0 }.joined(separator: ", ")
+                    title: String(localized: "En charge"),
+                    value: "\(worstMs)", unit: "ms",
+                    detail: extra.map { String(localized: "\($0) ms de plus") },
+                    tab: .latency, delay: 0.32, identifier: "speedtest.result.underLoad"
                 )
             }
             if let bytes = figures.transferredBytes(deviceCount: deviceBytes) {
                 tile(
                     title: String(localized: "Données"),
                     value: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file), unit: nil,
-                    detail: String(localized: "réception et envoi"),
+                    detail: String(localized: "consommés"),
                     tab: .speed, delay: 0.38, identifier: "speedtest.result.data"
                 )
             }
@@ -381,8 +380,8 @@ struct SpeedtestResultSummary: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func tile(title: String, grade: SQShareCardModel.Grade? = nil, value: String, unit: String?, detail: String?,
-                      tab: SpeedtestDetailsTab, delay: Double, identifier: String, spoken: String? = nil) -> some View {
+    private func tile(title: String, value: String, unit: String?, detail: String?,
+                      tab: SpeedtestDetailsTab, delay: Double, identifier: String) -> some View {
         Button {
             Haptics.selection()
             onDetails(tab)
@@ -396,15 +395,6 @@ struct SpeedtestResultSummary: View {
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    if let grade {
-                        // Fond de la note comme sur l'image ; lettre en couleur de texte
-                        // pour rester lisible en sombre et en OLED.
-                        Text(verbatim: grade.letter)
-                            .font(SQFont.body(9.5, .heavy, relativeTo: .caption2))
-                            .foregroundStyle(SQColor.label)
-                            .padding(.horizontal, 4)
-                            .background(Color(uiColor: grade.background), in: RoundedRectangle(cornerRadius: 3))
-                    }
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(verbatim: value)
@@ -434,8 +424,7 @@ struct SpeedtestResultSummary: View {
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityElement(children: .ignore)
-        // Les flèches ↓ ↑ se liraient « flèche » : la tuile Sous charge dicte son texte.
-        .accessibilityLabel(Text(verbatim: spoken ?? [title, value, unit, detail].compactMap { $0 }.joined(separator: " ")))
+        .accessibilityLabel(Text(verbatim: [title, value, unit, detail].compactMap { $0 }.joined(separator: " ")))
         .accessibilityHint(Text("Ouvre les détails du test"))
         .accessibilityIdentifier(identifier)
         .modifier(SpeedtestRise(shown: shown, delay: delay))
