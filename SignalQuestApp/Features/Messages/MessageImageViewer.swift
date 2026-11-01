@@ -185,7 +185,8 @@ private struct MessageImagePage: View {
                 maxDimension: 1600,
                 contentMode: .fit,
                 cacheScope: target.accountSession.map(ImageCacheScope.privateAccount) ?? .publicContent,
-                showsFailureUI: true
+                showsFailureUI: true,
+                animates: true
             ) {
                 SQSpinner()
                     .tint(.white)

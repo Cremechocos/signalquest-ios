@@ -37,7 +37,8 @@ struct RemoteImageQAScreen: View {
                     maxDimension: 320,
                     contentMode: .fill,
                     pipeline: usesSyntheticTimeout ? Self.timeoutPipeline : .shared,
-                    showsFailureUI: true
+                    showsFailureUI: true,
+                    animates: ProcessInfo.processInfo.environment["SQ_QA_IMAGE_ANIMATED"] == "1"
                 ) {
                     Rectangle().fill(SQColor.fill)
                         .accessibilityIdentifier("remoteImage.loading")

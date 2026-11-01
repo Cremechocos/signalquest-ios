@@ -195,26 +195,29 @@ final class ImagePipeline: @unchecked Sendable {
     /// Image déjà décodée en cache mémoire, le cas échéant (accès synchrone). Permet
     /// aux vues recyclées fréquemment (marqueurs carte) d'afficher immédiatement sans
     /// repasser par une tâche asynchrone annulable.
-    func cachedImage(for url: URL, maxPixel: CGFloat, scope: ImageCacheScope = .publicContent) -> UIImage? {
+    func cachedImage(for url: URL, maxPixel: CGFloat, scope: ImageCacheScope = .publicContent, animated: Bool = false) -> UIImage? {
         guard (try? scope.requireCurrentPrivateSession()) != nil else { return nil }
-        return memory.object(forKey: memoryKey(for: url, maxPixel: maxPixel, scope: scope))
+        return memory.object(forKey: memoryKey(for: url, maxPixel: maxPixel, scope: scope, animated: animated))
     }
 
-    /// Image décodée et redimensionnée à `maxPixel` (plus grand côté, en pixels).
+    /// Image décodée et redimensionnée à `maxPixel` (plus grand côté, en pixels). Avec
+    /// `animated`, une image animée garde toutes ses images ; sinon seule la première.
     func image(
         for url: URL,
         maxPixel: CGFloat,
         scope: ImageCacheScope = .publicContent,
-        reload: Bool = false
+        reload: Bool = false,
+        animated: Bool = false
     ) async throws -> UIImage {
         try scope.requireCurrentPrivateSession()
-        let key = memoryKey(for: url, maxPixel: maxPixel, scope: scope)
+        let key = memoryKey(for: url, maxPixel: maxPixel, scope: scope, animated: animated)
         if !reload, let cached = memory.object(forKey: key) { return cached }
         let data = try await dataLoader(url, scope, reload)
         // La session peut avoir changé pendant le transport ou le décodage. Ne
         // publie jamais les octets de A dans une vue qui appartient désormais à B.
         try scope.requireCurrentPrivateSession()
-        guard let image = Self.downsample(data: data, maxPixel: maxPixel) else {
+        let animation = animated ? Self.animatedImage(data: data, maxPixel: maxPixel) : nil
+        guard let image = animation ?? Self.downsample(data: data, maxPixel: maxPixel) else {
             throw ImagePipelineError.decodeFailed
         }
         try scope.requireCurrentPrivateSession()
@@ -222,8 +225,8 @@ final class ImagePipeline: @unchecked Sendable {
         return image
     }
 
-    private func memoryKey(for url: URL, maxPixel: CGFloat, scope: ImageCacheScope) -> NSString {
-        "\(scope.cacheIdentity)|\(url.absoluteString)|\(Int(maxPixel))" as NSString
+    private func memoryKey(for url: URL, maxPixel: CGFloat, scope: ImageCacheScope, animated: Bool) -> NSString {
+        "\(scope.cacheIdentity)|\(url.absoluteString)|\(Int(maxPixel))\(animated ? "|animated" : "")" as NSString
     }
 
     static func downsample(data: Data, maxPixel: CGFloat) -> UIImage? {
@@ -239,7 +242,68 @@ final class ImagePipeline: @unchecked Sendable {
         return UIImage(cgImage: cgImage)
     }
 
+    /// Pixels décodés au plus pour toutes les images d'une animation (≈ 40 Mo) : une longue
+    /// animation est décodée plus petite plutôt que de saturer la mémoire.
+    static let animationPixelBudget: CGFloat = 10_000_000
+    static let maxAnimationFrames = 500
+
+    /// GIF, WebP ou PNG animé décodé en `UIImage` animée, au délai de chaque image
+    /// (moins de 20 ms = 100 ms, comme les navigateurs) ; `nil` pour une image fixe.
+    static func animatedImage(data: Data, maxPixel: CGFloat) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
+        let count = CGImageSourceGetCount(source)
+        guard count > 1, count <= maxAnimationFrames else { return nil }
+        let framePixel = min(maxPixel, (animationPixelBudget / CGFloat(count)).squareRoot())
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(1, framePixel),
+        ] as CFDictionary
+        var frames: [(image: UIImage, centiseconds: Int)] = []
+        for index in 0..<count {
+            guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, index, options) else { continue }
+            frames.append((UIImage(cgImage: cgImage), frameDelayCentiseconds(source: source, index: index)))
+        }
+        guard frames.count > 1 else { return nil }
+        // `animatedImage(with:duration:)` donne la même durée à chaque image : une image plus
+        // longue est répétée, au pas du plus grand diviseur commun des délais.
+        let step = frames.map(\.centiseconds).reduce(0, gcd)
+        let repeated = frames.flatMap { Array(repeating: $0.image, count: $0.centiseconds / max(1, step)) }
+        let total = Double(frames.map(\.centiseconds).reduce(0, +)) / 100
+        if repeated.count <= maxAnimationFrames * 4 {
+            return UIImage.animatedImage(with: repeated, duration: total)
+        }
+        return UIImage.animatedImage(with: frames.map(\.image), duration: total)
+    }
+
+    static func frameDelayCentiseconds(source: CGImageSource, index: Int) -> Int {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] ?? [:]
+        let containers: [(CFString, CFString, CFString)] = [
+            (kCGImagePropertyGIFDictionary, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyGIFDelayTime),
+            (kCGImagePropertyWebPDictionary, kCGImagePropertyWebPUnclampedDelayTime, kCGImagePropertyWebPDelayTime),
+            (kCGImagePropertyPNGDictionary, kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyAPNGDelayTime),
+        ]
+        for (dictionary, unclamped, clamped) in containers {
+            guard let values = properties[dictionary] as? [CFString: Any] else { continue }
+            let seconds = (values[unclamped] as? Double).flatMap { $0 > 0 ? $0 : nil } ?? values[clamped] as? Double ?? 0
+            let centiseconds = Int((seconds * 100).rounded())
+            return centiseconds < 2 ? 10 : centiseconds
+        }
+        return 10
+    }
+
+    private static func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
+
     private static func cost(of image: UIImage) -> Int {
+        // Une animation coûte toutes ses images distinctes, pas la première seule.
+        if let images = image.images, !images.isEmpty {
+            var seen = Set<ObjectIdentifier>()
+            return images.reduce(0) { total, frame in
+                guard seen.insert(ObjectIdentifier(frame)).inserted, let cg = frame.cgImage else { return total }
+                return total + cg.bytesPerRow * cg.height
+            }
+        }
         guard let cg = image.cgImage else { return 0 }
         return cg.bytesPerRow * cg.height
     }
@@ -255,6 +319,8 @@ struct RemoteImage<Placeholder: View>: View {
     var cacheScope: ImageCacheScope = .publicContent
     var pipeline: ImagePipeline = .shared
     var showsFailureUI = false
+    /// Joue les GIF et WebP animés (messages) ; ailleurs, la première image suffit.
+    var animates = false
     @ViewBuilder var placeholder: () -> Placeholder
 
     @State private var image: UIImage?
@@ -262,14 +328,23 @@ struct RemoteImage<Placeholder: View>: View {
     @State private var retryCount = 0
     @State private var retryIdentity: String?
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
             if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-                    .accessibilityIdentifier("remoteImage.loaded")
+                // SwiftUI `Image` n'affiche que la première image d'une animation. Réduire
+                // les animations laisse l'image fixe.
+                if image.images != nil, !reduceMotion {
+                    AnimatedImageView(image: image, contentMode: contentMode)
+                        .aspectRatio(image.size, contentMode: contentMode)
+                        .accessibilityIdentifier("remoteImage.loaded")
+                } else {
+                    Image(uiImage: image.images?.first ?? image)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                        .accessibilityIdentifier("remoteImage.loaded")
+                }
             } else if failed && showsFailureUI {
                 failureView
             } else {
@@ -289,7 +364,8 @@ struct RemoteImage<Placeholder: View>: View {
             if let cached = pipeline.cachedImage(
                 for: url,
                 maxPixel: maxPixel,
-                scope: cacheScope
+                scope: cacheScope,
+                animated: animates
             ) {
                 image = cached
                 return
@@ -301,7 +377,8 @@ struct RemoteImage<Placeholder: View>: View {
                     for: url,
                     maxPixel: maxPixel,
                     scope: cacheScope,
-                    reload: forceReload
+                    reload: forceReload,
+                    animated: animates
                 )
                 guard !Task.isCancelled else { return }
                 image = loaded
@@ -352,10 +429,35 @@ struct RemoteImage<Placeholder: View>: View {
 
     /// Recharge quand l'URL OU l'échelle change.
     private var requestIdentity: String {
-        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))"
+        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))|\(animates)"
     }
 
     private var taskKey: String {
         "\(requestIdentity)|\(retryCount)"
+    }
+}
+
+/// Image animée jouée par `UIImageView` : la taille vient du cadre SwiftUI, jamais de
+/// l'image, et le débord est rogné comme avec `Image.resizable()`.
+private struct AnimatedImageView: UIViewRepresentable {
+    let image: UIImage
+    let contentMode: ContentMode
+
+    func makeUIView(context: Context) -> UIImageView {
+        let view = UIImageView()
+        view.clipsToBounds = true
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        return view
+    }
+
+    func updateUIView(_ view: UIImageView, context: Context) {
+        view.contentMode = contentMode == .fill ? .scaleAspectFill : .scaleAspectFit
+        if view.image !== image {
+            view.image = image
+            view.startAnimating()
+        }
     }
 }

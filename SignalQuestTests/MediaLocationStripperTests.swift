@@ -143,7 +143,8 @@ final class MediaLocationStripperTests: XCTestCase {
     /// un GIF fixe ou une autre image reste sur le chemin JPEG.
     func testAnimatedGIFKeepsItsFrames() throws {
         let animated = try gif(frames: 3)
-        let result = try XCTUnwrap(MediaLocationStripper.animatedGIF(animated))
+        let result = try XCTUnwrap(MediaLocationStripper.animatedImage(animated))
+        XCTAssertEqual(result.type, .gif)
         XCTAssertEqual(result.width, 8)
         XCTAssertEqual(result.height, 6)
         let source = try XCTUnwrap(CGImageSourceCreateWithData(result.data as CFData, nil))
@@ -154,8 +155,19 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertEqual(gifProperties[kCGImagePropertyGIFDelayTime] as? Double ?? 0, 0.1, accuracy: 0.001)
         XCTAssertFalse(MediaLocationStripper.hasLocation(result.data))
 
-        XCTAssertNil(MediaLocationStripper.animatedGIF(try gif(frames: 1)))
-        XCTAssertNil(MediaLocationStripper.animatedGIF(Data("bonjour".utf8)))
+        XCTAssertNil(MediaLocationStripper.animatedImage(try gif(frames: 1)))
+        XCTAssertNil(MediaLocationStripper.animatedImage(Data("bonjour".utf8)))
+    }
+
+    /// Reçue, une image animée est décodée image par image, au délai de chacune
+    /// (0,1 s × 3 = 0,3 s) ; sans animation demandée, seule la première est gardée.
+    func testReceivedAnimationPlaysAllItsFrames() throws {
+        let data = try gif(frames: 3)
+        let animation = try XCTUnwrap(ImagePipeline.animatedImage(data: data, maxPixel: 240))
+        XCTAssertEqual(animation.images?.count, 3)
+        XCTAssertEqual(animation.duration, 0.3, accuracy: 0.001)
+        XCTAssertNil(ImagePipeline.animatedImage(data: try gif(frames: 1), maxPixel: 240))
+        XCTAssertNil(ImagePipeline.downsample(data: data, maxPixel: 240)?.images)
     }
 
     /// Ce qui n'est pas une image (un PDF, du texte) passe tel quel.

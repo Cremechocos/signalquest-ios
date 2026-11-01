@@ -2412,7 +2412,8 @@ struct ConversationDetailView: View {
                         contentMode: .fill,
                         cacheScope: privateImageCacheScope,
                         // Sans état d'échec, le reflet tournait indéfiniment.
-                        showsFailureUI: true
+                        showsFailureUI: true,
+                        animates: true
                     ) {
                         Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
                     }
@@ -4623,11 +4624,12 @@ struct ConversationDetailView: View {
         }
     }
 
-    /// Image prête à l'envoi : un GIF animé part tel quel, sans lieu, pour garder son
-    /// animation (s'il tient dans les 10 Mo) ; toute autre image part en JPEG.
+    /// Image prête à l'envoi : un GIF ou un WebP animé part tel quel, sans lieu, pour garder
+    /// son animation (s'il tient dans les 10 Mo) ; toute autre image part en JPEG.
     nonisolated private static func preparedImage(from data: Data) -> (data: Data, width: Int, height: Int, filename: String, mimeType: String)? {
-        if let gif = MediaLocationStripper.animatedGIF(data), MessageAttachmentOutboxStore.fits(gif.data.count) {
-            return (gif.data, gif.width, gif.height, "image.gif", "image/gif")
+        if let animated = MediaLocationStripper.animatedImage(data), MessageAttachmentOutboxStore.fits(animated.data.count) {
+            let ext = animated.type.preferredFilenameExtension ?? "gif"
+            return (animated.data, animated.width, animated.height, "image.\(ext)", animated.type.preferredMIMEType ?? "image/gif")
         }
         return preparedJPEG(from: data).map { ($0.data, $0.width, $0.height, "photo.jpg", "image/jpeg") }
     }
