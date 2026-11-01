@@ -414,9 +414,11 @@ struct SocialSignalSummary: Codable, Equatable {
     /// Speedtest fait dans une zone privée : position et identifiants réservés à l'auteur.
     let detailsHidden: Bool?
     let detailsHiddenReason: String?
+    /// Tracé d'une session (au plus 64 points, dans l'ordre du trajet) ; vide sinon.
+    let mapPoints: [SocialMapPoint]
 
     enum CodingKeys: String, CodingKey {
-        case detailsHidden, detailsHiddenReason
+        case detailsHidden, detailsHiddenReason, mapPoints
         case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
         case `operator` = "operator"
     }
@@ -468,7 +470,14 @@ struct SocialSignalSummary: Codable, Equatable {
         longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
         detailsHidden = try? c.decodeIfPresent(Bool.self, forKey: .detailsHidden)
         detailsHiddenReason = try? c.decodeIfPresent(String.self, forKey: .detailsHiddenReason)
+        mapPoints = c.decodeLossyArray([SocialMapPoint].self, forKey: .mapPoints)
     }
+}
+
+/// Point du tracé d'une session dans le fil (contrat social-session-preview).
+struct SocialMapPoint: Codable, Equatable {
+    let latitude: Double
+    let longitude: Double
 }
 
 struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {

@@ -730,11 +730,20 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         XCTAssertEqual(result.hashtags.map(\.tag), ["5g", "fibre"])
     }
 
-    /// Le départ d'une session ou d'un drive test (souvent le domicile) n'est montré qu'à l'auteur.
-    func testSessionStartPointIsHiddenFromOthers() {
-        XCTAssertTrue(SignalDetailSheet.hidesStartPoint(kind: "session", canManage: false))
-        XCTAssertTrue(SignalDetailSheet.hidesStartPoint(kind: "DRIVE_TEST", canManage: false))
-        XCTAssertFalse(SignalDetailSheet.hidesStartPoint(kind: "session", canManage: true))
-        XCTAssertFalse(SignalDetailSheet.hidesStartPoint(kind: "speedtest", canManage: false))
+    /// Une session se montre par son tracé (`signal.mapPoints`), jamais par un point isolé :
+    /// ce serait son départ, souvent le domicile.
+    func testSessionShowsItsTraceAndNeverASinglePoint() throws {
+        func signal(_ json: String) throws -> SocialSignalSummary {
+            try JSONDecoder().decode(SocialSignalSummary.self, from: Data(json.utf8))
+        }
+        let traced = try signal(#"{"latitude":45.1,"longitude":5.7,"mapPoints":[{"latitude":45.1,"longitude":5.7},{"latitude":45.2,"longitude":5.8},{"latitude":"x"}]}"#)
+        XCTAssertEqual(traced.mapPoints.count, 2)
+        XCTAssertEqual(SignalDetailSheet.trace(kind: "session", signal: traced)?.count, 2)
+        XCTAssertEqual(SignalDetailSheet.trace(kind: "DRIVE_TEST", signal: traced)?.count, 2)
+        // Un seul point, ou une position sans tracé : aucune carte.
+        let single = try signal(#"{"latitude":45.1,"longitude":5.7,"mapPoints":[{"latitude":45.1,"longitude":5.7}]}"#)
+        XCTAssertEqual(SignalDetailSheet.trace(kind: "session", signal: single)?.isEmpty, true)
+        XCTAssertEqual(SignalDetailSheet.trace(kind: "session", signal: try signal(#"{"latitude":45.1,"longitude":5.7}"#))?.isEmpty, true)
+        XCTAssertNil(SignalDetailSheet.trace(kind: "speedtest", signal: traced))
     }
 }

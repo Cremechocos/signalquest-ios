@@ -644,6 +644,22 @@
         }
       }
     },
+    "Carte du parcours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte du parcours"
+          }
+        }
+      }
+    },
     "Cette fonction demande une carte SIM d'un opérateur pris en charge." : {
       "localizations" : {
         "en" : {

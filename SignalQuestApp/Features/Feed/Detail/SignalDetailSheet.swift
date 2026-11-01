@@ -672,10 +672,13 @@ struct SignalDetailSheet: View {
 
     // MARK: Map
 
-    /// Le point unique d'une session ou d'un drive test est son départ (premier point ou
-    /// centre du tracé) : souvent le domicile, même quand les zones privées vident le tracé.
-    nonisolated static func hidesStartPoint(kind: String, canManage: Bool) -> Bool {
-        !canManage && ["session", "drive_test"].contains(kind.lowercased())
+    /// Session ou drive test : le tracé servi (`signal.mapPoints`), jamais une position isolée.
+    /// Un point seul serait le départ du parcours, souvent le domicile : sans tracé, pas de carte
+    /// (contrat social-session-preview). `nil` pour les autres publications.
+    nonisolated static func trace(kind: String, signal: SocialSignalSummary?) -> [CLLocationCoordinate2D]? {
+        guard ["session", "drive_test"].contains(kind.lowercased()) else { return nil }
+        let points = (signal?.mapPoints ?? []).map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+        return points.count >= 2 ? points : []
     }
 
     @ViewBuilder
@@ -685,9 +688,15 @@ struct SignalDetailSheet: View {
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
                 .accessibilityIdentifier("signal.detail.hidden")
-        } else if Self.hidesStartPoint(kind: item.kind, canManage: item.canManage) {
-            // Seul l'auteur voit le départ ; les autres n'ont pas de carte.
-            EmptyView()
+        } else if let trace = Self.trace(kind: item.kind, signal: signal) {
+            if !trace.isEmpty {
+                SignalTraceMap(coordinates: trace, color: UIColor(accent))
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    .accessibilityElement()
+                    .accessibilityLabel(Text("Carte du parcours"))
+                    .accessibilityIdentifier("signal.detail.trace")
+            }
         } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
             let center = CLLocationCoordinate2D(
@@ -746,3 +755,45 @@ struct SignalDetailSheet: View {
     }
 }
 
+/// Tracé d'une session sur une carte fixe, cadré sur tout le parcours. MapKit en UIKit :
+/// la `Map` SwiftUI ne trace pas de ligne avant iOS 17.
+private struct SignalTraceMap: UIViewRepresentable {
+    let coordinates: [CLLocationCoordinate2D]
+    let color: UIColor
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView()
+        map.delegate = context.coordinator
+        map.isScrollEnabled = false
+        map.isZoomEnabled = false
+        map.isRotateEnabled = false
+        map.isPitchEnabled = false
+        map.pointOfInterestFilter = .excludingAll
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.color = color
+        map.removeOverlays(map.overlays)
+        let line = MKPolyline(coordinates: coordinates, count: coordinates.count)
+        map.addOverlay(line)
+        map.setVisibleMapRect(line.boundingMapRect, edgePadding: UIEdgeInsets(top: 24, left: 24, bottom: 24, right: 24), animated: false)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(color: color) }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        var color: UIColor
+        init(color: UIColor) { self.color = color }
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let line = overlay as? MKPolyline else { return MKOverlayRenderer(overlay: overlay) }
+            let renderer = MKPolylineRenderer(polyline: line)
+            renderer.strokeColor = color
+            renderer.lineWidth = 4
+            renderer.lineCap = .round
+            renderer.lineJoin = .round
+            return renderer
+        }
+    }
+}
