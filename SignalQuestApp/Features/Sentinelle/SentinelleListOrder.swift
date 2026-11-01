@@ -48,7 +48,8 @@ enum SentinelleListOrder {
             .replacingOccurrences(of: " ", with: "")
         switch normalized {
         case "BOUYGUES", "BOUYGUESTELECOM", "BYTEL": return "Bouygues Telecom"
-        case "FREE", "FREEMOBILE": return "Free Mobile"
+        // Une box Free est une Freebox : « Free Mobile » est le réseau mobile, pas elle.
+        case "FREE", "FREEMOBILE": return "Free"
         case "ORANGE", "ORANGEFRANCE": return "Orange"
         case "SFR": return "SFR"
         default: return raw
