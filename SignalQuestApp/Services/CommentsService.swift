@@ -169,6 +169,24 @@ struct SiteComment: Decodable, Identifiable, Equatable {
     let canDelete: Bool
 }
 
+extension SiteComment {
+    private enum CodingKeys: String, CodingKey { case id, kind, text, createdAt, radio, author, own, canDelete }
+
+    /// Tolérant aux formes à venir du fil (site-thread-v2, #828) : un type inconnu (`rating`) se lit
+    /// comme un message, un texte absent ou nul comme un texte vide, que la page écarte.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        kind = (try? c.decode(SiteCommentKind.self, forKey: .kind)) ?? .comment
+        text = (try? c.decodeIfPresent(String.self, forKey: .text)) ?? ""
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        radio = try? c.decodeIfPresent(SiteCommentRadio.self, forKey: .radio)
+        author = try c.decode(SocialFeedAuthor.self, forKey: .author)
+        own = try c.decodeIfPresent(Bool.self, forKey: .own) ?? false
+        canDelete = try c.decodeIfPresent(Bool.self, forKey: .canDelete) ?? false
+    }
+}
+
 struct SiteThreadSummary: Decodable, Equatable {
     let commentCount: Int
 }
@@ -177,6 +195,38 @@ struct SiteCommentsPage: Decodable {
     let thread: SiteThreadSummary
     let comments: [SiteComment]
     let nextCursor: String?
+
+    private enum CodingKeys: String, CodingKey { case thread, comments, nextCursor }
+
+    /// Un message illisible est écarté seul au lieu de faire tomber tout le fil. Les réponses
+    /// (`parentId`) et les messages sans texte (parent supprimé) attendent l'affichage v2 :
+    /// mêlés au premier niveau, ils tromperaient.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        thread = try c.decode(SiteThreadSummary.self, forKey: .thread)
+        comments = c.decodeLossyArray([Entry].self, forKey: .comments)
+            .filter { $0.parentId == nil && !$0.comment.text.isEmpty }
+            .map(\.comment)
+        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+
+    init(thread: SiteThreadSummary, comments: [SiteComment], nextCursor: String?) {
+        self.thread = thread
+        self.comments = comments
+        self.nextCursor = nextCursor
+    }
+
+    private struct Entry: Decodable {
+        let comment: SiteComment
+        let parentId: String?
+
+        private enum CodingKeys: String, CodingKey { case parentId }
+
+        init(from decoder: Decoder) throws {
+            comment = try SiteComment(from: decoder)
+            parentId = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(String.self, forKey: .parentId)
+        }
+    }
 }
 
 private struct SiteCommentCreateRequest: Encodable {

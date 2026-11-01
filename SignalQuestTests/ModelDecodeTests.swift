@@ -1112,6 +1112,28 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(daily.errorDescription, String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."))
     }
 
+    /// site-thread-v2 (#828) servi à cette app : un avis se lit comme un message, et une réponse,
+    /// un parent supprimé ou un message illisible sont écartés seuls, sans faire tomber le fil.
+    func testSiteThreadPageToleratesV2Shapes() throws {
+        let author = #""author":{"id":"u1","handle":null,"name":"Camille","avatarUrl":null}"#
+        let json = """
+        {"thread":{"commentCount":3},"comments":[
+          {"id":"r1","kind":"rating","text":"Coupures le soir","createdAt":"2026-11-01T20:00:00.000Z","radio":null,
+           "parentId":null,"visibility":"public","rating":{"stars":2,"trend":"degraded","tags":["coupures"]},"replyCount":1,
+           \(author),"own":false,"canDelete":false},
+          {"id":"a1","kind":"comment","text":"Pareil ici","parentId":"r1",\(author),"own":false,"canDelete":false},
+          {"id":"d1","kind":"comment","text":null,"status":"deleted","parentId":null,\(author),"own":false,"canDelete":false},
+          {"id":"x1","kind":"comment","text":"Sans auteur"},
+          {"id":"c1","kind":"help","text":"Pas de 4G","radio":{"technology":"4G"},\(author),"own":true,"canDelete":true}],
+         "nextCursor":null}
+        """
+        let page = try JSONDecoder.signalQuest.decode(SiteCommentsPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.comments.map(\.id), ["r1", "c1"])
+        XCTAssertEqual(page.comments.map(\.kind), [.comment, .help])
+        XCTAssertEqual(page.comments[0].text, "Coupures le soir")
+        XCTAssertNil(page.nextCursor)
+    }
+
     /// ROOM-1 : une page de salon, avec ce que le serveur peut omettre ou mettre à null.
     func testDecodesARoomMessagesPageWithMissingAndNullFields() throws {
         let json = """
