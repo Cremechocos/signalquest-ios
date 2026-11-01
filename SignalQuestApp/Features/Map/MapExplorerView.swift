@@ -1656,6 +1656,9 @@ struct MapExplorerView: View {
     @AppStorage("map_coverage_by_generation") private var coverageByGeneration = false
     @State private var selectedItem: MapDisplayItem?
     @State private var selectedAntenna: AntennaSite?
+    /// Marché et opérateur demandés par le lien qui a ouvert la fiche (site suivi d'un autre
+    /// pays, fil d'un opérateur précis) ; ne valent que pour ce site-là.
+    @State private var routedSite: (id: String, market: String, operatorKey: String?)?
     /// Sites et lieux consultés récemment, proposés quand on touche la
     /// recherche sans rien saisir (plan 3, vague 1).
     @State private var recentItems: [RecentlyViewedStore.Item] = []
@@ -2106,6 +2109,8 @@ struct MapExplorerView: View {
         }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
+        // Fiche refermée : le marché et l'opérateur du lien ne suivent pas une ouverture suivante.
+        .onChangeCompat(of: selectedAntenna?.id) { _, id in if id == nil { routedSite = nil } }
         // Notification de mise à jour ANFR : l'écran ANFR, comme depuis la feuille Carte.
         .onChangeCompat(of: router.openANFRMap) { _, _ in openANFRFromRouterIfNeeded() }
         .onChangeCompat(of: searchFieldFocused) { _, focused in
@@ -3568,6 +3573,9 @@ struct MapExplorerView: View {
         // Un favori d'un autre pays se cherche dans son marché, pas dans celui affiché.
         let market = router.openSiteMarket ?? model.marketFilter
         router.openSiteMarket = nil
+        let operatorKey = router.openSiteOperator
+        router.openSiteOperator = nil
+        routedSite = (siteId, market, operatorKey)
         let isShownMarket = market.caseInsensitiveCompare(model.marketFilter) == .orderedSame
         if isShownMarket,
            let site = model.antennas.first(where: { $0.id == siteId || $0.siteId == siteId }) {
@@ -4761,10 +4769,11 @@ struct MapExplorerView: View {
     }
 
     private func antennaDetail(_ site: AntennaSite, onClose: (() -> Void)? = nil) -> some View {
-        AntennaDetailSheet(
+        let routed = routedSite.flatMap { $0.id == site.id || $0.id == site.siteId ? $0 : nil }
+        return AntennaDetailSheet(
             site: site,
-            market: model.marketFilter,
-            operatorName: model.operatorFilter,
+            market: routed?.market ?? model.marketFilter,
+            operatorName: routed?.operatorKey ?? model.operatorFilter,
             service: services.antennas,
             sightOrigin: sightOrigin,
             onIsolateCoverage: { focus in isolateCoverage(focus) },
@@ -4773,7 +4782,7 @@ struct MapExplorerView: View {
             onOutageChanged: { Task { await reloadCurrentRegion() } }
         )
         // Tous les chemins mènent ici : recherche, carte, lien, historique.
-        .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
+        .onAppear { RecentlyViewedStore.record(.site(site, market: routed?.market ?? model.marketFilter)) }
     }
 
     @ViewBuilder

@@ -133,10 +133,21 @@ final class NotificationRoutingTests: XCTestCase {
 
     func testSiteFollowOpensTheSiteInItsMarket() {
         let router = AppRouter()
-        router.handle(type: "site_follow", conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM")
+        router.handle(type: "site_follow", conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM",
+                      operatorKey: "FREE_CARAIBES")
         XCTAssertEqual(router.selectedTab, .map)
         XCTAssertEqual(router.openSiteId, "DROM:97100001")
         XCTAssertEqual(router.openSiteMarket, "DROM")
+        // Le fil d'un support partagé est celui de l'opérateur suivi.
+        XCTAssertEqual(router.openSiteOperator, "FREE_CARAIBES")
+    }
+
+    /// Une alerte de zone ne vise aucun opérateur : la fiche suit le filtre de la carte.
+    func testSiteAlertWithoutFollowKeepsTheMapOperator() {
+        let router = AppRouter()
+        router.handle(type: "zone_new_antenna", conversationId: nil, postId: nil, siteId: "123", market: "FR",
+                      operatorKey: "ORANGE")
+        XCTAssertNil(router.openSiteOperator)
     }
 
     /// Nouvelle antenne ou montée de génération près d'un lieu : le site s'ouvre dans le marché de la charge.

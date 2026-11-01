@@ -910,6 +910,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let bugId = Self.string(info, "bugId", "bug_id")
         // Site suivi : son marché, pour retrouver un site hors de France.
         let market = Self.string(info, "market")
+        let operatorKey = Self.string(info, "operator")
         // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
         let anfrFocus = ANFRFocus.parse(
             date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),
@@ -951,7 +952,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     e2eeDeviceApprovalId: e2eeDeviceApprovalId,
                     bugId: bugId,
                     anfrFocus: anfrFocus,
-                    market: market
+                    market: market,
+                    operatorKey: operatorKey
                 )
                 AppServicesHolder.services.syncIconBadge()
             }

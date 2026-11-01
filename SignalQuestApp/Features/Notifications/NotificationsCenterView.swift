@@ -494,7 +494,8 @@ struct NotificationsCenterView: View {
             outageId: metaString(meta, "outageId", "outage_id"),
             bugId: metaString(meta, "bugId", "bug_id"),
             anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil,
-            market: metaString(meta, "market")
+            market: metaString(meta, "market"),
+            operatorKey: metaString(meta, "operator")
         )
     }
 

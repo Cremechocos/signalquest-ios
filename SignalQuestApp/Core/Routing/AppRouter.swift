@@ -79,6 +79,8 @@ final class AppRouter: ObservableObject {
     @Published var openSiteId: String?
     /// Marché où chercher ce site (favori d'un autre pays) ; nil = marché affiché.
     var openSiteMarket: String?
+    /// Opérateur sur lequel ouvrir la fiche (site suivi : son fil est celui de cet opérateur) ; nil = filtre de la carte.
+    var openSiteOperator: String?
     /// Panne communautaire dont la feuille doit s'ouvrir sur la carte, posée par la page
     /// « Pannes signalées ». L'objet ENTIER et non son identifiant : cette page est paginée sans
     /// tenir compte de l'emprise, donc la carte n'a en général pas chargé la panne demandée et
@@ -271,7 +273,8 @@ final class AppRouter: ObservableObject {
         e2eeDeviceApprovalId: String? = nil,
         bugId: String? = nil,
         anfrFocus: ANFRFocus? = nil,
-        market: String? = nil
+        market: String? = nil,
+        operatorKey: String? = nil
     ) {
         switch rawType?.lowercased() {
         // Types réellement émis par le serveur : préfixés `message_*` et
@@ -319,9 +322,10 @@ final class AppRouter: ObservableObject {
              "zone_new_antenna", "zone_antenna_upgrade":
             route(toSite: siteId, market: market)
         // Site suivi (message, activation, nouvelle bande, panne confirmée) : la charge porte
-        // son marché, sans lequel un site hors de France ne se retrouve pas.
+        // son marché, sans lequel un site hors de France ne se retrouve pas, et l'opérateur
+        // suivi : sur un support partagé, la fiche ouverte sur un autre montrait un autre fil.
         case "site_follow":
-            route(toSite: siteId, market: market)
+            route(toSite: siteId, market: market, operatorKey: operatorKey)
         case "anfr_update":
             selectedTab = .map
             // Sans relevé ni zone dans la charge, l'écran s'ouvre comme avant.
@@ -455,11 +459,12 @@ final class AppRouter: ObservableObject {
         if let id, !id.isEmpty { pendingLiveFriendId = id }
     }
 
-    func route(toSite id: String?, market: String? = nil) {
+    func route(toSite id: String?, market: String? = nil, operatorKey: String? = nil) {
         selectedTab = .map
         guard let id else { return }
-        // Posé avant l'identifiant, que la carte observe.
+        // Posés avant l'identifiant, que la carte observe.
         openSiteMarket = market
+        openSiteOperator = operatorKey
         openSiteId = id
     }
 
