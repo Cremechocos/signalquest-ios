@@ -25,9 +25,9 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(model.fallbackBody, "Meilleur réseau à Lyon ?")
     }
 
-    /// Une photo retirée ne part plus avec la publication ; une photo floutée
-    /// remplace l'originale (plan 3, vague 1).
-    func testRemovedPhotoIsNotPublishedAndBlurredPhotoReplacesIt() throws {
+    /// Une photo retirée ne part plus avec la publication ; une photo retouchée
+    /// remplace l'originale (plan 3, vague 1 ; E1).
+    func testRemovedPhotoIsNotPublishedAndEditedPhotoReplacesIt() throws {
         let model = ComposerViewModel(service: ComposerFeedFixture())
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
@@ -35,7 +35,7 @@ final class FeedComposerTests: XCTestCase {
             UIColor.red.setFill()
             context.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
         }
-        model.applyBlurredImage(photo)
+        model.applyEdits(photo, PhotoEdits(blurRegions: [CGRect(x: 0, y: 0, width: 0.5, height: 0.5)]))
         XCTAssertEqual(model.imageDataForUpload, photo.jpegData(compressionQuality: 0.92))
         XCTAssertTrue(model.previewImage === photo)
         model.removeImage()

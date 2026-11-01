@@ -60,6 +60,10 @@ final class StoryComposerViewModel: ObservableObject {
     /// Octets choisis, conservés seulement pour l'aperçu. Le service les
     /// ré-encode sans métadonnées avant tout envoi réseau.
     private var pickedImageData: Data?
+    /// Photo choisie avant retouche, et ses octets : rouvrir « Modifier » repart d'elle.
+    private(set) var editSource: UIImage?
+    private var originalImageData: Data?
+    private(set) var photoEdits = PhotoEdits()
     private let service: StoriesServicing
     private let friendsService: FriendsServicing
     init(service: StoriesServicing, friendsService: FriendsServicing) {
@@ -107,14 +111,23 @@ final class StoryComposerViewModel: ObservableObject {
             }
             previewImage = image
             pickedImageData = data
+            editSource = image
+            originalImageData = data
+            photoEdits = PhotoEdits()
         } catch {
             errorMessage = error.userFacingMessage
         }
     }
 
-    /// Photo floutée avant publication (plan 3, vague 1) : elle remplace
-    /// l'originale, et c'est elle qui part.
-    func applyBlurredImage(_ image: UIImage) {
+    /// Retouches (« Modifier ») : c'est la copie retouchée qui s'affiche et part ;
+    /// l'original et les retouches restent, pour rouvrir l'éditeur sans rien perdre.
+    func applyEdits(_ image: UIImage, _ edits: PhotoEdits) {
+        photoEdits = edits
+        if edits.isIdentity, let editSource, let originalImageData {
+            previewImage = editSource
+            pickedImageData = originalImageData
+            return
+        }
         guard let data = image.jpegData(compressionQuality: 0.92) else { return }
         previewImage = image
         pickedImageData = data
@@ -260,9 +273,12 @@ struct StoryComposer: View {
         .onChangeCompat(of: model.selectedItem) { _, _ in
             Task { await model.loadPickerImage() }
         }
-        .sheet(isPresented: $showBlurEditor) {
-            if let image = model.previewImage {
-                PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+        .fullScreenCover(isPresented: $showBlurEditor) {
+            if let image = model.editSource ?? model.previewImage {
+                // Une story est verticale : le cadre 9:16 est imposé.
+                PhotoEditorView(image: image, edits: model.photoEdits, fixedAspect: 9 / 16) { edited, edits in
+                    model.applyEdits(edited, edits)
+                }
             }
         }
         .task {
@@ -318,8 +334,8 @@ struct StoryComposer: View {
             // imbriqué n'y recevrait pas le toucher.
             .overlay(alignment: .topLeading) {
                 if previewImage != nil {
-                    PhotoBlurButton { showBlurEditor = true }
-                        .accessibilityIdentifier("story.blur")
+                    PhotoEditButton { showBlurEditor = true }
+                        .accessibilityIdentifier("story.edit")
                 }
             }
 

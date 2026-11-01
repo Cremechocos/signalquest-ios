@@ -78,9 +78,9 @@ final class PhotoBlurTests: XCTestCase {
     }
 
     func testEditorMapsTheDrawnAreaToTheImage() {
-        let frame = PhotoBlurEditor.fittedFrame(for: CGSize(width: 400, height: 200), in: CGSize(width: 300, height: 300))
+        let frame = PhotoBlurCanvas.fittedFrame(for: CGSize(width: 400, height: 200), in: CGSize(width: 300, height: 300))
         XCTAssertEqual(frame, CGRect(x: 0, y: 75, width: 300, height: 150))
-        let rect = PhotoBlurEditor.normalizedRect(from: CGPoint(x: 150, y: 150), to: CGPoint(x: 75, y: 112.5), in: frame)
+        let rect = PhotoBlurCanvas.normalizedRect(from: CGPoint(x: 150, y: 150), to: CGPoint(x: 75, y: 112.5), in: frame)
         XCTAssertEqual(rect.minX, 0.25, accuracy: 1e-9)
         XCTAssertEqual(rect.minY, 0.25, accuracy: 1e-9)
         XCTAssertEqual(rect.width, 0.25, accuracy: 1e-9)
@@ -91,18 +91,18 @@ final class PhotoBlurTests: XCTestCase {
     /// l'éditeur.
     func testRemoveButtonSitsOnTheTopRightCornerInsideTheEditor() {
         let container = CGSize(width: 300, height: 300)
-        let frame = PhotoBlurEditor.fittedFrame(for: CGSize(width: 400, height: 200), in: container)
-        let middle = PhotoBlurEditor.removeButtonOrigin(
+        let frame = PhotoBlurCanvas.fittedFrame(for: CGSize(width: 400, height: 200), in: container)
+        let middle = PhotoBlurCanvas.removeButtonOrigin(
             for: CGRect(x: 0.25, y: 0.5, width: 0.25, height: 0.25), in: frame, container: container
         )
         XCTAssertEqual(middle, CGPoint(x: 150 - 22, y: 75 + 75 - 22))
 
-        let topRight = PhotoBlurEditor.removeButtonOrigin(
+        let topRight = PhotoBlurCanvas.removeButtonOrigin(
             for: CGRect(x: 0.8, y: 0, width: 0.2, height: 0.2), in: frame, container: container
         )
         XCTAssertEqual(topRight, CGPoint(x: 300 - 44, y: 75 - 22), "Collée au bord droit, sans le dépasser")
 
-        let tinyAtTheLeft = PhotoBlurEditor.removeButtonOrigin(
+        let tinyAtTheLeft = PhotoBlurCanvas.removeButtonOrigin(
             for: CGRect(x: 0, y: 0.1, width: 0.04, height: 0.1), in: CGRect(x: 0, y: 0, width: 300, height: 300), container: container
         )
         XCTAssertEqual(tinyAtTheLeft.x, 0, "Jamais à gauche de l'éditeur")
@@ -124,7 +124,7 @@ final class PhotoBlurTests: XCTestCase {
 
         let plain = try XCTUnwrap(PhotoUploadPreparation.prepare(from: data as Data))
         let blurred = try XCTUnwrap(PhotoUploadPreparation.prepare(
-            from: data as Data, blurRegions: [CGRect(x: 0, y: 0, width: 1, height: 1)]
+            from: data as Data, edits: PhotoEdits(blurRegions: [CGRect(x: 0, y: 0, width: 1, height: 1)])
         ))
         let plainMetadata = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(plain.exifJSON).utf8)) as? NSDictionary
         let blurredMetadata = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(blurred.exifJSON).utf8)) as? NSDictionary
@@ -132,5 +132,132 @@ final class PhotoBlurTests: XCTestCase {
         XCTAssertNotNil(blurredMetadata?["gpsLatitude"])
         let after = try pixels(try XCTUnwrap(UIImage(data: blurred.jpeg)))
         XCTAssertLessThan(contrast(after, row: 100, from: 60, to: 140), 20)
+    }
+}
+
+/// Éditeur « Modifier » (E1) : géométrie du cadre et rendu non destructif.
+@MainActor
+final class PhotoEditorTests: XCTestCase {
+    /// Moitié gauche rouge, moitié droite bleue, 40 × 20 px.
+    private func halves() -> UIImage {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 40, height: 20), format: format).image { context in
+            UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+            UIColor.blue.setFill(); context.fill(CGRect(x: 20, y: 0, width: 20, height: 20))
+        }
+    }
+
+    /// Composantes rouge et bleue du pixel (x, y).
+    private func color(_ image: UIImage, x: Int, y: Int) throws -> (red: UInt8, blue: UInt8) {
+        let cgImage = try XCTUnwrap(image.cgImage)
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let context = try XCTUnwrap(CGContext(
+            data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(cgImage, in: CGRect(x: -x, y: -(cgImage.height - 1 - y), width: cgImage.width, height: cgImage.height))
+        return (bytes[0], bytes[2])
+    }
+
+    func testUnchangedEditsReturnTheOriginal() {
+        let image = halves()
+        XCTAssertTrue(PhotoEdits().isIdentity)
+        XCTAssertTrue(PhotoEditRenderer.render(image, edits: PhotoEdits()) === image)
+    }
+
+    /// Quart de tour à gauche : la moitié droite (bleue) monte en haut.
+    func testRotateLeftTurnsThePixelsAndTheFrame() throws {
+        var edits = PhotoEdits()
+        edits.rotateLeft()
+        let output = PhotoEditRenderer.render(halves(), edits: edits)
+        let cg = try XCTUnwrap(output.cgImage)
+        XCTAssertEqual(cg.width, 20)
+        XCTAssertEqual(cg.height, 40)
+        XCTAssertGreaterThan(try color(output, x: 10, y: 5).blue, 200, "le haut doit être bleu")
+        XCTAssertGreaterThan(try color(output, x: 10, y: 35).red, 200, "le bas doit être rouge")
+
+        let rect = CGRect(x: 0.6, y: 0.1, width: 0.3, height: 0.2)
+        let turnedRect = PhotoEdits.rotatedLeft(rect)
+        for (value, expected) in [(turnedRect.minX, 0.1), (turnedRect.minY, 0.1), (turnedRect.width, 0.2), (turnedRect.height, 0.3)] {
+            XCTAssertEqual(value, expected, accuracy: 1e-9)
+        }
+        var turned = PhotoEdits(blurRegions: [rect])
+        for _ in 0..<4 { turned.rotateLeft() }
+        XCTAssertEqual(turned.quarterTurns, 0)
+        XCTAssertEqual(turned.blurRegions[0].minX, rect.minX, accuracy: 1e-9)
+        XCTAssertEqual(turned.blurRegions[0].height, rect.height, accuracy: 1e-9)
+    }
+
+    /// Cadre sur la moitié gauche : il ne reste que du rouge, à la bonne taille.
+    func testCropKeepsOnlyTheFrame() throws {
+        let edits = PhotoEdits(crop: CGRect(x: 0, y: 0, width: 0.5, height: 1))
+        let output = PhotoEditRenderer.render(halves(), edits: edits)
+        let cg = try XCTUnwrap(output.cgImage)
+        XCTAssertEqual(cg.width, 20)
+        XCTAssertEqual(cg.height, 20)
+        XCTAssertGreaterThan(try color(output, x: 18, y: 10).red, 200)
+        XCTAssertLessThan(try color(output, x: 18, y: 10).blue, 50)
+    }
+
+    /// Redresser agrandit juste assez pour qu'aucun coin ne reste vide.
+    func testStraightenScaleCoversTheFrame() {
+        XCTAssertEqual(PhotoEdits.straightenScale(for: CGSize(width: 100, height: 100), degrees: 0), 1)
+        XCTAssertEqual(PhotoEdits.straightenScale(for: CGSize(width: 100, height: 100), degrees: 45), sqrt(2), accuracy: 1e-9)
+        XCTAssertEqual(PhotoEdits.straightenScale(for: CGSize(width: 100, height: 100), degrees: -45), sqrt(2), accuracy: 1e-9)
+    }
+
+    func testLargestCropFollowsThePixelAspect() {
+        let square = PhotoEdits.largestCrop(aspect: 1, in: CGSize(width: 400, height: 200))
+        XCTAssertEqual(square, CGRect(x: 0.25, y: 0, width: 0.5, height: 1))
+        let story = PhotoEdits.largestCrop(aspect: 9 / 16, in: CGSize(width: 900, height: 1600))
+        XCTAssertEqual(story.width, 1, accuracy: 1e-9)
+        XCTAssertEqual(story.height, 1, accuracy: 1e-9)
+        let moved = PhotoEdits.largestCrop(aspect: 1, in: CGSize(width: 400, height: 200), centeredOn: CGPoint(x: 0.95, y: 0.5))
+        XCTAssertEqual(moved.maxX, 1, accuracy: 1e-9, "le cadre reste dans la photo")
+    }
+
+    /// Tirer un coin garde le coin opposé et les proportions, sans sortir de la photo.
+    func testCornerDragKeepsTheOppositeCornerAndTheAspect() {
+        let start = CGRect(x: 0.2, y: 0.2, width: 0.4, height: 0.4)
+        let free = PhotoEditorView.resized(start, corner: .bottomRight, to: CGPoint(x: 0.9, y: 0.7), aspect: nil)
+        XCTAssertEqual(free.minX, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(free.maxX, 0.9, accuracy: 1e-9)
+        XCTAssertEqual(free.maxY, 0.7, accuracy: 1e-9)
+        let square = PhotoEditorView.resized(start, corner: .topLeft, to: CGPoint(x: -0.5, y: 0.1), aspect: 1)
+        XCTAssertEqual(square.maxX, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(square.maxY, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(square.width, square.height, accuracy: 1e-9)
+        XCTAssertGreaterThanOrEqual(square.minX, 0)
+        XCTAssertGreaterThanOrEqual(square.minY, 0)
+        let zoomed = PhotoEditorView.zoomed(start, by: 2)
+        XCTAssertEqual(zoomed.width, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(zoomed.midX, start.midX, accuracy: 1e-9)
+        XCTAssertLessThanOrEqual(PhotoEditorView.zoomed(start, by: 0.1).width, 1)
+    }
+
+    /// Les zones gardées dans la base se retrouvent à l'identique après un aller-retour par le cadre.
+    func testBlurRegionsRoundTripThroughTheFrame() {
+        let crop = CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.4)
+        let region = CGRect(x: 0.3, y: 0.3, width: 0.1, height: 0.1)
+        let back = PhotoEditorView.toBase(PhotoEditorView.toCrop(region, crop: crop), crop: crop)
+        XCTAssertEqual(back.minX, region.minX, accuracy: 1e-9)
+        XCTAssertEqual(back.width, region.width, accuracy: 1e-9)
+    }
+
+    /// À l'envoi, la borne de 1600 px vaut pour le cadre retenu, pas pour la photo entière.
+    func testUploadAppliesTheFrameToTheOriginal() throws {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let large = UIGraphicsImageRenderer(size: CGSize(width: 3200, height: 1600), format: format).image { context in
+            UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 3200, height: 1600))
+        }
+        let data = try XCTUnwrap(large.jpegData(compressionQuality: 0.9))
+        let prepared = try XCTUnwrap(PhotoUploadPreparation.prepare(
+            from: data, edits: PhotoEdits(crop: CGRect(x: 0, y: 0, width: 0.5, height: 1))
+        ))
+        let output = try XCTUnwrap(UIImage(data: prepared.jpeg)?.cgImage)
+        XCTAssertEqual(output.width, 1600)
+        XCTAssertEqual(output.height, 1600)
     }
 }

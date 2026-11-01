@@ -1208,9 +1208,11 @@ struct PhotoUploadView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var imageData: Data?
-    /// Zones à flouter (plan 3, vague 1), appliquées à l'envoi sur l'original
-    /// réduit : ses métadonnées (position, date) restent celles de l'original.
-    @State private var blurRegions: [CGRect] = []
+    /// Retouches (« Modifier »), appliquées à l'envoi sur l'original : ses
+    /// métadonnées (position, date) restent celles de l'original.
+    @State private var photoEdits = PhotoEdits()
+    /// Aperçu retouché ; `image` reste la photo choisie, base de l'éditeur.
+    @State private var editedPreview: UIImage?
     @State private var showBlurEditor = false
     @State private var isUploading = false
     @State private var uploadError: String?
@@ -1227,15 +1229,15 @@ struct PhotoUploadView: View {
                     // Aperçu image
                     ZStack {
                         if let image {
-                            Image(uiImage: image)
+                            Image(uiImage: editedPreview ?? image)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(height: 260)
                                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                                 .sqShadowCard()
                                 .overlay(alignment: .topLeading) {
-                                    PhotoBlurButton { showBlurEditor = true }
-                                        .accessibilityIdentifier("photoUpload.blur")
+                                    PhotoEditButton { showBlurEditor = true }
+                                        .accessibilityIdentifier("photoUpload.edit")
                                 }
                         } else {
                             RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
@@ -1288,16 +1290,15 @@ struct PhotoUploadView: View {
                             uploadError = nil
                             imageData = data
                             image = loaded
-                            blurRegions = []
+                            photoEdits = PhotoEdits()
+                            editedPreview = nil
                         }
                     }
-                    .sheet(isPresented: $showBlurEditor) {
+                    .fullScreenCover(isPresented: $showBlurEditor) {
                         if let image {
-                            PhotoBlurEditor(image: image) { blurred, regions in
-                                // L'aperçu flouté sert de base à une nouvelle retouche :
-                                // mêmes proportions, les zones s'additionnent.
-                                self.image = blurred
-                                blurRegions.append(contentsOf: regions)
+                            PhotoEditorView(image: image, edits: photoEdits) { edited, edits in
+                                photoEdits = edits
+                                editedPreview = edits.isIdentity ? nil : edited
                             }
                         }
                     }
@@ -1367,13 +1368,13 @@ struct PhotoUploadView: View {
 
                     GradientButton("Envoyer la photo", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }
-                        let regions = blurRegions
+                        let edits = photoEdits
                         Task {
                             isUploading = true
                             uploadError = nil
                             // Extraction EXIF + downscale hors du main thread (PHOTO-PERF-01/SEC-01).
                             let prepared = await Task.detached(priority: .userInitiated) {
-                                PhotoUploadPreparation.prepare(from: original, blurRegions: regions)
+                                PhotoUploadPreparation.prepare(from: original, edits: edits)
                             }.value
                             guard let prepared else {
                                 isUploading = false

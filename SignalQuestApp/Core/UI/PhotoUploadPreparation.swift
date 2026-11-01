@@ -17,13 +17,13 @@ enum PhotoUploadPreparation {
     }
 
     /// Extrait les métadonnées PUIS re-encode (à exécuter hors du thread principal).
-    /// Les zones floutées (normalisées, image droite) sont cuites dans les pixels
-    /// avant l'encodage ; les métadonnées, elles, viennent de l'original.
+    /// Les retouches (cadre, rotation, flou) sont cuites dans les pixels avant
+    /// l'encodage ; les métadonnées, elles, viennent de l'original.
     static func prepare(
-        from original: Data, maxSide: CGFloat = 1600, quality: CGFloat = 0.85, blurRegions: [CGRect] = []
+        from original: Data, maxSide: CGFloat = 1600, quality: CGFloat = 0.85, edits: PhotoEdits = PhotoEdits()
     ) -> Prepared? {
         let exif = extractMetadata(from: original)
-        guard let jpeg = downscaledJPEG(from: original, maxSide: maxSide, quality: quality, blurRegions: blurRegions)
+        guard let jpeg = downscaledJPEG(from: original, maxSide: maxSide, quality: quality, edits: edits)
         else { return nil }
         let json = exif.flatMap { dict -> String? in
             guard let data = try? JSONSerialization.data(withJSONObject: dict),
@@ -87,9 +87,13 @@ enum PhotoUploadPreparation {
     /// Downscale + re-encode JPEG via UIGraphicsImageRenderer (qui n'embarque AUCUNE
     /// métadonnée), bornant le plus grand côté à `maxSide`.
     static func downscaledJPEG(
-        from data: Data, maxSide: CGFloat, quality: CGFloat, blurRegions: [CGRect] = []
+        from data: Data, maxSide: CGFloat, quality: CGFloat, edits: PhotoEdits = PhotoEdits()
     ) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
+        // Retouches : la borne s'applique au cadre retenu, pas à l'image entière.
+        if !edits.isIdentity {
+            return PhotoEditRenderer.render(image, edits: edits, maxSide: maxSide).jpegData(compressionQuality: quality)
+        }
         let largest = max(image.size.width, image.size.height)
         let scale = largest > maxSide ? maxSide / largest : 1
         let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -100,9 +104,7 @@ enum PhotoUploadPreparation {
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: target, format: format)
         let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
-        // Flou avant publication (plan 3, vague 1) : cuit avant l'encodage.
-        let output = blurRegions.isEmpty ? resized : PhotoBlur.render(resized, regions: blurRegions)
-        return output.jpegData(compressionQuality: quality)
+        return resized.jpegData(compressionQuality: quality)
     }
 
     private static func mimeType(of source: CGImageSource) -> String {

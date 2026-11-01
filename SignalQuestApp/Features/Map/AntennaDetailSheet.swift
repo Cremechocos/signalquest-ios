@@ -56,7 +56,7 @@ final class AntennaDetailViewModel: ObservableObject {
     /// floutées sont cuites avant l'encodage ; l'EXIF vient de l'original.
     func uploadPhoto(
         raw: Data,
-        blurRegions: [CGRect],
+        edits: PhotoEdits,
         photos: PhotoServicing,
         siteId: String,
         anfrCode: String?,
@@ -69,7 +69,7 @@ final class AntennaDetailViewModel: ObservableObject {
         do {
             // Extraction EXIF + recompression hors du main thread (UI non gelée).
             guard let prepared = await Task.detached(priority: .userInitiated, operation: {
-                PhotoUploadPreparation.prepare(from: raw, blurRegions: blurRegions)
+                PhotoUploadPreparation.prepare(from: raw, edits: edits)
             }).value else {
                 photoUploadMessage = "Image illisible."
                 return
@@ -359,13 +359,15 @@ struct AntennaDetailSheet: View {
             Text("Le support est partagé. Choisis le réseau réellement visible sur la photo.")
         }
         // Visages repérés : flouter avant l'envoi, ou envoyer sans flou.
-        .sheet(item: $photoToBlur) { request in
-            PhotoBlurEditor(
+        .fullScreenCover(item: $photoToBlur) { request in
+            PhotoEditorView(
                 image: request.photo.preview,
-                confirmTitle: "Flouter et envoyer",
-                emptyConfirmTitle: "Envoyer sans flou"
-            ) { _, regions in
-                Task { await sendPhoto(request.photo.raw, blurRegions: regions, operatorName: request.operatorName) }
+                edits: PhotoEdits(blurRegions: request.photo.faces, facesChecked: true),
+                initialTool: .blur,
+                confirmTitle: "Envoyer sans flou",
+                blurConfirmTitle: "Flouter et envoyer"
+            ) { _, edits in
+                Task { await sendPhoto(request.photo.raw, edits: edits, operatorName: request.operatorName) }
             }
         }
     }
@@ -420,17 +422,17 @@ struct AntennaDetailSheet: View {
             defer { photoPickerItem = nil }
             guard let pending = await model.loadPhotoForUpload(item: item) else { return }
             if pending.faces.isEmpty {
-                await sendPhoto(pending.raw, blurRegions: [], operatorName: operatorName)
+                await sendPhoto(pending.raw, edits: PhotoEdits(), operatorName: operatorName)
             } else {
                 photoToBlur = BlurRequest(photo: pending, operatorName: operatorName)
             }
         }
     }
 
-    private func sendPhoto(_ raw: Data, blurRegions: [CGRect], operatorName: String) async {
+    private func sendPhoto(_ raw: Data, edits: PhotoEdits, operatorName: String) async {
         await model.uploadPhoto(
             raw: raw,
-            blurRegions: blurRegions,
+            edits: edits,
             photos: services.photos,
             siteId: site.writeSiteId,
             anfrCode: site.anfrCode,

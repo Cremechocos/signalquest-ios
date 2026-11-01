@@ -1029,8 +1029,8 @@ struct MainTabView: View {
             )
         }
         #if DEBUG
-        .sheet(isPresented: $showsBlurEditorQA) {
-            PhotoBlurEditor(image: PhotoBlur.qaSample()) { _, _ in }
+        .fullScreenCover(isPresented: $showsBlurEditorQA) {
+            PhotoEditorView(image: PhotoBlur.qaSample(), initialTool: .blur) { _, _ in }
         }
         #endif
         .sheet(isPresented: $router.showsCommandPalette, onDismiss: {

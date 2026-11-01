@@ -111,6 +111,10 @@ final class ComposerViewModel: ObservableObject {
     /// Données brutes de la photo choisie : `publishPost` les ré-encode (1600 px,
     /// sans métadonnées) hors du main thread AVANT de les mettre en file.
     private var pickedImageData: Data?
+    /// Photo choisie avant retouche, et ses octets : rouvrir « Modifier » repart d'elle.
+    private(set) var editSource: UIImage?
+    private var originalImageData: Data?
+    private(set) var photoEdits = PhotoEdits()
     @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var didPublish = false
@@ -313,8 +317,7 @@ final class ComposerViewModel: ObservableObject {
             text = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? shared.text : text + "\n\n" + shared.text
         }
         if let data = shared.imageData, let image = ImagePipeline.downsample(data: data, maxPixel: 1600) {
-            previewImage = image
-            pickedImageData = data
+            setPickedImage(image, data: data)
         } else if shared.imageData != nil {
             errorMessage = String(localized: "Photo illisible")
         }
@@ -330,8 +333,7 @@ final class ComposerViewModel: ObservableObject {
                 errorMessage = String(localized: "Photo illisible")
                 return
             }
-            previewImage = image
-            pickedImageData = data
+            setPickedImage(image, data: data)
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -381,11 +383,28 @@ final class ComposerViewModel: ObservableObject {
         previewImage = nil
         selectedItem = nil
         pickedImageData = nil
+        editSource = nil
+        originalImageData = nil
+        photoEdits = PhotoEdits()
     }
 
-    /// Photo floutée avant publication (plan 3, vague 1) : elle remplace
-    /// l'originale, et c'est elle qui part.
-    func applyBlurredImage(_ image: UIImage) {
+    private func setPickedImage(_ image: UIImage, data: Data) {
+        previewImage = image
+        pickedImageData = data
+        editSource = image
+        originalImageData = data
+        photoEdits = PhotoEdits()
+    }
+
+    /// Retouches (« Modifier ») : c'est la copie retouchée qui s'affiche et part ;
+    /// l'original et les retouches restent, pour rouvrir l'éditeur sans rien perdre.
+    func applyEdits(_ image: UIImage, _ edits: PhotoEdits) {
+        photoEdits = edits
+        if edits.isIdentity, let editSource, let originalImageData {
+            previewImage = editSource
+            pickedImageData = originalImageData
+            return
+        }
         guard let data = image.jpegData(compressionQuality: 0.92) else { return }
         previewImage = image
         pickedImageData = data
@@ -671,8 +690,8 @@ struct ComposerSheet: View {
                                     }
                                 }
                                 .overlay(alignment: .topLeading) {
-                                    PhotoBlurButton { showBlurEditor = true }
-                                        .accessibilityIdentifier("composer.blur")
+                                    PhotoEditButton { showBlurEditor = true }
+                                        .accessibilityIdentifier("composer.edit")
                                 }
                                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
                         }
@@ -769,9 +788,9 @@ struct ComposerSheet: View {
         } message: {
             Text("Le texte que tu as écrit sera effacé.")
         }
-        .sheet(isPresented: $showBlurEditor) {
-            if let image = model.previewImage {
-                PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+        .fullScreenCover(isPresented: $showBlurEditor) {
+            if let image = model.editSource ?? model.previewImage {
+                PhotoEditorView(image: image, edits: model.photoEdits) { edited, edits in model.applyEdits(edited, edits) }
             }
         }
         .onDisappear {

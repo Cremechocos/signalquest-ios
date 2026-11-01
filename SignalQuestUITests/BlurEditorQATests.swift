@@ -1,7 +1,7 @@
 import XCTest
 
-/// Éditeur « Flouter » avant publication (plan 3, vague 1), ouvert sur une
-/// image générée sans visage (`--qa-blur-editor`, Debug seulement).
+/// Outil « Flouter » de l'éditeur « Modifier » (plan 3, vague 1 ; E1), ouvert
+/// sur une image générée sans visage (`--qa-blur-editor`, Debug seulement).
 @MainActor
 final class BlurEditorQATests: XCTestCase {
     func testDrawingRemovingAndApplyingAnArea() {
@@ -21,8 +21,8 @@ final class BlurEditorQATests: XCTestCase {
         let status = app.staticTexts["blur.status"]
         XCTAssertTrue(status.waitForExistence(timeout: 20), "Éditeur « Flouter » introuvable")
         XCTAssertTrue(waitForLabel(of: status, startingWith: noFace), "Aucun visage sur l'image de recette : \(status.label)")
-        let apply = app.buttons["blur.apply"]
-        XCTAssertFalse(apply.isEnabled, "Sans zone, il n'y a rien à flouter")
+        let apply = app.buttons["photoEditor.done"]
+        XCTAssertTrue(app.buttons["photoEditor.tool.blur"].isSelected, "L'éditeur s'ouvre sur Flouter")
 
         drawArea(in: app)
         XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea), status.label)
@@ -38,9 +38,23 @@ final class BlurEditorQATests: XCTestCase {
 
         drawArea(in: app)
         XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea))
-        XCTAssertTrue(apply.isEnabled)
+
+        // Recadrer : pivoter, puis cadre carré ; la zone floutée suit la photo.
+        app.buttons["photoEditor.tool.crop"].tap()
+        let rotate = app.buttons["photoEditor.rotate"]
+        XCTAssertTrue(rotate.waitForExistence(timeout: 5))
+        rotate.tap()
+        app.buttons["photoEditor.ratio.square"].tap()
+        XCTAssertTrue(app.buttons["photoEditor.ratio.square"].isSelected)
+        XCTAssertTrue(app.buttons["photoEditor.reset"].exists, "« Réinitialiser » apparaît après une modification")
+        let crop = XCTAttachment(screenshot: app.screenshot())
+        crop.name = "crop-tool-\(locale)"
+        crop.lifetime = .keepAlways
+        add(crop)
+        app.buttons["photoEditor.tool.blur"].tap()
+        XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea), "La zone floutée survit au recadrage")
         apply.tap()
-        XCTAssertTrue(status.waitForNonExistence(timeout: 5), "« Flouter » doit refermer l'éditeur")
+        XCTAssertTrue(status.waitForNonExistence(timeout: 5), "« Valider » doit refermer l'éditeur")
     }
 
     /// Glisser le doigt sur la photo trace une zone.
