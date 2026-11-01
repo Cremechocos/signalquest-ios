@@ -61,7 +61,12 @@ struct CoverageCardView: View {
                 if let trace, !trace.isEmpty {
                     CoverageRouteThumbnail(postId: item.id, coordinates: trace, lineColor: accent)
                         // En haut : le bas gauche porte la mention « Plans » d'Apple, à laisser visible.
-                        .overlay(alignment: .topLeading) { techTag.padding(SQSpace.sm) }
+                        // Fond opaque sous la teinte translucide : sinon les étiquettes du plan transparaissent.
+                        .overlay(alignment: .topLeading) {
+                            techTag
+                                .background(SQColor.surface, in: Capsule(style: .continuous))
+                                .padding(SQSpace.sm)
+                        }
                     coverageHeading
                 } else {
                 Group {
