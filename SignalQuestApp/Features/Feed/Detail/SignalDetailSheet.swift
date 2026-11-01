@@ -672,6 +672,12 @@ struct SignalDetailSheet: View {
 
     // MARK: Map
 
+    /// Le point unique d'une session ou d'un drive test est son départ (premier point ou
+    /// centre du tracé) : souvent le domicile, même quand les zones privées vident le tracé.
+    nonisolated static func hidesStartPoint(kind: String, canManage: Bool) -> Bool {
+        !canManage && ["session", "drive_test"].contains(kind.lowercased())
+    }
+
     @ViewBuilder
     private var map: some View {
         if detailsHidden {
@@ -679,6 +685,9 @@ struct SignalDetailSheet: View {
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
                 .accessibilityIdentifier("signal.detail.hidden")
+        } else if Self.hidesStartPoint(kind: item.kind, canManage: item.canManage) {
+            // Seul l'auteur voit le départ ; les autres n'ont pas de carte.
+            EmptyView()
         } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
             let center = CLLocationCoordinate2D(

@@ -729,4 +729,12 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         XCTAssertEqual(result.people.map(\.id), ["u1", "u2"])
         XCTAssertEqual(result.hashtags.map(\.tag), ["5g", "fibre"])
     }
+
+    /// Le départ d'une session ou d'un drive test (souvent le domicile) n'est montré qu'à l'auteur.
+    func testSessionStartPointIsHiddenFromOthers() {
+        XCTAssertTrue(SignalDetailSheet.hidesStartPoint(kind: "session", canManage: false))
+        XCTAssertTrue(SignalDetailSheet.hidesStartPoint(kind: "DRIVE_TEST", canManage: false))
+        XCTAssertFalse(SignalDetailSheet.hidesStartPoint(kind: "session", canManage: true))
+        XCTAssertFalse(SignalDetailSheet.hidesStartPoint(kind: "speedtest", canManage: false))
+    }
 }
