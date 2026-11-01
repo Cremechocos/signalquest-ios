@@ -141,7 +141,7 @@ struct CoverageCardView: View {
     private var techTag: some View {
         let tech = signal?.technology ?? bestDetectedTech ?? "—"
         return SQEditorialTag(text: tech, color: accent)
-            .accessibilityHidden(subtitle.contains(tech))
+            .accessibilityHidden(shownSubtitle?.contains(tech) ?? false)
     }
 
     private var coverageHeading: some View {
@@ -149,12 +149,21 @@ struct CoverageCardView: View {
             Text(hasSessionAggregate ? "Session de couverture" : "Mesure de couverture")
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
-            Text(subtitle)
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            if let shownSubtitle {
+                Text(shownSubtitle)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    /// Session avec tracé : pas de sous-titre (contrat social-session-preview), la carte
+    /// et sa pastille disent déjà l'essentiel. Avant que le serveur serve l'opérateur,
+    /// ce sous-titre ne valait que le repli « Parcours radio ».
+    private var shownSubtitle: String? {
+        hasSessionAggregate && !(trace ?? []).isEmpty ? nil : subtitle
     }
 
     /// Mesures et distance sont déjà dans les tuiles : le sous-titre dit les
@@ -168,9 +177,8 @@ struct CoverageCardView: View {
         if hasSessionAggregate, let op = signal?.operator {
             parts.append(SQBrand.operatorName(op) ?? op)
         }
-        // Avec un tracé, la pastille posée dessus dit la technologie.
         let techs = signal?.detectedTechs.prefix(3).joined(separator: " / ") ?? ""
-        if !techs.isEmpty && hasSessionAggregate && (trace ?? []).isEmpty { parts.append(techs) }
+        if !techs.isEmpty && hasSessionAggregate { parts.append(techs) }
         return parts.joined(separator: " · ").nonEmpty ?? String(localized: "Parcours radio")
     }
 
