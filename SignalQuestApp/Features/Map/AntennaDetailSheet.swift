@@ -1691,8 +1691,8 @@ struct AntennaDetailSheet: View {
         case "single":
             return String(localized: "Non partagé")
         case "crozon":
-            guard let leader = core.crozonLeader else { return String(localized: "Réseau partagé SFR et Bouygues (Crozon)") }
-            return String(localized: "Réseau partagé SFR et Bouygues (Crozon), opéré par \(photoOperatorLabel(leader))")
+            guard let leader = core.crozonLeader else { return String(localized: "Réseau partagé SFR et Bouygues Telecom (Crozon)") }
+            return String(localized: "Réseau partagé SFR et Bouygues Telecom (Crozon), opéré par \(photoOperatorLabel(leader))")
         case "zb":
             guard let leader = core.zbLeader else { return String(localized: "Zone blanche partagée") }
             return String(localized: "Zone blanche partagée, opérée par \(photoOperatorLabel(leader))")

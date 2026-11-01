@@ -30,7 +30,7 @@ struct RadioLogsFilterSheet: View {
                     VStack(spacing: 0) {
                         toggleRow(
                             title: "Grouper par opérateur",
-                            hint: "SFR, Orange, Free, Bouygues Telecom",
+                            hint: "SFR, Orange, Free Mobile, Bouygues Telecom",
                             isOn: $model.groupByOperator,
                             identifier: "radioLogs.sort.group"
                         )

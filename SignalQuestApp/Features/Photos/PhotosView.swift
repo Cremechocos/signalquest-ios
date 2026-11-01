@@ -599,10 +599,15 @@ struct PhotosView: View {
                         .fill(opColor)
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
-                        Text(verbatim: Self.operatorLabel(op))
-                            .font(SQFont.body(12, .medium))
-                            .foregroundStyle(.white.opacity(0.82))
-                            .sqSingleLine()
+                        // Nom complet, ou le court quand la vignette est trop étroite.
+                        ViewThatFits(in: .horizontal) {
+                            ForEach(Self.operatorLabels(op), id: \.self) { label in
+                                Text(verbatim: label)
+                                    .font(SQFont.body(12, .medium))
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .sqSingleLine()
+                            }
+                        }
                     }
                     Spacer()
                     Image(systemName: isLiked ? "heart.fill" : "heart")
@@ -640,14 +645,25 @@ struct PhotosView: View {
         SQBrand.operatorName(raw) ?? raw
     }
 
+    /// Nom complet puis nom court (« Bouygues Telecom », « Bouygues »), pour `ViewThatFits`.
+    static func operatorLabels(_ raw: String) -> [String] {
+        let full = operatorLabel(raw)
+        guard let short = SQBrand.operatorShortName(raw), short != full else { return [full] }
+        return [full, short]
+    }
+
     /// Puce claire posée sur l'image : la pastille de l'opérateur et son nom.
     static func operatorChip(_ raw: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(SQBrand.operatorColor(raw)).frame(width: 8, height: 8)
-            Text(verbatim: operatorLabel(raw))
-                .font(SQFont.body(12, .bold, relativeTo: .caption2))
-                .foregroundStyle(SQColor.label)
-                .sqSingleLine()
+            ViewThatFits(in: .horizontal) {
+                ForEach(operatorLabels(raw), id: \.self) { label in
+                    Text(verbatim: label)
+                        .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.label)
+                        .sqSingleLine()
+                }
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)

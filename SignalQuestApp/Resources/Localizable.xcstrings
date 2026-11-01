@@ -19021,18 +19021,18 @@
       },
       "shouldTranslate" : false
     },
-    "SFR, Orange, Free, Bouygues Telecom" : {
+    "SFR, Orange, Free Mobile, Bouygues Telecom" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SFR, Orange, Free, Bouygues Telecom"
+            "value" : "SFR, Orange, Free Mobile, Bouygues Telecom"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SFR, Orange, Free, Bouygues Telecom"
+            "value" : "SFR, Orange, Free Mobile, Bouygues Telecom"
           }
         }
       }
@@ -33184,18 +33184,18 @@
         }
       }
     },
-    "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom." : {
+    "208-01 Orange, 208-10 SFR, 208-15 Free Mobile, 208-20 Bouygues Telecom." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom."
+            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free Mobile, 208-20 Bouygues Telecom."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom."
+            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free Mobile, 208-20 Bouygues Telecom."
           }
         }
       }
@@ -74559,34 +74559,34 @@
         }
       }
     },
-    "Réseau partagé SFR et Bouygues (Crozon)" : {
+    "Réseau partagé SFR et Bouygues Telecom (Crozon)" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Network shared by SFR and Bouygues (Crozon)"
+            "value" : "Network shared by SFR and Bouygues Telecom (Crozon)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réseau partagé SFR et Bouygues (Crozon)"
+            "value" : "Réseau partagé SFR et Bouygues Telecom (Crozon)"
           }
         }
       }
     },
-    "Réseau partagé SFR et Bouygues (Crozon), opéré par %@" : {
+    "Réseau partagé SFR et Bouygues Telecom (Crozon), opéré par %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Network shared by SFR and Bouygues (Crozon), run by %@"
+            "value" : "Network shared by SFR and Bouygues Telecom (Crozon), run by %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réseau partagé SFR et Bouygues (Crozon), opéré par %@"
+            "value" : "Réseau partagé SFR et Bouygues Telecom (Crozon), opéré par %@"
           }
         }
       }

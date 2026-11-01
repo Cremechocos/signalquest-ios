@@ -22,12 +22,15 @@ enum SQBrand {
         let start: Color
         let end: Color
         let name: String
+        /// Secours pour les places étroites (pastilles, puces) : « Bouygues » pour « Bouygues Telecom ».
+        let shortName: String
         let badgeForeground: Color
 
-        init(start: Color, end: Color, name: String, badgeForeground: Color = .white) {
+        init(start: Color, end: Color, name: String, shortName: String? = nil, badgeForeground: Color = .white) {
             self.start = start
             self.end = end
             self.name = name
+            self.shortName = shortName ?? name
             self.badgeForeground = badgeForeground
         }
 
@@ -39,9 +42,9 @@ enum SQBrand {
         // Départs du contrat quality-scale v1 (teintes officielles, celles du web
         // et d'Android). Bouygues cyan : encre noire, le blanc n'y tient pas 4,5:1.
         "sfr": .init(start: Color(hex: 0xE60012), end: Color(hex: 0xFF5A33), name: "SFR"),
-        "bouygues": .init(start: Color(hex: 0x009DDC), end: Color(hex: 0x38BDF8), name: "Bouygues", badgeForeground: .black),
+        "bouygues": .init(start: Color(hex: 0x009DDC), end: Color(hex: 0x38BDF8), name: "Bouygues Telecom", shortName: "Bouygues", badgeForeground: .black),
         "orange": .init(start: Color(hex: 0xFF7900), end: Color(hex: 0xFFA44F), name: "Orange", badgeForeground: .black),
-        "free": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free"),
+        "free": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free Mobile", shortName: "Free"),
         // Free Caraïbes : le contrat quality-scale v1 donne aux opérateurs des
         // DOM la teinte métropolitaine de leur marque, comme le registre des
         // marchés. Entrée gardée pour son nom affiché.
@@ -143,11 +146,23 @@ enum SQBrand {
     /// opérateur absent de la palette. Une couleur approximative est
     /// acceptable ; un faux nom ne l'est pas.
     static func operatorName(_ rawName: String?) -> String? {
+        knownOperator(rawName)?.name
+    }
+
+    /// Nom court, pour une pastille ou une puce où le nom complet ne tient pas.
+    static func operatorShortName(_ rawName: String?) -> String? {
+        knownOperator(rawName)?.shortName
+    }
+
+    private static func knownOperator(_ rawName: String?) -> OperatorColors? {
         guard let rawName, !rawName.isEmpty else { return nil }
         let resolved = operatorColors(rawName)
         // Le repli ne porte pas de nom d'opérateur : on renvoie nil plutôt que
         // d'étiqueter une clé inconnue.
-        return resolved.name == defaultOperator.name ? nil : resolved.name
+        if resolved.name == defaultOperator.name { return nil }
+        // Free au Sénégal (FREE_608) partage la teinte de Free, pas le nom de Free Mobile.
+        if resolved.name == operators["free"]?.name, rawName.contains("608") { return nil }
+        return resolved
     }
 }
 

@@ -623,8 +623,8 @@ enum RoomsLogic {
         switch key {
         case "ORANGE": return "Orange"
         case "SFR": return "SFR"
-        case "BOUYGUES": return "Bouygues"
-        case "FREE": return "Free"
+        case "BOUYGUES": return "Bouygues Telecom"
+        case "FREE": return "Free Mobile"
         case "FREE_CARAIBES": return "Free Caraïbe"
         case "OUTREMER_TELECOM": return "SFR Caraïbe"
         case "SRR": return "SFR Réunion"

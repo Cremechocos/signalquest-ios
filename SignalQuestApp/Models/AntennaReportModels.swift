@@ -111,7 +111,7 @@ struct AntennaLeaderReport: Equatable {
         switch key {
         case "BOUYGUES": return "Bouygues Telecom"
         case "ORANGE": return "Orange"
-        case "FREE": return "Free"
+        case "FREE": return "Free Mobile"
         default: return key
         }
     }

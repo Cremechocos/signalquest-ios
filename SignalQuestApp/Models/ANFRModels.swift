@@ -26,13 +26,13 @@ enum ANFROperator: String, CaseIterable, Identifiable, Sendable, Hashable {
 
     var id: String { rawValue }
 
-    /// Libellé court affiché dans les filtres / pastilles.
+    /// Nom affiché de l’opérateur (filtres, pastilles, graphiques).
     var label: String {
         switch self {
         case .orange: return "Orange"
         case .sfr: return "SFR"
-        case .bouygues: return "Bouygues"
-        case .free: return "Free"
+        case .bouygues: return "Bouygues Telecom"
+        case .free: return "Free Mobile"
         }
     }
 

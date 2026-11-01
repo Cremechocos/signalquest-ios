@@ -48,7 +48,7 @@ enum SentinelleListOrder {
             .replacingOccurrences(of: " ", with: "")
         switch normalized {
         case "BOUYGUES", "BOUYGUESTELECOM", "BYTEL": return "Bouygues Telecom"
-        case "FREE", "FREEMOBILE": return "Free"
+        case "FREE", "FREEMOBILE": return "Free Mobile"
         case "ORANGE", "ORANGEFRANCE": return "Orange"
         case "SFR": return "SFR"
         default: return raw

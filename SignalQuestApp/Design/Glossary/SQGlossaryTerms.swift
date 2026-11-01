@@ -164,7 +164,7 @@ enum SQTerm: String, CaseIterable, Identifiable {
             return SQGlossaryEntry(
                 title: String(localized: "Code opérateur (MCC-MNC)"),
                 definition: String(localized: "Le code d’un réseau mobile : le pays (MCC, 208 pour la France) suivi de l’opérateur (MNC)."),
-                example: String(localized: "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom."),
+                example: String(localized: "208-01 Orange, 208-10 SFR, 208-15 Free Mobile, 208-20 Bouygues Telecom."),
                 related: related
             )
         case .band:
