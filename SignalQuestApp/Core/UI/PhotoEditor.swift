@@ -69,6 +69,7 @@ struct PhotoEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var edits: PhotoEdits
     /// Référence de « rien n'a changé » : les visages trouvés d'office n'en sont pas un.
     @State private var baseline: PhotoEdits
@@ -124,7 +125,9 @@ struct PhotoEditorView: View {
                 } else {
                     VStack(spacing: 0) {
                         canvas
-                        panel.frame(height: 120)
+                        // Hauteur minimale, pas fixe : en grand texte, le panneau grandit
+                        // au lieu de rogner ses commandes ; la photo prend le reste.
+                        panel.frame(minHeight: 120)
                         toolBar
                     }
                 }
@@ -363,39 +366,67 @@ struct PhotoEditorView: View {
                     .padding(.horizontal, SQSpace.lg)
                 }
             }
-            HStack(spacing: SQSpace.md) {
-                Button {
-                    rotateLeft()
-                } label: {
-                    Image(systemName: "rotate.left").frame(width: 44, height: 44)
-                }
-                .accessibilityLabel(Text("Pivoter à gauche"))
-                .accessibilityIdentifier("photoEditor.rotate")
-                VStack(alignment: .leading, spacing: 0) {
+            // Tailles d'accessibilité : le curseur passe sous Pivoter et Réinitialiser,
+            // sinon il n'a plus la place d'exister à côté d'eux.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
                     HStack {
-                        Text("Redresser").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                        rotateButton
                         Spacer()
-                        Text(verbatim: Self.angleText(edits.straighten))
-                            .font(SQType.caption.monospacedDigit())
-                            .foregroundStyle(SQColor.label)
+                        resetButton
                     }
-                    Slider(value: straightenBinding, in: -PhotoEdits.straightenLimit...PhotoEdits.straightenLimit, step: 0.5)
-                        .tint(SQColor.brandRed)
-                        .accessibilityLabel(Text("Redresser"))
-                        .accessibilityValue(Text(Self.spokenAngle(edits.straighten)))
-                        .accessibilityIdentifier("photoEditor.straighten")
+                    straightenControl
                 }
-                if edits.hasGeometryChanges && !(fixedAspect != nil && onlyFixedCrop) {
-                    Button("Réinitialiser") { resetGeometry() }
-                        .font(SQType.subhead)
-                        .frame(minHeight: 44)
-                        .accessibilityIdentifier("photoEditor.reset")
+                .padding(.horizontal, SQSpace.lg)
+            } else {
+                HStack(spacing: SQSpace.md) {
+                    rotateButton
+                    straightenControl
+                    resetButton
                 }
+                .padding(.horizontal, SQSpace.lg)
             }
-            .padding(.horizontal, SQSpace.lg)
         }
         .padding(.vertical, SQSpace.sm)
         .foregroundStyle(SQColor.label)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+    }
+
+    private var rotateButton: some View {
+        Button {
+            rotateLeft()
+        } label: {
+            Image(systemName: "rotate.left").frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(Text("Pivoter à gauche"))
+        .accessibilityIdentifier("photoEditor.rotate")
+    }
+
+    private var straightenControl: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Redresser").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                Spacer()
+                Text(verbatim: Self.angleText(edits.straighten))
+                    .font(SQType.caption.monospacedDigit())
+                    .foregroundStyle(SQColor.label)
+            }
+            Slider(value: straightenBinding, in: -PhotoEdits.straightenLimit...PhotoEdits.straightenLimit, step: 0.5)
+                .tint(SQColor.brandRed)
+                .accessibilityLabel(Text("Redresser"))
+                .accessibilityValue(Text(Self.spokenAngle(edits.straighten)))
+                .accessibilityIdentifier("photoEditor.straighten")
+        }
+    }
+
+    @ViewBuilder
+    private var resetButton: some View {
+        if edits.hasGeometryChanges && !(fixedAspect != nil && onlyFixedCrop) {
+            Button("Réinitialiser") { resetGeometry() }
+                .font(SQType.subhead)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("photoEditor.reset")
+        }
     }
 
     /// Story : le cadre 9:16 d'office n'est pas une modification à réinitialiser.
@@ -432,7 +463,9 @@ struct PhotoEditorView: View {
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, SQSpace.lg)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.vertical, SQSpace.sm)
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
             .accessibilityIdentifier("blur.status")
     }
 
@@ -456,6 +489,8 @@ struct PhotoEditorView: View {
                     VStack(spacing: 4) {
                         Image(systemName: item.symbol).font(.system(size: 18, weight: .semibold))
                         Text(item.title).font(SQType.micro)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         // Point d'accent : l'outil contient une modification.
                         Circle().fill(modified ? SQColor.brandRed : .clear).frame(width: 5, height: 5)
                     }
@@ -473,6 +508,8 @@ struct PhotoEditorView: View {
             }
         }
         .padding(.bottom, SQSpace.xs)
+        // Même plafond que le dock : au-delà, « Recadrer » se coupait en deux lignes.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .background(SQColor.surface)
     }
 
