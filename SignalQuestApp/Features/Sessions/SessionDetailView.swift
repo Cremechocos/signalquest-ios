@@ -1689,26 +1689,35 @@ private struct SessionTraceFullScreen: View {
 /// Sessions déjà ouvertes depuis le fil, gardées le temps de la navigation :
 /// rouvrir le détail ne relance aucune requête. Chaque lecture de la session d'un
 /// autre membre compte dans la limite du serveur, un 304 compris. Clé par compte,
-/// vidée au changement de compte.
+/// vidée au changement de compte. Cinq minutes au plus : une session dépubliée
+/// ou supprimée par son auteur ne reste pas visible au-delà.
 @MainActor
 final class SharedSessionMemory {
     static let shared = SharedSessionMemory()
-    private var entries: [(key: String, detail: CoverageSessionDetail)] = []
+    nonisolated static let lifetime: TimeInterval = 5 * 60
+    private var entries: [(key: String, detail: CoverageSessionDetail, storedAt: Date)] = []
     private let capacity = 4
+    /// Compte courant, injectable pour les tests.
+    private let account: () -> String?
 
-    private static func key(_ sessionId: String) -> String? {
-        LocalAccountScope.sessionSnapshot().map { "\($0.ownerScopeId)|\($0.sessionId)|\(sessionId)" }
+    init(account: @escaping () -> String? = { LocalAccountScope.sessionSnapshot().map { "\($0.ownerScopeId)|\($0.sessionId)" } }) {
+        self.account = account
     }
 
-    func detail(for sessionId: String) -> CoverageSessionDetail? {
-        guard let key = Self.key(sessionId) else { return nil }
+    private func key(_ sessionId: String) -> String? {
+        account().map { "\($0)|\(sessionId)" }
+    }
+
+    func detail(for sessionId: String, now: Date = Date()) -> CoverageSessionDetail? {
+        entries.removeAll { now.timeIntervalSince($0.storedAt) >= Self.lifetime }
+        guard let key = key(sessionId) else { return nil }
         return entries.first { $0.key == key }?.detail
     }
 
-    func remember(_ detail: CoverageSessionDetail, for sessionId: String) {
-        guard let key = Self.key(sessionId) else { return }
+    func remember(_ detail: CoverageSessionDetail, for sessionId: String, now: Date = Date()) {
+        guard let key = key(sessionId) else { return }
         entries.removeAll { $0.key == key }
-        entries.append((key, detail))
+        entries.append((key, detail, now))
         if entries.count > capacity { entries.removeFirst(entries.count - capacity) }
     }
 

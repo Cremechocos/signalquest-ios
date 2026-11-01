@@ -199,6 +199,21 @@ final class SessionDetailProgressiveLoadingTests: XCTestCase {
         XCTAssertEqual(reopened.detail?.points.count, 2)
     }
 
+    /// Une session gardée en mémoire expire au bout de cinq minutes : dépubliée entre-temps,
+    /// elle n'est pas resservie, la réouverture repasse par le serveur.
+    func testRememberedSessionExpires() throws {
+        var account: String? = "user:a|s"
+        let memory = SharedSessionMemory(account: { account })
+        let detail = try JSONDecoder().decode(CoverageSessionDetail.self, from: Data(Self.firstPage([Self.point("p1")], cursor: nil).utf8))
+        let start = Date()
+        memory.remember(detail, for: "s1", now: start)
+        account = "user:b|s"
+        XCTAssertNil(memory.detail(for: "s1", now: start), "jamais servie à un autre compte")
+        account = "user:a|s"
+        XCTAssertNotNil(memory.detail(for: "s1", now: start.addingTimeInterval(SharedSessionMemory.lifetime - 1)))
+        XCTAssertNil(memory.detail(for: "s1", now: start.addingTimeInterval(SharedSessionMemory.lifetime)))
+    }
+
     /// 404 et limite de lecture se disent différemment : un membre à la limite ne doit pas
     /// lire « plus publique » et croire la session supprimée.
     func testSharedSessionErrorsTellNotPublicFromRateLimit() {
