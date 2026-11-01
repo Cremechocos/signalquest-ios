@@ -1,4 +1,5 @@
 import XCTest
+import MapKit
 import CoreLocation
 @testable import SignalQuest
 
@@ -745,5 +746,21 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         XCTAssertEqual(SignalDetailSheet.trace(kind: "session", signal: single)?.isEmpty, true)
         XCTAssertEqual(SignalDetailSheet.trace(kind: "session", signal: try signal(#"{"latitude":45.1,"longitude":5.7}"#))?.isEmpty, true)
         XCTAssertNil(SignalDetailSheet.trace(kind: "speedtest", signal: traced))
+    }
+
+    /// Miniature du fil : emprise d'au moins 250 m de demi-côté, au format 16:9, et tout le
+    /// tracé projeté à l'intérieur (contrat social-session-preview, « Rendu dans les apps »).
+    func testRouteThumbnailFramesTheWholeRoute() {
+        let short = [CLLocationCoordinate2D(latitude: 45, longitude: 5), CLLocationCoordinate2D(latitude: 45.0001, longitude: 5.0001)]
+        let small = RouteSnapshotCache.frame(for: short, aspect: 16 / 9)
+        XCTAssertGreaterThanOrEqual(small.height / MKMapPointsPerMeterAtLatitude(45), 499.9)
+        XCTAssertEqual(small.width / small.height, 16 / 9, accuracy: 0.0001)
+
+        let long = (0..<40).map { CLLocationCoordinate2D(latitude: 45.17 + 0.03 * Double($0) / 39, longitude: 5.70 + 0.2 * Double($0) / 39) }
+        let rect = RouteSnapshotCache.frame(for: long, aspect: 16 / 9)
+        XCTAssertEqual(rect.width / rect.height, 16 / 9, accuracy: 0.0001)
+        for point in RouteSnapshotCache.project(long, in: rect) {
+            XCTAssertTrue((0...1).contains(point.x) && (0...1).contains(point.y), "\(point)")
+        }
     }
 }
