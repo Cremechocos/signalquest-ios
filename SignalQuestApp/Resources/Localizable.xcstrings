@@ -628,6 +628,22 @@
         }
       }
     },
+    "%lld sur 5" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld out of 5"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld sur 5"
+          }
+        }
+      }
+    },
     "+%lld %% par rapport aux 30 jours précédents" : {
       "localizations" : {
         "en" : {
@@ -1044,6 +1060,54 @@
         }
       }
     },
+    "Membre anonyme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anonymous member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membre anonyme"
+          }
+        }
+      }
+    },
+    "Message retiré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message retiré"
+          }
+        }
+      }
+    },
+    "Message retiré par la modération." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message removed by moderation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message retiré par la modération."
+          }
+        }
+      }
+    },
     "Mono" : {
       "localizations" : {
         "en" : {
@@ -1076,6 +1140,46 @@
         }
       }
     },
+    "Réponse à un message anonyme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replying to an anonymous message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse à un message anonyme"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton texte restera visible sans ton nom, parce que des membres y ont répondu." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre texte restera visible sans votre nom, parce que des membres y ont répondu."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Visible de toi seul" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible de vous seul"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Saturation" : {
       "localizations" : {
         "en" : {
@@ -1088,6 +1192,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Saturation"
+          }
+        }
+      }
+    },
+    "Ton texte restera visible sans ton nom, parce que des membres y ont répondu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your text will stay visible without your name, because members replied to it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton texte restera visible sans ton nom, parce que des membres y ont répondu."
           }
         }
       }
@@ -1120,6 +1240,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appareil photo"
+          }
+        }
+      }
+    },
+    "Visible de toi seul" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only visible to you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible de toi seul"
           }
         }
       }

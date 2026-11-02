@@ -116,7 +116,20 @@ final class CommentsService: CommentsServicing {
 /// Ce qu'on publie dans le fil d'un site : une remarque, ou une demande d'aide qui joint l'état
 /// radio de l'appareil.
 enum SiteCommentKind: String, Codable, Sendable {
-    case comment, help
+    case comment, help, rating
+}
+
+/// État d'un message en v2 (site-thread-v2, #833) : anonymisé = gardé sans auteur parce qu'on y a
+/// répondu ; retiré = enlevé par la modération, servi sans texte tant que ses réponses restent.
+enum SiteCommentStatus: String, Decodable, Sendable {
+    case active, anonymized, removed
+}
+
+/// Un avis publié par le fil (v2, PR1b) : note, tendance et étiquettes publiques, jamais les notes privées.
+struct SiteCommentRating: Decodable, Equatable, Sendable {
+    let stars: Int
+    let trend: String?
+    let tags: [String]
 }
 
 /// L'état radio joint à une demande d'aide, aux noms du serveur, jamais de position.
@@ -164,27 +177,62 @@ struct SiteComment: Decodable, Identifiable, Equatable {
     let text: String
     let createdAt: Date?
     let radio: SiteCommentRadio?
-    let author: SocialFeedAuthor
-    let own: Bool
-    let canDelete: Bool
+    /// Nul pour un message anonymisé ou retiré (v2).
+    var author: SocialFeedAuthor?
+    var own: Bool
+    var canDelete: Bool
+    var parentId: String? = nil
+    var status: SiteCommentStatus = .active
+    /// Message privé : servi à son seul auteur.
+    var isPrivate = false
+    var rating: SiteCommentRating? = nil
+    var replyCount = 0
+    var canReply = false
+    /// Servi à l'auteur seulement : supprimer gardera le texte, sans nom (Q4).
+    var hasReplies = false
 }
 
 extension SiteComment {
-    private enum CodingKeys: String, CodingKey { case id, kind, text, createdAt, radio, author, own, canDelete }
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, text, createdAt, radio, author, own, canDelete
+        case parentId, status, visibility, rating, replyCount, canReply, hasReplies
+    }
 
-    /// Tolérant aux formes à venir du fil (site-thread-v2, #828) : un type inconnu (`rating`) se lit
-    /// comme un message, un texte absent ou nul comme un texte vide, que la page écarte.
+    /// Forme v2 (site-thread-v2, #833). Un `kind` ou un `status` inconnu fait écarter le message
+    /// par la page ; un texte nul (message retiré, texte privé d'un avis) se lit vide.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
-        kind = (try? c.decode(SiteCommentKind.self, forKey: .kind)) ?? .comment
+        kind = try c.decodeIfPresent(SiteCommentKind.self, forKey: .kind) ?? .comment
         text = (try? c.decodeIfPresent(String.self, forKey: .text)) ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
         radio = try? c.decodeIfPresent(SiteCommentRadio.self, forKey: .radio)
-        author = try c.decode(SocialFeedAuthor.self, forKey: .author)
-        own = try c.decodeIfPresent(Bool.self, forKey: .own) ?? false
-        canDelete = try c.decodeIfPresent(Bool.self, forKey: .canDelete) ?? false
+        author = try? c.decodeIfPresent(SocialFeedAuthor.self, forKey: .author)
+        parentId = try? c.decodeIfPresent(String.self, forKey: .parentId)
+        status = try c.decodeIfPresent(SiteCommentStatus.self, forKey: .status) ?? .active
+        isPrivate = (try? c.decodeIfPresent(String.self, forKey: .visibility)) == "private"
+        rating = try? c.decodeIfPresent(SiteCommentRating.self, forKey: .rating)
+        replyCount = (try? c.decodeIfPresent(Int.self, forKey: .replyCount)) ?? 0
+        let active = status == .active && author != nil
+        own = active && ((try? c.decodeIfPresent(Bool.self, forKey: .own)) ?? false)
+        canDelete = active && ((try? c.decodeIfPresent(Bool.self, forKey: .canDelete)) ?? false)
+        canReply = (try? c.decodeIfPresent(Bool.self, forKey: .canReply)) ?? false
+        hasReplies = (try? c.decodeIfPresent(Bool.self, forKey: .hasReplies)) ?? false
     }
+
+    /// Montré dans le fil : un message actif a un auteur et du texte (ou une note) ; un message
+    /// anonymisé garde son texte ; un message retiré n'est servi que pour porter ses réponses.
+    var isDisplayable: Bool {
+        switch status {
+        case .removed: return true
+        case .active, .anonymized: return !text.isEmpty || rating != nil
+        }
+    }
+}
+
+/// Résultat d'une suppression (v2, Q4) : sans réponse le message disparaît, avec des réponses il reste sans nom.
+enum SiteCommentDeleteOutcome: String, Decodable, Sendable {
+    case deleted, anonymized
 }
 
 struct SiteThreadSummary: Decodable, Equatable {
@@ -199,14 +247,12 @@ struct SiteCommentsPage: Decodable {
     private enum CodingKeys: String, CodingKey { case thread, comments, nextCursor }
 
     /// Un message illisible est écarté seul au lieu de faire tomber tout le fil. Les réponses
-    /// (`parentId`) et les messages sans texte (parent supprimé) attendent l'affichage v2 :
-    /// mêlés au premier niveau, ils tromperaient.
+    /// n'ont rien à faire au premier niveau (elles sont servies sous leur message).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         thread = try c.decode(SiteThreadSummary.self, forKey: .thread)
-        comments = c.decodeLossyArray([Entry].self, forKey: .comments)
-            .filter { $0.parentId == nil && !$0.comment.text.isEmpty }
-            .map(\.comment)
+        comments = c.decodeLossyArray([SiteComment].self, forKey: .comments)
+            .filter { $0.parentId == nil && $0.isDisplayable }
         nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
     }
 
@@ -216,17 +262,30 @@ struct SiteCommentsPage: Decodable {
         self.nextCursor = nextCursor
     }
 
-    private struct Entry: Decodable {
-        let comment: SiteComment
-        let parentId: String?
+}
 
-        private enum CodingKeys: String, CodingKey { case parentId }
+/// Les réponses d'un message (v2), des plus anciennes aux plus récentes.
+struct SiteRepliesPage: Decodable {
+    let replies: [SiteComment]
+    let nextCursor: String?
 
-        init(from decoder: Decoder) throws {
-            comment = try SiteComment(from: decoder)
-            parentId = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(String.self, forKey: .parentId)
-        }
+    private enum CodingKeys: String, CodingKey { case replies, nextCursor }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        replies = c.decodeLossyArray([SiteComment].self, forKey: .replies).filter(\.isDisplayable)
+        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
     }
+
+    init(replies: [SiteComment], nextCursor: String?) {
+        self.replies = replies
+        self.nextCursor = nextCursor
+    }
+}
+
+/// Un message seul (v2), cible d'une notification : on y lit son parent.
+struct SiteCommentLookup: Decodable {
+    let comment: SiteComment
 }
 
 private struct SiteCommentCreateRequest: Encodable {
@@ -236,6 +295,11 @@ private struct SiteCommentCreateRequest: Encodable {
     let kind: SiteCommentKind
     let text: String
     let radio: SiteCommentRadio?
+    let parentId: String?
+}
+
+private struct SiteCommentDeleteResponse: Decodable {
+    let outcome: SiteCommentDeleteOutcome?
 }
 
 private struct SiteCommentCreateResponse: Decodable {
@@ -245,9 +309,14 @@ private struct SiteCommentCreateResponse: Decodable {
 protocol SiteCommentsServicing: Sendable {
     /// Le fil d'un site pour un opérateur, du plus récent au plus ancien. Lecture ouverte à tous.
     func list(market: String, operatorKey: String, siteId: String, cursor: String?) async throws -> SiteCommentsPage
-    func add(market: String, operatorKey: String, siteId: String, kind: SiteCommentKind, text: String, radio: SiteCommentRadio?) async throws -> SiteComment
-    /// Ses propres messages seulement.
-    func delete(id: String) async throws
+    /// `parentId` : une réponse, toujours publique, à un message du premier niveau.
+    func add(market: String, operatorKey: String, siteId: String, kind: SiteCommentKind, text: String, radio: SiteCommentRadio?, parentId: String?) async throws -> SiteComment
+    /// Ses propres messages seulement ; avec des réponses, le message reste sans nom.
+    func delete(id: String) async throws -> SiteCommentDeleteOutcome
+    /// Les réponses d'un message, des plus anciennes aux plus récentes.
+    func replies(to parentId: String, cursor: String?) async throws -> SiteRepliesPage
+    /// Un message seul (réponse comprise), pour retrouver le message notifié.
+    func comment(id: String) async throws -> SiteComment
     /// Le membre a ouvert la discussion d'un site qu'il suit : son activité repart de maintenant.
     func markSeen(market: String, operatorKey: String, siteId: String) async
 }
@@ -268,6 +337,8 @@ final class SiteCommentsService: SiteCommentsServicing {
             URLQueryItem(name: "siteId", value: siteId),
             URLQueryItem(name: "limit", value: "20"),
         ]
+        // Formes v2 (#833) : réponses comptées, messages anonymisés, ses messages privés.
+        if SQFeatures.siteThreadV2 { query.append(URLQueryItem(name: "v", value: "2")) }
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         return try await api.request(
             APIEndpoint(path: "/api/site-threads/comments", query: query),
@@ -275,27 +346,47 @@ final class SiteCommentsService: SiteCommentsServicing {
         )
     }
 
-    func add(market: String, operatorKey: String, siteId: String, kind: SiteCommentKind, text: String, radio: SiteCommentRadio?) async throws -> SiteComment {
+    func add(market: String, operatorKey: String, siteId: String, kind: SiteCommentKind, text: String, radio: SiteCommentRadio?, parentId: String? = nil) async throws -> SiteComment {
         if AppEnvironment.usesDemoData {
             try? await Task.sleep(nanoseconds: 300_000_000)
             return SiteComment(
                 id: UUID().uuidString, kind: kind, text: text, createdAt: Date(), radio: radio,
                 author: SocialFeedAuthor(id: "demo-me", name: "Alex", handle: "alex", avatarUrl: nil,
                                          isFriend: nil, isFollowing: nil, liveRadio: nil),
-                own: true, canDelete: true
+                own: true, canDelete: true, parentId: parentId
             )
         }
         let response: SiteCommentCreateResponse = try await api.requestJSON(
             "/api/site-threads/comments",
             body: SiteCommentCreateRequest(market: market, operator: operatorKey, siteId: siteId,
-                                           kind: kind, text: text, radio: kind == .help ? radio : nil)
+                                           kind: kind, text: text, radio: kind == .help ? radio : nil, parentId: parentId)
         )
         return response.comment
     }
 
-    func delete(id: String) async throws {
-        if AppEnvironment.usesDemoData { return }
-        try await api.request(APIEndpoint(path: "/api/site-threads/comments/\(id)", method: .delete))
+    func delete(id: String) async throws -> SiteCommentDeleteOutcome {
+        if AppEnvironment.usesDemoData { return .deleted }
+        let response = try await api.request(APIEndpoint(path: "/api/site-threads/comments/\(id)", method: .delete),
+                                             as: SiteCommentDeleteResponse.self)
+        // Un serveur d'avant la v2 ne dit rien : le message a été supprimé.
+        return response.outcome ?? .deleted
+    }
+
+    func replies(to parentId: String, cursor: String?) async throws -> SiteRepliesPage {
+        if AppEnvironment.usesDemoData { return Self.demoReplies(to: parentId) }
+        var query = [URLQueryItem(name: "v", value: "2"), URLQueryItem(name: "limit", value: "20")]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return try await api.request(
+            APIEndpoint(path: "/api/site-threads/comments/\(parentId)/replies", query: query),
+            as: SiteRepliesPage.self
+        )
+    }
+
+    func comment(id: String) async throws -> SiteComment {
+        try await api.request(
+            APIEndpoint(path: "/api/site-threads/comments/\(id)", query: [URLQueryItem(name: "v", value: "2")]),
+            as: SiteCommentLookup.self
+        ).comment
     }
 
     /// Sans suivi, rien n'est écrit ; un échec ne se montre pas, c'est un simple compteur.
@@ -311,7 +402,7 @@ final class SiteCommentsService: SiteCommentsServicing {
     }
 
     private static var demoPage: SiteCommentsPage { SiteCommentsPage(
-        thread: SiteThreadSummary(commentCount: 2),
+        thread: SiteThreadSummary(commentCount: 3),
         comments: [
             SiteComment(
                 id: "demo-site-comment-2", kind: .help,
@@ -320,7 +411,15 @@ final class SiteCommentsService: SiteCommentsServicing {
                 radio: SiteCommentRadio(technology: "4G", band: "b3", pci: 214, rsrp: -98),
                 author: SocialFeedAuthor(id: "demo-camille", name: "Camille", handle: "camille", avatarUrl: nil,
                                          isFriend: nil, isFollowing: nil, liveRadio: nil),
-                own: false, canDelete: false
+                own: false, canDelete: false, replyCount: 1, canReply: true
+            ),
+            // Gardé sans nom : son auteur l'a supprimé après qu'on y a répondu (v2, Q4).
+            SiteComment(
+                id: "demo-site-comment-anon", kind: .comment,
+                text: "Travaux annoncés sur le pylône la semaine prochaine.",
+                createdAt: Date().addingTimeInterval(-86_400),
+                radio: nil, author: nil, own: false, canDelete: false,
+                status: .anonymized, replyCount: 1, canReply: true
             ),
             SiteComment(
                 id: "demo-site-comment-1", kind: .comment,
@@ -329,11 +428,24 @@ final class SiteCommentsService: SiteCommentsServicing {
                 radio: nil,
                 author: SocialFeedAuthor(id: "demo-yanis", name: "Yanis", handle: "yanis", avatarUrl: nil,
                                          isFriend: nil, isFollowing: nil, liveRadio: nil),
-                own: false, canDelete: false
+                own: false, canDelete: false, canReply: true
             ),
         ],
         nextCursor: nil
     ) }
+
+    private static func demoReplies(to parentId: String) -> SiteRepliesPage {
+        SiteRepliesPage(replies: [
+            SiteComment(
+                id: "demo-site-reply-\(parentId)", kind: .comment,
+                text: "Pareil ici, ça revient vers 23 h.",
+                createdAt: Date().addingTimeInterval(-1_800), radio: nil,
+                author: SocialFeedAuthor(id: "demo-lea", name: "Léa", handle: "lea", avatarUrl: nil,
+                                         isFriend: nil, isFollowing: nil, liveRadio: nil),
+                own: false, canDelete: false, parentId: parentId
+            ),
+        ], nextCursor: nil)
+    }
 }
 
 /// La clé d'un suivi de site : un site, un marché et un opérateur précis (jamais « ALL »).

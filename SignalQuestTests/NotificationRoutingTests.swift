@@ -158,6 +158,19 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertNil(zone.openSiteCommentId)
     }
 
+    /// Réponse à son message dans le fil d'un site (site-thread-v2, Q5) : la fiche sur l'opérateur du
+    /// fil, ouverte sur la réponse (le fil la cherche sous son message).
+    func testSiteThreadReplyOpensTheReply() {
+        let router = AppRouter()
+        router.handle(type: "site_thread_reply", conversationId: nil, postId: nil, siteId: "DROM:97100001", market: "DROM",
+                      operatorKey: "ORANGE", commentId: "reply-7")
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertEqual(router.openSiteId, "DROM:97100001")
+        XCTAssertEqual(router.openSiteMarket, "DROM")
+        XCTAssertEqual(router.openSiteOperator, "ORANGE")
+        XCTAssertEqual(router.openSiteCommentId, "reply-7")
+    }
+
     /// Une alerte de zone ne vise aucun opérateur : la fiche suit le filtre de la carte.
     func testSiteAlertWithoutFollowKeepsTheMapOperator() {
         let router = AppRouter()

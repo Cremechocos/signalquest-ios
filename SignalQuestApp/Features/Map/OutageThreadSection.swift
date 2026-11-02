@@ -743,6 +743,15 @@ struct SiteThreadSection: View {
     @State private var reportTarget: SiteComment?
     @State private var highlightedId: String?
     @State private var focusHandled = false
+    /// Message auquel on répond (v2) : le champ lui écrit, sous son nom.
+    @State private var replyTarget: SiteComment?
+    @State private var repliesByComment: [String: [SiteComment]] = [:]
+    @State private var replyCursors: [String: String] = [:]
+    @State private var expandedReplies: Set<String> = []
+    @State private var loadingReplies: Set<String> = []
+    @State private var loadingMoreReplies: Set<String> = []
+    @State private var moreRepliesFailed: Set<String> = []
+    @State private var repliesErrors: [String: String] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let textLimit = 1000
@@ -786,8 +795,13 @@ struct SiteThreadSection: View {
                 Task { await delete(comment) }
             }
             Button("Annuler", role: .cancel) { pendingDelete = nil }
-        } message: { _ in
-            Text("Il disparaîtra de la discussion pour tout le monde.")
+        } message: { comment in
+            // Q4 : avec des réponses, le texte reste, sans nom. Le membre le sait avant de confirmer.
+            if comment.hasReplies {
+                Text("Ton texte restera visible sans ton nom, parce que des membres y ont répondu.")
+            } else {
+                Text("Il disparaîtra de la discussion pour tout le monde.")
+            }
         }
         .sheet(item: $reportTarget) { comment in
             ReportSheet(target: .siteComment(comment.id), service: services.reports)
@@ -863,12 +877,35 @@ struct SiteThreadSection: View {
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
+            // À qui l'on répond, au-dessus du champ ; la croix rend le champ au fil.
+            if let target = replyTarget {
+                HStack(spacing: SQSpace.sm) {
+                    Text(Self.replyBanner(for: target))
+                        .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                        .foregroundStyle(SQColor.brandRed)
+                        .sqSingleLine()
+                    Spacer()
+                    Button {
+                        replyTarget = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel(String(localized: "Annuler la réponse"))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if let postError {
                 SQInlineError(message: postError)
             }
 
             TextField(
-                asksHelp ? String(localized: "Décris ce qui ne va pas…") : String(localized: "Écrire sur ce site…"),
+                replyTarget != nil ? String(localized: "Répondre…")
+                    : asksHelp ? String(localized: "Décris ce qui ne va pas…") : String(localized: "Écrire sur ce site…"),
                 text: $draft,
                 axis: .vertical
             )
@@ -879,7 +916,8 @@ struct SiteThreadSection: View {
                 .disabled(posting)
                 .accessibilityIdentifier("antenna.detail.siteThread.field")
 
-            if let radio = deviceRadio {
+            // Une réponse reste un message simple : la demande d'aide se pose au fil.
+            if replyTarget == nil, let radio = deviceRadio {
                 Toggle(isOn: $asksHelp) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Demande d'aide")
@@ -931,18 +969,36 @@ struct SiteThreadSection: View {
     }
 
     private func row(_ comment: SiteComment) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Text(String(comment.author.displayName.prefix(2)).uppercased())
-                .font(SQFont.body(12, .semibold, relativeTo: .caption))
-                .frame(width: 34, height: 34)
-                .background(SQColor.accentSoft, in: Circle())
-                .foregroundStyle(SQColor.brandRed)
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            messageRow(comment, isReply: false)
+            if comment.parentId == nil {
+                replyActions(comment)
+                    .padding(.leading, 34 + SQSpace.md)
+            }
+        }
+    }
+
+    /// Un message du fil ou une réponse ; une réponse est plus petite et n'a pas de réponses.
+    private func messageRow(_ comment: SiteComment, isReply: Bool) -> some View {
+        HStack(alignment: .top, spacing: isReply ? SQSpace.sm : SQSpace.md) {
+            Group {
+                if let author = comment.author {
+                    Text(String(author.displayName.prefix(2)).uppercased())
+                } else {
+                    Image(systemName: "person.fill")
+                }
+            }
+            .font(SQFont.body(isReply ? 11 : 12, .semibold, relativeTo: .caption))
+            .frame(width: isReply ? 27 : 34, height: isReply ? 27 : 34)
+            .background(comment.author == nil ? SQColor.fill : SQColor.accentSoft, in: Circle())
+            .foregroundStyle(comment.author == nil ? SQColor.labelSecondary : SQColor.brandRed)
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
-                    Text(comment.author.displayName)
-                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                    Text(Self.authorLine(for: comment))
+                        .font(SQFont.body(isReply ? 13 : 15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(comment.author == nil ? SQColor.labelSecondary : SQColor.label)
                         .sqSingleLine()
                     if let date = comment.createdAt {
                         Text(date, format: .relative(presentation: .named))
@@ -950,6 +1006,11 @@ struct SiteThreadSection: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .sqSingleLine()
                     }
+                }
+                if comment.isPrivate {
+                    Label("Visible de toi seul", systemImage: "lock")
+                        .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 if comment.kind == .help {
                     VStack(alignment: .leading, spacing: 2) {
@@ -964,19 +1025,127 @@ struct SiteThreadSection: View {
                         }
                     }
                 }
-                Text(comment.text)
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+                if let rating = comment.rating {
+                    stars(rating.stars)
+                }
+                if comment.status == .removed {
+                    Text("Message retiré par la modération.")
+                        .font(SQType.caption.italic())
+                        .foregroundStyle(SQColor.labelSecondary)
+                } else if !comment.text.isEmpty {
+                    Text(comment.text)
+                        .font(isReply ? SQType.caption : SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if comment.canDelete || isSignedIn {
+            if comment.canDelete || (isSignedIn && comment.status != .removed) {
                 rowMenu(comment)
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// Note d'un avis en étoiles dessinées, lue « 3 sur 5 ».
+    private func stars(_ count: Int) -> some View {
+        HStack(spacing: 2) {
+            ForEach(1...5, id: \.self) { index in
+                Image(systemName: index <= count ? "star.fill" : "star")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(index <= count ? SQColor.accentInk : SQColor.labelSecondary)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(String(localized: "\(count) sur 5"))
+    }
+
+    /// « Répondre », le compte des réponses à déplier, puis les réponses sous un filet.
+    @ViewBuilder
+    private func replyActions(_ comment: SiteComment) -> some View {
+        let loaded = repliesByComment[comment.id] ?? []
+        let hasReplies = comment.replyCount > 0 || !loaded.isEmpty
+        if (comment.canReply && isSignedIn) || hasReplies {
+            HStack(spacing: SQSpace.md) {
+                if hasReplies {
+                    Button {
+                        Task { await toggleReplies(comment) }
+                    } label: {
+                        HStack(spacing: SQSpace.sm) {
+                            Rectangle()
+                                .fill(SQColor.separator)
+                                .frame(width: 20, height: 1.5)
+                            Text(repliesLabel(for: comment))
+                                .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                                .foregroundStyle(SQColor.brandRed)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityIdentifier("antenna.detail.siteThread.replies")
+                }
+                if comment.canReply && isSignedIn {
+                    Button {
+                        replyTarget = comment
+                    } label: {
+                        Text("Répondre")
+                            .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityIdentifier("antenna.detail.siteThread.reply")
+                }
+            }
+        }
+        if let repliesError = repliesErrors[comment.id] {
+            SQInlineError(message: repliesError)
+        }
+        if expandedReplies.contains(comment.id), !loaded.isEmpty {
+            // Un filet vertical : l'indentation seule se perd dès qu'une réponse est longue.
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                Rectangle()
+                    .fill(SQColor.separator)
+                    .frame(width: 2)
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    ForEach(loaded) { reply in
+                        messageRow(reply, isReply: true)
+                            .padding(highlightedId == reply.id ? SQSpace.sm : 0)
+                            .background(
+                                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                                    .fill(highlightedId == reply.id ? SQColor.accentSoft : .clear)
+                            )
+                            .id(Self.rowId(reply.id))
+                    }
+                    if replyCursors[comment.id] != nil {
+                        retryButton(moreRepliesFailed.contains(comment.id) ? "Réessayer de charger la suite" : "Voir plus de réponses",
+                                    busy: loadingMoreReplies.contains(comment.id)) { await loadMoreReplies(comment.id) }
+                            .disabled(loadingMoreReplies.contains(comment.id))
+                    }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func repliesLabel(for comment: SiteComment) -> String {
+        if loadingReplies.contains(comment.id) { return String(localized: "Chargement…") }
+        if expandedReplies.contains(comment.id) { return String(localized: "Masquer les réponses") }
+        let count = max(comment.replyCount, repliesByComment[comment.id]?.count ?? 0)
+        return count == 1 ? String(localized: "Voir 1 réponse") : String(localized: "Voir \(count) réponses")
+    }
+
+    /// Nom de l'auteur ; sans auteur, ce qui est arrivé au message.
+    static func authorLine(for comment: SiteComment) -> String {
+        if let author = comment.author { return author.displayName }
+        return comment.status == .removed ? String(localized: "Message retiré") : String(localized: "Membre anonyme")
+    }
+
+    static func replyBanner(for target: SiteComment) -> String {
+        guard let author = target.author else { return String(localized: "Réponse à un message anonyme") }
+        return String(localized: "Réponse à @\(author.handle ?? author.displayName)")
     }
 
     private func rowMenu(_ comment: SiteComment) -> some View {
@@ -1041,6 +1210,10 @@ struct SiteThreadSection: View {
             commentCount = page.thread.commentCount
             nextCursor = page.nextCursor
             moreFailed = false
+            repliesByComment = [:]
+            replyCursors = [:]
+            expandedReplies = []
+            repliesErrors = [:]
             if isSignedIn {
                 await services.siteComments.markSeen(market: market, operatorKey: operatorKey, siteId: siteId)
             }
@@ -1059,23 +1232,93 @@ struct SiteThreadSection: View {
     }
 
     /// Message notifié : quelques pages au plus, puis défilement et surlignage de deux secondes.
-    /// Introuvable (supprimé, réponse, trop ancien) : la discussion reste en tête, sans erreur.
+    /// Une réponse est cherchée sous son message, dépliée. Introuvable (supprimé, trop ancien) :
+    /// la discussion reste en tête, sans erreur.
     private func revealFocusedComment() async {
         guard let focusCommentId, !focusHandled else { return }
         focusHandled = true
+        var parentId = focusCommentId
+        var replyId: String?
+        if SQFeatures.siteThreadV2, !comments.contains(where: { $0.id == focusCommentId }),
+           let found = try? await services.siteComments.comment(id: focusCommentId),
+           let parent = found.parentId {
+            parentId = parent
+            replyId = focusCommentId
+        }
         var pages = 1
-        while !comments.contains(where: { $0.id == focusCommentId }), nextCursor != nil, pages < Self.focusPageLimit {
+        while !comments.contains(where: { $0.id == parentId }), nextCursor != nil, pages < Self.focusPageLimit {
             await loadMore()
             if moreFailed { return }
             pages += 1
         }
-        guard comments.contains(where: { $0.id == focusCommentId }) else { return }
+        guard comments.contains(where: { $0.id == parentId }) else { return }
+        var target = parentId
+        if let replyId {
+            guard await loadReplies(parentId) else { return }
+            var replyPages = 1
+            while !(repliesByComment[parentId] ?? []).contains(where: { $0.id == replyId }),
+                  replyCursors[parentId] != nil, replyPages < Self.focusPageLimit {
+                await loadMoreReplies(parentId)
+                if moreRepliesFailed.contains(parentId) { break }
+                replyPages += 1
+            }
+            expandedReplies.insert(parentId)
+            if (repliesByComment[parentId] ?? []).contains(where: { $0.id == replyId }) { target = replyId }
+        }
         // Le temps que la ligne soit posée avant d'y défiler.
         try? await Task.sleep(nanoseconds: 150_000_000)
-        onFocus?(focusCommentId)
-        if reduceMotion { highlightedId = focusCommentId } else { withAnimation { highlightedId = focusCommentId } }
+        onFocus?(target)
+        if reduceMotion { highlightedId = target } else { withAnimation { highlightedId = target } }
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         if reduceMotion { highlightedId = nil } else { withAnimation(.easeOut(duration: 0.6)) { highlightedId = nil } }
+    }
+
+    /// Déplie, replie, et charge la première fois.
+    private func toggleReplies(_ comment: SiteComment) async {
+        let id = comment.id
+        if expandedReplies.contains(id) {
+            expandedReplies.remove(id)
+            return
+        }
+        if repliesByComment[id] != nil {
+            expandedReplies.insert(id)
+            return
+        }
+        loadingReplies.insert(id)
+        // Déplié seulement si la lecture a réussi : sinon « Masquer » coiffait un fil vide.
+        if await loadReplies(id) { expandedReplies.insert(id) }
+        loadingReplies.remove(id)
+    }
+
+    @discardableResult
+    private func loadReplies(_ commentId: String) async -> Bool {
+        do {
+            let page = try await services.siteComments.replies(to: commentId, cursor: nil)
+            repliesByComment[commentId] = page.replies
+            replyCursors[commentId] = page.nextCursor
+            repliesErrors[commentId] = nil
+            return true
+        } catch {
+            if !error.isCancellation { repliesErrors[commentId] = error.userFacingMessage }
+            return false
+        }
+    }
+
+    /// La page suivante, plus récente, sous les réponses déjà lues.
+    private func loadMoreReplies(_ commentId: String) async {
+        guard let cursor = replyCursors[commentId], !loadingMoreReplies.contains(commentId) else { return }
+        loadingMoreReplies.insert(commentId)
+        defer { loadingMoreReplies.remove(commentId) }
+        do {
+            let page = try await services.siteComments.replies(to: commentId, cursor: cursor)
+            let existing = repliesByComment[commentId] ?? []
+            let ids = Set(existing.map(\.id))
+            repliesByComment[commentId] = existing + page.replies.filter { !ids.contains($0.id) }
+            replyCursors[commentId] = page.nextCursor
+            moreRepliesFailed.remove(commentId)
+        } catch {
+            if !error.isCancellation { moreRepliesFailed.insert(commentId) }
+        }
     }
 
     private func loadMore() async {
@@ -1096,7 +1339,8 @@ struct SiteThreadSection: View {
     private func post() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canPost else { return }
-        let radio = asksHelp ? deviceRadio : nil
+        let parent = replyTarget
+        let radio = asksHelp && parent == nil ? deviceRadio : nil
         let kind: SiteCommentKind = radio == nil ? .comment : .help
         posting = true
         postError = nil
@@ -1104,10 +1348,24 @@ struct SiteThreadSection: View {
         do {
             // Le serveur renvoie le message tel qu'il l'a enregistré : on l'affiche sans relire le fil.
             let comment = try await services.siteComments.add(
-                market: market, operatorKey: operatorKey, siteId: siteId, kind: kind, text: text, radio: radio
+                market: market, operatorKey: operatorKey, siteId: siteId, kind: kind, text: text, radio: radio,
+                parentId: parent?.id
             )
-            comments.insert(comment, at: 0)
-            commentCount += 1
+            if let parent {
+                // La réponse se lit sous son message, déplié ; le fil ne compte que le premier niveau.
+                if repliesByComment[parent.id] == nil { await loadReplies(parent.id) }
+                var replies = repliesByComment[parent.id] ?? []
+                if !replies.contains(where: { $0.id == comment.id }) { replies.append(comment) }
+                repliesByComment[parent.id] = replies
+                expandedReplies.insert(parent.id)
+                if let index = comments.firstIndex(where: { $0.id == parent.id }) {
+                    comments[index].replyCount = max(comments[index].replyCount + 1, replies.count)
+                }
+                replyTarget = nil
+            } else {
+                comments.insert(comment, at: 0)
+                commentCount += 1
+            }
             draft = ""
             asksHelp = false
             Haptics.success()
@@ -1125,9 +1383,24 @@ struct SiteThreadSection: View {
         actionError = nil
         defer { deletingId = nil }
         do {
-            try await services.siteComments.delete(id: comment.id)
-            comments.removeAll { $0.id == comment.id }
-            commentCount = max(0, commentCount - 1)
+            let outcome = try await services.siteComments.delete(id: comment.id)
+            if let parentId = comment.parentId {
+                repliesByComment[parentId]?.removeAll { $0.id == comment.id }
+                if let index = comments.firstIndex(where: { $0.id == parentId }) {
+                    comments[index].replyCount = max(0, comments[index].replyCount - 1)
+                }
+            } else if outcome == .anonymized, let index = comments.firstIndex(where: { $0.id == comment.id }) {
+                // Q4 : le texte reste, sans nom ; ses réponses aussi.
+                comments[index].author = nil
+                comments[index].status = .anonymized
+                comments[index].own = false
+                comments[index].canDelete = false
+                comments[index].hasReplies = false
+            } else {
+                comments.removeAll { $0.id == comment.id }
+                commentCount = max(0, commentCount - 1)
+            }
+            if replyTarget?.id == comment.id { replyTarget = nil }
         } catch {
             if !error.isCancellation { actionError = error.userFacingMessage }
         }

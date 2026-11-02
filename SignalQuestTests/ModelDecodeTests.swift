@@ -1091,7 +1091,7 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(page.comments.map(\.kind), [.help, .comment])
         XCTAssertNotNil(page.comments[0].createdAt)
         XCTAssertEqual(page.comments[0].radio?.summary, "4G · B3 · PCI 214 · -98 dBm")
-        XCTAssertEqual(page.comments[0].author.displayName, "Camille")
+        XCTAssertEqual(page.comments[0].author?.displayName, "Camille")
         XCTAssertTrue(page.comments[1].canDelete)
         XCTAssertNil(page.comments[1].radio)
 
@@ -1112,8 +1112,8 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(daily.errorDescription, String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."))
     }
 
-    /// site-thread-v2 (#828) servi à cette app : un avis se lit comme un message, et une réponse,
-    /// un parent supprimé ou un message illisible sont écartés seuls, sans faire tomber le fil.
+    /// site-thread-v2 (#828, #833) : un avis garde sa note ; une réponse, un statut inconnu ou un
+    /// message illisible sont écartés seuls, sans faire tomber le fil.
     func testSiteThreadPageToleratesV2Shapes() throws {
         let author = #""author":{"id":"u1","handle":null,"name":"Camille","avatarUrl":null}"#
         let json = """
@@ -1128,10 +1128,63 @@ final class ModelDecodeTests: XCTestCase {
          "nextCursor":null}
         """
         let page = try JSONDecoder.signalQuest.decode(SiteCommentsPage.self, from: Data(json.utf8))
-        XCTAssertEqual(page.comments.map(\.id), ["r1", "c1"])
-        XCTAssertEqual(page.comments.map(\.kind), [.comment, .help])
+        XCTAssertEqual(page.comments.map(\.id), ["r1", "x1", "c1"])
+        XCTAssertEqual(page.comments.map(\.kind), [.rating, .comment, .help])
         XCTAssertEqual(page.comments[0].text, "Coupures le soir")
+        XCTAssertEqual(page.comments[0].rating, SiteCommentRating(stars: 2, trend: "degraded", tags: ["coupures"]))
+        XCTAssertEqual(page.comments[0].replyCount, 1)
+        XCTAssertNil(page.comments[1].author, "no author: shown without a name, never with someone else's")
+        XCTAssertFalse(page.comments[1].canDelete)
         XCTAssertNil(page.nextCursor)
+
+        let unknownKind = #"{"thread":{"commentCount":1},"comments":[{"id":"k1","kind":"poll","text":"?",\#(author)}]}"#
+        XCTAssertTrue(try JSONDecoder.signalQuest.decode(SiteCommentsPage.self, from: Data(unknownKind.utf8)).comments.isEmpty)
+    }
+
+    /// v2 (#833) : message anonymisé, retiré par la modération (gardé pour ses réponses), privé,
+    /// et ce que le lecteur peut y faire.
+    func testSiteThreadV2StatusesAndViewerFlags() throws {
+        let json = """
+        {"thread":{"commentCount":4,"viewer":{"canPost":true,"cannotPostReason":null,"canRate":true,"ownRatings":[]}},
+         "comments":[
+          {"id":"a1","kind":"comment","text":"Gardé sans nom","parentId":null,"status":"anonymized","visibility":"public",
+           "textVisibility":null,"rating":null,"attachments":[],"replyCount":2,"editedAt":null,"author":null,
+           "own":false,"canDelete":false,"canReply":true},
+          {"id":"m1","kind":"comment","text":null,"radio":null,"parentId":null,"status":"removed","visibility":"public",
+           "replyCount":1,"author":null,"own":false,"canDelete":false,"canReply":false},
+          {"id":"p1","kind":"help","text":"Pour moi","parentId":null,"status":"active","visibility":"private","replyCount":0,
+           "author":{"id":"me","handle":"moi","name":"Moi","avatarUrl":null},"own":true,"canDelete":true,"canReply":false,
+           "hasReplies":false},
+          {"id":"o1","kind":"comment","text":"Le mien","parentId":null,"status":"active","visibility":"public","replyCount":3,
+           "author":{"id":"me","handle":"moi","name":"Moi","avatarUrl":null},"own":true,"canDelete":true,"canReply":true,
+           "hasReplies":true}],
+         "nextCursor":null}
+        """
+        let page = try JSONDecoder.signalQuest.decode(SiteCommentsPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.comments.map(\.id), ["a1", "m1", "p1", "o1"])
+        XCTAssertEqual(page.comments.map(\.status), [.anonymized, .removed, .active, .active])
+        XCTAssertEqual(SiteThreadSection.authorLine(for: page.comments[0]), String(localized: "Membre anonyme"))
+        XCTAssertEqual(SiteThreadSection.authorLine(for: page.comments[1]), String(localized: "Message retiré"))
+        XCTAssertTrue(page.comments[0].canReply)
+        XCTAssertEqual(page.comments[1].text, "")
+        XCTAssertTrue(page.comments[2].isPrivate)
+        XCTAssertTrue(page.comments[3].hasReplies, "the author is warned before deleting")
+        XCTAssertEqual(SiteThreadSection.replyBanner(for: page.comments[0]), String(localized: "Réponse à un message anonyme"))
+
+        let replies = try JSONDecoder.signalQuest.decode(SiteRepliesPage.self, from: Data("""
+        {"replies":[{"id":"r1","kind":"comment","text":"Oui","parentId":"a1","status":"active","replyCount":0,
+          "author":{"id":"u2","handle":"cam","name":"Camille","avatarUrl":null},"own":false,"canDelete":false,"canReply":false},
+          {"id":"r2","kind":"comment","text":"","parentId":"a1","author":null}],"nextCursor":"2026-11-02T00:00:00.000Z::r1"}
+        """.utf8))
+        XCTAssertEqual(replies.replies.map(\.id), ["r1"])
+        XCTAssertEqual(replies.replies.first?.parentId, "a1")
+        XCTAssertNotNil(replies.nextCursor)
+        let lookup = try JSONDecoder.signalQuest.decode(SiteCommentLookup.self, from: Data("""
+        {"comment":{"id":"r1","kind":"comment","text":"Oui","parentId":"a1","author":null,"status":"anonymized"},
+         "thread":{"market":"FR","operator":"ORANGE","siteKey":"0123456"}}
+        """.utf8))
+        XCTAssertEqual(lookup.comment.parentId, "a1")
+        XCTAssertEqual(try JSONDecoder().decode(SiteCommentDeleteOutcome.self, from: Data(#""anonymized""#.utf8)), .anonymized)
     }
 
     /// ROOM-1 : une page de salon, avec ce que le serveur peut omettre ou mettre à null.

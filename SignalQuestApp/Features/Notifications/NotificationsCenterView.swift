@@ -496,7 +496,7 @@ struct NotificationsCenterView: View {
             anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil,
             market: metaString(meta, "market"),
             operatorKey: metaString(meta, "operator"),
-            commentId: metaString(meta, "commentId")
+            commentId: metaString(meta, "commentId") ?? metaString(meta, "replyId")
         )
     }
 

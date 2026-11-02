@@ -327,7 +327,8 @@ final class AppRouter: ObservableObject {
         // Site suivi (message, activation, nouvelle bande, panne confirmée) : la charge porte
         // son marché, sans lequel un site hors de France ne se retrouve pas, et l'opérateur
         // suivi : sur un support partagé, la fiche ouverte sur un autre montrait un autre fil.
-        case "site_follow":
+        // Réponse à son message dans le fil d'un site (site-thread-v2, Q5) : la discussion, sur la réponse.
+        case "site_follow", "site_thread_reply":
             route(toSite: siteId, market: market, operatorKey: operatorKey, commentId: commentId)
         case "anfr_update":
             selectedTab = .map

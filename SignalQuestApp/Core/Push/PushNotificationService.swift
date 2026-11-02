@@ -911,7 +911,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // Site suivi : son marché, pour retrouver un site hors de France.
         let market = Self.string(info, "market")
         let operatorKey = Self.string(info, "operator")
-        let commentId = Self.string(info, "commentId")
+        // Réponse à son message dans un fil de site (`site_thread_reply`) : la réponse elle-même.
+        let commentId = Self.string(info, "commentId") ?? Self.string(info, "replyId")
         // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
         let anfrFocus = ANFRFocus.parse(
             date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),

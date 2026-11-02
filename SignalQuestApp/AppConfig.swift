@@ -42,6 +42,14 @@ enum SQFeatures {
     /// synchroniseur présent) pour qu'un achat soit éligible.
     static let storeKitServerVerificationEnabled = true
 
+    /// Lecture du fil de site en `?v=2` (#833) : réponses, messages anonymisés,
+    /// messages privés de l'auteur. Fermé tant qu'aucune build publiée ne porte
+    /// le décodeur tolérant et l'auteur facultatif : la v2 peut servir
+    /// `author: null`, qui fait tomber la page entière dans les builds d'avant.
+    /// Fermé, la v1 ne sert ni `replyCount` ni `canReply` : rien des réponses
+    /// ne s'affiche.
+    static let siteThreadV2 = false
+
     /// Réactions chiffrées (spec E2EE D.16) : l'appareil annonce l'enveloppe
     /// v3, `REACTION` et `reactions` quand ce verrou est ouvert ET que le
     /// serveur publie `e2ee_message_envelope_v3` (`E2EEV2ServerGate.reactionsOpen`).
