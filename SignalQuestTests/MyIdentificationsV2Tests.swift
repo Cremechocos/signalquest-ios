@@ -128,6 +128,21 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(IdentifiedNodeGroup.group(items).map(\.nodeValue), ["2", "1"])
     }
 
+    /// Un nœud est (support, opérateur, eNB) comme côté serveur : le même numéro chez deux
+    /// opérateurs n'en cache plus un, et chaque cellule reste avec le sien. Une page sert
+    /// ses nœuds puis leurs cellules : l'ordre des nœuds reste celui du serveur.
+    func testSameNodeNumberOnTwoOperatorsMakesTwoNodes() throws {
+        let items = try JSONDecoder.signalQuest.decode([MyIdentification].self, from: Data("""
+        [{"id":"n1","siteId":"7","operator":"ORANGE","type":"enb","enb":"81234"},
+         {"id":"n2","siteId":"9","operator":"SFR","type":"enb","enb":"81234"},
+         {"id":"c1","siteId":"9","operator":"SFR","type":"pci","enb":"81234","pciValue":"214","sectors":[2]},
+         {"id":"c2","siteId":"7","operator":"ORANGE","type":"pci","enb":"81234","pciValue":"11","sectors":[1]}]
+        """.utf8))
+        let groups = IdentifiedNodeGroup.group(items)
+        XCTAssertEqual(groups.map(\.representative.id), ["n1", "n2"])
+        XCTAssertEqual(groups.map { $0.cells.map(\.source.id) }, [["c2"], ["c1"]])
+    }
+
     // MARK: Pagination
 
     func testPagesAppendKeepFirstTotalsAndRestartOnInvalidCursor() async throws {

@@ -222,7 +222,10 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
                 node = (.unassigned, "")
             }
             let (kind, nodeValue) = node
-            let key = "\(kind.rawValue):\(nodeValue)"
+            // Un nœud est (support, opérateur, eNB/gNB), comme le serveur rattache ses cellules :
+            // le même numéro chez deux opérateurs, ou sur deux supports, fait deux nœuds.
+            let key = kind == .unassigned ? "\(kind.rawValue):"
+                : "\(kind.rawValue):\(nodeValue)|\(item.siteId)|\(item.operatorName ?? "")"
             var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item, order: values.count)
             // La ligne du NŒUD (eNB/gNB) représente le groupe dès qu'elle existe :
             // la plus récente pouvait être une cellule PCI, et toucher le nœud ouvrait
