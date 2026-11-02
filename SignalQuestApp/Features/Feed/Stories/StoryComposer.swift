@@ -17,6 +17,34 @@ enum StoryAudience: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Fond d'une story sans photo, tiré de la charte Crème. Il part en `#RRGGBB` :
+/// le lecteur (iOS, web, Android) affiche toute couleur hex et choisit l'encre selon la luminosité.
+enum StoryBackground: String, CaseIterable, Identifiable {
+    case nuit, creme, brique, olive, ambre, encre
+
+    var id: String { rawValue }
+    var hex: String {
+        switch self {
+        case .nuit: return "#191410"
+        case .creme: return "#F3EDE2"
+        case .brique: return "#B04A3C"
+        case .olive: return "#606B46"
+        case .ambre: return "#85602B"
+        case .encre: return "#332818"
+        }
+    }
+    var label: String {
+        switch self {
+        case .nuit: return String(localized: "Nuit")
+        case .creme: return String(localized: "Crème")
+        case .brique: return String(localized: "Brique")
+        case .olive: return String(localized: "Olive")
+        case .ambre: return String(localized: "Ambre")
+        case .encre: return String(localized: "Encre")
+        }
+    }
+}
+
 @MainActor
 final class StoryComposerViewModel: ObservableObject {
     /// Plafond du schéma serveur (`POST /api/social/stories`) : au-delà, la story
@@ -48,6 +76,8 @@ final class StoryComposerViewModel: ObservableObject {
     /// cas d'usage, partager sa couverture.
     @Published var attachRadio = false
     @Published var closeFriendIds: Set<String> = []
+    /// Fond d'une story sans photo ; ignoré dès qu'une photo est choisie.
+    @Published var background: StoryBackground = .nuit
     /// La liste d'amis proches est-elle bien revenue du serveur, et dans quel état ?
     /// Sans cela, une liste vide (chargement raté) serait enregistrée à la fermeture
     /// de l'éditeur et effacerait la vraie.
@@ -147,6 +177,18 @@ final class StoryComposerViewModel: ObservableObject {
         pickedImageData = data
     }
 
+    var hasPhoto: Bool { pickedImageData != nil }
+
+    /// Retire la photo : la story redevient une story texte, sur son fond.
+    func removePhoto() {
+        selectedItem = nil
+        previewImage = nil
+        pickedImageData = nil
+        editSource = nil
+        originalImageData = nil
+        photoEdits = PhotoEdits()
+    }
+
     /// Persiste la liste d'amis proches (PUT). Appelé à la fermeture de l'éditeur,
     /// seulement si la liste du serveur a été lue ET que tu l'as modifiée.
     func saveCloseFriends() async {
@@ -186,7 +228,7 @@ final class StoryComposerViewModel: ObservableObject {
                 visibility: audience.rawValue,
                 ttlHours: ttlHours,
                 hiddenUserIds: Array(hiddenUserIds),
-                background: nil,
+                background: mediaUrl == nil ? background.hex : nil,
                 attachRadio: attachRadio,
                 metadata: nil
             )
@@ -207,94 +249,61 @@ final class StoryComposerViewModel: ObservableObject {
     }
 }
 
+/// Création d'une story en deux temps, plein écran : d'abord la story telle que les autres
+/// la verront (photo ou fond, légende par-dessus, relevé joint), puis « Partager »
+/// (audience et options). Choix d'Alexandre du 02/11 : le contenu avant les réglages.
 struct StoryComposer: View {
     @StateObject private var model: StoryComposerViewModel
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var step: Step = .create
     @State private var showPremiumPaywall = false
-    /// Éditeur « Flouter » de la photo (plan 3, vague 1).
-    @State private var showBlurEditor = false
+    @State private var showPhotoEditor = false
     @State private var showsCamera = false
+    @FocusState private var captionFocused: Bool
 
+    private let author: AuthUser?
     private let onPublished: (SocialStory) -> Void
+
+    private enum Step { case create, share }
 
     init(
         service: StoriesServicing,
         friendsService: FriendsServicing,
+        author: AuthUser? = nil,
         onPublished: @escaping (SocialStory) -> Void = { _ in }
     ) {
         _model = StateObject(wrappedValue: StoryComposerViewModel(service: service, friendsService: friendsService))
+        self.author = author
         self.onPublished = onPublished
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg) {
-                HStack(spacing: SQSpace.sm) {
-                    Text("Nouvelle story")
-                        .font(SQFont.display(22, .heavy, relativeTo: .title2))
-                        .foregroundStyle(SQColor.label)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: 0)
-                    MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "story.composer.close") {
-                        dismiss()
-                    }
-                }
-
-                mediaAndCaption
-
-                segmentGroup("Qui la voit") {
-                    ForEach([StoryAudience.friends, .publicAll, .closeFriends]) { audience in
-                        segment(audience.label, isSelected: model.audience == audience) {
-                            model.audience = audience
-                        }
-                    }
-                }
-                segmentGroup("Disparaît après") { ttlSegments }
-                segmentGroup("Affichage") {
-                    ForEach([5, 10, 15], id: \.self) { seconds in
-                        segment(String(localized: "\(seconds) s"), isSelected: model.displayDuration == seconds) {
-                            model.displayDuration = seconds
-                        }
-                        .accessibilityLabel("Durée d'affichage \(seconds) secondes")
-                    }
-                }
-
-                optionsCard
-
-                if let error = model.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.footnote)
-                        .foregroundStyle(SQColor.dangerInk)
-                }
-
-                GradientButton("Publier la story", isBusy: model.isSending) {
-                    Task {
-                        await model.publish()
-                        if model.didPublish {
-                            if let story = model.publishedStory { onPublished(story) }
-                            dismiss()
-                        }
-                    }
-                }
-                // Story vide : le bouton est grisé plutôt que sans effet.
-                .disabled(!model.canPublish)
-                .accessibilityIdentifier("story.publish")
+        ZStack {
+            switch step {
+            case .create:
+                createStep
+                    .transition(.opacity)
+            case .share:
+                shareStep
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing))
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.lg)
-            .padding(.bottom, SQSpace.xxl)
         }
         .onChangeCompat(of: model.selectedItem) { _, _ in
             Task { await model.loadPickerImage() }
         }
-        .fullScreenCover(isPresented: $showBlurEditor) {
+        .fullScreenCover(isPresented: $showPhotoEditor) {
             if let image = model.editSource ?? model.previewImage {
                 // Une story est verticale : le cadre 9:16 est imposé.
                 PhotoEditorView(image: image, edits: model.photoEdits, fixedAspect: 9 / 16) { edited, edits in
                     model.applyEdits(edited, edits)
                 }
             }
+        }
+        .fullScreenCover(isPresented: $showsCamera) {
+            CameraCapturePicker(isPresented: $showsCamera) { model.loadCapturedPhoto($0) }
+                .ignoresSafeArea()
         }
         .task {
             await model.loadAudience()
@@ -319,112 +328,362 @@ struct StoryComposer: View {
             }
             .presentationDetents([.large])
         }
-        .sqSheet(background: SQColor.bg)
     }
 
-    /// Aperçu du média et légende côte à côte.
-    private var mediaAndCaption: some View {
-        let previewImage = model.previewImage
-        return HStack(alignment: .top, spacing: SQSpace.md) {
-            PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                ZStack {
-                    if let image = previewImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Rectangle().fill(SQColor.chip)
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 28))
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .frame(width: 112, height: 198)
-                .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityLabel(previewImage == nil ? "Ajouter un média" : "Changer le média")
-            // Posé sur le sélecteur, pas dans son étiquette : un bouton
-            // imbriqué n'y recevrait pas le toucher.
-            .overlay(alignment: .topLeading) {
-                if previewImage != nil {
-                    PhotoEditButton { showBlurEditor = true }
-                        .accessibilityIdentifier("story.edit")
-                }
-            }
+    private func go(to next: Step) {
+        captionFocused = false
+        Haptics.light()
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { step = next }
+    }
 
-            VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text("Ta légende")
-                    .font(SQType.caption(.bold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                TextField("Une légende ?", text: $model.text, axis: .vertical)
-                    .lineLimit(3...7)
-                    .font(SQFont.body(15, .regular, relativeTo: .body))
-                    .foregroundStyle(SQColor.label)
-                    .textFieldStyle(.plain)
-                    .accessibilityIdentifier("story.caption")
-                Spacer(minLength: 0)
-                PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                    Text(previewImage == nil ? "Ajouter un média" : "Changer le média")
-                        .font(SQType.subhead(.bold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .frame(minHeight: 44)
+    // MARK: - Étape 1 : la story
+
+    private var createStep: some View {
+        VStack(spacing: SQSpace.md) {
+            StoryCanvas(model: model, author: author, editable: true, captionFocused: $captionFocused)
+                .overlay(alignment: .top) { canvasTopBar }
+                .padding(.horizontal, SQSpace.sm)
+                // La story prend la place qui reste : les outils restent toujours visibles.
+                .frame(maxHeight: .infinity)
+                .layoutPriority(-1)
+
+            if !model.hasPhoto {
+                backgroundPicker
+            }
+            // Toujours posée, masquée quand la story a un contenu : la story ne change pas de taille.
+            Text(verbatim: emptyHint)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.onGlass.opacity(0.75))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, SQSpace.lg)
+                .opacity(model.canPublish ? 0 : 1)
+                .accessibilityHidden(model.canPublish)
+            toolBar
+        }
+        .padding(.top, SQSpace.xs)
+        .padding(.bottom, SQSpace.sm)
+        .background(Color.black.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
+        .statusBarHidden(true)
+    }
+
+    private var canvasTopBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            glassIconButton("xmark", label: String(localized: "Annuler"), identifier: "story.composer.close") { dismiss() }
+            Spacer(minLength: 0)
+            if model.hasPhoto {
+                PhotoEditButton { showPhotoEditor = true }
+                    .accessibilityIdentifier("story.edit")
+                glassIconButton("trash", label: String(localized: "Retirer la photo"), identifier: "story.removePhoto") {
+                    Haptics.light()
+                    model.removePhoto()
+                }
+            }
+        }
+        .padding(SQSpace.sm)
+    }
+
+    /// Six fonds de la charte, touchables sous la story.
+    private var backgroundPicker: some View {
+        HStack(spacing: SQSpace.xs) {
+            ForEach(StoryBackground.allCases) { background in
+                Button {
+                    Haptics.selection()
+                    model.background = background
+                } label: {
+                    Circle()
+                        .fill(StoryViewer.backgroundColor(background.hex)?.color ?? .black)
+                        .frame(width: 30, height: 30)
+                        .overlay(Circle().strokeBorder(SQColor.onGlass.opacity(0.35), lineWidth: 1))
+                        .overlay {
+                            if model.background == background {
+                                Circle().strokeBorder(SQColor.onGlass, lineWidth: 2.5).padding(-5)
+                            }
+                        }
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                if CameraCapturePicker.isAvailable {
-                    Button { showsCamera = true } label: {
-                        Text("Prendre une photo")
-                            .font(SQType.subhead(.bold))
-                            .foregroundStyle(SQColor.accentInk)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+                .accessibilityLabel(Text(verbatim: background.label))
+                .accessibilityAddTraits(model.background == background ? .isSelected : [])
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Fond de la story"))
+        .accessibilityIdentifier("story.backgrounds")
+    }
+
+    private var toolBar: some View {
+        HStack(alignment: .center, spacing: SQSpace.xs) {
+            PhotosPicker(selection: $model.selectedItem, matching: .images) {
+                StoryToolLabel(title: String(localized: "Photo"), systemImage: "photo.on.rectangle", isOn: false)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("story.library")
+
+            if CameraCapturePicker.isAvailable {
+                Button { showsCamera = true } label: {
+                    StoryToolLabel(title: String(localized: "Appareil photo"), systemImage: "camera", isOn: false)
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityIdentifier("story.camera")
+            }
+
+            Button {
+                Haptics.selection()
+                model.attachRadio.toggle()
+            } label: {
+                StoryToolLabel(title: String(localized: "Réseau"), systemImage: "antenna.radiowaves.left.and.right", isOn: model.attachRadio)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint(Text("Joint l’opérateur et la technologie de ton dernier relevé"))
+            .accessibilityAddTraits(model.attachRadio ? .isSelected : [])
+            .accessibilityIdentifier("story.radio")
+
+            Spacer(minLength: SQSpace.sm)
+
+            GradientButton(String(localized: "Suivant"), systemImage: "arrow.right", style: .primary) {
+                go(to: .share)
+            }
+            .fixedSize()
+            .disabled(!model.canPublish)
+            .accessibilityHint(model.canPublish ? Text("") : Text(emptyHint))
+            .accessibilityIdentifier("story.next")
+        }
+        .padding(.horizontal, SQSpace.md)
+    }
+
+    private var emptyHint: String {
+        String(localized: "Ajoute une photo, un texte ou ton relevé réseau.")
+    }
+
+    private func glassIconButton(_ systemImage: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(SQColor.onGlass)
+                .frame(width: 36, height: 36)
+                .background(.black.opacity(0.55), in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(Text(verbatim: label))
+        .accessibilityIdentifier(identifier)
+    }
+
+    // MARK: - Étape 2 : Partager
+
+    private var shareStep: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: SQSpace.sm) {
+                Button { go(to: .create) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(SQColor.label)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel(Text("Retour à la story"))
+                .accessibilityIdentifier("story.back")
+                Text("Partager")
+                    .font(SQFont.display(22, .heavy, relativeTo: .title2))
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.top, SQSpace.sm)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    HStack(alignment: .center, spacing: SQSpace.md) {
+                        StoryCanvas(model: model, author: author, editable: false, captionFocused: $captionFocused)
+                            .frame(width: 72)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            Text(storyKind)
+                                .font(SQType.subhead(.bold))
+                                .foregroundStyle(SQColor.label)
+                            Text(String(localized: "Visible \(ttlLabel(model.ttlHours)), \(model.displayDuration) s à l’écran"))
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("story.camera")
+
+                    section(String(localized: "Qui la voit")) {
+                        ForEach(Array([StoryAudience.friends, .publicAll, .closeFriends].enumerated()), id: \.element) { index, audience in
+                            if index > 0 { Divider().padding(.leading, 62) }
+                            audienceRow(audience)
+                        }
+                        if model.audience == .closeFriends {
+                            Divider().padding(.leading, 62)
+                            optionRow(systemImage: "star", title: String(localized: "Liste d’amis proches"),
+                                      value: "\(model.closeFriendIds.count)") {
+                                // Liste du serveur non lue (échec réseau) : nouvel essai avant d'éditer.
+                                if !model.closeFriendsLoaded { Task { await model.loadAudience() } }
+                                model.showCloseFriendsEditor = true
+                            }
+                        }
+                        Divider().padding(.leading, 62)
+                        optionRow(systemImage: "hand.raised", title: String(localized: "Masquer à…"), value: hiddenValue) {
+                            model.showHideEditor = true
+                        }
+                    }
+
+                    section(String(localized: "Options")) {
+                        ttlMenu
+                        Divider().padding(.leading, 62)
+                        durationMenu
+                    }
+
+                    if let error = model.errorMessage {
+                        SQNotice(message: error, tone: .danger)
+                            .accessibilityIdentifier("story.error")
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.md)
+            }
+
+            GradientButton(String(localized: "Partager la story"), systemImage: "paperplane.fill", isBusy: model.isSending) {
+                Task {
+                    await model.publish()
+                    if model.didPublish {
+                        if let story = model.publishedStory { onPublished(story) }
+                        dismiss()
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 198, alignment: .topLeading)
-            .fullScreenCover(isPresented: $showsCamera) {
-                CameraCapturePicker(isPresented: $showsCamera) { model.loadCapturedPhoto($0) }
-                    .ignoresSafeArea()
-            }
+            .disabled(!model.canPublish)
+            .accessibilityIdentifier("story.publish")
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.bottom, SQSpace.md)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+    }
+
+    private var storyKind: String {
+        if model.hasPhoto { return String(localized: "Story photo") }
+        if model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Story réseau") }
+        return String(localized: "Story texte")
+    }
+
+    private func ttlLabel(_ hours: Int) -> String {
+        String(localized: "\(hours) h")
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(verbatim: title)
+                .font(SQType.caption(.bold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .padding(.leading, SQSpace.xs)
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) { content() }
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         }
     }
 
-    /// 24 h pour tous ; 12 h et 6 h en segments, les autres durées dans « Plus ».
-    /// Toute durée autre que 24 h est réservée à Premium.
-    @ViewBuilder
-    private var ttlSegments: some View {
-        ForEach([24, 12, 6], id: \.self) { hours in
-            segment(String(localized: "\(hours) h"), isSelected: model.ttlHours == hours, locked: hours != 24 && !isPremium) {
-                selectTTL(hours)
+    private func audienceRow(_ audience: StoryAudience) -> some View {
+        let isSelected = model.audience == audience
+        return Button {
+            Haptics.selection()
+            model.audience = audience
+        } label: {
+            SQListRow(audience.label, subtitle: audienceDetail(audience), systemImage: audienceIcon(audience)) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isSelected ? SQColor.label : SQColor.labelTertiary)
+                    .accessibilityHidden(true)
             }
-            .accessibilityHint(hours == 24 ? "Disponible pour tous" : "Réservé à Premium")
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .contentShape(Rectangle())
         }
-        let others = [1, 48, 72]
-        let otherSelected = others.contains(model.ttlHours)
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("story.audience.\(audience.rawValue)")
+    }
+
+    private func audienceIcon(_ audience: StoryAudience) -> String {
+        switch audience {
+        case .friends: return "person.2"
+        case .publicAll: return "globe.europe.africa"
+        case .closeFriends: return "star"
+        }
+    }
+
+    private func audienceDetail(_ audience: StoryAudience) -> String {
+        switch audience {
+        case .friends: return String(localized: "Tes amis seulement")
+        case .publicAll: return String(localized: "Tous les membres de SignalQuest")
+        case .closeFriends: return String(localized: "Seulement ta liste d’amis proches")
+        }
+    }
+
+    /// 24 h pour tous ; toute autre durée est réservée à Premium.
+    private var ttlMenu: some View {
         Menu {
-            ForEach(others, id: \.self) { hours in
+            ForEach([24, 12, 6, 1, 48, 72], id: \.self) { hours in
                 Button {
                     selectTTL(hours)
                 } label: {
                     if model.ttlHours == hours {
-                        Label("\(hours) h", systemImage: "checkmark")
-                    } else if !isPremium {
-                        Label("\(hours) h", systemImage: "lock.fill")
+                        Label(ttlLabel(hours), systemImage: "checkmark")
+                    } else if hours != 24 && !isPremium {
+                        Label(ttlLabel(hours), systemImage: "lock.fill")
                     } else {
-                        Text("\(hours) h")
+                        Text(verbatim: ttlLabel(hours))
                     }
                 }
             }
         } label: {
-            segmentLabel(otherSelected ? String(localized: "\(model.ttlHours) h") : String(localized: "Plus"),
-                         isSelected: otherSelected, locked: false, showsChevron: true)
+            menuRow(systemImage: "clock", title: String(localized: "Disparaît après"), value: ttlLabel(model.ttlHours))
         }
-        .accessibilityLabel("Autres durées")
-        .accessibilityValue(otherSelected ? Text("\(model.ttlHours) h") : Text(""))
+        .accessibilityIdentifier("story.ttl")
+    }
+
+    private var durationMenu: some View {
+        Menu {
+            ForEach([5, 10, 15], id: \.self) { seconds in
+                Button {
+                    Haptics.selection()
+                    model.displayDuration = seconds
+                } label: {
+                    if model.displayDuration == seconds {
+                        Label(String(localized: "\(seconds) s"), systemImage: "checkmark")
+                    } else {
+                        Text(String(localized: "\(seconds) s"))
+                    }
+                }
+            }
+        } label: {
+            menuRow(systemImage: "timer", title: String(localized: "Durée à l’écran"), value: String(localized: "\(model.displayDuration) s"))
+        }
+        .accessibilityIdentifier("story.duration")
+    }
+
+    private func menuRow(systemImage: String, title: String, value: String) -> some View {
+        SQListRow(title, systemImage: systemImage) {
+            HStack(spacing: SQSpace.xs2) {
+                Text(verbatim: value)
+                    .font(SQType.subhead(.medium))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(Text(verbatim: value))
     }
 
     private var isPremium: Bool { services.entitlements.confirmedServerTier == .premium }
@@ -436,40 +695,6 @@ struct StoryComposer: View {
         } else {
             showPremiumPaywall = true
         }
-    }
-
-    /// Relevé réseau, puis « Masquer à… » (et les amis proches), sur une carte.
-    private var optionsCard: some View {
-        VStack(spacing: 0) {
-            SQListRow(
-                String(localized: "Joindre mon relevé réseau"),
-                subtitle: String(localized: "Opérateur et technologie du dernier relevé connu, sans mesure radio détaillée."),
-                systemImage: "antenna.radiowaves.left.and.right"
-            ) {
-                Toggle("Joindre mon relevé réseau", isOn: $model.attachRadio)
-                    .labelsHidden()
-                    .tint(SQColor.success)
-            }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.sm)
-
-            Divider().padding(.leading, 62)
-
-            optionRow(systemImage: "hand.raised", title: String(localized: "Masquer à…"), value: hiddenValue) {
-                model.showHideEditor = true
-            }
-
-            if model.audience == .closeFriends {
-                Divider().padding(.leading, 62)
-                optionRow(systemImage: "star", title: String(localized: "Amis proches"),
-                          value: String(localized: "\(model.closeFriendIds.count)")) {
-                    // Liste du serveur non lue (échec réseau) : nouvel essai avant d'éditer.
-                    if !model.closeFriendsLoaded { Task { await model.loadAudience() } }
-                    model.showCloseFriendsEditor = true
-                }
-            }
-        }
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private var hiddenValue: String {
@@ -502,51 +727,152 @@ struct StoryComposer: View {
         .buttonStyle(SQPressButtonStyle())
         .accessibilityValue(Text(verbatim: value))
     }
+}
 
-    /// Titre discret puis piste de segments égaux (langage `Segmented` Halo).
-    private func segmentGroup<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs2) {
-            Text(title)
-                .font(SQType.caption(.bold))
-                .foregroundStyle(SQColor.labelSecondary)
-                .padding(.leading, SQSpace.xs)
-            HStack(spacing: 3) { content() }
-                .padding(SQSpace.xs)
-                .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        }
-    }
+/// Outil sous la story : symbole et mot, allumé quand il est actif.
+private struct StoryToolLabel: View {
+    let title: String
+    let systemImage: String
+    let isOn: Bool
 
-    private func segment(_ title: String, isSelected: Bool, locked: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            segmentLabel(title, isSelected: isSelected, locked: locked, showsChevron: false)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private func segmentLabel(_ title: String, isSelected: Bool, locked: Bool, showsChevron: Bool) -> some View {
-        HStack(spacing: SQSpace.xs) {
+    var body: some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .font(.system(size: 19, weight: .semibold))
+                .frame(height: 22)
+                .accessibilityHidden(true)
             Text(verbatim: title)
+                .font(SQType.caption(.semibold))
                 .lineLimit(1)
-            if locked {
-                Image(systemName: "lock.fill").font(.system(size: 9)).accessibilityHidden(true)
-            }
-            if showsChevron {
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).accessibilityHidden(true)
-            }
+                .minimumScaleFactor(0.8)
         }
-        .font(SQType.subhead(.bold))
-        .foregroundStyle(isSelected ? SQColor.label : SQColor.ink2)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 44)
+        .foregroundStyle(isOn ? Color.black : SQColor.onGlass)
+        .frame(minWidth: 60, minHeight: 52)
+        .padding(.horizontal, SQSpace.xs)
         .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(SQColor.segThumb)
-                    .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
-            }
+            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                .fill(isOn ? SQColor.onGlass : SQColor.onGlass.opacity(0.12))
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// La story en 9:16, comme le lecteur l'affiche : photo et légende en bas, ou fond et texte
+/// au centre sous l'avatar, puis le relevé joint. `editable` : la légende se tape dessus.
+private struct StoryCanvas: View {
+    @ObservedObject var model: StoryComposerViewModel
+    let author: AuthUser?
+    let editable: Bool
+    var captionFocused: FocusState<Bool>.Binding
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Color.clear
+            .aspectRatio(9 / 16, contentMode: .fit)
+            .overlay { content }
+            .clipShape(RoundedRectangle(cornerRadius: editable ? SQRadius.xl : SQRadius.sm, style: .continuous))
+    }
+
+    /// Toucher le fond ouvre ou ferme le clavier ; le champ garde ses propres touchers.
+    private func toggleFocus() {
+        if editable { captionFocused.wrappedValue.toggle() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let image = model.previewImage {
+            ZStack(alignment: .bottomLeading) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggleFocus)
+                    .accessibilityLabel(Text("Photo de la story"))
+                LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 260)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .allowsHitTesting(false)
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    caption(alignment: .leading, font: SQFont.body(16, .semibold, relativeTo: .body))
+                    radioPill
+                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.bottom, SQSpace.lg)
+            }
+            .environment(\.colorScheme, .dark)
+        } else {
+            let tint = StoryViewer.backgroundColor(model.background.hex)
+            ZStack {
+                (tint?.color ?? .black)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggleFocus)
+                VStack(spacing: editable ? SQSpace.lg : SQSpace.xs) {
+                    SQAvatar(url: author?.avatarUrl, name: author?.name ?? author?.handle ?? "", size: editable ? 72 : 18)
+                    caption(alignment: .center, font: SQFont.display(editable ? 26 : 8, .bold, relativeTo: .title2))
+                    radioPill
+                }
+                .padding(.horizontal, editable ? SQSpace.xl : SQSpace.xs)
+            }
+            .environment(\.colorScheme, tint?.isLight == true ? .light : .dark)
+        }
+    }
+
+    private var inkColor: Color {
+        model.previewImage == nil ? SQColor.label : SQColor.onGlass
+    }
+
+    @ViewBuilder
+    private func caption(alignment: TextAlignment, font: Font) -> some View {
+        if editable {
+            TextField("", text: $model.text, prompt: Text(placeholder).foregroundColor(inkColor.opacity(0.6)), axis: .vertical)
+                .font(font)
+                .foregroundStyle(inkColor)
+                .multilineTextAlignment(alignment)
+                .lineLimit(1...(model.previewImage == nil ? 8 : 4))
+                .textFieldStyle(.plain)
+                .tint(inkColor)
+                .focused(captionFocused)
+                .submitLabel(.done)
+                .accessibilityLabel(Text(model.previewImage == nil ? "Texte de la story" : "Légende"))
+                .accessibilityIdentifier("story.caption")
+        } else if !model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Text(model.text)
+                .font(font)
+                .foregroundStyle(inkColor)
+                .multilineTextAlignment(alignment)
+                .lineLimit(4)
+        }
+    }
+
+    private var placeholder: String {
+        model.previewImage == nil ? String(localized: "Écris quelque chose…") : String(localized: "Ajoute une légende…")
+    }
+
+    /// Ce que le serveur joindra n'est connu qu'à l'envoi (son dernier relevé) : on ne devine pas l'opérateur.
+    @ViewBuilder
+    private var radioPill: some View {
+        if model.attachRadio && editable {
+            Label {
+                Text("Relevé réseau joint")
+            } icon: {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+            }
+            .font(SQType.caption(.bold))
+            .foregroundStyle(inkColor)
+            .lineLimit(1)
+            .padding(.horizontal, SQSpace.sm2)
+            .frame(minHeight: 26)
+            .background(inkColor.opacity(0.16), in: Capsule(style: .continuous))
+        } else if model.attachRadio {
+            // Mini-story de « Partager » : le symbole seul.
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(inkColor)
+                .padding(3)
+                .background(inkColor.opacity(0.16), in: Capsule(style: .continuous))
+        }
     }
 }
 

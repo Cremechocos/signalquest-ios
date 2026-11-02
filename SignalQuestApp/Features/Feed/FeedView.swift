@@ -1066,11 +1066,11 @@ struct FeedView: View {
                             onHideAuthor: { hideStories(of: $0) })
             }
         }
-        .sheet(isPresented: $showStoryComposer) {
-            StoryComposer(service: services.stories, friendsService: services.friends) { story in
+        // Plein écran : la story se compose telle qu'elle sera vue (refonte du 02/11).
+        .fullScreenCover(isPresented: $showStoryComposer) {
+            StoryComposer(service: services.stories, friendsService: services.friends, author: currentUser) { story in
                 model.insertPublishedStory(story)
             }
-            .presentationDragIndicator(.visible)
         }
         .sheet(item: $composerRequest) { request in
             ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start, sharing: request.shared,
