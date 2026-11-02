@@ -22,6 +22,7 @@ enum SQDiagnostics {
         case mainHang = "main_hang"
         case e2eeV2 = "e2ee_v2"
         case experienceTests = "experience_tests"
+        case photoUpload = "photo_upload"
         case qa
     }
 

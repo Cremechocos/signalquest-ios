@@ -287,6 +287,16 @@ final class PhotoUploadMarketTests: XCTestCase {
         return String(decoding: body, as: UTF8.self)
     }
 
+    func testAnUploadWithAMarketWarningStillReturnsThePhoto() throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(Photo.demoList[0])) as? [String: Any])
+        object["warnings"] = ["MARKET_IGNORED"]
+        let response = try JSONDecoder().decode(PhotoUploadResponse.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(response.photo.id, Photo.demoList[0].id)
+        XCTAssertEqual(response.warnings, ["MARKET_IGNORED"])
+        let plain = try JSONDecoder().decode(PhotoUploadResponse.self, from: JSONEncoder().encode(Photo.demoList[0]))
+        XCTAssertEqual(plain.warnings, [])
+    }
+
     func testTheSiteMarketIsSent() async throws {
         let body = try await sentBody(market: "GP")
         XCTAssertTrue(body.contains("name=\"market\"\r\n\r\nGP\r\n"), body)

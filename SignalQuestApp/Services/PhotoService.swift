@@ -90,14 +90,35 @@ final class PhotoService: PhotoServicing {
         // Métadonnées EXIF extraites côté client (GPS, date, appareil) — fusionnées par
         // le backend (mergeClientPhotoExifMetadata), parité Android.
         if let exifMetadata, !exifMetadata.isEmpty { fields["exifMetadata"] = exifMetadata }
-        return try await api.uploadMultipart(
+        let response = try await api.uploadMultipart(
             path: "/api/photos",
             fields: fields,
             fileField: "file",
             fileName: "signalquest-ios-\(UUID().uuidString).jpg",
             mimeType: "image/jpeg",
             data: data,
-            as: Photo.self
+            as: PhotoUploadResponse.self
         )
+        // Photo acceptée, marché écarté (#831) : rien pour le membre, mais une erreur du
+        // registre des marchés passerait inaperçue sans cette trace.
+        if response.warnings.contains("MARKET_IGNORED") {
+            SQDiagnostics.recordReport("market_ignored", area: .photoUpload, info: [
+                "market": fields["market"] ?? "", "operator": operatorName ?? ""
+            ])
+        }
+        return response.photo
+    }
+}
+
+/// Réponse de `POST /api/photos` : la photo à la racine, plus d'éventuels avertissements.
+struct PhotoUploadResponse: Decodable {
+    let photo: Photo
+    let warnings: [String]
+
+    private enum CodingKeys: String, CodingKey { case warnings }
+
+    init(from decoder: Decoder) throws {
+        photo = try Photo(from: decoder)
+        warnings = (try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent([String].self, forKey: .warnings)) ?? []
     }
 }
