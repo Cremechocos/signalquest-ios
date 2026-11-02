@@ -1189,6 +1189,22 @@
         }
       }
     },
+    "antenna.tab.discussion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        }
+      }
+    },
     "au Canada" : {
       "localizations" : {
         "en" : {

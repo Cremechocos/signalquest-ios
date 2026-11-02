@@ -911,6 +911,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // Site suivi : son marché, pour retrouver un site hors de France.
         let market = Self.string(info, "market")
         let operatorKey = Self.string(info, "operator")
+        let commentId = Self.string(info, "commentId")
         // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
         let anfrFocus = ANFRFocus.parse(
             date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),
@@ -953,7 +954,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     bugId: bugId,
                     anfrFocus: anfrFocus,
                     market: market,
-                    operatorKey: operatorKey
+                    operatorKey: operatorKey,
+                    commentId: commentId
                 )
                 AppServicesHolder.services.syncIconBadge()
             }

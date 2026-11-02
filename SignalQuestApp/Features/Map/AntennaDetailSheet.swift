@@ -118,6 +118,7 @@ struct AntennaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotionForScroll
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
     /// L'image est conservée quelques instants le temps de choisir sa facette
@@ -133,6 +134,8 @@ struct AntennaDetailSheet: View {
     }
     @State private var showPhotoOperatorPicker = false
     @State private var tab: AntennaDetailTab = .essential
+    /// Message notifié, montré une fois chargé dans l'onglet Discussion.
+    private let focusCommentId: String?
     @State private var showReportSheet = false
     /// Texte du site à envoyer dans une conversation (P2-47) ; non nil = sélecteur ouvert.
     @State private var siteShareDraft: SiteShareDraft?
@@ -176,6 +179,7 @@ struct AntennaDetailSheet: View {
         market: String = "FR",
         operatorName: String = "ALL",
         service: AntennasServicing,
+        focusCommentId: String? = nil,
         customSite: AndroidCustomSiteMarker? = nil,
         sightOrigin: AntennaSightOrigin = .device,
         onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil,
@@ -198,30 +202,41 @@ struct AntennaDetailSheet: View {
             $0.caseInsensitiveCompare(requested) == .orderedSame
         } ?? site.operators.first ?? (requested.isEmpty ? "ALL" : requested)
         _selectedOperator = State(initialValue: resolved)
+        // Notification d'un message : la fiche s'ouvre sur sa discussion.
+        let opensThread = focusCommentId != nil && resolved.uppercased() != "ALL"
+        self.focusCommentId = opensThread ? focusCommentId : nil
+        _tab = State(initialValue: opensThread ? .discussion : .essential)
         _model = StateObject(wrappedValue: AntennaDetailViewModel(service: service))
     }
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
-                // Quatre onglets, comme sur le web : ce qui sert sur le terrain
-                // d'abord (Essentiel), le registre, les mesures et les photos
-                // ensuite, chacun à un appui au lieu de huit sections repliées.
+                // Cinq onglets, comme sur le web : ce qui sert sur le terrain
+                // d'abord (Essentiel), le registre, les mesures, les photos et la
+                // discussion ensuite, chacun à un appui au lieu de sections repliées.
                 VStack(alignment: .leading, spacing: SQSpace.md) {
                     header
                     MapSegmented(selection: $tab,
-                                 options: AntennaDetailTab.allCases.map { ($0, tabLabel($0)) },
+                                 options: visibleTabs.map { ($0, tabLabel($0)) },
                                  identifier: "antenna.detail.tab")
                     switch tab {
                     case .essential: essentialTab
                     case .identifiers: detailsTab { identifiersTab($0) }
                     case .measures: detailsTab { measuresTab($0) }
                     case .photos: detailsTab { photosContent($0) }
+                    case .discussion: discussionTab(proxy)
                     }
                 }
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.top, SQSpace.lg)
                 .padding(.bottom, SQSpace.xl)
+            }
+            }
+            .onChangeCompat(of: selectedOperator) { _, op in
+                // « ALL » n'a pas de fil : l'onglet disparaît, on revient à l'Essentiel.
+                if op.uppercased() == "ALL", tab == .discussion { tab = .essential }
             }
             .accessibilityIdentifier("antenna.detail.scroll")
             .background(SQColor.bg.ignoresSafeArea())
@@ -744,6 +759,28 @@ struct AntennaDetailSheet: View {
         return components?.url
     }
 
+    /// Un fil par opérateur : « ALL » n'en a pas, l'onglet Discussion demande une facette précise.
+    private var visibleTabs: [AntennaDetailTab] {
+        AntennaDetailTab.allCases.filter { $0 != .discussion || selectedOperator.uppercased() != "ALL" }
+    }
+
+    private func discussionTab(_ proxy: ScrollViewProxy) -> some View {
+        SiteThreadSection(
+            market: market.uppercased(),
+            operatorKey: selectedOperator,
+            siteId: site.writeSiteId,
+            operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry),
+            focusCommentId: focusCommentId,
+            onFocus: { id in
+                withAnimation(reduceMotionForScroll ? nil : .easeOut(duration: 0.3)) {
+                    proxy.scrollTo(SiteThreadSection.rowId(id), anchor: .center)
+                }
+            }
+        )
+        .padding(SQSpace.md)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
     private func tabLabel(_ tab: AntennaDetailTab) -> String {
         switch tab {
         case .essential: return String(localized: "Essentiel")
@@ -752,6 +789,9 @@ struct AntennaDetailSheet: View {
         case .photos:
             let count = model.details.map { $0.photosCount ?? $0.photos.count } ?? 0
             return count > 0 ? String(localized: "Photos \(count)") : String(localized: "Photos")
+        // La clé brute : MapSegmented traduit son libellé, et « Discussion » traduit deux fois
+        // deviendrait « Chat » en anglais (la clé de la messagerie).
+        case .discussion: return "antenna.tab.discussion"
         }
     }
 
@@ -825,17 +865,6 @@ struct AntennaDetailSheet: View {
             if onIsolateCoverage == nil { miniMap }
             siteActions
             reportRows
-            // Un fil par opérateur : « ALL » n'en a pas, il faut une facette précise.
-            if selectedOperator.uppercased() != "ALL" {
-                SiteThreadSection(
-                    market: market.uppercased(),
-                    operatorKey: selectedOperator,
-                    siteId: site.writeSiteId,
-                    operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry)
-                )
-                .padding(SQSpace.md)
-                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            }
         }
     }
 
@@ -1839,7 +1868,7 @@ struct AzimuthFanView: View {
     }
 }
 
-/// Les quatre onglets de la fiche antenne.
+/// Les cinq onglets de la fiche antenne ; Discussion seulement sur une facette d'opérateur.
 private enum AntennaDetailTab: Hashable, CaseIterable {
-    case essential, identifiers, measures, photos
+    case essential, identifiers, measures, photos, discussion
 }

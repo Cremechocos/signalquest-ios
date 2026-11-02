@@ -1658,7 +1658,7 @@ struct MapExplorerView: View {
     @State private var selectedAntenna: AntennaSite?
     /// Marché et opérateur demandés par le lien qui a ouvert la fiche (site suivi d'un autre
     /// pays, fil d'un opérateur précis) ; ne valent que pour ce site-là.
-    @State private var routedSite: (id: String, market: String, operatorKey: String?)?
+    @State private var routedSite: (id: String, market: String, operatorKey: String?, commentId: String?)?
     /// Sites et lieux consultés récemment, proposés quand on touche la
     /// recherche sans rien saisir (plan 3, vague 1).
     @State private var recentItems: [RecentlyViewedStore.Item] = []
@@ -3575,7 +3575,9 @@ struct MapExplorerView: View {
         router.openSiteMarket = nil
         let operatorKey = router.openSiteOperator
         router.openSiteOperator = nil
-        routedSite = (siteId, market, operatorKey)
+        let commentId = router.openSiteCommentId
+        router.openSiteCommentId = nil
+        routedSite = (siteId, market, operatorKey, commentId)
         let isShownMarket = market.caseInsensitiveCompare(model.marketFilter) == .orderedSame
         if isShownMarket,
            let site = model.antennas.first(where: { $0.id == siteId || $0.siteId == siteId }) {
@@ -4775,6 +4777,7 @@ struct MapExplorerView: View {
             market: routed?.market ?? model.marketFilter,
             operatorName: routed?.operatorKey ?? model.operatorFilter,
             service: services.antennas,
+            focusCommentId: routed?.commentId,
             sightOrigin: sightOrigin,
             onIsolateCoverage: { focus in isolateCoverage(focus) },
             onClose: onClose,

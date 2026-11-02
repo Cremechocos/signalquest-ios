@@ -713,6 +713,14 @@ struct SiteThreadSection: View {
     let operatorKey: String
     let siteId: String
     let operatorLabel: String
+    /// Message notifié : cherché sur les premières pages, puis montré et souligné un instant.
+    var focusCommentId: String? = nil
+    var onFocus: ((String) -> Void)? = nil
+
+    /// Identifiant de défilement d'un message, pour le `ScrollViewReader` de la fiche.
+    static func rowId(_ commentId: String) -> String { "siteComment.\(commentId)" }
+    /// Pages chargées au plus pour trouver le message notifié ; au-delà, il est trop ancien ou supprimé.
+    private static let focusPageLimit = 4
 
     @EnvironmentObject private var services: AppServices
 
@@ -721,7 +729,7 @@ struct SiteThreadSection: View {
     @State private var nextCursor: String?
     @State private var loading = true
     @State private var failed = false
-    /// Le serveur ne connaît pas de fil pour ce site et cet opérateur : la section se retire.
+    /// Le serveur ne connaît pas de fil pour ce site et cet opérateur : un message le dit.
     @State private var unavailable = false
     @State private var loadingMore = false
     @State private var moreFailed = false
@@ -733,6 +741,9 @@ struct SiteThreadSection: View {
     @State private var pendingDelete: SiteComment?
     @State private var deletingId: String?
     @State private var reportTarget: SiteComment?
+    @State private var highlightedId: String?
+    @State private var focusHandled = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let textLimit = 1000
 
@@ -749,7 +760,15 @@ struct SiteThreadSection: View {
 
     var body: some View {
         Group {
-            if !unavailable {
+            if unavailable {
+                // Dans son onglet, la discussion ne peut plus se retirer : la page resterait vide.
+                // Pas de « Réessayer » : le serveur ne connaît pas ce fil (404 ou 400).
+                Text("Impossible de charger la discussion.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("antenna.detail.siteThread.unavailable")
+            } else {
                 content
             }
         }
@@ -824,6 +843,12 @@ struct SiteThreadSection: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     ForEach(comments) { comment in
                         row(comment)
+                            .padding(highlightedId == comment.id ? SQSpace.sm : 0)
+                            .background(
+                                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                                    .fill(highlightedId == comment.id ? SQColor.accentSoft : .clear)
+                            )
+                            .id(Self.rowId(comment.id))
                     }
                     if nextCursor != nil {
                         retryButton(moreFailed ? "Réessayer de charger la suite" : "Voir les messages plus anciens",
@@ -1019,6 +1044,7 @@ struct SiteThreadSection: View {
             if isSignedIn {
                 await services.siteComments.markSeen(market: market, operatorKey: operatorKey, siteId: siteId)
             }
+            await revealFocusedComment()
         } catch {
             guard !error.isCancellation else { return }
             comments = []
@@ -1030,6 +1056,26 @@ struct SiteThreadSection: View {
                 failed = true
             }
         }
+    }
+
+    /// Message notifié : quelques pages au plus, puis défilement et surlignage de deux secondes.
+    /// Introuvable (supprimé, réponse, trop ancien) : la discussion reste en tête, sans erreur.
+    private func revealFocusedComment() async {
+        guard let focusCommentId, !focusHandled else { return }
+        focusHandled = true
+        var pages = 1
+        while !comments.contains(where: { $0.id == focusCommentId }), nextCursor != nil, pages < Self.focusPageLimit {
+            await loadMore()
+            if moreFailed { return }
+            pages += 1
+        }
+        guard comments.contains(where: { $0.id == focusCommentId }) else { return }
+        // Le temps que la ligne soit posée avant d'y défiler.
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        onFocus?(focusCommentId)
+        if reduceMotion { highlightedId = focusCommentId } else { withAnimation { highlightedId = focusCommentId } }
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        if reduceMotion { highlightedId = nil } else { withAnimation(.easeOut(duration: 0.6)) { highlightedId = nil } }
     }
 
     private func loadMore() async {

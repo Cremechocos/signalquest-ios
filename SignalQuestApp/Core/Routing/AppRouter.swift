@@ -81,6 +81,8 @@ final class AppRouter: ObservableObject {
     var openSiteMarket: String?
     /// Opérateur sur lequel ouvrir la fiche (site suivi : son fil est celui de cet opérateur) ; nil = filtre de la carte.
     var openSiteOperator: String?
+    /// Message du fil à montrer dans l'onglet Discussion (site suivi, nouveau message).
+    var openSiteCommentId: String?
     /// Panne communautaire dont la feuille doit s'ouvrir sur la carte, posée par la page
     /// « Pannes signalées ». L'objet ENTIER et non son identifiant : cette page est paginée sans
     /// tenir compte de l'emprise, donc la carte n'a en général pas chargé la panne demandée et
@@ -274,7 +276,8 @@ final class AppRouter: ObservableObject {
         bugId: String? = nil,
         anfrFocus: ANFRFocus? = nil,
         market: String? = nil,
-        operatorKey: String? = nil
+        operatorKey: String? = nil,
+        commentId: String? = nil
     ) {
         switch rawType?.lowercased() {
         // Types réellement émis par le serveur : préfixés `message_*` et
@@ -325,7 +328,7 @@ final class AppRouter: ObservableObject {
         // son marché, sans lequel un site hors de France ne se retrouve pas, et l'opérateur
         // suivi : sur un support partagé, la fiche ouverte sur un autre montrait un autre fil.
         case "site_follow":
-            route(toSite: siteId, market: market, operatorKey: operatorKey)
+            route(toSite: siteId, market: market, operatorKey: operatorKey, commentId: commentId)
         case "anfr_update":
             selectedTab = .map
             // Sans relevé ni zone dans la charge, l'écran s'ouvre comme avant.
@@ -459,12 +462,13 @@ final class AppRouter: ObservableObject {
         if let id, !id.isEmpty { pendingLiveFriendId = id }
     }
 
-    func route(toSite id: String?, market: String? = nil, operatorKey: String? = nil) {
+    func route(toSite id: String?, market: String? = nil, operatorKey: String? = nil, commentId: String? = nil) {
         selectedTab = .map
         guard let id else { return }
         // Posés avant l'identifiant, que la carte observe.
         openSiteMarket = market
         openSiteOperator = operatorKey
+        openSiteCommentId = commentId
         openSiteId = id
     }
 

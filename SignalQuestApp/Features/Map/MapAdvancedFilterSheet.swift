@@ -608,7 +608,8 @@ struct MapChipIconButton: View {
 }
 
 /// Sélecteur segmenté pleine largeur (piste et pastille pleine). Les grands
-/// textes l'empilent plutôt que de tronquer les libellés.
+/// textes l'empilent plutôt que de tronquer les libellés ; quand les libellés
+/// ne tiennent pas sur une ligne, la piste défile au lieu de couper les mots.
 struct MapSegmented<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(Value, String)]
@@ -617,18 +618,38 @@ struct MapSegmented<Value: Hashable>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: 3)) : AnyLayout(HStackLayout(spacing: 3))
+        if dynamicTypeSize.isAccessibilitySize {
+            track(VStackLayout(spacing: 3), fills: true)
+        } else {
+            // Cinq onglets en français ne tiennent pas sur un iPhone : « Discussi / on ».
+            ViewThatFits(in: .horizontal) {
+                track(HStackLayout(spacing: 3), fills: true, singleLine: true)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollViewReader { proxy in
+                        track(HStackLayout(spacing: 3), fills: false, singleLine: true)
+                            // L'onglet choisi reste visible, même ouvert d'office (Discussion d'une notification).
+                            .onAppear { proxy.scrollTo(selection, anchor: .center) }
+                            .onChangeCompat(of: selection) { _, value in
+                                withAnimation(reduceMotion ? nil : SQMotion.snappy) { proxy.scrollTo(value, anchor: .center) }
+                            }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            }
+        }
+    }
+
+    private func track<L: Layout>(_ layout: L, fills: Bool, singleLine: Bool = false) -> some View {
         layout {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                segment(option.0, label: option.1)
+                segment(option.0, label: option.1, fills: fills, singleLine: singleLine)
             }
         }
         .padding(SQSpace.xs)
         .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
-    private func segment(_ value: Value, label: String) -> some View {
+    private func segment(_ value: Value, label: String, fills: Bool, singleLine: Bool) -> some View {
         let isSelected = value == selection
         return Button {
             Haptics.selection()
@@ -638,8 +659,9 @@ struct MapSegmented<Value: Hashable>: View {
                 .font(SQType.chip)
                 .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, SQSpace.sm)
-                .frame(maxWidth: .infinity, minHeight: 36)
+                .fixedSize(horizontal: singleLine, vertical: false)
+                .padding(.horizontal, fills ? SQSpace.sm : SQSpace.md)
+                .frame(maxWidth: fills ? .infinity : nil, minHeight: 36)
                 .background {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -651,6 +673,7 @@ struct MapSegmented<Value: Hashable>: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .id(value)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("\(identifier).\(String(describing: value))")
     }

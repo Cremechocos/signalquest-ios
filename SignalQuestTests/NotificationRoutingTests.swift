@@ -142,6 +142,22 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(router.openSiteOperator, "FREE_CARAIBES")
     }
 
+    /// Nouveau message sur un site suivi : la fiche s'ouvre sur sa discussion, au message.
+    func testSiteFollowMessageCarriesItsComment() {
+        let router = AppRouter()
+        router.handle(type: "site_follow", conversationId: nil, postId: nil, siteId: "123", market: "FR",
+                      operatorKey: "ORANGE", commentId: "c42")
+        XCTAssertEqual(router.openSiteCommentId, "c42")
+        // Les autres événements du site suivi (activation, bande, panne) n'en portent pas.
+        let other = AppRouter()
+        other.handle(type: "site_follow", conversationId: nil, postId: nil, siteId: "123", market: "FR", operatorKey: "ORANGE")
+        XCTAssertNil(other.openSiteCommentId)
+        // Une alerte de zone n'ouvre jamais la discussion.
+        let zone = AppRouter()
+        zone.handle(type: "zone_new_antenna", conversationId: nil, postId: nil, siteId: "123", market: "FR", commentId: "c42")
+        XCTAssertNil(zone.openSiteCommentId)
+    }
+
     /// Une alerte de zone ne vise aucun opérateur : la fiche suit le filtre de la carte.
     func testSiteAlertWithoutFollowKeepsTheMapOperator() {
         let router = AppRouter()
