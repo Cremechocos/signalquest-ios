@@ -126,11 +126,11 @@ struct CoverageCardView: View {
                 .init(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
             ]
         }
-        return [
-            // Sans tracé ou à 0 m, la distance ne mesure rien : un tiret, sans mise en avant.
-            hasDistance
-                ? .init(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
-                : .init(label: "Distance", value: "—"),
+        // Trois états de la distance, communs aux trois apps : mesurée → mise en avant ; à 0 m ou
+        // sans tracé → un tiret, sans mise en avant ; non servie → pas de tuile (« mesuré à zéro »
+        // et « pas de mesure » ne se confondent pas).
+        let distance = Self.distanceMetric(meters: signal?.distanceMeters, hasTrace: !(trace ?? []).isEmpty)
+        return Array([distance].compactMap { $0 }) + [
             .init(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds)),
             // Des points de mesure, pas des points de jeu (F-18).
             .init(label: "Mesures", value: signal?.pointsCount.map { $0.formatted() } ?? "—")
@@ -139,15 +139,28 @@ struct CoverageCardView: View {
         ]
     }
 
-    private var hasDistance: Bool {
-        !(trace ?? []).isEmpty && (signal?.distanceMeters ?? 0) > 0
+    static func distanceMetric(meters: Double?, hasTrace: Bool) -> FeedMetricGrid.Metric? {
+        guard let meters else { return nil }
+        return hasTrace && meters > 0
+            ? .init(label: "Distance", value: SignalFormatters.meters(meters), highlight: true)
+            : .init(label: "Distance", value: "—")
     }
 
     private var tagTech: String { signal?.technology ?? bestDetectedTech ?? "—" }
 
     /// Carte sans tracé : le sous-titre (« Bouygues Telecom · 4G ») nomme déjà la technologie,
     /// la pastille ferait doublon. Sur le tracé, elle reste : il n'y a pas de sous-titre.
-    private var subtitleNamesTech: Bool { shownSubtitle?.contains(tagTech) ?? false }
+    /// Règle commune : la technologie de la pastille figure parmi celles du sous-titre, comparée
+    /// technologie par technologie (« 4G · 5G NSA » nomme 4G). Absente du sous-titre, elle reste :
+    /// mieux vaut voir l'incohérence.
+    private var subtitleNamesTech: Bool { Self.subtitle(shownSubtitle, names: tagTech) }
+
+    static func subtitle(_ subtitle: String?, names tech: String) -> Bool {
+        guard let subtitle else { return false }
+        let parts = subtitle.components(separatedBy: CharacterSet(charactersIn: "·/"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        return parts.contains(tech)
+    }
 
     /// Déjà dite par le sous-titre (« 4G / 5G NSA »), la technologie de la
     /// pastille n'est pas relue par VoiceOver (lot F, F-49).

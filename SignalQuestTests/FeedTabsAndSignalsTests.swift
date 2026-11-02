@@ -808,3 +808,24 @@ final class FeedPhotoSiteLinkTests: XCTestCase {
         XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(#""siteId":"S1","marketCode":"FR","operatorKey":"ORANGE""#, kind: "post")))
     }
 }
+
+/// Carte de session de couverture : règles communes aux trois apps (relayées le 02/11).
+final class CoverageCardRulesTests: XCTestCase {
+    func testDistanceHasThreeStates() {
+        let measured = CoverageCardView.distanceMetric(meters: 1250, hasTrace: true)
+        XCTAssertEqual(measured?.highlight, true)
+        XCTAssertNotEqual(measured?.value, "—")
+        XCTAssertEqual(CoverageCardView.distanceMetric(meters: 0, hasTrace: true), .init(label: "Distance", value: "—"))
+        XCTAssertEqual(CoverageCardView.distanceMetric(meters: 800, hasTrace: false), .init(label: "Distance", value: "—"))
+        XCTAssertNil(CoverageCardView.distanceMetric(meters: nil, hasTrace: true), "not served: no tile at all")
+    }
+
+    func testThePillIsRedundantOnlyWhenTheSubtitleNamesItsTechnology() {
+        XCTAssertTrue(CoverageCardView.subtitle("Bouygues Telecom · 4G", names: "4G"))
+        XCTAssertTrue(CoverageCardView.subtitle("Orange · 4G / 5G NSA", names: "4G"))
+        XCTAssertTrue(CoverageCardView.subtitle("4G", names: "4G"), "no operator, technology alone")
+        XCTAssertFalse(CoverageCardView.subtitle("Orange · 4G", names: "5G"), "a different technology stays visible")
+        XCTAssertFalse(CoverageCardView.subtitle("Orange · 5G NSA", names: "5G"), "compared technology by technology, not as text")
+        XCTAssertFalse(CoverageCardView.subtitle(nil, names: "4G"))
+    }
+}
