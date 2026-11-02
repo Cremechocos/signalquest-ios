@@ -249,6 +249,16 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(hex(network?.barColor), 0xFF7900)
     }
 
+    /// #834 : Free s'appelle « Free Mobile » sur le réseau mobile et « Free » sur sa box,
+    /// quel que soit le nom que l'IP a donné.
+    func testFreeIsNamedByItsLinkType() {
+        XCTAssertEqual(model(result(operatorName: "Free")).network?.name, "Free Mobile")
+        XCTAssertEqual(model(result(operatorName: "Free Mobile")).network?.name, "Free Mobile")
+        XCTAssertEqual(model(result(connection: .wifi, operatorName: "Free Mobile")).network?.name, "Free")
+        XCTAssertEqual(model(result(connection: .wired, operatorName: "Free SAS")).network?.name, "Free")
+        XCTAssertEqual(model(result(connection: .wifi, operatorName: "Orange")).network?.name, "Orange")
+    }
+
     /// SA et NSA, comme l'image d'Android : iOS les distingue, l'image aussi.
     func testHeaderTellsNonStandaloneApart() {
         XCTAssertEqual(model(result(technology: .fiveGNSA)).network?.detail, "5G NSA")
