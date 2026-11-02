@@ -64,9 +64,9 @@ enum SQFeatures {
     static let e2eeAutoLogEnabled = false
 
     /// Envoi des tests d'expérience (`POST /api/experience-tests`, contrat
-    /// `experience-tests-v1`). Fermé : les tests mesurés restent sur le téléphone,
-    /// en attente, et partent à l'ouverture du verrou dans une build suivante.
-    static let experienceTestsUploadEnabled = false
+    /// `experience-tests-v1`). Ouvert le 03/11 (décision d'Alexandre) : les tests
+    /// gardés en attente sur le téléphone partent au premier passage de la file.
+    static let experienceTestsUploadEnabled = true
 
     /// Statistiques ANFR des cinq départements d'outre-mer (contrats ANFR DROM
     /// v1 et bandes DROM v2) : sélecteur France / Outre-mer sur les statistiques
