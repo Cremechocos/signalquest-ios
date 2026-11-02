@@ -781,3 +781,30 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         XCTAssertNotNil(next)
     }
 }
+
+/// Post photo du fil (contrat social-photo-post v1, #827) : le lien vers la fiche
+/// d'antenne n'existe qu'avec la clé complète, jamais devinée depuis le libellé.
+final class FeedPhotoSiteLinkTests: XCTestCase {
+    private func photo(_ metadata: String, kind: String = "photo") throws -> UnifiedSocialFeedItem {
+        try JSONDecoder().decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"photo-p1","kind":"\(kind)","sourceType":"photo","sourceId":"p1","author":{"id":"u1"},
+         "text":"Pylône","commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,"metadata":{\(metadata)}}
+        """.utf8))
+    }
+
+    func testACompleteKeyOpensTheSite() throws {
+        let item = try photo(#""photoId":"p1","siteId":"S1","operator":"Orange","marketCode":"FR","operatorKey":"ORANGE""#)
+        let key = try XCTUnwrap(SignalDetailSheet.photoSiteKey(of: item))
+        XCTAssertEqual(key.siteId, "S1")
+        XCTAssertEqual(key.market, "FR")
+        XCTAssertEqual(key.operatorKey, "ORANGE")
+    }
+
+    func testAnIncompleteKeyShowsNoLink() throws {
+        XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(#""siteId":"S1","operator":"Orange","marketCode":null,"operatorKey":"ORANGE""#)))
+        XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(#""siteId":"S1","operator":"Orange","marketCode":"FR","operatorKey":null"#)))
+        XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(#""siteId":"S1","operator":"Orange""#)), "never guessed from the label")
+        XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(#""siteId":"S1","marketCode":"FR","operatorKey":"ORANGE""#, kind: "post")))
+    }
+}

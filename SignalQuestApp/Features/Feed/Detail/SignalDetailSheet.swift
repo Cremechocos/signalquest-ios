@@ -96,6 +96,7 @@ struct SignalDetailSheet: View {
                     CardHashtags(tags: item.hashtags)
                 }
                 media
+                photoSiteLink
                 if isSpeedtest {
                     FeedMeasureBlock(signal: signal)
                 }
@@ -375,6 +376,33 @@ struct SignalDetailSheet: View {
         }
     }
 
+    /// Clé de la fiche d'antenne d'un post photo (contrat social-photo-post v1, #827) : le
+    /// support, son marché et la clé d'opérateur enregistrés avec la photo. Sans marché ou
+    /// sans clé d'opérateur, pas de lien : on ne devine jamais la clé depuis le libellé.
+    static func photoSiteKey(of item: UnifiedSocialFeedItem) -> (siteId: String, market: String, operatorKey: String)? {
+        guard ["photo", "antenna_photo"].contains(item.kind.lowercased()) else { return nil }
+        func value(_ key: String) -> String? {
+            guard case .string(let raw)? = item.metadata?[key] else { return nil }
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        guard let siteId = value("siteId"), let market = value("marketCode"), let operatorKey = value("operatorKey")
+        else { return nil }
+        return (siteId, market, operatorKey)
+    }
+
+    @ViewBuilder
+    private var photoSiteLink: some View {
+        if let key = Self.photoSiteKey(of: item) {
+            GradientButton("Voir le site", systemImage: "mappin.and.ellipse", style: .secondary) {
+                Haptics.selection()
+                dismiss()
+                services.router.route(toSite: key.siteId, market: key.market, operatorKey: key.operatorKey)
+            }
+            .accessibilityIdentifier("signal.detail.openSite")
+        }
+    }
+
     @ViewBuilder
     private var media: some View {
         let images = Self.images(of: item)
@@ -456,6 +484,7 @@ struct SignalDetailSheet: View {
             ]
         }
         pairs += outagePairs
+        pairs += photoPairs
         pairs += speedtestPairs
         pairs += experiencePairs
         pairs.append(("Lieu", place ?? ""))
@@ -467,6 +496,17 @@ struct SignalDetailSheet: View {
             seen.insert(pair.0)
             return true
         }
+    }
+
+    /// L'antenne photographiée (#827) : opérateur et adresse du support, tels qu'enregistrés avec la photo.
+    private var photoPairs: [(String, String)] {
+        guard ["photo", "antenna_photo"].contains(item.kind.lowercased()) else { return [] }
+        let label = metaString("operatorKey") ?? metaString("operator")
+        return [
+            ("Opérateur", SQBrand.operatorName(label) ?? metaString("operator") ?? ""),
+            // La commune seule redirait le « Lieu » de l'en-tête : l'adresse d'abord.
+            ("Adresse", metaString("siteAddress") ?? "")
+        ]
     }
 
     private func metricPairs(for signal: SocialSignalSummary) -> [(String, String)] {
