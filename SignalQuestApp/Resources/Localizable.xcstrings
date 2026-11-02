@@ -69007,6 +69007,34 @@
         }
       }
     },
+    "Ta liste d’amis proches est vide : personne ne verrait cette story. Ajoute des amis ou choisis une autre audience." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your close friends list is empty: nobody would see this story. Add friends or choose another audience."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta liste d’amis proches est vide : personne ne verrait cette story. Ajoute des amis ou choisis une autre audience."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta liste d’amis proches est vide : personne ne verrait cette story. Ajoute des amis ou choisis une autre audience." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre liste d’amis proches est vide : personne ne verrait cette story. Ajoutez des amis ou choisissez une autre audience."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Ajoute une légende…" : {
       "extractionState" : "manual",
       "localizations" : {

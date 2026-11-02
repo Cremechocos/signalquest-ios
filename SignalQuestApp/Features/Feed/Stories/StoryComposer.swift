@@ -257,6 +257,7 @@ struct StoryComposer: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var step: Step = .create
     @State private var showPremiumPaywall = false
     @State private var showPhotoEditor = false
@@ -356,13 +357,18 @@ struct StoryComposer: View {
                 .foregroundStyle(SQColor.onGlass.opacity(0.75))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, SQSpace.lg)
+                .fixedSize(horizontal: false, vertical: true)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .opacity(model.canPublish ? 0 : 1)
                 .accessibilityHidden(model.canPublish)
             toolBar
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
         .padding(.top, SQSpace.xs)
         .padding(.bottom, SQSpace.sm)
         .background(Color.black.ignoresSafeArea())
+        // Le clavier passe par-dessus : la story ne rétrécit pas et les boutons ne bougent pas.
+        .ignoresSafeArea(.keyboard)
         .environment(\.colorScheme, .dark)
         .statusBarHidden(true)
     }
@@ -371,7 +377,24 @@ struct StoryComposer: View {
         HStack(spacing: SQSpace.sm) {
             glassIconButton("xmark", label: String(localized: "Annuler"), identifier: "story.composer.close") { dismiss() }
             Spacer(minLength: 0)
-            if model.hasPhoto {
+            if captionFocused {
+                // En saisie : un seul geste visible, terminer le texte.
+                Button {
+                    captionFocused = false
+                } label: {
+                    // Même verre sombre que ✕ : lisible sur un fond Crème comme sur une photo claire.
+                    Text("OK")
+                        .font(SQType.button)
+                        .foregroundStyle(SQColor.onGlass)
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(height: 36)
+                        .background(.black.opacity(0.55), in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityIdentifier("story.caption.done")
+            } else if model.hasPhoto {
                 PhotoEditButton { showPhotoEditor = true }
                     .accessibilityIdentifier("story.edit")
                 glassIconButton("trash", label: String(localized: "Retirer la photo"), identifier: "story.removePhoto") {
@@ -414,43 +437,56 @@ struct StoryComposer: View {
     }
 
     private var toolBar: some View {
-        HStack(alignment: .center, spacing: SQSpace.xs) {
-            PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                StoryToolLabel(title: String(localized: "Photo"), systemImage: "photo.on.rectangle", isOn: false)
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityIdentifier("story.library")
-
-            if CameraCapturePicker.isAvailable {
-                Button { showsCamera = true } label: {
-                    StoryToolLabel(title: String(localized: "Appareil photo"), systemImage: "camera", isOn: false)
+        // Aux tailles d'accessibilité, « Suivant » passe sur sa ligne : sinon il sortait de l'écran.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        return VStack(spacing: SQSpace.sm) {
+            HStack(alignment: .center, spacing: SQSpace.xs) {
+                tools
+                if !stacked {
+                    Spacer(minLength: SQSpace.sm)
+                    nextButton.fixedSize()
                 }
-                .buttonStyle(SQPressButtonStyle())
-                .accessibilityIdentifier("story.camera")
             }
-
-            Button {
-                Haptics.selection()
-                model.attachRadio.toggle()
-            } label: {
-                StoryToolLabel(title: String(localized: "Réseau"), systemImage: "antenna.radiowaves.left.and.right", isOn: model.attachRadio)
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityHint(Text("Joint l’opérateur et la technologie de ton dernier relevé"))
-            .accessibilityAddTraits(model.attachRadio ? .isSelected : [])
-            .accessibilityIdentifier("story.radio")
-
-            Spacer(minLength: SQSpace.sm)
-
-            GradientButton(String(localized: "Suivant"), systemImage: "arrow.right", style: .primary) {
-                go(to: .share)
-            }
-            .fixedSize()
-            .disabled(!model.canPublish)
-            .accessibilityHint(model.canPublish ? Text("") : Text(emptyHint))
-            .accessibilityIdentifier("story.next")
+            if stacked { nextButton }
         }
         .padding(.horizontal, SQSpace.md)
+    }
+
+    @ViewBuilder
+    private var tools: some View {
+        PhotosPicker(selection: $model.selectedItem, matching: .images) {
+            StoryToolLabel(title: String(localized: "Photo"), systemImage: "photo.on.rectangle", isOn: false)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityIdentifier("story.library")
+
+        if CameraCapturePicker.isAvailable {
+            Button { showsCamera = true } label: {
+                StoryToolLabel(title: String(localized: "Caméra"), systemImage: "camera", isOn: false)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("story.camera")
+        }
+
+        Button {
+            Haptics.selection()
+            model.attachRadio.toggle()
+        } label: {
+            StoryToolLabel(title: String(localized: "Réseau"), systemImage: "antenna.radiowaves.left.and.right", isOn: model.attachRadio)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityHint(Text("Joint l’opérateur et la technologie de ton dernier relevé"))
+        .accessibilityAddTraits(model.attachRadio ? .isSelected : [])
+        .accessibilityIdentifier("story.radio")
+    }
+
+    private var nextButton: some View {
+        GradientButton(String(localized: "Suivant"), systemImage: "arrow.right", style: .primary) {
+            go(to: .share)
+        }
+        .disabled(!model.canPublish)
+        .accessibilityHint(model.canPublish ? Text("") : Text(emptyHint))
+        .accessibilityIdentifier("story.next")
     }
 
     private var emptyHint: String {
@@ -521,7 +557,7 @@ struct StoryComposer: View {
                         }
                         if model.audience == .closeFriends {
                             Divider().padding(.leading, 62)
-                            optionRow(systemImage: "star", title: String(localized: "Liste d’amis proches"),
+                            optionRow(systemImage: "list.star", title: String(localized: "Liste d’amis proches"),
                                       value: "\(model.closeFriendIds.count)") {
                                 // Liste du serveur non lue (échec réseau) : nouvel essai avant d'éditer.
                                 if !model.closeFriendsLoaded { Task { await model.loadAudience() } }
@@ -532,6 +568,12 @@ struct StoryComposer: View {
                         optionRow(systemImage: "hand.raised", title: String(localized: "Masquer à…"), value: hiddenValue) {
                             model.showHideEditor = true
                         }
+                    }
+
+                    if closeFriendsListEmpty {
+                        SQNotice(message: String(localized: "Ta liste d’amis proches est vide : personne ne verrait cette story. Ajoute des amis ou choisis une autre audience."),
+                                 tone: .warning)
+                            .accessibilityIdentifier("story.closeFriends.empty")
                     }
 
                     section(String(localized: "Options")) {
@@ -558,12 +600,17 @@ struct StoryComposer: View {
                     }
                 }
             }
-            .disabled(!model.canPublish)
+            .disabled(!model.canPublish || closeFriendsListEmpty)
             .accessibilityIdentifier("story.publish")
             .padding(.horizontal, SQSpace.lg)
             .padding(.bottom, SQSpace.md)
         }
         .background(SQColor.bg.ignoresSafeArea())
+    }
+
+    /// « Proches » avec une liste lue et vide : la story ne serait montrée à personne.
+    private var closeFriendsListEmpty: Bool {
+        model.audience == .closeFriends && model.closeFriendsLoaded && model.closeFriendIds.isEmpty
     }
 
     private var storyKind: String {
@@ -668,11 +715,13 @@ struct StoryComposer: View {
     }
 
     private func menuRow(systemImage: String, title: String, value: String) -> some View {
-        SQListRow(title, systemImage: systemImage) {
+        SQListRow(title, subtitle: stackedValue ? value : nil, systemImage: systemImage) {
             HStack(spacing: SQSpace.xs2) {
-                Text(verbatim: value)
-                    .font(SQType.subhead(.medium))
-                    .foregroundStyle(SQColor.labelSecondary)
+                if !stackedValue {
+                    Text(verbatim: value)
+                        .font(SQType.subhead(.medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(SQColor.labelTertiary)
@@ -685,6 +734,10 @@ struct StoryComposer: View {
         .accessibilityElement(children: .combine)
         .accessibilityValue(Text(verbatim: value))
     }
+
+    /// Aux tailles d'accessibilité, la valeur passe sous le titre au lieu de se
+    /// couper en plein mot à droite.
+    private var stackedValue: Bool { dynamicTypeSize.isAccessibilitySize }
 
     private var isPremium: Bool { services.entitlements.confirmedServerTier == .premium }
 
@@ -710,11 +763,13 @@ struct StoryComposer: View {
             Haptics.light()
             action()
         } label: {
-            SQListRow(title, systemImage: systemImage) {
+            SQListRow(title, subtitle: stackedValue ? value : nil, systemImage: systemImage) {
                 HStack(spacing: SQSpace.xs2) {
-                    Text(verbatim: value)
-                        .font(SQType.subhead(.medium))
-                        .foregroundStyle(SQColor.labelSecondary)
+                    if !stackedValue {
+                        Text(verbatim: value)
+                            .font(SQType.subhead(.medium))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(SQColor.labelTertiary)
@@ -734,6 +789,7 @@ private struct StoryToolLabel: View {
     let title: String
     let systemImage: String
     let isOn: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 3) {
@@ -741,10 +797,19 @@ private struct StoryToolLabel: View {
                 .font(.system(size: 19, weight: .semibold))
                 .frame(height: 22)
                 .accessibilityHidden(true)
-            Text(verbatim: title)
-                .font(SQType.caption(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            // Aux tailles d'accessibilité, le symbole seul : le libellé passe par
+            // VoiceOver et par l'aperçu agrandi d'un appui long, comme dans le dock.
+            if !dynamicTypeSize.isAccessibilitySize {
+                Text(verbatim: title)
+                    .font(SQType.caption(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: title))
+        .accessibilityShowsLargeContentViewer {
+            Label(title, systemImage: systemImage)
         }
         .foregroundStyle(isOn ? Color.black : SQColor.onGlass)
         .frame(minWidth: 60, minHeight: 52)
@@ -771,6 +836,8 @@ private struct StoryCanvas: View {
             .aspectRatio(9 / 16, contentMode: .fit)
             .overlay { content }
             .clipShape(RoundedRectangle(cornerRadius: editable ? SQRadius.xl : SQRadius.sm, style: .continuous))
+            // La story est une image de taille fixe chez ceux qui la verront : elle ne grossit pas ici.
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 
     /// Toucher le fond ouvre ou ferme le clavier ; le champ garde ses propres touchers.
@@ -781,27 +848,42 @@ private struct StoryCanvas: View {
     @ViewBuilder
     private var content: some View {
         if let image = model.previewImage {
-            ZStack(alignment: .bottomLeading) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: toggleFocus)
-                    .accessibilityLabel(Text("Photo de la story"))
-                LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 260)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .allowsHitTesting(false)
-                VStack(alignment: .leading, spacing: SQSpace.md) {
-                    caption(alignment: .leading, font: SQFont.body(16, .semibold, relativeTo: .body))
-                    radioPill
+            // La photo remplit le cadre sans jamais le dimensionner : en `scaledToFill`
+            // dans une pile, elle l'élargissait et poussait la légende hors de la story.
+            Color.clear
+                .overlay {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .accessibilityLabel(Text("Photo de la story"))
                 }
-                .padding(.horizontal, SQSpace.lg)
-                .padding(.bottom, SQSpace.lg)
-            }
-            .environment(\.colorScheme, .dark)
+                .clipped()
+                .contentShape(Rectangle())
+                .onTapGesture(perform: toggleFocus)
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: editable ? 220 : 40)
+                        .allowsHitTesting(false)
+                }
+                // En saisie, la photo s'assombrit et la légende monte au centre, au-dessus du clavier.
+                .overlay {
+                    if isTyping {
+                        Color.black.opacity(0.45)
+                            .contentShape(Rectangle())
+                            .onTapGesture(perform: toggleFocus)
+                    }
+                }
+                .overlay(alignment: isTyping ? .center : .bottomLeading) {
+                    VStack(alignment: isTyping ? .center : .leading, spacing: editable ? SQSpace.sm2 : 2) {
+                        caption(alignment: isTyping ? .center : .leading,
+                                font: isTyping ? SQFont.display(24, .bold, relativeTo: .title2)
+                                    : SQFont.body(editable ? 17 : 6, .semibold, relativeTo: .body))
+                        radioPill
+                    }
+                    .padding(.horizontal, editable ? SQSpace.lg : SQSpace.xs)
+                    .padding(.bottom, editable ? SQSpace.lg : SQSpace.xs)
+                }
+                .environment(\.colorScheme, .dark)
         } else {
             let tint = StoryViewer.backgroundColor(model.background.hex)
             ZStack {
@@ -819,6 +901,8 @@ private struct StoryCanvas: View {
         }
     }
 
+    private var isTyping: Bool { editable && captionFocused.wrappedValue }
+
     private var inkColor: Color {
         model.previewImage == nil ? SQColor.label : SQColor.onGlass
     }
@@ -826,17 +910,19 @@ private struct StoryCanvas: View {
     @ViewBuilder
     private func caption(alignment: TextAlignment, font: Font) -> some View {
         if editable {
-            TextField("", text: $model.text, prompt: Text(placeholder).foregroundColor(inkColor.opacity(0.6)), axis: .vertical)
-                .font(font)
-                .foregroundStyle(inkColor)
-                .multilineTextAlignment(alignment)
-                .lineLimit(1...(model.previewImage == nil ? 8 : 4))
-                .textFieldStyle(.plain)
-                .tint(inkColor)
-                .focused(captionFocused)
-                .submitLabel(.done)
-                .accessibilityLabel(Text(model.previewImage == nil ? "Texte de la story" : "Légende"))
-                .accessibilityIdentifier("story.caption")
+            // Le texte d'aide est posé sous le champ : un `prompt` ne passe pas à la ligne
+            // et se coupait (« Écris quelque c… ») sur une story étroite.
+            ZStack(alignment: alignment == .center ? .center : .leading) {
+                if model.text.isEmpty {
+                    Text(verbatim: placeholder)
+                        .font(font)
+                        .foregroundStyle(inkColor.opacity(0.6))
+                        .multilineTextAlignment(alignment)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+                captionField(alignment: alignment, font: font)
+            }
         } else if !model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text(model.text)
                 .font(font)
@@ -844,6 +930,28 @@ private struct StoryCanvas: View {
                 .multilineTextAlignment(alignment)
                 .lineLimit(4)
         }
+    }
+
+    private func captionField(alignment: TextAlignment, font: Font) -> some View {
+        TextField("", text: $model.text, axis: .vertical)
+            .font(font)
+            .foregroundStyle(inkColor)
+            .multilineTextAlignment(alignment)
+            .lineLimit(1...(model.previewImage == nil ? 8 : 4))
+            .textFieldStyle(.plain)
+            .tint(inkColor)
+            .focused(captionFocused)
+            .submitLabel(.done)
+            // Un champ vertical prend « ✓ » pour un saut de ligne : ✓ termine la saisie.
+            .onChangeCompat(of: model.text) { _, text in
+                guard text.contains("\n") else { return }
+                model.text = text.replacingOccurrences(of: "\n", with: " ")
+                    .trimmingCharacters(in: .whitespaces)
+                captionFocused.wrappedValue = false
+            }
+            .accessibilityLabel(Text(model.previewImage == nil ? "Texte de la story" : "Légende"))
+            .accessibilityHint(Text(verbatim: placeholder))
+            .accessibilityIdentifier("story.caption")
     }
 
     private var placeholder: String {

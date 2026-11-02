@@ -766,6 +766,7 @@ struct SQListRow<Trailing: View>: View {
             if let systemImage {
                 Image(systemName: systemImage)
                     .font(SQFont.body(16, .semibold, relativeTo: .body))
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .foregroundStyle(SQColor.ink2)
                     .frame(width: 38, height: 38)
                     .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
