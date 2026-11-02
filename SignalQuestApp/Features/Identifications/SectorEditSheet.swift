@@ -68,7 +68,9 @@ final class SectorEditViewModel: ObservableObject {
     /// Secteurs proposés : les azimuts du radar, ou les lignes de la liste.
     var slotCount: Int { usesList ? listCount : azimuths.count }
     static let defaultListCount = 3
-    static let maxListCount = 12
+    /// Borne commune aux apps, mesurée en base le 02/11 : aucun secteur enregistré au-delà de 5,
+    /// hors deux saisies isolées. Le secteur stocké ou prouvé l'élargit au besoin.
+    static let maxListCount = 6
 
     private func storedIndex(_ value: Int) -> Int? {
         SectorNumbering.index(forStoredValue: value, azimuthCount: slotCount, mccMnc: mccMnc, operatorName: item.operatorName)
@@ -76,13 +78,15 @@ final class SectorEditViewModel: ObservableObject {
 
     /// « Ajouter un secteur » : la ligne suivante, dans la même convention d'opérateur.
     func addListSlot() {
-        listCount = min(listCount + 1, Self.maxListCount)
+        guard listCount < Self.maxListCount else { return }
+        listCount += 1
     }
 
     /// Assez de lignes pour montrer le secteur enregistré et celui du PCI.
     private func ensureListCovers(_ values: [Int]) {
         for value in values {
-            if let index = SectorNumbering.index(forStoredValue: value, azimuthCount: Self.maxListCount,
+            // Au-delà de la borne, une valeur enregistrée reste affichable : jamais de perte.
+            if let index = SectorNumbering.index(forStoredValue: value, azimuthCount: max(Self.maxListCount, value + 1),
                                                  mccMnc: mccMnc, operatorName: item.operatorName) {
                 listCount = max(listCount, index + 1)
             }

@@ -324,6 +324,20 @@ final class MyIdentificationsV2Tests: XCTestCase {
         model.selectedIndex = 3
         await model.submit()
         XCTAssertEqual(service.sentSectors.last, [3])
+
+        // Borne commune de 6 lignes ; un secteur enregistré au-delà reste affiché et choisi.
+        for _ in 0..<10 { model.addListSlot() }
+        XCTAssertEqual(model.slotCount, SectorEditViewModel.maxListCount)
+        let beyond = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"t","siteId":"799050","type":"pci","pci":214,"pciValue":"214","operator":"SFR","operatorMcc":208,
+         "operatorMnc":10,"marketCode":"FR","sectors":[9]}
+        """.utf8))
+        let wide = SectorEditViewModel(item: beyond, antennas: AzimuthAntennasService(azimuts: []), identify: service)
+        await wide.load()
+        XCTAssertEqual(wide.slotCount, 10)
+        XCTAssertEqual(wide.selectedIndex, 9)
+        wide.addListSlot()
+        XCTAssertEqual(wide.slotCount, 10, "« Ajouter » ne raccourcit jamais la liste")
     }
 
     /// `derivedSector` (02/11) : la référence du PCI se montre avant tout choix, même sans
