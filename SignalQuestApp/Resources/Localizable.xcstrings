@@ -102807,19 +102807,19 @@
         }
       }
     },
-    "30 s de sondes TCP, 10 par seconde. Gigue = moyenne des écarts entre deux mesures successives ; à-coups = mesures au-dessus de la médiane + 100 ms. Sous charge : reprise d’un speedtest du même réseau de moins de 10 min, sinon 5 s de charge par sens ; note A ≤ 5 ms · B ≤ 30 · C ≤ 60 · D ≤ 200 · F au-delà. Pertes de paquets : non mesurées." : {
+    "30 s de sondes TCP, 10 par seconde. Variation (gigue) = moyenne des écarts entre deux mesures successives ; pointes = mesures au-dessus du seuil tracé sur le graphique. Sous charge : reprise d’un speedtest du même réseau de moins de 10 min, sinon 5 s de charge par sens ; on affiche l’écart avec la latence au repos. Pertes de paquets : non mesurées." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "30 s of TCP probes, 10 per second. Jitter = average gap between two successive measurements; spikes = measurements above the median + 100 ms. Under load: reused from a speedtest on the same network less than 10 min old, otherwise 5 s of load in each direction; grade A ≤ 5 ms · B ≤ 30 · C ≤ 60 · D ≤ 200 · F above. Packet loss: not measured."
+            "value" : "30 s of TCP probes, 10 per second. Variation (jitter) = average gap between two successive measurements; peaks = measurements above the threshold drawn on the chart. Under load: reused from a speedtest on the same network less than 10 min old, otherwise 5 s of load in each direction; the gap with the idle latency is shown. Packet loss: not measured."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "30 s de sondes TCP, 10 par seconde. Gigue = moyenne des écarts entre deux mesures successives ; à-coups = mesures au-dessus de la médiane + 100 ms. Sous charge : reprise d’un speedtest du même réseau de moins de 10 min, sinon 5 s de charge par sens ; note A ≤ 5 ms · B ≤ 30 · C ≤ 60 · D ≤ 200 · F au-delà. Pertes de paquets : non mesurées."
+            "value" : "30 s de sondes TCP, 10 par seconde. Variation (gigue) = moyenne des écarts entre deux mesures successives ; pointes = mesures au-dessus du seuil tracé sur le graphique. Sous charge : reprise d’un speedtest du même réseau de moins de 10 min, sinon 5 s de charge par sens ; on affiche l’écart avec la latence au repos. Pertes de paquets : non mesurées."
           }
         }
       }
@@ -102858,125 +102858,6 @@
         }
       }
     },
-    "Aucun fichier envoyé jusqu’au bout." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No file was fully sent."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun fichier envoyé jusqu’au bout."
-          }
-        }
-      }
-    },
-    "Aucune ouverture mesurée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No opening measured."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune ouverture mesurée."
-          }
-        }
-      }
-    },
-    "Comment c’est mesuré" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "How it is measured"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comment c’est mesuré"
-          }
-        }
-      }
-    },
-    "Convient" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suitable"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Convient"
-          }
-        }
-      }
-    },
-    "Ne convient pas" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not suitable"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ne convient pas"
-          }
-        }
-      }
-    },
-    "Coupures en %@ à %@ de lecture" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ stalls at %2$@ of playback"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coupures en %1$@ à %2$@ de lecture"
-          }
-        }
-      }
-    },
-    "Courbe de latence sur 30 s, médiane %lld ms" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latency curve over 30 s, median %lld ms"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Courbe de latence sur 30 s, médiane %lld ms"
-          }
-        }
-      }
-    },
     "Données utilisées : %@ · durée %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -102990,57 +102871,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Données utilisées : %1$@ · durée %2$@"
-          }
-        }
-      }
-    },
-    "En cache" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cached"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En cache"
-          }
-        }
-      }
-    },
-    "Irrégulière" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uneven"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Irrégulière"
-          }
-        }
-      }
-    },
-    "Latence sur 30 s · %lld mesures" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latency over 30 s · %lld measurements"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latence sur 30 s · %lld mesures"
           }
         }
       }
@@ -103079,23 +102909,6 @@
         }
       }
     },
-    "Non mesurées" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not measured"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non mesurées"
-          }
-        }
-      }
-    },
     "Non mesurés" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -103109,23 +102922,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non mesurés"
-          }
-        }
-      }
-    },
-    "Note %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grade %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Note %@"
           }
         }
       }
@@ -103147,23 +102943,6 @@
         }
       }
     },
-    "Pas de note : la lecture n’est pas allée au bout." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No score: playback did not finish."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas de note : la lecture n’est pas allée au bout."
-          }
-        }
-      }
-    },
     "Retour au résultat" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -103181,40 +102960,6 @@
         }
       }
     },
-    "Vidéo · 30 Mo (≈ 30 s en 1080p)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video · 30 MB (≈ 30 s in 1080p)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vidéo · 30 Mo (≈ 30 s en 1080p)"
-          }
-        }
-      }
-    },
-    "médiane %lld ms · échelle 0 à %lld ms" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "median %1$lld ms · scale 0 to %2$lld ms"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "médiane %1$lld ms · échelle 0 à %2$lld ms"
-          }
-        }
-      }
-    },
     "sur %@ au maximum · sans plafond" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -103228,23 +102973,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sur %@ au maximum · sans plafond"
-          }
-        }
-      }
-    },
-    "Écart %@%lld ms" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gap %1$@%2$lld ms"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écart %1$@%2$lld ms"
           }
         }
       }
@@ -103555,108 +103283,6 @@
         }
       }
     },
-    "Démarrage de la vidéo" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video startup"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Démarrage de la vidéo"
-          }
-        }
-      }
-    },
-    "Qualité moyenne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Average quality"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qualité moyenne"
-          }
-        }
-      }
-    },
-    "Changements de qualité" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quality changes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Changements de qualité"
-          }
-        }
-      }
-    },
-    "Fluidité" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smoothness"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fluidité"
-          }
-        }
-      }
-    },
-    "Total" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total"
-          }
-        }
-      }
-    },
-    "Régularité" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consistency"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Régularité"
-          }
-        }
-      }
-    },
     "Échecs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -103670,23 +103296,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échecs"
-          }
-        }
-      }
-    },
-    "Min" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Min"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Min"
           }
         }
       }
@@ -103708,40 +103317,6 @@
         }
       }
     },
-    "Écart MAX − min" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spread MAX − min"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écart MAX − min"
-          }
-        }
-      }
-    },
-    "DNS" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DNS"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DNS"
-          }
-        }
-      }
-    },
     "TLS" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -103755,176 +103330,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TLS"
-          }
-        }
-      }
-    },
-    "Connexion TCP" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCP connection"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connexion TCP"
-          }
-        }
-      }
-    },
-    "Premier octet" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "First byte"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premier octet"
-          }
-        }
-      }
-    },
-    "Contenu" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Content"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contenu"
-          }
-        }
-      }
-    },
-    "Latence MAX" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MAX latency"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latence MAX"
-          }
-        }
-      }
-    },
-    "Pertes de paquets" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Packet loss"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pertes de paquets"
-          }
-        }
-      }
-    },
-    "Pendant un téléchargement" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "During a download"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pendant un téléchargement"
-          }
-        }
-      }
-    },
-    "Pendant un envoi" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "During an upload"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pendant un envoi"
-          }
-        }
-      }
-    },
-    "Durée d’envoi" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Upload time"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Durée d’envoi"
-          }
-        }
-      }
-    },
-    "Débit montant moyen" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Average upload speed"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Débit montant moyen"
-          }
-        }
-      }
-    },
-    "Rapport à la durée de la vidéo" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ratio to video length"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rapport à la durée de la vidéo"
           }
         }
       }
@@ -103959,108 +103364,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Durée mesurée"
-          }
-        }
-      }
-    },
-    "Temps par qualité" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Time per quality"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temps par qualité"
-          }
-        }
-      }
-    },
-    "Note vidéo SignalQuest" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest video score"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Note vidéo SignalQuest"
-          }
-        }
-      }
-    },
-    "Verdict par usage" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verdict per use"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verdict par usage"
-          }
-        }
-      }
-    },
-    "Jeu compétitif" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Competitive gaming"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jeu compétitif"
-          }
-        }
-      }
-    },
-    "Jeu occasionnel" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Casual gaming"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jeu occasionnel"
-          }
-        }
-      }
-    },
-    "Appel vidéo HD" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "HD video call"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appel vidéo HD"
           }
         }
       }

@@ -142,7 +142,7 @@ struct SignalDetailSheet: View {
         .sheet(item: $openedExperienceTest) { opened in
             if let experienceDetail {
                 ScrollView {
-                    ExperienceDetailView(tests: experienceDetail.result, test: opened.test) {
+                    ExperienceDetailView(tests: experienceDetail.result, methodology: experienceDetail.methodology, test: opened.test) {
                         openedExperienceTest = nil
                     }
                     .padding(SQSpace.lg)
