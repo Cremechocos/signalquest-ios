@@ -406,6 +406,37 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertFalse(none.selectionMatchesPci)
     }
 
+    /// Déplacer (planche 4) : la cible du conflit est présélectionnée une fois, la vue
+    /// l'englobe, et la distance au support actuel est donnée.
+    @MainActor
+    func testMoveSelectsTheConflictTargetAndKnowsTheDistance() async throws {
+        let node = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"n","siteId":"799050","type":"enb","enb":"80977","operator":"ORANGE","marketCode":"FR","conflict":true,
+         "conflictSiteId":"799051","conflictSiteValidations":3,"conflictSiteLat":45.009,"conflictSiteLng":5.0}
+        """.utf8))
+        func site(_ id: String, _ lat: Double) -> AntennaSite {
+            AntennaSite(id: id, siteId: id, latitude: lat, longitude: 5.0, operators: ["ORANGE"], technologies: ["4G"],
+                        bands: [], azimuths: [], sharingType: nil, crozonLeader: nil, address: nil, height: nil, owner: nil)
+        }
+        var antennas = AzimuthAntennasService()
+        antennas.sites = [site("799050", 45.0), site("799051", 45.009), site("799052", 45.02)]
+        let model = SiteRemapViewModel(item: node, antennas: antennas, identify: PagedIdentifyService(), location: LocationService())
+        await model.prepareCenter()
+        XCTAssertGreaterThan(model.initialSpanMeters, 1_000)
+        XCTAssertEqual(model.initialCenter?.latitude ?? 0, 45.0045, accuracy: 0.0001, "la vue englobe les deux supports")
+
+        model.load(bbox: BoundingBox(north: 45.05, south: 44.95, east: 5.05, west: 4.95))
+        for _ in 0..<50 where model.selected == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(model.selected?.siteId, "799051")
+        XCTAssertEqual(try XCTUnwrap(model.distanceFromCurrent(to: site("799051", 45.009))), 1_000, accuracy: 15)
+
+        // Un autre choix du membre n'est pas écrasé au rechargement suivant.
+        model.selected = site("799052", 45.02)
+        model.load(bbox: BoundingBox(north: 45.05, south: 44.95, east: 5.05, west: 4.95))
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(model.selected?.siteId, "799052")
+    }
+
     /// Les lignes du log que le membre a identifiées : nœud et support, jamais la seule cellule.
     func testLogRowsKnowWhichNodesTheMemberIdentified() throws {
         let items = try page("cellsTruncatedNode").identifications
@@ -525,8 +556,9 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
 
 private struct AzimuthAntennasService: AntennasServicing {
     var azimuts: [Double] = [0, 120, 240]
+    var sites: [AntennaSite] = []
     func list(bbox: BoundingBox) async throws -> [AntennaSite] { [] }
-    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { [] }
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { sites }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode, sharing: Set<String>) async throws -> [AntennaSite] { [] }
     func details(id: String) async throws -> AntennaDetails { try await details(id: id, market: "FR", operatorName: "ORANGE") }

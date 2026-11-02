@@ -10921,6 +10921,70 @@
         }
       }
     },
+    "Plus validé ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More confirmed here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus validé ici"
+          }
+        }
+      }
+    },
+    "%lld validations le placent ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld confirmations place it here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld validations le placent ici"
+          }
+        }
+      }
+    },
+    "1 validation le place ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 confirmation places it here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 validation le place ici"
+          }
+        }
+      }
+    },
+    "À %@ de l’actuel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from the current one"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %@ de l’actuel"
+          }
+        }
+      }
+    },
     "Dépose ici pour joindre à la conversation" : {
       "localizations" : {
         "en" : {

@@ -10,6 +10,12 @@ final class SiteRemapViewModel: ObservableObject {
     @Published var isSubmitting = false
     @Published var errorMessage: String?
     @Published var initialCenter: CLLocationCoordinate2D?
+    /// Hauteur de la vue initiale : assez pour montrer aussi le support du conflit.
+    private(set) var initialSpanMeters: CLLocationDistance = 2200
+    /// Position du support actuel, pour dire à quelle distance est le choix.
+    private(set) var currentCoordinate: CLLocationCoordinate2D?
+    /// La cible du conflit n'est présélectionnée qu'une fois : un autre choix du membre reste.
+    private var didPreselectConflictTarget = false
     @Published var done = false
     /// Support où le nœud se trouve après le déplacement (le même pour un `noop`).
     private(set) var movedTo: String?
@@ -39,6 +45,19 @@ final class SiteRemapViewModel: ObservableObject {
     var selectedIsCurrentSite: Bool {
         guard let selected else { return false }
         return selected.siteId == item.siteId || selected.id == item.siteId || selected.writeSiteId == item.siteId
+    }
+
+    /// Le support où d'autres placent ce nœud (`conflictSiteId`), quand la ligne est en conflit.
+    func isConflictTarget(_ site: AntennaSite) -> Bool {
+        guard item.conflict, let target = item.conflictSiteId, !target.isEmpty else { return false }
+        return site.siteId == target || site.id == target || site.writeSiteId == target
+    }
+
+    /// Distance entre le support actuel et le support choisi, quand les deux sont placés.
+    func distanceFromCurrent(to site: AntennaSite) -> CLLocationDistance? {
+        guard let current = currentCoordinate, let lat = site.latitude, let lng = site.longitude else { return nil }
+        return CLLocation(latitude: current.latitude, longitude: current.longitude)
+            .distance(from: CLLocation(latitude: lat, longitude: lng))
     }
 
     /// Centre de repli quand ni le site actuel ni la position ne répondent : celui du
@@ -71,7 +90,20 @@ final class SiteRemapViewModel: ObservableObject {
         }
         if let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
            let core = details.core, core.lat != 0 || core.lng != 0 {
-            initialCenter = CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)
+            let current = CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)
+            currentCoordinate = current
+            initialCenter = current
+            // En conflit, la vue englobe aussi le support des autres, dans la limite où la
+            // carte charge encore les supports (0,5° de haut).
+            if item.conflict, let lat = item.conflictSiteLat, let lng = item.conflictSiteLng, lat != 0 || lng != 0 {
+                let distance = CLLocation(latitude: current.latitude, longitude: current.longitude)
+                    .distance(from: CLLocation(latitude: lat, longitude: lng))
+                if distance < 25_000 {
+                    initialCenter = CLLocationCoordinate2D(latitude: (current.latitude + lat) / 2,
+                                                           longitude: (current.longitude + lng) / 2)
+                    initialSpanMeters = max(2200, distance * 1.6)
+                }
+            }
             return
         }
         if let loc = await location.currentLocation(timeoutSeconds: 4) {
@@ -103,6 +135,10 @@ final class SiteRemapViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 sites = list.filter(\.hasValidCoordinate)
                 errorMessage = nil
+                if !didPreselectConflictTarget, selected == nil, let target = sites.first(where: isConflictTarget) {
+                    didPreselectConflictTarget = true
+                    selected = target
+                }
             } catch {
                 // Une carte vide sans explication passait pour « aucun site ici » (AF-RAD-17).
                 guard !Task.isCancelled, !error.isCancellation else { return }
@@ -168,6 +204,7 @@ struct SiteRemapSheet: View {
                     selectedId: model.selected?.id,
                     currentSiteId: model.item.siteId,
                     initialCenter: center,
+                    initialSpanMeters: model.initialSpanMeters,
                     onRegionChange: { bbox in model.load(bbox: bbox) },
                     onSelect: { site in
                         model.selected = site
@@ -233,6 +270,23 @@ struct SiteRemapSheet: View {
         }
     }
 
+    /// « À 640 m de l'actuel · 3 validations le placent ici » : ce qu'on sait du choix, sans deviner.
+    private func selectionFacts(_ site: AntennaSite) -> String? {
+        var facts: [String] = []
+        if !model.selectedIsCurrentSite, let meters = model.distanceFromCurrent(to: site) {
+            facts.append(String(localized: "À \(SQUnits.distance(meters: meters)) de l’actuel"))
+        }
+        if model.isConflictTarget(site) {
+            // `validations` compte des validations, pas des personnes : règle commune aux trois apps.
+            switch model.item.conflictSiteValidations {
+            case .some(1): facts.append(String(localized: "1 validation le place ici"))
+            case let .some(count): facts.append(String(localized: "\(count) validations le placent ici"))
+            case .none: facts.append(String(localized: "Plus validé ici"))
+            }
+        }
+        return facts.isEmpty ? nil : facts.joined(separator: " · ")
+    }
+
     @ViewBuilder
     private var selectionCard: some View {
         if let selected = model.selected {
@@ -249,6 +303,14 @@ struct SiteRemapSheet: View {
                             .sqSingleLine()
                         if let address = selected.address, !address.isEmpty {
                             Text(address).font(SQType.caption).foregroundStyle(SQColor.labelSecondary).lineLimit(2)
+                        }
+                        if let facts = selectionFacts(selected) {
+                            Text(facts)
+                                .font(SQType.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("remap.facts")
                         }
                     }
                     Spacer(minLength: 0)
@@ -300,6 +362,7 @@ private struct AntennaPickerMapView: UIViewRepresentable {
     let selectedId: String?
     let currentSiteId: String
     let initialCenter: CLLocationCoordinate2D
+    let initialSpanMeters: CLLocationDistance
     let onRegionChange: (BoundingBox) -> Void
     let onSelect: (AntennaSite) -> Void
 
@@ -310,7 +373,7 @@ private struct AntennaPickerMapView: UIViewRepresentable {
         map.delegate = context.coordinator
         map.pointOfInterestFilter = .excludingAll
         map.showsUserLocation = true
-        let region = MKCoordinateRegion(center: initialCenter, latitudinalMeters: 2200, longitudinalMeters: 2200)
+        let region = MKCoordinateRegion(center: initialCenter, latitudinalMeters: initialSpanMeters, longitudinalMeters: initialSpanMeters)
         map.setRegion(region, animated: false)
         context.coordinator.didSetInitialRegion = true
         return map
@@ -339,7 +402,7 @@ private struct AntennaPickerMapView: UIViewRepresentable {
             }
             // Ajouts
             for (id, site) in desired where annotationsById[id] == nil {
-                let pin = AntennaPin(site: site)
+                let pin = AntennaPin(site: site, isCurrent: site.siteId == parent.currentSiteId || id == parent.currentSiteId)
                 annotationsById[id] = pin
                 map.addAnnotation(pin)
             }
@@ -347,6 +410,7 @@ private struct AntennaPickerMapView: UIViewRepresentable {
             for (id, pin) in annotationsById {
                 if let view = map.view(for: pin) as? MKMarkerAnnotationView {
                     view.markerTintColor = self.tint(for: id)
+                    view.alpha = pin.isCurrent ? 0.55 : 1
                 }
             }
         }
@@ -383,6 +447,9 @@ private struct AntennaPickerMapView: UIViewRepresentable {
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: id)
             view.annotation = annotation
             view.markerTintColor = tint(for: pin.site.id)
+            // Le support actuel est estompé et nommé « Actuel » : on ne le choisit pas.
+            view.alpha = pin.isCurrent ? 0.55 : 1
+            view.titleVisibility = pin.isCurrent ? .visible : .adaptive
             view.glyphImage = UIImage(systemName: "antenna.radiowaves.left.and.right")
             view.clusteringIdentifier = "antenna"
             view.displayPriority = .defaultHigh
@@ -406,10 +473,14 @@ private struct AntennaPickerMapView: UIViewRepresentable {
 
 private final class AntennaPin: NSObject, MKAnnotation {
     let site: AntennaSite
-    init(site: AntennaSite) { self.site = site }
+    let isCurrent: Bool
+    init(site: AntennaSite, isCurrent: Bool) {
+        self.site = site
+        self.isCurrent = isCurrent
+    }
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: site.latitude ?? 0, longitude: site.longitude ?? 0)
     }
-    var title: String? { site.siteId ?? site.id }
-    var subtitle: String? { site.address }
+    var title: String? { isCurrent ? String(localized: "Actuel") : site.siteId ?? site.id }
+    var subtitle: String? { isCurrent ? nil : site.address }
 }
