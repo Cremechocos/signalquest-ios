@@ -223,7 +223,7 @@ enum WidgetUnits {
     /// « 412 Mbit/s », « 1,722 Gbit/s ».
     static func throughput(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
-        return "\(throughputValue(mbps: mbps, locale: locale)) \(throughputUnit(mbps: mbps))"
+        return "\(throughputValue(mbps: mbps, locale: locale))\u{00A0}\(throughputUnit(mbps: mbps))"
     }
 
     /// Sans place pour l'unité (Dynamic Island, jauge d'écran verrouillé) : un « G »

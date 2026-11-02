@@ -107,7 +107,7 @@ final class ExperienceResultTextTests: XCTestCase {
         ])
         let line = ExperienceResultText.upload(result, failure: nil)
         XCTAssertEqual(line.headline, "Photo envoyée en 4,6 s · vidéo de 30 s en 27,3 s")
-        XCTAssertEqual(line.detail, "8,7 Mb/s et 8,8 Mb/s en montant")
+        XCTAssertEqual(line.detail, "8,7\u{00A0}Mb/s et 8,8\u{00A0}Mb/s en montant")
         XCTAssertEqual(ExperienceResultText.upload(ExperienceUploadResult(state: .interrupted, reason: .userStopped), failure: nil),
                        .init(headline: "Interrompu", detail: "test arrêté"))
     }
@@ -121,7 +121,7 @@ final class ExperienceResultTextTests: XCTestCase {
         held.receivedBps = 18_000_000
         XCTAssertEqual(ExperienceResultText.margin(held), "× 1,5")
         XCTAssertEqual(ExperienceResultText.rungVerdict(held), "Tient · × 1,5")
-        XCTAssertEqual(ExperienceResultText.rungDetail(held), "démarrage 1,4 s · tampon 0,7 / 2,3 s · reçu 18 Mb/s")
+        XCTAssertEqual(ExperienceResultText.rungDetail(held), "démarrage 1,4 s · tampon 0,7 / 2,3 s · reçu 18\u{00A0}Mb/s")
         let stalled = rung(.p2160, stalls: 4)
         XCTAssertEqual(ExperienceResultText.rungVerdict(stalled), "4 coupures")
         XCTAssertEqual(ExperienceResultText.rungDetail(stalled), "1,2 s d’attente")

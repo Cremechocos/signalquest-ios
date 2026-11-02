@@ -94,11 +94,11 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(card.download, .init(number: "770", unit: "Mb/s"))
         // Avec courbes, le MAX s'écrit sur elles et pas sous les chiffres.
         XCTAssertNil(card.downloadPeakText)
-        XCTAssertEqual(card.downloadGraph?.maxText, "MAX 812 Mb/s")
+        XCTAssertEqual(card.downloadGraph?.maxText, "MAX 812\u{00A0}Mb/s")
         XCTAssertEqual(card.downloadGraph?.maxValue, 812.4)
         XCTAssertEqual(card.upload, .init(number: "126", unit: "Mb/s"))
         XCTAssertNil(card.uploadPeakText)
-        XCTAssertEqual(card.uploadGraph?.maxText, "MAX 131 Mb/s")
+        XCTAssertEqual(card.uploadGraph?.maxText, "MAX 131\u{00A0}Mb/s")
         XCTAssertEqual(card.latencyLabel, "Latence min.")
         XCTAssertEqual(card.latency, .init(number: "14", unit: "ms"))
         XCTAssertEqual(card.latencyAverageText, "Moyenne 24 ms")
@@ -111,8 +111,8 @@ final class SQShareCardBuilderTests: XCTestCase {
     func testMaxStaysUnderTheFigureWithoutCurve() {
         let card = model(result(downloadSeries: nil, uploadSeries: nil))
         XCTAssertNil(card.downloadGraph)
-        XCTAssertEqual(card.downloadPeakText, "MAX 812 Mb/s")
-        XCTAssertEqual(card.uploadPeakText, "MAX 131 Mb/s")
+        XCTAssertEqual(card.downloadPeakText, "MAX 812\u{00A0}Mb/s")
+        XCTAssertEqual(card.uploadPeakText, "MAX 131\u{00A0}Mb/s")
     }
 
     /// Un pic qui s'écrit comme le débit n'apporte rien : pas de ligne.
@@ -407,7 +407,7 @@ final class SQShareCardBuilderTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(text.contains("770 \(SQUnits.throughputUnit(mbps: 770))"))
+        XCTAssertTrue(text.contains("770\u{00A0}\(SQUnits.throughputUnit(mbps: 770))"))
         XCTAssertTrue(text.contains("ping 24 ms"))
         XCTAssertTrue(text.contains("#SignalQuest"))
         XCTAssertFalse(text.contains("Orange"))

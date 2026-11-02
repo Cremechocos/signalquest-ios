@@ -148,7 +148,9 @@ enum SQUnits {
     /// MES-25).
     static func throughput(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
-        return "\(throughputValue(mbps: mbps, locale: locale)) \(throughputUnit(mbps: mbps))"
+        // Insécable U+00A0 entre le nombre et l'unité : jamais « 84 » en fin de ligne
+        // et « Mb/s » sur la suivante (décision des trois apps du 02/11).
+        return "\(throughputValue(mbps: mbps, locale: locale))\u{00A0}\(throughputUnit(mbps: mbps))"
     }
 
     /// Le nombre seul, pour un grand chiffre dont l'unité est posée à part. Une

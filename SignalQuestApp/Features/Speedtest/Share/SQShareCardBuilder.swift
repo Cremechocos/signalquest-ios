@@ -129,7 +129,7 @@ enum SQShareCardBuilder {
     /// « MAX » ne se traduit pas, comme dans l'app.
     private static func peakText(_ peak: Double, average: Double, locale: Locale) -> String? {
         guard let value = throughput(peak, locale: locale), value != throughput(average, locale: locale) else { return nil }
-        return "MAX \(value.number) \(value.unit)"
+        return "MAX \(value.number)\u{00A0}\(value.unit)"
     }
 
     /// Le minimum en grand, la moyenne dessous ; sans minimum, la médiane puis la
