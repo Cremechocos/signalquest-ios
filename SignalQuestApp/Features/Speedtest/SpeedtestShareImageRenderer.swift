@@ -9,32 +9,11 @@ import SwiftUI
 /// résultat : couleurs de la DA codées en dur, car ces vues sont aussi rendues
 /// hors hiérarchie, où les jetons dynamiques ne se résolvent pas toujours.
 enum SpeedtestShareImageRenderer {
-    static func shareText(
-        for result: SpeedtestRunResult,
-        options: SpeedtestShareOptions = .init()
-    ) -> String {
-        // Unité de l'app (Mbit/s en français, Mbps en anglais), pas « Mbps » figé.
-        let download = SQUnits.throughput(mbps: result.downloadAverageMbps)
-        let uploadValue = result.uploadAverageMbps.map { SQUnits.throughput(mbps: $0) }
-            ?? "-- \(SQUnits.throughputUnit(mbps: 0))"
-        let upload = String(localized: "\(uploadValue) en upload")
-        let ping = (result.primaryPingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
-        var context = ""
-        if options.includeNetworkContext {
-            let net = result.networkShareDisplayName.trimmedNonEmpty ?? String(localized: "réseau mobile")
-            context += String(localized: " sur \(net)")
-        }
-        if options.includeApproximateLocation, let place = result.city?.trimmedNonEmpty {
-            context += String(localized: " à \(place)")
-        }
-        if options.includeServerDetails,
-           let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty {
-            context += String(localized: " via \(server)")
-        }
-        // Dans la langue de l'app : l'app anglaise partageait un texte en
-        // français (TRX-06).
-        return String(localized: "\(download) en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.")
-            + "\n#SignalQuest · signalquest.fr"
+    /// Texte joint à l'image : la légende commune `speedtest.share.caption` (presentation-v1,
+    /// décision du 01/11), sans lien, sans opérateur ni chiffre, dans la langue de l'app.
+    /// L'image porte déjà le résultat et respecte les options de confidentialité.
+    static func shareText(for result: SpeedtestRunResult, options: SpeedtestShareOptions = .init()) -> String {
+        ExperiencePresentation.label("speedtest.share.caption")
     }
 
     // Conservé pour la dérivation de localisation (tests).

@@ -1,22 +1,6 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
-    " via %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " via %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " via %@"
-          }
-        }
-      }
-    },
     "%@ / %@ pts vers le niveau %lld" : {
       "localizations" : {
         "en" : {
@@ -162,22 +146,6 @@
         }
       }
     },
-    "%@ en download%@, ping %@, %@ — mesuré avec SignalQuest." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ download%@, ping %@, %@ — measured with SignalQuest."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ en download%@, ping %@, %@ — mesuré avec SignalQuest."
-          }
-        }
-      }
-    },
     "%@ en envoi" : {
       "localizations" : {
         "en" : {
@@ -206,22 +174,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ en moyenne"
-          }
-        }
-      }
-    },
-    "%@ en upload" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ up"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ en upload"
           }
         }
       }
@@ -21105,22 +21057,6 @@
         }
       }
     },
-    "Speedtest SignalQuest — %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest speedtest — %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speedtest SignalQuest — %@"
-          }
-        }
-      }
-    },
     "Speedtest du %@" : {
       "localizations" : {
         "en" : {
@@ -30794,22 +30730,6 @@
         }
       }
     },
-    " à %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " in %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " à %@"
-          }
-        }
-      }
-    },
     " La hauteur de l'antenne étant inconnue, 25 m ont été supposés." : {
       "localizations" : {
         "en" : {
@@ -30854,22 +30774,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : " Les hauteurs sont à l'échelle du graphe, dont l'axe vertical est dilaté pour rester lisible."
-          }
-        }
-      }
-    },
-    " sur %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " on %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " sur %@"
           }
         }
       }
@@ -79027,22 +78931,6 @@
         }
       }
     },
-    "Speedtest SignalQuest — %lld Mbps" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest speedtest — %lld Mb/s"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speedtest SignalQuest — %lld Mb/s"
-          }
-        }
-      }
-    },
     "Speedtest arrêté : changement de réseau détecté (%@ -> %@). Relance le test pour mesurer une connexion stable." : {
       "localizations" : {
         "en" : {
@@ -90121,23 +90009,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "réseau interne · %lld sauts"
-          }
-        }
-      }
-    },
-    "réseau mobile" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "mobile network"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "réseau mobile"
           }
         }
       }

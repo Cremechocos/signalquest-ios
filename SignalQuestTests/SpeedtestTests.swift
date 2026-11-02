@@ -551,12 +551,12 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedtestGaugeScale.maxSpeed(for: wifi, upload: false), 1_000)
     }
 
-    func testShareTextIncludesDownloadAndHashtag() {
+    func testShareTextIsTheCaptionWithoutFigures() {
         let result = makeSpeedtestResult(downloadSeries: [120, 480], uploadSeries: [40, 90])
         let text = SpeedtestShareImageRenderer.shareText(for: result)
-        XCTAssertTrue(text.contains(SQUnits.throughputUnit(mbps: 480)))
-        XCTAssertTrue(text.contains("#SignalQuest"))
-        XCTAssertTrue(text.contains("signalquest.fr"))
+        XCTAssertFalse(text.contains(SQUnits.throughputUnit(mbps: 480)))
+        XCTAssertFalse(text.contains("signalquest.fr"))
+        XCTAssertTrue(text.contains("SignalQuest"))
     }
 
     func testShareImageLocationKeepsMeasuredCityAndDoesNotInventCountry() {

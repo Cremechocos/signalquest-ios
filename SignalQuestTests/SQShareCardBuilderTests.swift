@@ -394,26 +394,14 @@ final class SQShareCardBuilderTests: XCTestCase {
         )
     }
 
-    func testShareTextHonorsPrivacyOptionsAndKeepsCoreResult() {
-        let sample = result()
-        let text = SpeedtestShareImageRenderer.shareText(
-            for: sample,
-            options: SpeedtestShareOptions(
-                includeNetworkContext: false,
-                includeApproximateLocation: false,
-                includeDevice: false,
-                includeRadioDetails: false,
-                includeServerDetails: false,
-                includeTimestamp: false
-            )
-        )
-
-        XCTAssertTrue(text.contains("770\u{00A0}\(SQUnits.throughputUnit(mbps: 770))"))
-        XCTAssertTrue(text.contains("ping 24 ms"))
-        XCTAssertTrue(text.contains("#SignalQuest"))
-        XCTAssertFalse(text.contains("Orange"))
-        XCTAssertFalse(text.contains("Lyon"))
-        XCTAssertFalse(text.contains("Paris BBR"))
+    /// Le texte joint est la légende commune : aucun chiffre, opérateur, lieu, serveur ni lien.
+    func testShareTextIsTheCommonCaption() {
+        let text = SpeedtestShareImageRenderer.shareText(for: result())
+        XCTAssertEqual(text, ExperiencePresentation.label("speedtest.share.caption"))
+        XCTAssertEqual(ExperiencePresentation.label("speedtest.share.caption", .fr), "Débit et latence, mesurés avec SignalQuest")
+        for leak in ["770", "Orange", "Lyon", "Paris BBR", "signalquest.fr"] {
+            XCTAssertFalse(text.contains(leak), leak)
+        }
     }
 
     func testExportFilenameDoesNotExposeInternalResultIdentifier() throws {
