@@ -11,6 +11,8 @@ final class SiteRemapViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var initialCenter: CLLocationCoordinate2D?
     @Published var done = false
+    /// Support où le nœud se trouve après le déplacement (le même pour un `noop`).
+    private(set) var movedTo: String?
 
     let item: MyIdentification
     private let antennas: AntennasServicing
@@ -122,6 +124,7 @@ final class SiteRemapViewModel: ObservableObject {
             )
             if result.changed {
                 Haptics.success()
+                movedTo = result.toSiteId ?? toSiteId
                 done = true
             } else {
                 errorMessage = result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Le déplacement n'a pas abouti.")
@@ -138,7 +141,7 @@ final class SiteRemapViewModel: ObservableObject {
 struct SiteRemapSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: SiteRemapViewModel
-    let onDone: () -> Void
+    let onDone: (String) -> Void
     /// Le déplacement est public et emporte toutes les cellules du nœud : il se
     /// confirme, comme le choix sur carte des Logs (AF-RAD-17).
     @State private var confirmsRemap = false
@@ -149,7 +152,7 @@ struct SiteRemapSheet: View {
         identify: IdentifyServicing,
         location: LocationService,
         markets: MarketRegistryServicing? = nil,
-        onDone: @escaping () -> Void
+        onDone: @escaping (String) -> Void
     ) {
         _model = StateObject(wrappedValue: SiteRemapViewModel(
             item: item, antennas: antennas, identify: identify, location: location, markets: markets
@@ -182,11 +185,8 @@ struct SiteRemapSheet: View {
                 instructionCard
                 Spacer(minLength: 0)
                 if let errorMessage = model.errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption).foregroundStyle(SQColor.onAccent)
-                        .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
-                        .background(SQColor.danger, in: Capsule(style: .continuous))
-                        .frame(maxWidth: .infinity)
+                    SQNotice(message: errorMessage, tone: .danger)
+                        .accessibilityIdentifier("remap.error")
                 }
                 selectionCard
             }
@@ -196,7 +196,7 @@ struct SiteRemapSheet: View {
             await model.prepareCenter()
         }
         .onChangeCompat(of: model.done) { _, done in
-            if done { onDone(); dismiss() }
+            if done, let movedTo = model.movedTo { onDone(movedTo); dismiss() }
         }
     }
 

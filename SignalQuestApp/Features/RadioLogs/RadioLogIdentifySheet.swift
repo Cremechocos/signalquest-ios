@@ -24,10 +24,17 @@ struct RadioLogIdentifySheet: View {
     /// alors sur son résultat au lieu de se refermer sèchement. On vient de
     /// contribuer à une base publique, l'écran doit dire QUOI.
     @State private var identifiedSiteId: String?
+    /// « Corriger » ouvert sur l'identification qu'on vient de faire.
+    @State private var correcting = false
+    /// Ce que la dernière correction a fait, dit en tête de l'écran revenu au choix.
+    @State private var correctionNote: String?
     @AccessibilityFocusState private var resultFocused: Bool
     private let antennas: AntennasServicing
     private let customSites: CustomSitesServicing?
+    private let identify: IdentifyServicing
     let onIdentified: (String) -> Void
+    /// L'identification a été retirée ou supprimée depuis « Corriger ».
+    let onWithdrawn: () -> Void
 
     init(
         site: RadioLogSite,
@@ -35,12 +42,15 @@ struct RadioLogIdentifySheet: View {
         identify: IdentifyServicing,
         antennas: AntennasServicing,
         customSites: CustomSitesServicing? = nil,
-        onIdentified: @escaping (String) -> Void
+        onIdentified: @escaping (String) -> Void,
+        onWithdrawn: @escaping () -> Void = {}
     ) {
         self.site = site
         self.antennas = antennas
         self.customSites = customSites
+        self.identify = identify
         self.onIdentified = onIdentified
+        self.onWithdrawn = onWithdrawn
         _picker = StateObject(
             wrappedValue: RadioLogIdentifyPicker(service: service, identify: identify, antennas: antennas)
         )
@@ -59,14 +69,25 @@ struct RadioLogIdentifySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.md) {
+                    MapSheetHeader(
+                        title: identifiedSiteId == nil ? String(localized: "Identifier ce site") : String(localized: "Site identifié"),
+                        closeIdentifier: "radioLogs.identify.close"
+                    ) { dismiss() }
                     header
                     if let identifiedSiteId {
                         resultCard(siteId: identifiedSiteId)
-                    } else if let blocking = RadioLogIdentifyPicker.blockingReason(for: site) {
-                        noticeBanner(blocking, systemImage: "exclamationmark.triangle.fill", tint: SQColor.warning, soft: SQColor.warningSoft)
+                        correctButton
                     } else {
-                        map
-                        candidateList
+                        if let correctionNote {
+                            SQNotice(message: correctionNote, tone: .success)
+                                .accessibilityIdentifier("radioLogs.identify.correctionNote")
+                        }
+                        if let blocking = RadioLogIdentifyPicker.blockingReason(for: site) {
+                            noticeBanner(blocking, systemImage: "exclamationmark.triangle.fill", tint: SQColor.warning, soft: SQColor.warningSoft)
+                        } else {
+                            map
+                            candidateList
+                        }
                     }
                     if identifiedSiteId == nil, let errorMessage = picker.errorMessage {
                         noticeBanner(errorMessage, systemImage: "exclamationmark.circle.fill", tint: SQColor.dangerInk, soft: SQColor.dangerSoft)
@@ -82,17 +103,12 @@ struct RadioLogIdentifySheet: View {
                     }
                 }
                 .padding(.horizontal, M.sheetPaddingH)
-                .padding(.top, SQSpace.sm)
+                .padding(.top, SQSpace.lg)
                 .padding(.bottom, M.sheetPaddingBottom)
             }
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(identifiedSiteId == nil ? String(localized: "Identifier ce site") : String(localized: "Site identifié"))
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(identifiedSiteId == nil ? String(localized: "Fermer") : String(localized: "Terminé")) { dismiss() }
-                }
-            }
+            // En-tête Halo des feuilles : grand titre et bouton de fermeture rond.
+            .toolbar(.hidden, for: .navigationBar)
             .task { await picker.load(for: site) }
             .onChangeCompat(of: identifiedSiteId) { _, siteId in
                 guard siteId != nil else { return }
@@ -118,6 +134,19 @@ struct RadioLogIdentifySheet: View {
                     address: candidate.address,
                     needsVerification: candidate.needsVerification
                 ))
+            }
+            .sheet(isPresented: $correcting) {
+                if let identifiedSiteId {
+                    IdentificationCorrectionSheet(
+                        target: IdentificationCorrectionTarget(
+                            siteId: identifiedSiteId,
+                            kind: site.kind == .gnb ? .gnb : .enb,
+                            node: site.node
+                        ),
+                        service: identify,
+                        onOutcome: applyCorrection
+                    )
+                }
             }
             .sheet(isPresented: $showsMapPicker) {
                 RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
@@ -171,7 +200,7 @@ struct RadioLogIdentifySheet: View {
                 .foregroundStyle(P.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, SQSpace.md)
-            Text("Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications ».")
+            Text("Cette identification est publique et attribuée à ton compte.")
                 .font(SQFont.body(M.siteMetaSize))
                 .foregroundStyle(P.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -183,6 +212,32 @@ struct RadioLogIdentifySheet: View {
         .accessibilityElement(children: .combine)
         .accessibilityFocused($resultFocused)
         .accessibilityIdentifier("radioLogs.identify.result")
+    }
+
+    /// « Corriger » : la fiche de cette identification, sans passer par la liste.
+    private var correctButton: some View {
+        GradientButton("Corriger", systemImage: "pencil", style: .secondary) {
+            correcting = true
+        }
+        .accessibilityHint(Text("Retirer, supprimer, changer de support ou de secteur"))
+        .accessibilityIdentifier("radioLogs.identify.correct")
+    }
+
+    /// Ce qu'une correction a changé : retirée, l'écran revient au choix de l'antenne ;
+    /// déplacée, le résultat nomme le nouveau support.
+    private func applyCorrection(_ outcome: IdentificationCorrectionOutcome) {
+        switch outcome {
+        case .withdrawn:
+            identifiedSiteId = nil
+            picker.selectedId = nil
+            correctionNote = String(localized: "Identification retirée. Tu peux identifier ce site à nouveau.")
+            onWithdrawn()
+        case let .moved(siteId):
+            identifiedSiteId = siteId
+            onIdentified(siteId)
+        case .edited:
+            break
+        }
     }
 
     // MARK: Sous-vues

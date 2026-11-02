@@ -193,6 +193,56 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(plain.selectedIndex, 0, "Sans écart : le secteur enregistré")
     }
 
+    // MARK: Corriger juste après l'identification (ticket ck2uk3vwvd2p5b8sd6y9p4zvl)
+
+    func testCorrectionFindsTheNodeJustIdentifiedWithItsCells() async throws {
+        let first = try page("cellsTruncatedNode")
+        let node = try XCTUnwrap(first.identifications.first { $0.kind == .enb })
+        let service = PagedIdentifyService()
+        service.pages[nil] = first
+        let model = IdentificationCorrectionModel(
+            target: IdentificationCorrectionTarget(siteId: node.siteId, kind: .enb, node: try XCTUnwrap(node.enb)),
+            service: service
+        )
+        await model.load()
+        guard case let .found(found, cells) = model.state else { return XCTFail("\(model.state)") }
+        XCTAssertEqual(found.id, node.id)
+        XCTAssertEqual(cells.map(\.kind), [.cellid], "les cellules du nœud viennent avec lui, pour corriger leur secteur")
+        XCTAssertEqual(service.requests.count, 1)
+    }
+
+    func testCorrectionReadsTheNextPagesThenSaysWhenTheNodeIsNotThere() async throws {
+        let service = PagedIdentifyService()
+        service.pages[nil] = try page("cellsTruncatedNode")
+        service.pages["eyJwIjoibiJ9"] = try page("orphanPage")
+        let model = IdentificationCorrectionModel(
+            target: IdentificationCorrectionTarget(siteId: "000", kind: .enb, node: "1"),
+            service: service
+        )
+        await model.load()
+        XCTAssertEqual(model.state, .notFound)
+        XCTAssertEqual(service.requests.map(\.cursor), [nil, "eyJwIjoibiJ9"])
+    }
+
+    func testAWithdrawalThatMatchedNothingKeepsTheSheetOpenWithTheReason() async throws {
+        let first = try page("cellsTruncatedNode")
+        let node = try XCTUnwrap(first.identifications.first { $0.kind == .enb })
+        let service = PagedIdentifyService()
+        service.withdrawAnswer = #"{"success":true,"withdrawn":0}"#
+        let model = IdentificationCorrectionModel(
+            target: IdentificationCorrectionTarget(siteId: node.siteId, kind: .enb, node: "1"),
+            service: service
+        )
+        let withdrawn = await model.withdraw(node)
+        XCTAssertFalse(withdrawn)
+        XCTAssertEqual(model.actionError, IdentificationCorrectionText.nothingChanged)
+
+        service.withdrawAnswer = #"{"success":true,"withdrawn":2}"#
+        let again = await model.withdraw(node)
+        XCTAssertTrue(again)
+        XCTAssertNil(model.actionError)
+    }
+
     // MARK: Requêtes
 
     func testMinePageQueryAndAdoptConsensusBody() async throws {
@@ -270,7 +320,10 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
 
     func identify(_ request: IdentifyDirectRequest) async throws -> IdentifyResult { throw APIError.cancelled }
     func mine(includeRelated: Bool) async throws -> [MyIdentification] { [] }
-    func withdraw(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> WithdrawResult { throw APIError.cancelled }
+    var withdrawAnswer = #"{"success":true,"withdrawn":1}"#
+    func withdraw(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> WithdrawResult {
+        try JSONDecoder().decode(WithdrawResult.self, from: Data(withdrawAnswer.utf8))
+    }
     func delete(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> DeleteResult { throw APIError.cancelled }
     func editSite(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?, reason: String?) async throws -> EditSiteResult { throw APIError.cancelled }
     func editSectors(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> EditSectorsResult { throw APIError.cancelled }

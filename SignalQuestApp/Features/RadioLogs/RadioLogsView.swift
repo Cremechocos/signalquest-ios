@@ -158,11 +158,16 @@ struct RadioLogsView: View {
                 service: services.radioLogs,
                 identify: services.identify,
                 antennas: services.antennas,
-                customSites: services.customSites
-            ) { siteId in
-                model.markIdentified(site, siteId: siteId)
-                model.toast = String(localized: "Site identifié.")
-            }
+                customSites: services.customSites,
+                onIdentified: { siteId in
+                    model.markIdentified(site, siteId: siteId)
+                    model.toast = String(localized: "Site identifié.")
+                },
+                onWithdrawn: {
+                    model.markWithdrawn(site)
+                    model.toast = String(localized: "Identification retirée")
+                }
+            )
         }
         .sheet(item: $chainQueue) { queue in
             RadioLogIdentifyChainView(

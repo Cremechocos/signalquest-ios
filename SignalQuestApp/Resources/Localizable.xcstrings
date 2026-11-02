@@ -43881,29 +43881,29 @@
         }
       }
     },
-    "Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications »." : {
+    "Cette identification est publique et attribuée à ton compte." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This identification is public and attributed to your account. You can withdraw it from “My identifications”."
+            "value" : "This identification is public and credited to your account."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications »."
+            "value" : "Cette identification est publique et attribuée à ton compte."
           }
         }
       }
     },
-    "SQFormal|Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications »." : {
+    "SQFormal|Cette identification est publique et attribuée à ton compte." : {
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette identification est publique et attribuée à votre compte. Vous pouvez la retirer depuis « Mes identifications »."
+            "value" : "Cette identification est publique et attribuée à votre compte."
           }
         }
       },
@@ -54813,6 +54813,126 @@
           }
         }
       }
+    },
+    "Retirer, supprimer, changer de support ou de secteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove, delete, change site or sector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer, supprimer, changer de support ou de secteur"
+          }
+        }
+      }
+    },
+    "Recherche de l’identification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for the identification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche de l’identification"
+          }
+        }
+      }
+    },
+    "Elle n’apparaît pas encore dans « Mes identifications ». Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It isn’t in “My identifications” yet. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle n’apparaît pas encore dans « Mes identifications ». Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Elle n’apparaît pas encore dans « Mes identifications ». Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle n’apparaît pas encore dans « Mes identifications ». Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Identification indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification indisponible"
+          }
+        }
+      }
+    },
+    "Identification introuvable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification not found"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification introuvable"
+          }
+        }
+      }
+    },
+    "Identification retirée. Tu peux identifier ce site à nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification removed. You can identify this site again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification retirée. Tu peux identifier ce site à nouveau."
+          }
+        }
+      }
+    },
+    "SQFormal|Identification retirée. Tu peux identifier ce site à nouveau." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identification retirée. Vous pouvez identifier ce site à nouveau."
+          }
+        }
+      },
+      "shouldTranslate" : false
     },
     "Identification supprimée" : {
       "extractionState" : "stale",

@@ -509,6 +509,15 @@ final class RadioLogsViewModel: ObservableObject {
         loadSiteName(for: site)
     }
 
+    /// L'identification vient d'être retirée ou supprimée depuis « Corriger » : le site
+    /// redevient à identifier, ici et dans le cache.
+    func markWithdrawn(_ site: RadioLogSite) {
+        states[site.id] = .unidentified
+        service.markWithdrawn(siteKey: site.id)
+        siteNames[site.id] = nil
+        rebuild()
+    }
+
     // MARK: Purge
 
     func purge() async {

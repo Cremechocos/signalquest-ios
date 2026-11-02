@@ -18,6 +18,8 @@ protocol RadioLogsServicing: Sendable {
     /// Persiste une identification faite par l'utilisateur, pour qu'elle survive au retour sur
     /// l'écran — le balayage n'en sait rien tant qu'il n'a pas retourné ce site.
     func markIdentified(siteKey: String, siteId: String)
+    /// L'identification vient d'être retirée ou supprimée : le site est de nouveau à identifier.
+    func markWithdrawn(siteKey: String)
     /// Balaie le catalogue par fenêtres, en émettant chaque fenêtre résolue.
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]>
     /// Hypothèse de site pour UN site non identifié — charge complète, position
@@ -287,6 +289,10 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// tient son `siteId`), et le prochain scan ne ferait que reconfirmer ce qu'on sait.
     func markIdentified(siteKey: String, siteId: String) {
         statusStore.merge([siteKey: .identified(siteId: siteId)], nowMs: nowMs())
+    }
+
+    func markWithdrawn(siteKey: String) {
+        statusStore.merge([siteKey: .unidentified], nowMs: nowMs())
     }
 
     /// Balaie les sites par fenêtres concurrentes bornées.

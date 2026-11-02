@@ -763,8 +763,9 @@ private struct IdentificationCellRow: View {
     }
 }
 
-/// Fiche détaillée d'une identification : tous les identifiants radio + retrait.
-private struct IdentificationDetailSheet: View {
+/// Fiche détaillée d'une identification : tous les identifiants radio + retrait. Ouverte
+/// depuis la liste, ou juste après une identification pour la corriger sur place.
+struct IdentificationDetailSheet: View {
     let item: MyIdentification
     /// Contrôles de la liste : un contrôle indisponible ne vaut jamais « rien à signaler ».
     let checks: IdentificationChecks
@@ -774,6 +775,13 @@ private struct IdentificationDetailSheet: View {
     var onChanged: () -> Void = {}
     /// Le consensus a bougé : la liste se recharge, la fiche reste ouverte avec le message.
     var onStale: () -> Void = {}
+    /// Le nœud a été déplacé : le support où il se trouve désormais.
+    var onMoved: (String) -> Void = { _ in }
+    /// Cellules du nœud, quand la fiche s'ouvre sans la liste (après une identification) :
+    /// leur secteur se corrige d'ici. Vide depuis la liste, où chaque cellule a sa ligne.
+    var cells: [MyIdentification] = []
+    /// Retrait ou suppression refusés, quand la fiche reste ouverte pour le dire.
+    var actionError: String?
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -781,6 +789,8 @@ private struct IdentificationDetailSheet: View {
     @State private var confirmingDelete = false
     @State private var showRemap = false
     @State private var showSector = false
+    /// Cellule du nœud dont on corrige le secteur (voir `cells`).
+    @State private var sectorCell: MyIdentification?
     /// Secteur proposé à l'ouverture de « Corriger le secteur » (écart de règle).
     @State private var sectorPrefill: Int?
     @State private var adoptBusy = false
@@ -803,6 +813,10 @@ private struct IdentificationDetailSheet: View {
                 signalsSection
                 detailsCard
                 editSection
+                if let actionError {
+                    SQNotice(message: actionError, tone: .danger)
+                        .accessibilityIdentifier("identification.actionError")
+                }
                 withdrawBlock
                 dangerZone
             }
@@ -816,6 +830,14 @@ private struct IdentificationDetailSheet: View {
                 identify: services.identify,
                 location: services.location,
                 markets: services.markets,
+                onDone: { siteId in onMoved(siteId); onChanged(); dismiss() }
+            )
+        }
+        .sheet(item: $sectorCell) { cell in
+            SectorEditSheet(
+                item: cell,
+                antennas: services.antennas,
+                identify: services.identify,
                 onDone: { onChanged(); dismiss() }
             )
         }
@@ -858,21 +880,10 @@ private struct IdentificationDetailSheet: View {
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
-                    Button {
-                        Haptics.medium()
+                    // Halo ne remplit jamais un bouton de carmin : pilule carte et filet.
+                    GradientButton("Adopter ce site", systemImage: "checkmark.seal", isBusy: adoptBusy, style: .secondary) {
                         Task { await adoptConsensus(toSiteId: consensusId) }
-                    } label: {
-                        HStack(spacing: SQSpace.xs2) {
-                            if adoptBusy { SQSpinner().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
-                            Text("Adopter ce site").font(SQFont.body(13, .semibold))
-                        }
-                        .padding(.horizontal, SQSpace.md)
-                        .frame(minHeight: 44)
-                        .foregroundStyle(SQColor.onAccent)
-                        .background(SQColor.brandRed, in: Capsule(style: .continuous))
                     }
-                    .buttonStyle(SQPressButtonStyle())
-                    .disabled(adoptBusy)
                     .accessibilityIdentifier("identification.adopt")
                     if let adoptError {
                         Text(adoptError).font(SQType.micro).foregroundStyle(SQColor.dangerInk)
@@ -886,7 +897,7 @@ private struct IdentificationDetailSheet: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqNoticeBackground(SQColor.warningSoft)
         .accessibilityIdentifier("identification.conflict")
     }
 
@@ -909,12 +920,13 @@ private struct IdentificationDetailSheet: View {
                 fromSiteId: item.siteId, toSiteId: toSiteId,
                 enb: item.enb, gnb: item.gnb
             )
-            if result.success || result.moved > 0 || result.noop {
+            if result.changed {
                 Haptics.success()
+                onMoved(result.toSiteId ?? toSiteId)
                 onChanged()
                 dismiss()
             } else {
-                adoptError = String(localized: "Adoption non appliquée.")
+                adoptError = result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Adoption non appliquée.")
                 Haptics.error()
             }
         } catch APIError.http(409, "CONSENSUS_TARGET_CHANGED"?, _, _, _) {
@@ -962,19 +974,11 @@ private struct IdentificationDetailSheet: View {
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.label)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Button {
+                            GradientButton("Corriger le secteur", style: .secondary) {
                                 // Prérempli avec la règle ; le membre reste libre de choisir autre chose.
                                 sectorPrefill = expected
                                 showSector = true
-                            } label: {
-                                Text("Corriger le secteur")
-                                    .font(SQFont.body(13, .semibold, relativeTo: .caption))
-                                    .padding(.horizontal, SQSpace.md)
-                                    .frame(minHeight: 44)
-                                    .foregroundStyle(SQColor.onAccent)
-                                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
                             }
-                            .buttonStyle(SQPressButtonStyle())
                             .accessibilityIdentifier("identification.sectorMismatch")
                         }
                     }
@@ -982,7 +986,7 @@ private struct IdentificationDetailSheet: View {
             }
             .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .sqNoticeBackground(SQColor.warningSoft)
             .accessibilityIdentifier("identification.signals")
         }
     }
@@ -1047,14 +1051,14 @@ private struct IdentificationDetailSheet: View {
 
     @ViewBuilder
     private var editSection: some View {
-        if canRemapSite || canEditSector {
+        if canRemapSite || canEditSector || !sectorCells.isEmpty {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Text("Corriger").sqKicker().accessibilityAddTraits(.isHeader)
                 VStack(spacing: 0) {
                     if canRemapSite {
                         editRow(
                             title: "Corriger le site",
-                            subtitle: "Choisir le bon site sur la carte",
+                            subtitle: Text("Choisir le bon site sur la carte"),
                             icon: "mappin.and.ellipse",
                             identifier: "identification.remap"
                         ) { showRemap = true }
@@ -1065,10 +1069,19 @@ private struct IdentificationDetailSheet: View {
                     if canEditSector {
                         editRow(
                             title: "Corriger le secteur",
-                            subtitle: "Toucher le bon secteur sur le radar",
+                            subtitle: Text("Toucher le bon secteur sur le radar"),
                             icon: "dot.radiowaves.right",
                             identifier: "identification.sector"
                         ) { sectorPrefill = nil; showSector = true }
+                    }
+                    ForEach(sectorCells) { cell in
+                        Divider().overlay(SQColor.separator).padding(.leading, 64)
+                        editRow(
+                            title: "Corriger le secteur",
+                            subtitle: Text(verbatim: cell.nodeLabel),
+                            icon: "dot.radiowaves.right",
+                            identifier: "identification.sector.\(cell.id)"
+                        ) { sectorCell = cell }
                     }
                 }
                 .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
@@ -1076,14 +1089,19 @@ private struct IdentificationDetailSheet: View {
         }
     }
 
-    private func editRow(title: LocalizedStringKey, subtitle: LocalizedStringKey, icon: String,
+    /// Cellules du nœud dont le secteur se corrige depuis cette fiche (voir `cells`).
+    private var sectorCells: [MyIdentification] {
+        isNode ? cells.filter { $0.kind == .pci || $0.kind == .cellid } : []
+    }
+
+    private func editRow(title: LocalizedStringKey, subtitle: Text, icon: String,
                          identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SQSpace.md) {
-                SQIconPastille(systemImage: icon, size: 36, tint: SQColor.accentInk, fill: SQColor.accentSoft)
+                IdentificationIconTile(systemImage: icon)
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                    Text(title).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)
-                    Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
+                    Text(title).font(SQType.subhead(.semibold)).foregroundStyle(SQColor.label)
+                    subtitle.font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -1195,13 +1213,13 @@ private struct IdentificationDetailSheet: View {
                 confirmingDelete = true
             } label: {
                 HStack(spacing: SQSpace.md) {
-                    SQIconPastille(systemImage: "trash.slash", size: 36, tint: SQColor.dangerInk, fill: SQColor.danger.opacity(0.12))
+                    IdentificationIconTile(systemImage: "trash.slash", tint: SQColor.dangerInk, fill: SQColor.dangerSoft)
                     VStack(alignment: .leading, spacing: SQSpace.xxs) {
                         Text("Supprimer définitivement")
-                            .font(SQFont.body(15, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .foregroundStyle(SQColor.dangerInk)
                         Text("Irréversible. Les cellules confirmées par d’autres sont seulement retirées.")
-                            .font(SQType.micro)
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1225,5 +1243,33 @@ private struct IdentificationDetailSheet: View {
             }
         }
         .padding(.top, SQSpace.md)
+    }
+}
+
+/// Tuile d'icône d'une rangée Halo (`ListRow`) : 38 pt, coins de tuile, icône à l'encre
+/// secondaire sur la puce ; le carmin reste à l'identité et à la sélection.
+private struct IdentificationIconTile: View {
+    let systemImage: String
+    var tint: Color = SQColor.ink2
+    var fill: Color = SQColor.chip
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(SQFont.body(16, .semibold, relativeTo: .body))
+            .foregroundStyle(tint)
+            .frame(width: 38, height: 38)
+            .background(fill, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+private extension View {
+    /// Fond d'un encadré Halo (`Notice`) : 14 pt de coins, ton doux, filet en « Noir intense ».
+    func sqNoticeBackground(_ fill: Color) -> some View {
+        background(fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+            }
     }
 }

@@ -1140,6 +1140,7 @@ private struct StubRadioLogsService: RadioLogsServicing {
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]> { AsyncStream { $0.finish() } }
     func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? { nil }
     func markIdentified(siteKey: String, siteId: String) {}
+    func markWithdrawn(siteKey: String) {}
     func purge() async throws {}
     func clearLocalCache() {}
 }

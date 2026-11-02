@@ -220,6 +220,7 @@
 		3AE2A1D61D1D7996E56BC9CF /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755436C239643387D984492 /* LocationService.swift */; };
 		3AE8F8F6C26BF8C83E847DDA /* CallEpochChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5941927D1B65E89840417BE /* CallEpochChangeTests.swift */; };
 		3B35AD691B8C4B53BD19DC6F /* AntennaReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */; };
+		3B80055E57054126DBF494F8 /* IdentificationCorrectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DFFD66CB6D9266855E500B0 /* IdentificationCorrectionSheet.swift */; };
 		3BEB5F8563CC68FDDA890B7B /* CallUnlockPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C397B40A4E067792C1A88A /* CallUnlockPrompt.swift */; };
 		3C74CE44243B57CF33545AAD /* UnifiedHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5FD17A6A7BA851109888F9 /* UnifiedHistoryTests.swift */; };
 		3CBA7D1E7B974E193635CC61 /* E2EEAutoNewDeviceAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B67566C7F2560694C68F6A /* E2EEAutoNewDeviceAlertView.swift */; };
@@ -1368,6 +1369,7 @@
 		6D9D541BEF00A9C73ECDCC19 /* VersionPolicyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionPolicyService.swift; sourceTree = "<group>"; };
 		6DA29CF4FE66121B9C7C8ECC /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		6DB848EAD86B221515305F77 /* MapTilePlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTilePlanner.swift; sourceTree = "<group>"; };
+		6DFFD66CB6D9266855E500B0 /* IdentificationCorrectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentificationCorrectionSheet.swift; sourceTree = "<group>"; };
 		6E03409117483C26347387EE /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		6E0D04BA1DF4DD1BC2D566A3 /* MapOutageFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapOutageFilterTests.swift; sourceTree = "<group>"; };
 		6E309C5B2B935EA2E5944068 /* SignupConsentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupConsentTests.swift; sourceTree = "<group>"; };
@@ -2628,6 +2630,7 @@
 		947CDFB421A69E616D1D4C36 /* Identifications */ = {
 			isa = PBXGroup;
 			children = (
+				6DFFD66CB6D9266855E500B0 /* IdentificationCorrectionSheet.swift */,
 				7B3358D3E2CFEC772D02F2D2 /* MyIdentificationsView.swift */,
 				18C58605C20828352068B1EE /* SectorEditSheet.swift */,
 				3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */,
@@ -3976,6 +3979,7 @@
 				2652E7DB8E184DD3896C42AB /* HiddenStoryAuthorsStore.swift in Sources */,
 				45E031C6AB7C6A13B13FCE19 /* ICMPPinger.swift in Sources */,
 				7B2E163A3536AB5845B515FC /* IPerfCatalogService.swift in Sources */,
+				3B80055E57054126DBF494F8 /* IdentificationCorrectionSheet.swift in Sources */,
 				572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */,
 				7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */,
 				B34CAE48D657CA2E1045EDD2 /* JSONValue.swift in Sources */,
