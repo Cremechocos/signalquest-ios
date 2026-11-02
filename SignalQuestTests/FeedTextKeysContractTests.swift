@@ -1,8 +1,8 @@
 import XCTest
 @testable import SignalQuest
 
-/// Textes traduisibles du fil : les vecteurs du contrat `feed-text-keys` v1
-/// (copie à l'octet de `contracts/feed-text-keys/v1.json`, 32995cd9e), rejoués
+/// Textes traduisibles du fil : les vecteurs du contrat `feed-text-keys` v2
+/// (copie à l'octet de `contracts/feed-text-keys/v2.json`, 8a274a7d1, #845 servie le 02/11), rejoués
 /// contre `FeedTextKey` et le décodage des posts (lot F, F8).
 final class FeedTextKeysContractTests: XCTestCase {
 
@@ -24,20 +24,26 @@ final class FeedTextKeysContractTests: XCTestCase {
             let input: Input
             let expect: Expect
         }
+        struct Rate: Decodable {
+            let downloadMbps: Double
+            let fr: String
+            let en: String
+        }
         let version: Int
         let keys: [Key]
         let cases: [Case]
+        let rates: [Rate]
     }
 
     private func vectors() throws -> Vectors {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let data = try Data(contentsOf: root.appendingPathComponent("contracts/feed-text-keys/v1.json"))
+        let data = try Data(contentsOf: root.appendingPathComponent("contracts/feed-text-keys/v2.json"))
         return try JSONDecoder().decode(Vectors.self, from: data)
     }
 
     func testCatalogMatchesTheContract() throws {
         let vectors = try vectors()
-        XCTAssertEqual(vectors.version, 1)
+        XCTAssertEqual(vectors.version, 2)
         XCTAssertEqual(vectors.keys.count, 36)
         XCTAssertEqual(Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0.args) }), FeedTextKey.contractArgs)
         // Règle 8 : une clé n'est jamais le préfixe d'une autre.
@@ -75,6 +81,21 @@ final class FeedTextKeysContractTests: XCTestCase {
                 XCTAssertTrue(text.contains(String(Int64(value))), "\(vector.name) : sans séparateur de milliers")
             }
         }
+    }
+
+    /// v2 : `downloadMbps` est rendu avec son unité par la règle commune des débits (`rules.rate`).
+    func testSpeedtestRateFollowsTheCommonRule() throws {
+        let rates = try vectors().rates
+        XCTAssertFalse(rates.isEmpty)
+        for rate in rates {
+            for (identifier, expected) in [("fr", rate.fr), ("en", rate.en)] {
+                XCTAssertEqual(SQUnits.throughput(mbps: rate.downloadMbps, locale: Locale(identifier: identifier)), expected,
+                               "\(rate.downloadMbps) \(identifier)")
+            }
+        }
+        let text = try XCTUnwrap(FeedTextKey(key: "feed.speedtest.done", args: ["downloadMbps": .number(87.34)])?.text)
+        XCTAssertTrue(text.contains("87\u{00A0}Mb/s"), text)
+        XCTAssertFalse(text.contains("Mbps"), text)
     }
 
     /// Ce que l'app refuse d'elle-même (règle 2) : la carte garde `text`.

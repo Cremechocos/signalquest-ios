@@ -1,16 +1,81 @@
 {
   "contract": "docs/feed-text-keys-contract.md",
-  "version": 1,
-  "frozen": "2026-10-26",
-  "note": "Gabarits fr et en : référence et proposition (§4) ; le pays de feed.netmonster.daily vient de countryCode. Entrée : colonnes du post (sourceType, marketCode), texte servi, metadata, et noms résolus par le serveur (place, badgeName, questTitle). Sortie : textKey/textArgs servis. Une sortie à null veut dire : afficher text.",
+  "version": 2,
+  "frozen": null,
+  "note": "Gabarits fr et en : référence et proposition (§4) ; le pays de feed.netmonster.daily vient de countryCode. Entrée : colonnes du post (sourceType, marketCode), texte servi, metadata, et noms résolus par le serveur (place, badgeName, questTitle). Sortie : textKey/textArgs servis. Une sortie à null veut dire : afficher text. v2 (02/11, décision d'Alexandre) : `downloadMbps` est rendu avec son unité par la règle commune des débits (`rules.rate`, vecteurs `rates`) ; les gabarits de feed.speedtest.done ne portent plus « Mbps ». Clés, arguments et cas inchangés.",
+  "rules": {
+    "rate": "L’app rend l’argument `downloadMbps` AVEC son unité ; le serveur l’envoie toujours en NOMBRE JSON brut dans `textArgs` (jamais une chaîne pré-formatée). Règle commune des débits : sous 9,95 Mb/s une décimale facultative (« 7 Mb/s », « 7,5 Mb/s », jamais « 7,0 Mb/s ») ; puis Mb/s entiers ; dès 999,5 Mb/s en Gb/s à trois décimales (« 1,722 Gb/s »), jamais « 1 000 Mb/s ». Demi vers le haut, sur la valeur en kb/s entiers (Math.round(mbps × 1000)), jamais sur le nombre à virgule flottante. Espace insécable U+00A0 entre le nombre et l’unité. Unité « Mb/s » / « Gb/s » dans toutes les langues."
+  },
+  "rates": [
+    {
+      "downloadMbps": 0.15,
+      "fr": "0,2 Mb/s",
+      "en": "0.2 Mb/s"
+    },
+    {
+      "downloadMbps": 7,
+      "fr": "7 Mb/s",
+      "en": "7 Mb/s"
+    },
+    {
+      "downloadMbps": 7.25,
+      "fr": "7,3 Mb/s",
+      "en": "7.3 Mb/s"
+    },
+    {
+      "downloadMbps": 7.5,
+      "fr": "7,5 Mb/s",
+      "en": "7.5 Mb/s"
+    },
+    {
+      "downloadMbps": 9.94,
+      "fr": "9,9 Mb/s",
+      "en": "9.9 Mb/s"
+    },
+    {
+      "downloadMbps": 9.95,
+      "fr": "10 Mb/s",
+      "en": "10 Mb/s"
+    },
+    {
+      "downloadMbps": 12.5,
+      "fr": "13 Mb/s",
+      "en": "13 Mb/s"
+    },
+    {
+      "downloadMbps": 87.34,
+      "fr": "87 Mb/s",
+      "en": "87 Mb/s"
+    },
+    {
+      "downloadMbps": 999.4,
+      "fr": "999 Mb/s",
+      "en": "999 Mb/s"
+    },
+    {
+      "downloadMbps": 999.5,
+      "fr": "1,000 Gb/s",
+      "en": "1.000 Gb/s"
+    },
+    {
+      "downloadMbps": 1722,
+      "fr": "1,722 Gb/s",
+      "en": "1.722 Gb/s"
+    },
+    {
+      "downloadMbps": 1722.5,
+      "fr": "1,723 Gb/s",
+      "en": "1.723 Gb/s"
+    }
+  ],
   "keys": [
     {
       "key": "feed.speedtest.done",
       "args": {
         "downloadMbps": "decimal"
       },
-      "fr": "Test de débit effectué ({downloadMbps} Mbps)",
-      "en": "Speed test done ({downloadMbps} Mbps)"
+      "fr": "Test de débit effectué ({downloadMbps})",
+      "en": "Speed test done ({downloadMbps})"
     },
     {
       "key": "feed.speedtest.done_no_speed",
