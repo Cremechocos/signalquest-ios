@@ -625,7 +625,7 @@ private struct GenerationTile: View {
 
 /// Pastille de signal (« Conflit », « Contesté »…) : point de couleur et mot,
 /// comme les statuts du lot.
-private struct SignalPill: View {
+struct SignalPill: View {
     let text: LocalizedStringKey
 
     var body: some View {
@@ -763,9 +763,8 @@ private struct IdentificationCellRow: View {
     }
 }
 
-/// Fiche détaillée d'une identification : tous les identifiants radio + retrait. Ouverte
-/// depuis la liste, ou juste après une identification pour la corriger sur place.
-struct IdentificationDetailSheet: View {
+/// Fiche détaillée d'une identification : tous les identifiants radio + retrait.
+private struct IdentificationDetailSheet: View {
     let item: MyIdentification
     /// Contrôles de la liste : un contrôle indisponible ne vaut jamais « rien à signaler ».
     let checks: IdentificationChecks
@@ -775,22 +774,12 @@ struct IdentificationDetailSheet: View {
     var onChanged: () -> Void = {}
     /// Le consensus a bougé : la liste se recharge, la fiche reste ouverte avec le message.
     var onStale: () -> Void = {}
-    /// Le nœud a été déplacé : le support où il se trouve désormais.
-    var onMoved: (String) -> Void = { _ in }
-    /// Cellules du nœud, quand la fiche s'ouvre sans la liste (après une identification) :
-    /// leur secteur se corrige d'ici. Vide depuis la liste, où chaque cellule a sa ligne.
-    var cells: [MyIdentification] = []
-    /// Retrait ou suppression refusés, quand la fiche reste ouverte pour le dire.
-    var actionError: String?
-
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingWithdraw = false
     @State private var confirmingDelete = false
     @State private var showRemap = false
     @State private var showSector = false
-    /// Cellule du nœud dont on corrige le secteur (voir `cells`).
-    @State private var sectorCell: MyIdentification?
     /// Secteur proposé à l'ouverture de « Corriger le secteur » (écart de règle).
     @State private var sectorPrefill: Int?
     @State private var adoptBusy = false
@@ -813,10 +802,6 @@ struct IdentificationDetailSheet: View {
                 signalsSection
                 detailsCard
                 editSection
-                if let actionError {
-                    SQNotice(message: actionError, tone: .danger)
-                        .accessibilityIdentifier("identification.actionError")
-                }
                 withdrawBlock
                 dangerZone
             }
@@ -830,15 +815,7 @@ struct IdentificationDetailSheet: View {
                 identify: services.identify,
                 location: services.location,
                 markets: services.markets,
-                onDone: { siteId in onMoved(siteId); onChanged(); dismiss() }
-            )
-        }
-        .sheet(item: $sectorCell) { cell in
-            SectorEditSheet(
-                item: cell,
-                antennas: services.antennas,
-                identify: services.identify,
-                onDone: { onChanged(); dismiss() }
+                onDone: { _ in onChanged(); dismiss() }
             )
         }
         .sheet(isPresented: $showSector) {
@@ -922,7 +899,6 @@ struct IdentificationDetailSheet: View {
             )
             if result.changed {
                 Haptics.success()
-                onMoved(result.toSiteId ?? toSiteId)
                 onChanged()
                 dismiss()
             } else {
@@ -1051,14 +1027,14 @@ struct IdentificationDetailSheet: View {
 
     @ViewBuilder
     private var editSection: some View {
-        if canRemapSite || canEditSector || !sectorCells.isEmpty {
+        if canRemapSite || canEditSector {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Text("Corriger").sqKicker().accessibilityAddTraits(.isHeader)
                 VStack(spacing: 0) {
                     if canRemapSite {
                         editRow(
                             title: "Corriger le site",
-                            subtitle: Text("Choisir le bon site sur la carte"),
+                            subtitle: "Choisir le bon site sur la carte",
                             icon: "mappin.and.ellipse",
                             identifier: "identification.remap"
                         ) { showRemap = true }
@@ -1069,19 +1045,10 @@ struct IdentificationDetailSheet: View {
                     if canEditSector {
                         editRow(
                             title: "Corriger le secteur",
-                            subtitle: Text("Toucher le bon secteur sur le radar"),
+                            subtitle: "Toucher le bon secteur sur le radar",
                             icon: "dot.radiowaves.right",
                             identifier: "identification.sector"
                         ) { sectorPrefill = nil; showSector = true }
-                    }
-                    ForEach(sectorCells) { cell in
-                        Divider().overlay(SQColor.separator).padding(.leading, 64)
-                        editRow(
-                            title: "Corriger le secteur",
-                            subtitle: Text(verbatim: cell.nodeLabel),
-                            icon: "dot.radiowaves.right",
-                            identifier: "identification.sector.\(cell.id)"
-                        ) { sectorCell = cell }
                     }
                 }
                 .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
@@ -1089,19 +1056,14 @@ struct IdentificationDetailSheet: View {
         }
     }
 
-    /// Cellules du nœud dont le secteur se corrige depuis cette fiche (voir `cells`).
-    private var sectorCells: [MyIdentification] {
-        isNode ? cells.filter { $0.kind == .pci || $0.kind == .cellid } : []
-    }
-
-    private func editRow(title: LocalizedStringKey, subtitle: Text, icon: String,
+    private func editRow(title: LocalizedStringKey, subtitle: LocalizedStringKey, icon: String,
                          identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SQSpace.md) {
                 IdentificationIconTile(systemImage: icon)
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     Text(title).font(SQType.subhead(.semibold)).foregroundStyle(SQColor.label)
-                    subtitle.font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                    Text(subtitle).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")

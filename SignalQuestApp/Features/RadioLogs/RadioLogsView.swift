@@ -105,7 +105,8 @@ struct RadioLogsView: View {
                             isExpanded: model.expandedSiteId == site.id,
                             onIdentify: { identifyTarget = site },
                             onOpenMap: { mapTarget = site },
-                            onToggleCells: { model.toggleExpansion(site) }
+                            onToggleCells: { model.toggleExpansion(site) },
+                            onCorrect: model.isMine(site) ? { identifyTarget = site } : nil
                         )
                         .listRowBackground(SQColor.surface)
                         .listRowSeparatorTint(SQColor.separator)
@@ -135,8 +136,16 @@ struct RadioLogsView: View {
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()
-        .refreshable { await model.refresh() }
-        .task { await model.onAppear() }
+        .refreshable {
+            async let mine: Void = model.loadMine(identify: services.identify)
+            await model.refresh()
+            await mine
+        }
+        .task {
+            async let mine: Void = model.loadMine(identify: services.identify)
+            await model.onAppear()
+            await mine
+        }
         .onDisappear { model.stopScan() }
         .sheet(isPresented: $showsPremiumPaywall, onDismiss: {
             // Un achat abouti change le droit côté serveur : resynchroniser. Un simple
@@ -159,13 +168,14 @@ struct RadioLogsView: View {
                 identify: services.identify,
                 antennas: services.antennas,
                 customSites: services.customSites,
+                identifiedSiteId: model.isMine(site) ? model.state(of: site).siteId : nil,
                 onIdentified: { siteId in
                     model.markIdentified(site, siteId: siteId)
                     model.toast = String(localized: "Site identifié.")
                 },
-                onWithdrawn: {
+                onWithdrawn: { note in
                     model.markWithdrawn(site)
-                    model.toast = String(localized: "Identification retirée")
+                    model.toast = note
                 }
             )
         }

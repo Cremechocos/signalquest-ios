@@ -66,6 +66,10 @@ final class RadioLogsViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var premiumMessage: String?
     @Published var toast: String?
+    /// Nœuds identifiés par le membre, « eNB|81234|2283456 » : leur ligne propose « Corriger ».
+    /// Une lecture ratée garde l'ensemble précédent, jamais un ensemble vide qui ferait
+    /// disparaître le bouton de toutes les lignes.
+    @Published private(set) var myNodeKeys: Set<String> = []
 
     @Published var filter: Filter = .all { didSet { rebuild() } }
     @Published var sortOrder: SortOrder = .relevance { didSet { rebuild() } }
@@ -494,12 +498,57 @@ final class RadioLogsViewModel: ObservableObject {
         Haptics.selection()
     }
 
+    // MARK: Identifications du membre
+
+    /// Pages de 200 nœuds lues au plus : au-delà, les lignes les plus anciennes n'ont pas
+    /// « Corriger » sur cet écran, mais restent corrigeables dans « Mes identifications ».
+    static let maxMinePages = 25
+
+    func loadMine(identify: IdentifyServicing) async {
+        var items: [MyIdentification] = []
+        var cursor: String?
+        do {
+            for _ in 0..<Self.maxMinePages {
+                let page = try await identify.minePage(cursor: cursor, conflictOnly: false, includeRelated: false, limit: 200)
+                items += page.identifications
+                guard let next = page.nextCursor else { break }
+                cursor = next
+            }
+        } catch {
+            return
+        }
+        myNodeKeys = Self.nodeKeys(items)
+    }
+
+    nonisolated static func nodeKeys(_ items: [MyIdentification]) -> Set<String> {
+        Set(items.compactMap { item in
+            switch item.kind {
+            case .enb: return item.enb.map { nodeKey(kind: .enb, node: $0, siteId: item.siteId) }
+            case .gnb: return item.gnb.map { nodeKey(kind: .gnb, node: $0, siteId: item.siteId) }
+            default: return nil
+            }
+        })
+    }
+
+    nonisolated static func nodeKey(kind: RadioLogNodeKind, node: String, siteId: String) -> String {
+        "\(kind.rawValue)|\(node)|\(siteId)"
+    }
+
+    /// Le site est identifié, et c'est le membre qui l'a fait.
+    func isMine(_ site: RadioLogSite) -> Bool {
+        guard let siteId = state(of: site).siteId else { return false }
+        return myNodeKeys.contains(Self.nodeKey(kind: site.kind, node: site.node, siteId: siteId))
+    }
+
     // MARK: Suites d'une identification
 
     /// Une identification vient d'aboutir : on marque le site sans attendre le
     /// prochain balayage. C'est un fait établi par le serveur, pas une supposition.
     func markIdentified(_ site: RadioLogSite, siteId: String) {
         states[site.id] = .identified(siteId: siteId)
+        // Déplacé : l'ancienne clé ne vaut plus. Le nœud n'a qu'un support par membre.
+        myNodeKeys = myNodeKeys.filter { !$0.hasPrefix("\(site.kind.rawValue)|\(site.node)|") }
+        myNodeKeys.insert(Self.nodeKey(kind: site.kind, node: site.node, siteId: siteId))
         // ⚠️ ET DANS LE CACHE, sinon le statut ne vit qu'en mémoire : `states` est rechargé
         // depuis `cachedSiteStates()` au retour sur l'écran, et le site repassait « Non
         // identifié » — alors que le serveur avait bien accepté l'écriture.
@@ -513,6 +562,7 @@ final class RadioLogsViewModel: ObservableObject {
     /// redevient à identifier, ici et dans le cache.
     func markWithdrawn(_ site: RadioLogSite) {
         states[site.id] = .unidentified
+        myNodeKeys = myNodeKeys.filter { !$0.hasPrefix("\(site.kind.rawValue)|\(site.node)|") }
         service.markWithdrawn(siteKey: site.id)
         siteNames[site.id] = nil
         rebuild()

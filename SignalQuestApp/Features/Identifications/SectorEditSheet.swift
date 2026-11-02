@@ -3,6 +3,9 @@ import SwiftUI
 @MainActor
 final class SectorEditViewModel: ObservableObject {
     @Published var azimuths: [Double] = []
+    /// Support sans schéma possible (au plus un azimut connu) : les secteurs se choisissent dans
+    /// une liste de `listCount` lignes, trois par défaut. 0 = le radar.
+    @Published private(set) var listCount = 0
     @Published var selectedIndex: Int?
     @Published var isLoading = false
     @Published var isSubmitting = false
@@ -12,18 +15,73 @@ final class SectorEditViewModel: ObservableObject {
     /// Secteur enregistré mais feuille gardée ouverte, le temps de lire la référence du serveur.
     @Published private(set) var savedAwaitingClose = false
 
-    let item: MyIdentification
+    /// Cellule dont on corrige le secteur : celle observée à l'ouverture, puis celle choisie.
+    @Published private(set) var item: MyIdentification
+    /// Les cellules du nœud, quand il en a plusieurs : on change de cellule sans quitter la feuille.
+    let cells: [MyIdentification]
     /// Secteur proposé par la règle de l'opérateur (`sectorCheck.expected`), dans la
     /// numérotation stockée ; présélectionné à la place du secteur enregistré.
     let prefilledSector: Int?
+    /// `checks.sectorCheck` de la liste : contrôle indisponible, aucune référence du PCI n'est montrée.
+    let trustsSectorCheck: Bool
     private let antennas: AntennasServicing
     private let identify: IdentifyServicing
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, prefilledSector: Int? = nil) {
+    init(item: MyIdentification, cells: [MyIdentification] = [], antennas: AntennasServicing, identify: IdentifyServicing,
+         prefilledSector: Int? = nil, trustsSectorCheck: Bool = true) {
         self.item = item
+        self.cells = cells.count > 1 ? cells : []
         self.prefilledSector = prefilledSector
+        self.trustsSectorCheck = trustsSectorCheck
         self.antennas = antennas
         self.identify = identify
+    }
+
+    /// Secteur que la règle de l'opérateur déduit du PCI, s'il diffère de celui enregistré.
+    var referenceIndex: Int? {
+        guard trustsSectorCheck, item.sectorCheck?.status == .mismatch, let expected = item.sectorCheck?.expected else { return nil }
+        return storedIndex(expected)
+    }
+
+    /// Le secteur enregistré concorde avec le PCI, et c'est lui qui est choisi.
+    var selectionMatchesPci: Bool {
+        guard trustsSectorCheck, item.sectorCheck?.status == .match, let stored = item.sectors.first else { return false }
+        return selectedIndex != nil && selectedIndex == storedIndex(stored)
+    }
+
+    /// Le choix se fait dans une liste plutôt que sur le radar.
+    var usesList: Bool { listCount > 0 }
+    /// Secteurs proposés : les azimuts du radar, ou les lignes de la liste.
+    var slotCount: Int { usesList ? listCount : azimuths.count }
+    static let defaultListCount = 3
+    static let maxListCount = 12
+
+    private func storedIndex(_ value: Int) -> Int? {
+        SectorNumbering.index(forStoredValue: value, azimuthCount: slotCount, mccMnc: mccMnc, operatorName: item.operatorName)
+    }
+
+    /// « Ajouter un secteur » : la ligne suivante, dans la même convention d'opérateur.
+    func addListSlot() {
+        listCount = min(listCount + 1, Self.maxListCount)
+    }
+
+    /// Assez de lignes pour montrer le secteur enregistré et celui du PCI.
+    private func ensureListCovers(_ values: [Int]) {
+        for value in values {
+            if let index = SectorNumbering.index(forStoredValue: value, azimuthCount: Self.maxListCount,
+                                                 mccMnc: mccMnc, operatorName: item.operatorName) {
+                listCount = max(listCount, index + 1)
+            }
+        }
+    }
+
+    func select(cell: MyIdentification) {
+        guard cell.id != item.id else { return }
+        item = cell
+        errorMessage = nil
+        infoMessage = nil
+        if usesList { ensureListCovers(cell.sectors + [cell.sectorCheck?.expected].compactMap { $0 }) }
+        selectedIndex = cell.sectors.first.flatMap(storedIndex)
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
@@ -42,26 +100,30 @@ final class SectorEditViewModel: ObservableObject {
             errorMessage = String(localized: "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement.")
             return
         }
-        guard let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
-              let core = details.core else {
+        let details: AntennaDetails
+        do {
+            details = try await antennas.details(id: item.siteId, market: market, operatorName: operatorName)
+        } catch {
             errorMessage = String(localized: "Impossible de charger les secteurs de ce site.")
             return
         }
         // Azimuts dédupliqués/triés : porteuses radio si dispo, sinon azimuts bruts.
-        let carrierAzimuths = core.radioCarriers.compactMap { $0.sectorAzimuthDeg }
-        let raw = carrierAzimuths.isEmpty ? core.azimuts : carrierAzimuths
+        let carrierAzimuths = details.core?.radioCarriers.compactMap { $0.sectorAzimuthDeg } ?? []
+        let raw = carrierAzimuths.isEmpty ? details.core?.azimuts ?? [] : carrierAzimuths
         let unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
             .sorted()
-        azimuths = unique
+        // Support communautaire ou personnalisé, au plus un azimut : pas de schéma possible,
+        // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0).
+        if unique.count <= 1 {
+            listCount = Self.defaultListCount
+            ensureListCovers(item.sectors + [prefilledSector, item.sectorCheck?.expected].compactMap { $0 })
+        } else {
+            azimuths = unique
+        }
         // Pré-sélection sur le secteur proposé par la règle, sinon sur celui enregistré, selon la convention de
         // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
         if let first = prefilledSector ?? item.sectors.first {
-            selectedIndex = SectorNumbering.index(
-                forStoredValue: first, azimuthCount: unique.count, mccMnc: mccMnc, operatorName: item.operatorName
-            )
-        }
-        if unique.isEmpty {
-            errorMessage = String(localized: "Ce site n'expose pas d'azimuts de secteur.")
+            selectedIndex = storedIndex(first)
         }
     }
 
@@ -71,7 +133,7 @@ final class SectorEditViewModel: ObservableObject {
     }
 
     func submit() async {
-        guard let selectedIndex, selectedIndex < azimuths.count else { return }
+        guard let selectedIndex, selectedIndex < slotCount else { return }
         // SECTOR-TELECOM-01 : valeur soumise dans la convention de l'opérateur
         // (un `index + 1` naïf écrivait une valeur fausse pour SFR).
         let sectorNumber = SectorNumbering.submissionValue(index: selectedIndex, mccMnc: mccMnc, operatorName: item.operatorName)
@@ -91,8 +153,9 @@ final class SectorEditViewModel: ObservableObject {
             if result.changed {
                 Haptics.success()
                 // Le serveur renvoie le secteur déduit du PCI comme référence : s'il diffère
-                // du choix enregistré, on le montre avant de fermer.
-                if !result.derived.isEmpty, result.derived != [sectorNumber] {
+                // du choix enregistré, on le montre avant de fermer. Jamais une seconde fois
+                // quand la référence était déjà sur le radar.
+                if referenceIndex == nil, !result.derived.isEmpty, result.derived != [sectorNumber] {
                     let derived = result.derived.map(String.init).joined(separator: ", ")
                     infoMessage = String(localized: "Secteur déduit du PCI : \(derived)")
                     savedAwaitingClose = true
@@ -118,12 +181,16 @@ final class SectorEditViewModel: ObservableObject {
 struct SectorEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: SectorEditViewModel
+    /// « Pas le bon support ? » : la feuille se ferme sur le choix du support sur la carte.
+    let onMove: (() -> Void)?
     let onDone: () -> Void
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing,
-         prefilledSector: Int? = nil, onDone: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: SectorEditViewModel(item: item, antennas: antennas, identify: identify,
-                                                               prefilledSector: prefilledSector))
+    init(item: MyIdentification, cells: [MyIdentification] = [], antennas: AntennasServicing, identify: IdentifyServicing,
+         prefilledSector: Int? = nil, trustsSectorCheck: Bool = true,
+         onMove: (() -> Void)? = nil, onDone: @escaping () -> Void) {
+        _model = StateObject(wrappedValue: SectorEditViewModel(item: item, cells: cells, antennas: antennas, identify: identify,
+                                                               prefilledSector: prefilledSector, trustsSectorCheck: trustsSectorCheck))
+        self.onMove = onMove
         self.onDone = onDone
     }
 
@@ -136,18 +203,26 @@ struct SectorEditSheet: View {
                     closeIdentifier: "sector.cancel"
                 ) { dismiss() }
 
+                if !model.cells.isEmpty {
+                    cellPicker
+                }
+
                 if model.isLoading {
                     SQSpinner().tint(SQColor.brandRed).frame(height: 260)
+                } else if model.usesList {
+                    sectorList
+                    pciReference
                 } else if model.azimuths.isEmpty {
                     EmptyStateView(
                         title: "Aucun secteur",
-                        message: model.errorMessage ?? "Ce site n'expose pas d'azimuts.",
+                        message: model.errorMessage ?? "Impossible de charger les secteurs de ce site.",
                         systemImage: "dot.radiowaves.right"
                     )
                 } else {
                     SelectableSectorRadar(
                         azimuths: model.azimuths,
                         selectedIndex: $model.selectedIndex,
+                        referenceIndex: model.referenceIndex,
                         displayNumber: { model.sectorLabel(forIndex: $0) }
                     )
                     .frame(width: 260, height: 260)
@@ -155,6 +230,7 @@ struct SectorEditSheet: View {
                     .accessibilityIdentifier("sector.radar")
 
                     selectionPill
+                    pciReference
                 }
 
                 if let info = model.infoMessage {
@@ -173,12 +249,16 @@ struct SectorEditSheet: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("sector.info")
                 }
-                if let error = model.errorMessage, !model.azimuths.isEmpty {
+                if let error = model.errorMessage, model.slotCount > 0 {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption).foregroundStyle(OutageTint.degradedInk)
                 }
 
                 saveButton
+
+                if let onMove, !model.savedAwaitingClose {
+                    moveLink(onMove)
+                }
             }
             .padding(SQSpace.lg)
         }
@@ -198,7 +278,9 @@ struct SectorEditSheet: View {
     /// « Secteur 2 · 120° » : le numéro suit la convention de l'opérateur.
     @ViewBuilder
     private var selectionPill: some View {
-        if let index = model.selectedIndex, index < model.azimuths.count {
+        if model.usesList {
+            EmptyView()
+        } else if let index = model.selectedIndex, index < model.azimuths.count {
             HStack(spacing: SQSpace.xs) {
                 Image(systemName: "dot.radiowaves.right").accessibilityHidden(true)
                 Text("Secteur \(model.sectorLabel(forIndex: index)) · \(Int(model.azimuths[index].rounded()))°")
@@ -217,12 +299,182 @@ struct SectorEditSheet: View {
         }
     }
 
+    /// Les cellules du nœud, la cellule observée cochée : une ligne par cellule.
+    private var cellPicker: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Ta cellule")
+                .font(SQType.micro.weight(.semibold))
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .padding(.bottom, SQSpace.xs)
+            ForEach(model.cells) { cell in
+                let isSelected = cell.id == model.item.id
+                Button {
+                    model.select(cell: cell)
+                    Haptics.selection()
+                } label: {
+                    HStack(spacing: SQSpace.sm2) {
+                        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                        Text(cell.nodeLabel)
+                            .font(SQFont.body(14, .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.label)
+                        Spacer(minLength: 0)
+                        if let sector = cell.sectors.first {
+                            Text("secteur \(sector) aujourd’hui")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier("sector.cell")
+                Divider()
+            }
+        }
+    }
+
+    /// Sans schéma : une ligne par secteur, trois par défaut, puis « Ajouter un secteur ».
+    private var sectorList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Ce support n’a pas d’azimuts connus : choisis le numéro de son secteur.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, SQSpace.sm)
+            ForEach(0..<model.listCount, id: \.self) { index in
+                let isSelected = index == model.selectedIndex
+                Button {
+                    model.selectedIndex = index
+                    Haptics.selection()
+                } label: {
+                    HStack(spacing: SQSpace.sm2) {
+                        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                        Text("Secteur \(model.sectorLabel(forIndex: index))")
+                            .font(SQFont.body(15, .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.label)
+                        Spacer(minLength: 0)
+                        if index == model.referenceIndex {
+                            Label {
+                                Text("indiqué par le PCI")
+                            } icon: {
+                                Image(systemName: "diamond.fill").imageScale(.small).foregroundStyle(OutageTint.degradedInk)
+                            }
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier("sector.listRow")
+                Divider()
+            }
+            if model.listCount < SectorEditViewModel.maxListCount {
+                Button {
+                    model.addListSlot()
+                } label: {
+                    Label("Ajouter un secteur", systemImage: "plus")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sector.addSlot")
+            }
+        }
+        .accessibilityIdentifier("sector.list")
+    }
+
+    /// Le secteur que le PCI indique, quand il diffère, ou l'accord avec le choix.
+    /// Une indication, jamais un refus : le choix du membre est gardé.
+    @ViewBuilder
+    private var pciReference: some View {
+        if let reference = model.referenceIndex, reference < model.slotCount {
+            VStack(spacing: SQSpace.xs) {
+                Label {
+                    if reference < model.azimuths.count {
+                        Text("Le PCI indique le secteur \(model.sectorLabel(forIndex: reference)) · \(Int(model.azimuths[reference].rounded()))°")
+                            .monospacedDigit()
+                    } else {
+                        Text("Le PCI indique le secteur \(model.sectorLabel(forIndex: reference))")
+                            .monospacedDigit()
+                    }
+                } icon: {
+                    Image(systemName: "diamond.fill").imageScale(.small).foregroundStyle(OutageTint.degradedInk)
+                }
+                .font(SQType.subhead(.semibold))
+                .foregroundStyle(SQColor.label)
+                Text("Garde ton choix si tu as vu l’antenne : le PCI n’est qu’un indice.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("sector.pciReference")
+        } else if model.selectionMatchesPci {
+            Label {
+                Text("Conforme au PCI")
+            } icon: {
+                Image(systemName: "checkmark").foregroundStyle(SQColor.success)
+            }
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("sector.pciMatch")
+        }
+    }
+
+    /// « Pas le bon support ? » : la correction passe au choix du support sur la carte.
+    private func moveLink(_ onMove: @escaping () -> Void) -> some View {
+        Button {
+            onMove()
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pas le bon support ?")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text("Choisir le bon sur la carte")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .padding(.top, SQSpace.sm)
+            .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("sector.move")
+    }
+
     @ViewBuilder
     private var saveButton: some View {
         if model.savedAwaitingClose {
             GradientButton(String(localized: "Fermer"), style: .secondary) { model.finish() }
                 .accessibilityIdentifier("sector.close")
-        } else if !model.azimuths.isEmpty {
+        } else if model.slotCount > 0 {
             GradientButton(
                 "Enregistrer le secteur",
                 systemImage: "checkmark",
@@ -243,7 +495,11 @@ struct SectorEditSheet: View {
 struct SelectableSectorRadar: View {
     let azimuths: [Double]
     @Binding var selectedIndex: Int?
-    var color: Color = SQColor.brandRed
+    /// Secteur que le PCI indique : en pointillés, doublé de son libellé sous le radar.
+    var referenceIndex: Int? = nil
+    /// Le choix est plein à l'encre (Halo : jamais de carmin plein), son numéro en couleur papier.
+    var color: Color = SQColor.label
+    var onColor: Color = SQColor.onInk
     /// Numéro de secteur affiché pour un index (convention opérateur). 1-based par défaut.
     var displayNumber: (Int) -> Int = { $0 + 1 }
 
@@ -269,14 +525,17 @@ struct SelectableSectorRadar: View {
                 ForEach(Array(azimuths.enumerated()), id: \.offset) { index, azimuth in
                     let isSelected = index == selectedIndex
                     SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius - 4, center: center)
-                        .fill(isSelected ? color.opacity(0.55) : SQColor.labelTertiary.opacity(0.18))
+                        .fill(isSelected ? color.opacity(0.85) : SQColor.labelTertiary.opacity(0.18))
                     if isSelected {
                         SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius - 4, center: center)
                             .stroke(color, lineWidth: 2.5)
+                    } else if index == referenceIndex {
+                        SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius - 4, center: center)
+                            .stroke(OutageTint.degradedInk, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
                     }
                     Text("\(displayNumber(index))")
                         .font(SQFont.display(14, .heavy))
-                        .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(isSelected ? onColor : SQColor.label)
                         .frame(width: 28, height: 28)
                         .background(isSelected ? color : SQColor.surface, in: Circle())
                         .overlay(Circle().stroke(SQColor.separator, lineWidth: isSelected ? 0 : 1))
@@ -284,7 +543,9 @@ struct SelectableSectorRadar: View {
                         // SECTOR-A11Y-03 : chaque secteur est un élément accessible
                         // sélectionnable (le radar tactile est sinon invisible à VoiceOver).
                         .accessibilityElement()
-                        .accessibilityLabel("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés")
+                        .accessibilityLabel(index == referenceIndex
+                            ? Text("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés, indiqué par le PCI")
+                            : Text("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés"))
                         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                         .accessibilityAction {
                             selectedIndex = index

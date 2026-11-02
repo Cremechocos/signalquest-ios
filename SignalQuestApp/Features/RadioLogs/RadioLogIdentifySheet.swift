@@ -24,8 +24,6 @@ struct RadioLogIdentifySheet: View {
     /// alors sur son résultat au lieu de se refermer sèchement. On vient de
     /// contribuer à une base publique, l'écran doit dire QUOI.
     @State private var identifiedSiteId: String?
-    /// « Corriger » ouvert sur l'identification qu'on vient de faire.
-    @State private var correcting = false
     /// Ce que la dernière correction a fait, dit en tête de l'écran revenu au choix.
     @State private var correctionNote: String?
     @AccessibilityFocusState private var resultFocused: Bool
@@ -33,8 +31,8 @@ struct RadioLogIdentifySheet: View {
     private let customSites: CustomSitesServicing?
     private let identify: IdentifyServicing
     let onIdentified: (String) -> Void
-    /// L'identification a été retirée ou supprimée depuis « Corriger ».
-    let onWithdrawn: () -> Void
+    /// L'identification a été retirée ou supprimée depuis « Corriger », avec la phrase qui le dit.
+    let onWithdrawn: (String) -> Void
 
     init(
         site: RadioLogSite,
@@ -42,8 +40,9 @@ struct RadioLogIdentifySheet: View {
         identify: IdentifyServicing,
         antennas: AntennasServicing,
         customSites: CustomSitesServicing? = nil,
+        identifiedSiteId: String? = nil,
         onIdentified: @escaping (String) -> Void,
-        onWithdrawn: @escaping () -> Void = {}
+        onWithdrawn: @escaping (String) -> Void = { _ in }
     ) {
         self.site = site
         self.antennas = antennas
@@ -51,6 +50,8 @@ struct RadioLogIdentifySheet: View {
         self.identify = identify
         self.onIdentified = onIdentified
         self.onWithdrawn = onWithdrawn
+        // Ouverte depuis une ligne déjà identifiée par le membre : directement sur sa correction.
+        _identifiedSiteId = State(initialValue: identifiedSiteId)
         _picker = StateObject(
             wrappedValue: RadioLogIdentifyPicker(service: service, identify: identify, antennas: antennas)
         )
@@ -76,7 +77,17 @@ struct RadioLogIdentifySheet: View {
                     header
                     if let identifiedSiteId {
                         resultCard(siteId: identifiedSiteId)
-                        correctButton
+                        IdentificationCorrectionBlock(
+                            target: IdentificationCorrectionTarget(
+                                siteId: identifiedSiteId,
+                                kind: site.kind == .gnb ? .gnb : .enb,
+                                node: site.node,
+                                observedPcis: site.cells.compactMap(\.pci)
+                            ),
+                            service: identify,
+                            onOutcome: applyCorrection
+                        )
+                        .id(identifiedSiteId)
                     } else {
                         if let correctionNote {
                             SQNotice(message: correctionNote, tone: .success)
@@ -134,19 +145,6 @@ struct RadioLogIdentifySheet: View {
                     address: candidate.address,
                     needsVerification: candidate.needsVerification
                 ))
-            }
-            .sheet(isPresented: $correcting) {
-                if let identifiedSiteId {
-                    IdentificationCorrectionSheet(
-                        target: IdentificationCorrectionTarget(
-                            siteId: identifiedSiteId,
-                            kind: site.kind == .gnb ? .gnb : .enb,
-                            node: site.node
-                        ),
-                        service: identify,
-                        onOutcome: applyCorrection
-                    )
-                }
             }
             .sheet(isPresented: $showsMapPicker) {
                 RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
@@ -214,24 +212,15 @@ struct RadioLogIdentifySheet: View {
         .accessibilityIdentifier("radioLogs.identify.result")
     }
 
-    /// « Corriger » : la fiche de cette identification, sans passer par la liste.
-    private var correctButton: some View {
-        GradientButton("Corriger", systemImage: "pencil", style: .secondary) {
-            correcting = true
-        }
-        .accessibilityHint(Text("Retirer, supprimer, changer de support ou de secteur"))
-        .accessibilityIdentifier("radioLogs.identify.correct")
-    }
-
     /// Ce qu'une correction a changé : retirée, l'écran revient au choix de l'antenne ;
     /// déplacée, le résultat nomme le nouveau support.
     private func applyCorrection(_ outcome: IdentificationCorrectionOutcome) {
         switch outcome {
-        case .withdrawn:
+        case let .withdrawn(note):
             identifiedSiteId = nil
             picker.selectedId = nil
-            correctionNote = String(localized: "Identification retirée. Tu peux identifier ce site à nouveau.")
-            onWithdrawn()
+            correctionNote = note + " " + String(localized: "Tu peux identifier ce site à nouveau.")
+            onWithdrawn(note)
         case let .moved(siteId):
             identifiedSiteId = siteId
             onIdentified(siteId)

@@ -222,6 +222,8 @@ struct RadioLogSiteCard: View {
     let onIdentify: () -> Void
     let onOpenMap: () -> Void
     var onToggleCells: () -> Void = {}
+    /// Identifié par le membre : « Corriger » ouvre sa correction.
+    var onCorrect: (() -> Void)? = nil
 
     /// Les actions s'alignent sous le texte, pas sous la pastille.
     private var actionInset: CGFloat { M.leadPill + M.cardInnerGap }
@@ -282,6 +284,11 @@ struct RadioLogSiteCard: View {
             } else {
                 HStack(spacing: M.ctaGap) {
                     RadioLogStatePill(state: state, checkable: site.isCheckable)
+                    if let onCorrect {
+                        RadioLogActionButton(label: "Corriger", ghost: true, systemImage: "pencil", action: onCorrect)
+                            .accessibilityLabel(Text("Corriger \(site.nodeLabel)"))
+                            .accessibilityIdentifier("radioLogs.site.correct")
+                    }
                     Spacer(minLength: 0)
                     cellsToggle(short: false)
                 }

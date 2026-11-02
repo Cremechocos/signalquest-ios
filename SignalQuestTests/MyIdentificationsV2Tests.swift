@@ -234,13 +234,103 @@ final class MyIdentificationsV2Tests: XCTestCase {
             service: service
         )
         let withdrawn = await model.withdraw(node)
-        XCTAssertFalse(withdrawn)
+        XCTAssertNil(withdrawn)
         XCTAssertEqual(model.actionError, IdentificationCorrectionText.nothingChanged)
 
         service.withdrawAnswer = #"{"success":true,"withdrawn":2}"#
         let again = await model.withdraw(node)
-        XCTAssertTrue(again)
+        XCTAssertEqual(again, String(localized: "Identification retirée."))
         XCTAssertNil(model.actionError)
+    }
+
+    func testADeletionOfASharedLineSaysItWasOnlyWithdrawnForTheMember() async throws {
+        let node = try XCTUnwrap(try page("cellsTruncatedNode").identifications.first { $0.kind == .enb })
+        let service = PagedIdentifyService()
+        let model = IdentificationCorrectionModel(
+            target: IdentificationCorrectionTarget(siteId: node.siteId, kind: .enb, node: "1"),
+            service: service
+        )
+        service.deleteAnswer = #"{"success":true,"deleted":0,"softWithdrawn":1}"#
+        let shared = await model.delete(node)
+        XCTAssertEqual(shared, String(localized: "Identification retirée pour toi. D’autres l’ont confirmée, leur travail reste."))
+        service.deleteAnswer = #"{"success":true,"deleted":2,"softWithdrawn":0}"#
+        let own = await model.delete(node)
+        XCTAssertEqual(own, String(localized: "Identification supprimée."))
+    }
+
+    /// « Corriger » s'ouvre sur la cellule que le membre a vue, pas sur la première de la liste.
+    func testCorrectionOpensOnTheObservedCell() throws {
+        let cells = try ["11", "214", "216"].map { pci in
+            try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+            {"id":"\(pci)","siteId":"799050","type":"pci","pci":\(pci),"pciValue":"\(pci)","enb":"81234","sectors":[1]}
+            """.utf8))
+        }
+        XCTAssertEqual(IdentificationCorrectionModel.observedCell(in: cells, observedPcis: [999, 216, 214])?.id, "216")
+        XCTAssertEqual(IdentificationCorrectionModel.observedCell(in: cells, observedPcis: [])?.id, "11")
+    }
+
+    /// Sur un écart, le secteur du PCI est la référence en pointillés ; le choix reste le
+    /// secteur enregistré. Changer de cellule repart du secteur de la nouvelle cellule.
+    func testSectorSheetShowsThePciReferenceAndSwitchesCells() async throws {
+        let mismatch = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"a","siteId":"799050","type":"cellid","ci":"267173891","operator":"ORANGE","operatorMcc":208,
+         "operatorMnc":1,"marketCode":"FR","sectors":[1],"sectorCheck":{"status":"mismatch","expected":2}}
+        """.utf8))
+        let match = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"b","siteId":"799050","type":"cellid","ci":"267173892","operator":"ORANGE","operatorMcc":208,
+         "operatorMnc":1,"marketCode":"FR","sectors":[2],"sectorCheck":{"status":"match"}}
+        """.utf8))
+        let model = SectorEditViewModel(item: mismatch, cells: [mismatch, match], antennas: AzimuthAntennasService(),
+                                        identify: PagedIdentifyService())
+        await model.load()
+        XCTAssertEqual(model.selectedIndex, 0)
+        XCTAssertEqual(model.referenceIndex, 1, "secteur 2 d'Orange = deuxième azimut")
+        XCTAssertFalse(model.selectionMatchesPci)
+
+        model.select(cell: match)
+        XCTAssertEqual(model.selectedIndex, 1)
+        XCTAssertNil(model.referenceIndex)
+        XCTAssertTrue(model.selectionMatchesPci)
+
+        let untrusted = SectorEditViewModel(item: mismatch, antennas: AzimuthAntennasService(),
+                                            identify: PagedIdentifyService(), trustsSectorCheck: false)
+        await untrusted.load()
+        XCTAssertNil(untrusted.referenceIndex, "contrôle indisponible : aucune référence montrée")
+        XCTAssertTrue(untrusted.cells.isEmpty)
+    }
+
+    /// Support sans schéma (au plus un azimut) : une liste de trois secteurs, extensible, dans
+    /// la convention de l'opérateur. Pour SFR : 0, 1, 2 puis 3, et le numéro envoyé est le même.
+    func testASiteWithoutAzimuthsOffersAListInTheOperatorsNumbering() async throws {
+        let sfr = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"s","siteId":"799050","type":"pci","pci":214,"pciValue":"214","operator":"SFR","operatorMcc":208,
+         "operatorMnc":10,"marketCode":"FR","sectors":[0]}
+        """.utf8))
+        let service = PagedIdentifyService()
+        for azimuts: [Double] in [[], [140]] {
+            let model = SectorEditViewModel(item: sfr, antennas: AzimuthAntennasService(azimuts: azimuts), identify: service)
+            await model.load()
+            XCTAssertTrue(model.usesList, "\(azimuts.count) azimut(s) : pas de schéma")
+            XCTAssertEqual(model.slotCount, 3)
+            XCTAssertEqual((0..<3).map(model.sectorLabel(forIndex:)), [0, 1, 2])
+            XCTAssertEqual(model.selectedIndex, 0, "le secteur 0 enregistré par SFR est retrouvé")
+        }
+        let model = SectorEditViewModel(item: sfr, antennas: AzimuthAntennasService(azimuts: []), identify: service)
+        await model.load()
+        model.addListSlot()
+        XCTAssertEqual(model.sectorLabel(forIndex: 3), 3)
+        model.selectedIndex = 3
+        await model.submit()
+        XCTAssertEqual(service.sentSectors.last, [3])
+    }
+
+    /// Les lignes du log que le membre a identifiées : nœud et support, jamais la seule cellule.
+    func testLogRowsKnowWhichNodesTheMemberIdentified() throws {
+        let items = try page("cellsTruncatedNode").identifications
+        let keys = RadioLogsViewModel.nodeKeys(items)
+        let node = try XCTUnwrap(items.first { $0.kind == .enb })
+        XCTAssertTrue(keys.contains(RadioLogsViewModel.nodeKey(kind: .enb, node: try XCTUnwrap(node.enb), siteId: node.siteId)))
+        XCTAssertEqual(keys.count, 1, "les cellules ne font pas de clé à elles seules")
     }
 
     // MARK: Requêtes
@@ -324,12 +414,20 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
     func withdraw(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> WithdrawResult {
         try JSONDecoder().decode(WithdrawResult.self, from: Data(withdrawAnswer.utf8))
     }
-    func delete(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> DeleteResult { throw APIError.cancelled }
+    var deleteAnswer = #"{"success":true,"deleted":1,"softWithdrawn":0}"#
+    func delete(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> DeleteResult {
+        try JSONDecoder().decode(DeleteResult.self, from: Data(deleteAnswer.utf8))
+    }
     func editSite(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?, reason: String?) async throws -> EditSiteResult { throw APIError.cancelled }
-    func editSectors(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> EditSectorsResult { throw APIError.cancelled }
+    var sentSectors: [[Int]] = []
+    func editSectors(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> EditSectorsResult {
+        sentSectors.append(sectors)
+        return try JSONDecoder().decode(EditSectorsResult.self, from: Data(#"{"success":true,"applied":true,"updated":1}"#.utf8))
+    }
 }
 
 private struct AzimuthAntennasService: AntennasServicing {
+    var azimuts: [Double] = [0, 120, 240]
     func list(bbox: BoundingBox) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite] { [] }
@@ -337,7 +435,7 @@ private struct AzimuthAntennasService: AntennasServicing {
     func details(id: String) async throws -> AntennaDetails { try await details(id: id, market: "FR", operatorName: "ORANGE") }
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails {
         try JSONDecoder.signalQuest.decode(AntennaDetails.self, from: Data("""
-        {"antenna":{"id":"799050","supId":"799050","lat":45.0,"lng":5.0,"operators":["ORANGE"],"technologies":["4G"],"azimuts":[0,120,240]}}
+        {"antenna":{"id":"799050","supId":"799050","lat":45.0,"lng":5.0,"operators":["ORANGE"],"technologies":["4G"],"azimuts":\(azimuts)}}
         """.utf8))
     }
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails {
