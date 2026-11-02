@@ -82,6 +82,8 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(node.contested?.otherSites.first?.siteId, "2603829")
         XCTAssertEqual(node.contested?.otherSites.first?.validations, 1)
         XCTAssertEqual(page.totals?.contested, 1)
+        let mismatch = try XCTUnwrap(page.identifications.first { $0.sectorCheck?.status == .mismatch })
+        XCTAssertEqual(mismatch.derivedSector, 2, "derivedSector de l'exemple servi")
 
         let cell = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
         {"id":"c","siteId":"1","type":"cellid","ci":"267173891","cellConflict":{"reason":"pci_mismatch","pci":"42"}}
@@ -322,6 +324,34 @@ final class MyIdentificationsV2Tests: XCTestCase {
         model.selectedIndex = 3
         await model.submit()
         XCTAssertEqual(service.sentSectors.last, [3])
+    }
+
+    /// `derivedSector` (02/11) : la référence du PCI se montre avant tout choix, même sans
+    /// secteur enregistré ; absent, rien n'est deviné.
+    func testDerivedSectorIsShownBeforeTheChoiceAndNeverGuessed() async throws {
+        let derived = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"c","siteId":"799050","type":"cellid","ci":"267173893","operator":"SFR","operatorMcc":208,
+         "operatorMnc":10,"marketCode":"FR","sectors":[],"sectorCheck":{"status":"not_applicable"},"derivedSector":1}
+        """.utf8))
+        XCTAssertEqual(derived.derivedSector, 1)
+        let model = SectorEditViewModel(item: derived, antennas: AzimuthAntennasService(), identify: PagedIdentifyService())
+        await model.load()
+        XCTAssertNil(model.selectedIndex)
+        XCTAssertEqual(model.referenceIndex, 1, "SFR en base 0 : secteur 1 = deuxième azimut")
+        model.selectedIndex = 1
+        XCTAssertNil(model.referenceIndex)
+        XCTAssertTrue(model.selectionMatchesPci)
+
+        let absent = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"d","siteId":"799050","type":"cellid","ci":"267173894","operator":"SFR","operatorMcc":208,
+         "operatorMnc":10,"marketCode":"FR","sectors":[],"sectorCheck":{"status":"not_applicable"}}
+        """.utf8))
+        XCTAssertNil(absent.derivedSector)
+        let none = SectorEditViewModel(item: absent, antennas: AzimuthAntennasService(), identify: PagedIdentifyService())
+        await none.load()
+        none.selectedIndex = 0
+        XCTAssertNil(none.referenceIndex)
+        XCTAssertFalse(none.selectionMatchesPci)
     }
 
     /// Les lignes du log que le membre a identifiées : nœud et support, jamais la seule cellule.

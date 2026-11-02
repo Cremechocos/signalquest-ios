@@ -343,7 +343,14 @@ struct IdentificationCorrectionBlock: View {
                         .foregroundStyle(SQColor.label)
                 }
             }
-            if model.checks.sectorCheck == .ok, let check = cell.sectorCheck {
+            if model.checks.sectorCheck == .ok, let derived = cell.derivedSector {
+                // `derivedSector` dit le secteur prouvé, même sans secteur enregistré.
+                if cell.sectors == [derived] {
+                    reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
+                } else {
+                    reference(String(localized: "Le PCI indique le secteur \(derived)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
+                }
+            } else if model.checks.sectorCheck == .ok, let check = cell.sectorCheck {
                 switch check.status {
                 case .mismatch:
                     if let expected = check.expected {

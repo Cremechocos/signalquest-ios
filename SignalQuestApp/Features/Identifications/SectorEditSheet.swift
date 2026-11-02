@@ -37,16 +37,30 @@ final class SectorEditViewModel: ObservableObject {
         self.identify = identify
     }
 
-    /// Secteur que la règle de l'opérateur déduit du PCI, s'il diffère de celui enregistré.
-    var referenceIndex: Int? {
-        guard trustsSectorCheck, item.sectorCheck?.status == .mismatch, let expected = item.sectorCheck?.expected else { return nil }
-        return storedIndex(expected)
+    /// Secteur que la règle de l'opérateur prouve à partir du PCI : `derivedSector`, montré
+    /// avant le choix. Un serveur plus ancien ne le sert pas : on se rabat sur `sectorCheck`.
+    /// Absent, il n'est jamais remplacé par une valeur à nous.
+    private var derivedValue: Int? {
+        guard trustsSectorCheck else { return nil }
+        if let derived = item.derivedSector { return derived }
+        switch item.sectorCheck?.status {
+        case .mismatch: return item.sectorCheck?.expected
+        case .match: return item.sectors.count == 1 ? item.sectors.first : nil
+        default: return nil
+        }
     }
 
-    /// Le secteur enregistré concorde avec le PCI, et c'est lui qui est choisi.
+    private var derivedIndex: Int? { derivedValue.flatMap(storedIndex) }
+
+    /// Le secteur du PCI, tant que le choix en diffère : dessiné en pointillés.
+    var referenceIndex: Int? {
+        guard let derivedIndex, derivedIndex != selectedIndex else { return nil }
+        return derivedIndex
+    }
+
+    /// Le secteur choisi est celui que le PCI indique.
     var selectionMatchesPci: Bool {
-        guard trustsSectorCheck, item.sectorCheck?.status == .match, let stored = item.sectors.first else { return false }
-        return selectedIndex != nil && selectedIndex == storedIndex(stored)
+        derivedIndex != nil && derivedIndex == selectedIndex
     }
 
     /// Le choix se fait dans une liste plutôt que sur le radar.
@@ -80,7 +94,7 @@ final class SectorEditViewModel: ObservableObject {
         item = cell
         errorMessage = nil
         infoMessage = nil
-        if usesList { ensureListCovers(cell.sectors + [cell.sectorCheck?.expected].compactMap { $0 }) }
+        if usesList { ensureListCovers(cell.sectors + [cell.derivedSector, cell.sectorCheck?.expected].compactMap { $0 }) }
         selectedIndex = cell.sectors.first.flatMap(storedIndex)
     }
 
@@ -116,7 +130,7 @@ final class SectorEditViewModel: ObservableObject {
         // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0).
         if unique.count <= 1 {
             listCount = Self.defaultListCount
-            ensureListCovers(item.sectors + [prefilledSector, item.sectorCheck?.expected].compactMap { $0 })
+            ensureListCovers(item.sectors + [prefilledSector, item.derivedSector, item.sectorCheck?.expected].compactMap { $0 })
         } else {
             azimuths = unique
         }
@@ -154,8 +168,8 @@ final class SectorEditViewModel: ObservableObject {
                 Haptics.success()
                 // Le serveur renvoie le secteur déduit du PCI comme référence : s'il diffère
                 // du choix enregistré, on le montre avant de fermer. Jamais une seconde fois
-                // quand la référence était déjà sur le radar.
-                if referenceIndex == nil, !result.derived.isEmpty, result.derived != [sectorNumber] {
+                // quand `derivedSector` l'avait déjà mis sur le radar.
+                if derivedIndex == nil, !result.derived.isEmpty, result.derived != [sectorNumber] {
                     let derived = result.derived.map(String.init).joined(separator: ", ")
                     infoMessage = String(localized: "Secteur déduit du PCI : \(derived)")
                     savedAwaitingClose = true

@@ -49,6 +49,9 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     let cellConflict: IdentificationCellConflict?
     /// v2, lignes pci et cellid : secteur stocké comparé à la règle de l'opérateur.
     let sectorCheck: IdentificationSectorCheck?
+    /// v2, lignes pci et cellid : secteur que la règle de l'opérateur prouve, stocké ou non,
+    /// dans la numérotation de `sectors`. Absent quand rien n'est prouvé : jamais deviné ici.
+    let derivedSector: Int?
     /// v2 : cellule qu'aucune ligne nœud active du membre ne porte (pages finales).
     let orphan: Bool
     /// v2 : nœud dont seules les 4 000 cellules les plus récentes sont servies.
@@ -59,7 +62,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case `operator`, operatorMcc, operatorMnc, marketCode, sectors, validations, source
         case createdAt, lastValidated, conflict
         case conflictSiteId, conflictSiteAddress, conflictSiteValidations, conflictSiteLat, conflictSiteLng
-        case conflictStatus, contested, cellConflict, sectorCheck, orphan, cellsTruncated
+        case conflictStatus, contested, cellConflict, sectorCheck, derivedSector, orphan, cellsTruncated
     }
 
     init(from decoder: Decoder) throws {
@@ -94,6 +97,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         contested = (try? c.decodeIfPresent(IdentificationContested.self, forKey: .contested)) ?? nil
         cellConflict = (try? c.decodeIfPresent(IdentificationCellConflict.self, forKey: .cellConflict)) ?? nil
         sectorCheck = (try? c.decodeIfPresent(IdentificationSectorCheck.self, forKey: .sectorCheck)) ?? nil
+        derivedSector = (try? c.decodeIfPresent(Int.self, forKey: .derivedSector)) ?? nil
         orphan = (try? c.decodeIfPresent(Bool.self, forKey: .orphan)) ?? false
         cellsTruncated = (try? c.decodeIfPresent(Bool.self, forKey: .cellsTruncated)) ?? false
     }
