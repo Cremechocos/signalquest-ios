@@ -273,6 +273,14 @@ final class MyIdentificationsV2Tests: XCTestCase {
         let again = await model.withdraw(node)
         XCTAssertEqual(again, String(localized: "Identification retirée."))
         XCTAssertNil(model.actionError)
+
+        // Raison facultative (planche 3) : vide, rien n'est envoyé ; sinon nettoyée et bornée à 280.
+        _ = await model.withdraw(node, reason: "  ")
+        _ = await model.withdraw(node, reason: " Mauvais support \n")
+        _ = await model.withdraw(node, reason: String(repeating: "a", count: 400))
+        XCTAssertNil(service.sentReasons[service.sentReasons.count - 3] ?? nil)
+        XCTAssertEqual(service.sentReasons[service.sentReasons.count - 2], "Mauvais support")
+        XCTAssertEqual(service.sentReasons.last??.count, 280)
     }
 
     func testADeletionOfASharedLineSaysItWasOnlyWithdrawnForTheMember() async throws {
@@ -498,8 +506,10 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
     func identify(_ request: IdentifyDirectRequest) async throws -> IdentifyResult { throw APIError.cancelled }
     func mine(includeRelated: Bool) async throws -> [MyIdentification] { [] }
     var withdrawAnswer = #"{"success":true,"withdrawn":1}"#
+    var sentReasons: [String?] = []
     func withdraw(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> WithdrawResult {
-        try JSONDecoder().decode(WithdrawResult.self, from: Data(withdrawAnswer.utf8))
+        sentReasons.append(reason)
+        return try JSONDecoder().decode(WithdrawResult.self, from: Data(withdrawAnswer.utf8))
     }
     var deleteAnswer = #"{"success":true,"deleted":1,"softWithdrawn":0}"#
     func delete(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, reason: String?) async throws -> DeleteResult {

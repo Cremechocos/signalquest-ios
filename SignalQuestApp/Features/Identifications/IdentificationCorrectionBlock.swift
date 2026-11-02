@@ -139,11 +139,14 @@ final class IdentificationCorrectionModel: ObservableObject {
     }
 
     /// Rend la phrase du succès, ou nil quand le retrait a échoué (la raison est dans `actionError`).
-    func withdraw(_ item: MyIdentification) async -> String? {
-        await run {
+    /// `reason` est facultative : vide, rien n'est envoyé ; le serveur en garde 280 caractères.
+    func withdraw(_ item: MyIdentification, reason: String? = nil) async -> String? {
+        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return await run {
             let result = try await self.service.withdraw(
                 siteId: item.siteId, enb: item.enb, gnb: item.gnb, pci: item.pciValue,
-                cellId: item.cellId, ci: item.ci, tech: item.tech, reason: nil
+                cellId: item.cellId, ci: item.ci, tech: item.tech,
+                reason: reason.flatMap { $0.isEmpty ? nil : String($0.prefix(280)) }
             )
             guard result.changed else {
                 return .failure(result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Retrait impossible"))
@@ -200,6 +203,7 @@ struct IdentificationCorrectionBlock: View {
     /// « Pas le bon support ? » depuis les secteurs : la carte s'ouvre une fois la feuille fermée.
     @State private var movesAfterSectors = false
     @State private var confirmingWithdraw = false
+    @State private var withdrawReason = ""
     @State private var confirmingDelete = false
     let onOutcome: (IdentificationCorrectionOutcome) -> Void
 
@@ -269,7 +273,8 @@ struct IdentificationCorrectionBlock: View {
         .alert("Retirer cette identification ?", isPresented: $confirmingWithdraw) {
             Button("Annuler", role: .cancel) {}
             Button("Supprimer définitivement", role: .destructive) { confirmingDelete = true }
-            Button("Retirer") { finish { node in await model.withdraw(node) } }
+            TextField("Pourquoi ? (facultatif)", text: $withdrawReason)
+            Button("Retirer") { finish { node in await model.withdraw(node, reason: withdrawReason) } }
         } message: {
             Text("La ligne disparaît de la carte et ses points te sont retirés. Tu pourras la valider à nouveau plus tard.")
         }
@@ -352,7 +357,7 @@ struct IdentificationCorrectionBlock: View {
                     correct(node: node, cells: cells)
                 }
                 .accessibilityIdentifier("radioLogs.identify.correct")
-                Button("Retirer") { confirmingWithdraw = true }
+                Button("Retirer") { withdrawReason = ""; confirmingWithdraw = true }
                     .font(SQType.subhead(.semibold))
                     .foregroundStyle(SQColor.ink2)
                     .frame(minWidth: 88, minHeight: 44)
