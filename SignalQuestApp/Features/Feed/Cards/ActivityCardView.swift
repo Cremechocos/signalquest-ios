@@ -17,15 +17,26 @@ struct FeedActivity: Equatable {
         case bug(id: String)
     }
 
+    /// Quête atteinte (#835) : ce que demandait la quête, lu dans le catalogue
+    /// actuel du serveur, pas celui du jour de la réclamation.
+    struct Quest: Equatable {
+        let cadence: QuestCadenceGroup?
+        /// Objectif mis en forme ; `nil` quand la mesure ne se nomme pas (`event_count`).
+        let goal: String?
+        /// Consigne du catalogue : elle n'existe qu'en français.
+        let description: String?
+    }
+
     let family: Family
     /// Points gagnés par l'activité, quand le serveur les donne.
     let points: Int?
     let title: String
     let subtitle: String?
     let link: Link?
+    let quest: Quest?
 
     /// `nil` pour une publication ordinaire : elle garde sa carte de post.
-    init?(item: UnifiedSocialFeedItem) {
+    init?(item: UnifiedSocialFeedItem, appIsFrench: Bool = SQAddress.appIsFrench) {
         let metadata = item.metadata ?? [:]
         func string(_ key: String) -> String? {
             guard case .string(let value)? = metadata[key] else { return nil }
@@ -61,6 +72,11 @@ struct FeedActivity: Equatable {
         self.family = family
         // Un récap officiel ne fait gagner de points à personne.
         self.points = family == .officialRecap ? nil : int("points").flatMap { $0 > 0 ? $0 : nil }
+        // Une clé retirée du catalogue n'a aucun de ces champs : la carte garde son repli.
+        self.quest = family == .quest
+            ? Self.quest(cadence: string("cadence"), metric: string("questMetric"), target: int("questTargetValue"),
+                         description: appIsFrench ? string("questDescription") : nil)
+            : nil
 
         // La phrase traduite remplace le français du serveur partout où il
         // servait de titre ou de repli (F8).
@@ -72,7 +88,7 @@ struct FeedActivity: Equatable {
         switch family {
         case .quest:
             title = String(localized: "Quête terminée")
-            subtitle = key?.string("questTitle") ?? quoted
+            subtitle = string("questTitle") ?? key?.string("questTitle") ?? quoted
             link = isMine ? .progression : nil
         case .level:
             if let level = int("newLevel") ?? key?.integer("level").map({ Int(clamping: $0) }) {
@@ -130,6 +146,30 @@ struct FeedActivity: Equatable {
             title = text.isEmpty ? String(localized: "Récompense obtenue") : text
             subtitle = nil
             link = isMine ? .progression : nil
+        }
+    }
+
+    static func quest(cadence: String?, metric: String?, target: Int?, description: String?) -> Quest? {
+        let goal = target.flatMap { $0 > 0 ? questGoal(metric: metric, target: $0) : nil }
+        let cadenceGroup = cadence.map { QuestCadenceGroup(rawCadence: $0) }.flatMap { $0 == .other ? nil : $0 }
+        guard goal != nil || cadenceGroup != nil || description != nil else { return nil }
+        return Quest(cadence: cadenceGroup, goal: goal, description: description)
+    }
+
+    /// Ce que compte la cible, dans la langue de l'app (`QuestMetric` du serveur).
+    /// `event_count` compte des actions différentes d'une quête à l'autre : la
+    /// consigne seule les nomme.
+    static func questGoal(metric: String?, target: Int) -> String? {
+        switch metric {
+        case "coverage_points": return String(localized: "\(target) points de couverture")
+        case "coverage_distance_km": return String(localized: "\(target) km de sessions")
+        case "multi_cell_points": return String(localized: "\(target) points multi-cellules")
+        case "distinct_operators": return String(localized: "\(target) opérateurs différents")
+        case "distinct_technologies": return String(localized: "\(target) technologies différentes")
+        case "photo_uploads": return String(localized: "\(target) photos envoyées")
+        case "speedtests": return String(localized: "\(target) tests de débit")
+        case "validations": return String(localized: "\(target) validations de site")
+        default: return nil
         }
     }
 

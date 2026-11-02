@@ -742,6 +742,17 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
         }
     }
 
+    /// Fréquence au singulier, dans le détail d'un post de quête ; `nil` pour « Autres ».
+    var frequency: String? {
+        switch self {
+        case .daily: return String(localized: "Quotidienne")
+        case .weekly: return String(localized: "Hebdomadaire")
+        case .seasonal: return String(localized: "Saison")
+        case .event: return String(localized: "Évènement")
+        case .other: return nil
+        }
+    }
+
     /// Description VoiceOver — « Quête quotidienne : … ».
     var voiceOverLabel: String {
         switch self {

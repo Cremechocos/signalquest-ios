@@ -275,6 +275,39 @@ final class FeedActivityTests: XCTestCase {
         XCTAssertTrue(try item(kind: "validation", #""activityType":"validation""#).isShareable)
     }
 
+    /// #835 : le détail d'une quête atteinte vient du catalogue ; les points gagnés restent `points`,
+    /// jamais `rewardXp` ; la consigne, française, n'apparaît qu'en français ; une clé retirée du
+    /// catalogue n'a aucun champ et garde le repli sur le texte.
+    func testAClaimedQuestCarriesItsCatalogDetail() throws {
+        let metadata = #""activityType":"quest_claim","questKey":"weekly_trace","points":120,"rewardXp":999,"#
+            + #""questTitle":"Trace 10 km","questDescription":"Terminer 10 km de sessions couverture ou drive test.","#
+            + #""questMetric":"coverage_distance_km","questTargetValue":10,"cadence":"weekly","specialty":"coverage""#
+        let french = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: "Quête terminée", metadata), appIsFrench: true))
+        XCTAssertEqual(french.subtitle, "Trace 10 km")
+        XCTAssertEqual(french.points, 120, "points earned, never the catalog reward")
+        let quest = try XCTUnwrap(french.quest)
+        XCTAssertEqual(quest.cadence, .weekly)
+        XCTAssertEqual(quest.goal, FeedActivity.questGoal(metric: "coverage_distance_km", target: 10))
+        XCTAssertEqual(quest.description, "Terminer 10 km de sessions couverture ou drive test.")
+        // La suite tourne en français (comme le runner) : le pluriel du catalogue est résolu.
+        XCTAssertEqual(FeedActivity.questGoal(metric: "coverage_points", target: 1), "1 point de couverture")
+        XCTAssertEqual(FeedActivity.questGoal(metric: "coverage_points", target: 25), "25 points de couverture")
+
+        let english = try XCTUnwrap(FeedActivity(item: item(kind: "badge", metadata), appIsFrench: false))
+        XCTAssertNil(english.quest?.description, "the French-only description is not shown in English")
+        XCTAssertNotNil(english.quest?.goal)
+
+        let eventCount = try XCTUnwrap(FeedActivity(item: item(kind: "badge",
+            #""activityType":"quest_claim","questKey":"daily_outage_arbiter","questMetric":"event_count","questTargetValue":3"#)))
+        XCTAssertNil(eventCount.quest, "an event count has no name of its own, and nothing else is known")
+
+        let retired = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: #"Quête "Ancienne quête" terminée"#,
+            #""activityType":"quest_claim","questKey":"retired","points":40"#)))
+        XCTAssertNil(retired.quest)
+        XCTAssertEqual(retired.subtitle, "Ancienne quête")
+        XCTAssertEqual(retired.points, 40)
+    }
+
     func testEachFamilyIsReadFromItsActivityType() throws {
         let level = try XCTUnwrap(FeedActivity(item: item(kind: "badge", text: "Niveau 12 atteint !",
             #""activityType":"level_up","newLevel":12,"points":10"#)))

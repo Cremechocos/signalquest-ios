@@ -74,6 +74,14 @@ struct SignalDetailSheet: View {
                 // ce qu'il raconte, plutôt que le texte français du serveur (F2).
                 if let activity = FeedActivity(item: item) {
                     ActivitySummaryRow(activity: activity)
+                    if let description = activity.quest?.description {
+                        Text(verbatim: description)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("signal.detail.questDescription")
+                    }
                     if let link = activity.link {
                         GradientButton(link.title, systemImage: link.symbol, style: .secondary) {
                             Haptics.selection()
@@ -485,6 +493,7 @@ struct SignalDetailSheet: View {
         }
         pairs += outagePairs
         pairs += photoPairs
+        pairs += questPairs
         pairs += speedtestPairs
         pairs += experiencePairs
         pairs.append(("Lieu", place ?? ""))
@@ -496,6 +505,15 @@ struct SignalDetailSheet: View {
             seen.insert(pair.0)
             return true
         }
+    }
+
+    /// Quête atteinte (#835) : sa fréquence et son objectif ; les points gagnés sont dans le résumé.
+    private var questPairs: [(String, String)] {
+        guard let quest = FeedActivity(item: item)?.quest else { return [] }
+        return [
+            ("Fréquence", quest.cadence?.frequency ?? ""),
+            ("Objectif", quest.goal ?? "")
+        ]
     }
 
     /// L'antenne photographiée (#827) : opérateur et adresse du support, tels qu'enregistrés avec la photo.
