@@ -401,9 +401,13 @@ struct MessageComposerBar: View {
 }
 
 /// Appareil photo du système (`UIImagePickerController`) : une photo, rendue en JPEG, puis la feuille se ferme.
-private struct CameraCapturePicker: UIViewControllerRepresentable {
+/// Partagé par la messagerie et les éditeurs du fil et des stories (E4).
+struct CameraCapturePicker: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
     let onCapture: (Data) -> Void
+
+    /// Faux au simulateur et sur un appareil sans caméra : le bouton ne s'affiche pas.
+    static var isAvailable: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()

@@ -339,6 +339,16 @@ final class ComposerViewModel: ObservableObject {
         }
     }
 
+    /// Photo prise avec l'appareil (E4) : même chemin qu'une photo choisie dans la photothèque.
+    func loadCapturedPhoto(_ data: Data) {
+        guard let image = ImagePipeline.downsample(data: data, maxPixel: 1600) else {
+            errorMessage = String(localized: "Photo illisible")
+            return
+        }
+        selectedItem = nil
+        setPickedImage(image, data: data)
+    }
+
     func attachLatestSpeedtest() async {
         guard attachedSpeedtest == nil, !isLoadingSpeedtest else { return }
         if AppEnvironment.usesDemoData {
@@ -541,6 +551,7 @@ struct ComposerSheet: View {
     private let onPublished: () -> Void
     /// Photothèque ouverte d'emblée quand on arrive par le bouton Photo du fil.
     @State private var showStartPhotoPicker = false
+    @State private var showsCamera = false
     /// Hashtags proposés sous le texte : tendances du fil d'abord.
     private let quickHashtags: [String]
 
@@ -776,6 +787,10 @@ struct ComposerSheet: View {
             }
         }
         .photosPicker(isPresented: $showStartPhotoPicker, selection: $model.selectedItem, matching: .images)
+        .fullScreenCover(isPresented: $showsCamera) {
+            CameraCapturePicker(isPresented: $showsCamera) { model.loadCapturedPhoto($0) }
+                .ignoresSafeArea()
+        }
         .onChangeCompat(of: model.selectedItem) { _, _ in
             Task { await model.loadPickerImage() }
         }
@@ -979,6 +994,15 @@ struct ComposerSheet: View {
                 ComposerToolChip(title: "Photo", systemImage: "photo", isOn: model.previewImage != nil, showsLabel: showsLabels)
             }
             .accessibilityLabel("Ajouter une photo")
+
+            if CameraCapturePicker.isAvailable {
+                Button { showsCamera = true } label: {
+                    ComposerToolChip(title: "Appareil photo", systemImage: "camera", isOn: false, showsLabel: showsLabels)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Prendre une photo")
+                .accessibilityIdentifier("composer.feed.camera")
+            }
 
             Button {
                 if model.attachedSpeedtest == nil {

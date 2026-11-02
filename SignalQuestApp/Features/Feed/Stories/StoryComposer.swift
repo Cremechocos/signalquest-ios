@@ -100,6 +100,20 @@ final class StoryComposerViewModel: ObservableObject {
         }
     }
 
+    /// Photo prise avec l'appareil (E4) : même chemin qu'une photo de la photothèque.
+    func loadCapturedPhoto(_ data: Data) {
+        guard let image = ImagePipeline.downsample(data: data, maxPixel: 1600) else {
+            errorMessage = String(localized: "Photo illisible")
+            return
+        }
+        selectedItem = nil
+        previewImage = image
+        pickedImageData = data
+        editSource = image
+        originalImageData = data
+        photoEdits = PhotoEdits()
+    }
+
     func loadPickerImage() async {
         guard let item = selectedItem else { return }
         do {
@@ -200,6 +214,7 @@ struct StoryComposer: View {
     @State private var showPremiumPaywall = false
     /// Éditeur « Flouter » de la photo (plan 3, vague 1).
     @State private var showBlurEditor = false
+    @State private var showsCamera = false
 
     private let onPublished: (SocialStory) -> Void
 
@@ -358,8 +373,23 @@ struct StoryComposer: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                if CameraCapturePicker.isAvailable {
+                    Button { showsCamera = true } label: {
+                        Text("Prendre une photo")
+                            .font(SQType.subhead(.bold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("story.camera")
+                }
             }
             .frame(maxWidth: .infinity, minHeight: 198, alignment: .topLeading)
+            .fullScreenCover(isPresented: $showsCamera) {
+                CameraCapturePicker(isPresented: $showsCamera) { model.loadCapturedPhoto($0) }
+                    .ignoresSafeArea()
+            }
         }
     }
 

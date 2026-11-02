@@ -25,6 +25,25 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(model.fallbackBody, "Meilleur réseau à Lyon ?")
     }
 
+    /// Une photo prise avec l'appareil (E4) devient la photo du post, comme celle de la photothèque ;
+    /// des octets illisibles laissent le post sans photo et le disent.
+    func testCapturedPhotoBecomesThePostPhoto() throws {
+        let model = ComposerViewModel(service: ComposerFeedFixture())
+        let jpeg = try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 40, height: 30)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 40, height: 30))
+        }.jpegData(compressionQuality: 0.9))
+        model.loadCapturedPhoto(jpeg)
+        XCTAssertNotNil(model.previewImage)
+        XCTAssertEqual(model.imageDataForUpload, jpeg)
+        XCTAssertNil(model.errorMessage)
+
+        let unreadable = ComposerViewModel(service: ComposerFeedFixture())
+        unreadable.loadCapturedPhoto(Data([0x00, 0x01]))
+        XCTAssertNil(unreadable.previewImage)
+        XCTAssertNotNil(unreadable.errorMessage)
+    }
+
     /// Une photo retirée ne part plus avec la publication ; une photo retouchée
     /// remplace l'originale (plan 3, vague 1 ; E1).
     func testRemovedPhotoIsNotPublishedAndEditedPhotoReplacesIt() throws {
