@@ -1286,4 +1286,33 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertFalse(refused.applied)
         XCTAssertEqual(refused.message, "Secteur invalide")
     }
+
+    /// Les routes de correction répondent 200 même quand aucune ligne ne correspond : un compte
+    /// à zéro n'est pas un changement, `noop` en est un (ticket ck2uk3vwvd2p5b8sd6y9p4zvl, comme le web).
+    func testACorrectionThatMatchedNothingIsNotAChange() throws {
+        func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
+            try JSONDecoder().decode(type, from: Data(json.utf8))
+        }
+        XCTAssertTrue(try decode(WithdrawResult.self, #"{"success":true,"siteId":"1","withdrawn":2}"#).changed)
+        XCTAssertFalse(try decode(WithdrawResult.self, #"{"success":true,"siteId":"1","withdrawn":0}"#).changed)
+        XCTAssertFalse(try decode(WithdrawResult.self, #"{"success":false,"withdrawn":3}"#).changed)
+
+        XCTAssertTrue(try decode(DeleteResult.self, #"{"success":true,"deleted":1,"softWithdrawn":0}"#).changed)
+        XCTAssertTrue(try decode(DeleteResult.self, #"{"success":true,"deleted":0,"softWithdrawn":2}"#).changed)
+        XCTAssertFalse(try decode(DeleteResult.self, #"{"success":true,"deleted":0,"softWithdrawn":0}"#).changed)
+
+        XCTAssertTrue(try decode(EditSiteResult.self, #"{"success":true,"moved":3,"toSiteId":"2"}"#).changed)
+        XCTAssertTrue(try decode(EditSiteResult.self, #"{"success":true,"moved":0,"toSiteId":"2","noop":true}"#).changed)
+        XCTAssertFalse(try decode(EditSiteResult.self, #"{"success":true,"moved":0,"toSiteId":"2"}"#).changed)
+
+        XCTAssertTrue(try decode(EditSectorsResult.self, #"{"applied":true,"updated":1,"sectors":[2]}"#).changed)
+        XCTAssertFalse(try decode(EditSectorsResult.self, #"{"applied":true,"updated":0,"sectors":[2]}"#).changed)
+    }
+
+    /// Un support cible inexistant (edit-site, 404) se dit simplement, sans le message serveur.
+    func testAMissingTargetSiteIsNamedPlainly() {
+        let message = APIError.userFacingMessage(status: 404, code: "TARGET_SITE_NOT_FOUND",
+                                                 serverMessage: "Site de destination introuvable", appIsFrench: true)
+        XCTAssertEqual(message, String(localized: "Support introuvable : vérifie son numéro."))
+    }
 }

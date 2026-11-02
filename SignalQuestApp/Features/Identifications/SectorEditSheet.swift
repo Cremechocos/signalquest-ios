@@ -88,7 +88,7 @@ final class SectorEditViewModel: ObservableObject {
                 marketCode: item.marketCode,
                 sectors: [sectorNumber]
             )
-            if result.applied {
+            if result.changed {
                 Haptics.success()
                 // Le serveur renvoie le secteur déduit du PCI comme référence : s'il diffère
                 // du choix enregistré, on le montre avant de fermer.
@@ -100,7 +100,8 @@ final class SectorEditViewModel: ObservableObject {
                     done = true
                 }
             } else {
-                errorMessage = result.message ?? String(localized: "Le secteur n'a pas pu être enregistré.")
+                errorMessage = result.applied ? IdentificationCorrectionText.nothingChanged
+                    : result.message ?? String(localized: "Le secteur n'a pas pu être enregistré.")
                 Haptics.error()
             }
         } catch {

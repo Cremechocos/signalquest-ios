@@ -482,6 +482,10 @@ struct EditSiteResult: Decodable, Equatable {
         toSiteId = c.decodeFlexibleString(forKey: .toSiteId)
         noop = (try? c.decodeIfPresent(Bool.self, forKey: .noop)) ?? false
     }
+
+    /// Le serveur répond 200 même quand rien ne correspond (`moved: 0`) ; `noop` (site
+    /// déjà le bon) compte comme un changement, comme sur le web.
+    var changed: Bool { success && (moved > 0 || noop) }
 }
 
 /// Réponse de `POST /api/android/map/identify/edit-sectors`. Le secteur saisi est écrit ;
@@ -507,6 +511,9 @@ struct EditSectorsResult: Decodable, Equatable {
         reason = c.decodeFlexibleString(forKey: .reason)
         message = c.decodeFlexibleString(forKey: .message)
     }
+
+    /// `applied` avec `updated: 0` : aucune ligne n'a changé.
+    var changed: Bool { applied && updated > 0 }
 }
 
 /// Réponse de `POST /api/android/map/identify/withdraw`.
@@ -525,6 +532,10 @@ struct WithdrawResult: Decodable, Equatable {
         withdrawn = (try? c.decodeIfPresent(Int.self, forKey: .withdrawn)) ?? 0
         withdrawnAt = (try? c.decodeIfPresent(Date.self, forKey: .withdrawnAt)) ?? nil
     }
+
+    /// Le retrait ne touche que les lignes de l'auteur et répond toujours 200 :
+    /// `withdrawn: 0` veut dire qu'aucune ne correspondait.
+    var changed: Bool { success && withdrawn > 0 }
 }
 
 /// Réponse de `POST /api/android/map/identify/delete` (suppression DÉFINITIVE).
@@ -545,4 +556,6 @@ struct DeleteResult: Decodable, Equatable {
         deleted = (try? c.decodeIfPresent(Int.self, forKey: .deleted)) ?? 0
         softWithdrawn = (try? c.decodeIfPresent(Int.self, forKey: .softWithdrawn)) ?? 0
     }
+
+    var changed: Bool { success && deleted + softWithdrawn > 0 }
 }

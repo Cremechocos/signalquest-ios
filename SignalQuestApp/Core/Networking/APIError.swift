@@ -177,6 +177,8 @@ enum APIError: Error, LocalizedError, Equatable {
         "MISSING_CELL_IDENTIFIERS": String(localized: "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)."),
         "OPERATOR_NOT_ALLOWED": String(localized: "Ton compte ne peut pas identifier de site chez cet opérateur."),
         "IDENTIFY_SITE_NOT_FOUND": String(localized: "Site introuvable : aucune antenne connue pour cet identifiant."),
+        // Correction d'une identification vers un support qui n'existe pas (edit-site, 404).
+        "TARGET_SITE_NOT_FOUND": String(localized: "Support introuvable : vérifie son numéro."),
         "VALIDATION_SITE_NOT_FOUND": String(localized: "Site introuvable : aucune antenne connue pour cet identifiant."),
         // Registre officiel (ISED…) momentanément injoignable : le serveur demande
         // d'attendre une quinzaine de secondes, plus que le rejeu automatique.

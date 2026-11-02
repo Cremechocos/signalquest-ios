@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Textes communs aux corrections d'une identification (retrait, suppression, site, secteur).
+enum IdentificationCorrectionText {
+    /// Les routes de correction répondent 200 même quand aucune ligne ne correspond :
+    /// on ne présente jamais comme faite une correction qui n'a rien changé (comme le web).
+    static var nothingChanged: String {
+        String(localized: "Aucune de tes lignes ne correspond : rien n’a été modifié.")
+    }
+}
+
 @MainActor
 final class MyIdentificationsViewModel: ObservableObject {
     @Published var items: [MyIdentification] = []
@@ -170,12 +179,12 @@ final class MyIdentificationsViewModel: ObservableObject {
                 cellId: item.cellId, ci: item.ci,
                 tech: item.tech, reason: nil
             )
-            if result.success {
+            if result.changed {
                 await load()
                 toast = String(localized: "Identification retirée")
                 Haptics.success()
             } else {
-                toast = String(localized: "Retrait impossible")
+                toast = result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Retrait impossible")
                 Haptics.error()
             }
         } catch {
@@ -200,14 +209,14 @@ final class MyIdentificationsViewModel: ObservableObject {
                 cellId: item.cellId, ci: item.ci,
                 tech: item.tech, reason: nil
             )
-            if result.success {
+            if result.changed {
                 await load()
                 toast = (result.deleted == 0 && result.softWithdrawn > 0)
                     ? String(localized: "Retirée : des cellules sont confirmées par d’autres")
                     : String(localized: "Identification supprimée")
                 Haptics.success()
             } else {
-                toast = String(localized: "Suppression impossible")
+                toast = result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Suppression impossible")
                 Haptics.error()
             }
         } catch {

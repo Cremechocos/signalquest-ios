@@ -73931,6 +73931,62 @@
         }
       }
     },
+    "Support introuvable : vérifie son numéro." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site not found: check its number."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support introuvable : vérifie son numéro."
+          }
+        }
+      }
+    },
+    "SQFormal|Support introuvable : vérifie son numéro." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support introuvable : vérifiez son numéro."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucune de tes lignes ne correspond : rien n’a été modifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of your entries match: nothing was changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune de tes lignes ne correspond : rien n’a été modifié."
+          }
+        }
+      }
+    },
+    "SQFormal|Aucune de tes lignes ne correspond : rien n’a été modifié." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune de vos lignes ne correspond : rien n’a été modifié."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Retrait…" : {
       "localizations" : {
         "en" : {

@@ -120,11 +120,11 @@ final class SiteRemapViewModel: ObservableObject {
                 fromSiteId: item.siteId, toSiteId: toSiteId,
                 enb: item.enb, gnb: item.gnb, reason: nil
             )
-            if result.success {
+            if result.changed {
                 Haptics.success()
                 done = true
             } else {
-                errorMessage = String(localized: "Le déplacement n'a pas abouti.")
+                errorMessage = result.success ? IdentificationCorrectionText.nothingChanged : String(localized: "Le déplacement n'a pas abouti.")
                 Haptics.error()
             }
         } catch {
