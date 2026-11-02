@@ -534,7 +534,8 @@ final class RadioLogsViewModel: ObservableObject {
         "\(kind.rawValue)|\(node)|\(siteId)"
     }
 
-    /// Le site est identifié, et c'est le membre qui l'a fait.
+    /// Le site est identifié, et c'est le membre qui l'a fait. `false` ne prouve pas l'inverse
+    /// (liste bornée, lecture ratée) : la ligne n'a simplement pas « Corriger », sans rien en conclure.
     func isMine(_ site: RadioLogSite) -> Bool {
         guard let siteId = state(of: site).siteId else { return false }
         return myNodeKeys.contains(Self.nodeKey(kind: site.kind, node: site.node, siteId: siteId))
