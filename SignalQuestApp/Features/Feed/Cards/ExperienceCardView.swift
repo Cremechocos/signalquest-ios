@@ -119,17 +119,20 @@ extension ExperienceHighlights {
         if let overall = scores?.overall { metrics.append(.init(label: "Note globale", value: "\(overall)/100")) }
         if let videoMaxQualityLabel { metrics.append(.init(label: "Vidéo sans coupure", value: videoMaxQualityLabel)) }
         if let videoScore { metrics.append(.init(label: "Score vidéo", value: "\(videoScore)/100")) }
-        if let pageMedianMs { metrics.append(.init(label: "Page web", value: Self.waitingTime(pageMedianMs))) }
+        if let pageMedianMs { metrics.append(.init(label: "Page web", value: Self.duration(pageMedianMs))) }
         // Une ouverture TCP (apps) et un aller-retour HTTP (web) ne se comparent pas :
         // la tuile dit de quelle mesure il s'agit (contrat, §4).
         if let gameMedianMs {
             let label = gameIsHTTPRoundTrip ? "Jeu et appels · navigateur" : "Jeu et appels · app"
-            metrics.append(.init(label: label, value: "\(gameMedianMs) ms"))
+            metrics.append(.init(label: label, value: ExperiencePresentation.format(.ms, .int(gameMedianMs), .current)))
         }
-        if let uploadPhotoMs { metrics.append(.init(label: "Envoi photo", value: Self.waitingTime(uploadPhotoMs))) }
+        if let uploadPhotoMs { metrics.append(.init(label: "Envoi photo", value: Self.duration(uploadPhotoMs))) }
         if !metrics.isEmpty { metrics[0].highlight = true }
         return metrics
     }
+
+    /// La règle `duration` de presentation-v1, comme la carte du web : U+00A0 avant l'unité.
+    private static func duration(_ ms: Int) -> String { ExperiencePresentation.format(.duration, .int(ms), .current) }
 
     /// 850 ms, puis 2,1 s au-delà d'une seconde, arrondi demi vers le haut en entiers
     /// comme l'image de partage (méthode §10) : 1 250 ms → 1,3 s.
