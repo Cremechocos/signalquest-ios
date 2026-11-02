@@ -377,10 +377,10 @@ enum SQShareCardBuilder {
     static func throughput(_ mbps: Double, locale: Locale) -> SQShareCardModel.Value? {
         guard mbps.isFinite, mbps > 0 else { return nil }
         if mbps >= 999.5 {
-            return .init(number: number(mbps / 1000, fractionDigits: 3, locale: locale), unit: "Gb/s")
+            return .init(number: number(mbps.rounded() / 1000, fractionDigits: 3, locale: locale), unit: "Gb/s")
         }
         if mbps >= 9.95 {
-            return .init(number: number(mbps, fractionDigits: 0, locale: locale), unit: "Mb/s")
+            return .init(number: number(mbps.rounded(), fractionDigits: 0, locale: locale), unit: "Mb/s")
         }
         // Décimale seulement si elle n'est pas nulle : « 7 Mb/s », jamais « 7,0 » (02/11).
         let tenths = (mbps * 10).rounded()

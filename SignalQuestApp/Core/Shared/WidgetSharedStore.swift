@@ -205,7 +205,7 @@ enum WidgetUnits {
         if mbps >= 999.5 {
             // Trois décimales : la précision de l'entier en Mbit/s, sans saut au
             // passage du gigabit (règle commune web, Android et iOS du 20/10).
-            return (mbps / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
+            return (mbps.rounded() / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
         }
         if mbps < 9.95 {
             // Décimale seulement si elle n'est pas nulle : « 7 », jamais « 7,0 ».
@@ -213,7 +213,7 @@ enum WidgetUnits {
             return (tenths / 10).formatted(.number.precision(.fractionLength(tenths.truncatingRemainder(dividingBy: 10) == 0 ? 0 : 1)).locale(locale))
         }
         // Bascules sur la valeur arrondie : 9,96 s'écrit « 10 », 999,6 « 1,000 Gbit/s ».
-        return mbps.formatted(.number.precision(.fractionLength(0)).locale(locale))
+        return mbps.rounded().formatted(.number.precision(.fractionLength(0)).locale(locale))
     }
 
     static func throughputUnit(mbps: Double) -> String {

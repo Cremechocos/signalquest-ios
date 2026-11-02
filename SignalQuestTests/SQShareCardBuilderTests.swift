@@ -133,6 +133,7 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(text(7.54), "7,5 Mb/s")
         XCTAssertEqual(text(7), "7 Mb/s", "Décimale facultative : jamais « 7,0 » (02/11)")
         XCTAssertEqual(text(9.94), "9,9 Mb/s")
+        XCTAssertEqual(text(12.5), "13 Mb/s", "Demi vers le haut, jamais au pair")
         XCTAssertEqual(text(9.96), "10 Mb/s")
         XCTAssertEqual(text(84.24), "84 Mb/s")
         XCTAssertEqual(text(214.4), "214 Mb/s")
