@@ -5,8 +5,48 @@ enum IdentificationCorrectionText {
     /// Les routes de correction répondent 200 même quand aucune ligne ne correspond :
     /// on ne présente jamais comme faite une correction qui n'a rien changé (comme le web).
     static var nothingChanged: String {
-        String(localized: "Aucune de tes lignes ne correspond : rien n’a été modifié.")
+        String(localized: "Rien n’a été modifié. Aucune de tes lignes ne correspond : elle a peut-être déjà été retirée ou déplacée.")
     }
+    static var consensusChanged: String {
+        String(localized: "Le support le plus validé a changé. Recharge la liste avant de déplacer.")
+    }
+    static var noConsensus: String {
+        String(localized: "Aucun autre support n’est plus validé : rien à déplacer.")
+    }
+
+    /// Échec d'une correction, tel que le dit la maquette commune (planche 6) : jamais de
+    /// code brut. Les corrections iOS partent sans file : hors ligne, rien n'est parti.
+    static func failure(_ error: Error) -> String {
+        guard let api = error as? APIError else { return error.userFacingMessage }
+        switch api {
+        case .http(401, _, _, _, _), .missingAuthToken:
+            // Le refresh a déjà échoué : l'app repasse seule sur l'écran de connexion.
+            return String(localized: "Ta session a expiré. Reconnecte-toi, puis refais la correction.")
+        case .http(404, "TARGET_SITE_NOT_FOUND"?, _, _, _):
+            return String(localized: "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre.")
+        case .http(409, "CONSENSUS_TARGET_CHANGED"?, _, _, _):
+            return consensusChanged
+        case .http(409, "NO_CONSENSUS_CONFLICT"?, _, _, _):
+            return noConsensus
+        case let .http(status, code, message, _, _):
+            // Le message du serveur s'il est lisible, sinon un texte propre à la correction.
+            let readable = APIError.userFacingMessage(status: status, code: code, serverMessage: message)
+            return readable == APIError.statusFallback(status)
+                ? String(localized: "La correction n’a pas pu être enregistrée.") : readable
+        case .transport where !api.isServerUnreachable:
+            return String(localized: "Erreur réseau. Ta correction n’est pas partie. Elle reste ici : réessaie quand le réseau revient.")
+        default:
+            return api.userFacingMessage
+        }
+    }
+
+    /// Échecs qui se règlent en relisant ses identifications, jamais en réessayant.
+    static func needsReload(_ message: String?) -> Bool {
+        guard let message else { return false }
+        return [nothingChanged, consensusChanged, noConsensus].contains(message)
+    }
+
+    static var reload: String { String(localized: "Recharger mes identifications") }
 }
 
 @MainActor
@@ -190,7 +230,7 @@ final class MyIdentificationsViewModel: ObservableObject {
         } catch {
             // En toast, visible à la fermeture de la fiche : la ligne d'erreur en
             // bas de liste passait inaperçue et laissait croire au retrait.
-            toast = error.userFacingMessage
+            toast = IdentificationCorrectionText.failure(error)
             Haptics.error()
         }
     }
@@ -222,7 +262,7 @@ final class MyIdentificationsViewModel: ObservableObject {
         } catch {
             // En toast, visible à la fermeture de la fiche : la ligne d'erreur en
             // bas de liste passait inaperçue et laissait croire au retrait.
-            toast = error.userFacingMessage
+            toast = IdentificationCorrectionText.failure(error)
             Haptics.error()
         }
     }
@@ -815,6 +855,7 @@ private struct IdentificationDetailSheet: View {
                 identify: services.identify,
                 location: services.location,
                 markets: services.markets,
+                onReload: { onChanged(); dismiss() },
                 onDone: { _ in onChanged(); dismiss() }
             )
         }
@@ -824,6 +865,7 @@ private struct IdentificationDetailSheet: View {
                 antennas: services.antennas,
                 identify: services.identify,
                 prefilledSector: sectorPrefill,
+                onReload: { onChanged(); dismiss() },
                 onDone: { onChanged(); dismiss() }
             )
         }
@@ -906,15 +948,15 @@ private struct IdentificationDetailSheet: View {
                 Haptics.error()
             }
         } catch APIError.http(409, "CONSENSUS_TARGET_CHANGED"?, _, _, _) {
-            adoptError = String(localized: "Le support le plus validé a changé. Recharge la liste avant de déplacer.")
+            adoptError = IdentificationCorrectionText.consensusChanged
             Haptics.error()
             onStale()
         } catch APIError.http(409, "NO_CONSENSUS_CONFLICT"?, _, _, _) {
-            adoptError = String(localized: "Aucun autre support n’est plus validé : rien à déplacer.")
+            adoptError = IdentificationCorrectionText.noConsensus
             Haptics.error()
             onStale()
         } catch {
-            adoptError = error.userFacingMessage
+            adoptError = IdentificationCorrectionText.failure(error)
             Haptics.error()
         }
     }

@@ -283,6 +283,32 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(service.sentReasons.last??.count, 280)
     }
 
+    /// Planche 6 : chaque refus a son texte, jamais un code brut ; seuls les refus qui se
+    /// règlent en relisant proposent « Recharger mes identifications ».
+    func testCorrectionFailuresSpeakLikeTheSharedMockup() {
+        typealias T = IdentificationCorrectionText
+        func http(_ status: Int, _ code: String? = nil, _ message: String = "") -> APIError {
+            .http(status: status, code: code, message: message, requestId: nil, retryAfter: nil)
+        }
+        XCTAssertEqual(T.failure(http(401)), String(localized: "Ta session a expiré. Reconnecte-toi, puis refais la correction."))
+        XCTAssertEqual(T.failure(http(404, "TARGET_SITE_NOT_FOUND", "Site cible introuvable")),
+                       String(localized: "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre."))
+        XCTAssertEqual(T.failure(http(409, "CONSENSUS_TARGET_CHANGED")), T.consensusChanged)
+        XCTAssertEqual(T.failure(http(409, "NO_CONSENSUS_CONFLICT")), T.noConsensus)
+        XCTAssertEqual(T.failure(http(500, nil, "Invalid `prisma.$queryRaw()` invocation")),
+                       String(localized: "La correction n’a pas pu être enregistrée."))
+        XCTAssertEqual(T.failure(http(400, "SOMETHING_ODD")), String(localized: "La correction n’a pas pu être enregistrée."))
+        XCTAssertEqual(T.failure(APIError.transport(from: URLError(.notConnectedToInternet))),
+                       String(localized: "Erreur réseau. Ta correction n’est pas partie. Elle reste ici : réessaie quand le réseau revient."))
+        XCTAssertEqual(T.failure(APIError.transport(from: URLError(.cannotConnectToHost))), SQOfflineText.serverUnreachable)
+
+        XCTAssertTrue(T.needsReload(T.nothingChanged))
+        XCTAssertTrue(T.needsReload(T.consensusChanged))
+        XCTAssertTrue(T.needsReload(T.noConsensus))
+        XCTAssertFalse(T.needsReload(T.failure(http(500))))
+        XCTAssertFalse(T.needsReload(nil))
+    }
+
     func testADeletionOfASharedLineSaysItWasOnlyWithdrawnForTheMember() async throws {
         let node = try XCTUnwrap(try page("cellsTruncatedNode").identifications.first { $0.kind == .enb })
         let service = PagedIdentifyService()

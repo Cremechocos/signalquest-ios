@@ -74486,29 +74486,145 @@
       },
       "shouldTranslate" : false
     },
-    "Aucune de tes lignes ne correspond : rien n’a été modifié." : {
+    "Recharger mes identifications" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "None of your entries match: nothing was changed."
+            "value" : "Reload my identifications"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune de tes lignes ne correspond : rien n’a été modifié."
+            "value" : "Recharger mes identifications"
           }
         }
       }
     },
-    "SQFormal|Aucune de tes lignes ne correspond : rien n’a été modifié." : {
+    "Erreur réseau. Ta correction n’est pas partie. Elle reste ici : réessaie quand le réseau revient." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network error. Your correction was not sent. It stays here: try again when the network is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreur réseau. Ta correction n’est pas partie. Elle reste ici : réessaie quand le réseau revient."
+          }
+        }
+      }
+    },
+    "SQFormal|Erreur réseau. Ta correction n’est pas partie. Elle reste ici : réessaie quand le réseau revient." : {
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune de vos lignes ne correspond : rien n’a été modifié."
+            "value" : "Erreur réseau. Votre correction n’est pas partie. Elle reste ici : réessayez quand le réseau revient."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "La correction n’a pas pu être enregistrée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The correction could not be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La correction n’a pas pu être enregistrée."
+          }
+        }
+      }
+    },
+    "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site is no longer on the map. It may have been removed in the meantime: pick another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisissez-en un autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta session a expiré. Reconnecte-toi, puis refais la correction." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your session has expired. Sign in again, then redo the correction."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta session a expiré. Reconnecte-toi, puis refais la correction."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta session a expiré. Reconnecte-toi, puis refais la correction." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre session a expiré. Reconnectez-vous, puis refaites la correction."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Rien n’a été modifié. Aucune de tes lignes ne correspond : elle a peut-être déjà été retirée ou déplacée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was changed. None of your entries match: it may already have been withdrawn or moved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été modifié. Aucune de tes lignes ne correspond : elle a peut-être déjà été retirée ou déplacée."
+          }
+        }
+      }
+    },
+    "SQFormal|Rien n’a été modifié. Aucune de tes lignes ne correspond : elle a peut-être déjà été retirée ou déplacée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été modifié. Aucune de vos lignes ne correspond : elle a peut-être déjà été retirée ou déplacée."
           }
         }
       },

@@ -62,7 +62,10 @@ final class IdentificationCorrectionModel: ObservableObject {
     /// Filtre refusé (`INVALID_FILTER`) : relecture complète, avec la même règle.
     /// `quietly` : après une correction, le bloc reste affiché le temps de relire.
     func load(quietly: Bool = false) async {
-        if !quietly { state = .loading }
+        if !quietly {
+            state = .loading
+            actionError = nil
+        }
         do {
             let read: (items: [MyIdentification], checks: IdentificationChecks?)
             do {
@@ -186,7 +189,7 @@ final class IdentificationCorrectionModel: ObservableObject {
                 actionError = reason
             }
         } catch {
-            actionError = error.userFacingMessage
+            actionError = IdentificationCorrectionText.failure(error)
         }
         Haptics.error()
         return nil
@@ -254,6 +257,7 @@ struct IdentificationCorrectionBlock: View {
                         movesAfterSectors = true
                         self.route = nil
                     },
+                    onReload: { Task { await model.load() } },
                     onDone: {
                         onOutcome(.edited)
                         Task { await model.load(quietly: true) }
@@ -266,6 +270,7 @@ struct IdentificationCorrectionBlock: View {
                     identify: services.identify,
                     location: services.location,
                     markets: services.markets,
+                    onReload: { Task { await model.load() } },
                     onDone: { siteId in onOutcome(.moved(siteId: siteId)) }
                 )
             }
@@ -351,6 +356,12 @@ struct IdentificationCorrectionBlock: View {
             if let error = model.actionError {
                 SQNotice(message: error, tone: .danger)
                     .accessibilityIdentifier("identification.actionError")
+                if IdentificationCorrectionText.needsReload(error) {
+                    GradientButton(IdentificationCorrectionText.reload, systemImage: "arrow.clockwise", style: .secondary) {
+                        Task { await model.load() }
+                    }
+                    .accessibilityIdentifier("identification.block.reloadMine")
+                }
             }
             HStack(spacing: SQSpace.sm) {
                 GradientButton(String(localized: "Corriger"), systemImage: "pencil", isBusy: model.isBusy, style: .secondary) {

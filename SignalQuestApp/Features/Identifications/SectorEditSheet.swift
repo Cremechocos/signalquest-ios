@@ -186,7 +186,7 @@ final class SectorEditViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            errorMessage = IdentificationCorrectionText.failure(error)
             Haptics.error()
         }
     }
@@ -201,14 +201,17 @@ struct SectorEditSheet: View {
     @StateObject private var model: SectorEditViewModel
     /// « Pas le bon support ? » : la feuille se ferme sur le choix du support sur la carte.
     let onMove: (() -> Void)?
+    /// « Recharger mes identifications » après un échec que seule une relecture règle.
+    let onReload: (() -> Void)?
     let onDone: () -> Void
 
     init(item: MyIdentification, cells: [MyIdentification] = [], antennas: AntennasServicing, identify: IdentifyServicing,
          prefilledSector: Int? = nil, trustsSectorCheck: Bool = true,
-         onMove: (() -> Void)? = nil, onDone: @escaping () -> Void) {
+         onMove: (() -> Void)? = nil, onReload: (() -> Void)? = nil, onDone: @escaping () -> Void) {
         _model = StateObject(wrappedValue: SectorEditViewModel(item: item, cells: cells, antennas: antennas, identify: identify,
                                                                prefilledSector: prefilledSector, trustsSectorCheck: trustsSectorCheck))
         self.onMove = onMove
+        self.onReload = onReload
         self.onDone = onDone
     }
 
@@ -270,6 +273,13 @@ struct SectorEditSheet: View {
                 if let error = model.errorMessage, model.slotCount > 0 {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption).foregroundStyle(OutageTint.degradedInk)
+                    if let onReload, IdentificationCorrectionText.needsReload(error) {
+                        GradientButton(IdentificationCorrectionText.reload, systemImage: "arrow.clockwise", style: .secondary) {
+                            onReload()
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("sector.reloadMine")
+                    }
                 }
 
                 saveButton

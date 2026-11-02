@@ -167,7 +167,7 @@ final class SiteRemapViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            errorMessage = IdentificationCorrectionText.failure(error)
             Haptics.error()
         }
     }
@@ -177,6 +177,8 @@ final class SiteRemapViewModel: ObservableObject {
 struct SiteRemapSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: SiteRemapViewModel
+    /// « Recharger mes identifications » après un échec que seule une relecture règle.
+    let onReload: (() -> Void)?
     let onDone: (String) -> Void
     /// Le déplacement est public et emporte toutes les cellules du nœud : il se
     /// confirme, comme le choix sur carte des Logs (AF-RAD-17).
@@ -188,11 +190,13 @@ struct SiteRemapSheet: View {
         identify: IdentifyServicing,
         location: LocationService,
         markets: MarketRegistryServicing? = nil,
+        onReload: (() -> Void)? = nil,
         onDone: @escaping (String) -> Void
     ) {
         _model = StateObject(wrappedValue: SiteRemapViewModel(
             item: item, antennas: antennas, identify: identify, location: location, markets: markets
         ))
+        self.onReload = onReload
         self.onDone = onDone
     }
 
@@ -224,6 +228,13 @@ struct SiteRemapSheet: View {
                 if let errorMessage = model.errorMessage {
                     SQNotice(message: errorMessage, tone: .danger)
                         .accessibilityIdentifier("remap.error")
+                    if let onReload, IdentificationCorrectionText.needsReload(errorMessage) {
+                        GradientButton(IdentificationCorrectionText.reload, systemImage: "arrow.clockwise", style: .secondary) {
+                            onReload()
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("remap.reloadMine")
+                    }
                 }
                 selectionCard
             }
