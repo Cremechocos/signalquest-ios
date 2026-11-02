@@ -282,10 +282,10 @@ final class PhotosViewModel: ObservableObject {
 
     /// Renvoie `nil` si l'envoi a réussi, sinon le message à afficher dans la feuille
     /// (session expirée, fichier trop gros, trop de requêtes… ne sont pas la même panne).
-    func upload(data: Data, siteId: String, description: String, operatorName: String?, exifMetadata: String?) async -> String? {
+    func upload(data: Data, siteId: String, market: String?, description: String, operatorName: String?, exifMetadata: String?) async -> String? {
         do {
             let photo = try await service.uploadPhoto(
-                data: data, siteId: siteId, description: description,
+                data: data, siteId: siteId, market: market, description: description,
                 anfrCode: nil, operatorName: operatorName, exifMetadata: exifMetadata
             )
             photos.insert(photo, at: 0)
@@ -414,8 +414,8 @@ struct PhotosView: View {
             }
         }
         .sheet(isPresented: $showingUpload) {
-            PhotoUploadView(antennas: services.antennas, markets: services.markets) { data, siteId, desc, op, exif in
-                await model.upload(data: data, siteId: siteId, description: desc, operatorName: op, exifMetadata: exif)
+            PhotoUploadView(antennas: services.antennas, markets: services.markets) { data, siteId, market, desc, op, exif in
+                await model.upload(data: data, siteId: siteId, market: market, description: desc, operatorName: op, exifMetadata: exif)
             }
             .presentationDetents([.large])
             .presentationBackgroundCompat(SQColor.bg)
@@ -1202,7 +1202,8 @@ struct PhotoUploadView: View {
     /// Renvoie `nil` si l'upload a réussi (la feuille se ferme alors), sinon le
     /// message d'échec à afficher. Le dernier paramètre est le JSON `exifMetadata`
     /// extrait de l'original.
-    var onUpload: (Data, String, String, String?, String?) async -> String?
+    /// Image, site, marché du site, légende, opérateur, EXIF.
+    var onUpload: (Data, String, String?, String, String?, String?) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var pickerItem: PhotosPickerItem?
@@ -1217,6 +1218,8 @@ struct PhotoUploadView: View {
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var selectedSite: AntennaSite?
+    /// Marché dans lequel le sélecteur a trouvé ce site.
+    @State private var selectedSiteMarket: String?
     @State private var selectedOperator: String?
     @State private var description = ""
     @State private var showSitePicker = false
@@ -1385,7 +1388,7 @@ struct PhotoUploadView: View {
                             // pas. Le serveur conserve alors l'attribution vide ;
                             // seul un support réellement mutualisé impose le choix.
                             let networkOperator = selectedOperator ?? availableOperators.first
-                            let failure = await onUpload(prepared.jpeg, site.writeSiteId, description, networkOperator, prepared.exifJSON)
+                            let failure = await onUpload(prepared.jpeg, site.writeSiteId, selectedSiteMarket, description, networkOperator, prepared.exifJSON)
                             isUploading = false
                             if let failure { uploadError = failure } else { dismiss() }
                         }
@@ -1403,8 +1406,9 @@ struct PhotoUploadView: View {
             .toolbar(.hidden, for: .navigationBar)
             .signalQuestBackground()
             .sheet(isPresented: $showSitePicker) {
-                AntennaSitePickerSheet(antennas: antennas, markets: markets) { site in
+                AntennaSitePickerSheet(antennas: antennas, markets: markets) { site, market in
                     selectedSite = site
+                    selectedSiteMarket = market
                     selectedOperator = nil
                     showSitePicker = false
                 }
@@ -1594,7 +1598,8 @@ struct PhotoShareSheet: View {
 struct AntennaSitePickerSheet: View {
     let antennas: AntennasServicing
     let markets: MarketRegistryServicing
-    let onSelect: (AntennaSite) -> Void
+    /// Site choisi et marché dans lequel il a été chargé.
+    let onSelect: (AntennaSite, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var locationService = LocationService()
@@ -1608,6 +1613,8 @@ struct AntennaSitePickerSheet: View {
     @State private var errorMessage: String?
     @State private var sitesLoadTask: Task<Void, Never>?
     @State private var marketLabel: String?
+    /// Marché des sites affichés : il part avec la photo (#831).
+    @State private var sitesMarket: String?
     @State private var isCommunityFallback = false
 
     var body: some View {
@@ -1622,7 +1629,7 @@ struct AntennaSitePickerSheet: View {
                 ) { site in
                     MapAnnotation(coordinate: CLLocationCoordinate2D(latitude: site.latitude!, longitude: site.longitude!)) {
                         Button {
-                            onSelect(site)
+                            onSelect(site, sitesMarket)
                         } label: {
                             ZStack {
                                 Circle()
@@ -1796,6 +1803,7 @@ struct AntennaSitePickerSheet: View {
                 isCommunityFallback = !merged.isEmpty
             }
             sites = merged
+            sitesMarket = marketCode
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }

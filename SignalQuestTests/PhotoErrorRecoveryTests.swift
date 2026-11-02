@@ -245,5 +245,57 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
     func deleteComment(photoId: String, commentId: String) async throws { throw Failure.unavailable }
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse { throw Failure.unavailable }
     func updatePhotoOperator(photoId: String, operatorName: String) async throws { throw Failure.unavailable }
-    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo { throw Failure.unavailable }
+    func uploadPhoto(data: Data, siteId: String, market: String?, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo { throw Failure.unavailable }
+}
+
+/// `market` (#831) : le marché du support photographié part dans le multipart, et rien quand il manque.
+final class PhotoUploadMarketTests: XCTestCase {
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    private func sentBody(market: String?) async throws -> String {
+        nonisolated(unsafe) var captured: URLRequest?
+        let reply = try JSONEncoder().encode(Photo.demoList[0])
+        MockURLProtocol.requestHandler = { request in
+            captured = request
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, reply)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("photo-market-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        _ = try await PhotoService(api: api).uploadPhoto(
+            data: Data([0xFF, 0xD8, 0xFF]), siteId: "site-1", market: market, description: nil,
+            anfrCode: nil, operatorName: "ORANGE", exifMetadata: nil
+        )
+        let request = try XCTUnwrap(captured)
+        XCTAssertEqual(request.url?.path, "/api/photos")
+        var body = request.httpBody ?? Data()
+        if body.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 4_096)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                body.append(buffer, count: count)
+            }
+        }
+        return String(decoding: body, as: UTF8.self)
+    }
+
+    func testTheSiteMarketIsSent() async throws {
+        let body = try await sentBody(market: "GP")
+        XCTAssertTrue(body.contains("name=\"market\"\r\n\r\nGP\r\n"), body)
+    }
+
+    func testNoMarketFieldWithoutAMarket() async throws {
+        let absent = try await sentBody(market: nil)
+        let empty = try await sentBody(market: "")
+        XCTAssertFalse(absent.contains("name=\"market\""))
+        XCTAssertFalse(empty.contains("name=\"market\""))
+    }
 }

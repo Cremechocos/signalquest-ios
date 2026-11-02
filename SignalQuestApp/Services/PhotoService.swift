@@ -9,7 +9,7 @@ protocol PhotoServicing: Sendable {
     func deleteComment(photoId: String, commentId: String) async throws
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse
     func updatePhotoOperator(photoId: String, operatorName: String) async throws
-    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo
+    func uploadPhoto(data: Data, siteId: String, market: String?, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo
 }
 
 final class PhotoService: PhotoServicing {
@@ -79,8 +79,11 @@ final class PhotoService: PhotoServicing {
         )
     }
 
-    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo {
+    func uploadPhoto(data: Data, siteId: String, market: String?, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo {
         var fields = ["siteId": siteId]
+        // Marché DU SUPPORT photographié, tel que la fiche l'a donné (#831) — jamais celui de la
+        // SIM. Sans lui, une clé multi-marchés comme ORANGE laissait la photo sans marché.
+        if let market, !market.isEmpty { fields["market"] = market }
         if let description, !description.isEmpty { fields["description"] = description }
         if let anfrCode, !anfrCode.isEmpty { fields["anfrCode"] = anfrCode }
         if let operatorName, !operatorName.isEmpty { fields["operator"] = operatorName }

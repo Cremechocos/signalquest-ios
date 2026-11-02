@@ -77,6 +77,7 @@ final class AntennaDetailViewModel: ObservableObject {
             _ = try await photos.uploadPhoto(
                 data: prepared.jpeg,
                 siteId: siteId,
+                market: market.uppercased(),
                 description: nil,
                 anfrCode: anfrCode,
                 operatorName: operatorName == "ALL" ? nil : operatorName,
