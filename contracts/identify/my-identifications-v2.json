@@ -22,7 +22,7 @@
     "cursor": {
       "invalid": "pas-un-curseur",
       "invalidCode": "INVALID_CURSOR",
-      "note": "valable seulement avec les mêmes operator, marketCode, include et conflict ; sinon INVALID_CURSOR"
+      "note": "valable seulement avec les mêmes operator, marketCode, include, conflict, siteId et enb/gnb ; sinon INVALID_CURSOR"
     },
     "conflict": {
       "values": [
@@ -31,6 +31,28 @@
       ],
       "invalidCode": "INVALID_FILTER",
       "note": "nœuds seulement, jamais d'orphelines"
+    },
+    "siteId": {
+      "example": "siteId=1234567",
+      "rule": "égalité exacte avec le siteId stocké sur la ligne (pas de résolution d'alias ANFR) ; nœuds, leurs cellules et les orphelines de ce support ; totals sur ce support",
+      "invalid": [
+        "x × 65"
+      ],
+      "invalidCode": "INVALID_FILTER",
+      "added": "2026-11-02"
+    },
+    "node": {
+      "params": [
+        "enb=…",
+        "gnb=…"
+      ],
+      "rule": "chiffres seulement (1 à 12) ; un seul des deux ; la ligne nœud de cette valeur, les cellules qui la portent et ses orphelines ; cumulable avec siteId et les autres filtres",
+      "invalid": [
+        "enb=12a",
+        "enb=1&gnb=2"
+      ],
+      "invalidCode": "INVALID_FILTER",
+      "added": "2026-11-02"
     }
   },
   "response": {
@@ -213,7 +235,7 @@
         "derivedSector": 2
       },
       {
-        "label": "2506127 : Bouygues sous leader Free",
+        "label": "2506127 : Bouygues sous leader Free (équipement ZB, (CID mod 3) + 1)",
         "operator": "BOUYGUES",
         "cid": 3,
         "stored": 1,
@@ -224,10 +246,10 @@
           "FREE",
           "BOUYGUES"
         ],
-        "expected": 3,
-        "status": "mismatch",
+        "expected": null,
+        "status": "match",
         "basis": "leader",
-        "derivedSector": 3
+        "derivedSector": 1
       },
       {
         "label": "hors ZB, SFR base 0",
