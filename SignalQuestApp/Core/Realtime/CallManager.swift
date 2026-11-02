@@ -1499,6 +1499,13 @@ final class CallManager: NSObject, ObservableObject {
 
     fileprivate func registerVoIPToken(_ token: String) async {
         lastVoipToken = token
+        // PushKit livre le jeton dès le lancement, avant toute session : sans jeton
+        // d'auth, le POST finirait en 401. `registerVoIPTokenForSession` l'enverra
+        // à la connexion.
+        guard api.credentials.accessToken() != nil else {
+            voipTokenNeedsSync = true
+            return
+        }
         do {
             let _: SuccessResponse = try await api.requestJSON(
                 "/api/user/voip-token",
