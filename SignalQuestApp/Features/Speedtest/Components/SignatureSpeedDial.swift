@@ -566,7 +566,10 @@ struct SpeedtestSparkline: View {
                 .stroke(SQColor.separator, lineWidth: 1)
                 if points.count > 1 {
                     Path { path in
-                        for (index, point) in points.enumerated() {
+                        // Au dessin seulement, le tracé part de (0, 0) (décision du 02/11).
+                        let drawn = points.first.map { $0.progress > 0 || $0.value > 0 } == true
+                            ? [Point(progress: 0, value: 0)] + points : points
+                        for (index, point) in drawn.enumerated() {
                             let x = size.width * CGFloat(max(0, min(1, point.progress)))
                             let y = size.height - 2 - CGFloat(min(1, point.value / (peak * 1.1))) * (size.height - 6)
                             index == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
