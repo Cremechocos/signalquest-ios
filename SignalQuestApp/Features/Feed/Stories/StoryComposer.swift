@@ -300,6 +300,8 @@ struct StoryComposer: View {
                 PhotoEditorView(image: image, edits: model.photoEdits, fixedAspect: 9 / 16) { edited, edits in
                     model.applyEdits(edited, edits)
                 }
+                // Même noir que la story : l'éditeur ne s'allume pas en crème au-dessus.
+                .environment(\.colorScheme, .dark)
             }
         }
         .fullScreenCover(isPresented: $showsCamera) {
