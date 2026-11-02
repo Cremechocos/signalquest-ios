@@ -374,13 +374,11 @@ private struct ExperienceResultView: View {
             if !scores.isEmpty {
                 ExperienceOverallScoreCard(scores: scores)
             }
-            VStack(spacing: 0) {
-                ForEach(tests, id: \.self) { test in
-                    resultRow(test)
-                    if test != tests.last { Divider().padding(.leading, SQSpace.cardPadding) }
-                }
-            }
-            .sqCardBackground()
+            ExperienceUseList(
+                items: ExperienceUseItem.items(finished.run.tests, failures: finished.run.failures, only: finished.selected),
+                identifier: "experience.result",
+                open: model.openDetail
+            )
 
             usageLine
             saveLine
@@ -400,8 +398,6 @@ private struct ExperienceResultView: View {
         .accessibilityIdentifier("experience.result")
         .sheet(item: $shareInput) { ExperienceSharePreviewSheet(input: $0) }
     }
-
-    private var tests: [ExperienceTestKind] { ExperienceMethod.order.filter(finished.selected.contains) }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -449,38 +445,6 @@ private struct ExperienceResultView: View {
         .sqCardBackground(SQColor.warningSoft)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("experience.stopBanner")
-    }
-
-    /// Un test lancé qui a produit quelque chose (mesuré, interrompu ou en échec) ouvre son détail.
-    private func hasDetail(_ test: ExperienceTestKind) -> Bool {
-        guard let state = finished.run.tests.state(of: test) else { return false }
-        return state != .notTested
-    }
-
-    @ViewBuilder
-    private func resultRow(_ test: ExperienceTestKind) -> some View {
-        if hasDetail(test) {
-            Button {
-                Haptics.selection()
-                model.openDetail(test)
-            } label: {
-                resultRowContent(test, chevron: true)
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityHint(Text("Ouvre le détail du test"))
-            .accessibilityIdentifier("experience.result.\(test.rawValue)")
-        } else {
-            resultRowContent(test, chevron: false)
-                .accessibilityIdentifier("experience.result.\(test.rawValue)")
-        }
-    }
-
-    private func resultRowContent(_ test: ExperienceTestKind, chevron: Bool) -> some View {
-        ExperienceResultRowContent(
-            test: test,
-            line: ExperienceResultText.line(test, in: finished.run.tests, failure: finished.run.failures[test]),
-            chevron: chevron
-        )
     }
 
     private var usageLine: some View {
@@ -612,69 +576,12 @@ private struct ExperienceFigure: View {
     }
 }
 
-/// Une ligne du résultat : le test, sa phrase, sa note vidéo à part. Partagée avec la fiche
-/// d'un test de l'historique.
-struct ExperienceResultRowContent: View {
-    let test: ExperienceTestKind
-    let line: ExperienceResultText.Line
-    let chevron: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(LocalizedStringKey(test.title))
-                    .font(SQFont.body(10, .bold, relativeTo: .caption))
-                    .tracking(10 * 0.12)
-                    .textCase(.uppercase)
-                    .foregroundStyle(SQColor.labelSecondary)
-                Text(verbatim: line.headline)
-                    .font(SQFont.body(15, .semibold, relativeTo: .body))
-                    .foregroundStyle(SQColor.label)
-                if let detail = line.detail {
-                    Text(verbatim: detail)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if let score = line.score {
-                VStack(spacing: 0) {
-                    Text(verbatim: "\(score)")
-                        .font(SQFont.display(24, .heavy, relativeTo: .title2))
-                        .foregroundStyle(SQColor.label)
-                    Text(verbatim: "/100")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text("Note \(score) sur 100"))
-            }
-            if chevron {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .padding(.top, 2)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(SQSpace.cardPadding)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// Note globale /100 (`experience-score-v1`) : moyenne des usages notés, chacun du même
-/// poids (choix d'Alexandre), puis la note de chaque usage noté. Partagée avec la fiche
-/// d'un test de l'historique.
+/// poids (choix d'Alexandre). La note de chaque usage est sur sa ligne, plus ici
+/// (presentation-v1 : pas de tuile en double). Partagée avec la fiche d'un test de l'historique.
 struct ExperienceOverallScoreCard: View {
     let scores: ExperienceScores
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var uses: [(title: String, score: Int)] {
-        [("Vidéo", scores.video), ("Web", scores.webPage), ("Jeu et appels", scores.gameAndCalls), ("Envoi", scores.upload)]
-            .compactMap { use in use.1.map { (use.0, $0) } }
-    }
 
     /// « Moyenne des 4 usages », ou ce qui manque pour avoir une note globale.
     private var caption: String {
@@ -715,27 +622,6 @@ struct ExperienceOverallScoreCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if !uses.isEmpty {
-                let layout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
-                    : AnyLayout(HStackLayout(alignment: .top, spacing: SQSpace.sm))
-                layout {
-                    // La note d'abord : les chiffres restent alignés quand un libellé passe à la ligne.
-                    ForEach(uses, id: \.title) { use in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: "\(use.score)")
-                                .font(SQFont.body(18, .bold, relativeTo: .headline))
-                                .foregroundStyle(SQColor.label)
-                                .monospacedDigit()
-                            Text(LocalizedStringKey(use.title))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
         }
         .padding(SQSpace.cardPadding)
         .sqCardBackground()
@@ -748,7 +634,6 @@ struct ExperienceOverallScoreCard: View {
         var parts: [String] = []
         if let overall = scores.overall { parts.append(String(localized: "Note globale \(overall) sur 100")) }
         parts.append(caption)
-        parts += uses.map { String(localized: "\(String(localized: String.LocalizationValue($0.title))) : \($0.score) sur 100") }
         return parts.joined(separator: ". ")
     }
 }

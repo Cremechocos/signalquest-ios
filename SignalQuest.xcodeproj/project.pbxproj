@@ -378,6 +378,7 @@
 		64ED0D522FBEACC4E8B0CDD1 /* ExperienceTestsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F8765D024ADFB20FDF2E17 /* ExperienceTestsService.swift */; };
 		658A7AFE3AE3E2DBF9E452F2 /* MessageNotificationCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2B6F4A6B5D82D43D85F763 /* MessageNotificationCategory.swift */; };
 		669A95D9E954E5641284B736 /* QualityScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */; };
+		66CF67A62105B8047EEED4B5 /* ExperienceUseRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */; };
 		678B47CAC48F151310C54D0E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ECDB8C8F6B147454109FBCFA /* PrivacyInfo.xcprivacy */; };
 		67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */; };
 		6892B2A9907095297A350A62 /* ExperienceMeasures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92452FAF52C31A8F343410F8 /* ExperienceMeasures.swift */; };
@@ -392,7 +393,6 @@
 		6ACAAE95B6D7025523DE3DB5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E156E2B3CA6D911D4A0C30 /* AuthService.swift */; };
 		6AFC03231CE9DF48BB9C4932 /* PendingQueueFlusherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA994FD16C75058CC013488 /* PendingQueueFlusherTests.swift */; };
 		6B0FD6F8C15034A7A364DFEC /* SentinelleOwnerLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6714ECEA3256C6DAF0E2BCA0 /* SentinelleOwnerLabel.swift */; };
-		6B3D56845A344A9E4AC01CC6 /* experience-share-phrases-v1-vectors.json in Resources */ = {isa = PBXBuildFile; fileRef = AD40E40884652EE217E447D3 /* experience-share-phrases-v1-vectors.json */; };
 		6C457F1CED31DCDD42A579C3 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EFB586826CF2A6A011E18D /* TestSupport.swift */; };
 		6C58DDE202F647212D913ABB /* AppLockSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53BD18D08BED09E80348163 /* AppLockSetupController.swift */; };
 		6C64A344FD4BF997E50CF513 /* MapNativeViewportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE4E9AF2E441E9BC074D737 /* MapNativeViewportTests.swift */; };
@@ -1007,6 +1007,7 @@
 		08085CAF5AC02754C4042714 /* E2EEV2MessageSenderV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2MessageSenderV2Tests.swift; sourceTree = "<group>"; };
 		0830E8B030A7AC99A32FF917 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		09CB65B2D1C9FAFB41970E34 /* MetricKitReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitReporter.swift; sourceTree = "<group>"; };
+		0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceUseRow.swift; sourceTree = "<group>"; };
 		0A6F8CBC682F830C6285FAB7 /* AndroidDataPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AndroidDataPresence.swift; sourceTree = "<group>"; };
 		0AE35D85E1465DC7E47D01A5 /* Audit2TourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Audit2TourQATests.swift; sourceTree = "<group>"; };
 		0AF16D27D79B41690FDAF2A5 /* E2EEAutoDeviceRevocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoDeviceRevocationTests.swift; sourceTree = "<group>"; };
@@ -1589,7 +1590,6 @@
 		ACB33739AFC84C313844322C /* MapExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapExplorerView.swift; sourceTree = "<group>"; };
 		AD04EAFD67FBCB63533321A0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AD2EBD9C272198901276D84C /* SentinelleBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleBoxView.swift; sourceTree = "<group>"; };
-		AD40E40884652EE217E447D3 /* experience-share-phrases-v1-vectors.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "experience-share-phrases-v1-vectors.json"; sourceTree = "<group>"; };
 		AD67A7B51B7000BB42264042 /* MessageDraftsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageDraftsQATests.swift; sourceTree = "<group>"; };
 		AD6D6F9AEC13320786BD614D /* SpeedtestServerPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestServerPicker.swift; sourceTree = "<group>"; };
 		AD8048DF32A4922952CF4D9B /* SignalQuestWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SignalQuestWidget.entitlements; sourceTree = "<group>"; };
@@ -2156,7 +2156,6 @@
 			isa = PBXGroup;
 			children = (
 				10D993FDAA16B4D1D3F9F529 /* experience-score-v1-vectors.json */,
-				AD40E40884652EE217E447D3 /* experience-share-phrases-v1-vectors.json */,
 				A7DEC153CB635E3EAD378372 /* geotagged-mdta.mov */,
 				53043E8410BD4D6EF71540B8 /* geotagged.mov */,
 				BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */,
@@ -2663,6 +2662,7 @@
 				CB04A4F099E380E7AD6EB352 /* ExperienceResultText.swift */,
 				D79BA1E3773815C05B91DA4C /* ExperienceTestsModel.swift */,
 				D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */,
+				0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */,
 			);
 			path = Experience;
 			sourceTree = "<group>";
@@ -3616,7 +3616,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3D21B9B2DCFFC76B6EE496E4 /* experience-score-v1-vectors.json in Resources */,
-				6B3D56845A344A9E4AC01CC6 /* experience-share-phrases-v1-vectors.json in Resources */,
 				1BC4AB188A4696FADCD58628 /* geotagged-mdta.mov in Resources */,
 				4FB32C72F5EB1EB842A8A5F3 /* geotagged.mov in Resources */,
 				D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */,
@@ -3948,6 +3947,7 @@
 				E7574EA0357A0473763283EF /* ExperienceTestsModel.swift in Sources */,
 				64ED0D522FBEACC4E8B0CDD1 /* ExperienceTestsService.swift in Sources */,
 				019BDBFC5EB0DC2A9D370F15 /* ExperienceTestsView.swift in Sources */,
+				66CF67A62105B8047EEED4B5 /* ExperienceUseRow.swift in Sources */,
 				25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */,
 				1AEAB77F8A0E0AD0655997F4 /* FavoriteAntenna.swift in Sources */,
 				935A4C8A912D8AF9FB0A4798 /* FavoriteAntennasLocalStore.swift in Sources */,

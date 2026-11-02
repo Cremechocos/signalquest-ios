@@ -195,8 +195,9 @@ struct ExperienceSharePreviewSheet: View {
             removeTemporaryShareFile()
             let url = try SQShareCardBuilder.writePNG(image)
             temporaryShareURL = url
-            let text = input.scores.overall.map { String(localized: "Test d’expérience SignalQuest · note globale \($0)/100") }
-                ?? String(localized: "Test d’expérience SignalQuest")
+            // Légende commune (presentation-v1, décision du 01/11) : sans lien, sans opérateur ni
+            // chiffre, l'image les montre déjà.
+            let text = ExperiencePresentation.label("experience.share.caption")
             sharePayload = ExperienceSharePayload(items: [ImageAndTextShareItem(fileURL: url, text: text, title: text), text])
         } catch {
             shareError = true

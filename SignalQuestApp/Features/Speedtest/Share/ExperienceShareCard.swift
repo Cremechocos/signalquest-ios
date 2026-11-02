@@ -7,7 +7,7 @@ import UIKit
 /// Données de l'image de partage d'un test d'expérience (modèle « A · Fiche » validé le 27/10,
 /// commun au web et à Android) : déjà formatées, le rendu ne décide de rien.
 struct ExperienceShareCardModel {
-    /// Un usage : son nom, sa phrase courte (§10), la ligne de détail de la Vidéo, sa note.
+    /// Un usage : son nom, sa phrase courte (`presentation-v1`, `share`), une ligne de détail facultative, sa note.
     struct Row {
         let label: String
         let phrase: String
@@ -38,19 +38,16 @@ enum ExperienceShareCardBuilder {
         network: SQShareCardModel.NetworkLine?,
         language: ExperienceShareLanguage = .current
     ) -> ExperienceShareCardModel {
+        // La phrase de chaque usage est la première ligne de `presentation-v1` (60 caractères
+        // au plus) ; plus de ligne « Échelle · Adaptative » : la note de la Vidéo suffit.
+        let uses = ExperiencePresentation.uses(tests: tests, methodology: ExperienceMethod.methodology)
         let rows = ExperienceSharePhrases.Use.allCases.map { use in
-            let score: Int? = switch use {
-            case .video: scores.video
-            case .webPage: scores.webPage
-            case .gameAndCalls: scores.gameAndCalls
-            case .upload: scores.upload
-            }
+            let presentation = ExperiencePresentation.Use(rawValue: use.rawValue).flatMap { uses[$0] }
             return ExperienceShareCardModel.Row(
                 label: use.label(language),
-                phrase: ExperienceSharePhrases.phrase(use, tests: tests, language: language),
-                detail: use == .video && score != nil
-                    ? ExperienceSharePhrases.videoDetail(tests: tests, scores: scores, language: language) : nil,
-                score: score
+                phrase: presentation?.share.rendered(language) ?? "",
+                detail: nil,
+                score: presentation?.score
             )
         }
         let rated = scores.ratedUses

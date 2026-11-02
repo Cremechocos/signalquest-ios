@@ -69,8 +69,7 @@ struct ExperienceHistoryDetailSheet: View {
     }
 
     private func summary(_ detail: ExperienceHistoryEntryDetail) -> some View {
-        let tests = ExperienceMethod.order.filter { detail.result.tests.state(of: $0) != nil }
-        return VStack(alignment: .leading, spacing: SQSpace.md) {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Test d’expérience")
                     .font(SQType.title)
@@ -95,13 +94,11 @@ struct ExperienceHistoryDetailSheet: View {
                 ExperienceOverallScoreCard(scores: scores)
             }
 
-            VStack(spacing: 0) {
-                ForEach(tests, id: \.self) { test in
-                    row(test, detail: detail)
-                    if test != tests.last { Divider().padding(.leading, SQSpace.cardPadding) }
-                }
-            }
-            .sqCardBackground()
+            ExperienceUseList(
+                items: ExperienceUseItem.items(detail.result.tests, failures: detail.failures),
+                identifier: "experience.history.detail",
+                open: { openedTest = $0 }
+            )
 
             if let usageLine = usageLine(detail.result) {
                 Text(verbatim: usageLine)
@@ -122,34 +119,11 @@ struct ExperienceHistoryDetailSheet: View {
         }
     }
 
-    /// La note servie fait foi ; celle du téléphone seulement pour un test pas encore confirmé.
+    /// La note se recalcule depuis les tests (`presentation-v1`) : le plafond du jeu par son
+    /// verdict s'applique à la lecture, aux anciens tests comme aux nouveaux, et les lignes
+    /// affichent la même note.
     private func scores(_ detail: ExperienceHistoryEntryDetail) -> ExperienceScores {
-        item.highlights.scores ?? ExperienceScores(detail.result.tests)
-    }
-
-    private func line(_ test: ExperienceTestKind, detail: ExperienceHistoryEntryDetail) -> ExperienceResultText.Line {
-        var line = ExperienceResultText.line(test, in: detail.result.tests, failure: detail.failures[test])
-        line.score = scores(detail).score(for: test)
-        return line
-    }
-
-    @ViewBuilder
-    private func row(_ test: ExperienceTestKind, detail: ExperienceHistoryEntryDetail) -> some View {
-        let line = line(test, detail: detail)
-        if detail.result.tests.state(of: test) != .notTested {
-            Button {
-                Haptics.selection()
-                openedTest = test
-            } label: {
-                ExperienceResultRowContent(test: test, line: line, chevron: true)
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityHint(Text("Ouvre le détail du test"))
-            .accessibilityIdentifier("experience.history.detail.\(test.rawValue)")
-        } else {
-            ExperienceResultRowContent(test: test, line: line, chevron: false)
-                .accessibilityIdentifier("experience.history.detail.\(test.rawValue)")
-        }
+        ExperienceScores(detail.result.tests)
     }
 
     /// « Données utilisées : 81,9 Mo · durée 34 s », seulement avec ce que le test a gardé.

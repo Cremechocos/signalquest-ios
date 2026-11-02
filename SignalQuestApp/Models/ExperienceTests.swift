@@ -180,6 +180,8 @@ struct ExperienceTestDetail: Decodable, Equatable {
     let highlights: ExperienceHighlights
     let location: Location?
     let network: Network?
+    /// `experience-v3` ou `experience-v4` : le seuil des pointes en dépend. Nil s'il n'est pas servi.
+    let methodology: String?
     /// Moment de la mesure ; nil s'il manque ou s'il est mal formé.
     let measuredAt: Date?
     let durationMs: Int64?
@@ -187,7 +189,7 @@ struct ExperienceTestDetail: Decodable, Equatable {
     /// Les tests relus dans le modèle des fiches de résultat (contrat v1 §5).
     let result: ExperienceTestsResult
 
-    enum CodingKeys: String, CodingKey { case id, tests, highlights, location, network, measuredAt, durationMs, bytesUsed }
+    enum CodingKeys: String, CodingKey { case id, tests, highlights, location, network, methodology, measuredAt, durationMs, bytesUsed }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -200,6 +202,7 @@ struct ExperienceTestDetail: Decodable, Equatable {
         }
         location = try? c.decodeIfPresent(Location.self, forKey: .location)
         network = try? c.decodeIfPresent(Network.self, forKey: .network)
+        methodology = (try? c.decodeIfPresent(String.self, forKey: .methodology)) ?? nil
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         measuredAt = (try? c.decodeIfPresent(String.self, forKey: .measuredAt)).flatMap { $0 }.flatMap(formatter.date(from:))
@@ -214,9 +217,10 @@ struct ExperienceTestDetail: Decodable, Equatable {
         result = ExperienceTestsResult(served: tests)
     }
 
-    /// La note servie fait foi ; à défaut, le même barème sur les tests servis.
+    /// Le barème recalculé sur les tests servis (`presentation-v1`) : le plafond de la note du
+    /// jeu par son verdict s'applique à la lecture, anciens tests compris.
     var scores: ExperienceScores {
-        highlights.scores ?? ExperienceScores(result)
+        ExperienceScores(result)
     }
 
     /// État de chacun des cinq tests présents, dans l'ordre de l'écran. Un test non

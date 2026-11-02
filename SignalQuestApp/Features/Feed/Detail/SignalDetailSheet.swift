@@ -269,9 +269,9 @@ struct SignalDetailSheet: View {
 
     @ViewBuilder
     private func experienceLoaded(_ detail: ExperienceTestDetail) -> some View {
-        let scores = detail.scores
+        let scores = ExperienceScores(detail.result)
         if !scores.isEmpty {
-            ExperienceUseScoresCard(scores: scores, result: detail.result)
+            ExperienceOverallScoreCard(scores: scores)
         }
         if item.canManage, let input = experienceShareInput(detail) {
             GradientButton("Télécharger l’image", systemImage: "square.and.arrow.down", style: .secondary) {
@@ -280,18 +280,14 @@ struct SignalDetailSheet: View {
             }
             .accessibilityIdentifier("signal.detail.experience.image")
         }
-        let tests = ExperienceMethod.order.filter { detail.result.state(of: $0) != nil }
-        if !tests.isEmpty {
+        let items = ExperienceUseItem.items(detail.result, methodology: detail.methodology)
+        if !items.isEmpty {
             Text("Détail des tests")
                 .sqKicker()
                 .accessibilityAddTraits(.isHeader)
-            VStack(spacing: 0) {
-                ForEach(tests, id: \.self) { test in
-                    experienceRow(test, detail: detail, scores: scores)
-                    if test != tests.last { Divider().padding(.leading, SQSpace.cardPadding) }
-                }
+            ExperienceUseList(items: items, identifier: "signal.detail.experience") {
+                openedExperienceTest = OpenedExperienceTest(test: $0)
             }
-            .sqCardBackground()
         }
         if let line = experienceUsageLine(detail) {
             Text(verbatim: line)
@@ -299,29 +295,6 @@ struct SignalDetailSheet: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    @ViewBuilder
-    private func experienceRow(_ test: ExperienceTestKind, detail: ExperienceTestDetail, scores: ExperienceScores) -> some View {
-        let line: ExperienceResultText.Line = {
-            var line = ExperienceResultText.line(test, in: detail.result, failure: nil)
-            line.score = scores.score(for: test)
-            return line
-        }()
-        if detail.result.state(of: test) != .notTested {
-            Button {
-                Haptics.selection()
-                openedExperienceTest = OpenedExperienceTest(test: test)
-            } label: {
-                ExperienceResultRowContent(test: test, line: line, chevron: true)
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityHint(Text("Ouvre le détail du test"))
-            .accessibilityIdentifier("signal.detail.experience.\(test.rawValue)")
-        } else {
-            ExperienceResultRowContent(test: test, line: line, chevron: false)
-                .accessibilityIdentifier("signal.detail.experience.\(test.rawValue)")
         }
     }
 
