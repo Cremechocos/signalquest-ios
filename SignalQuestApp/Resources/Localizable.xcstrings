@@ -32202,22 +32202,6 @@
         }
       }
     },
-    "%lld Mbps en envoi" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mb/s upload"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mb/s en envoi"
-          }
-        }
-      }
-    },
     "%lld MHz — plus la fréquence monte, plus le fuseau s'affine" : {
       "localizations" : {
         "en" : {

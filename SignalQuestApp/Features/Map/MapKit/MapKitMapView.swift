@@ -724,10 +724,11 @@ struct MapKitMapView: UIViewRepresentable {
             MapAnnotationPayload(
                 id: "speed-\(speedtest.id)",
                 kind: .speedtest,
-                title: "\(Int(speedtest.downloadMbps.rounded())) Mb/s",
+                // Règle commune des débits (décimale facultative, Gb/s, U+00A0).
+                title: SQUnits.throughput(mbps: speedtest.downloadMbps),
                 subtitle: speedtest.tech ?? String(localized: "Speedtest"),
                 coordinate: speedtest.coordinate,
-                metric: speedtest.uploadMbps.map { String(localized: "\(Int($0.rounded())) Mbps en envoi") },
+                metric: speedtest.uploadMbps.map { String(localized: "\(SQUnits.throughput(mbps: $0)) en envoi") },
                 backendId: speedtest.id,
                 details: MapItemDetails(
                     downloadMbps: speedtest.downloadMbps,
