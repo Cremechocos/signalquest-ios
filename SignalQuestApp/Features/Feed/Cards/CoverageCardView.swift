@@ -73,13 +73,13 @@ struct CoverageCardView: View {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             coverageHeading
-                            techTag
+                            if !subtitleNamesTech { techTag }
                         }
                     } else {
                         HStack(alignment: .center, spacing: SQSpace.md) {
                             coverageHeading
                             Spacer()
-                            techTag
+                            if !subtitleNamesTech { techTag }
                         }
                     }
                 }
@@ -127,7 +127,10 @@ struct CoverageCardView: View {
             ]
         }
         return [
-            .init(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true),
+            // Sans tracé ou à 0 m, la distance ne mesure rien : un tiret, sans mise en avant.
+            hasDistance
+                ? .init(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
+                : .init(label: "Distance", value: "—"),
             .init(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds)),
             // Des points de mesure, pas des points de jeu (F-18).
             .init(label: "Mesures", value: signal?.pointsCount.map { $0.formatted() } ?? "—")
@@ -136,12 +139,21 @@ struct CoverageCardView: View {
         ]
     }
 
+    private var hasDistance: Bool {
+        !(trace ?? []).isEmpty && (signal?.distanceMeters ?? 0) > 0
+    }
+
+    private var tagTech: String { signal?.technology ?? bestDetectedTech ?? "—" }
+
+    /// Carte sans tracé : le sous-titre (« Bouygues Telecom · 4G ») nomme déjà la technologie,
+    /// la pastille ferait doublon. Sur le tracé, elle reste : il n'y a pas de sous-titre.
+    private var subtitleNamesTech: Bool { shownSubtitle?.contains(tagTech) ?? false }
+
     /// Déjà dite par le sous-titre (« 4G / 5G NSA »), la technologie de la
     /// pastille n'est pas relue par VoiceOver (lot F, F-49).
     private var techTag: some View {
-        let tech = signal?.technology ?? bestDetectedTech ?? "—"
-        return SQEditorialTag(text: tech, color: accent)
-            .accessibilityHidden(shownSubtitle?.contains(tech) ?? false)
+        SQEditorialTag(text: tagTech, color: accent)
+            .accessibilityHidden(subtitleNamesTech)
     }
 
     private var coverageHeading: some View {
