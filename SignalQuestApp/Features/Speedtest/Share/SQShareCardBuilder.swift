@@ -159,8 +159,11 @@ enum SQShareCardBuilder {
             points: points,
             localMax: Swift.max(points.max() ?? 1, usablePeak ?? 0, 1),
             accentColor: accentColor,
-            normalizedTimes: trace.map { phase in
-                (timed ?? []).map { Double($0.elapsedMs - phase.sampleStartMs) / Double(max(1, phase.sampleDurationMs)) }
+            // Du premier débit récent (fin de la 1re fenêtre de 1 s) au dernier : sinon
+            // la courbe démarre après un blanc (signalé le 31/10).
+            normalizedTimes: timed.flatMap { timed in
+                guard let start = timed.first?.elapsedMs, let end = timed.last?.elapsedMs, end > start else { return nil }
+                return timed.map { Double($0.elapsedMs - start) / Double(end - start) }
             },
             durationSeconds: trace.map { Double($0.sampleDurationMs) / 1000 },
             maxText: maxText,

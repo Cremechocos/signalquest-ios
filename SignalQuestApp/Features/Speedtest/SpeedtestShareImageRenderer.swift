@@ -181,11 +181,13 @@ struct SpeedtestShareGraph: View {
             }
             if hasData {
                 axisLabels
-                if let timedSeries, let last = timedSeries.last {
+                if let timedSeries, let first = timedSeries.first, let last = timedSeries.last {
                     VStack {
                         Spacer()
                         HStack {
-                            Text("0 s")
+                            // L'axe part du premier point mesuré : une fenêtre de 1 s n'a
+                            // de débit qu'à sa fin, jamais à 0 s (blanc signalé le 31/10).
+                            Text("\(Double(first.elapsedMs - (timeOriginMs ?? first.elapsedMs)) / 1000, format: .number.precision(.fractionLength(1))) s")
                             Spacer()
                             Text("\(Double(last.elapsedMs - (timeOriginMs ?? 0)) / 1000, format: .number.precision(.fractionLength(1))) s")
                         }
@@ -257,8 +259,7 @@ struct SpeedtestShareGraph: View {
         let x: (Int) -> CGFloat = { index in
             if let timedSeries, let first = timedSeries.first, let last = timedSeries.last,
                last.elapsedMs > first.elapsedMs, index < timedSeries.count {
-                let origin = timeOriginMs ?? first.elapsedMs
-                return leftInset + CGFloat(timedSeries[index].elapsedMs - origin) / CGFloat(max(1, last.elapsedMs - origin)) * plotWidth
+                return leftInset + CGFloat(timedSeries[index].elapsedMs - first.elapsedMs) / CGFloat(last.elapsedMs - first.elapsedMs) * plotWidth
             }
             return leftInset + CGFloat(index) * step
         }
@@ -288,9 +289,11 @@ struct SpeedtestShareGraph: View {
         }
 
         let averagePath = Path { path in
-            guard let timedAverageSeries, let last = timedAverageSeries.last, let origin = timeOriginMs else { return }
-            for (index, sample) in timedAverageSeries.enumerated() {
-                let point = CGPoint(x: leftInset + CGFloat(sample.elapsedMs - origin) / CGFloat(max(1, last.elapsedMs - origin)) * plotWidth,
+            // Même domaine que la courbe : du premier débit récent au dernier.
+            guard let timedAverageSeries, let start = timedSeries?.first?.elapsedMs,
+                  let end = timedSeries?.last?.elapsedMs, end > start else { return }
+            for (index, sample) in timedAverageSeries.filter({ $0.elapsedMs >= start && $0.elapsedMs <= end }).enumerated() {
+                let point = CGPoint(x: leftInset + CGFloat(sample.elapsedMs - start) / CGFloat(end - start) * plotWidth,
                                     y: y(sample.mbps))
                 if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
