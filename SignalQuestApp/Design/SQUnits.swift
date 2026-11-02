@@ -158,25 +158,27 @@ enum SQUnits {
     /// trois en Gbit/s.
     static func throughputValue(mbps: Double, locale: Locale = .current) -> String {
         guard mbps.isFinite, mbps >= 0 else { return "—" }
-        if mbps >= 999.5 {
+        // Arrondi sur des kb/s entiers, demi vers le haut, puis bascules sur la
+        // valeur arrondie : la règle des contrats feed-text-keys v2 et
+        // presentation-v1 (02/11), identique au web. 9,96 s'écrit « 10 », 999,6
+        // « 1,000 Gbit/s », 10,5 « 11 » (jamais arrondi au pair).
+        let kbps = (mbps * 1_000).rounded()
+        if kbps >= 999_500 {
             // Trois décimales : la précision de l'entier en Mbit/s, sans saut au
             // passage du gigabit (règle commune web, Android et iOS du 20/10).
-            return (mbps.rounded() / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
+            let wholeMbps = ((kbps + 500) / 1_000).rounded(.down)
+            return (wholeMbps / 1_000).formatted(.number.precision(.fractionLength(3)).locale(locale))
         }
-        if mbps < 9.95 {
-            // Décimale seulement si elle n'est pas nulle : « 7 », jamais « 7,0 »
-            // (décision d'Alexandre du 02/11, `rates` de presentation-v1).
-            let tenths = (mbps * 10).rounded()
+        if kbps < 9_950 {
+            // Décimale seulement si elle n'est pas nulle : « 7 », jamais « 7,0 ».
+            let tenths = ((kbps + 50) / 100).rounded(.down)
             return (tenths / 10).formatted(.number.precision(.fractionLength(tenths.truncatingRemainder(dividingBy: 10) == 0 ? 0 : 1)).locale(locale))
         }
-        // Bascules sur la valeur arrondie : 9,96 s'écrit « 10 », 999,6 « 1,000 Gbit/s ».
-        // Demi vers le haut comme le web (`rounded()`), jamais au pair : le format
-        // seul écrirait « 10 » pour 10,5 et « 998 » pour 998,5.
-        return mbps.rounded().formatted(.number.precision(.fractionLength(0)).locale(locale))
+        return ((kbps + 500) / 1_000).rounded(.down).formatted(.number.precision(.fractionLength(0)).locale(locale))
     }
 
     static func throughputUnit(mbps: Double) -> String {
-        mbps >= 999.5 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
+        (mbps * 1_000).rounded() >= 999_500 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
     }
 
     /// Latence ou gigue : « 18 ms ».

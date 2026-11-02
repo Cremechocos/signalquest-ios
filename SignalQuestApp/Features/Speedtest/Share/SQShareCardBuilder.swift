@@ -376,19 +376,10 @@ enum SQShareCardBuilder {
     /// « 10,0 ». `nil` pour une valeur nulle ou non finie : la ligne disparaît.
     static func throughput(_ mbps: Double, locale: Locale) -> SQShareCardModel.Value? {
         guard mbps.isFinite, mbps > 0 else { return nil }
-        if mbps >= 999.5 {
-            return .init(number: number(mbps.rounded() / 1000, fractionDigits: 3, locale: locale), unit: "Gb/s")
-        }
-        if mbps >= 9.95 {
-            return .init(number: number(mbps.rounded(), fractionDigits: 0, locale: locale), unit: "Mb/s")
-        }
-        // Décimale seulement si elle n'est pas nulle : « 7 Mb/s », jamais « 7,0 » (02/11).
-        let tenths = (mbps * 10).rounded()
-        return .init(number: number(tenths / 10, fractionDigits: tenths.truncatingRemainder(dividingBy: 10) == 0 ? 0 : 1, locale: locale), unit: "Mb/s")
-    }
-
-    private static func number(_ value: Double, fractionDigits: Int, locale: Locale) -> String {
-        value.formatted(.number.precision(.fractionLength(fractionDigits)).grouping(.never).locale(locale))
+        // Même nombre que partout dans l'app (`SQUnits`, arrondi sur des kb/s
+        // entiers) ; l'unité reste écrite en dur, l'image ne se traduit pas.
+        let unit = (mbps * 1_000).rounded() >= 999_500 ? "Gb/s" : "Mb/s"
+        return .init(number: SQUnits.throughputValue(mbps: mbps, locale: locale), unit: unit)
     }
 
     /// « 19 octobre 2026 à 14:32 », « October 19, 2026 at 2:32 PM » — heure locale.

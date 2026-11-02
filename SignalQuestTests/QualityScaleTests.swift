@@ -86,11 +86,12 @@ final class QualityScaleTests: XCTestCase {
         }
         XCTAssertEqual(SQUnits.throughputValue(mbps: 0, locale: fr), "0")
         XCTAssertEqual(SQUnits.throughputValue(mbps: 6.96, locale: fr), "7")
-        // Demi vers le haut comme le web, jamais au pair (feed-text-keys v2, #845).
-        for (mbps, expected) in [(7.25, "7,3"), (10.5, "11"), (12.5, "13"), (87.34, "87"), (998.5, "999"), (1_722.5, "1,723")] {
+        // Arrondi sur des kb/s entiers, demi vers le haut (feed-text-keys v2, presentation-v1).
+        for (mbps, expected) in [(0.15, "0,2"), (7.25, "7,3"), (10.5, "11"), (12.5, "13"), (87.34, "87"), (998.5, "999"), (999.4996, "1,000"), (1_722.5, "1,723")] {
             XCTAssertEqual(SQUnits.throughputValue(mbps: mbps, locale: fr), expected, "\(mbps)")
             XCTAssertEqual(WidgetUnits.throughputValue(mbps: mbps, locale: fr), expected, "\(mbps)")
         }
+        XCTAssertEqual(SQUnits.throughputUnit(mbps: 999.4996), SQUnits.throughputUnit(mbps: 1_000), "999 499,6 kb/s s'arrondit à 999 500 : Gb/s")
     }
 
     /// Même règle pour les distances : « 12,3 km » en français (MES-25).
