@@ -135,6 +135,11 @@ protocol IdentifyServicing: Sendable {
     /// les nœuds en conflit (`conflict=only`).
     func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage
 
+    /// Les lignes d'un nœud sur un support (`siteId=` par égalité exacte, sans alias ANFR,
+    /// et `enb=`/`gnb=`), cellules comprises. Le curseur est lié aux filtres. Une ligne
+    /// absente tant que `nextCursor` n'est pas épuisé n'est pas une ligne qui n'existe pas.
+    func minePage(cursor: String?, siteId: String, enb: String?, gnb: String?) async throws -> MyIdentificationsPage
+
     /// Déplace un nœud vers le support du consensus, recalculé par le serveur.
     /// `toSiteId` est le support AFFICHÉ au membre : s'il ne correspond plus,
     /// `409 CONSENSUS_TARGET_CHANGED` plutôt qu'un déplacement vers un support non vu.
@@ -195,6 +200,10 @@ protocol IdentifyServicing: Sendable {
 extension IdentifyServicing {
     func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage {
         throw APIError.cancelled
+    }
+
+    func minePage(cursor: String?, siteId: String, enb: String?, gnb: String?) async throws -> MyIdentificationsPage {
+        throw APIError.http(status: 400, code: "INVALID_FILTER", message: "", requestId: nil, retryAfter: nil)
     }
 
     func adoptConsensus(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?) async throws -> EditSiteResult {
@@ -276,6 +285,18 @@ final class IdentifyService: IdentifyServicing {
         if includeRelated { query.append(URLQueryItem(name: "include", value: "related")) }
         if conflictOnly { query.append(URLQueryItem(name: "conflict", value: "only")) }
         if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return try await api.request(
+            APIEndpoint(path: "/api/android/map/identify/mine", query: query),
+            as: MyIdentificationsPage.self
+        )
+    }
+
+    func minePage(cursor: String?, siteId: String, enb: String?, gnb: String?) async throws -> MyIdentificationsPage {
+        var query = [URLQueryItem(name: "v", value: "2"), URLQueryItem(name: "include", value: "related"),
+                     URLQueryItem(name: "siteId", value: siteId)]
+        if let enb { query.append(URLQueryItem(name: "enb", value: enb)) }
+        if let gnb { query.append(URLQueryItem(name: "gnb", value: gnb)) }
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         return try await api.request(
             APIEndpoint(path: "/api/android/map/identify/mine", query: query),

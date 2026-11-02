@@ -202,6 +202,7 @@ final class MyIdentificationsV2Tests: XCTestCase {
         let node = try XCTUnwrap(first.identifications.first { $0.kind == .enb })
         let service = PagedIdentifyService()
         service.pages[nil] = first
+        service.pages["eyJwIjoibiJ9"] = try page("orphanPage")
         let model = IdentificationCorrectionModel(
             target: IdentificationCorrectionTarget(siteId: node.siteId, kind: .enb, node: try XCTUnwrap(node.enb)),
             service: service
@@ -210,7 +211,7 @@ final class MyIdentificationsV2Tests: XCTestCase {
         guard case let .found(found, cells) = model.state else { return XCTFail("\(model.state)") }
         XCTAssertEqual(found.id, node.id)
         XCTAssertEqual(cells.map(\.kind), [.cellid], "les cellules du nœud viennent avec lui, pour corriger leur secteur")
-        XCTAssertEqual(service.requests.count, 1)
+        XCTAssertEqual(service.requests.map(\.cursor), [nil, "eyJwIjoibiJ9"], "filtre refusé : lecture complète, jusqu'au bout")
     }
 
     func testCorrectionReadsTheNextPagesThenSaysWhenTheNodeIsNotThere() async throws {
@@ -224,6 +225,35 @@ final class MyIdentificationsV2Tests: XCTestCase {
         await model.load()
         XCTAssertEqual(model.state, .notFound)
         XCTAssertEqual(service.requests.map(\.cursor), [nil, "eyJwIjoibiJ9"])
+    }
+
+    /// Filtre `/mine` (#854) : le support tel qu'écrit et le nœud, puis tout le curseur avant
+    /// de conclure. Une page sans la ligne ne dit pas qu'elle n'existe pas.
+    func testCorrectionFiltersOnTheNodeAndReadsTheCursorToTheEnd() async throws {
+        let node = try XCTUnwrap(try page("cellsTruncatedNode").identifications.first { $0.kind == .enb })
+        let empty = try JSONDecoder.signalQuest.decode(MyIdentificationsPage.self,
+                                                       from: Data(#"{"identifications":[],"nextCursor":"n2"}"#.utf8))
+        let service = PagedIdentifyService()
+        service.filteredPages = [nil: empty, "n2": try page("cellsTruncatedNode"), "eyJwIjoibiJ9": try page("orphanPage")]
+        let model = IdentificationCorrectionModel(
+            target: IdentificationCorrectionTarget(siteId: node.siteId, kind: .enb, node: try XCTUnwrap(node.enb)),
+            service: service
+        )
+        await model.load()
+        guard case let .found(found, _) = model.state else { return XCTFail("\(model.state)") }
+        XCTAssertEqual(found.id, node.id)
+        XCTAssertEqual(service.filters.map(\.cursor), [nil, "n2", "eyJwIjoibiJ9"], "le curseur est suivi jusqu'au bout")
+        XCTAssertEqual(service.filters.first?.siteId, node.siteId)
+        XCTAssertEqual(service.filters.first?.enb, node.enb)
+        XCTAssertNil(service.filters.first?.gnb)
+        XCTAssertTrue(service.requests.isEmpty, "aucune lecture complète quand le filtre répond")
+
+        // Un curseur qui ne s'épuise pas : ni « trouvée » ni « absente ».
+        let endless = try JSONDecoder.signalQuest.decode(MyIdentificationsPage.self,
+                                                         from: Data(#"{"identifications":[],"nextCursor":"again"}"#.utf8))
+        service.filteredPages = [nil: endless, "again": endless]
+        await model.load()
+        XCTAssertEqual(model.state, .failed(String(localized: "Tes identifications n’ont pas pu être lues en entier. Réessaie.")))
     }
 
     func testAWithdrawalThatMatchedNothingKeepsTheSheetOpenWithTheReason() async throws {
@@ -441,6 +471,19 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
     var pages: [String?: MyIdentificationsPage] = [:]
     var invalidCursor = false
     var requests: [Request] = []
+    struct Filter { let cursor: String?; let siteId: String; let enb: String?; let gnb: String? }
+    /// nil : le serveur refuse le filtre (`INVALID_FILTER`), comme avant #854.
+    var filteredPages: [String?: MyIdentificationsPage]?
+    var filters: [Filter] = []
+
+    func minePage(cursor: String?, siteId: String, enb: String?, gnb: String?) async throws -> MyIdentificationsPage {
+        filters.append(Filter(cursor: cursor, siteId: siteId, enb: enb, gnb: gnb))
+        guard let filteredPages else {
+            throw APIError.http(status: 400, code: "INVALID_FILTER", message: "", requestId: nil, retryAfter: nil)
+        }
+        guard let page = filteredPages[cursor] else { throw APIError.cancelled }
+        return page
+    }
 
     func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage {
         requests.append(Request(cursor: cursor, conflictOnly: conflictOnly))

@@ -55077,6 +55077,34 @@
         }
       }
     },
+    "Tes identifications n’ont pas pu être lues en entier. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your identifications could not be read in full. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes identifications n’ont pas pu être lues en entier. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Tes identifications n’ont pas pu être lues en entier. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos identifications n’ont pas pu être lues en entier. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Ta nouvelle identification arrive…" : {
       "extractionState" : "manual",
       "localizations" : {

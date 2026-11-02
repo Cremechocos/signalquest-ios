@@ -22,6 +22,13 @@ enum IdentificationCorrectionOutcome: Equatable, Sendable {
     case edited
 }
 
+/// Liste plus longue que le garde-fou : on ne conclut ni présente ni absente.
+private struct IncompleteRead: LocalizedError {
+    var errorDescription: String? {
+        String(localized: "Tes identifications n’ont pas pu être lues en entier. Réessaie.")
+    }
+}
+
 /// Retrouve l'identification qu'on vient de faire dans « Mes identifications », puis la
 /// retire ou la supprime. Les déplacements et les secteurs passent par leurs feuilles.
 @MainActor
@@ -42,39 +49,67 @@ final class IdentificationCorrectionModel: ObservableObject {
     let target: IdentificationCorrectionTarget
     private let service: IdentifyServicing
 
-    /// Pages lues au plus : la liste va du plus récent au plus ancien, l'identification
-    /// qu'on vient de faire est presque toujours sur la première.
-    static let maxPages = 5
+    /// Garde-fou contre un curseur qui ne finirait pas. Atteint, on ne conclut rien.
+    static let maxPages = 50
 
     init(target: IdentificationCorrectionTarget, service: IdentifyServicing) {
         self.target = target
         self.service = service
     }
 
+    /// Lit les lignes du nœud filtrées par le serveur, puis conclut seulement une fois le
+    /// curseur épuisé : une ligne absente d'une page n'est pas une ligne inexistante.
+    /// Filtre refusé (`INVALID_FILTER`) : relecture complète, avec la même règle.
     /// `quietly` : après une correction, le bloc reste affiché le temps de relire.
     func load(quietly: Bool = false) async {
         if !quietly { state = .loading }
-        var items: [MyIdentification] = []
-        var cursor: String?
-        var checks: IdentificationChecks?
         do {
-            for _ in 0..<Self.maxPages {
-                let page = try await service.minePage(cursor: cursor, conflictOnly: false, includeRelated: true, limit: nil)
-                items += page.identifications
-                checks = checks.map { $0.merged(with: page.checks) } ?? page.checks
-                if let match = Self.match(target, in: items) {
-                    self.checks = checks ?? .unavailable
-                    state = .found(node: match.node, cells: match.cells)
-                    return
+            let read: (items: [MyIdentification], checks: IdentificationChecks?)
+            do {
+                read = try await readToTheEnd { cursor in
+                    try await self.service.minePage(cursor: cursor, siteId: self.target.siteId,
+                                                    enb: self.target.kind == .enb ? self.target.node : nil,
+                                                    gnb: self.target.kind == .gnb ? self.target.node : nil)
                 }
-                guard let next = page.nextCursor else { break }
-                cursor = next
+            } catch APIError.http(400, "INVALID_FILTER"?, _, _, _) {
+                read = try await readToTheEnd { cursor in
+                    try await self.service.minePage(cursor: cursor, conflictOnly: false, includeRelated: true, limit: nil)
+                }
             }
-            state = .notFound
+            checks = read.checks ?? .unavailable
+            if let match = Self.match(target, in: read.items) {
+                state = .found(node: match.node, cells: match.cells)
+            } else {
+                state = .notFound
+            }
         } catch {
             // Relecture discrète ratée : le bloc affiché reste.
             guard !error.isCancellation, !quietly else { return }
             state = .failed(error.userFacingMessage)
+        }
+    }
+
+    /// Toutes les pages, du début à `nextCursor == nil`. Curseur refusé : une reprise du début.
+    private func readToTheEnd(
+        _ page: (String?) async throws -> MyIdentificationsPage
+    ) async throws -> (items: [MyIdentification], checks: IdentificationChecks?) {
+        var restarted = false
+        while true {
+            var items: [MyIdentification] = []
+            var checks: IdentificationChecks?
+            var cursor: String?
+            do {
+                for _ in 0..<Self.maxPages {
+                    let next = try await page(cursor)
+                    items += next.identifications
+                    checks = checks.map { $0.merged(with: next.checks) } ?? next.checks
+                    guard let following = next.nextCursor else { return (items, checks) }
+                    cursor = following
+                }
+                throw IncompleteRead()
+            } catch APIError.http(400, "INVALID_CURSOR"?, _, _, _) where !restarted {
+                restarted = true
+            }
         }
     }
 
