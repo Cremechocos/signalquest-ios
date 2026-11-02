@@ -52,7 +52,7 @@ struct ExperienceScores: Equatable, Sendable {
         videoLadder = Self.ladder(Self.measured(tests["videoLadder"]))
         videoAdaptive = Self.measured(tests["videoAdaptive"]).flatMap { Self.int(($0["score"] as? [String: Any])?["total"]) }
         webPage = Self.web(Self.measured(tests["webPage"]))
-        gameAndCalls = Self.game(Self.measured(tests["gameAndCalls"]))
+        gameAndCalls = Self.cappedGame(Self.measured(tests["gameAndCalls"]))
         upload = Self.upload(Self.measured(tests["upload"]))
         let videos = [videoLadder, videoAdaptive].compactMap { $0 }
         video = videos.isEmpty ? nil : Self.mean(videos)
@@ -123,6 +123,15 @@ struct ExperienceScores: Equatable, Sendable {
             maximum += 20
         }
         return final(points / maximum * 100)
+    }
+
+    /// La note ne dit jamais plus que le verdict affiché à côté (décision du 28/10) :
+    /// min(note, plafond du verdict), à la lecture, anciens tests compris, avant la
+    /// moyenne globale. Sans verdict (donnée manquante), la note reste telle quelle.
+    private static func cappedGame(_ test: [String: Any]?) -> Int? {
+        guard let test, let score = game(test) else { return nil }
+        guard let verdict = ExperiencePresentation.gameVerdict(test) else { return score }
+        return min(score, verdict.scoreCap)
     }
 
     /// E existe dans le schéma ; les apps n'émettent que A à D et F.

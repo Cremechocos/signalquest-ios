@@ -1,0 +1,2401 @@
+{
+  "version": "experience-presentation-v1",
+  "description": "Présentation commune des tests d’expérience (docs/contracts/experience-tests-v3.md) : catalogue des phrases, règles de rendu, seuil d’à-coup, verdict « Appels et jeu » et plafond de sa note, cas résolus. Remplace experience-share-phrases-v1 (`replaces` donne la phrase d’avant). Généré par scripts/experience/write-presentation-v1.ts depuis packages/core/experience-presentation.ts.",
+  "rules": {
+    "shareMaxChars": 60,
+    "adaptivePlannedS": 30,
+    "spikeThreshold": "experience-v3 : médiane + 100 ; experience-v4 : médiane + min(max(30, médiane), 100) (29→59, 31→62, 99→198, 101→201) ; à-coup = mesure STRICTEMENT supérieure au seuil",
+    "spaces": "U+00A0 entre un nombre et son unité et devant « : » en français ; U+202F comme séparateur de milliers en français, virgule en anglais",
+    "apostrophe": "U+2019 en français",
+    "duration": "< 1 000 ms en ms, sinon en secondes à une décimale, demi vers le haut ((ms + 50) ÷ 100)",
+    "rate": "règle commune des débits (20/10), depuis des kb/s entiers, demi vers le haut : sous 9 950 kb/s une décimale facultative (« 7 Mb/s », « 7,5 Mb/s ») ; puis Mb/s entiers ; dès 999 500 kb/s en Gb/s à trois décimales (« 1,722 Gb/s »), jamais « 1 000 Mb/s ». Bornes dans `rates`",
+    "quality": "2160p s’affiche « 4K »",
+    "plurals": "clé suffixée _one si le compte vaut 1, _other sinon",
+    "ellipsis": "jamais de « … »",
+    "local": "une clé `local: true` n’est rendue qu’à la fin du test sur l’appareil, jamais depuis un test relu"
+  },
+  "texts": {
+    "experience.video.ladder_up_to": {
+      "args": {
+        "q": "quality"
+      },
+      "fr": "Jusqu’à {q} sans coupure",
+      "en": "Up to {q} without stalling"
+    },
+    "experience.video.ladder_at_least": {
+      "args": {
+        "q": "quality"
+      },
+      "fr": "Au moins {q} sans coupure",
+      "en": "At least {q} without stalling"
+    },
+    "experience.video.ladder_stalls_from_lowest": {
+      "args": {},
+      "fr": "Coupures dès 480p",
+      "en": "Stalls from 480p"
+    },
+    "experience.video.starts_in": {
+      "args": {
+        "t": "duration"
+      },
+      "fr": "démarre en {t}",
+      "en": "starts in {t}"
+    },
+    "experience.video.adaptive_clean": {
+      "args": {
+        "q": "quality"
+      },
+      "fr": "{q} la plupart du temps, sans coupure",
+      "en": "Mostly {q}, no stalls"
+    },
+    "experience.video.adaptive_stalls_one": {
+      "args": {
+        "q": "quality",
+        "n": "integer"
+      },
+      "fr": "{q} la plupart du temps, {n} coupure",
+      "en": "Mostly {q}, {n} stall"
+    },
+    "experience.video.adaptive_stalls_other": {
+      "args": {
+        "q": "quality",
+        "n": "integer"
+      },
+      "fr": "{q} la plupart du temps, {n} coupures",
+      "en": "Mostly {q}, {n} stalls"
+    },
+    "experience.video.adaptive_interrupted": {
+      "args": {
+        "n": "integer",
+        "m": "integer"
+      },
+      "fr": "Interrompu à {n} s sur {m}",
+      "en": "Stopped at {n} s of {m}"
+    },
+    "experience.web.opens_in": {
+      "args": {
+        "t": "duration"
+      },
+      "fr": "Une page s’ouvre en {t}",
+      "en": "A page opens in {t}"
+    },
+    "experience.web.failed_one": {
+      "args": {
+        "n": "integer",
+        "m": "integer"
+      },
+      "fr": "{n} échec sur {m}",
+      "en": "{n} failed of {m}"
+    },
+    "experience.web.failed_other": {
+      "args": {
+        "n": "integer",
+        "m": "integer"
+      },
+      "fr": "{n} échecs sur {m}",
+      "en": "{n} failed of {m}"
+    },
+    "experience.web.uneven": {
+      "args": {},
+      "fr": "temps irrégulier",
+      "en": "uneven times"
+    },
+    "experience.game.all": {
+      "args": {},
+      "fr": "Convient à tous les usages, jeu compétitif compris",
+      "en": "Fine for everything, competitive gaming included"
+    },
+    "experience.game.casual": {
+      "args": {},
+      "fr": "Convient aux appels vidéo et au jeu occasionnel",
+      "en": "Fine for video calls and casual gaming"
+    },
+    "experience.game.video": {
+      "args": {},
+      "fr": "Convient aux appels vidéo, pas au jeu",
+      "en": "Fine for video calls, not gaming"
+    },
+    "experience.game.audio": {
+      "args": {},
+      "fr": "Convient aux appels audio seulement",
+      "en": "Fine for audio calls only"
+    },
+    "experience.game.none": {
+      "args": {},
+      "fr": "Latence trop élevée pour le jeu et les appels",
+      "en": "Latency too high for gaming and calls"
+    },
+    "experience.game.key": {
+      "args": {
+        "median": "ms",
+        "max": "ms"
+      },
+      "fr": "réactivité {median} · pointes à {max}",
+      "en": "responsiveness {median} · peaks at {max}"
+    },
+    "experience.game.key_median": {
+      "args": {
+        "median": "ms"
+      },
+      "fr": "réactivité {median}",
+      "en": "responsiveness {median}"
+    },
+    "experience.game.line": {
+      "args": {
+        "median": "ms",
+        "max": "ms"
+      },
+      "fr": "Réactivité {median} · pointes à {max}",
+      "en": "Responsiveness {median} · peaks at {max}"
+    },
+    "experience.game.line_median": {
+      "args": {
+        "median": "ms"
+      },
+      "fr": "Réactivité {median}",
+      "en": "Responsiveness {median}"
+    },
+    "experience.upload.both": {
+      "args": {
+        "photo": "duration",
+        "video": "duration"
+      },
+      "fr": "Photo en {photo} · vidéo de 30 s en {video}",
+      "en": "Photo in {photo} · 30 s video in {video}"
+    },
+    "experience.upload.photo": {
+      "args": {
+        "photo": "duration"
+      },
+      "fr": "Photo en {photo}",
+      "en": "Photo in {photo}"
+    },
+    "experience.upload.video": {
+      "args": {
+        "video": "duration"
+      },
+      "fr": "Vidéo de 30 s en {video}",
+      "en": "30 s video in {video}"
+    },
+    "experience.upload.rate": {
+      "args": {
+        "r": "rate"
+      },
+      "fr": "{r} en envoi",
+      "en": "{r} upload"
+    },
+    "experience.state.not_measured": {
+      "args": {},
+      "fr": "Non mesuré",
+      "en": "Not measured"
+    },
+    "experience.state.interrupted": {
+      "args": {},
+      "fr": "Interrompu",
+      "en": "Interrupted"
+    },
+    "experience.state.interrupted_background": {
+      "args": {},
+      "fr": "Interrompu : app passée en arrière-plan",
+      "en": "Interrupted: app went to background"
+    },
+    "experience.state.interrupted_network_changed": {
+      "args": {},
+      "fr": "Interrompu : réseau changé",
+      "en": "Interrupted: network changed"
+    },
+    "experience.state.interrupted_offline": {
+      "args": {},
+      "fr": "Interrompu : connexion perdue",
+      "en": "Interrupted: connection lost"
+    },
+    "experience.state.interrupted_user_stopped": {
+      "args": {},
+      "fr": "Interrompu : test arrêté",
+      "en": "Interrupted: test stopped"
+    },
+    "experience.state.failed": {
+      "args": {},
+      "fr": "Échec de la mesure",
+      "en": "Measurement failed"
+    },
+    "experience.detail.peaks_above": {
+      "args": {
+        "ms": "ms"
+      },
+      "fr": "Pointes au-delà de {ms}",
+      "en": "Peaks above {ms}"
+    },
+    "experience.detail.under_load": {
+      "args": {
+        "delta": "ms"
+      },
+      "fr": "Avec un téléchargement en cours : +{delta}",
+      "en": "While downloading: +{delta}"
+    },
+    "experience.detail.responsiveness": {
+      "args": {},
+      "fr": "Réactivité",
+      "en": "Responsiveness"
+    },
+    "experience.detail.variation": {
+      "args": {},
+      "fr": "Variation",
+      "en": "Variation"
+    },
+    "experience.detail.typical_time": {
+      "args": {},
+      "fr": "Temps typique",
+      "en": "Typical time"
+    },
+    "experience.detail.slowest": {
+      "args": {},
+      "fr": "Plus lente",
+      "en": "Slowest"
+    },
+    "experience.detail.failures": {
+      "args": {},
+      "fr": "Échecs",
+      "en": "Failures"
+    },
+    "experience.detail.startup": {
+      "args": {},
+      "fr": "Démarrage",
+      "en": "Start-up"
+    },
+    "experience.detail.stalls": {
+      "args": {},
+      "fr": "Coupures",
+      "en": "Stalls"
+    },
+    "experience.detail.upload_speed": {
+      "args": {},
+      "fr": "Débit d’envoi",
+      "en": "Upload speed"
+    },
+    "experience.detail.how_calculated": {
+      "args": {},
+      "fr": "Comment c’est calculé",
+      "en": "How it's calculated"
+    },
+    "experience.share.caption": {
+      "args": {},
+      "fr": "Vidéo, web, jeu : ma connexion testée avec SignalQuest",
+      "en": "Video, web, gaming: my connection tested with SignalQuest"
+    },
+    "speedtest.share.caption": {
+      "args": {},
+      "fr": "Débit et latence, mesurés avec SignalQuest",
+      "en": "Speed and latency, measured with SignalQuest"
+    },
+    "experience.local.failed_server_busy": {
+      "args": {},
+      "fr": "Échec : serveur de mesure occupé",
+      "en": "Failed: measurement server busy",
+      "local": true
+    },
+    "experience.local.failed_server_redirected": {
+      "args": {},
+      "fr": "Échec : serveur de mesure redirigé",
+      "en": "Failed: measurement server redirected",
+      "local": true
+    }
+  },
+  "rates": [
+    {
+      "kbps": 150,
+      "fr": "0,2 Mb/s",
+      "en": "0.2 Mb/s"
+    },
+    {
+      "kbps": 7000,
+      "fr": "7 Mb/s",
+      "en": "7 Mb/s"
+    },
+    {
+      "kbps": 7250,
+      "fr": "7,3 Mb/s",
+      "en": "7.3 Mb/s"
+    },
+    {
+      "kbps": 7500,
+      "fr": "7,5 Mb/s",
+      "en": "7.5 Mb/s"
+    },
+    {
+      "kbps": 9940,
+      "fr": "9,9 Mb/s",
+      "en": "9.9 Mb/s"
+    },
+    {
+      "kbps": 9950,
+      "fr": "10 Mb/s",
+      "en": "10 Mb/s"
+    },
+    {
+      "kbps": 12500,
+      "fr": "13 Mb/s",
+      "en": "13 Mb/s"
+    },
+    {
+      "kbps": 84000,
+      "fr": "84 Mb/s",
+      "en": "84 Mb/s"
+    },
+    {
+      "kbps": 999400,
+      "fr": "999 Mb/s",
+      "en": "999 Mb/s"
+    },
+    {
+      "kbps": 999500,
+      "fr": "1,000 Gb/s",
+      "en": "1.000 Gb/s"
+    },
+    {
+      "kbps": 1722000,
+      "fr": "1,722 Gb/s",
+      "en": "1.722 Gb/s"
+    },
+    {
+      "kbps": 1722500,
+      "fr": "1,723 Gb/s",
+      "en": "1.723 Gb/s"
+    }
+  ],
+  "spikes": {
+    "thresholds": [
+      {
+        "medianMs": 29,
+        "methodology": "experience-v3",
+        "thresholdMs": 129
+      },
+      {
+        "medianMs": 29,
+        "methodology": "experience-v4",
+        "thresholdMs": 59
+      },
+      {
+        "medianMs": 30,
+        "methodology": "experience-v3",
+        "thresholdMs": 130
+      },
+      {
+        "medianMs": 30,
+        "methodology": "experience-v4",
+        "thresholdMs": 60
+      },
+      {
+        "medianMs": 31,
+        "methodology": "experience-v3",
+        "thresholdMs": 131
+      },
+      {
+        "medianMs": 31,
+        "methodology": "experience-v4",
+        "thresholdMs": 62
+      },
+      {
+        "medianMs": 99,
+        "methodology": "experience-v3",
+        "thresholdMs": 199
+      },
+      {
+        "medianMs": 99,
+        "methodology": "experience-v4",
+        "thresholdMs": 198
+      },
+      {
+        "medianMs": 100,
+        "methodology": "experience-v3",
+        "thresholdMs": 200
+      },
+      {
+        "medianMs": 100,
+        "methodology": "experience-v4",
+        "thresholdMs": 200
+      },
+      {
+        "medianMs": 101,
+        "methodology": "experience-v3",
+        "thresholdMs": 201
+      },
+      {
+        "medianMs": 101,
+        "methodology": "experience-v4",
+        "thresholdMs": 201
+      }
+    ],
+    "series": [
+      {
+        "name": "mesure égale au seuil : non comptée ; un de plus : comptée",
+        "methodology": "experience-v3",
+        "seriesMs": [
+          40,
+          40,
+          40,
+          80,
+          81
+        ],
+        "expected": {
+          "medianMs": 40,
+          "thresholdMs": 140,
+          "spikeCount": 0,
+          "spikeShare": 0
+        }
+      },
+      {
+        "name": "mesure égale au seuil : non comptée ; un de plus : comptée",
+        "methodology": "experience-v4",
+        "seriesMs": [
+          40,
+          40,
+          40,
+          80,
+          81
+        ],
+        "expected": {
+          "medianMs": 40,
+          "thresholdMs": 80,
+          "spikeCount": 1,
+          "spikeShare": 0.2
+        }
+      }
+    ]
+  },
+  "gameVerdicts": [
+    {
+      "name": "A aux bornes",
+      "game": {
+        "medianMs": 40,
+        "jitterMs": 10,
+        "maxMs": 80,
+        "spikeCount": 0
+      },
+      "verdict": "all",
+      "scoreCap": 100
+    },
+    {
+      "name": "A manqué par un à-coup → B",
+      "game": {
+        "medianMs": 40,
+        "jitterMs": 10,
+        "maxMs": 80,
+        "spikeCount": 1
+      },
+      "verdict": "casual",
+      "scoreCap": 85
+    },
+    {
+      "name": "A sans compte d’à-coups → B",
+      "game": {
+        "medianMs": 30,
+        "jitterMs": 5,
+        "maxMs": 60
+      },
+      "verdict": "casual",
+      "scoreCap": 85
+    },
+    {
+      "name": "B aux bornes",
+      "game": {
+        "medianMs": 80,
+        "jitterMs": 20,
+        "maxMs": 150,
+        "spikeCount": 3
+      },
+      "verdict": "casual",
+      "scoreCap": 85
+    },
+    {
+      "name": "médiane 30, gigue 5, une pointe à 200 → C (la note plafonne à 70)",
+      "game": {
+        "medianMs": 30,
+        "jitterMs": 5,
+        "maxMs": 200,
+        "spikeCount": 1
+      },
+      "verdict": "video",
+      "scoreCap": 70
+    },
+    {
+      "name": "C aux bornes",
+      "game": {
+        "medianMs": 150,
+        "jitterMs": 30,
+        "maxMs": 300
+      },
+      "verdict": "video",
+      "scoreCap": 70
+    },
+    {
+      "name": "gigue manquante : D au mieux",
+      "game": {
+        "medianMs": 50,
+        "maxMs": 100
+      },
+      "verdict": "audio",
+      "scoreCap": 50
+    },
+    {
+      "name": "D aux bornes",
+      "game": {
+        "medianMs": 300,
+        "maxMs": 600
+      },
+      "verdict": "audio",
+      "scoreCap": 50
+    },
+    {
+      "name": "médiane au-delà de D → E",
+      "game": {
+        "medianMs": 301,
+        "maxMs": 400
+      },
+      "verdict": "none",
+      "scoreCap": 25
+    },
+    {
+      "name": "maximum au-delà de D → E",
+      "game": {
+        "medianMs": 100,
+        "jitterMs": 10,
+        "maxMs": 601
+      },
+      "verdict": "none",
+      "scoreCap": 25
+    },
+    {
+      "name": "maximum manquant : pas de verdict",
+      "game": {
+        "medianMs": 100,
+        "jitterMs": 10
+      },
+      "verdict": null,
+      "scoreCap": null
+    },
+    {
+      "name": "médiane manquante : pas de verdict",
+      "game": {
+        "maxMs": 100
+      },
+      "verdict": null,
+      "scoreCap": null
+    }
+  ],
+  "cases": [
+    {
+      "name": "cas courant : quatre usages",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "state": "measured"
+            },
+            {
+              "quality": "2160p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 300
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [],
+          "timeByQualityMs": {
+            "1080p": 12000,
+            "1440p": 18000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2061
+            },
+            {
+              "state": "measured",
+              "totalMs": 2150
+            },
+            {
+              "state": "measured",
+              "totalMs": 1800
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 41,
+          "jitterMs": 6,
+          "spikeCount": 0
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 9840
+            }
+          ]
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 80,
+          "lines": [
+            {
+              "key": "experience.video.ladder_up_to",
+              "args": {
+                "q": "1440p"
+              },
+              "fr": "Jusqu’à 1440p sans coupure",
+              "en": "Up to 1440p without stalling"
+            },
+            {
+              "key": "experience.video.adaptive_clean",
+              "args": {
+                "q": "1440p"
+              },
+              "fr": "1440p la plupart du temps, sans coupure",
+              "en": "Mostly 1440p, no stalls"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_up_to",
+            "args": {
+              "q": "1440p"
+            },
+            "fr": "Jusqu’à 1440p sans coupure",
+            "en": "Up to 1440p without stalling"
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "score": 79,
+          "lines": [
+            {
+              "key": "experience.web.opens_in",
+              "args": {
+                "t": 2061
+              },
+              "fr": "Une page s’ouvre en 2,1 s",
+              "en": "A page opens in 2.1 s"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.web.opens_in",
+            "args": {
+              "t": 2061
+            },
+            "fr": "Une page s’ouvre en 2,1 s",
+            "en": "A page opens in 2.1 s"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 95,
+          "lines": [
+            {
+              "key": "experience.game.line_median",
+              "args": {
+                "median": 41
+              },
+              "fr": "Réactivité 41 ms",
+              "en": "Responsiveness 41 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 82
+              },
+              "fr": "Pointes au-delà de 82 ms",
+              "en": "Peaks above 82 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.line_median",
+            "args": {
+              "median": 41
+            },
+            "fr": "Réactivité 41 ms",
+            "en": "Responsiveness 41 ms"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "score": 69,
+          "lines": [
+            {
+              "key": "experience.upload.both",
+              "args": {
+                "photo": 1200,
+                "video": 9840
+              },
+              "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+              "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.upload.rate",
+            "args": {
+              "r": 24390
+            },
+            "fr": "24 Mb/s en envoi",
+            "en": "24 Mb/s upload"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.upload.both",
+            "args": {
+              "photo": 1200,
+              "video": 9840
+            },
+            "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+            "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "Jusqu’en 1440p sans coupure, lecture fluide",
+          "webPage": "Pages ouvertes en 2,1 s",
+          "gameAndCalls": "41 ms, fluide en jeu comme en appel",
+          "upload": "Vidéo de 30 s envoyée en 9,8 s, photo en 1,2 s"
+        },
+        "en": {
+          "video": "Up to 1440p with no stalls, smooth playback",
+          "webPage": "Pages opened in 2.1 s",
+          "gameAndCalls": "41 ms, smooth for games and calls",
+          "upload": "30 s video sent in 9.8 s, photo in 1.2 s"
+        }
+      }
+    },
+    {
+      "name": "pire cas vidéo (deux tests) : aucune qualité tenue, 50 coupures ; pire cas web : 10 s et 2 échecs sur 3",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 300
+                },
+                {
+                  "atPlaybackMs": 4000,
+                  "waitMs": 300
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [
+            {
+              "atPlaybackMs": 2000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 4000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 6000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 8000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 10000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 12000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 14000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 16000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 18000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 20000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 22000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 24000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 26000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 28000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 30000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 32000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 34000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 36000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 38000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 40000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 42000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 44000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 46000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 48000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 50000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 52000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 54000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 56000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 58000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 60000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 62000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 64000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 66000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 68000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 70000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 72000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 74000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 76000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 78000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 80000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 82000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 84000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 86000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 88000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 90000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 92000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 94000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 96000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 98000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 100000,
+              "waitMs": 300
+            }
+          ],
+          "timeByQualityMs": {
+            "480p": 30000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 9960
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 100,
+          "jitterMs": 30,
+          "spikeCount": 4
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 59960
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 59999
+            }
+          ]
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 0,
+          "lines": [
+            {
+              "key": "experience.video.ladder_stalls_from_lowest",
+              "args": {},
+              "fr": "Coupures dès 480p",
+              "en": "Stalls from 480p"
+            },
+            {
+              "key": "experience.video.adaptive_stalls_other",
+              "args": {
+                "q": "480p",
+                "n": 50
+              },
+              "fr": "480p la plupart du temps, 50 coupures",
+              "en": "Mostly 480p, 50 stalls"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_stalls_from_lowest",
+            "args": {},
+            "fr": "Coupures dès 480p",
+            "en": "Stalls from 480p"
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "score": 0,
+          "lines": [
+            {
+              "key": "experience.web.opens_in",
+              "args": {
+                "t": 9960
+              },
+              "fr": "Une page s’ouvre en 10,0 s",
+              "en": "A page opens in 10.0 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.web.failed_other",
+            "args": {
+              "n": 2,
+              "m": 3
+            },
+            "fr": "2 échecs sur 3",
+            "en": "2 failed of 3"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.web.opens_in",
+            "args": {
+              "t": 9960
+            },
+            "fr": "Une page s’ouvre en 10,0 s",
+            "en": "A page opens in 10.0 s"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 61,
+          "lines": [
+            {
+              "key": "experience.game.line_median",
+              "args": {
+                "median": 100
+              },
+              "fr": "Réactivité 100 ms",
+              "en": "Responsiveness 100 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 200
+              },
+              "fr": "Pointes au-delà de 200 ms",
+              "en": "Peaks above 200 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.line_median",
+            "args": {
+              "median": 100
+            },
+            "fr": "Réactivité 100 ms",
+            "en": "Responsiveness 100 ms"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "score": 30,
+          "lines": [
+            {
+              "key": "experience.upload.both",
+              "args": {
+                "photo": 59960,
+                "video": 59999
+              },
+              "fr": "Photo en 60,0 s · vidéo de 30 s en 60,0 s",
+              "en": "Photo in 60.0 s · 30 s video in 60.0 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.upload.rate",
+            "args": {
+              "r": 4000
+            },
+            "fr": "4 Mb/s en envoi",
+            "en": "4 Mb/s upload"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.upload.both",
+            "args": {
+              "photo": 59960,
+              "video": 59999
+            },
+            "fr": "Photo en 60,0 s · vidéo de 30 s en 60,0 s",
+            "en": "Photo in 60.0 s · 30 s video in 60.0 s"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "Aucune qualité sans coupure, 50 coupures en lecture",
+          "webPage": "Pages ouvertes en 10,0 s, 2 ouvertures sur 3 en échec",
+          "gameAndCalls": "100 ms, bien pour le jeu occasionnel et les appels",
+          "upload": "Vidéo de 30 s envoyée en 60,0 s, photo en 60,0 s"
+        },
+        "en": {
+          "video": "No quality without stalls, 50 stalls in playback",
+          "webPage": "Pages opened in 10.0 s, 2 of 3 openings failed",
+          "gameAndCalls": "100 ms, fine for casual games and calls",
+          "upload": "30 s video sent in 60.0 s, photo in 60.0 s"
+        }
+      }
+    },
+    {
+      "name": "pire cas vidéo tenue avec coupures en lecture ; jeu trop lent à 1 000 ms ; photo seule (vidéo en échec)",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured"
+            },
+            {
+              "quality": "720p",
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "state": "measured"
+            },
+            {
+              "quality": "2160p",
+              "state": "abandoned"
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [
+            {
+              "atPlaybackMs": 2000,
+              "waitMs": 300
+            }
+          ],
+          "timeByQualityMs": {
+            "720p": 20000,
+            "1080p": 10000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 850
+            },
+            {
+              "state": "measured",
+              "totalMs": 990
+            },
+            {
+              "state": "measured",
+              "totalMs": 1049
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 1000,
+          "jitterMs": 120,
+          "spikeCount": 40
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 12449
+            }
+          ]
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 80,
+          "lines": [
+            {
+              "key": "experience.video.ladder_up_to",
+              "args": {
+                "q": "1440p"
+              },
+              "fr": "Jusqu’à 1440p sans coupure",
+              "en": "Up to 1440p without stalling"
+            },
+            {
+              "key": "experience.video.adaptive_stalls_one",
+              "args": {
+                "q": "720p",
+                "n": 1
+              },
+              "fr": "720p la plupart du temps, 1 coupure",
+              "en": "Mostly 720p, 1 stall"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_up_to",
+            "args": {
+              "q": "1440p"
+            },
+            "fr": "Jusqu’à 1440p sans coupure",
+            "en": "Up to 1440p without stalling"
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "score": 100,
+          "lines": [
+            {
+              "key": "experience.web.opens_in",
+              "args": {
+                "t": 990
+              },
+              "fr": "Une page s’ouvre en 990 ms",
+              "en": "A page opens in 990 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.web.opens_in",
+            "args": {
+              "t": 990
+            },
+            "fr": "Une page s’ouvre en 990 ms",
+            "en": "A page opens in 990 ms"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 0,
+          "lines": [
+            {
+              "key": "experience.game.none",
+              "args": {},
+              "fr": "Latence trop élevée pour le jeu et les appels",
+              "en": "Latency too high for gaming and calls"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.game.key_median",
+            "args": {
+              "median": 1000
+            },
+            "fr": "réactivité 1 000 ms",
+            "en": "responsiveness 1,000 ms"
+          },
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 1100
+              },
+              "fr": "Pointes au-delà de 1 100 ms",
+              "en": "Peaks above 1,100 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.none",
+            "args": {},
+            "fr": "Latence trop élevée pour le jeu et les appels",
+            "en": "Latency too high for gaming and calls"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "score": 25,
+          "lines": [
+            {
+              "key": "experience.upload.photo",
+              "args": {
+                "photo": 12449
+              },
+              "fr": "Photo en 12,4 s",
+              "en": "Photo in 12.4 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.upload.rate",
+            "args": {
+              "r": 3213
+            },
+            "fr": "3,2 Mb/s en envoi",
+            "en": "3.2 Mb/s upload"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.upload.photo",
+            "args": {
+              "photo": 12449
+            },
+            "fr": "Photo en 12,4 s",
+            "en": "Photo in 12.4 s"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "Jusqu’en 1440p sans coupure, 1 coupure en lecture",
+          "webPage": "Pages ouvertes en 990 ms",
+          "gameAndCalls": "1 000 ms, trop lent pour jouer ou appeler",
+          "upload": "Photo envoyée en 12,4 s, vidéo en échec"
+        },
+        "en": {
+          "video": "Up to 1440p with no stalls, 1 stall in playback",
+          "webPage": "Pages opened in 990 ms",
+          "gameAndCalls": "1,000 ms, too slow for games or calls",
+          "upload": "Photo sent in 12.4 s, video failed"
+        }
+      }
+    },
+    {
+      "name": "échelle seule, aucune qualité ; adaptatif en échec ; jeu appel audio ; envoi interrompu",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 300
+                }
+              ]
+            },
+            {
+              "quality": "720p",
+              "state": "abandoned"
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "failed"
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 220,
+          "jitterMs": 40,
+          "spikeCount": 12
+        },
+        "upload": {
+          "state": "interrupted",
+          "notTestedReason": "background"
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 0,
+          "lines": [
+            {
+              "key": "experience.video.ladder_stalls_from_lowest",
+              "args": {},
+              "fr": "Coupures dès 480p",
+              "en": "Stalls from 480p"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_stalls_from_lowest",
+            "args": {},
+            "fr": "Coupures dès 480p",
+            "en": "Stalls from 480p"
+          }
+        },
+        "webPage": {
+          "state": "not_tested",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.not_measured",
+              "args": {},
+              "fr": "Non mesuré",
+              "en": "Not measured"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.not_measured",
+            "args": {},
+            "fr": "Non mesuré",
+            "en": "Not measured"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 26,
+          "lines": [
+            {
+              "key": "experience.game.line_median",
+              "args": {
+                "median": 220
+              },
+              "fr": "Réactivité 220 ms",
+              "en": "Responsiveness 220 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 320
+              },
+              "fr": "Pointes au-delà de 320 ms",
+              "en": "Peaks above 320 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.line_median",
+            "args": {
+              "median": 220
+            },
+            "fr": "Réactivité 220 ms",
+            "en": "Responsiveness 220 ms"
+          }
+        },
+        "upload": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.interrupted_background",
+              "args": {},
+              "fr": "Interrompu : app passée en arrière-plan",
+              "en": "Interrupted: app went to background"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.interrupted_background",
+            "args": {},
+            "fr": "Interrompu : app passée en arrière-plan",
+            "en": "Interrupted: app went to background"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "Aucune qualité sans coupure",
+          "webPage": "Test non lancé",
+          "gameAndCalls": "220 ms, assez pour un appel audio",
+          "upload": "Test interrompu"
+        },
+        "en": {
+          "video": "No quality without stalls",
+          "webPage": "Not run",
+          "gameAndCalls": "220 ms, enough for a voice call",
+          "upload": "Test interrupted"
+        }
+      }
+    },
+    {
+      "name": "adaptatif seul avec coupures, surtout en 4K ; jeu appel vidéo HD ; web en échec",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [
+            {
+              "atPlaybackMs": 2000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 4000,
+              "waitMs": 300
+            },
+            {
+              "atPlaybackMs": 6000,
+              "waitMs": 300
+            }
+          ],
+          "timeByQualityMs": {
+            "1440p": 9000,
+            "2160p": 21000
+          }
+        },
+        "webPage": {
+          "state": "failed",
+          "openings": [
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "failed"
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 130,
+          "jitterMs": 20,
+          "spikeCount": 2
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.video.adaptive_stalls_other",
+              "args": {
+                "q": "2160p",
+                "n": 3
+              },
+              "fr": "4K la plupart du temps, 3 coupures",
+              "en": "Mostly 4K, 3 stalls"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.adaptive_stalls_other",
+            "args": {
+              "q": "2160p",
+              "n": 3
+            },
+            "fr": "4K la plupart du temps, 3 coupures",
+            "en": "Mostly 4K, 3 stalls"
+          }
+        },
+        "webPage": {
+          "state": "failed",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.failed",
+              "args": {},
+              "fr": "Échec de la mesure",
+              "en": "Measurement failed"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.failed",
+            "args": {},
+            "fr": "Échec de la mesure",
+            "en": "Measurement failed"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 63,
+          "lines": [
+            {
+              "key": "experience.game.line_median",
+              "args": {
+                "median": 130
+              },
+              "fr": "Réactivité 130 ms",
+              "en": "Responsiveness 130 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 230
+              },
+              "fr": "Pointes au-delà de 230 ms",
+              "en": "Peaks above 230 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.line_median",
+            "args": {
+              "median": 130
+            },
+            "fr": "Réactivité 130 ms",
+            "en": "Responsiveness 130 ms"
+          }
+        },
+        "upload": {
+          "state": "not_tested",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.not_measured",
+              "args": {},
+              "fr": "Non mesuré",
+              "en": "Not measured"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.not_measured",
+            "args": {},
+            "fr": "Non mesuré",
+            "en": "Not measured"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "3 coupures en lecture, surtout en 4K",
+          "webPage": "Échec du test",
+          "gameAndCalls": "130 ms, assez pour un appel vidéo HD",
+          "upload": "Test non lancé"
+        },
+        "en": {
+          "video": "3 stalls in playback, mostly in 4K",
+          "webPage": "Test failed",
+          "gameAndCalls": "130 ms, enough for an HD video call",
+          "upload": "Not run"
+        }
+      }
+    },
+    {
+      "name": "un seul échec et une seule coupure : pluriels au singulier (web : EN suit {o}, FR suit {f} ; vidéo : {n} dans les deux langues)",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 4000,
+                  "waitMs": 400
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [
+            {
+              "atPlaybackMs": 8000,
+              "waitMs": 500
+            }
+          ],
+          "timeByQualityMs": {
+            "1080p": 20000,
+            "1440p": 10000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2100
+            },
+            {
+              "state": "failed"
+            },
+            {
+              "state": "measured",
+              "totalMs": 2100
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 41,
+          "jitterMs": 6,
+          "spikeCount": 0
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 9840
+            }
+          ]
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 60,
+          "lines": [
+            {
+              "key": "experience.video.ladder_up_to",
+              "args": {
+                "q": "1080p"
+              },
+              "fr": "Jusqu’à 1080p sans coupure",
+              "en": "Up to 1080p without stalling"
+            },
+            {
+              "key": "experience.video.adaptive_stalls_one",
+              "args": {
+                "q": "1080p",
+                "n": 1
+              },
+              "fr": "1080p la plupart du temps, 1 coupure",
+              "en": "Mostly 1080p, 1 stall"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_up_to",
+            "args": {
+              "q": "1080p"
+            },
+            "fr": "Jusqu’à 1080p sans coupure",
+            "en": "Up to 1080p without stalling"
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "score": 63,
+          "lines": [
+            {
+              "key": "experience.web.opens_in",
+              "args": {
+                "t": 2100
+              },
+              "fr": "Une page s’ouvre en 2,1 s",
+              "en": "A page opens in 2.1 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.web.failed_one",
+            "args": {
+              "n": 1,
+              "m": 3
+            },
+            "fr": "1 échec sur 3",
+            "en": "1 failed of 3"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.web.opens_in",
+            "args": {
+              "t": 2100
+            },
+            "fr": "Une page s’ouvre en 2,1 s",
+            "en": "A page opens in 2.1 s"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 95,
+          "lines": [
+            {
+              "key": "experience.game.line_median",
+              "args": {
+                "median": 41
+              },
+              "fr": "Réactivité 41 ms",
+              "en": "Responsiveness 41 ms"
+            }
+          ],
+          "keyValue": null,
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 82
+              },
+              "fr": "Pointes au-delà de 82 ms",
+              "en": "Peaks above 82 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.line_median",
+            "args": {
+              "median": 41
+            },
+            "fr": "Réactivité 41 ms",
+            "en": "Responsiveness 41 ms"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "score": 69,
+          "lines": [
+            {
+              "key": "experience.upload.both",
+              "args": {
+                "photo": 1200,
+                "video": 9840
+              },
+              "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+              "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.upload.rate",
+            "args": {
+              "r": 24390
+            },
+            "fr": "24 Mb/s en envoi",
+            "en": "24 Mb/s upload"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.upload.both",
+            "args": {
+              "photo": 1200,
+              "video": 9840
+            },
+            "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+            "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+          }
+        }
+      },
+      "replaces": {
+        "fr": {
+          "video": "Jusqu’en 1080p sans coupure, 1 coupure en lecture",
+          "webPage": "Pages ouvertes en 2,1 s, 1 ouverture sur 3 en échec",
+          "gameAndCalls": "41 ms, fluide en jeu comme en appel",
+          "upload": "Vidéo de 30 s envoyée en 9,8 s, photo en 1,2 s"
+        },
+        "en": {
+          "video": "Up to 1080p with no stalls, 1 stall in playback",
+          "webPage": "Pages opened in 2.1 s, 1 of 3 openings failed",
+          "gameAndCalls": "41 ms, smooth for games and calls",
+          "upload": "30 s video sent in 9.8 s, photo in 1.2 s"
+        }
+      }
+    },
+    {
+      "name": "cas courant avec maxMs (apps récentes) : verdict B, valeur secondaire, note plafonnée à 85",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "measured",
+          "rungs": [
+            {
+              "quality": "480p",
+              "state": "measured",
+              "stalls": []
+            },
+            {
+              "quality": "720p",
+              "state": "measured"
+            },
+            {
+              "quality": "1080p",
+              "state": "measured"
+            },
+            {
+              "quality": "1440p",
+              "state": "measured"
+            },
+            {
+              "quality": "2160p",
+              "state": "measured",
+              "stalls": [
+                {
+                  "atPlaybackMs": 2000,
+                  "waitMs": 300
+                }
+              ]
+            }
+          ]
+        },
+        "videoAdaptive": {
+          "state": "measured",
+          "stalls": [],
+          "timeByQualityMs": {
+            "1080p": 12000,
+            "1440p": 18000
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "openings": [
+            {
+              "state": "measured",
+              "totalMs": 2061
+            },
+            {
+              "state": "measured",
+              "totalMs": 2150
+            },
+            {
+              "state": "measured",
+              "totalMs": 1800
+            }
+          ]
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "medianMs": 41,
+          "jitterMs": 6,
+          "maxMs": 90,
+          "spikeCount": 0
+        },
+        "upload": {
+          "state": "measured",
+          "items": [
+            {
+              "kind": "photo",
+              "bytes": 5000000,
+              "totalMs": 1200
+            },
+            {
+              "kind": "video",
+              "bytes": 30000000,
+              "totalMs": 9840
+            }
+          ]
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "measured",
+          "score": 80,
+          "lines": [
+            {
+              "key": "experience.video.ladder_up_to",
+              "args": {
+                "q": "1440p"
+              },
+              "fr": "Jusqu’à 1440p sans coupure",
+              "en": "Up to 1440p without stalling"
+            },
+            {
+              "key": "experience.video.adaptive_clean",
+              "args": {
+                "q": "1440p"
+              },
+              "fr": "1440p la plupart du temps, sans coupure",
+              "en": "Mostly 1440p, no stalls"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.ladder_up_to",
+            "args": {
+              "q": "1440p"
+            },
+            "fr": "Jusqu’à 1440p sans coupure",
+            "en": "Up to 1440p without stalling"
+          }
+        },
+        "webPage": {
+          "state": "measured",
+          "score": 79,
+          "lines": [
+            {
+              "key": "experience.web.opens_in",
+              "args": {
+                "t": 2061
+              },
+              "fr": "Une page s’ouvre en 2,1 s",
+              "en": "A page opens in 2.1 s"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.web.opens_in",
+            "args": {
+              "t": 2061
+            },
+            "fr": "Une page s’ouvre en 2,1 s",
+            "en": "A page opens in 2.1 s"
+          }
+        },
+        "gameAndCalls": {
+          "state": "measured",
+          "score": 85,
+          "lines": [
+            {
+              "key": "experience.game.casual",
+              "args": {},
+              "fr": "Convient aux appels vidéo et au jeu occasionnel",
+              "en": "Fine for video calls and casual gaming"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.game.key",
+            "args": {
+              "median": 41,
+              "max": 90
+            },
+            "fr": "réactivité 41 ms · pointes à 90 ms",
+            "en": "responsiveness 41 ms · peaks at 90 ms"
+          },
+          "detail": [
+            {
+              "key": "experience.detail.peaks_above",
+              "args": {
+                "ms": 82
+              },
+              "fr": "Pointes au-delà de 82 ms",
+              "en": "Peaks above 82 ms"
+            }
+          ],
+          "share": {
+            "key": "experience.game.casual",
+            "args": {},
+            "fr": "Convient aux appels vidéo et au jeu occasionnel",
+            "en": "Fine for video calls and casual gaming"
+          }
+        },
+        "upload": {
+          "state": "measured",
+          "score": 69,
+          "lines": [
+            {
+              "key": "experience.upload.both",
+              "args": {
+                "photo": 1200,
+                "video": 9840
+              },
+              "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+              "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+            }
+          ],
+          "keyValue": {
+            "key": "experience.upload.rate",
+            "args": {
+              "r": 24390
+            },
+            "fr": "24 Mb/s en envoi",
+            "en": "24 Mb/s upload"
+          },
+          "detail": [],
+          "share": {
+            "key": "experience.upload.both",
+            "args": {
+              "photo": 1200,
+              "video": 9840
+            },
+            "fr": "Photo en 1,2 s · vidéo de 30 s en 9,8 s",
+            "en": "Photo in 1.2 s · 30 s video in 9.8 s"
+          }
+        }
+      }
+    },
+    {
+      "name": "interruptions : chaque cause a sa phrase, sans cause la phrase générique",
+      "methodology": "experience-v4",
+      "tests": {
+        "videoLadder": {
+          "state": "interrupted",
+          "notTestedReason": "background",
+          "rungs": []
+        },
+        "videoAdaptive": {
+          "state": "interrupted",
+          "playbackMs": 12400
+        },
+        "webPage": {
+          "state": "interrupted",
+          "notTestedReason": "network_changed"
+        },
+        "gameAndCalls": {
+          "state": "interrupted",
+          "notTestedReason": "offline"
+        },
+        "upload": {
+          "state": "interrupted"
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.video.adaptive_interrupted",
+              "args": {
+                "n": 12,
+                "m": 30
+              },
+              "fr": "Interrompu à 12 s sur 30",
+              "en": "Stopped at 12 s of 30"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.video.adaptive_interrupted",
+            "args": {
+              "n": 12,
+              "m": 30
+            },
+            "fr": "Interrompu à 12 s sur 30",
+            "en": "Stopped at 12 s of 30"
+          }
+        },
+        "webPage": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.interrupted_network_changed",
+              "args": {},
+              "fr": "Interrompu : réseau changé",
+              "en": "Interrupted: network changed"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.interrupted_network_changed",
+            "args": {},
+            "fr": "Interrompu : réseau changé",
+            "en": "Interrupted: network changed"
+          }
+        },
+        "gameAndCalls": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.interrupted_offline",
+              "args": {},
+              "fr": "Interrompu : connexion perdue",
+              "en": "Interrupted: connection lost"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.interrupted_offline",
+            "args": {},
+            "fr": "Interrompu : connexion perdue",
+            "en": "Interrupted: connection lost"
+          }
+        },
+        "upload": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.interrupted",
+              "args": {},
+              "fr": "Interrompu",
+              "en": "Interrupted"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.interrupted",
+            "args": {},
+            "fr": "Interrompu",
+            "en": "Interrupted"
+          }
+        }
+      }
+    },
+    {
+      "name": "arrêt par le membre : user_stopped ; aucun test lancé : non mesuré",
+      "methodology": "experience-v4",
+      "tests": {
+        "webPage": {
+          "state": "interrupted",
+          "notTestedReason": "user_stopped"
+        },
+        "gameAndCalls": {
+          "state": "failed"
+        }
+      },
+      "expected": {
+        "video": {
+          "state": "not_tested",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.not_measured",
+              "args": {},
+              "fr": "Non mesuré",
+              "en": "Not measured"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.not_measured",
+            "args": {},
+            "fr": "Non mesuré",
+            "en": "Not measured"
+          }
+        },
+        "webPage": {
+          "state": "interrupted",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.interrupted_user_stopped",
+              "args": {},
+              "fr": "Interrompu : test arrêté",
+              "en": "Interrupted: test stopped"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.interrupted_user_stopped",
+            "args": {},
+            "fr": "Interrompu : test arrêté",
+            "en": "Interrupted: test stopped"
+          }
+        },
+        "gameAndCalls": {
+          "state": "failed",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.failed",
+              "args": {},
+              "fr": "Échec de la mesure",
+              "en": "Measurement failed"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.failed",
+            "args": {},
+            "fr": "Échec de la mesure",
+            "en": "Measurement failed"
+          }
+        },
+        "upload": {
+          "state": "not_tested",
+          "score": null,
+          "lines": [
+            {
+              "key": "experience.state.not_measured",
+              "args": {},
+              "fr": "Non mesuré",
+              "en": "Not measured"
+            }
+          ],
+          "keyValue": null,
+          "detail": [],
+          "share": {
+            "key": "experience.state.not_measured",
+            "args": {},
+            "fr": "Non mesuré",
+            "en": "Not measured"
+          }
+        }
+      }
+    }
+  ]
+}
