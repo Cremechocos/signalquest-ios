@@ -288,8 +288,8 @@ struct SpeedtestShareGraph: View {
         }
 
         let averagePath = Path { path in
-            // Même domaine que la courbe : du premier débit récent au dernier. La moyenne
-            // cumulée vaudrait réellement 0 à l'origine : cas soumis à Alexandre le 02/11.
+            // Même domaine que la courbe : du premier débit récent au dernier. Les deux tracés
+            // commencent au même endroit (décision d'Alexandre du 02/11).
             guard let timedAverageSeries, let start = timedSeries?.first?.elapsedMs,
                   let end = timedSeries?.last?.elapsedMs, end > start else { return }
             for (index, sample) in timedAverageSeries.filter({ $0.elapsedMs >= start && $0.elapsedMs <= end }).enumerated() {
