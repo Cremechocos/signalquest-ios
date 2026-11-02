@@ -370,7 +370,7 @@ enum SQShareCardBuilder {
 
     // MARK: - Formats
 
-    /// Règle commune du 20/10 : sous 10 Mb/s une décimale (« 7,5 »), de 10 à 999
+    /// Règle commune du 20/10 : sous 10 Mb/s une décimale facultative (« 7 », « 7,5 »), de 10 à 999
     /// un entier (« 214 »), dès 1 000 des Gb/s à trois décimales (« 1,722 »). Les
     /// bascules se font sur la valeur ARRONDIE : 9,96 s'écrit « 10 », jamais
     /// « 10,0 ». `nil` pour une valeur nulle ou non finie : la ligne disparaît.
@@ -382,7 +382,9 @@ enum SQShareCardBuilder {
         if mbps >= 9.95 {
             return .init(number: number(mbps, fractionDigits: 0, locale: locale), unit: "Mb/s")
         }
-        return .init(number: number(mbps, fractionDigits: 1, locale: locale), unit: "Mb/s")
+        // Décimale seulement si elle n'est pas nulle : « 7 Mb/s », jamais « 7,0 » (02/11).
+        let tenths = (mbps * 10).rounded()
+        return .init(number: number(tenths / 10, fractionDigits: tenths.truncatingRemainder(dividingBy: 10) == 0 ? 0 : 1, locale: locale), unit: "Mb/s")
     }
 
     private static func number(_ value: Double, fractionDigits: Int, locale: Locale) -> String {

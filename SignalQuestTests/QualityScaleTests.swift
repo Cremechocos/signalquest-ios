@@ -66,6 +66,28 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.throughputValue(mbps: .nan, locale: fr), "—")
     }
 
+    /// Bornes `rates` de presentation-v1 (map-nextjs, #811) : décimale facultative
+    /// sous 9,95 Mb/s (« 7 », jamais « 7,0 »), entier ensuite, Gb/s à trois
+    /// décimales dès 999,5 (décision du 02/11, commune aux trois apps).
+    func testThroughputFollowsThePresentationRateVector() {
+        let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
+        let rates: [(kbps: Double, fr: String, en: String)] = [
+            (7_000, "7 Mb/s", "7 Mb/s"), (7_500, "7,5 Mb/s", "7.5 Mb/s"),
+            (9_940, "9,9 Mb/s", "9.9 Mb/s"), (9_950, "10 Mb/s", "10 Mb/s"),
+            (84_000, "84 Mb/s", "84 Mb/s"), (999_400, "999 Mb/s", "999 Mb/s"),
+            (999_500, "1,000 Gb/s", "1.000 Gb/s"), (1_722_000, "1,722 Gb/s", "1.722 Gb/s"),
+        ]
+        for rate in rates {
+            let mbps = rate.kbps / 1_000
+            let unit = mbps >= 999.5 ? "Gb/s" : "Mb/s"
+            XCTAssertEqual("\(SQUnits.throughputValue(mbps: mbps, locale: fr)) \(unit)", rate.fr, "\(rate.kbps)")
+            XCTAssertEqual("\(SQUnits.throughputValue(mbps: mbps, locale: en)) \(unit)", rate.en, "\(rate.kbps)")
+            XCTAssertEqual(WidgetUnits.throughputValue(mbps: mbps, locale: fr), SQUnits.throughputValue(mbps: mbps, locale: fr), "\(rate.kbps)")
+        }
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 0, locale: fr), "0")
+        XCTAssertEqual(SQUnits.throughputValue(mbps: 6.96, locale: fr), "7")
+    }
+
     /// Même règle pour les distances : « 12,3 km » en français (MES-25).
     func testDistanceUsesTheLocaleDecimalSeparator() {
         let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
