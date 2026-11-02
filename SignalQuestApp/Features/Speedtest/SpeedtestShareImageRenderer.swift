@@ -168,16 +168,7 @@ struct SpeedtestShareGraph: View {
     /// Série affichée : mesures du moteur si ≥ 2 points ; sinon moyenne réelle
     /// plate (toujours une donnée mesurée, jamais une courbe fantaisie).
     private var displaySeries: [Double] {
-        drawnTimedSeries?.map(\.mbps) ?? (series.count >= 2 ? [0] + series : series)
-    }
-
-    /// Au dessin seulement, la courbe part de (0, 0) (décision d'Alexandre du 02/11,
-    /// les trois apps) : un débit récent est une fenêtre de 1 s datée à sa fin, donc le
-    /// premier point mesuré tombe après l'origine. Les séries enregistrées ne changent pas.
-    private var drawnTimedSeries: [SpeedtestTimedRate]? {
-        guard let timedSeries, let first = timedSeries.first else { return timedSeries }
-        let origin = timeOriginMs ?? first.elapsedMs
-        return first.elapsedMs > origin ? [SpeedtestTimedRate(elapsedMs: origin, mbps: 0)] + timedSeries : timedSeries
+        timedSeries?.map(\.mbps) ?? series
     }
 
     private var isSparse: Bool { displaySeries.count < 2 }
@@ -194,7 +185,8 @@ struct SpeedtestShareGraph: View {
                     VStack {
                         Spacer()
                         HStack {
-                            Text("0 s")
+                            // L'axe part de la première fenêtre mesurée, sans étiquette à gauche
+                            // (décision d'Alexandre du 02/11 : ne pas surcharger le graphe).
                             Spacer()
                             Text("\(Double(last.elapsedMs - (timeOriginMs ?? 0)) / 1000, format: .number.precision(.fractionLength(1))) s")
                         }
@@ -243,8 +235,7 @@ struct SpeedtestShareGraph: View {
     private func effectiveSeries(maxPoints: Int = 44) -> (values: [Double], grace: Int) {
         let base = displaySeries
         if timedSeries != nil { return (base, 0) }
-        // Le 0 ajouté au dessin en tête fait partie de la montée en charge.
-        let grace = isSparse || graceCount <= 0 ? 0 : min(graceCount + 1, base.count)
+        let grace = isSparse ? 0 : min(max(0, graceCount), base.count)
         guard base.count > maxPoints else { return (base, grace) }
         let useful = Array(base[grace...])
         let bucketed = simplified(useful, maxPoints: max(8, maxPoints - grace))
@@ -265,9 +256,9 @@ struct SpeedtestShareGraph: View {
         let plotWidth = max(1, w - leftInset - rightInset)
         let step = plotWidth / CGFloat(max(pts.count - 1, 1))
         let x: (Int) -> CGFloat = { index in
-            if let drawn = drawnTimedSeries, let first = drawn.first, let last = drawn.last,
-               last.elapsedMs > first.elapsedMs, index < drawn.count {
-                return leftInset + CGFloat(drawn[index].elapsedMs - first.elapsedMs) / CGFloat(last.elapsedMs - first.elapsedMs) * plotWidth
+            if let timedSeries, let first = timedSeries.first, let last = timedSeries.last,
+               last.elapsedMs > first.elapsedMs, index < timedSeries.count {
+                return leftInset + CGFloat(timedSeries[index].elapsedMs - first.elapsedMs) / CGFloat(last.elapsedMs - first.elapsedMs) * plotWidth
             }
             return leftInset + CGFloat(index) * step
         }
@@ -297,11 +288,11 @@ struct SpeedtestShareGraph: View {
         }
 
         let averagePath = Path { path in
-            // Même domaine que la courbe, depuis (0, 0).
-            guard let timedAverageSeries, let start = drawnTimedSeries?.first?.elapsedMs,
-                  let end = drawnTimedSeries?.last?.elapsedMs, end > start else { return }
-            let drawnAverage = [SpeedtestTimedRate(elapsedMs: start, mbps: 0)] + timedAverageSeries.filter { $0.elapsedMs > start && $0.elapsedMs <= end }
-            for (index, sample) in drawnAverage.enumerated() {
+            // Même domaine que la courbe : du premier débit récent au dernier. La moyenne
+            // cumulée vaudrait réellement 0 à l'origine : cas soumis à Alexandre le 02/11.
+            guard let timedAverageSeries, let start = timedSeries?.first?.elapsedMs,
+                  let end = timedSeries?.last?.elapsedMs, end > start else { return }
+            for (index, sample) in timedAverageSeries.filter({ $0.elapsedMs >= start && $0.elapsedMs <= end }).enumerated() {
                 let point = CGPoint(x: leftInset + CGFloat(sample.elapsedMs - start) / CGFloat(end - start) * plotWidth,
                                     y: y(sample.mbps))
                 if index == 0 { path.move(to: point) } else { path.addLine(to: point) }

@@ -171,9 +171,8 @@ extension SpeedtestV6ContractTests {
             connectionType: .wifi, uploadMeasurementSource: "client-written", measurementTrace: trace, methodologyVersion: 6)
         let card = SQShareCardBuilder.model(for: result, theme: .light, locale: Locale(identifier: "fr_FR"))
         XCTAssertEqual(card.download, .init(number: "1,000", unit: "Gb/s"))
-        // Au dessin, la courbe part de (0, 0) puis rejoint les fenêtres à leur fin (décision du 02/11).
-        XCTAssertEqual(card.downloadGraph?.normalizedTimes, [0, 0.65, 1.0])
-        XCTAssertEqual(card.downloadGraph?.points.first, 0)
+        // La courbe part du premier débit mesuré (fin de la 1re fenêtre), pas de l'origine de mesure (blanc du 31/10).
+        XCTAssertEqual(card.downloadGraph?.normalizedTimes, [0, 1.0])
         XCTAssertEqual(card.latency?.number, "12")
         // Upload absent: its line disappears instead of showing a dash.
         XCTAssertNil(card.upload)
@@ -867,7 +866,6 @@ extension SpeedtestV6ContractTests {
         let graph = try XCTUnwrap(SQShareCardBuilder.model(for: result, theme: .light).uploadGraph)
         XCTAssertEqual(graph.durationSeconds, 10)
         XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.first), 0, accuracy: 0.00001)
-        XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.dropFirst().first), 0.1, accuracy: 0.00001)
         XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.last), 1, accuracy: 0.00001)
     }
 

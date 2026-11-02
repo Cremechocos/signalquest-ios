@@ -211,10 +211,8 @@ final class SQShareCardBuilderTests: XCTestCase {
     func testLongSeriesIsDownsampled() {
         let series = (0..<200).map { Double($0) }
         let graph = model(result(downloadSeries: series)).downloadGraph
-        // 32 points mesurés, plus l'origine (0, 0) ajoutée au dessin (décision du 02/11).
-        XCTAssertEqual(graph?.points.count, 33)
-        XCTAssertEqual(graph?.points.first, 0)
-        XCTAssertGreaterThan(graph?.points.dropFirst().first ?? 0, 0)
+        XCTAssertEqual(graph?.points.count, 32)
+        XCTAssertGreaterThan(graph?.points.first ?? 0, 0)
         XCTAssertLessThan(graph?.points.last ?? 0, 200)
     }
 
@@ -236,7 +234,7 @@ final class SQShareCardBuilderTests: XCTestCase {
 
     func testNonFiniteSamplesAreDropped() {
         let graph = model(result(downloadSeries: [100, .nan, .infinity, -5, 300])).downloadGraph
-        XCTAssertEqual(graph?.points, [0, 100, 300])
+        XCTAssertEqual(graph?.points, [100, 300])
     }
 
     func testCurvesUseInkForDownloadAndBrandForUpload() {
