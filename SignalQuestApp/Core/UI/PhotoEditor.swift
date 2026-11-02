@@ -33,18 +33,20 @@ enum PhotoCropRatio: CaseIterable, Identifiable {
     }
 }
 
-/// Éditeur « Modifier » avant publication (E1) : Recadrer, puis Flouter.
+/// Éditeur « Modifier » avant publication : Recadrer et Flouter (E1), Filtres et Réglages (E2).
 ///
 /// Les retouches restent non destructives : `onDone` reçoit l'aperçu retouché et
 /// les retouches, que l'écran garde pour rouvrir l'éditeur ou cuire l'envoi.
 struct PhotoEditorView: View {
     enum Tool: CaseIterable, Identifiable {
-        case crop, blur
+        case crop, filters, adjust, blur
         var id: Self { self }
 
         var title: LocalizedStringKey {
             switch self {
             case .crop: return "Recadrer"
+            case .filters: return "Filtres"
+            case .adjust: return "photoEditor.adjust"
             case .blur: return "Flouter"
             }
         }
@@ -52,9 +54,13 @@ struct PhotoEditorView: View {
         var symbol: String {
             switch self {
             case .crop: return "crop.rotate"
+            case .filters: return "camera.filters"
+            case .adjust: return "slider.horizontal.3"
             case .blur: return "eye.slash"
             }
         }
+
+        var isColor: Bool { self == .filters || self == .adjust }
     }
 
     let image: UIImage
@@ -63,6 +69,8 @@ struct PhotoEditorView: View {
     let confirmTitle: LocalizedStringKey
     /// Titre de validation quand des zones sont floutées (« Flouter et envoyer »).
     let blurConfirmTitle: LocalizedStringKey?
+    /// Filtres et Réglages : pas sur une photo d'antenne, qui documente le site tel qu'il est.
+    let allowsColor: Bool
     let onDone: (UIImage, PhotoEdits) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -81,6 +89,12 @@ struct PhotoEditorView: View {
     @State private var isDetecting = false
     @State private var confirmDiscard = false
     @State private var gestureStart: CGRect?
+    @State private var adjustKind: PhotoAdjustments.Kind = .brightness
+    /// Copie réduite de la photo : aperçus en couleur sans recalculer l'original à chaque geste.
+    @State private var previewSource: UIImage?
+    @State private var colorPreview: UIImage?
+    @State private var livePreview: UIImage?
+    @State private var filterThumbnails: [PhotoFilter: UIImage] = [:]
 
     init(
         image: UIImage,
@@ -89,12 +103,14 @@ struct PhotoEditorView: View {
         initialTool: Tool = .crop,
         confirmTitle: LocalizedStringKey = "photoEditor.done",
         blurConfirmTitle: LocalizedStringKey? = nil,
+        allowsColor: Bool = true,
         onDone: @escaping (UIImage, PhotoEdits) -> Void
     ) {
         self.image = image
         self.fixedAspect = fixedAspect
         self.confirmTitle = confirmTitle
         self.blurConfirmTitle = blurConfirmTitle
+        self.allowsColor = allowsColor
         self.onDone = onDone
         var start = edits
         if let fixedAspect, start.crop == PhotoEdits.fullFrame {
@@ -108,6 +124,7 @@ struct PhotoEditorView: View {
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }
     private var baseSize: CGSize { edits.baseSize(for: image.size) }
     private var hasChanges: Bool { edits != baseline }
+    private var tools: [Tool] { Tool.allCases.filter { allowsColor || !$0.isColor } }
 
     var body: some View {
         NavigationStack {
@@ -162,6 +179,8 @@ struct PhotoEditorView: View {
             .task(id: tool) {
                 if tool == .blur { await prepareBlurTool() }
             }
+            .task { prepareColorPreviews() }
+            .task(id: edits) { refreshColorPreviews() }
         }
     }
 
@@ -175,6 +194,18 @@ struct PhotoEditorView: View {
                 cropCanvas(in: proxy.size)
             }
             .padding(SQSpace.lg)
+        case .filters, .adjust:
+            if let livePreview {
+                Image(uiImage: livePreview)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(SQSpace.lg)
+                    .accessibilityHidden(true)
+            } else {
+                SQSpinner().tint(SQColor.brandRed)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         case .blur:
             if let croppedPreview {
                 PhotoBlurCanvas(image: croppedPreview, regions: cropSpaceRegions)
@@ -192,7 +223,7 @@ struct PhotoEditorView: View {
         let crop = CGRect(x: frame.minX + edits.crop.minX * frame.width, y: frame.minY + edits.crop.minY * frame.height,
                           width: edits.crop.width * frame.width, height: edits.crop.height * frame.height)
         return ZStack(alignment: .topLeading) {
-            Image(uiImage: image)
+            Image(uiImage: colorPreview ?? image)
                 .resizable()
                 .frame(width: upright.width, height: upright.height)
                 .rotationEffect(.degrees(-90 * Double(edits.quarterTurns) + edits.straighten))
@@ -340,6 +371,8 @@ struct PhotoEditorView: View {
     private var panel: some View {
         switch tool {
         case .crop: cropPanel
+        case .filters: filtersPanel
+        case .adjust: adjustPanel
         case .blur: blurPanel
         }
     }
@@ -456,6 +489,154 @@ struct PhotoEditorView: View {
         .accessibilityIdentifier("photoEditor.ratio.\(String(describing: option))")
     }
 
+    private var filtersPanel: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: SQSpace.sm) {
+                    ForEach(PhotoFilter.allCases) { option in
+                        filterButton(option)
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+            }
+            if edits.filter != .none {
+                percentSlider(
+                    title: "Intensité",
+                    value: Binding(get: { edits.filterStrength * 100 }, set: { edits.filterStrength = $0 / 100 }),
+                    range: 0...100,
+                    identifier: "photoEditor.filterStrength"
+                )
+                .padding(.horizontal, SQSpace.lg)
+            }
+        }
+        .padding(.vertical, SQSpace.sm)
+        .foregroundStyle(SQColor.label)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+    }
+
+    private func filterButton(_ option: PhotoFilter) -> some View {
+        let selected = edits.filter == option
+        return Button {
+            Haptics.selection()
+            edits.filter = option
+            edits.filterStrength = 1
+        } label: {
+            VStack(spacing: SQSpace.xs) {
+                Group {
+                    if let thumbnail = filterThumbnails[option] {
+                        Image(uiImage: thumbnail).resizable().scaledToFill()
+                    } else {
+                        SQColor.fill
+                    }
+                }
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(selected ? SQColor.brandRed : .clear, lineWidth: 2.5)
+                )
+                Text(option.title)
+                    .font(SQType.micro)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(selected ? SQColor.label : SQColor.labelSecondary)
+            }
+            .frame(width: 72)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(option.title))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("photoEditor.filter.\(option.rawValue)")
+    }
+
+    private var adjustPanel: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SQSpace.sm) {
+                    ForEach(PhotoAdjustments.Kind.allCases) { kind in
+                        adjustChip(kind)
+                    }
+                    if edits.hasAdjustments {
+                        Button("Réinitialiser") {
+                            Haptics.light()
+                            edits.adjustments = PhotoAdjustments()
+                        }
+                        .font(SQType.subhead)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("photoEditor.adjust.reset")
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+            }
+            percentSlider(
+                title: adjustKind.title,
+                value: Binding(
+                    get: { edits.adjustments[adjustKind] * 100 },
+                    set: { value in
+                        // Aimanté à 0, comme le redressement.
+                        let snapped = abs(value) < 3 ? 0 : value
+                        if snapped == 0, edits.adjustments[adjustKind] != 0 { Haptics.selection() }
+                        edits.adjustments[adjustKind] = snapped / 100
+                    }
+                ),
+                range: -100...100,
+                identifier: "photoEditor.adjust.value"
+            )
+            .padding(.horizontal, SQSpace.lg)
+        }
+        .padding(.vertical, SQSpace.sm)
+        .foregroundStyle(SQColor.label)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+    }
+
+    private func adjustChip(_ kind: PhotoAdjustments.Kind) -> some View {
+        let selected = adjustKind == kind
+        let modified = edits.adjustments[kind] != 0
+        return Button {
+            Haptics.selection()
+            adjustKind = kind
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: kind.symbol)
+                Text(kind.title).lineLimit(1)
+                if modified {
+                    Circle().fill(selected ? SQColor.onInk : SQColor.brandRed).frame(width: 5, height: 5)
+                }
+            }
+            .font(SQType.micro)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 44)
+            .foregroundStyle(selected ? SQColor.onInk : SQColor.label)
+            .background(selected ? SQColor.label : SQColor.fill, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityValue(modified ? Text("Modifié") : Text(""))
+        .accessibilityIdentifier("photoEditor.adjust.\(String(describing: kind))")
+    }
+
+    /// Curseur gradué en pourcentage, avec sa valeur lisible et dite.
+    private func percentSlider(title: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>, identifier: String) -> some View {
+        let rounded = Int(value.wrappedValue.rounded())
+        let signed = range.lowerBound < 0 && rounded > 0 ? "+\(rounded)" : "\(rounded)"
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(title).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                Spacer()
+                Text(verbatim: signed)
+                    .font(SQType.caption.monospacedDigit())
+                    .foregroundStyle(SQColor.label)
+            }
+            Slider(value: value, in: range, step: 1)
+                .tint(SQColor.brandRed)
+                .accessibilityLabel(Text(title))
+                .accessibilityValue(Text(verbatim: signed))
+                .accessibilityIdentifier(identifier)
+        }
+    }
+
     private var blurPanel: some View {
         Text(blurStatus)
             .font(SQType.caption)
@@ -479,15 +660,17 @@ struct PhotoEditorView: View {
 
     private var toolBar: some View {
         HStack(spacing: 0) {
-            ForEach(Tool.allCases) { item in
+            ForEach(tools) { item in
                 let selected = tool == item
-                let modified = item == .crop ? (edits.hasGeometryChanges && !onlyFixedCrop) : edits.hasBlur
+                let modified = isModified(item)
                 Button {
                     Haptics.selection()
                     tool = item
                 } label: {
                     VStack(spacing: 4) {
+                        // Hauteur fixe : les symboles n'ont pas la même, et les libellés se décalaient.
                         Image(systemName: item.symbol).font(.system(size: 18, weight: .semibold))
+                            .frame(height: 24)
                         Text(item.title).font(SQType.micro)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -513,7 +696,37 @@ struct PhotoEditorView: View {
         .background(SQColor.surface)
     }
 
+    private func isModified(_ item: Tool) -> Bool {
+        switch item {
+        case .crop: return edits.hasGeometryChanges && !onlyFixedCrop
+        case .filters: return edits.hasFilter
+        case .adjust: return edits.hasAdjustments
+        case .blur: return edits.hasBlur
+        }
+    }
+
     // MARK: Actions
+
+    /// Copie réduite et vignettes des filtres, une fois à l'ouverture.
+    private func prepareColorPreviews() {
+        guard allowsColor, previewSource == nil else { return }
+        let source = PhotoColor.thumbnail(image, longestSide: 1_200)
+        previewSource = source
+        let small = PhotoColor.thumbnail(source, longestSide: 160)
+        var thumbnails: [PhotoFilter: UIImage] = [:]
+        for filter in PhotoFilter.allCases {
+            thumbnails[filter] = PhotoColor.render(small, matrix: filter.matrix)
+        }
+        filterThumbnails = thumbnails
+        refreshColorPreviews()
+    }
+
+    /// Aperçus recalculés sur la copie réduite : couleur sous Recadrer, rendu final sous Filtres et Réglages.
+    private func refreshColorPreviews() {
+        guard let previewSource else { return }
+        colorPreview = edits.hasColorChanges ? PhotoColor.render(previewSource, matrix: edits.colorMatrix) : nil
+        livePreview = PhotoEditRenderer.render(previewSource, edits: edits)
+    }
 
     private var straightenBinding: Binding<Double> {
         Binding(

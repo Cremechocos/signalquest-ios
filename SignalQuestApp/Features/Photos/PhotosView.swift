@@ -1296,7 +1296,7 @@ struct PhotoUploadView: View {
                     }
                     .fullScreenCover(isPresented: $showBlurEditor) {
                         if let image {
-                            PhotoEditorView(image: image, edits: photoEdits) { edited, edits in
+                            PhotoEditorView(image: image, edits: photoEdits, allowsColor: false) { edited, edits in
                                 photoEdits = edits
                                 editedPreview = edits.isIdentity ? nil : edited
                             }

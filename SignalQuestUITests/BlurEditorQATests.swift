@@ -6,15 +6,16 @@ import XCTest
 final class BlurEditorQATests: XCTestCase {
     func testDrawingRemovingAndApplyingAnArea() {
         run(locale: "fr", noFace: "Aucun visage repéré", oneArea: "Zones à flouter : 1", remove: "Retirer la zone 1",
-            done: "Valider", keepEditing: "Continuer")
+            done: "Valider", keepEditing: "Continuer", filters: "Filtres", adjust: "Réglages", warm: "Chaud", contrast: "Contraste")
     }
 
     func testEnglishDrawingRemovingAndApplyingAnArea() {
         run(locale: "en", noFace: "No faces found", oneArea: "Areas to blur: 1", remove: "Remove area 1",
-            done: "Done", keepEditing: "Keep editing")
+            done: "Done", keepEditing: "Keep editing", filters: "Filters", adjust: "Adjust", warm: "Warm", contrast: "Contrast")
     }
 
-    private func run(locale: String, noFace: String, oneArea: String, remove: String, done: String, keepEditing: String) {
+    private func run(locale: String, noFace: String, oneArea: String, remove: String, done: String, keepEditing: String,
+                     filters: String, adjust: String, warm: String, contrast: String) {
         continueAfterFailure = false
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-blur-editor"], locale: locale)
@@ -56,6 +57,33 @@ final class BlurEditorQATests: XCTestCase {
         add(crop)
         app.buttons["photoEditor.tool.blur"].tap()
         XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea), "La zone floutée survit au recadrage")
+
+        // Filtres : Chaud, puis son intensité ; Réglages : contraste.
+        let filtersTool = app.buttons["photoEditor.tool.filters"]
+        XCTAssertEqual(filtersTool.label, filters)
+        filtersTool.tap()
+        let warmFilter = app.buttons["photoEditor.filter.warm"]
+        XCTAssertTrue(warmFilter.waitForExistence(timeout: 5))
+        XCTAssertEqual(warmFilter.label, warm)
+        warmFilter.tap()
+        XCTAssertTrue(warmFilter.isSelected)
+        XCTAssertTrue(app.sliders["photoEditor.filterStrength"].waitForExistence(timeout: 5), "Intensité après un filtre")
+        let adjustTool = app.buttons["photoEditor.tool.adjust"]
+        XCTAssertEqual(adjustTool.label, adjust)
+        adjustTool.tap()
+        let contrastChip = app.buttons["photoEditor.adjust.contrast"]
+        XCTAssertTrue(contrastChip.waitForExistence(timeout: 5))
+        contrastChip.tap()
+        let value = app.sliders["photoEditor.adjust.value"]
+        XCTAssertEqual(value.label, contrast)
+        value.adjust(toNormalizedSliderPosition: 0.8)
+        XCTAssertTrue(app.buttons["photoEditor.adjust.reset"].waitForExistence(timeout: 5), "« Réinitialiser » après un réglage")
+        let color = XCTAttachment(screenshot: app.screenshot())
+        color.name = "adjust-tool-\(locale)"
+        color.lifetime = .keepAlways
+        add(color)
+        app.buttons["photoEditor.tool.blur"].tap()
+        XCTAssertTrue(waitForLabel(of: status, startingWith: oneArea), "La zone floutée survit aux couleurs")
 
         // Annuler avec des modifications : on peut reprendre la retouche.
         app.buttons["photoEditor.cancel"].tap()

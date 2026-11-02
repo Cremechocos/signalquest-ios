@@ -19,14 +19,29 @@ struct PhotoEdits: Equatable, Sendable {
     var blurRegions: [CGRect] = []
     /// Les visages ont déjà été cherchés : rouvrir l'éditeur ne rajoute pas ceux qu'on a retirés.
     var facesChecked = false
+    /// Filtre prédéfini et son intensité (0…1), puis réglages (E2).
+    var filter: PhotoFilter = .none
+    var filterStrength: Double = 1
+    var adjustments = PhotoAdjustments()
 
     static let fullFrame = CGRect(x: 0, y: 0, width: 1, height: 1)
     static let straightenLimit: Double = 45
 
     var hasGeometryChanges: Bool { quarterTurns % 4 != 0 || straighten != 0 || crop != Self.fullFrame }
     var hasBlur: Bool { !blurRegions.isEmpty }
+    var hasFilter: Bool { filter != .none && filterStrength > 0 }
+    var hasAdjustments: Bool { !adjustments.isNeutral }
+    var hasColorChanges: Bool { hasFilter || hasAdjustments }
     /// Rien à cuire : l'original peut partir tel quel.
-    var isIdentity: Bool { !hasGeometryChanges && !hasBlur }
+    var isIdentity: Bool { !hasGeometryChanges && !hasBlur && !hasColorChanges }
+
+    /// Filtre à son intensité, puis réglages, en une seule matrice.
+    var colorMatrix: PhotoColorMatrix {
+        // Sans retouche, l'identité exacte : les calculs en flottants n'y retombent pas toujours.
+        guard hasColorChanges else { return .identity }
+        let filtered = hasFilter ? filter.matrix.strength(filterStrength) : .identity
+        return hasAdjustments ? filtered.then(adjustments.matrix) : filtered
+    }
 
     /// Taille de l'espace de base pour une image droite de taille `upright`.
     func baseSize(for upright: CGSize) -> CGSize {
@@ -77,8 +92,8 @@ struct PhotoEdits: Equatable, Sendable {
     }
 }
 
-/// Cuit `PhotoEdits` dans une copie : quarts de tour et redressement, puis flou,
-/// puis cadre. Le flou passe avant le cadre sur l'image entière ; le résultat est le
+/// Cuit `PhotoEdits` dans une copie : quarts de tour et redressement, puis couleur,
+/// puis flou, puis cadre. Le flou passe avant le cadre sur l'image entière ; le résultat est le
 /// même qu'après, et une zone à cheval sur le bord reste floutée jusqu'au bord.
 enum PhotoEditRenderer {
     /// `maxSide` borne le plus grand côté de la sortie, en pixels.
@@ -102,7 +117,8 @@ enum PhotoEditRenderer {
             cg.scaleBy(x: scale, y: scale)
             image.draw(in: CGRect(x: -upright.width / 2, y: -upright.height / 2, width: upright.width, height: upright.height))
         }
-        let blurred = PhotoBlur.render(straightened, regions: edits.blurRegions)
+        let colored = PhotoColor.render(straightened, matrix: edits.colorMatrix)
+        let blurred = PhotoBlur.render(colored, regions: edits.blurRegions)
         guard edits.crop != PhotoEdits.fullFrame, let source = blurred.cgImage else { return blurred }
         let pixels = CGSize(width: source.width, height: source.height)
         let rect = CGRect(x: edits.crop.minX * pixels.width, y: edits.crop.minY * pixels.height,

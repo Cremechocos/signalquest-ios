@@ -365,7 +365,8 @@ struct AntennaDetailSheet: View {
                 edits: PhotoEdits(blurRegions: request.photo.faces, facesChecked: true),
                 initialTool: .blur,
                 confirmTitle: "Envoyer sans flou",
-                blurConfirmTitle: "Flouter et envoyer"
+                blurConfirmTitle: "Flouter et envoyer",
+                allowsColor: false
             ) { _, edits in
                 Task { await sendPhoto(request.photo.raw, edits: edits, operatorName: request.operatorName) }
             }
