@@ -70,6 +70,8 @@ enum ANFROperator: String, CaseIterable, Identifiable, Sendable, Hashable {
 enum ANFRStatsMarket: String, CaseIterable, Identifiable, Sendable {
     case fr = "FR"
     case drom = "DROM"
+    /// Canada (ISED, extrait mensuel, contrat ISED-STATS v1 §11).
+    case ca = "CA"
 
     var id: String { rawValue }
 
@@ -77,7 +79,16 @@ enum ANFRStatsMarket: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .fr: return String(localized: "France")
         case .drom: return String(localized: "Outre-mer")
+        case .ca: return String(localized: "Canada")
         }
+    }
+
+    /// Un extrait ISED vaut un mois ; un relevé ANFR, une semaine.
+    var isMonthly: Bool { self == .ca }
+
+    /// Le pays d'ouverture : le Canada pour un membre dont « Mon pays » est le Canada.
+    static var initial: ANFRStatsMarket {
+        ANFRMapMarket.initial == .ca ? .ca : .fr
     }
 
     /// Garde-fou du contrat : des chiffres d'outre-mer ne s'affichent que si
@@ -86,7 +97,7 @@ enum ANFRStatsMarket: String, CaseIterable, Identifiable, Sendable {
     func accepts(served: String?) -> Bool {
         switch self {
         case .fr: return served == nil || served == rawValue
-        case .drom: return served == rawValue
+        case .drom, .ca: return served == rawValue
         }
     }
 }
@@ -332,6 +343,8 @@ struct ANFRStats: Decodable, Sendable {
     /// Départements d'outre-mer du dernier relevé, lus seulement en `DROM` :
     /// en métropole, la centaine de départements ne sert pas à l'écran.
     let departments: [ANFRTerritoryMetric]
+    /// Provinces et territoires canadiens, lus seulement en `CA`.
+    let provinces: [ANFRTerritoryMetric]
     /// Opérateurs présents, dans l'ordre et aux couleurs de la carte (`filters`).
     let operators: [ANFRStatsOperator]
 
@@ -358,44 +371,35 @@ struct ANFRStats: Decodable, Sendable {
             departments = market == ANFRStatsMarket.drom.rawValue
                 ? territories.value([ANFRTerritoryMetric].self, .departments, [])
                 : []
+            provinces = market == ANFRStatsMarket.ca.rawValue
+                ? territories.value([ANFRTerritoryMetric].self, .provinces, [])
+                : []
         } else {
             regions = []
             departments = []
+            provinces = []
         }
 
         let filters = try? c.nestedContainer(keyedBy: FilterKeys.self, forKey: .filters)
-        operators = filters?.value([FilterOperator].self, .operators, []).compactMap(\.statsOperator) ?? []
+        operators = filters?.value([ANFRServedOperator].self, .operators, []).compactMap(\.statsOperator) ?? []
     }
 
     private enum MetaKeys: String, CodingKey { case latestDate, market }
     private enum NationalKeys: String, CodingKey { case series, latest }
-    private enum TerritoryKeys: String, CodingKey { case regions, departments, crozon }
+    private enum TerritoryKeys: String, CodingKey { case regions, departments, provinces, crozon }
     private enum FilterKeys: String, CodingKey { case operators }
-
-    /// `{ key, label, color }` des filtres ; `DROM_OTHER` est dit « Autres »
-    /// dans la langue de l'app.
-    private struct FilterOperator: Decodable {
-        let key: String
-        let label: String?
-        let color: String?
-
-        var statsOperator: ANFRStatsOperator? {
-            guard !key.isEmpty else { return nil }
-            let name = key == "DROM_OTHER" ? String(localized: "Autres") : (label ?? key)
-            let rgb = color.flatMap { UInt32($0.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) }
-            return ANFRStatsOperator(key: key, label: name, color: rgb.map { Color(hex: $0) } ?? SQColor.labelSecondary)
-        }
-    }
 
     /// Constructeur direct (données de démo).
     init(latestDate: String?, series: [ANFRStatsPoint], latest: [ANFRStatsLatest], regions: [ANFRTerritoryMetric],
-         market: String? = nil, departments: [ANFRTerritoryMetric] = [], operators: [ANFRStatsOperator] = []) {
+         market: String? = nil, departments: [ANFRTerritoryMetric] = [], provinces: [ANFRTerritoryMetric] = [],
+         operators: [ANFRStatsOperator] = []) {
         self.latestDate = latestDate
         self.market = market
         self.series = series
         self.latest = latest
         self.regions = regions
         self.departments = departments
+        self.provinces = provinces
         self.operators = operators
     }
 }

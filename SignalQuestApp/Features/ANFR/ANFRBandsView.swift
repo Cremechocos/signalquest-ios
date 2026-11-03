@@ -15,6 +15,8 @@ final class ANFRBandsViewModel: ObservableObject {
     let market: ANFRStatsMarket
     /// Un an et une semaine : l'écart sur 52 semaines se lit sur la courbe.
     static let weeks = 53
+    /// Au Canada, un relevé vaut un mois : treize extraits couvrent un an.
+    var history: Int { market.isMonthly ? 13 : Self.weeks }
 
     @Published private(set) var operatorKey = "all"
     @Published private(set) var generation = "5g"
@@ -65,7 +67,7 @@ final class ANFRBandsViewModel: ObservableObject {
         defer { if operatorKey == self.operatorKey, generation == self.generation { isLoading = false } }
         do {
             async let overview = stats(weeks: 1, generation: nil, operatorKey: operatorKey)
-            async let detail = stats(weeks: Self.weeks, generation: generation, operatorKey: operatorKey)
+            async let detail = stats(weeks: history, generation: generation, operatorKey: operatorKey)
             let (loadedOverview, loadedDetail) = try await (overview, detail)
             guard operatorKey == self.operatorKey, generation == self.generation else { return }
             self.overview = loadedOverview
@@ -175,7 +177,14 @@ enum ANFRBandsFormat {
     }
 
     static func yearChange(_ summary: ANFRBandStats.Summary) -> String? {
-        summary.delta52w.map { String(localized: "\(signed($0.operational)) en un an") }
+        (summary.delta52w ?? summary.delta12m).map { String(localized: "\(signed($0.operational)) en un an") }
+    }
+
+    /// « 1 234 sites en service » ; au Canada, ISED publie des sites autorisés (contrat §11).
+    static func sitesLine(_ count: Int, market: ANFRStatsMarket) -> String {
+        market == .ca
+            ? String(localized: "\(sites(count)) sites autorisés")
+            : String(localized: "\(sites(count)) sites en service")
     }
 
     /// Sites autorisés pas encore en service, pour la 4G et la 5G, comme le
@@ -206,9 +215,13 @@ struct ANFRBandsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
-                Text(model.market == .fr
-                     ? "Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande."
-                     : "Outre-mer (Guadeloupe, Martinique, Guyane, La Réunion et Mayotte) : supports en service relevés chaque semaine par l’ANFR, génération par génération et bande par bande.")
+                Group {
+                    switch model.market {
+                    case .fr: Text("Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande.")
+                    case .drom: Text("Outre-mer (Guadeloupe, Martinique, Guyane, La Réunion et Mayotte) : supports en service relevés chaque semaine par l’ANFR, génération par génération et bande par bande.")
+                    case .ca: Text("Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences.")
+                    }
+                }
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -256,7 +269,9 @@ struct ANFRBandsView: View {
                     // un état vide, pas un chargement sans fin.
                     EmptyStateView(
                         title: "Aucune statistique disponible",
-                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
+                        message: model.market == .ca
+                            ? "Les extraits ISED ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser."
+                            : "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
                         systemImage: "chart.bar"
                     )
                 } else {
@@ -317,7 +332,7 @@ struct ANFRBandsView: View {
                     .foregroundStyle(SQColor.label)
                 // Moins de 13 pt sur une tuile : à l'encre, comme au lot 4f
                 // (le gris secondaire n'y tient pas le contraste une fois rendu).
-                Text("sites en service")
+                Text(model.market == .ca ? "sites autorisés" : "sites en service")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.label)
             }
@@ -350,7 +365,7 @@ struct ANFRBandsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle(scale: 0.98))
-        .accessibilityLabel(([row.generation, String(localized: "\(ANFRBandsFormat.sites(row.summary.latest.operational)) sites en service")] + trend)
+        .accessibilityLabel(([row.generation, ANFRBandsFormat.sitesLine(row.summary.latest.operational, market: model.market)] + trend)
             .joined(separator: ", "))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("anfr.bands.generation.\(row.key)")
@@ -368,7 +383,7 @@ struct ANFRBandsView: View {
                         .font(SQFont.display(32, .bold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    Text("sites en service")
+                    Text(model.market == .ca ? "sites autorisés" : "sites en service")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                         .accessibilityIdentifier("anfr.bands.detail.unit")
@@ -383,7 +398,8 @@ struct ANFRBandsView: View {
                 ANFRBandsTrendChart(
                     points: model.selectedSeries,
                     color: SQNetworkColors.generationChartColor(generation.generation),
-                    title: generation.localizedLabel()
+                    title: generation.localizedLabel(),
+                    authorized: model.market == .ca
                 )
                 .frame(height: 150)
                 VStack(spacing: SQSpace.sm) {
@@ -403,9 +419,12 @@ struct ANFRBandsView: View {
         }
     }
 
-    /// Écarts sur 1, 4 et 52 semaines, chacun à sa référence.
+    /// Écarts sur 1, 4 et 52 semaines, chacun à sa référence ; sur 1 et 12 mois au Canada.
     private func changes(_ summary: ANFRBandStats.Summary) -> some View {
-        let items: [(String, ANFRBandStats.Summary.Change?)] = [
+        let items: [(String, ANFRBandStats.Summary.Change?)] = model.market.isMonthly ? [
+            (String(localized: "en un mois"), summary.delta1m),
+            (String(localized: "en un an"), summary.delta12m),
+        ] : [
             (String(localized: "en une semaine"), summary.delta1w),
             (String(localized: "en 4 semaines"), summary.delta4w),
             (String(localized: "en un an"), summary.delta52w),
@@ -444,7 +463,7 @@ struct ANFRBandsView: View {
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(String(localized: "\(ANFRBandsFormat.sites(row.summary.latest.operational)) sites en service"))
+            Text(ANFRBandsFormat.sitesLine(row.summary.latest.operational, market: model.market))
                 .font(SQType.caption)
                 .monospacedDigit()
                 .foregroundStyle(SQColor.label)
@@ -470,7 +489,7 @@ struct ANFRBandsView: View {
         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(([row.band.localizedLabel(),
-                              String(localized: "\(ANFRBandsFormat.sites(row.summary.latest.operational)) sites en service")] + trend)
+                              ANFRBandsFormat.sitesLine(row.summary.latest.operational, market: model.market)] + trend)
             .joined(separator: ", "))
         .accessibilityIdentifier("anfr.bands.band.\(row.band.key)")
     }
@@ -480,9 +499,15 @@ struct ANFRBandsView: View {
     private var footnote: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             if let date = model.latestDateLabel {
-                Text("Source : observatoire de l’ANFR, relevé du \(date).")
+                if model.market == .ca {
+                    Text("Source : licences ISED, extrait du \(date).")
+                } else {
+                    Text("Source : observatoire de l’ANFR, relevé du \(date).")
+                }
             }
-            Text("« Tous » compte chaque support une fois, même partagé entre opérateurs.")
+            Text(model.market == .ca
+                 ? "Au Canada, un site n’a qu’un opérateur : « Tous » est leur somme."
+                 : "« Tous » compte chaque support une fois, même partagé entre opérateurs.")
             if model.isPartial {
                 Text("Rattrapage en cours côté serveur : ces chiffres peuvent encore bouger.")
             }
@@ -523,6 +548,8 @@ private struct ANFRBandsTrendChart: View {
     let points: [ANFRBandStats.Point]
     let color: Color
     let title: String
+    /// Canada : des sites autorisés, pas en service.
+    var authorized = false
 
     private struct Dated: Identifiable {
         let date: Date
@@ -572,7 +599,9 @@ private struct ANFRBandsTrendChart: View {
         guard let first = dated.first, let last = dated.last else {
             return String(localized: "\(title) : aucune donnée sur la période.")
         }
-        return String(localized: "\(title) : de \(ANFRBandsFormat.sites(first.value)) à \(ANFRBandsFormat.sites(last.value)) sites en service sur la période.")
+        return authorized
+            ? String(localized: "\(title) : de \(ANFRBandsFormat.sites(first.value)) à \(ANFRBandsFormat.sites(last.value)) sites autorisés sur la période.")
+            : String(localized: "\(title) : de \(ANFRBandsFormat.sites(first.value)) à \(ANFRBandsFormat.sites(last.value)) sites en service sur la période.")
     }
 }
 

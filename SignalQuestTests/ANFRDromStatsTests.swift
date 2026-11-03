@@ -230,6 +230,82 @@ final class ANFRDromStatsTests: XCTestCase {
         XCTAssertTrue(service.calls.allSatisfy { $0.hasPrefix("bands:DROM:") })
     }
 
+    // MARK: Canada (ISED-STATS v1 §11)
+
+    private func canadaStatsJSON() throws -> ANFRStats {
+        func point(_ op: String, _ band: String, _ value: Int, delta: Int = 0) -> [String: Any] {
+            ["date": "2026-10-06", "operator": op, "operatorLabel": op, "band": band, "bandLabel": band,
+             "technology": band == "all" ? "all" : String(band.prefix(2)).uppercased(), "operational": value,
+             "projected": 0, "total": value, "deltaOperational": delta, "deltaProjected": 0, "deltaTotal": delta]
+        }
+        let latest = [point("BELL", "all", 10_718, delta: 3), point("ROGERS", "all", 9_000, delta: -2),
+                      point("BELL", "5g", 7_000), point("REGIONAL", "all", 1_200)]
+        let province: [String: Any] = ["key": "QC", "label": "Québec", "kind": "province", "operator": "BELL",
+                                       "operatorLabel": "Bell", "band": "all", "bandLabel": "Tous réseaux", "technology": "all",
+                                       "operational": 4_000, "projected": 0, "total": 4_000, "shareOfNational": 0.37]
+        let object: [String: Any] = [
+            "meta": ["market": "CA", "firstDate": "2026-09-01", "latestDate": "2026-10-06", "partial": false],
+            "cadence": "monthly",
+            "national": ["series": latest, "latest": latest],
+            "territories": ["regions": [], "departments": [], "crozon": [], "provinces": [province]],
+            "filters": ["operators": [["key": "BELL", "label": "Bell", "color": "#0F5BDC"],
+                                      ["key": "ROGERS", "label": "Rogers", "color": "#D62D20"],
+                                      ["key": "REGIONAL", "label": "Regionaux", "color": "#D97706"]],
+                        "statuses": [["key": "total", "label": "Sites"]]],
+        ]
+        return try JSONDecoder().decode(ANFRStats.self, from: JSONSerialization.data(withJSONObject: object))
+    }
+
+    func testCanadaStatsCarryProvincesAndServedOperators() throws {
+        let stats = try canadaStatsJSON()
+        XCTAssertTrue(ANFRStatsMarket.ca.accepts(served: stats.market))
+        XCTAssertFalse(ANFRStatsMarket.ca.accepts(served: nil))
+        XCTAssertFalse(ANFRStatsMarket.ca.accepts(served: "FR"))
+        XCTAssertEqual(stats.provinces.map(\.key), ["QC"])
+        XCTAssertTrue(stats.departments.isEmpty)
+        XCTAssertEqual(stats.operators.map(\.key), ["BELL", "ROGERS", "REGIONAL"])
+        // « Regionaux » du serveur, dit « Autres » dans la langue de l'app.
+        XCTAssertEqual(stats.operators.last?.label, String(localized: "Autres"))
+    }
+
+    /// Au Canada : bandes ISED (tous réseaux par défaut), jamais de projets, provinces.
+    func testSwitchingToCanadaUsesItsBandsAndProvinces() async throws {
+        let service = MarketService()
+        service.responses[.fr] = try statsJSON(market: "FR", operators: [], latest: [row("orange", "4g", 30_000)])
+        service.responses[.ca] = try canadaStatsJSON()
+        let model = ANFRStatsViewModel(service: service)
+        await model.load()
+        model.showProjected = true
+        await model.select(market: .ca)
+        XCTAssertFalse(model.showProjected, "ISED ne connaît pas les sites en projet")
+        XCTAssertEqual(model.filters.map(\.key), ["all", "4g", "5g", "5g-3500"])
+        XCTAssertEqual(model.selectedFilter.key, "4g", "la 4G existe des deux côtés : le choix est gardé")
+        model.selectedFilter = model.filters[0]
+        XCTAssertEqual(model.selectedFilter.key, "all")
+        XCTAssertEqual(model.totalOperational, 20_918)
+        XCTAssertEqual(model.totalDelta, 1)
+        XCTAssertEqual(model.selectedOperator.key, "BELL")
+        XCTAssertEqual(model.territories.map(\.label), ["Québec"])
+
+        await model.select(market: .fr)
+        XCTAssertEqual(model.selectedFilter.key, "4g", "« Tous réseaux » n'existe pas en France")
+        XCTAssertEqual(ANFRStatsViewModel(service: service, market: .ca).selectedFilter.key, "all", "ouvert sur le Canada : tous réseaux")
+    }
+
+    func testCanadaBandsReadMonthlyChanges() throws {
+        let summary: [String: Any] = ["operator": "all", "band": "5g", "latest": ["date": "2026-10-06", "operational": 26_139, "projected": 0],
+                                      "delta1w": NSNull(), "delta4w": NSNull(), "delta52w": NSNull(),
+                                      "delta1m": ["referenceDate": "2026-09-01", "operational": 474],
+                                      "delta12m": ["referenceDate": "2025-10-01", "operational": 3_000],
+                                      "peak": ["date": "2026-10-06", "operational": 26_139], "shareOfPeakPermille": 1_000]
+        let object: [String: Any] = ["meta": ["firstDate": "2026-09-01", "latestDate": "2026-10-06", "partial": false, "market": "CA"],
+                                     "bands": [], "series": [], "summary": [summary]]
+        let stats = try JSONDecoder().decode(ANFRBandStats.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(stats.summary.first?.delta1m?.operational, 474)
+        XCTAssertNil(stats.summary.first?.delta52w)
+        XCTAssertEqual(stats.summary.first.flatMap(ANFRBandsFormat.yearChange), String(localized: "\(ANFRBandsFormat.signed(3_000)) en un an"))
+    }
+
     func testOverseasBandsWithoutTheMarketAreRefused() async throws {
         let service = MarketService()
         let unlabelled = try bandsJSON(market: nil)

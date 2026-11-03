@@ -106858,6 +106858,450 @@
           }
         }
       }
+    },
+    "%@ sites autorisés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ licensed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sites autorisés"
+          }
+        }
+      }
+    },
+    "Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada: licensed sites from ISED’s monthly licence extract, generation by generation and by frequency family."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences."
+          }
+        }
+      }
+    },
+    "Les extraits ISED ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED extracts aren’t available yet. Pull down to refresh."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les extraits ISED ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser."
+          }
+        }
+      }
+    },
+    "sites autorisés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "licensed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sites autorisés"
+          }
+        }
+      }
+    },
+    "en un mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in a month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en un mois"
+          }
+        }
+      }
+    },
+    "Source : licences ISED, extrait du %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ISED licences, extract of %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source : licences ISED, extrait du %@."
+          }
+        }
+      }
+    },
+    "Au Canada, un site n’a qu’un opérateur : « Tous » est leur somme." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Canada, a site has a single operator: “All” is their sum."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au Canada, un site n’a qu’un opérateur : « Tous » est leur somme."
+          }
+        }
+      }
+    },
+    "%@ : de %@ à %@ sites autorisés sur la période." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: from %2$@ to %3$@ licensed sites over the period."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : de %@ à %@ sites autorisés sur la période."
+          }
+        }
+      }
+    },
+    "Tous réseaux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All networks"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous réseaux"
+          }
+        }
+      }
+    },
+    "Source : ISED (Innovation, Sciences et Développement économique Canada), sites autorisés. Les provinces suivent l’opérateur choisi dans « Évolution »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ISED (Innovation, Science and Economic Development Canada), licensed sites. Provinces follow the operator chosen in “Trend”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source : ISED (Innovation, Sciences et Développement économique Canada), sites autorisés. Les provinces suivent l’opérateur choisi dans « Évolution »."
+          }
+        }
+      }
+    },
+    "Statistiques des antennes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna statistics"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistiques des antennes"
+          }
+        }
+      }
+    },
+    "Le réseau mobile canadien, d’après les licences publiées par ISED." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada’s mobile network, from the licences published by ISED."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le réseau mobile canadien, d’après les licences publiées par ISED."
+          }
+        }
+      }
+    },
+    "Extrait du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extract of %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extrait du %@"
+          }
+        }
+      }
+    },
+    "Sites autorisés, tous opérateurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licensed sites, all carriers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites autorisés, tous opérateurs."
+          }
+        }
+      }
+    },
+    "Changements du mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month’s changes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements du mois"
+          }
+        }
+      }
+    },
+    "Les sites modifiés selon ISED, sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites changed according to ISED, on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites modifiés selon ISED, sur la carte"
+          }
+        }
+      }
+    },
+    "+%lld en 1 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld in 1 month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld en 1 mois"
+          }
+        }
+      }
+    },
+    "−%lld en 1 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−%lld in 1 month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−%lld en 1 mois"
+          }
+        }
+      }
+    },
+    "en hausse de %lld en un mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "up %lld in a month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en hausse de %lld en un mois"
+          }
+        }
+      }
+    },
+    "en baisse de %lld en un mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "down %lld in a month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en baisse de %lld en un mois"
+          }
+        }
+      }
+    },
+    "stable en un mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "steady over a month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "stable en un mois"
+          }
+        }
+      }
+    },
+    "sur 1 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over 1 month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur 1 mois"
+          }
+        }
+      }
+    },
+    "de %@ à %@ supports" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from %1$@ to %2$@ sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %@ à %@ supports"
+          }
+        }
+      }
+    },
+    "Par province · %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By province · %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par province · %@ %@"
+          }
+        }
+      }
+    },
+    "Chargement des statistiques…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading statistics…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des statistiques…"
+          }
+        }
+      }
+    },
+    "Évolution · sites %@ autorisés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trend · licensed %@ sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Évolution · sites %@ autorisés"
+          }
+        }
+      }
+    },
+    "ISED · extraits mensuels" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED · monthly extracts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED · extraits mensuels"
+          }
+        }
+      }
+    },
+    "SQFormal|Les extraits ISED ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les extraits ISED ne sont pas encore disponibles. Tirez l’écran vers le bas pour actualiser."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -3,32 +3,34 @@ import Charts
 
 // MARK: - Filter Enum
 
-enum ANFRFilterType: String, CaseIterable, Identifiable {
-    case g4 = "4G"
-    case g5_3500 = "5G 3,5 GHz"
-    case g5_2100 = "5G 2,1 GHz"
-    case g5_700 = "5G 700 MHz"
-    
-    var id: String { rawValue }
-    
-    var bands: Set<String> {
-        switch self {
-        case .g4: return ["4g"]
-        case .g5_3500: return ["n78"]
-        case .g5_2100: return ["n1"]
-        case .g5_700: return ["n28"]
-        }
-    }
-    
+/// Une bande en pastille : la clé servie de la série, et sa génération pour
+/// VoiceOver (aucune pour « Tous réseaux » au Canada).
+struct ANFRFilterType: Identifiable, Hashable {
+    let key: String
     /// Libellé affiché : « 5G 3,5 GHz » devient « 5G 3.5 GHz » en anglais.
-    var label: String {
-        switch self {
-        case .g4: return String(localized: "4G")
-        case .g5_3500: return String(localized: "5G 3,5 GHz")
-        case .g5_2100: return String(localized: "5G 2,1 GHz")
-        case .g5_700: return String(localized: "5G 700 MHz")
-        }
-    }
+    let label: String
+    let generation: ANFRGeneration?
+
+    var id: String { key }
+    var bands: Set<String> { [key] }
+
+    static let g4 = ANFRFilterType(key: "4g", label: String(localized: "4G"), generation: .g4)
+
+    /// La 4G et les trois bandes 5G de la métropole et de l'outre-mer.
+    static let france: [ANFRFilterType] = [
+        .g4,
+        ANFRFilterType(key: "n78", label: String(localized: "5G 3,5 GHz"), generation: .g5),
+        ANFRFilterType(key: "n1", label: String(localized: "5G 2,1 GHz"), generation: .g5),
+        ANFRFilterType(key: "n28", label: String(localized: "5G 700 MHz"), generation: .g5)
+    ]
+
+    /// Clés ISED (contrat §11) : tous réseaux, une génération entière, ou une famille.
+    static let canada: [ANFRFilterType] = [
+        ANFRFilterType(key: "all", label: String(localized: "Tous réseaux"), generation: nil),
+        .g4,
+        ANFRFilterType(key: "5g", label: String(localized: "5G"), generation: .g5),
+        ANFRFilterType(key: "5g-3500", label: String(localized: "5G 3,5 GHz"), generation: .g5)
+    ]
 }
 
 // MARK: - ViewModel
@@ -38,8 +40,8 @@ final class ANFRStatsViewModel: ObservableObject {
     @Published var stats: ANFRStats? { didSet { trendCache.removeAll() } }
     @Published var isLoading = false
     @Published var errorMessage: String?
-    /// Métropole, ou les cinq départements d'outre-mer.
-    @Published private(set) var market: ANFRStatsMarket = .fr
+    /// Métropole, les cinq départements d'outre-mer, ou le Canada.
+    @Published private(set) var market: ANFRStatsMarket
     /// Opérateur sélectionné pour le graphe d'évolution.
     @Published var selectedOperator = ANFRStatsOperator(.orange)
     /// Bascule opérationnel ↔ total (incluant le projeté).
@@ -55,7 +57,14 @@ final class ANFRStatsViewModel: ObservableObject {
     private var trendCache: [String: [ANFRTrendPoint]] = [:]
     /// Dernières statistiques de chaque marché : revenir à l'autre est immédiat.
     private var loadedByMarket: [ANFRStatsMarket: ANFRStats] = [:]
-    init(service: ANFRServicing) { self.service = service }
+    init(service: ANFRServicing, market: ANFRStatsMarket = .fr) {
+        self.service = service
+        self.market = market
+        selectedFilter = market == .ca ? ANFRFilterType.canada[0] : .g4
+    }
+
+    /// Les pastilles de bande du marché.
+    var filters: [ANFRFilterType] { market == .ca ? ANFRFilterType.canada : ANFRFilterType.france }
 
     /// Le sélecteur France / Outre-mer, hors données de démo (métropole seule).
     var offersOverseas: Bool {
@@ -71,9 +80,13 @@ final class ANFRStatsViewModel: ObservableObject {
         market == .fr ? ANFRStatsOperator.france : (stats?.operators ?? [])
     }
 
-    /// Régions en métropole, départements en outre-mer.
+    /// Régions en métropole, départements en outre-mer, provinces au Canada.
     var territories: [ANFRTerritoryMetric] {
-        market == .fr ? (stats?.regions ?? []) : (stats?.departments ?? [])
+        switch market {
+        case .fr: return stats?.regions ?? []
+        case .drom: return stats?.departments ?? []
+        case .ca: return stats?.provinces ?? []
+        }
     }
 
     func select(market: ANFRStatsMarket) async {
@@ -81,6 +94,9 @@ final class ANFRStatsViewModel: ObservableObject {
         self.market = market
         errorMessage = nil
         stats = loadedByMarket[market]
+        // ISED ne connaît pas les sites en projet ; les bandes changent de clés.
+        if market == .ca { showProjected = false }
+        if !filters.contains(selectedFilter), let first = filters.first { selectedFilter = first }
         keepSelectedOperator()
         guard stats == nil else { return }
         await load()
@@ -212,16 +228,10 @@ final class ANFRStatsViewModel: ObservableObject {
     /// plusieurs.
     func trendSeries(for op: ANFRStatsOperator) -> [ANFRTrendPoint] {
         guard let stats else { return [] }
-        let cacheKey = "\(op.key)|\(selectedFilter.rawValue)|\(showProjected)"
+        let cacheKey = "\(op.key)|\(selectedFilter.key)|\(showProjected)"
         if let cached = trendCache[cacheKey] { return cached }
-        let band: String
-        let gen: ANFRGeneration
-        switch selectedFilter {
-        case .g4: (band, gen) = ("4g", .g4)
-        case .g5_3500: (band, gen) = ("n78", .g5)
-        case .g5_2100: (band, gen) = ("n1", .g5)
-        case .g5_700: (band, gen) = ("n28", .g5)
-        }
+        let band = selectedFilter.key
+        let gen = selectedFilter.generation
         let points = stats.series
             .filter { $0.operatorKey == op.key && $0.band == band }
             .sorted { $0.date < $1.date }
@@ -250,7 +260,8 @@ final class ANFRStatsViewModel: ObservableObject {
 struct ANFRTrendPoint: Identifiable {
     let date: Date
     let value: Int
-    let generation: ANFRGeneration
+    /// Aucune pour « Tous réseaux » (Canada).
+    let generation: ANFRGeneration?
     /// Stable d'un rendu à l'autre : un identifiant tiré à chaque calcul
     /// faisait retracer la courbe à chaque mouvement du doigt.
     var id: Date { date }
@@ -282,10 +293,11 @@ struct ANFRStatsView: View {
     /// Vrai quand l'écran a été ouvert depuis la carte ANFR : le lien vers la carte revient en arrière.
     private let cameFromMap: Bool
 
-    init(service: ANFRServicing, cameFromMap: Bool = false) {
+    /// `market` : le marché imposé (l'annonce ISED ouvre le Canada), sinon celui de « Mon pays ».
+    init(service: ANFRServicing, cameFromMap: Bool = false, market: ANFRStatsMarket? = nil) {
         self.service = service
         self.cameFromMap = cameFromMap
-        _model = StateObject(wrappedValue: ANFRStatsViewModel(service: service))
+        _model = StateObject(wrappedValue: ANFRStatsViewModel(service: service, market: market ?? .initial))
     }
 
     var body: some View {
@@ -302,7 +314,10 @@ struct ANFRStatsView: View {
                 }
                 if let stats = model.stats, !stats.latest.isEmpty {
                     VStack(spacing: SQSpace.sm) {
-                        metricToggle
+                        // ISED ne connaît pas les sites en projet (contrat §11).
+                        if model.market != .ca {
+                            metricToggle
+                        }
                         filterToggle
                     }
                     .sqFadeUp()
@@ -310,8 +325,8 @@ struct ANFRStatsView: View {
                         .sqFadeUp()
                     bandsLink
                         .sqFadeUp()
-                    // La carte des changements suit la métropole.
-                    if model.market == .fr {
+                    // La carte des changements suit la métropole et le Canada.
+                    if model.market != .drom {
                         changesMapLink
                             .sqFadeUp()
                     }
@@ -325,9 +340,13 @@ struct ANFRStatsView: View {
                         regionsSection
                             .sqFadeUp()
                     }
-                    Text(model.market == .fr
-                         ? "Source : Observatoire ANFR. Les régions suivent l’opérateur choisi dans « Évolution »."
-                         : "Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution ».")
+                    Group {
+                        switch model.market {
+                        case .fr: Text("Source : Observatoire ANFR. Les régions suivent l’opérateur choisi dans « Évolution ».")
+                        case .drom: Text("Source : Observatoire ANFR. Les départements suivent l’opérateur choisi dans « Évolution ».")
+                        case .ca: Text("Source : ISED (Innovation, Sciences et Développement économique Canada), sites autorisés. Les provinces suivent l’opérateur choisi dans « Évolution ».")
+                        }
+                    }
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -340,7 +359,9 @@ struct ANFRStatsView: View {
                     // Réponse reçue mais sans relevé : un état vide, pas un chargement sans fin.
                     EmptyStateView(
                         title: "Aucune statistique disponible",
-                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
+                        message: model.market == .ca
+                            ? "Les extraits ISED ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser."
+                            : "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
                         systemImage: "chart.bar"
                     )
                 } else {
@@ -356,7 +377,7 @@ struct ANFRStatsView: View {
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : UIKit coupe le balayage retour, rétabli ici.
         .sqKeepsSwipeBack()
-        .navigationTitle("Statistiques ANFR")
+        .navigationTitle("Statistiques des antennes")
         .signalQuestBackground()
         .refreshable { await model.refresh() }
         .task { await model.load() }
@@ -389,19 +410,23 @@ struct ANFRStatsView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.stats.back") { dismiss() }
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Statistiques ANFR")
+                Text("Statistiques des antennes")
                     .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
                     .accessibilityIdentifier("anfr.stats.title")
-                Text(model.market == .fr
-                     ? "Le réseau mobile français, d’après l’Agence nationale des fréquences."
-                     : "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte, d’après l’Agence nationale des fréquences.")
+                Group {
+                    switch model.market {
+                    case .fr: Text("Le réseau mobile français, d’après l’Agence nationale des fréquences.")
+                    case .drom: Text("Guadeloupe, Martinique, Guyane, La Réunion et Mayotte, d’après l’Agence nationale des fréquences.")
+                    case .ca: Text("Le réseau mobile canadien, d’après les licences publiées par ISED.")
+                    }
+                }
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.stats != nil {
-                    Label("Relevé du \(model.latestDateLabel)", systemImage: "clock")
+                    Label(model.market == .ca ? "Extrait du \(model.latestDateLabel)" : "Relevé du \(model.latestDateLabel)", systemImage: "clock")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .padding(.top, 2)
@@ -447,7 +472,7 @@ struct ANFRStatsView: View {
     private var filterToggle: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(ANFRFilterType.allCases) { type in
+                ForEach(model.filters) { type in
                     SQChip(
                         label: type.label, isSelected: model.selectedFilter == type,
                         selectedFill: SQColor.label, selectedInk: SQColor.onInk
@@ -487,16 +512,19 @@ struct ANFRStatsView: View {
             }
             // Somme par opérateur : un pylône partagé compte une fois par opérateur,
             // à la différence du total « Tous » de l'écran Bandes.
-            Text(model.showProjected
-                 ? "Sites opérationnels et projetés, tous opérateurs."
+            Text(model.market == .ca ? "Sites autorisés, tous opérateurs."
+                 : model.showProjected ? "Sites opérationnels et projetés, tous opérateurs."
                  : "Sites opérationnels, tous opérateurs.")
                 .font(SQType.callout)
                 .foregroundStyle(SQColor.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Un pylône partagé compte une fois par opérateur.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Au Canada, un site physique n'a qu'un opérateur (contrat §11).
+            if model.market != .ca {
+                Text("Un pylône partagé compte une fois par opérateur.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
@@ -553,7 +581,7 @@ struct ANFRStatsView: View {
                 .accessibilityIdentifier("anfr.stats.changes")
         } else {
             NavigationLink {
-                ANFRMapView(service: service, cameFromStats: true, market: .fr)
+                ANFRMapView(service: service, cameFromStats: true, market: model.market == .ca ? .ca : .fr)
             } label: { changesMapRow }
                 .buttonStyle(SQPressButtonStyle(scale: 0.98))
                 .accessibilityIdentifier("anfr.stats.changes")
@@ -564,10 +592,10 @@ struct ANFRStatsView: View {
         HStack(spacing: SQSpace.md) {
             SQIconPastille(systemImage: "map.fill", size: 40)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Changements de la semaine")
+                Text(model.market == .ca ? "Changements du mois" : "Changements de la semaine")
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
-                Text("Les supports modifiés par l’ANFR, sur la carte")
+                Text(model.market == .ca ? "Les sites modifiés selon ISED, sur la carte" : "Les supports modifiés par l’ANFR, sur la carte")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -583,12 +611,15 @@ struct ANFRStatsView: View {
         .sqCardBackground()
     }
 
-    /// Variation sur 7 jours dite en mots : « +3 en 7 j », « −3 en 7 j », « stable ».
+    /// Variation sur 7 jours (un mois au Canada) dite en mots : « +3 en 7 j », « −3 en 1 mois », « stable ».
     @ViewBuilder
     private func deltaTag(_ delta: Int) -> some View {
+        let monthly = model.market.isMonthly
         if delta != 0 {
             let positive = delta > 0
-            Text(positive ? "+\(delta) en 7 j" : "−\(abs(delta)) en 7 j")
+            Text(monthly
+                 ? (positive ? "+\(delta) en 1 mois" : "−\(abs(delta)) en 1 mois")
+                 : (positive ? "+\(delta) en 7 j" : "−\(abs(delta)) en 7 j"))
                 .font(SQFont.body(12.5, .bold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
@@ -599,7 +630,9 @@ struct ANFRStatsView: View {
                 .sqSingleLine()
                 // En très grand texte, la pastille peut passer sur plusieurs lignes.
                 .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
-                .accessibilityLabel(positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine")
+                .accessibilityLabel(monthly
+                    ? (positive ? "en hausse de \(delta) en un mois" : "en baisse de \(abs(delta)) en un mois")
+                    : (positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine"))
         } else {
             // Delta nul MAIS donnée présente (la pastille n'est rendue que pour un
             // opérateur/total ayant des données) → indicateur NEUTRE « stable »,
@@ -613,7 +646,7 @@ struct ANFRStatsView: View {
                 .background(SQColor.chip, in: Capsule(style: .continuous))
                 .sqSingleLine()
                 .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
-                .accessibilityLabel("stable cette semaine")
+                .accessibilityLabel(monthly ? "stable en un mois" : "stable cette semaine")
         }
     }
 
@@ -623,7 +656,7 @@ struct ANFRStatsView: View {
         let rows = model.operatorBreakdown
         let maxValue = max(rows.map(\.value).max() ?? 1, 1)
         return statsCard("Par opérateur") {
-            Text("sur 7 jours")
+            Text(model.market.isMonthly ? "sur 1 mois" : "sur 7 jours")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         } content: {
@@ -694,7 +727,7 @@ struct ANFRStatsView: View {
                     series: [ANFRTrendSeries(op: op, points: points)],
                     selection: $scrubDate,
                     animate: appeared && !reduceMotion,
-                    drawKey: "\(op.key)-\(model.selectedFilter.rawValue)-\(model.showProjected)",
+                    drawKey: "\(op.key)-\(model.selectedFilter.key)-\(model.showProjected)",
                     onTap: { openFullScreen() }
                 )
                 .frame(height: 196)
@@ -764,7 +797,7 @@ struct ANFRStatsView: View {
     @ViewBuilder
     private func readoutTrailing(_ points: [ANFRTrendPoint], touched: ANFRTrendPoint?) -> some View {
         if let touched {
-            Text(ANFRTrendChart.weekLabel(touched.date))
+            Text(ANFRTrendChart.pointLabel(touched.date, monthly: model.market.isMonthly))
                 .font(SQType.caption(.semibold))
                 .foregroundStyle(SQColor.ink2)
                 .sqSingleLine()
@@ -774,8 +807,8 @@ struct ANFRStatsView: View {
     }
 
     private func seriesCaption(for op: ANFRStatsOperator) -> String {
-        let metric = model.showProjected
-            ? String(localized: "sites opérationnels et projetés")
+        let metric = model.market == .ca ? String(localized: "sites autorisés")
+            : model.showProjected ? String(localized: "sites opérationnels et projetés")
             : String(localized: "sites opérationnels")
         return "\(op.label) · \(model.selectedFilter.label), \(metric)"
     }
@@ -810,7 +843,8 @@ struct ANFRStatsView: View {
         guard !points.isEmpty else {
             return String(localized: "Évolution des supports \(opName) en \(scope) : aucune donnée disponible sur la période.")
         }
-        let metric = model.showProjected ? String(localized: "opérationnels et projetés") : String(localized: "opérationnels")
+        let metric = model.market == .ca ? String(localized: "autorisés")
+            : model.showProjected ? String(localized: "opérationnels et projetés") : String(localized: "opérationnels")
         let segments = ANFRGeneration.allCases
             .filter { gen in points.contains { $0.generation == gen } }
             .map { gen -> String in
@@ -819,6 +853,10 @@ struct ANFRStatsView: View {
                 let end = (series.last?.value ?? 0).formatted(.number.grouping(.automatic))
                 return String(localized: "\(gen.label) de \(start) à \(end) supports")
             }
+            // « Tous réseaux » (Canada) : une seule courbe, sans génération.
+            + (points.allSatisfy { $0.generation == nil } ? [
+                String(localized: "de \((points.first?.value ?? 0).formatted(.number.grouping(.automatic))) à \((points.last?.value ?? 0).formatted(.number.grouping(.automatic))) supports")
+            ] : [])
         return String(localized: "Évolution des supports \(opName) en \(scope), \(metric) : ")
             + segments.joined(separator: " ; ") + String(localized: " sur la période.")
     }
@@ -844,9 +882,12 @@ struct ANFRStatsView: View {
     private var regionsSection: some View {
         let rows = topRegions
         let maxValue = max(rows.map(\.operational).max() ?? 1, 1)
-        let title: LocalizedStringKey = model.market == .fr
-            ? "Top régions · \(model.selectedOperator.label) \(model.selectedFilter.label)"
-            : "Par département · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+        let title: LocalizedStringKey
+        switch model.market {
+        case .fr: title = "Top régions · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+        case .drom: title = "Par département · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+        case .ca: title = "Par province · \(model.selectedOperator.label) \(model.selectedFilter.label)"
+        }
         return statsCard(title) {
             VStack(spacing: SQSpace.sm2) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, region in
@@ -918,7 +959,7 @@ struct ANFRStatsView: View {
         VStack(spacing: SQSpace.lg) {
             SQSpinner()
                 .tint(SQColor.brandRed)
-            Text("Chargement des statistiques ANFR…")
+            Text("Chargement des statistiques…")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
         }
@@ -959,14 +1000,18 @@ private struct ANFRTrendChart: View {
     let drawKey: String
     /// Plein écran : axe à l'échelle des valeurs, info-bulle et sélection gardée.
     var isExpanded = false
+    /// Un point par mois (Canada) : l'info-bulle dit « Extrait du… ».
+    var monthly = false
     var onTap: (() -> Void)? = nil
     @State private var drawn = false
     @State private var lastHapticDate: Date?
     @State private var chartWidth: CGFloat = 0
 
-    /// « Semaine du 3 mars 2025 » : les relevés ANFR sont hebdomadaires.
-    static func weekLabel(_ date: Date) -> String {
-        String(localized: "Semaine du \(date.formatted(ANFRDateParser.style().day().month(.wide).year()))")
+    /// « Semaine du 3 mars 2025 » : les relevés ANFR sont hebdomadaires ;
+    /// « Extrait du 6 octobre 2026 » : ISED publie un extrait par mois, sans date fixe.
+    static func pointLabel(_ date: Date, monthly: Bool) -> String {
+        let day = date.formatted(ANFRDateParser.style().day().month(.wide).year())
+        return monthly ? String(localized: "Extrait du \(day)") : String(localized: "Semaine du \(day)")
     }
 
     static func nearest(in points: [ANFRTrendPoint], to date: Date) -> ANFRTrendPoint? {
@@ -1204,7 +1249,7 @@ private struct ANFRTrendChart: View {
     /// Info-bulle du plein écran : la semaine et la valeur de chaque courbe affichée.
     private func tooltip(at date: Date) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(Self.weekLabel(date))
+            Text(Self.pointLabel(date, monthly: monthly))
                 .font(SQType.caption(.semibold))
                 .foregroundStyle(SQColor.labelSecondary)
             ForEach(selectedPoints.sorted { $0.point.value > $1.point.value }, id: \.op) { item in
@@ -1291,7 +1336,9 @@ private struct ANFRTrendFullScreen: View {
     private var domain: ClosedRange<Date>? { zoomDomain ?? rangeDomain }
 
     private var title: String {
-        model.showProjected
+        model.market == .ca
+            ? String(localized: "Évolution · sites \(model.selectedFilter.label) autorisés")
+            : model.showProjected
             ? String(localized: "Évolution · sites \(model.selectedFilter.label), opérationnels et projetés")
             : String(localized: "Évolution · sites \(model.selectedFilter.label) opérationnels")
     }
@@ -1314,7 +1361,8 @@ private struct ANFRTrendFullScreen: View {
                 selection: $selection,
                 animate: false,
                 drawKey: "full",
-                isExpanded: true
+                isExpanded: true,
+                monthly: model.market.isMonthly
             )
             .modifier(ANFRPinchZoom(onChange: zoom(scale:anchor:), onEnd: { pinchBase = nil }))
             .frame(maxHeight: .infinity)
@@ -1356,7 +1404,7 @@ private struct ANFRTrendFullScreen: View {
                 .foregroundStyle(SQColor.label)
                 .sqHeader()
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Observatoire ANFR · relevés hebdomadaires")
+            Text(model.market == .ca ? "ISED · extraits mensuels" : "Observatoire ANFR · relevés hebdomadaires")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }

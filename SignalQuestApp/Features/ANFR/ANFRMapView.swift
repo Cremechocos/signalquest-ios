@@ -1026,21 +1026,18 @@ private struct ANFRMapContent: View {
                     .accessibilityLabel(showsSidePanel ? "Masquer la liste" : "Afficher la liste")
                     .accessibilityIdentifier("anfr.map.list")
                 }
-                // Les statistiques du Canada ne sont pas encore servies.
-                if model.market == .fr {
-                    Button {
-                        Haptics.light()
-                        if cameFromStats { dismiss() } else { showsStats = true }
-                    } label: {
-                        Image(systemName: "chart.bar.xaxis")
-                    }
-                    .accessibilityLabel("Statistiques ANFR")
-                    .accessibilityIdentifier("anfr.map.stats")
+                Button {
+                    Haptics.light()
+                    if cameFromStats { dismiss() } else { showsStats = true }
+                } label: {
+                    Image(systemName: "chart.bar.xaxis")
                 }
+                .accessibilityLabel("Statistiques des antennes")
+                .accessibilityIdentifier("anfr.map.stats")
             }
         }
         .navigationDestination(isPresented: $showsStats) {
-            ANFRStatsView(service: services.anfr, cameFromMap: true)
+            ANFRStatsView(service: services.anfr, cameFromMap: true, market: model.market == .ca ? .ca : .fr)
         }
         .sheet(item: $selectedSite) { site in
             if let changes = site.summary?.ised {

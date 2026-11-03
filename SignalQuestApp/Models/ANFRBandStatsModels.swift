@@ -103,6 +103,10 @@ struct ANFRBandStats: Decodable, Equatable, Sendable {
         let delta1w: Change?
         let delta4w: Change?
         let delta52w: Change?
+        /// Canada (un extrait par mois) : contre l'extrait précédent, et contre le
+        /// dernier d'au moins 330 jours plus tôt ; les écarts en semaines y sont nuls.
+        let delta1m: Change?
+        let delta12m: Change?
         /// Maximum de l'historique, le premier en date en cas d'égalité ;
         /// opérationnel à 0 pour une bande qui n'a eu que des projets.
         let peak: Peak
@@ -110,7 +114,7 @@ struct ANFRBandStats: Decodable, Equatable, Sendable {
         let shareOfPeakPermille: Int?
 
         enum CodingKeys: String, CodingKey {
-            case band, latest, delta1w, delta4w, delta52w, peak, shareOfPeakPermille
+            case band, latest, delta1w, delta4w, delta52w, delta1m, delta12m, peak, shareOfPeakPermille
             case operatorKey = "operator"
         }
     }
