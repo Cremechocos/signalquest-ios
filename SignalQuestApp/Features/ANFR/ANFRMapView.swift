@@ -1560,11 +1560,6 @@ private struct ANFRMapContent: View {
             } else {
                 dateStepper
             }
-            if model.comparison == nil, model.market == .fr {
-                // Pas de réorientations au Canada (ISED-STATS §7).
-                layerPicker
-                    .frame(maxWidth: .infinity)
-            }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.top, showsHandle ? SQSpace.xs : SQSpace.md)
@@ -1664,15 +1659,6 @@ private struct ANFRMapContent: View {
             .accessibilityIdentifier("anfr.map.compare.exit")
         }
         .padding(.leading, SQSpace.sm)
-    }
-
-    /// Changements du relevé, ou supports dont les azimuts ont changé.
-    private var layerPicker: some View {
-        SQSegmentedFilter(selection: $model.layer, options: [
-            (value: ANFRMapLayer.changes, label: "Changements", icon: "antenna.radiowaves.left.and.right"),
-            (value: ANFRMapLayer.reorientations, label: "Réorientés", icon: ANFRMapLayer.reorientationGlyph),
-        ])
-        .accessibilityIdentifier("anfr.map.layer")
     }
 
     private var filterButton: some View {
@@ -1945,6 +1931,9 @@ struct ANFRSiteListView: View {
             if showsSearch {
                 searchField
                     .padding(.horizontal, SQSpace.lg)
+            }
+            // Le panneau de la carte garde l'ordre par type, sans sélecteur.
+            if showsSearch, showsHeader {
                 Picker("Trier par", selection: $sort) {
                     Text("Type").tag(ANFRSiteListSort.type)
                     Text("Commune").tag(ANFRSiteListSort.city)
