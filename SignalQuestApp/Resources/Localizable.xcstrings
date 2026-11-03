@@ -107002,6 +107002,70 @@
           }
         }
       }
+    },
+    "Fiche du site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fiche du site"
+          }
+        }
+      }
+    },
+    "Photos, mesures et avis de ce support" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos, measurements and reviews of this mast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos, mesures et avis de ce support"
+          }
+        }
+      }
+    },
+    "Partager…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager…"
+          }
+        }
+      }
+    },
+    "Ouvrir dans Cartoradio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Cartoradio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir dans Cartoradio"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

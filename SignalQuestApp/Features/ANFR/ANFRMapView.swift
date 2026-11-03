@@ -423,14 +423,18 @@ final class ANFRMapViewModel: ObservableObject {
         filteredRevision &+= 1
     }
 
-    /// Les opérateurs réorientés d'un support au relevé affiché (vide hors couche chargée).
-    func reorientations(supId: String) -> [ANFRReorientation] { reorientationLookup[supId] ?? [] }
+    /// Les opérateurs réorientés d'un support au relevé affiché : l'avant / après de ses
+    /// azimuts dans la fiche, sur les deux couches. Vide en comparaison (une semaine, pas une période).
+    func reorientations(supId: String) -> [ANFRReorientation] {
+        comparison == nil ? reorientationLookup[supId] ?? [] : []
+    }
 
     // MARK: Réorientations
 
     /// Réorientations du relevé choisi ; une réponse arrivée après un autre choix est ignorée.
     func loadReorientations() async {
-        guard layer == .reorientations else { return }
+        // Quelques kilo-octets : chargés aussi sur la couche des changements pour la fiche.
+        guard market == .fr, comparison == nil else { return }
         reorientationTask?.cancel()
         let date = selectedDate
         let task = Task { await fetchReorientations(date: date) }
@@ -590,9 +594,11 @@ final class ANFRMapViewModel: ObservableObject {
         // s'arrêtent avec l'écran au lieu de survivre à une tâche annulée.
         async let dates: Void = loadArchiveDatesIfNeeded()
         async let weeksLoad: Void = loadWeeks()
+        async let reorientationsLoad: Void = loadReorientations()
         await startSnapshotLoad()
         await dates
         await weeksLoad
+        await reorientationsLoad
     }
 
     /// Ouvre un relevé et/ou une zone demandés par une notification, écran déjà ouvert.

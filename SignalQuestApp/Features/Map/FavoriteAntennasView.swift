@@ -247,6 +247,8 @@ struct FavoriteAntennaButton: View {
     let address: String?
     let latitude: Double?
     let longitude: Double?
+    /// Rond à libellé, dans la rangée d'actions d'une fiche de la carte des évolutions.
+    var roundStyle = false
     @State private var showsSyncError = false
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
@@ -297,10 +299,15 @@ struct FavoriteAntennaButton: View {
                 }
             }
         } label: {
-            Image(systemName: favorites.hasLoaded ? (isOn ? "star.fill" : "star") : "arrow.clockwise")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isOn ? SQColor.warning : SQColor.labelSecondary)
-                .frame(width: 44, height: 44)
+            if roundStyle {
+                ANFRRoundActionLabel(title: isOn ? "Suivi" : "Suivre",
+                                     systemImage: favorites.hasLoaded ? (isOn ? "star.fill" : "star") : "arrow.clockwise")
+            } else {
+                Image(systemName: favorites.hasLoaded ? (isOn ? "star.fill" : "star") : "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isOn ? SQColor.warning : SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+            }
         }
         .buttonStyle(.plain)
         .disabled(favorites.isLoading && !favorites.hasLoaded)

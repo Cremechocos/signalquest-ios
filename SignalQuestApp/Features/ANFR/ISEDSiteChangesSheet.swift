@@ -26,14 +26,8 @@ struct ISEDSiteChangesSheet: View {
             }
             .signalQuestBackground()
             .navigationTitle(site.displayName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .font(SQType.button)
-                        .foregroundStyle(SQColor.accentInk)
-                }
-            }
+            // L'en-tête porte le nom et la croix ; la ligne de licence garde sa barre.
+            .toolbar(.hidden, for: .navigationBar)
         }
         .presentationDetents([.medium, .large])
         .presentationBackgroundCompat(SQColor.bg)
@@ -42,45 +36,47 @@ struct ISEDSiteChangesSheet: View {
 
     // MARK: En-tête
 
+    /// « Site ISED · NL · Bell » : la source, la province et les opérateurs, en une ligne.
+    private var subtitle: String {
+        var parts = [String(localized: "Site ISED")]
+        if let province = changes.province, !province.isEmpty { parts.append(province) }
+        parts += site.mapOperators.map(\.label)
+        return parts.joined(separator: " · ")
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(site.displayName)
-                .font(SQType.title)
-                .sqHeader()
-                .foregroundStyle(SQColor.label)
-            Group {
-                if let province = changes.province, !province.isEmpty {
-                    Text("Site ISED · \(province)")
-                } else {
-                    Text("Site ISED")
-                }
-            }
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
-            HStack(spacing: SQSpace.xs2) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .accessibilityHidden(true)
-                Text(ANFRSiteDetailSheet.coordinateText(site))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text("Latitude \(ANFRSiteDetailSheet.decimal(site.latitude)), longitude \(ANFRSiteDetailSheet.decimal(site.longitude))"))
-            ANFRFlowLayout(spacing: SQSpace.xs2) {
-                ForEach(site.mapOperators) { op in
-                    SQEditorialTag(text: op.label, color: op.color)
-                }
-            }
-            .padding(.top, SQSpace.xs)
-            // Les autres titulaires sont regroupés : la fiche dit lequel.
-            if let holder = changes.holderName, !holder.isEmpty {
-                Text("Titulaire : \(holder)")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(site.displayName)
+                    .font(SQType.title)
+                    .sqHeader()
+                    .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: subtitle)
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                // Les autres titulaires sont regroupés : la fiche dit lequel.
+                if let holder = changes.holderName, !holder.isEmpty {
+                    Text("Titulaire : \(holder)")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: SQSpace.xs2) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(SQColor.brandRed)
+                        .accessibilityHidden(true)
+                    Text(ANFRSiteDetailSheet.coordinateText(site))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Latitude \(ANFRSiteDetailSheet.decimal(site.latitude)), longitude \(ANFRSiteDetailSheet.decimal(site.longitude))"))
             }
+            Spacer(minLength: 0)
+            ANFRSheetCloseButton { dismiss() }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -88,16 +84,16 @@ struct ISEDSiteChangesSheet: View {
     // MARK: Actions
 
     private var actionsRow: some View {
-        ANFRFlowLayout(spacing: SQSpace.sm) {
+        ANFRRoundActionRow {
             Button {
                 Haptics.light()
                 let item = MKMapItem(placemark: MKPlacemark(coordinate: site.coordinate))
                 item.name = site.displayName
                 item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
             } label: {
-                actionLabel("Itinéraire", systemImage: "arrow.triangle.turn.up.right.diamond")
+                ANFRRoundActionLabel(title: "Itinéraire", systemImage: "arrow.triangle.turn.up.right.diamond.fill", prominent: true)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SQPressButtonStyle())
 
             Button {
                 Haptics.light()
@@ -108,22 +104,11 @@ struct ISEDSiteChangesSheet: View {
                     copiedCoordinates = false
                 }
             } label: {
-                actionLabel(copiedCoordinates ? "Coordonnées copiées" : "Copier les coordonnées",
-                            systemImage: copiedCoordinates ? "checkmark" : "doc.on.doc")
+                ANFRRoundActionLabel(title: copiedCoordinates ? "Coordonnées copiées" : "Copier les coordonnées",
+                                     systemImage: copiedCoordinates ? "checkmark" : "doc.on.doc")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SQPressButtonStyle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func actionLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(SQType.subhead(.semibold))
-            .foregroundStyle(SQColor.accentInk)
-            .padding(.horizontal, SQSpace.md)
-            .frame(minHeight: 44)
-            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
-            .contentShape(Capsule(style: .continuous))
     }
 
     // MARK: Changements
