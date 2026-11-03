@@ -563,6 +563,7 @@ struct NotificationsCenterView: View {
         case "friend_accepted": return String(localized: "Demande d’ami acceptée")
         case "community_outage": return String(localized: "Panne signalée")
         case "site_follow": return String(localized: "Site suivi")
+        case "anfr_map_update": return String(localized: "Carte des antennes mise à jour")
         default: return String(localized: "Notification")
         }
     }

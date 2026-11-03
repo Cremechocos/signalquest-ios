@@ -278,6 +278,17 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(router.pendingANFRFocus?.radiusMeters, 1500)
     }
 
+    /// ANFR-MONTHLY §7 : la carte mensuelle ouvre la carte ANFR, sans relevé visé.
+    func testMonthlyANFRMapUpdateOpensTheANFRScreenWithoutFocus() {
+        let router = AppRouter()
+        router.pendingANFRFocus = ANFRFocus.parse(date: "2026-10-08", latitude: nil, longitude: nil, radiusMeters: nil)
+        router.handle(type: "anfr_map_update", conversationId: nil, postId: nil)
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertTrue(router.openANFRMap)
+        XCTAssertNil(router.pendingANFRFocus)
+        XCTAssertEqual(NotificationsCenterView.title(for: "anfr_map_update"), String(localized: "Carte des antennes mise à jour"))
+    }
+
     func testANFRFocusIgnoresUnusableFields() {
         XCTAssertNil(ANFRFocus.parse(date: "", latitude: nil, longitude: nil, radiusMeters: nil))
         XCTAssertNil(ANFRFocus.parse(date: "not-a-date", latitude: "x", longitude: "y", radiusMeters: "z"))

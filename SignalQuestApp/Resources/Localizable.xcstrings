@@ -20985,6 +20985,22 @@
         }
       }
     },
+    "Carte des antennes mise à jour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna map updated"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte des antennes mise à jour"
+          }
+        }
+      }
+    },
     "Sites au statut « En service » ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet." : {
       "localizations" : {
         "en" : {

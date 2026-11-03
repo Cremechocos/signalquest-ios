@@ -335,6 +335,12 @@ final class AppRouter: ObservableObject {
             // Sans relevé ni zone dans la charge, l'écran s'ouvre comme avant.
             pendingANFRFocus = anfrFocus
             openANFRMap = true
+        // Carte ANFR mensuelle (ANFR-MONTHLY §7) : la même carte, sans relevé visé ;
+        // `publishedAt` date le ZIP mensuel, pas un relevé hebdomadaire.
+        case "anfr_map_update":
+            selectedTab = .map
+            pendingANFRFocus = nil
+            openANFRMap = true
         // Retiré d'un groupe : la boîte de réception, pas une conversation devenue illisible.
         case "group_member_removed":
             route(toConversation: nil)

@@ -1227,7 +1227,7 @@ final class APIClientTests: XCTestCase {
             XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type, "recipientOwnerScope": owner],
                                                         currentOwnerScopeId: owner), .acceptTargeted, type)
         }
-        for type in ["anfr_update", "data_update", "ANFR_UPDATE"] {
+        for type in ["anfr_update", "anfr_map_update", "data_update", "ANFR_UPDATE"] {
             XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type], currentOwnerScopeId: nil),
                            .acceptPublic, type)
         }

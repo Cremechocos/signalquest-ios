@@ -381,7 +381,7 @@ enum PushRecipientPolicy {
     }
 
     /// Diffusions publiques du serveur : le même contenu pour tous, rien du compte.
-    private static let publicTypes: Set<String> = ["anfr_update", "data_update"]
+    private static let publicTypes: Set<String> = ["anfr_update", "anfr_map_update", "data_update"]
 
     /// Même règle que le serveur : tout type est lié au compte, sauf les diffusions
     /// publiques. Une notification locale sans type ni identifiant (appel chiffré à
