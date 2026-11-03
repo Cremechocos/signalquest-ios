@@ -1299,6 +1299,8 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let downloadServerId: String?
     let downloadServerName: String?
     let connectionType: String?
+    /// Classement serveur de `connectionType` (contrat CONN-KIND v1, liste fermée).
+    let connectionKind: String?
     let networkType: String?
     let mobileOperator: String?
     let mcc: Int?
@@ -1327,7 +1329,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
-        case id, timestamp, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
+        case id, timestamp, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
     }
 
@@ -1374,6 +1376,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         downloadServerId = c.decodeFlexibleString(forKey: .downloadServerId)
         downloadServerName = c.decodeFlexibleString(forKey: .downloadServerName)
         connectionType = c.decodeFlexibleString(forKey: .connectionType)
+        connectionKind = c.decodeFlexibleString(forKey: .connectionKind)
         networkType = c.decodeFlexibleString(forKey: .networkType)
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         mcc = try? c.decodeIfPresent(Int.self, forKey: .mcc)

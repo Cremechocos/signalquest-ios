@@ -59,7 +59,8 @@ extension SpeedtestAccountHistory {
             jitterUlMs: detail.jitterUl,
             pingProtocol: detail.pingProtocol,
             durationSeconds: detail.testDuration ?? 0,
-            connectionType: connectionKind(detail.connectionType, technology: technology),
+            connectionType: connectionKind(served: detail.connectionKind)
+                ?? connectionKind(detail.connectionType, technology: technology),
             cellularTechnology: technology,
             networkOperatorName: detail.mobileOperator,
             networkOperatorMcc: detail.mcc,
@@ -88,6 +89,18 @@ extension SpeedtestAccountHistory {
         if value.hasPrefix("LTE") { return .fourG }
         // « 5G » seul ne dit pas NSA ou SA : on ne devine pas.
         return nil
+    }
+
+    /// Classement du serveur (CONN-KIND v1) : il reconnaît aussi « 5G », « NR » ou
+    /// « LTE+ » envoyés par d'anciennes versions. `UNKNOWN` ou une valeur inconnue
+    /// rendent la main à la lecture brute.
+    static func connectionKind(served: String?) -> NetworkConnectionKind? {
+        switch served {
+        case "WIFI": return .wifi
+        case "ETHERNET": return .wired
+        case let kind? where kind.hasPrefix("CELLULAR"): return .cellular
+        default: return nil
+        }
     }
 
     static func connectionKind(_ raw: String?, technology: CellularRadioTechnology?) -> NetworkConnectionKind {

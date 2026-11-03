@@ -78,5 +78,17 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertEqual(SpeedtestAccountHistory.connectionKind(nil, technology: .fourG), .cellular)
         XCTAssertEqual(SpeedtestAccountHistory.connectionKind(nil, technology: nil), .other)
     }
+
+    /// CONN-KIND v1 : le classement du serveur l'emporte, `UNKNOWN` ou une valeur
+    /// d'une future v2 rendent la main à la lecture brute.
+    func testServedConnectionKindIsPreferred() {
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(served: "CELLULAR_5G"), .cellular)
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(served: "CELLULAR"), .cellular)
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(served: "ETHERNET"), .wired)
+        XCTAssertEqual(SpeedtestAccountHistory.connectionKind(served: "WIFI"), .wifi)
+        XCTAssertNil(SpeedtestAccountHistory.connectionKind(served: "UNKNOWN"))
+        XCTAssertNil(SpeedtestAccountHistory.connectionKind(served: "SATELLITE"))
+        XCTAssertNil(SpeedtestAccountHistory.connectionKind(served: nil))
+    }
 }
 
