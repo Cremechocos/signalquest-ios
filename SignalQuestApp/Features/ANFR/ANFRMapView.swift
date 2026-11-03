@@ -906,8 +906,8 @@ enum ANFRSiteList {
 
 // MARK: - Screen
 
-/// Crans de la feuille du bas de la carte des évolutions.
-enum ANFRPanelDetent: Equatable { case hidden, medium, large }
+/// Feuille du bas de la carte des évolutions : fermée ou ouverte à la taille de son contenu.
+enum ANFRPanelDetent: Equatable { case hidden, open }
 
 /// La carte des modifications d'un pays : changer de pays recrée l'écran, ses
 /// relevés, ses filtres et son cadrage (ISED-STATS v1 pour le Canada).
@@ -944,10 +944,10 @@ private struct ANFRMapContent: View {
     @State private var showDatePicker = false
     @State private var showLegend = false
     @State private var showsStats = false
-    /// Sur iPad, la liste reste à côté de la carte ; sur iPhone elle s'ouvre en feuille.
+    /// Sur iPad, le panneau reste à côté de la carte ; sur iPhone il s'ouvre en bas.
     @State private var showsSidePanel = true
     @State private var clusterSelection: ANFRClusterSelection?
-    /// Support choisi dans une feuille (liste, amas), ouvert à sa fermeture : deux
+    /// Support choisi dans la feuille d'un amas, ouvert à sa fermeture : deux
     /// feuilles ne se présentent pas ensemble.
     @State private var pendingSite: ANFRMapSite?
     @State private var showsUserLocation = false
@@ -955,7 +955,7 @@ private struct ANFRMapContent: View {
     /// Identifie le dernier message de position : la minuterie d'un message plus ancien
     /// n'efface pas le suivant.
     @State private var locationNoticeID = UUID()
-    /// Feuille du bas : fermée par défaut, à mi-hauteur ou dépliée.
+    /// Feuille du bas : fermée par défaut.
     @State private var panelDetent: ANFRPanelDetent = .hidden
     /// Déplacement du doigt sur la poignée, positif vers le bas.
     @State private var panelDrag: CGFloat = 0
@@ -972,11 +972,6 @@ private struct ANFRMapContent: View {
 
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
-    private var listTitle: LocalizedStringKey {
-        if model.market == .ca { return "Sites modifiés" }
-        return "Supports modifiés"
-    }
-
     var body: some View {
         Group {
             if isRegularWidth && showsSidePanel {
@@ -986,7 +981,7 @@ private struct ANFRMapContent: View {
                     // Sur iPad, le contenu du panneau reste ouvert à côté de la carte.
                     VStack(spacing: 0) {
                         panelHeader(showsHandle: false)
-                        panelBody
+                        Spacer(minLength: 0)
                     }
                     .frame(width: 380)
                     .background(SQColor.bg)
@@ -1015,7 +1010,7 @@ private struct ANFRMapContent: View {
                 .accessibilityAddTraits(.isHeader)
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                // Sur iPhone, la liste est dans le panneau du bas ; sur iPad, on masque la colonne.
+                // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
                 if isRegularWidth {
                     Button {
                         Haptics.light()
@@ -1023,7 +1018,7 @@ private struct ANFRMapContent: View {
                     } label: {
                         Image(systemName: "sidebar.right")
                     }
-                    .accessibilityLabel(showsSidePanel ? "Masquer la liste" : "Afficher la liste")
+                    .accessibilityLabel(showsSidePanel ? "Masquer le panneau" : "Afficher le panneau")
                     .accessibilityIdentifier("anfr.map.list")
                 }
                 Button {
@@ -1072,7 +1067,7 @@ private struct ANFRMapContent: View {
         .sheet(item: $clusterSelection, onDismiss: openPendingSite) { selection in
             ANFRSiteListView(
                 title: "Supports à cet emplacement", sites: selection.sites, revision: 0,
-                origin: model.userCoordinate, showsSearch: false, onClose: { clusterSelection = nil }
+                origin: model.userCoordinate, onClose: { clusterSelection = nil }
             ) { site in
                 pendingSite = site
                 clusterSelection = nil
@@ -1120,11 +1115,9 @@ private struct ANFRMapContent: View {
     }
 
     private var mapStack: some View {
-        GeometryReader { proxy in
-            ZStack {
-                mapLayer
-                controlsLayer(availableHeight: proxy.size.height)
-            }
+        ZStack {
+            mapLayer
+            controlsLayer
         }
     }
 
@@ -1190,16 +1183,14 @@ private struct ANFRMapContent: View {
 
     // MARK: Controls overlay
 
-    /// La carte reste nue : des boutons ronds en bas à droite ; pays, filtres, relevé
-    /// et liste vivent dans la feuille du bas, fermée par défaut.
-    private func controlsLayer(availableHeight: CGFloat) -> some View {
+    /// La carte reste nue : des boutons ronds en bas à droite ; pays, filtres et relevé
+    /// vivent dans la feuille du bas, fermée par défaut.
+    private var controlsLayer: some View {
         VStack(spacing: SQSpace.sm) {
             Spacer(minLength: 0)
             // Les pastilles basses réservent la hauteur du dock : sur iOS 16 à 25 il
             // se superpose à la carte au lieu de décaler la zone sûre.
-            if panelDetent != .large || !showsFloatingPanel {
-                statusPills
-            }
+            statusPills
             if !showsFloatingPanel || panelDetent == .hidden {
                 HStack {
                     Spacer(minLength: 0)
@@ -1207,7 +1198,7 @@ private struct ANFRMapContent: View {
                 }
             }
             if showsFloatingPanel, panelDetent != .hidden {
-                floatingPanel(availableHeight: availableHeight)
+                floatingPanel
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -1276,9 +1267,9 @@ private struct ANFRMapContent: View {
     private var sheetButton: some View {
         Button {
             Haptics.light()
-            setPanel(.medium)
+            setPanel(.open)
         } label: {
-            Image(systemName: "list.bullet")
+            Image(systemName: "slider.horizontal.3")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(SQColor.onAccent)
                 .frame(width: 52, height: 52)
@@ -1386,11 +1377,9 @@ private struct ANFRMapContent: View {
         withAnimation(reduceMotion ? nil : SQMotion.snappy) { panelDetent = detent }
     }
 
-    private func floatingPanel(availableHeight: CGFloat) -> some View {
-        let maxHeight = max(320, availableHeight - SQDock.floatingContentInset - SQSpace.xl)
-        let target: CGFloat = panelDetent == .large ? maxHeight : min(maxHeight, max(420, availableHeight * 0.58))
-        let height = min(maxHeight, max(160, target - panelDrag))
-        return VStack(spacing: 0) {
+    /// La feuille ne contient que les réglages : elle prend la hauteur de son contenu.
+    private var floatingPanel: some View {
+        VStack(spacing: 0) {
             panelHeader(showsHandle: true)
                 .contentShape(Rectangle())
                 .gesture(
@@ -1401,21 +1390,18 @@ private struct ANFRMapContent: View {
                                         predicted: value.predictedEndTranslation.height)
                         }
                 )
-            panelBody
         }
-        .frame(height: height, alignment: .top)
+        .padding(.bottom, SQSpace.xs)
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqCardBackground()
+        .offset(y: max(0, panelDrag))
         .accessibilityElement(children: .contain)
     }
 
-    /// Le geste choisit le cran voisin ; un lancer vif vers le bas ferme la feuille.
+    /// Glisser la poignée vers le bas ferme la feuille.
     private func settlePanel(translation: CGFloat, predicted: CGFloat) {
         var next = panelDetent
-        if translation < -40 || predicted < -120 { next = .large }
-        if translation > 40 || predicted > 120 {
-            next = panelDetent == .large && predicted < 500 ? .medium : .hidden
-        }
+        if translation > 40 || predicted > 120 { next = .hidden }
         withAnimation(reduceMotion ? nil : SQMotion.snappy) {
             panelDrag = 0
             panelDetent = next
@@ -1524,15 +1510,6 @@ private struct ANFRMapContent: View {
         let count = model.filteredSites.count.formatted(.number.grouping(.automatic))
         if model.market == .ca { return Text("\(count) sites modifiés") }
         return Text("\(count) supports modifiés")
-    }
-
-    private var panelBody: some View {
-        ANFRSiteListView(
-            title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
-            origin: model.userCoordinate, showsSearch: true, onClose: nil,
-            showsHeader: false
-        ) { site in focus(on: site) }
-            .frame(maxHeight: .infinity, alignment: .top)
     }
 
     /// En comparaison : ce que la carte montre, et la sortie vers le relevé choisi.
@@ -1776,42 +1753,20 @@ private struct ANFRSheetHeader: View {
 
 // MARK: - Liste des supports
 
-/// Les supports modifiés en liste, avec recherche et tri : l'alternative à la carte
-/// pour VoiceOver et Contrôle de sélection, et le panneau latéral de l'iPad.
+/// Les supports modifiés d'un amas en liste, ordonnés par type.
 struct ANFRSiteListView: View {
     let title: LocalizedStringKey
     let sites: [ANFRMapSite]
     /// Change quand `sites` change : évite de comparer des milliers de supports.
     let revision: Int
     let origin: CLLocationCoordinate2D?
-    let showsSearch: Bool
     let onClose: (() -> Void)?
-    /// Faux dans le panneau de la carte : son en-tête dit déjà le titre et le nombre.
-    let showsHeader: Bool
     let onSelect: (ANFRMapSite) -> Void
 
-    @State private var query = ""
-    @State private var sort: ANFRSiteListSort = .type
     @State private var rows: [ANFRSiteRow] = []
-    /// Recalcul différé de la recherche : le filtre et le tri ne repartent pas à chaque touche.
-    @State private var searchTask: Task<Void, Never>?
-
-    init(title: LocalizedStringKey, sites: [ANFRMapSite], revision: Int, origin: CLLocationCoordinate2D?,
-         showsSearch: Bool, onClose: (() -> Void)?, showsHeader: Bool = true,
-         onSelect: @escaping (ANFRMapSite) -> Void) {
-        self.title = title
-        self.sites = sites
-        self.revision = revision
-        self.origin = origin
-        self.showsSearch = showsSearch
-        self.onClose = onClose
-        self.showsHeader = showsHeader
-        self.onSelect = onSelect
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            if showsHeader {
             Group {
                 if let onClose {
                     ANFRSheetHeader(title: title, onClose: onClose)
@@ -1825,25 +1780,7 @@ struct ANFRSiteListView: View {
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, onClose == nil ? SQSpace.sm : SQSpace.md)
-            }
 
-            if showsSearch {
-                searchField
-                    .padding(.horizontal, SQSpace.lg)
-            }
-            // Le panneau de la carte garde l'ordre par type, sans sélecteur.
-            if showsSearch, showsHeader {
-                Picker("Trier par", selection: $sort) {
-                    Text("Type").tag(ANFRSiteListSort.type)
-                    Text("Commune").tag(ANFRSiteListSort.city)
-                    if origin != nil { Text("Distance").tag(ANFRSiteListSort.distance) }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, SQSpace.lg)
-            }
-
-            // Dans le panneau, le nombre n'apparaît que pour une recherche (le résumé dit le reste).
-            if showsHeader || !query.isEmpty {
             Group {
                 if sites.first?.market == .ca {
                     Text("Sites modifiés : \(rows.count.formatted())")
@@ -1851,15 +1788,13 @@ struct ANFRSiteListView: View {
                     Text("Supports modifiés : \(rows.count.formatted())")
                 }
             }
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .padding(.horizontal, SQSpace.lg)
-                .accessibilityAddTraits(.updatesFrequently)
-            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.lg)
+            .accessibilityAddTraits(.updatesFrequently)
 
             if rows.isEmpty {
-                Text(!query.isEmpty ? "Aucun support ne correspond à ta recherche."
-                     : "Aucun support modifié à afficher.")
+                Text("Aucun support modifié à afficher.")
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, SQSpace.lg)
@@ -1874,42 +1809,11 @@ struct ANFRSiteListView: View {
                 .scrollContentBackgroundHiddenCompat()
             }
         }
-        // Dans le panneau, la liste prend la surface du panneau.
-        .background { if showsHeader { SQColor.bg.ignoresSafeArea() } }
+        .background { SQColor.bg.ignoresSafeArea() }
         .tint(SQColor.brandRed)
         .onAppear(perform: recompute)
-        .onChangeCompat(of: query) { _, _ in recomputeSoon() }
-        .onChangeCompat(of: sort) { _, _ in recompute() }
         .onChangeCompat(of: revision) { _, _ in recompute() }
         .onChangeCompat(of: sites.count) { _, _ in recompute() }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(SQColor.labelSecondary)
-                .accessibilityHidden(true)
-            TextField("Commune, code du support ou adresse", text: $query)
-                .font(SQType.body)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Effacer la recherche")
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .frame(minHeight: 44)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     private func rowView(_ row: ANFRSiteRow) -> some View {
@@ -1952,19 +1856,8 @@ struct ANFRSiteListView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func recomputeSoon() {
-        searchTask?.cancel()
-        searchTask = Task {
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            guard !Task.isCancelled else { return }
-            recompute()
-        }
-    }
-
     private func recompute() {
-        searchTask?.cancel()
-        if sort == .distance && origin == nil { sort = .type }
-        rows = ANFRSiteList.rows(from: sites, query: query, sort: sort, origin: origin)
+        rows = ANFRSiteList.rows(from: sites, query: "", sort: .type, origin: origin)
     }
 }
 

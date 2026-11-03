@@ -7121,34 +7121,6 @@
         }
       }
     },
-    "Aucun support ne correspond à ta recherche." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No site matches your search."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun support ne correspond à ta recherche."
-          }
-        }
-      }
-    },
-    "SQFormal|Aucun support ne correspond à ta recherche." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun support ne correspond à votre recherche."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Aucun test sur cet iPhone pour l'instant" : {
       "localizations" : {
         "en" : {
@@ -9371,22 +9343,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commun"
-          }
-        }
-      }
-    },
-    "Commune, code du support ou adresse" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Town, site code or address"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Commune, code du support ou adresse"
           }
         }
       }
@@ -21134,22 +21090,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suivre cette connexion"
-          }
-        }
-      }
-    },
-    "Supports modifiés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Changed sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports modifiés"
           }
         }
       }
@@ -106054,22 +105994,6 @@
         }
       }
     },
-    "Sites modifiés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Changed sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sites modifiés"
-          }
-        }
-      }
-    },
     "Liste des sites modifiés" : {
       "localizations" : {
         "en" : {
@@ -106319,34 +106243,34 @@
         }
       }
     },
-    "Masquer la liste" : {
+    "Masquer le panneau" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide list"
+            "value" : "Hide panel"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Masquer la liste"
+            "value" : "Masquer le panneau"
           }
         }
       }
     },
-    "Afficher la liste" : {
+    "Afficher le panneau" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show list"
+            "value" : "Show panel"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Afficher la liste"
+            "value" : "Afficher le panneau"
           }
         }
       }
