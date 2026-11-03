@@ -751,7 +751,7 @@ extension ANFRMapViewModelTests {
         XCTAssertEqual(sites[0].sectorsByOperator.first { $0.operator == .free }?.azimuths, [0, 120, 240])
     }
 
-    func testTheReorientationLayerDrawsReorientedSitesFilteredByOperator() async {
+    func testReorientationsReachTheSheetWithoutChangingTheMap() async {
         let service = FakeService()
         service.snapshots["current"] = snapshot(mixedSites)
         service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, reoriented: 4)]
@@ -762,35 +762,21 @@ extension ANFRMapViewModelTests {
             ANFRReorientation(supId: "77", latitude: 46, longitude: 4, city: "MÂCON", operatorRaw: "SFR", systems: [], before: [90], after: [100])
         ])
         let model = await loadedModel(service)
-        XCTAssertEqual(model.filteredSites.count, mixedSites.count)
-
-        model.layer = .reorientations
         await model.loadReorientations()
-        XCTAssertEqual(model.reorientationState, .loaded)
-        XCTAssertEqual(Set(model.filteredSites.map(\.supId)), ["2", "77"])
+        XCTAssertEqual(model.filteredSites.count, mixedSites.count)
         XCTAssertEqual(model.reorientations(supId: "2").count, 2)
-        XCTAssertEqual(model.weekBars.map(\.total), [4, 2], "les barres comptent les supports réorientés")
-        XCTAssertEqual(model.operatorCounts[ANFROperator.orange.apiKey], 1)
-
-        model.toggleOperator(ANFROperator.sfr.apiKey)
-        await settle()
-        XCTAssertEqual(model.filteredSites.map(\.supId), ["2"])
-        XCTAssertEqual(model.activeFilterCount, 1)
-
-        model.layer = .changes
-        XCTAssertEqual(model.weekBars.map(\.total), [1, 6], "retour aux changements et aux antennes du relevé")
-        XCTAssertFalse(model.filteredSites.contains { $0.supId == "77" }, "la couche des changements ne montre que le relevé")
+        XCTAssertEqual(model.reorientations(supId: "77").count, 1)
+        XCTAssertEqual(model.weekBars.map(\.total), [1, 6], "les barres comptent les changements et les antennes du relevé")
+        XCTAssertFalse(model.filteredSites.contains { $0.supId == "77" }, "la carte ne montre que le relevé")
     }
 
-    func testAWeekWithoutKnownReorientationsSaysSo() async {
+    func testAWeekWithoutKnownReorientationsLeavesTheSheetWithout() async {
         let service = FakeService()
         service.snapshots["current"] = snapshot(mixedSites)
         let model = await loadedModel(service)
-        model.layer = .reorientations
         await model.loadReorientations()
-        XCTAssertEqual(model.reorientationState, .unknown)
-        XCTAssertTrue(model.filteredSites.isEmpty)
-        XCTAssertNil(model.currentWeekReoriented)
+        XCTAssertTrue(model.reorientations(supId: "2").isEmpty)
+        XCTAssertEqual(model.filteredSites.count, mixedSites.count)
     }
 
     func testTheServiceReadsAMissingWeekAsNoKnownReorientation() async throws {
@@ -986,7 +972,7 @@ extension ANFRMapViewModelTests {
         XCTAssertEqual(Set(model.filteredSites.map(\.supId)), ["A", "B", "C", "E"], "seul un support tout en rattrapage disparaît")
     }
 
-    func testAComparisonForcesTheChangesLayerAndEndsOnADateChoice() async {
+    func testAComparisonEndsOnADateChoice() async {
         let service = FakeService()
         service.snapshots["current"] = snapshot(mixedSites)
         service.snapshots["2026-10-08"] = snapshot([site("8", "BRON", [antenna("x", "SFR", "new")])])
@@ -995,11 +981,7 @@ extension ANFRMapViewModelTests {
         service.diffs["2026-10-01|2026-10-08"] = ANFRMapDiff(from: "2026-10-01", to: "2026-10-08", weeks: ["2026-10-08"],
                                                              sites: [liteSite("A", [.orange], [.new: 1])])
         let model = await loadedModel(service)
-        model.layer = .reorientations
         await model.compare(from: "2026-10-01", to: "2026-10-08")
-        XCTAssertEqual(model.layer, .changes)
-        model.layer = .reorientations
-        XCTAssertEqual(model.layer, .changes, "les réorientations sont celles d'une semaine")
         XCTAssertEqual(model.filteredSites.map(\.supId), ["A"])
         XCTAssertNotNil(model.comparisonLabel)
 

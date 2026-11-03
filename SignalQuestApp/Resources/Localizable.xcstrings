@@ -7149,54 +7149,6 @@
       },
       "shouldTranslate" : false
     },
-    "Aucun support réorienté dans ce relevé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No reoriented site in this survey"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun support réorienté dans ce relevé"
-          }
-        }
-      }
-    },
-    "Aucun support réorienté pour ces filtres" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No reoriented site for these filters"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun support réorienté pour ces filtres"
-          }
-        }
-      }
-    },
-    "Aucun support réorienté à afficher." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No reoriented site to show."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun support réorienté à afficher."
-          }
-        }
-      }
-    },
     "Aucun test sur cet iPhone pour l'instant" : {
       "localizations" : {
         "en" : {
@@ -7413,22 +7365,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune publication récente"
-          }
-        }
-      }
-    },
-    "Aucune réorientation connue pour ce relevé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No known reorientation for this survey"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune réorientation connue pour ce relevé"
           }
         }
       }
@@ -9001,22 +8937,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement des changements ANFR…"
-          }
-        }
-      }
-    },
-    "Chargement des réorientations du %@…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading reorientations for %@…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement des réorientations du %@…"
           }
         }
       }
@@ -15573,22 +15493,6 @@
         }
       }
     },
-    "Les réorientations se filtrent par opérateur. Les autres filtres s’appliquent aux changements du relevé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reorientations filter by operator. The other filters apply to the survey changes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les réorientations se filtrent par opérateur. Les autres filtres s’appliquent aux changements du relevé."
-          }
-        }
-      }
-    },
     "Les supports modifiés par l’ANFR, sur la carte" : {
       "localizations" : {
         "en" : {
@@ -19512,22 +19416,6 @@
         }
       }
     },
-    "Relevé du %@ : %@ supports réorientés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Survey of %1$@: %2$@ reoriented sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relevé du %@ : %@ supports réorientés"
-          }
-        }
-      }
-    },
     "Relevé du %@, %lld changements" : {
       "localizations" : {
         "en" : {
@@ -19970,22 +19858,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réorientation"
-          }
-        }
-      }
-    },
-    "Réorienté" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reoriented"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réorienté"
           }
         }
       }
@@ -21310,38 +21182,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supports modifiés affichés : %lld"
-          }
-        }
-      }
-    },
-    "Supports réorientés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reoriented sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports réorientés"
-          }
-        }
-      }
-    },
-    "Supports réorientés : %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reoriented sites: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports réorientés : %@"
           }
         }
       }
@@ -106623,22 +106463,6 @@
         }
       }
     },
-    "%@ supports réorientés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ reoriented sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ supports réorientés"
-          }
-        }
-      }
-    },
     "%@ sites modifiés" : {
       "localizations" : {
         "en" : {
@@ -106683,38 +106507,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le symbole : ce qui a changé"
-          }
-        }
-      }
-    },
-    "Support réorienté" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reoriented site"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Support réorienté"
-          }
-        }
-      }
-    },
-    "Les azimuts d’au moins une antenne ont changé depuis le relevé précédent. La fiche montre l’avant et l’après." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The azimuth of at least one antenna changed since the previous release. The site sheet shows before and after."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les azimuts d’au moins une antenne ont changé depuis le relevé précédent. La fiche montre l’avant et l’après."
           }
         }
       }
