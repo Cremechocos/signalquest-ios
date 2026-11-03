@@ -1329,6 +1329,8 @@ struct MainTabView: View {
                 router.route(toE2EEApprovalQR: payload)
             } else if parts == ["messages"] {
                 router.route(toConversation: nil)
+            } else if let market = ANFRStatsLink.market(from: url.absoluteString, appOrigin: AppConfig.current.appBaseURL) {
+                router.route(toANFRStats: market)
             }
             return
         }

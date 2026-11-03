@@ -29,6 +29,27 @@ enum PostDeepLink {
     }
 }
 
+/// Lien vers les statistiques des antennes (`/stats?tab=anfr&territoire=…`, ISED-ANNOUNCE v1 §3) :
+/// relatif (ligne de cloche) ou absolu sur le site (lien universel). `territoire` vaut
+/// `canada` ou `province:XX` pour le Canada ; l'écran n'a pas de vue par province, il
+/// ouvre le Canada. Une autre valeur garde la France, comme le Web.
+enum ANFRStatsLink {
+    static func market(from link: String?, appOrigin: URL) -> ANFRStatsMarket? {
+        guard let link, let components = URLComponents(string: link),
+              components.user == nil, components.password == nil,
+              components.path == "/stats" else { return nil }
+        if components.scheme != nil || components.host != nil {
+            guard components.scheme?.lowercased() == "https",
+                  components.host?.lowercased() == appOrigin.host?.lowercased(),
+                  components.port == appOrigin.port else { return nil }
+        }
+        let query = components.queryItems ?? []
+        guard query.first(where: { $0.name == "tab" })?.value == "anfr" else { return nil }
+        let territory = query.first(where: { $0.name == "territoire" })?.value?.lowercased() ?? ""
+        return territory == "canada" || territory.hasPrefix("province:") ? .ca : .fr
+    }
+}
+
 /// Un fichier d'un partage reçu, lu depuis la boîte de dépôt de l'App Group.
 struct ShareHandoffAttachment: Equatable, Sendable {
     let data: Data
@@ -144,6 +165,8 @@ final class AppRouter: ObservableObject {
     @Published var openProfileScreen: ProfileScreen?
     /// Mise à jour ANFR : l'écran ANFR de l'onglet Carte, consommé par la carte.
     @Published var openANFRMap = false
+    /// Statistiques des antennes sur un pays (lien `/stats`, annonce ISED), consommées par la carte.
+    @Published var openANFRStats: ANFRStatsMarket?
     /// Relevé et zone visés par la notification, lus par la carte ANFR à son ouverture.
     @Published var pendingANFRFocus: ANFRFocus?
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
@@ -202,7 +225,7 @@ final class AppRouter: ObservableObject {
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
             || openSentinelleTargetId != nil || openFriendRequests
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
-            || openProfileScreen != nil || openANFRMap
+            || openProfileScreen != nil || openANFRMap || openANFRStats != nil
             || pendingMapFocus != nil || pendingLiveFriendId != nil || pendingDriveTest || pendingSpeedtestStart
             || pendingShare != nil || pendingSharedPost != nil
     }
@@ -341,6 +364,9 @@ final class AppRouter: ObservableObject {
             selectedTab = .map
             pendingANFRFocus = nil
             openANFRMap = true
+        // Nouvel extrait ISED (ISED-ANNOUNCE v1) : les statistiques sur le Canada.
+        case "ised_map_update":
+            route(toANFRStats: .ca)
         // Retiré d'un groupe : la boîte de réception, pas une conversation devenue illisible.
         case "group_member_removed":
             route(toConversation: nil)
@@ -407,6 +433,11 @@ final class AppRouter: ObservableObject {
     }
 
     /// Test demandé hors de l'app (Siri, raccourci, contrôle iOS 18).
+    func route(toANFRStats market: ANFRStatsMarket) {
+        selectedTab = .map
+        openANFRStats = market
+    }
+
     func requestSpeedtestStart() {
         selectedTab = .speed
         pendingSpeedtestStart = true

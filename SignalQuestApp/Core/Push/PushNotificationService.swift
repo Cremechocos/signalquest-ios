@@ -1169,10 +1169,15 @@ extension PushNotificationService {
     /// Type suivi au toucher. La carte ANFR mensuelle part en push `data_update` +
     /// `updateType: "anfr"` (ANFR-MONTHLY §7, lisible par les builds Android en
     /// circulation) : elle ouvre la même carte que sa ligne de cloche `anfr_map_update`.
+    /// L'extrait ISED (`updateType: "ised"`, ISED-ANNOUNCE v1) suit `ised_map_update`.
     static func routedType(_ info: [AnyHashable: Any]) -> String? {
         let type = string(info, "type")
-        if type?.lowercased() == "data_update", string(info, "updateType")?.lowercased() == "anfr" {
-            return "anfr_map_update"
+        if type?.lowercased() == "data_update" {
+            switch string(info, "updateType")?.lowercased() {
+            case "anfr": return "anfr_map_update"
+            case "ised": return "ised_map_update"
+            default: break
+            }
         }
         return type
     }

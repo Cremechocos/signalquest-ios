@@ -297,6 +297,43 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(PushNotificationService.routedType(["type": "anfr_update"]), "anfr_update")
     }
 
+    /// ISED-ANNOUNCE v1 §3 : le lien d'annonce, relatif (cloche) ou absolu (lien universel).
+    /// `province:QC` porte un `:` dans la requête, que la lecture Android perdait.
+    func testStatsLinkReadsTheCanadaTerritoryRelativeAndAbsolute() {
+        let origin = URL(string: "https://signalquest.fr")!
+        for link in [
+            "/stats?tab=anfr&territoire=canada",
+            "/stats?tab=anfr&territoire=province:QC",
+            "https://signalquest.fr/stats?tab=anfr&territoire=province:QC",
+            "https://SignalQuest.fr/stats?territoire=province%3AON&tab=anfr",
+        ] {
+            XCTAssertEqual(ANFRStatsLink.market(from: link, appOrigin: origin), .ca, link)
+        }
+        // Un autre territoire, ou aucun, garde la France, comme le Web.
+        XCTAssertEqual(ANFRStatsLink.market(from: "/stats?tab=anfr", appOrigin: origin), .fr)
+        XCTAssertEqual(ANFRStatsLink.market(from: "/stats?tab=anfr&territoire=region:84", appOrigin: origin), .fr)
+        // Pas les statistiques des antennes, ou pas le site.
+        for link in [
+            "/stats", "/stats?tab=speed&territoire=canada", "/carte?market=CA",
+            "https://example.com/stats?tab=anfr&territoire=canada",
+            "http://signalquest.fr/stats?tab=anfr&territoire=canada",
+            "https://signalquest.fr:8443/stats?tab=anfr&territoire=canada",
+        ] {
+            XCTAssertNil(ANFRStatsLink.market(from: link, appOrigin: origin), link)
+        }
+        XCTAssertNil(ANFRStatsLink.market(from: nil, appOrigin: origin))
+    }
+
+    /// Ligne de cloche `ised_map_update` et push `data_update` + `updateType: "ised"` : les statistiques du Canada.
+    func testISEDMapUpdateOpensTheCanadaStatistics() {
+        let router = AppRouter()
+        router.handle(type: "ised_map_update", conversationId: nil, postId: nil)
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertEqual(router.openANFRStats, .ca)
+        XCTAssertFalse(router.openANFRMap)
+        XCTAssertEqual(PushNotificationService.routedType(["type": "data_update", "updateType": "ised"]), "ised_map_update")
+    }
+
     func testANFRFocusIgnoresUnusableFields() {
         XCTAssertNil(ANFRFocus.parse(date: "", latitude: nil, longitude: nil, radiusMeters: nil))
         XCTAssertNil(ANFRFocus.parse(date: "not-a-date", latitude: "x", longitude: "y", radiusMeters: "z"))

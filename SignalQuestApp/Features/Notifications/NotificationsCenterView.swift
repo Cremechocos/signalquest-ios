@@ -478,6 +478,10 @@ struct NotificationsCenterView: View {
             openURL(url)
             return
         }
+        if let market = ANFRStatsLink.market(from: item.link, appOrigin: AppConfig.current.appBaseURL) {
+            router.route(toANFRStats: market)
+            return
+        }
         let meta = item.metadata
         router.handle(
             type: item.type,

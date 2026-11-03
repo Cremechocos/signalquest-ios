@@ -1708,6 +1708,8 @@ struct MapExplorerView: View {
     // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
     @State private var showsANFRMap = false
     @State private var showsANFRStats = false
+    /// Pays demandé par un lien `/stats` ; `nil` : le pays d'ouverture habituel.
+    @State private var anfrStatsMarket: ANFRStatsMarket?
     /// Écran ANFR demandé depuis la feuille de filtres, ouvert à sa fermeture :
     /// naviguer pendant la transition de la feuille échouait.
     @State private var pendingANFR: MapANFRDestination?
@@ -1754,7 +1756,7 @@ struct MapExplorerView: View {
             ANFRMapView(service: services.anfr)
         }
         .navigationDestination(isPresented: $showsANFRStats) {
-            ANFRStatsView(service: services.anfr)
+            ANFRStatsView(service: services.anfr, market: anfrStatsMarket)
         }
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
         .sheet(item: $zoneCompareTarget, onDismiss: {
@@ -1984,6 +1986,7 @@ struct MapExplorerView: View {
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
             openANFRFromRouterIfNeeded()
+            openANFRStatsFromRouterIfNeeded()
         }
         // Le calque pilote uniquement la CONSOMMATION des amis. La diffusion de
         // ma propre position « carte ouverte » est liée à l'écran via onAppear.
@@ -2113,6 +2116,7 @@ struct MapExplorerView: View {
         .onChangeCompat(of: selectedAntenna?.id) { _, id in if id == nil { routedSite = nil } }
         // Notification de mise à jour ANFR : l'écran ANFR, comme depuis la feuille Carte.
         .onChangeCompat(of: router.openANFRMap) { _, _ in openANFRFromRouterIfNeeded() }
+        .onChangeCompat(of: router.openANFRStats) { _, _ in openANFRStatsFromRouterIfNeeded() }
         .onChangeCompat(of: searchFieldFocused) { _, focused in
             if focused { recentItems = RecentlyViewedStore.items() }
         }
@@ -3104,7 +3108,9 @@ struct MapExplorerView: View {
         pendingANFR = nil
         switch destination {
         case .map: showsANFRMap = true
-        case .stats: showsANFRStats = true
+        case .stats:
+            anfrStatsMarket = nil
+            showsANFRStats = true
         case .zoneCompare:
             if let center = model.viewportCenter { openZoneCompare(at: center) }
         }
@@ -3125,6 +3131,13 @@ struct MapExplorerView: View {
         guard router.openANFRMap else { return }
         router.openANFRMap = false
         showsANFRMap = true
+    }
+
+    private func openANFRStatsFromRouterIfNeeded() {
+        guard let market = router.openANFRStats else { return }
+        router.openANFRStats = nil
+        anfrStatsMarket = market
+        showsANFRStats = true
     }
 
     private func centerOnCurrentLocation() {
