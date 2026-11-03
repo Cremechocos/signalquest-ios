@@ -1918,12 +1918,13 @@ struct ANFRMapLegendSheet: View {
                     HStack(alignment: .top, spacing: SQSpace.md) {
                         Text(verbatim: "12")
                             .font(SQType.subhead(.bold))
-                            .foregroundStyle(SQColor.onAccent)
-                            .frame(width: 36, height: 36)
-                            .background(SQColor.info, in: Circle())
-                            .overlay(Circle().stroke(SQColor.onAccent, lineWidth: 2))
+                            .foregroundStyle(SQColor.label)
+                            .frame(width: 40, height: 40)
+                            .background(SQColor.surface, in: Circle())
+                            .overlay { clusterRing(width: 4).padding(3) }
+                            .sqShadowCard()
                             .accessibilityHidden(true)
-                        Text("Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un.")
+                        Text("Les supports proches sont regroupés sous un nombre ; l’anneau montre la part de chaque opérateur. Zoome ou touche le groupe pour les voir un par un.")
                             .font(SQType.subhead(.regular))
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1933,6 +1934,21 @@ struct ANFRMapLegendSheet: View {
             .padding(SQSpace.lg)
         }
         .signalQuestBackground()
+    }
+
+    /// Anneau d'exemple : les opérateurs du relevé à parts égales, comme sur la carte.
+    private func clusterRing(width: CGFloat) -> some View {
+        let colors = model.mapOperators.prefix(4).map(\.color)
+        let share = 1 / CGFloat(max(1, colors.count))
+        let gap: CGFloat = colors.count > 1 ? 0.01 : 0
+        return ZStack {
+            ForEach(Array(colors.enumerated()), id: \.offset) { index, color in
+                Circle()
+                    .trim(from: CGFloat(index) * share + gap, to: CGFloat(index + 1) * share - gap)
+                    .stroke(color, lineWidth: width)
+                    .rotationEffect(.degrees(-90))
+            }
+        }
     }
 
     private func detail(_ type: ANFRModType) -> String {
@@ -2419,9 +2435,81 @@ final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
     }
 }
 
-/// Vue d'un amas : un disque teinté par le type de modification le plus marquant de
-/// ses supports, avec leur nombre — à la place de la bulle grise de MapKit.
+/// Repère d'un support : une pastille ronde à la couleur de l'opérateur dominant, le
+/// symbole du changement le plus marquant au centre, comme dans la légende.
+final class ANFRSiteAnnotationView: MKAnnotationView {
+    private static let diameter: CGFloat = 30
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        canShowCallout = false
+        collisionMode = .circle
+        clusteringIdentifier = "anfr"
+        displayPriority = .defaultLow
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// Dernier contenu appliqué, pour redessiner au changement de thème.
+    private var applied: (tint: UIColor, ink: UIColor, glyph: String)?
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        transform = .identity
+        displayPriority = .defaultLow
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard let applied, traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        configure(tint: applied.tint, ink: applied.ink, glyph: applied.glyph)
+    }
+
+    func configure(tint rawTint: UIColor, ink rawInk: UIColor, glyph: String) {
+        applied = (rawTint, rawInk, glyph)
+        let tint = rawTint.resolvedColor(with: traitCollection)
+        let ink = rawInk.resolvedColor(with: traitCollection)
+        let ring = UIColor(SQColor.surface).resolvedColor(with: traitCollection)
+        let side = Self.diameter
+        // Marge pour l'ombre portée, dessinée dans l'image : MapKit ne l'ajoute pas.
+        let size = CGSize(width: side + 6, height: side + 6)
+        image = UIGraphicsImageRenderer(size: size).image { context in
+            let rect = CGRect(x: 3, y: 2, width: side, height: side)
+            let cg = context.cgContext
+            cg.saveGState()
+            cg.setShadow(offset: CGSize(width: 0, height: 1), blur: 3, color: UIColor.black.withAlphaComponent(0.28).cgColor)
+            ring.setFill()
+            UIBezierPath(ovalIn: rect).fill()
+            cg.restoreGState()
+            tint.setFill()
+            UIBezierPath(ovalIn: rect.insetBy(dx: 2, dy: 2)).fill()
+            let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)
+            if let symbol = UIImage(systemName: glyph, withConfiguration: config)?.withTintColor(ink, renderingMode: .alwaysOriginal) {
+                let origin = CGPoint(x: rect.midX - symbol.size.width / 2, y: rect.midY - symbol.size.height / 2)
+                symbol.draw(at: origin)
+            }
+        }
+        centerOffset = CGPoint(x: 0, y: -1)
+    }
+
+    override func setSelected(_ selected: Bool, animated: Bool) {
+        super.setSelected(selected, animated: animated)
+        let change = { self.transform = selected ? CGAffineTransform(scaleX: 1.3, y: 1.3) : .identity }
+        if animated && !UIAccessibility.isReduceMotionEnabled {
+            UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0, options: [.beginFromCurrentState], animations: change)
+        } else {
+            change()
+        }
+    }
+}
+
+/// Vue d'un amas : un disque clair avec le nombre de supports, entouré d'un anneau
+/// découpé selon la part de chaque opérateur — à la place de la bulle grise de MapKit.
 final class ANFRClusterAnnotationView: MKAnnotationView {
+    /// Part d'un opérateur dans l'amas : sa couleur et son nombre de supports.
+    typealias Segment = (color: UIColor, count: Int)
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         canShowCallout = false
@@ -2436,38 +2524,59 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
 
     /// Dernier contenu appliqué, pour redessiner le disque quand le thème bascule
     /// carte ouverte : l'image est rendue une fois, ses couleurs seraient sinon figées.
-    private var applied: (count: Int, tint: UIColor, ink: UIColor)?
+    private var applied: (count: Int, segments: [Segment])?
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
         guard let applied, traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
-        configure(count: applied.count, tint: applied.tint, ink: applied.ink)
+        configure(count: applied.count, segments: applied.segments)
     }
 
-    func configure(count: Int, tint rawTint: UIColor, ink rawInk: UIColor) {
-        applied = (count, rawTint, rawInk)
-        let tint = rawTint.resolvedColor(with: traitCollection)
-        let ink = rawInk.resolvedColor(with: traitCollection)
+    func configure(count: Int, segments: [Segment]) {
+        applied = (count, segments)
+        let fill = UIColor(SQColor.surface).resolvedColor(with: traitCollection)
+        let ink = UIColor(SQColor.label).resolvedColor(with: traitCollection)
         let text = count >= 1000
             ? (Double(count) / 1000).formatted(.number.precision(.fractionLength(0...1))) + "k"
             : String(count)
-        let diameter: CGFloat = text.count >= 4 ? 52 : (text.count == 3 ? 46 : 38)
-        let size = CGSize(width: diameter, height: diameter)
-        image = UIGraphicsImageRenderer(size: size).image { _ in
-            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 1.5, dy: 1.5)
-            tint.withAlphaComponent(0.94).setFill()
+        let diameter: CGFloat = text.count >= 4 ? 54 : (text.count == 3 ? 48 : 40)
+        let ringWidth: CGFloat = 5
+        let size = CGSize(width: diameter + 6, height: diameter + 6)
+        let resolved = segments.map { (color: $0.color.resolvedColor(with: traitCollection), count: $0.count) }
+        image = UIGraphicsImageRenderer(size: size).image { context in
+            let cg = context.cgContext
+            let rect = CGRect(x: 3, y: 2, width: diameter, height: diameter)
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            cg.saveGState()
+            cg.setShadow(offset: CGSize(width: 0, height: 1), blur: 4, color: UIColor.black.withAlphaComponent(0.25).cgColor)
+            fill.setFill()
             UIBezierPath(ovalIn: rect).fill()
-            UIColor.white.withAlphaComponent(0.9).setStroke()
-            let ring = UIBezierPath(ovalIn: rect)
-            ring.lineWidth = 2
-            ring.stroke()
+            cg.restoreGState()
+
+            // Anneau : un arc par opérateur, dans l'ordre reçu, depuis midi.
+            let total = max(1, resolved.reduce(0) { $0 + $1.count })
+            let radius = diameter / 2 - ringWidth / 2 - 1
+            let gap: CGFloat = resolved.count > 1 ? 0.06 : 0
+            var start = -CGFloat.pi / 2
+            for segment in resolved where segment.count > 0 {
+                let sweep = 2 * .pi * CGFloat(segment.count) / CGFloat(total)
+                let arc = UIBezierPath(arcCenter: center, radius: radius,
+                                       startAngle: start + gap / 2, endAngle: start + max(sweep - gap / 2, gap / 2 + 0.01),
+                                       clockwise: true)
+                arc.lineWidth = ringWidth
+                arc.lineCapStyle = .butt
+                segment.color.setStroke()
+                arc.stroke()
+                start += sweep
+            }
+
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: diameter > 44 ? 15 : 14, weight: .bold),
                 .foregroundColor: ink
             ]
             let label = text as NSString
             let textSize = label.size(withAttributes: attributes)
-            label.draw(at: CGPoint(x: (size.width - textSize.width) / 2, y: (size.height - textSize.height) / 2), withAttributes: attributes)
+            label.draw(at: CGPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2), withAttributes: attributes)
         }
         centerOffset = .zero
         accessibilityLabel = String(localized: "\(count) supports regroupés")
@@ -2496,8 +2605,8 @@ final class ANFRMapHostView: UIView {
     }
 }
 
-/// Carte ANFR rendue avec MapKit (Apple Plan natif). Marqueurs colorés par
-/// opérateur dominant + glyphe de type de modif ; clustering natif MapKit.
+/// Carte ANFR rendue avec MapKit (Apple Plan natif). Pastilles colorées par
+/// opérateur dominant + symbole du type de modif ; amas avec anneau par opérateur.
 struct ANFRMapKitView: UIViewRepresentable {
     let sites: [ANFRMapSite]
     /// Change quand `sites` change (`ANFRMapViewModel.filteredRevision`) : évite de
@@ -2525,7 +2634,7 @@ struct ANFRMapKitView: UIViewRepresentable {
         map.delegate = context.coordinator
         map.pointOfInterestFilter = .excludingAll
         context.coordinator.applyBackdrop(backdrop, on: map)
-        map.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "anfr-site")
+        map.register(ANFRSiteAnnotationView.self, forAnnotationViewWithReuseIdentifier: "anfr-site")
         map.register(ANFRClusterAnnotationView.self, forAnnotationViewWithReuseIdentifier: "anfr-cluster")
         let coordinator = context.coordinator
         host.onLayout = { [weak coordinator, weak map] in
@@ -2739,25 +2848,24 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let view = map.dequeueReusableAnnotationView(withIdentifier: "anfr-cluster", for: cluster) as? ANFRClusterAnnotationView
                     ?? ANFRClusterAnnotationView(annotation: cluster, reuseIdentifier: "anfr-cluster")
                 let members = cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }
-                let dominant = members.map { $0.style.modType }.max { $0.priority < $1.priority } ?? .added
-                view.configure(
-                    count: members.count,
-                    tint: UIColor(dominant.color),
-                    ink: UIColor(SQColor.onAccent)
-                )
+                // Un segment par opérateur, le plus présent d'abord ; les non suivis en gris, à la fin.
+                var counts: [String: (op: ANFRStatsOperator?, count: Int)] = [:]
+                for member in members {
+                    let op = member.style.dominantMapOperator
+                    counts[op?.key ?? "", default: (op, 0)].count += 1
+                }
+                let segments = counts.values
+                    .sorted { ($0.op == nil ? 0 : 1, $0.count) > ($1.op == nil ? 0 : 1, $1.count) }
+                    .map { (color: paint(for: $0.op).tint, count: $0.count) }
+                view.configure(count: members.count, segments: segments)
                 return view
             }
             guard let site = annotation as? ANFRSiteAnnotationMK else { return nil }
-            let v = map.dequeueReusableAnnotationView(withIdentifier: "anfr-site", for: annotation) as? MKMarkerAnnotationView
-                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "anfr-site")
+            let v = map.dequeueReusableAnnotationView(withIdentifier: "anfr-site", for: annotation) as? ANFRSiteAnnotationView
+                ?? ANFRSiteAnnotationView(annotation: annotation, reuseIdentifier: "anfr-site")
             let colors = paint(for: site.style.dominantMapOperator)
-            v.markerTintColor = colors.tint
-            // Orange et Bouygues demandent un symbole noir : le blanc par défaut n'y tient pas le contraste.
-            v.glyphTintColor = colors.ink
-            v.glyphImage = UIImage(systemName: site.style.modType.glyph(in: site.style.market))
-            v.clusteringIdentifier = "anfr"
-            v.displayPriority = .defaultLow
-            v.canShowCallout = false
+            // Orange et Bouygues demandent un symbole noir : le blanc n'y tient pas le contraste.
+            v.configure(tint: colors.tint, ink: colors.ink, glyph: site.style.modType.glyph(in: site.style.market))
             return v
         }
 

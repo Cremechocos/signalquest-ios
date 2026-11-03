@@ -106499,18 +106499,18 @@
         }
       }
     },
-    "Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un." : {
+    "Les supports proches sont regroupés sous un nombre ; l’anneau montre la part de chaque opérateur. Zoome ou touche le groupe pour les voir un par un." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nearby sites are grouped under a number. Zoom in or tap the group to see them one by one."
+            "value" : "Nearby sites are grouped under a number; the ring shows each operator’s share. Zoom in or tap the group to see them one by one."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un."
+            "value" : "Les supports proches sont regroupés sous un nombre ; l’anneau montre la part de chaque opérateur. Zoome ou touche le groupe pour les voir un par un."
           }
         }
       }
@@ -106659,13 +106659,13 @@
         }
       }
     },
-    "SQFormal|Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un." : {
+    "SQFormal|Les supports proches sont regroupés sous un nombre ; l’anneau montre la part de chaque opérateur. Zoome ou touche le groupe pour les voir un par un." : {
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les supports proches sont regroupés sous un nombre. Zoomez ou touchez le groupe pour les voir un par un."
+            "value" : "Les supports proches sont regroupés sous un nombre ; l’anneau montre la part de chaque opérateur. Zoomez ou touchez le groupe pour les voir un par un."
           }
         }
       },
