@@ -289,6 +289,14 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(NotificationsCenterView.title(for: "anfr_map_update"), String(localized: "Carte des antennes mise à jour"))
     }
 
+    /// Le push de la carte mensuelle arrive en `data_update` + `updateType: "anfr"`.
+    func testMonthlyANFRDataUpdatePushRoutesLikeTheMapUpdate() {
+        XCTAssertEqual(PushNotificationService.routedType(["type": "data_update", "updateType": "anfr"]), "anfr_map_update")
+        XCTAssertEqual(PushNotificationService.routedType(["type": "data_update", "updateType": "coverage"]), "data_update")
+        XCTAssertEqual(PushNotificationService.routedType(["type": "data_update"]), "data_update")
+        XCTAssertEqual(PushNotificationService.routedType(["type": "anfr_update"]), "anfr_update")
+    }
+
     func testANFRFocusIgnoresUnusableFields() {
         XCTAssertNil(ANFRFocus.parse(date: "", latitude: nil, longitude: nil, radiusMeters: nil))
         XCTAssertNil(ANFRFocus.parse(date: "not-a-date", latitude: "x", longitude: "y", radiusMeters: "z"))

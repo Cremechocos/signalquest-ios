@@ -896,7 +896,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             return completion()
         }
         let receipt = OutageNotificationReceiptPayload.parse(info, state: "opened")
-        let type = Self.string(info, "type")
+        let type = Self.routedType(info)
         let conversationId = Self.string(info, "conversationId", "conversation_id")
         let postId = Self.string(info, "postId", "post_id")
         let userId = Self.string(info, "userId", "user_id", "actorId", "actor_id")
@@ -1162,5 +1162,18 @@ enum OpenConversationTracker {
     /// entre-temps (navigation empilée).
     static func closed(_ id: String) {
         state.withLock { current in if current == id { current = nil } }
+    }
+}
+
+extension PushNotificationService {
+    /// Type suivi au toucher. La carte ANFR mensuelle part en push `data_update` +
+    /// `updateType: "anfr"` (ANFR-MONTHLY §7, lisible par les builds Android en
+    /// circulation) : elle ouvre la même carte que sa ligne de cloche `anfr_map_update`.
+    static func routedType(_ info: [AnyHashable: Any]) -> String? {
+        let type = string(info, "type")
+        if type?.lowercased() == "data_update", string(info, "updateType")?.lowercased() == "anfr" {
+            return "anfr_map_update"
+        }
+        return type
     }
 }
