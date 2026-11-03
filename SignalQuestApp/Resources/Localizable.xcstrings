@@ -106478,6 +106478,530 @@
           }
         }
       }
+    },
+    "Masquer la liste" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide list"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer la liste"
+          }
+        }
+      }
+    },
+    "Afficher la liste" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show list"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la liste"
+          }
+        }
+      }
+    },
+    "Opérateurs : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operators: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateurs : %@"
+          }
+        }
+      }
+    },
+    "%lld types" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld types"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld types"
+          }
+        }
+      }
+    },
+    "Types : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Types: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Types : %@"
+          }
+        }
+      }
+    },
+    "Générations : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generations: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générations : %@"
+          }
+        }
+      }
+    },
+    "Sans rattrapages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without catch-ups"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans rattrapages"
+          }
+        }
+      }
+    },
+    "Retire ce filtre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes this filter"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retire ce filtre"
+          }
+        }
+      }
+    },
+    "Afficher la frise et la liste" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show timeline and list"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la frise et la liste"
+          }
+        }
+      }
+    },
+    "%@ supports réorientés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ reoriented sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ supports réorientés"
+          }
+        }
+      }
+    },
+    "%@ sites modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sites modifiés"
+          }
+        }
+      }
+    },
+    "%@ supports modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ supports modifiés"
+          }
+        }
+      }
+    },
+    "Le symbole : ce qui a changé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The symbol: what changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le symbole : ce qui a changé"
+          }
+        }
+      }
+    },
+    "Support réorienté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reoriented site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support réorienté"
+          }
+        }
+      }
+    },
+    "Les azimuts d’au moins une antenne ont changé depuis le relevé précédent. La fiche montre l’avant et l’après." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The azimuth of at least one antenna changed since the previous release. The site sheet shows before and after."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les azimuts d’au moins une antenne ont changé depuis le relevé précédent. La fiche montre l’avant et l’après."
+          }
+        }
+      }
+    },
+    "Un support qui cumule plusieurs changements prend le symbole du plus marquant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A site with several changes shows the symbol of the most significant one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un support qui cumule plusieurs changements prend le symbole du plus marquant."
+          }
+        }
+      }
+    },
+    "La couleur : l’opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The colour: the operator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La couleur : l’opérateur"
+          }
+        }
+      }
+    },
+    "Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On a shared site, the marker takes the colour of the operator with the most changes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements."
+          }
+        }
+      }
+    },
+    "Le nombre : un regroupement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The number: a cluster"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nombre : un regroupement"
+          }
+        }
+      }
+    },
+    "Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby sites are grouped under a number. Zoom in or tap the group to see them one by one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un."
+          }
+        }
+      }
+    },
+    "Un site qui n’existait pas dans l’extrait précédent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A site that was not in the previous extract."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un site qui n’existait pas dans l’extrait précédent."
+          }
+        }
+      }
+    },
+    "Une technologie ajoutée dans une famille de bande, sur un site existant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A technology added in a band family on an existing site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une technologie ajoutée dans une famille de bande, sur un site existant."
+          }
+        }
+      }
+    },
+    "Un émetteur absent de cet extrait." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A transmitter missing from this extract."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un émetteur absent de cet extrait."
+          }
+        }
+      }
+    },
+    "Des fréquences ou des azimuts ont changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frequencies or azimuths changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des fréquences ou des azimuts ont changé."
+          }
+        }
+      }
+    },
+    "Un support qui n’existait pas au relevé précédent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A site that did not exist in the previous release."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un support qui n’existait pas au relevé précédent."
+          }
+        }
+      }
+    },
+    "Une antenne déclarée en service par l’opérateur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna declared in service by the operator."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une antenne déclarée en service par l’opérateur."
+          }
+        }
+      }
+    },
+    "Une antenne retirée de la déclaration du support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna removed from the site's declaration."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une antenne retirée de la déclaration du support."
+          }
+        }
+      }
+    },
+    "Une antenne déclarée sur un support existant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna declared on an existing site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une antenne déclarée sur un support existant."
+          }
+        }
+      }
+    },
+    "Une antenne en service revenue au statut de projet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna in service returned to planned status."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une antenne en service revenue au statut de projet."
+          }
+        }
+      }
+    },
+    "SQFormal|Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les supports proches sont regroupés sous un nombre. Zoomez ou touchez le groupe pour les voir un par un."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Fermer le panneau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close panel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer le panneau"
+          }
+        }
+      }
+    },
+    "Sites modifiés, filtres et relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed sites, filters and release"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites modifiés, filtres et relevé"
+          }
+        }
+      }
+    },
+    "Supports modifiés, filtres et relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed sites, filters and release"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports modifiés, filtres et relevé"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

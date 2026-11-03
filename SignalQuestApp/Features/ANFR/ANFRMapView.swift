@@ -976,6 +976,9 @@ enum ANFRSiteList {
 
 // MARK: - Screen
 
+/// Crans de la feuille du bas de la carte des évolutions.
+enum ANFRPanelDetent: Equatable { case hidden, medium, large }
+
 /// La carte des modifications d'un pays : changer de pays recrée l'écran, ses
 /// relevés, ses filtres et son cadrage (ISED-STATS v1 pour le Canada).
 struct ANFRMapView: View {
@@ -1005,14 +1008,11 @@ private struct ANFRMapContent: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dismiss) private var dismiss
-    /// Largeur et hauteur d'une barre de semaine, qui suivent la taille du texte de sa date.
-    @ScaledMetric(relativeTo: .caption2) private var weekBarWidth: CGFloat = 46
-    @ScaledMetric(relativeTo: .caption2) private var weekBarHeight: CGFloat = 62
 
     @State private var selectedSite: ANFRMapSite?
     @State private var showFilters = false
     @State private var showDatePicker = false
-    @State private var showList = false
+    @State private var showLegend = false
     @State private var showsStats = false
     /// Sur iPad, la liste reste à côté de la carte ; sur iPhone elle s'ouvre en feuille.
     @State private var showsSidePanel = true
@@ -1025,6 +1025,10 @@ private struct ANFRMapContent: View {
     /// Identifie le dernier message de position : la minuterie d'un message plus ancien
     /// n'efface pas le suivant.
     @State private var locationNoticeID = UUID()
+    /// Feuille du bas : fermée par défaut, à mi-hauteur ou dépliée.
+    @State private var panelDetent: ANFRPanelDetent = .hidden
+    /// Déplacement du doigt sur la poignée, positif vers le bas.
+    @State private var panelDrag: CGFloat = 0
 
     /// Vrai quand l'écran a été ouvert depuis les statistiques : leur bouton revient en arrière.
     private let cameFromStats: Bool
@@ -1049,12 +1053,13 @@ private struct ANFRMapContent: View {
                 HStack(spacing: 0) {
                     mapStack
                     Divider()
-                    ANFRSiteListView(
-                        title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
-                        origin: model.userCoordinate, showsSearch: true, layer: model.layer, onClose: nil
-                    ) { site in focus(on: site) }
-                        .frame(width: 380)
-                        .background(SQColor.bg)
+                    // Sur iPad, le contenu du panneau reste ouvert à côté de la carte.
+                    VStack(spacing: 0) {
+                        panelHeader(showsHandle: false)
+                        panelBody
+                    }
+                    .frame(width: 380)
+                    .background(SQColor.bg)
                 }
             } else {
                 mapStack
@@ -1080,22 +1085,17 @@ private struct ANFRMapContent: View {
                 .accessibilityAddTraits(.isHeader)
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    locate()
-                } label: {
-                    Image(systemName: "location")
+                // Sur iPhone, la liste est dans le panneau du bas ; sur iPad, on masque la colonne.
+                if isRegularWidth {
+                    Button {
+                        Haptics.light()
+                        showsSidePanel.toggle()
+                    } label: {
+                        Image(systemName: "sidebar.right")
+                    }
+                    .accessibilityLabel(showsSidePanel ? "Masquer la liste" : "Afficher la liste")
+                    .accessibilityIdentifier("anfr.map.list")
                 }
-                .accessibilityLabel("Me localiser")
-                Button {
-                    Haptics.light()
-                    if isRegularWidth { showsSidePanel.toggle() } else { showList = true }
-                } label: {
-                    Image(systemName: "list.bullet")
-                }
-                .accessibilityLabel(model.market == .ca ? "Liste des sites modifiés"
-                                    : model.layer == .reorientations ? "Liste des supports réorientés" : "Liste des supports modifiés")
-                .accessibilityIdentifier("anfr.map.list")
                 // Les statistiques du Canada ne sont pas encore servies.
                 if model.market == .fr {
                     Button {
@@ -1132,21 +1132,15 @@ private struct ANFRMapContent: View {
                 .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationBackgroundCompat(SQColor.bg)
         }
+        .sheet(isPresented: $showLegend) {
+            ANFRMapLegendSheet(model: model)
+                .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+                .presentationBackgroundCompat(SQColor.bg)
+        }
         .sheet(isPresented: $showDatePicker) {
             ANFRDatePickerSheet(model: model)
                 .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationBackgroundCompat(SQColor.bg)
-        }
-        .sheet(isPresented: $showList, onDismiss: openPendingSite) {
-            ANFRSiteListView(
-                title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
-                origin: model.userCoordinate, showsSearch: true, layer: model.layer, onClose: { showList = false }
-            ) { site in
-                pendingSite = site
-                showList = false
-            }
-            .presentationDetents([.medium, .large])
-            .presentationBackgroundCompat(SQColor.bg)
         }
         .sheet(item: $clusterSelection, onDismiss: openPendingSite) { selection in
             ANFRSiteListView(
@@ -1199,11 +1193,16 @@ private struct ANFRMapContent: View {
     }
 
     private var mapStack: some View {
-        ZStack {
-            mapLayer
-            controlsLayer
+        GeometryReader { proxy in
+            ZStack {
+                mapLayer
+                controlsLayer(availableHeight: proxy.size.height)
+            }
         }
     }
+
+    /// Le panneau flotte sur la carte quand la colonne de l'iPad n'est pas affichée.
+    private var showsFloatingPanel: Bool { !(isRegularWidth && showsSidePanel) }
 
     // MARK: Actions
 
@@ -1217,6 +1216,8 @@ private struct ANFRMapContent: View {
     private func focus(on site: ANFRMapSite) {
         Haptics.light()
         let full = model.site(supId: site.supId) ?? site
+        // La carte redevient visible derrière la fiche.
+        setPanel(.hidden)
         model.requestCamera(.site(full.coordinate, aboveSheet: !isRegularWidth))
         selectedSite = full
     }
@@ -1263,87 +1264,364 @@ private struct ANFRMapContent: View {
 
     // MARK: Controls overlay
 
-    private var controlsLayer: some View {
-        VStack(spacing: SQSpace.sm2) {
-            topBar
-            operatorStrip
-            Spacer()
+    /// La carte reste nue : des boutons ronds en bas à droite ; pays, filtres, relevé
+    /// et liste vivent dans la feuille du bas, fermée par défaut.
+    private func controlsLayer(availableHeight: CGFloat) -> some View {
+        VStack(spacing: SQSpace.sm) {
+            Spacer(minLength: 0)
             // Les pastilles basses réservent la hauteur du dock : sur iOS 16 à 25 il
             // se superpose à la carte au lieu de décaler la zone sûre.
-            VStack(spacing: SQSpace.sm) {
-                if model.layer == .reorientations {
-                    if model.reorientationState == .loading {
-                        loadingPill
-                    } else if model.filteredSites.isEmpty, model.reorientationState == .loaded || model.reorientationState == .unknown {
-                        emptyPill
-                    }
-                } else if model.isLoading {
-                    loadingPill
-                } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
-                    emptyPill
-                }
-                if model.layer == .reorientations, case .failed(let message) = model.reorientationState {
-                    errorPill(message)
-                } else if let error = model.errorMessage {
-                    errorPill(error)
-                } else if model.isShowingCachedCopy {
-                    cachedCopyPill
-                }
-                if let notice = locationNotice {
-                    noticePill(notice)
-                }
-                weekStrip
-                if !dynamicTypeSize.isAccessibilitySize {
-                    legend
+            if panelDetent != .large || !showsFloatingPanel {
+                statusPills
+            }
+            if !showsFloatingPanel || panelDetent == .hidden {
+                HStack {
+                    Spacer(minLength: 0)
+                    mapButtons
                 }
             }
-            .padding(.bottom, SQDock.floatingContentInset)
+            if showsFloatingPanel, panelDetent != .hidden {
+                floatingPanel(availableHeight: availableHeight)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.top, SQSpace.sm)
+        .padding(.bottom, SQDock.floatingContentInset)
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity, alignment: .top)
     }
 
     @ViewBuilder
-    private var topBar: some View {
-        VStack(spacing: SQSpace.xs) {
-            if SQFeatures.isedChangesMapEnabled {
-                MapSegmented(
-                    selection: Binding(get: { model.market }, set: { next in
-                        Haptics.light()
-                        market = next
-                    }),
-                    options: ANFRMapMarket.allCases.map { ($0, $0.label) },
-                    identifier: "anfr.map.market"
-                )
-            }
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: SQSpace.sm) {
-                    dateButton
-                    HStack(spacing: SQSpace.sm) {
-                        countBadge
-                        Spacer(minLength: 0)
-                        filterButton
-                    }
+    private var statusPills: some View {
+        VStack(spacing: SQSpace.sm) {
+            if model.layer == .reorientations {
+                if model.reorientationState == .loading {
+                    loadingPill
+                } else if model.filteredSites.isEmpty, model.reorientationState == .loaded || model.reorientationState == .unknown {
+                    emptyPill
                 }
-            } else {
-                HStack(spacing: SQSpace.sm) {
-                    dateButton
-                    Spacer(minLength: 0)
-                    countBadge
-                    filterButton
-                }
+            } else if model.isLoading {
+                loadingPill
+            } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
+                emptyPill
             }
-            if model.comparison != nil {
-                comparisonBar
-            } else if model.market == .fr {
-                // Pas de réorientations au Canada (ISED-STATS §7).
-                layerPicker
+            if model.layer == .reorientations, case .failed(let message) = model.reorientationState {
+                errorPill(message)
+            } else if let error = model.errorMessage {
+                errorPill(error)
+            } else if model.isShowingCachedCopy {
+                cachedCopyPill
+            }
+            if let notice = locationNotice {
+                noticePill(notice)
             }
         }
-        .padding(SQSpace.xs + 1)
+    }
+
+    // MARK: Boutons de carte
+
+    /// Localiser, légende, puis la feuille : comme les boutons de Plans.
+    private var mapButtons: some View {
+        VStack(spacing: SQSpace.sm) {
+            VStack(spacing: 0) {
+                mapButton(systemImage: showsUserLocation ? "location.fill" : "location", label: "Me localiser",
+                          identifier: "anfr.map.locate") { locate() }
+                Divider().frame(width: 28)
+                mapButton(systemImage: "info.circle", label: "Légende de la carte",
+                          identifier: "anfr.map.legend") { showLegend = true }
+            }
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .sqShadowCard()
+            sheetButton
+        }
+    }
+
+    private func mapButton(systemImage: String, label: LocalizedStringKey, identifier: String,
+                           action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// Ouvre la feuille ; la pastille dit combien de filtres restreignent la carte.
+    private var sheetButton: some View {
+        Button {
+            Haptics.light()
+            setPanel(.medium)
+        } label: {
+            Image(systemName: "list.bullet")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(SQColor.onAccent)
+                .frame(width: 52, height: 52)
+                .background(SQColor.brandRed, in: Circle())
+                .overlay(alignment: .topTrailing) {
+                    if model.activeFilterCount > 0 {
+                        Text("\(model.activeFilterCount)")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.brandRed)
+                            .frame(minWidth: 20, minHeight: 20)
+                            .background(SQColor.surface, in: Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
+                .sqShadowCard()
+                .contentShape(Circle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(model.market == .ca ? "Sites modifiés, filtres et relevé" : "Supports modifiés, filtres et relevé")
+        .accessibilityValue(model.activeFilterCount > 0 ? Text("Filtres actifs : \(model.activeFilterCount)") : Text(verbatim: ""))
+        .accessibilityIdentifier("anfr.map.panel")
+    }
+
+    // MARK: Filtres actifs
+
+    private struct ActiveFilter: Identifiable {
+        let id: String
+        let label: String
+        let spoken: String
+        let clear: () -> Void
+    }
+
+    /// Un filtre par dimension restreinte ; la croix rend toute la dimension.
+    private var activeFilters: [ActiveFilter] {
+        var filters: [ActiveFilter] = []
+        let operators = model.mapOperators.filter { model.operatorFilters.contains($0.key) }
+        if operators.count != model.mapOperators.count {
+            let names = operators.map(\.label).formatted(.list(type: .and, width: .narrow))
+            filters.append(ActiveFilter(id: "operators", label: names, spoken: String(localized: "Opérateurs : \(names)")) {
+                model.operatorFilters = Set(model.mapOperators.map(\.key))
+            })
+        }
+        guard model.layer != .reorientations else { return filters }
+        let types = model.market.modTypes.filter { model.selectedModTypes.contains($0) }
+        if types.count != model.market.modTypes.count {
+            let names = types.count <= 2
+                ? types.map { $0.label(in: model.market) }.formatted(.list(type: .and, width: .narrow))
+                : String(localized: "\(types.count) types")
+            filters.append(ActiveFilter(id: "types", label: names, spoken: String(localized: "Types : \(names)")) {
+                model.selectedModTypes = Set(ANFRModType.allCases)
+            })
+        }
+        if !model.displaysLite, model.selectedGenerations.count != ANFRGeneration.allCases.count {
+            let names = ANFRGeneration.allCases.filter { model.selectedGenerations.contains($0) }.map(\.label)
+                .formatted(.list(type: .and, width: .narrow))
+            filters.append(ActiveFilter(id: "generations", label: names, spoken: String(localized: "Générations : \(names)")) {
+                model.selectedGenerations = Set(ANFRGeneration.allCases)
+            })
+        }
+        if model.hidesCatchUp {
+            let label = String(localized: "Sans rattrapages")
+            filters.append(ActiveFilter(id: "catchUp", label: label, spoken: label) { model.hidesCatchUp = false })
+        }
+        return filters
+    }
+
+    @ViewBuilder
+    private var activeFilterPills: some View {
+        let filters = activeFilters
+        if !filters.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SQSpace.sm - 1) {
+                    ForEach(filters) { filter in
+                        Button {
+                            Haptics.light()
+                            withAnimation(reduceMotion ? nil : SQMotion.fast) { filter.clear() }
+                        } label: {
+                            HStack(spacing: SQSpace.xs) {
+                                Text(filter.label)
+                                    .lineLimit(1)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .accessibilityHidden(true)
+                            }
+                            .font(SQType.chip)
+                            .foregroundStyle(SQColor.accentInk)
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 34)
+                            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityLabel(Text(verbatim: filter.spoken))
+                        .accessibilityHint("Retire ce filtre")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Feuille du bas
+
+    private func setPanel(_ detent: ANFRPanelDetent) {
+        guard detent != panelDetent else { return }
+        withAnimation(reduceMotion ? nil : SQMotion.snappy) { panelDetent = detent }
+    }
+
+    private func floatingPanel(availableHeight: CGFloat) -> some View {
+        let maxHeight = max(320, availableHeight - SQDock.floatingContentInset - SQSpace.xl)
+        let target: CGFloat = panelDetent == .large ? maxHeight : min(maxHeight, max(420, availableHeight * 0.58))
+        let height = min(maxHeight, max(160, target - panelDrag))
+        return VStack(spacing: 0) {
+            panelHeader(showsHandle: true)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 8)
+                        .onChanged { panelDrag = $0.translation.height }
+                        .onEnded { value in
+                            settlePanel(translation: value.translation.height,
+                                        predicted: value.predictedEndTranslation.height)
+                        }
+                )
+            panelBody
+        }
+        .frame(height: height, alignment: .top)
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqCardBackground()
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Le geste choisit le cran voisin ; un lancer vif vers le bas ferme la feuille.
+    private func settlePanel(translation: CGFloat, predicted: CGFloat) {
+        var next = panelDetent
+        if translation < -40 || predicted < -120 { next = .large }
+        if translation > 40 || predicted > 120 {
+            next = panelDetent == .large && predicted < 500 ? .medium : .hidden
+        }
+        withAnimation(reduceMotion ? nil : SQMotion.snappy) {
+            panelDrag = 0
+            panelDetent = next
+        }
+    }
+
+    /// Poignée et fermeture, pays et filtres, filtres actifs, relevé et vue.
+    private func panelHeader(showsHandle: Bool) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            if showsHandle {
+                ZStack(alignment: .trailing) {
+                    Capsule(style: .continuous)
+                        .fill(SQColor.labelTertiary.opacity(0.6))
+                        .frame(width: 40, height: 5)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityHidden(true)
+                    Button {
+                        Haptics.light()
+                        setPanel(.hidden)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(width: 30, height: 30)
+                            .background(SQColor.surfaceMuted, in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Fermer le panneau")
+                    .accessibilityIdentifier("anfr.map.panel.close")
+                }
+                .frame(minHeight: 32)
+            }
+            HStack(spacing: SQSpace.sm) {
+                if SQFeatures.isedChangesMapEnabled {
+                    MapSegmented(
+                        selection: Binding(get: { model.market }, set: { next in
+                            Haptics.light()
+                            market = next
+                        }),
+                        options: ANFRMapMarket.allCases.map { ($0, $0.label) },
+                        identifier: "anfr.map.market"
+                    )
+                } else {
+                    Spacer(minLength: 0)
+                }
+                filterButton
+            }
+            activeFilterPills
+            if model.comparison != nil {
+                comparisonBar
+            } else {
+                dateStepper
+            }
+            if model.comparison == nil, model.market == .fr {
+                // Pas de réorientations au Canada (ISED-STATS §7).
+                layerPicker
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.top, showsHandle ? SQSpace.xs : SQSpace.md)
+        .padding(.bottom, SQSpace.xs)
+    }
+
+    /// « ‹ 29 oct. 2026 › » et le nombre de supports : le relevé voisin en un toucher,
+    /// le calendrier et la comparaison sur la date.
+    private var dateStepper: some View {
+        HStack(spacing: 0) {
+            stepButton(systemImage: "chevron.left", label: "Relevé précédent", enabled: model.canStepOlder) {
+                Task { await model.step(1) }
+            }
+            Button {
+                Haptics.light()
+                showDatePicker = true
+            } label: {
+                VStack(spacing: 0) {
+                    HStack(spacing: SQSpace.xs) {
+                        Text(model.dateLabel)
+                            .font(SQType.stateTitle)
+                            .foregroundStyle(SQColor.label)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityHidden(true)
+                    }
+                    countLine
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .contentTransition(.numericText())
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(model.supportsLite ? "Choisir une date ou comparer deux relevés" : "Choisir une date")
+            .accessibilityIdentifier("anfr.map.date")
+            stepButton(systemImage: "chevron.right", label: "Relevé suivant", enabled: model.canStepNewer) {
+                Task { await model.step(-1) }
+            }
+        }
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private var countLine: Text {
+        let count = model.filteredSites.count.formatted(.number.grouping(.automatic))
+        if model.layer == .reorientations { return Text("\(count) supports réorientés") }
+        if model.market == .ca { return Text("\(count) sites modifiés") }
+        return Text("\(count) supports modifiés")
+    }
+
+    private var panelBody: some View {
+        ANFRSiteListView(
+            title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
+            origin: model.userCoordinate, showsSearch: true, layer: model.layer, onClose: nil,
+            showsHeader: false
+        ) { site in focus(on: site) }
+            .frame(maxHeight: .infinity, alignment: .top)
     }
 
     /// En comparaison : ce que la carte montre, et la sortie vers le relevé choisi.
@@ -1391,56 +1669,6 @@ private struct ANFRMapContent: View {
         .accessibilityIdentifier("anfr.map.layer")
     }
 
-    private var dateButton: some View {
-        Button {
-            Haptics.light()
-            showDatePicker = true
-        } label: {
-            HStack(spacing: SQSpace.sm - 1) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 28, height: 28)
-                    .background(SQColor.accentSoft, in: Circle())
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(model.comparison != nil ? "Comparaison" : "Relevé")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                    Text(model.comparisonLabel ?? model.dateLabel)
-                        .font(SQType.callout(.semibold))
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, SQSpace.sm2)
-            .frame(minHeight: 48)
-            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityHint(model.supportsLite ? "Choisir une date ou comparer deux relevés" : "Choisir une date")
-        .accessibilityIdentifier("anfr.map.date")
-    }
-
-    private var countBadge: some View {
-        HStack(spacing: SQSpace.xs2) {
-            Image(systemName: model.layer == .reorientations ? ANFRMapLayer.reorientationGlyph : "antenna.radiowaves.left.and.right")
-                .font(.system(size: 12, weight: .semibold))
-            // Séparateur de milliers : « 61 234 » se lit, « 61234 » pas.
-            Text(model.filteredSites.count.formatted(.number.grouping(.automatic)))
-                .font(SQFont.display(15, .bold, relativeTo: .headline))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-        }
-        .foregroundStyle(SQColor.onAccent)
-        .padding(.horizontal, SQSpace.md - 1)
-        .frame(minHeight: 48)
-        .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(model.layer == .reorientations
-            ? Text("Supports réorientés affichés : \(model.filteredSites.count)")
-            : Text("Supports modifiés affichés : \(model.filteredSites.count)"))
-    }
-
     private var filterButton: some View {
         Button {
             Haptics.light()
@@ -1468,85 +1696,6 @@ private struct ANFRMapContent: View {
         .accessibilityIdentifier("anfr.map.filters")
     }
 
-    private var operatorStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm - 1) {
-                ForEach(model.mapOperators) { op in
-                    let on = model.operatorFilters.contains(op.key)
-                    // La coche de l'état actif double la couleur : l'état ne repose pas sur elle seule.
-                    SQChip(
-                        label: op.label, isSelected: on, selectedSystemImage: "checkmark", dot: op.color, selectedFill: op.color,
-                        selectedInk: SQBrand.operatorBadgeForeground(op.label),
-                        spokenLabel: "Filtre \(op.label)",
-                        spokenValue: on ? "activé" : "désactivé"
-                    ) {
-                        withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op.key) }
-                    }
-                }
-            }
-            .padding(.horizontal, SQSpace.xs)
-        }
-        .frame(minHeight: 44)
-    }
-
-    // MARK: Bandeau des semaines
-
-    @ViewBuilder
-    private var weekStrip: some View {
-        let bars = model.weekBars
-        if bars.count > 1 {
-            let maxTotal = max(bars.compactMap(\.total).max() ?? 1, 1)
-            HStack(spacing: 0) {
-                stepButton(systemImage: "chevron.left", label: "Relevé précédent", enabled: model.canStepOlder) {
-                    Task { await model.step(1) }
-                }
-                ScrollViewReader { proxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .bottom, spacing: SQSpace.xs) {
-                            ForEach(bars) { bar in
-                                weekBarButton(bar, maxTotal: maxTotal)
-                                    .id(bar.id)
-                            }
-                        }
-                        .padding(.horizontal, SQSpace.xs)
-                    }
-                    // Fondu des bords : une étiquette à moitié défilée s'estompe au lieu
-                    // d'être tranchée net contre les flèches.
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .clear, location: 0),
-                                .init(color: .black, location: 0.06),
-                                .init(color: .black, location: 0.94),
-                                .init(color: .clear, location: 1),
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .onAppear { scrollStrip(proxy, animated: false) }
-                    .onChangeCompat(of: bars.count) { _, _ in scrollStrip(proxy, animated: false) }
-                    .onChangeCompat(of: model.selectedDate) { _, _ in scrollStrip(proxy, animated: true) }
-                }
-                stepButton(systemImage: "chevron.right", label: "Relevé suivant", enabled: model.canStepNewer) {
-                    Task { await model.step(-1) }
-                }
-            }
-            .padding(.vertical, SQSpace.xs)
-            .padding(.horizontal, SQSpace.xs)
-            .sqCardBackground()
-        }
-    }
-
-    private func scrollStrip(_ proxy: ScrollViewProxy, animated: Bool) {
-        let target = model.selectedDate ?? "current"
-        if animated && !reduceMotion {
-            withAnimation(SQMotion.fast) { proxy.scrollTo(target, anchor: .center) }
-        } else {
-            proxy.scrollTo(target, anchor: .center)
-        }
-    }
-
     private func stepButton(systemImage: String, label: LocalizedStringKey, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.selection()
@@ -1561,80 +1710,6 @@ private struct ANFRMapContent: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .accessibilityLabel(label)
-    }
-
-    private func weekBarButton(_ bar: ANFRWeekBar, maxTotal: Int) -> some View {
-        let isSelected = model.comparison == nil ? bar.date == model.selectedDate : bar.inComparison
-        let barHeight: CGFloat = bar.total.map { max(4, 30 * CGFloat($0) / CGFloat(maxTotal)) } ?? 10
-        let dayText = ANFRText.date(bar.displayDate, month: .abbreviated, year: false) ?? String(localized: "Dernier")
-        let spoken = ANFRText.date(bar.displayDate) ?? String(localized: "Dernier relevé")
-        return Button {
-            Haptics.selection()
-            Task { await model.selectDate(bar.date) }
-        } label: {
-            VStack(spacing: 2) {
-                Spacer(minLength: 0)
-                Capsule(style: .continuous)
-                    .fill(isSelected ? SQColor.brandRed : SQColor.labelTertiary.opacity(bar.total == nil ? 0.35 : 0.7))
-                    .frame(width: 16, height: barHeight)
-                Text(dayText)
-                    .font(isSelected ? SQType.micro(.bold) : SQType.micro(.regular))
-                    .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(width: weekBarWidth, height: weekBarHeight)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(bar.total.map {
-            model.layer == .reorientations
-                ? Text("Relevé du \(spoken), \($0) supports réorientés")
-                : Text("Relevé du \(spoken), \($0) changements")
-        } ?? Text("Relevé du \(spoken)"))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    // MARK: Légende
-
-    /// Type de changement = symbole du repère ; opérateur = teinte (puces du haut).
-    private var legend: some View {
-        Group {
-            if model.layer == .reorientations {
-                HStack(spacing: SQSpace.xs) {
-                    legendGlyph(ANFRMapLayer.reorientationGlyph, color: ANFRMapLayer.reorientationColor)
-                    Text("Azimuts changés depuis le relevé précédent ; avant et après dans la fiche")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.label)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else {
-                ANFRFlowLayout(spacing: SQSpace.sm) {
-                    ForEach(model.market.modTypes) { type in
-                        HStack(spacing: SQSpace.xs) {
-                            legendGlyph(type.glyph(in: model.market), color: type.color)
-                            Text(type.label(in: model.market))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.label)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm)
-        .frame(maxWidth: .infinity)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-
-    private func legendGlyph(_ systemImage: String, color: Color) -> some View {
-        Image(systemName: systemImage)
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(SQColor.onAccent)
-            .frame(width: 16, height: 16)
-            .background(color, in: Circle())
     }
 
     // MARK: Pastilles d'état
@@ -1819,6 +1894,8 @@ struct ANFRSiteListView: View {
     let showsSearch: Bool
     let layer: ANFRMapLayer
     let onClose: (() -> Void)?
+    /// Faux dans le panneau de la carte : son en-tête dit déjà le titre et le nombre.
+    let showsHeader: Bool
     let onSelect: (ANFRMapSite) -> Void
 
     @State private var query = ""
@@ -1828,7 +1905,8 @@ struct ANFRSiteListView: View {
     @State private var searchTask: Task<Void, Never>?
 
     init(title: LocalizedStringKey, sites: [ANFRMapSite], revision: Int, origin: CLLocationCoordinate2D?,
-         showsSearch: Bool, layer: ANFRMapLayer = .changes, onClose: (() -> Void)?, onSelect: @escaping (ANFRMapSite) -> Void) {
+         showsSearch: Bool, layer: ANFRMapLayer = .changes, onClose: (() -> Void)?, showsHeader: Bool = true,
+         onSelect: @escaping (ANFRMapSite) -> Void) {
         self.title = title
         self.sites = sites
         self.revision = revision
@@ -1836,11 +1914,13 @@ struct ANFRSiteListView: View {
         self.showsSearch = showsSearch
         self.layer = layer
         self.onClose = onClose
+        self.showsHeader = showsHeader
         self.onSelect = onSelect
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
+            if showsHeader {
             Group {
                 if let onClose {
                     ANFRSheetHeader(title: title, onClose: onClose)
@@ -1854,6 +1934,7 @@ struct ANFRSiteListView: View {
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, onClose == nil ? SQSpace.sm : SQSpace.md)
+            }
 
             if showsSearch {
                 searchField
@@ -1867,6 +1948,8 @@ struct ANFRSiteListView: View {
                 .padding(.horizontal, SQSpace.lg)
             }
 
+            // Dans le panneau, le nombre n'apparaît que pour une recherche (le résumé dit le reste).
+            if showsHeader || !query.isEmpty {
             Group {
                 if layer == .reorientations {
                     Text("Supports réorientés : \(rows.count.formatted())")
@@ -1880,6 +1963,7 @@ struct ANFRSiteListView: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.horizontal, SQSpace.lg)
                 .accessibilityAddTraits(.updatesFrequently)
+            }
 
             if rows.isEmpty {
                 Text(!query.isEmpty ? "Aucun support ne correspond à ta recherche."
@@ -1898,7 +1982,9 @@ struct ANFRSiteListView: View {
                 .scrollContentBackgroundHiddenCompat()
             }
         }
-        .signalQuestBackground()
+        // Dans le panneau, la liste prend la surface du panneau.
+        .background { if showsHeader { SQColor.bg.ignoresSafeArea() } }
+        .tint(SQColor.brandRed)
         .onAppear(perform: recompute)
         .onChangeCompat(of: query) { _, _ in recomputeSoon() }
         .onChangeCompat(of: sort) { _, _ in recompute() }
@@ -1999,6 +2085,138 @@ private extension View {
 }
 
 // MARK: - Filter sheet
+
+/// Légende de la carte des évolutions : ce que disent le symbole, la couleur et le nombre
+/// d'un repère, avec les nombres du relevé affiché.
+struct ANFRMapLegendSheet: View {
+    @ObservedObject var model: ANFRMapViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                ANFRSheetHeader(title: "Légende") { dismiss() }
+
+                section(title: "Le symbole : ce qui a changé") {
+                    if model.layer == .reorientations {
+                        row(glyph: ANFRMapLayer.reorientationGlyph, color: ANFRMapLayer.reorientationColor,
+                            title: String(localized: "Support réorienté"),
+                            detail: String(localized: "Les azimuts d’au moins une antenne ont changé depuis le relevé précédent. La fiche montre l’avant et l’après."),
+                            count: model.filteredSites.count)
+                    } else {
+                        ForEach(model.market.modTypes) { type in
+                            row(glyph: type.glyph(in: model.market), color: type.color,
+                                title: type.label(in: model.market), detail: detail(type),
+                                count: model.modTypeCounts[type] ?? 0)
+                        }
+                        Text("Un support qui cumule plusieurs changements prend le symbole du plus marquant.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                section(title: "La couleur : l’opérateur") {
+                    ANFRFlowLayout(spacing: SQSpace.sm) {
+                        ForEach(model.mapOperators) { op in
+                            HStack(spacing: SQSpace.xs + 2) {
+                                Circle().fill(op.color).frame(width: 12, height: 12)
+                                Text(op.label)
+                                    .font(SQType.subhead(.semibold))
+                                    .foregroundStyle(SQColor.label)
+                            }
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 36)
+                            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    Text("Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                section(title: "Le nombre : un regroupement") {
+                    HStack(alignment: .top, spacing: SQSpace.md) {
+                        Text(verbatim: "12")
+                            .font(SQType.subhead(.bold))
+                            .foregroundStyle(SQColor.onAccent)
+                            .frame(width: 36, height: 36)
+                            .background(SQColor.info, in: Circle())
+                            .overlay(Circle().stroke(SQColor.onAccent, lineWidth: 2))
+                            .accessibilityHidden(true)
+                        Text("Les supports proches sont regroupés sous un nombre. Zoome ou touche le groupe pour les voir un par un.")
+                            .font(SQType.subhead(.regular))
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+        }
+        .signalQuestBackground()
+    }
+
+    private func detail(_ type: ANFRModType) -> String {
+        if model.market == .ca {
+            switch type {
+            case .new: return String(localized: "Un site qui n’existait pas dans l’extrait précédent.")
+            case .added: return String(localized: "Une technologie ajoutée dans une famille de bande, sur un site existant.")
+            case .deleted: return String(localized: "Un émetteur absent de cet extrait.")
+            case .modified: return String(localized: "Des fréquences ou des azimuts ont changé.")
+            case .activated: return ""
+            }
+        }
+        switch type {
+        case .new: return String(localized: "Un support qui n’existait pas au relevé précédent.")
+        case .activated: return String(localized: "Une antenne déclarée en service par l’opérateur.")
+        case .deleted: return String(localized: "Une antenne retirée de la déclaration du support.")
+        case .added: return String(localized: "Une antenne déclarée sur un support existant.")
+        case .modified: return String(localized: "Une antenne en service revenue au statut de projet.")
+        }
+    }
+
+    private func section<Content: View>(title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text(title)
+                .font(SQType.rowTitle)
+                .foregroundStyle(SQColor.label)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    private func row(glyph: String, color: Color, title: String, detail: String, count: Int) -> some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            Image(systemName: glyph)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(SQColor.onAccent)
+                .frame(width: 32, height: 32)
+                .background(color, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                Text(verbatim: detail)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: SQSpace.sm)
+            Text(count.formatted(.number.grouping(.automatic)))
+                .font(SQType.body(.bold))
+                .monospacedDigit()
+                .foregroundStyle(count == 0 ? SQColor.labelSecondary : SQColor.label)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(title), \(count.formatted()). \(detail)"))
+    }
+}
 
 struct ANFRMapFilterSheet: View {
     @ObservedObject var model: ANFRMapViewModel
@@ -2638,14 +2856,14 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 51.2, longitude: -5.3))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 41.3, longitude: 9.7))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                // Marges : barres du haut, bandeau et légende du bas.
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 150, left: 12, bottom: 240, right: 12), animated: animated)
+                // Petites marges : le dock est dans layoutMargins, rien ne flotte en haut.
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24, left: 12, bottom: 24, right: 12), animated: animated)
             case .canada:
                 // La bande habitée, de Vancouver à Halifax : en portrait, la largeur décide du zoom.
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 56, longitude: -128))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 42, longitude: -58))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 150, left: 12, bottom: 240, right: 12), animated: animated)
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24, left: 12, bottom: 24, right: 12), animated: animated)
             case .region(let center, let radius):
                 map.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: radius * 2.6, longitudinalMeters: radius * 2.6), animated: animated)
             case .site(let coordinate, let aboveSheet):
