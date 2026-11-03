@@ -73,6 +73,11 @@ enum SQFeatures {
     /// et les générations. Ouvert après l'annonce « servi données » du serveur
     /// (26/10) ; le refermer masque le sélecteur, la France reste inchangée.
     static let anfrDromStatsEnabled = true
+
+    /// Carte des modifications du Canada (contrat ISED-STATS v1, §10) : bascule
+    /// France / Canada sur la carte des relevés. Ouvert le 03/11, routes `market=CA`
+    /// servies (#911, #914) ; le refermer rend la carte à la France seule.
+    static let isedChangesMapEnabled = true
 }
 
 struct AppConfig: Equatable {

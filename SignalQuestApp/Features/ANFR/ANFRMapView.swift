@@ -13,22 +13,26 @@ private struct ANFRIndexedSite: Sendable {
     let site: ANFRMapSite
     /// Parallèles à `site.antennas`. Un support léger n'a pas d'antennes : une ligne
     /// par couple opérateur × type présent, ce qui filtre le support entier.
-    let operators: [ANFROperator?]
+    /// Clés d'opérateur de la carte (`ANFRStatsOperator.key`) ; `nil` : un opérateur non suivi.
+    let operators: [String?]
     let modTypes: [ANFRModType]
     let generations: [ANFRGeneration?]
     let catchUps: [Bool]
 
-    init(site: ANFRMapSite) {
+    init(site: ANFRMapSite, market: ANFRMapMarket) {
         self.site = site
         if let summary = site.summary {
-            let operators: [ANFROperator?] = summary.operators.map { Optional($0) } + (summary.hasOtherOperator || summary.operators.isEmpty ? [nil] : [])
+            // Au Canada, le serveur donne les clés de marché ; en France, des libellés ANFR.
+            let known = market == .ca ? summary.rawOperators : summary.operators.map(\.apiKey)
+            let other = market == .ca ? known.isEmpty : summary.hasOtherOperator || known.isEmpty
+            let operators: [String?] = known.map { Optional($0) } + (other ? [nil] : [])
             let types = summary.presentTypes
             self.operators = operators.flatMap { op in types.map { _ in op } }
             self.modTypes = operators.flatMap { _ in types }
             self.generations = self.modTypes.map { _ in nil }
             self.catchUps = self.modTypes.map { _ in summary.catchUp > 0 && summary.catchUp >= summary.total }
         } else {
-            operators = site.antennas.map(\.operator)
+            operators = site.antennas.map { $0.operator?.apiKey }
             modTypes = site.antennas.map(\.modType)
             generations = site.antennas.map(\.generationEnum)
             catchUps = site.antennas.map(\.catchUp)
@@ -52,9 +56,9 @@ private struct ANFRLoadedSnapshot: Sendable {
     let weeks: [String]
 
     /// Construit l'index d'un relevé : à appeler hors du fil principal.
-    static func build(_ snapshot: ANFRMapSnapshot, weeks: [String] = []) -> ANFRLoadedSnapshot {
+    static func build(_ snapshot: ANFRMapSnapshot, weeks: [String] = [], market: ANFRMapMarket = .fr) -> ANFRLoadedSnapshot {
         let sites = snapshot.sites
-        let index = sites.map(ANFRIndexedSite.init(site:))
+        let index = sites.map { ANFRIndexedSite(site: $0, market: market) }
         var lookup: [String: ANFRMapSite] = [:]
         lookup.reserveCapacity(sites.count)
         for site in sites where lookup[site.supId] == nil {
@@ -81,16 +85,6 @@ private extension ANFRModType {
     }
 }
 
-private extension ANFROperator {
-    var presenceBit: Int {
-        switch self {
-        case .orange: return 1
-        case .sfr: return 2
-        case .bouygues: return 4
-        case .free: return 8
-        }
-    }
-}
 
 // MARK: - Cadrage et zone
 
@@ -100,6 +94,8 @@ struct ANFRCameraRequest: Equatable {
     enum Target {
         /// France métropolitaine et Corse en entier.
         case france
+        /// Le Canada habité, des Grands Lacs au sud du Nunavut.
+        case canada
         case region(center: CLLocationCoordinate2D, radiusMeters: Double)
         /// Un support ; `aboveSheet` le place dans la moitié haute, que la fiche ne couvre pas.
         case site(CLLocationCoordinate2D, aboveSheet: Bool)
@@ -184,7 +180,11 @@ final class ANFRMapViewModel: ObservableObject {
     /// Change à chaque relevé affiché : annonce VoiceOver.
     @Published private(set) var loadRevision = 0
 
-    @Published var operatorFilters: Set<ANFROperator> = Set(ANFROperator.allCases) { didSet { scheduleRecompute() } }
+    /// Pays de la carte, fixé à l'ouverture : changer de pays recrée le modèle.
+    let market: ANFRMapMarket
+    /// Opérateurs des filtres, dans l'ordre : ceux du pays, avec les libellés servis au Canada.
+    @Published private(set) var mapOperators: [ANFRStatsOperator]
+    @Published var operatorFilters: Set<String> { didSet { scheduleRecompute() } }
     @Published var selectedModTypes: Set<ANFRModType> = Set(ANFRModType.allCases) { didSet { scheduleRecompute() } }
     @Published var selectedGenerations: Set<ANFRGeneration> = Set(ANFRGeneration.allCases) { didSet { scheduleRecompute() } }
     /// Masque les rattrapages : mises en service déclarées longtemps après coup.
@@ -237,7 +237,7 @@ final class ANFRMapViewModel: ObservableObject {
     /// Antennes du dernier relevé, une fois chargé (il n'est pas dans `weeks`).
     @Published private(set) var currentWeekTotal: Int?
 
-    @Published private(set) var cameraRequest = ANFRCameraRequest(id: 0, target: .france)
+    @Published private(set) var cameraRequest: ANFRCameraRequest
     @Published private(set) var zone: ANFRZone?
     @Published var userCoordinate: CLLocationCoordinate2D?
 
@@ -264,7 +264,22 @@ final class ANFRMapViewModel: ObservableObject {
     /// Au-delà, le dernier relevé est redemandé en arrière-plan.
     private let currentFreshness: TimeInterval = 60
 
-    init(service: ANFRServicing) { self.service = service }
+    init(service: ANFRServicing, market: ANFRMapMarket = .fr) {
+        self.service = service
+        self.market = market
+        mapOperators = market.operators
+        operatorFilters = Set(market.operators.map(\.key))
+        cameraRequest = ANFRCameraRequest(id: 0, target: market == .ca ? .canada : .france)
+        supportsLite = market == .ca
+    }
+
+    /// Libellés et couleurs servis, sur les mêmes clés : un filtre « tous » le reste.
+    private func adoptServedOperators(_ served: [ANFRStatsOperator]) {
+        guard !served.isEmpty, served != mapOperators else { return }
+        let wasEvery = operatorFilters == Set(mapOperators.map(\.key))
+        mapOperators = served
+        if wasEvery { operatorFilters = Set(served.map(\.key)) }
+    }
 
     /// Sites filtrés (opérateurs, types, générations, rattrapages), MÉMOÏSÉS :
     /// recalculés seulement sur changement de sites/filtres, pas à chaque accès — le
@@ -278,7 +293,7 @@ final class ANFRMapViewModel: ObservableObject {
     @Published private(set) var modTypeCounts: [ANFRModType: Int] = [:]
     /// Sites concernés par chaque opérateur, pour les types, générations et
     /// rattrapages retenus (indépendant du filtre d'opérateur).
-    @Published private(set) var operatorCounts: [ANFROperator: Int] = [:]
+    @Published private(set) var operatorCounts: [String: Int] = [:]
 
     private func apply(_ loaded: ANFRLoadedSnapshot, date: String?, comparison: ANFRComparison? = nil) {
         sites = loaded.sites
@@ -323,13 +338,16 @@ final class ANFRMapViewModel: ObservableObject {
         let modTypes = selectedModTypes
         let generations = selectedGenerations
         let hideCatchUp = hidesCatchUp
-        let everyOperator = operators.count == ANFROperator.allCases.count
+        let operatorKeys = mapOperators.map(\.key)
+        let everyOperator = operatorKeys.allSatisfy(operators.contains)
+        var operatorBits: [String: Int] = [:]
+        for (offset, key) in operatorKeys.enumerated() { operatorBits[key] = 1 << offset }
         // Un relevé léger ne dit pas les générations : le filtre ne s'y applique pas.
         let everyGeneration = displaysLite || generations.count == ANFRGeneration.allCases.count
         var result: [ANFRMapSite] = []
         result.reserveCapacity(index.count)
         var typeCounts: [ANFRModType: Int] = [:]
-        var perOperator: [ANFROperator: Int] = [:]
+        var perOperator: [String: Int] = [:]
         for entry in index {
             let antennas = entry.site.antennas
             // Génération et rattrapage ne dépendent ni de l'opérateur ni du type : ils
@@ -352,7 +370,7 @@ final class ANFRMapViewModel: ObservableObject {
             var operatorsPresent = 0
             for i in entry.modTypes.indices where passesShared(i) {
                 let typeAllowed = modTypes.contains(entry.modTypes[i])
-                if typeAllowed, let op = entry.operators[i] { operatorsPresent |= op.presenceBit }
+                if typeAllowed, let op = entry.operators[i], let bit = operatorBits[op] { operatorsPresent |= bit }
                 guard passesOperator(i) else { continue }
                 typesPresent |= entry.modTypes[i].presenceBit
                 if typeAllowed { keptCount += 1 }
@@ -361,7 +379,7 @@ final class ANFRMapViewModel: ObservableObject {
                 for type in ANFRModType.allCases where typesPresent & type.presenceBit != 0 { typeCounts[type, default: 0] += 1 }
             }
             if operatorsPresent != 0 {
-                for op in ANFROperator.allCases where operatorsPresent & op.presenceBit != 0 { perOperator[op, default: 0] += 1 }
+                for (op, bit) in operatorBits where operatorsPresent & bit != 0 { perOperator[op, default: 0] += 1 }
             }
             // Le repère ne garde que les antennes retenues : un site Orange + Free
             // filtré sur Free s'affichait en Orange. La fiche relit le site entier.
@@ -388,12 +406,12 @@ final class ANFRMapViewModel: ObservableObject {
     /// Couche des réorientations : seul le filtre d'opérateur s'applique.
     private func recomputeReorientations() {
         let operators = operatorFilters
-        let everyOperator = operators.count == ANFROperator.allCases.count
+        let everyOperator = mapOperators.allSatisfy { operators.contains($0.key) }
         var result: [ANFRMapSite] = []
-        var perOperator: [ANFROperator: Int] = [:]
+        var perOperator: [String: Int] = [:]
         for site in reorientationSites {
-            for op in site.operators { perOperator[op, default: 0] += 1 }
-            let kept = site.antennas.filter { $0.operator.map(operators.contains) ?? everyOperator }
+            for op in site.operators { perOperator[op.apiKey, default: 0] += 1 }
+            let kept = site.antennas.filter { $0.operator.map { operators.contains($0.apiKey) } ?? everyOperator }
             guard !kept.isEmpty else { continue }
             result.append(kept.count == site.antennas.count ? site : ANFRMapSite(
                 supId: site.supId, latitude: site.latitude, longitude: site.longitude, city: site.city, antennas: kept
@@ -468,7 +486,9 @@ final class ANFRMapViewModel: ObservableObject {
         // Sans relevé léger, les relevés de 2022 pèsent des dizaines de Mo : écartés.
         let hidesHeavy = !supportsLite
         hidesFullStateDates = hidesHeavy && sorted.contains(where: ANFRMapPolicy.isFullStateDate)
-        let selectable = sorted.filter { !(hidesHeavy && ANFRMapPolicy.isFullStateDate($0)) && $0 != current }
+        // Au Canada, le plus ancien extrait est la base : rien ne le précède à comparer.
+        let base = market == .ca ? orderedDates.last : nil
+        let selectable = sorted.filter { !(hidesHeavy && ANFRMapPolicy.isFullStateDate($0)) && $0 != current && $0 != base }
         selectableDates = selectable
         dateSections = Self.sections(from: selectable)
     }
@@ -562,7 +582,8 @@ final class ANFRMapViewModel: ObservableObject {
         guard !hasLoadedSnapshot else { return }
         // Un relevé visé par une notification se résout avec la liste des dates,
         // petite réponse qu'on attend alors avant de charger.
-        if focus?.date != nil { await loadArchiveDates() }
+        // Un mois canadien se lit depuis l'extrait précédent : les dates d'abord.
+        if focus?.date != nil || market == .ca { await loadArchiveDates() }
         if let focus { selectedDate = applyFocus(focus) }
         // Les dates d'archive (une petite réponse) n'attendent plus le relevé, bien
         // plus lourd : le sélecteur est utilisable tout de suite. En `async let`, elles
@@ -647,10 +668,20 @@ final class ANFRMapViewModel: ObservableObject {
         do {
             let snapshot: ANFRMapSnapshot
             var cumulated: [String] = []
+            var served: [ANFRStatsOperator] = []
             if let comparison {
-                let diff = try await service.mapDiff(from: comparison.from, to: comparison.to)
+                let diff = try await service.mapDiff(from: comparison.from, to: comparison.to, market: market)
                 snapshot = diff.snapshot
                 cumulated = diff.weeks
+                served = diff.operators
+            } else if market == .ca {
+                // Un mois canadien se lit comme la comparaison avec l'extrait précédent.
+                guard let from = previousDate(before: date ?? currentSnapshotDate) else {
+                    throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+                }
+                let diff = try await service.mapDiff(from: from, to: date, market: market)
+                snapshot = diff.snapshot
+                served = diff.operators
             } else if let date, loadsLite(date) {
                 snapshot = try await service.mapSnapshotLite(date: date)
             } else {
@@ -659,14 +690,23 @@ final class ANFRMapViewModel: ObservableObject {
             guard key == requestKey else { return }
             // L'index se construit hors du fil principal : la pastille de chargement
             // reste animée pendant l'analyse des antennes.
-            let built = await Task.detached(priority: .userInitiated) { ANFRLoadedSnapshot.build(snapshot, weeks: cumulated) }.value
+            let market = market
+            let built = await Task.detached(priority: .userInitiated) { ANFRLoadedSnapshot.build(snapshot, weeks: cumulated, market: market) }.value
             guard key == requestKey else { return }
             remember(built, for: key)
+            adoptServedOperators(served)
             apply(built, date: date, comparison: comparison)
         } catch {
             // Le relevé affiché reste à l'écran ; une revalidation manquée ne dit rien.
             if !error.isCancellation, key == requestKey, !shownFromMemory { errorMessage = Self.message(for: error, comparison: comparison) }
         }
+    }
+
+    /// L'extrait qui précède `date` ; `nil` pour le plus ancien ou une date inconnue.
+    private func previousDate(before date: String?) -> String? {
+        let dates = orderedDates
+        guard let date, let index = dates.firstIndex(of: date), index + 1 < dates.count else { return nil }
+        return dates[index + 1]
     }
 
     /// Ce que l'écran demande : un relevé ou une comparaison.
@@ -711,15 +751,16 @@ final class ANFRMapViewModel: ObservableObject {
     /// Dates d'archive : appelée aussi à l'ouverture du sélecteur quand la liste
     /// est restée vide (réponse manquée).
     func loadArchiveDates() async {
-        guard let meta = try? await service.archiveDates() else { return }
+        guard let meta = try? await service.archiveDates(market: market) else { return }
         availableDates = meta.dates
         currentSnapshotDate = meta.current
     }
 
     /// Les barres du bandeau ; sans elles le bandeau n'affiche que les dates.
     func loadWeeks() async {
-        guard let loaded = try? await service.archiveWeeks(count: 12) else { return }
-        supportsLite = loaded.contains { $0.siteCount != nil }
+        guard let loaded = try? await service.archiveWeeks(count: 12, market: market) else { return }
+        // Le Canada ne se lit qu'en comparaisons, toujours légères.
+        supportsLite = market == .ca || loaded.contains { $0.siteCount != nil }
         weeks = supportsLite ? loaded : loaded.filter { !ANFRMapPolicy.isFullStateDate($0.date) }
     }
 
@@ -797,7 +838,7 @@ final class ANFRMapViewModel: ObservableObject {
 
     // MARK: Filtres
 
-    func toggleOperator(_ op: ANFROperator) {
+    func toggleOperator(_ op: String) {
         if operatorFilters.contains(op) {
             let next = operatorFilters.subtracting([op])
             operatorFilters = next.isEmpty ? [op] : next
@@ -825,7 +866,7 @@ final class ANFRMapViewModel: ObservableObject {
     }
 
     func resetFilters() {
-        operatorFilters = Set(ANFROperator.allCases)
+        operatorFilters = Set(mapOperators.map(\.key))
         selectedModTypes = Set(ANFRModType.allCases)
         selectedGenerations = Set(ANFRGeneration.allCases)
         hidesCatchUp = false
@@ -833,7 +874,7 @@ final class ANFRMapViewModel: ObservableObject {
 
     var activeFilterCount: Int {
         var count = 0
-        if operatorFilters.count != ANFROperator.allCases.count { count += 1 }
+        if !mapOperators.allSatisfy({ operatorFilters.contains($0.key) }) { count += 1 }
         // Types, générations et rattrapages ne s'appliquent pas aux réorientations.
         if layer == .reorientations { return count }
         if selectedModTypes.count != ANFRModType.allCases.count { count += 1 }
@@ -850,7 +891,7 @@ final class ANFRMapViewModel: ObservableObject {
             return String(localized: "Relevé du \(dateLabel) : \(filteredSites.count.formatted()) supports réorientés")
         }
         let counts = ANFRModType.allCases
-            .compactMap { type in modTypeCounts[type].map { "\(type.label) : \($0.formatted())" } }
+            .compactMap { type in modTypeCounts[type].map { "\(type.label(in: market)) : \($0.formatted())" } }
             .joined(separator: ", ")
         let head = displayedComparison != nil
             ? String(localized: "Comparaison \(comparisonLabel ?? dateLabel) : \(filteredSites.count.formatted()) supports modifiés")
@@ -886,18 +927,22 @@ enum ANFRSiteList {
         var rows: [ANFRSiteRow] = []
         rows.reserveCapacity(sites.count)
         for site in sites where matches(site, needle: needle) {
-            let operators = site.operators
+            let operators = site.mapOperators
             let operatorText = operators.isEmpty ? String(localized: "Autre opérateur") : operators.map(\.label).joined(separator: ", ")
             var detail: String
             if layer == .reorientations {
                 detail = "\(operatorText) · " + String(localized: "Réorienté")
             } else {
-                detail = "\(operatorText) · \(site.dominantModType.label)"
-                if site.changeCount > 1 { detail += " · " + String(localized: "\(site.changeCount) antennes") }
+                detail = "\(operatorText) · \(site.dominantModType.label(in: site.market))"
+                if site.changeCount > 1 {
+                    detail += " · " + (site.market == .ca
+                        ? String(localized: "\(site.changeCount) émetteurs")
+                        : String(localized: "\(site.changeCount) antennes"))
+                }
             }
             rows.append(ANFRSiteRow(
                 site: site,
-                title: site.city.isEmpty ? String(localized: "Support \(site.supId)") : ANFRText.city(site.city),
+                title: site.displayName,
                 detail: detail,
                 modType: site.dominantModType,
                 distance: originLocation.map { CLLocation(latitude: site.latitude, longitude: site.longitude).distance(from: $0) }
@@ -931,7 +976,28 @@ enum ANFRSiteList {
 
 // MARK: - Screen
 
+/// La carte des modifications d'un pays : changer de pays recrée l'écran, ses
+/// relevés, ses filtres et son cadrage (ISED-STATS v1 pour le Canada).
 struct ANFRMapView: View {
+    private let service: ANFRServicing
+    private let cameFromStats: Bool
+    @State private var market: ANFRMapMarket
+
+    /// `market` : le pays imposé (les statistiques françaises ouvrent la France),
+    /// sinon celui de « Mon pays ».
+    init(service: ANFRServicing, cameFromStats: Bool = false, market: ANFRMapMarket? = nil) {
+        self.service = service
+        self.cameFromStats = cameFromStats
+        _market = State(initialValue: market ?? .initial)
+    }
+
+    var body: some View {
+        ANFRMapContent(service: service, market: $market, cameFromStats: cameFromStats)
+            .id(market)
+    }
+}
+
+private struct ANFRMapContent: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @StateObject private var model: ANFRMapViewModel
@@ -962,16 +1028,19 @@ struct ANFRMapView: View {
 
     /// Vrai quand l'écran a été ouvert depuis les statistiques : leur bouton revient en arrière.
     private let cameFromStats: Bool
+    @Binding private var market: ANFRMapMarket
 
-    init(service: ANFRServicing, cameFromStats: Bool = false) {
+    init(service: ANFRServicing, market: Binding<ANFRMapMarket>, cameFromStats: Bool) {
         self.cameFromStats = cameFromStats
-        _model = StateObject(wrappedValue: ANFRMapViewModel(service: service))
+        _market = market
+        _model = StateObject(wrappedValue: ANFRMapViewModel(service: service, market: market.wrappedValue))
     }
 
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
     private var listTitle: LocalizedStringKey {
-        model.layer == .reorientations ? "Supports réorientés" : "Supports modifiés"
+        if model.market == .ca { return "Sites modifiés" }
+        return model.layer == .reorientations ? "Supports réorientés" : "Supports modifiés"
     }
 
     var body: some View {
@@ -991,9 +1060,25 @@ struct ANFRMapView: View {
                 mapStack
             }
         }
-        .navigationTitle("Carte ANFR")
+        .navigationTitle("Carte des modifications")
         .toolbarTitleInlineCompat()
         .toolbar {
+            // Titre commun aux deux pays ; le registre publié en sous-titre.
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 0) {
+                    Text("Carte des modifications")
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text("Source : \(model.market.source)")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .allowsTightening(true)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     Haptics.light()
@@ -1008,29 +1093,39 @@ struct ANFRMapView: View {
                 } label: {
                     Image(systemName: "list.bullet")
                 }
-                .accessibilityLabel(model.layer == .reorientations ? "Liste des supports réorientés" : "Liste des supports modifiés")
+                .accessibilityLabel(model.market == .ca ? "Liste des sites modifiés"
+                                    : model.layer == .reorientations ? "Liste des supports réorientés" : "Liste des supports modifiés")
                 .accessibilityIdentifier("anfr.map.list")
-                Button {
-                    Haptics.light()
-                    if cameFromStats { dismiss() } else { showsStats = true }
-                } label: {
-                    Image(systemName: "chart.bar.xaxis")
+                // Les statistiques du Canada ne sont pas encore servies.
+                if model.market == .fr {
+                    Button {
+                        Haptics.light()
+                        if cameFromStats { dismiss() } else { showsStats = true }
+                    } label: {
+                        Image(systemName: "chart.bar.xaxis")
+                    }
+                    .accessibilityLabel("Statistiques ANFR")
+                    .accessibilityIdentifier("anfr.map.stats")
                 }
-                .accessibilityLabel("Statistiques ANFR")
-                .accessibilityIdentifier("anfr.map.stats")
             }
         }
         .navigationDestination(isPresented: $showsStats) {
             ANFRStatsView(service: services.anfr, cameFromMap: true)
         }
         .sheet(item: $selectedSite) { site in
-            ANFRSiteDetailSheet(
-                site: site, service: services.anfr,
-                snapshotDate: site.summary?.lastChangeDate ?? model.displayedDate ?? model.currentSnapshotDate,
-                reorientations: model.reorientations(supId: site.supId),
-                showsChanges: model.site(supId: site.supId) != nil
-            )
-            .id(site.supId)
+            if let changes = site.summary?.ised {
+                ISEDSiteChangesSheet(site: site, changes: changes, service: services.anfr,
+                                     isComparison: model.displayedComparison != nil)
+                    .id(site.supId)
+            } else {
+                ANFRSiteDetailSheet(
+                    site: site, service: services.anfr,
+                    snapshotDate: site.summary?.lastChangeDate ?? model.displayedDate ?? model.currentSnapshotDate,
+                    reorientations: model.reorientations(supId: site.supId),
+                    showsChanges: model.site(supId: site.supId) != nil
+                )
+                .id(site.supId)
+            }
         }
         .sheet(isPresented: $showFilters) {
             ANFRMapFilterSheet(model: model)
@@ -1065,6 +1160,12 @@ struct ANFRMapView: View {
             .presentationBackgroundCompat(SQColor.bg)
         }
         .task {
+            // Un relevé ou une zone visés par une notification sont français : la carte
+            // y revient, et l'écran recréé lit la demande.
+            if model.market != .fr, router.pendingANFRFocus != nil {
+                market = .fr
+                return
+            }
             // Une notification a pu viser un relevé ou une zone : lue une seule fois.
             let focus = router.pendingANFRFocus
             router.pendingANFRFocus = nil
@@ -1072,6 +1173,10 @@ struct ANFRMapView: View {
         }
         .onChangeCompat(of: router.pendingANFRFocus) { _, focus in
             guard let focus else { return }
+            guard model.market == .fr else {
+                market = .fr
+                return
+            }
             router.pendingANFRFocus = nil
             Task { await model.open(focus) }
         }
@@ -1203,6 +1308,16 @@ struct ANFRMapView: View {
     @ViewBuilder
     private var topBar: some View {
         VStack(spacing: SQSpace.xs) {
+            if SQFeatures.isedChangesMapEnabled {
+                MapSegmented(
+                    selection: Binding(get: { model.market }, set: { next in
+                        Haptics.light()
+                        market = next
+                    }),
+                    options: ANFRMapMarket.allCases.map { ($0, $0.label) },
+                    identifier: "anfr.map.market"
+                )
+            }
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) {
                     dateButton
@@ -1222,7 +1337,8 @@ struct ANFRMapView: View {
             }
             if model.comparison != nil {
                 comparisonBar
-            } else {
+            } else if model.market == .fr {
+                // Pas de réorientations au Canada (ISED-STATS §7).
                 layerPicker
             }
         }
@@ -1355,8 +1471,8 @@ struct ANFRMapView: View {
     private var operatorStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm - 1) {
-                ForEach(ANFROperator.allCases) { op in
-                    let on = model.operatorFilters.contains(op)
+                ForEach(model.mapOperators) { op in
+                    let on = model.operatorFilters.contains(op.key)
                     // La coche de l'état actif double la couleur : l'état ne repose pas sur elle seule.
                     SQChip(
                         label: op.label, isSelected: on, selectedSystemImage: "checkmark", dot: op.color, selectedFill: op.color,
@@ -1364,7 +1480,7 @@ struct ANFRMapView: View {
                         spokenLabel: "Filtre \(op.label)",
                         spokenValue: on ? "activé" : "désactivé"
                     ) {
-                        withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op) }
+                        withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op.key) }
                     }
                 }
             }
@@ -1495,10 +1611,10 @@ struct ANFRMapView: View {
                 }
             } else {
                 ANFRFlowLayout(spacing: SQSpace.sm) {
-                    ForEach(ANFRModType.allCases) { type in
+                    ForEach(model.market.modTypes) { type in
                         HStack(spacing: SQSpace.xs) {
-                            legendGlyph(type.glyph, color: type.color)
-                            Text(type.label)
+                            legendGlyph(type.glyph(in: model.market), color: type.color)
+                            Text(type.label(in: model.market))
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.label)
                         }
@@ -1754,6 +1870,8 @@ struct ANFRSiteListView: View {
             Group {
                 if layer == .reorientations {
                     Text("Supports réorientés : \(rows.count.formatted())")
+                } else if sites.first?.market == .ca {
+                    Text("Sites modifiés : \(rows.count.formatted())")
                 } else {
                     Text("Supports modifiés : \(rows.count.formatted())")
                 }
@@ -1823,7 +1941,7 @@ struct ANFRSiteListView: View {
             onSelect(row.site)
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : row.modType.glyph)
+                Image(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : row.modType.glyph(in: row.site.market))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(SQColor.onAccent)
                     .frame(width: 22, height: 22)
@@ -1893,7 +2011,7 @@ struct ANFRMapFilterSheet: View {
                 ANFRSheetHeader(title: "Filtres") { dismiss() }
 
                 section(title: "Opérateurs") {
-                    FlexibleChips(ANFROperator.allCases) { op in
+                    FlexibleChips(model.mapOperators) { op in
                         operatorChip(op)
                     }
                 }
@@ -1905,7 +2023,7 @@ struct ANFRMapFilterSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                 section(title: "Type de modification") {
-                    FlexibleChips(ANFRModType.allCases) { type in
+                    FlexibleChips(model.market.modTypes) { type in
                         modTypeChip(type)
                     }
                     // Légende de la carte : le symbole des puces est celui du repère.
@@ -1921,7 +2039,10 @@ struct ANFRMapFilterSheet: View {
                     }
                 }
 
-                if model.displaysLite {
+                // Le Canada n'a ni génération par antenne ni rattrapage (ISED-STATS §8).
+                if model.market == .ca {
+                    EmptyView()
+                } else if model.displaysLite {
                     section(title: "Génération") {
                         Text("Ce relevé ne détaille pas les antennes : il ne se filtre pas par génération. La fiche d’un support donne ses antennes.")
                             .font(SQType.caption)
@@ -1942,6 +2063,7 @@ struct ANFRMapFilterSheet: View {
                 }
                 }
 
+                if model.market == .fr {
                 section(title: "Rattrapages") {
                     Toggle(isOn: $model.hidesCatchUp) {
                         Text("Masquer les rattrapages")
@@ -1960,6 +2082,7 @@ struct ANFRMapFilterSheet: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
                 }
                 }
 
@@ -1984,27 +2107,28 @@ struct ANFRMapFilterSheet: View {
     }
 
     /// Puce d'opérateur avec le nombre de supports concernés une fois le relevé chargé.
-    private func operatorChip(_ op: ANFROperator) -> some View {
+    private func operatorChip(_ op: ANFRStatsOperator) -> some View {
         let label = model.hasLoadedSnapshot
-            ? "\(op.label) · \((model.operatorCounts[op] ?? 0).formatted(.number.grouping(.automatic)))"
+            ? "\(op.label) · \((model.operatorCounts[op.key] ?? 0).formatted(.number.grouping(.automatic)))"
             : op.label
         return SQChip(
-            label: label, isSelected: model.operatorFilters.contains(op), selectedSystemImage: "checkmark",
+            label: label, isSelected: model.operatorFilters.contains(op.key), selectedSystemImage: "checkmark",
             dot: op.color, selectedFill: op.color,
             selectedInk: SQBrand.operatorBadgeForeground(for: op.color, colorScheme: colorScheme)
         ) {
-            model.toggleOperator(op)
+            model.toggleOperator(op.key)
         }
     }
 
     /// Puce d'un type de modification : le symbole du repère sur la carte et, une
     /// fois le relevé chargé, le nombre de supports concernés.
     private func modTypeChip(_ type: ANFRModType) -> some View {
+        let name = type.label(in: model.market)
         let label = model.hasLoadedSnapshot
-            ? "\(type.label) · \((model.modTypeCounts[type] ?? 0).formatted(.number.grouping(.automatic)))"
-            : type.label
+            ? "\(name) · \((model.modTypeCounts[type] ?? 0).formatted(.number.grouping(.automatic)))"
+            : name
         return SQChip(
-            label: label, systemImage: type.glyph, isSelected: model.selectedModTypes.contains(type),
+            label: label, systemImage: type.glyph(in: model.market), isSelected: model.selectedModTypes.contains(type),
             selectedFill: type.color,
             selectedInk: SQBrand.operatorBadgeForeground(for: type.color, colorScheme: colorScheme)
         ) {
@@ -2031,10 +2155,12 @@ struct ANFRDatePickerSheet: View {
                 // avec ombre, n'ont pas à être tous construits à l'ouverture.
                 LazyVStack(alignment: .leading, spacing: SQSpace.md) {
                     ANFRSheetHeader(title: "Choisir une date") { dismiss() }
-                    Text("Relevé ANFR")
+                    (model.market == .ca ? Text("Relevé ISED") : Text("Relevé ANFR"))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                    Text("L’ANFR publie un relevé à peu près chaque semaine. La carte montre ce qui a changé depuis le relevé précédent : nouveaux supports, antennes mises en service, ajoutées ou retirées.")
+                    (model.market == .ca
+                        ? Text("ISED publie un extrait à peu près chaque mois. La carte montre ce qui a changé depuis l’extrait précédent : nouveaux sites, émetteurs ajoutés, retirés ou modifiés.")
+                        : Text("L’ANFR publie un relevé à peu près chaque semaine. La carte montre ce qui a changé depuis le relevé précédent : nouveaux supports, antennes mises en service, ajoutées ou retirées."))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2292,13 +2418,13 @@ final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
     /// amas (quelques centaines), alors qu'un relevé en crée jusqu'à plusieurs milliers.
     lazy var style = ANFRMarkerStyle(site: site)
     var coordinate: CLLocationCoordinate2D { site.coordinate }
-    var title: String? { site.city.isEmpty ? String(localized: "Support \(site.supId)") : ANFRText.city(site.city) }
+    var title: String? { site.displayName }
     /// Lu par VoiceOver : sans lui un repère ne disait que sa commune, pas ce qui a changé.
     var subtitle: String? {
-        let operators = style.operators.isEmpty
+        let operators = style.mapOperators.isEmpty
             ? String(localized: "Autre opérateur")
-            : style.operators.map(\.label).joined(separator: ", ")
-        return "\(operators) · \(style.modType.label)"
+            : style.mapOperators.map(\.label).joined(separator: ", ")
+        return "\(operators) · \(style.modType.label(in: style.market))"
     }
     init(site: ANFRMapSite) {
         self.site = site
@@ -2464,7 +2590,7 @@ struct ANFRMapKitView: UIViewRepresentable {
         private var drainTask: Task<Void, Never>?
         /// Couleur du repère et encre du symbole, par opérateur : leur résolution
         /// analyse le nom de l'opérateur, trop pour chaque repère affiché.
-        private var paints: [ANFROperator: (tint: UIColor, ink: UIColor)] = [:]
+        private var paints: [String: (tint: UIColor, ink: UIColor)] = [:]
         private var layer: ANFRMapLayer = .changes
 
         init(onSelectSite: @escaping (ANFRMapSite) -> Void, onSelectCluster: @escaping ([ANFRMapSite]) -> Void) {
@@ -2513,6 +2639,12 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 41.3, longitude: 9.7))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
                 // Marges : barres du haut, bandeau et légende du bas.
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 150, left: 12, bottom: 240, right: 12), animated: animated)
+            case .canada:
+                // La bande habitée, de Vancouver à Halifax : en portrait, la largeur décide du zoom.
+                let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 56, longitude: -128))
+                let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 42, longitude: -58))
+                let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
                 map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 150, left: 12, bottom: 240, right: 12), animated: animated)
             case .region(let center, let radius):
                 map.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: radius * 2.6, longitudinalMeters: radius * 2.6), animated: animated)
@@ -2621,12 +2753,12 @@ struct ANFRMapKitView: UIViewRepresentable {
                 && zip(a.antennas, b.antennas).allSatisfy { $0.id == $1.id && $0.modTypeRaw == $1.modTypeRaw }
         }
 
-        private func paint(for op: ANFROperator?) -> (tint: UIColor, ink: UIColor) {
+        private func paint(for op: ANFRStatsOperator?) -> (tint: UIColor, ink: UIColor) {
             // Opérateur non suivi : gris neutre, jamais la teinte d'un opérateur.
             guard let op else { return (tint: .systemGray, ink: .white) }
-            if let cached = paints[op] { return cached }
+            if let cached = paints[op.key] { return cached }
             let made = (tint: UIColor(op.color), ink: UIColor(SQBrand.operatorBadgeForeground(op.label)))
-            paints[op] = made
+            paints[op.key] = made
             return made
         }
 
@@ -2646,11 +2778,11 @@ struct ANFRMapKitView: UIViewRepresentable {
             guard let site = annotation as? ANFRSiteAnnotationMK else { return nil }
             let v = map.dequeueReusableAnnotationView(withIdentifier: "anfr-site", for: annotation) as? MKMarkerAnnotationView
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "anfr-site")
-            let colors = paint(for: site.style.dominantOperator)
+            let colors = paint(for: site.style.dominantMapOperator)
             v.markerTintColor = colors.tint
             // Orange et Bouygues demandent un symbole noir : le blanc par défaut n'y tient pas le contraste.
             v.glyphTintColor = colors.ink
-            v.glyphImage = UIImage(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : site.style.modType.glyph)
+            v.glyphImage = UIImage(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : site.style.modType.glyph(in: site.style.market))
             v.clusteringIdentifier = "anfr"
             v.displayPriority = .defaultLow
             v.canShowCallout = false

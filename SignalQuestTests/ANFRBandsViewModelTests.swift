@@ -385,12 +385,12 @@ final class ANFRMapViewModelTests: XCTestCase {
         XCTAssertEqual(model.modTypeCounts[.activated], 2)
         XCTAssertEqual(model.modTypeCounts[.deleted], 1)
         XCTAssertEqual(model.modTypeCounts[.added], 1)
-        XCTAssertEqual(model.operatorCounts[.orange], 2)
-        XCTAssertEqual(model.operatorCounts[.free], 2)
-        XCTAssertEqual(model.operatorCounts[.sfr], 1)
-        XCTAssertNil(model.operatorCounts[.bouygues])
+        XCTAssertEqual(model.operatorCounts[ANFROperator.orange.apiKey], 2)
+        XCTAssertEqual(model.operatorCounts[ANFROperator.free.apiKey], 2)
+        XCTAssertEqual(model.operatorCounts[ANFROperator.sfr.apiKey], 1)
+        XCTAssertNil(model.operatorCounts[ANFROperator.bouygues.apiKey])
 
-        model.operatorFilters = [.free]
+        model.operatorFilters = [ANFROperator.free.apiKey]
         await settle()
         // Le repère ne garde que les antennes de Free ; l'opérateur non suivi est écarté avec le filtre.
         XCTAssertEqual(model.filteredSites.map(\.supId).sorted(), ["2", "3"])
@@ -770,9 +770,9 @@ extension ANFRMapViewModelTests {
         XCTAssertEqual(Set(model.filteredSites.map(\.supId)), ["2", "77"])
         XCTAssertEqual(model.reorientations(supId: "2").count, 2)
         XCTAssertEqual(model.weekBars.map(\.total), [4, 2], "les barres comptent les supports réorientés")
-        XCTAssertEqual(model.operatorCounts[.orange], 1)
+        XCTAssertEqual(model.operatorCounts[ANFROperator.orange.apiKey], 1)
 
-        model.toggleOperator(.sfr)
+        model.toggleOperator(ANFROperator.sfr.apiKey)
         await settle()
         XCTAssertEqual(model.filteredSites.map(\.supId), ["2"])
         XCTAssertEqual(model.activeFilterCount, 1)
@@ -969,8 +969,8 @@ extension ANFRMapViewModelTests {
         XCTAssertEqual(model.weekBars.filter(\.inComparison).map(\.date), ["2026-10-08", nil])
         XCTAssertNotEqual(fullCount, 0)
 
-        model.toggleOperator(.sfr)
-        model.toggleOperator(.bouygues)
+        model.toggleOperator(ANFROperator.sfr.apiKey)
+        model.toggleOperator(ANFROperator.bouygues.apiKey)
         await settle()
         XCTAssertEqual(model.filteredSites.map(\.supId), ["A"], "un opérateur non suivi disparaît dès qu'un opérateur est écarté")
         XCTAssertEqual(model.modTypeCounts[.new], 1)

@@ -553,7 +553,7 @@ struct ANFRStatsView: View {
                 .accessibilityIdentifier("anfr.stats.changes")
         } else {
             NavigationLink {
-                ANFRMapView(service: service, cameFromStats: true)
+                ANFRMapView(service: service, cameFromStats: true, market: .fr)
             } label: { changesMapRow }
                 .buttonStyle(SQPressButtonStyle(scale: 0.98))
                 .accessibilityIdentifier("anfr.stats.changes")

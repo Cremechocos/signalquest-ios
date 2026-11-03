@@ -91,6 +91,63 @@ enum ANFRStatsMarket: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Pays de la carte des modifications : la France (ANFR, relevé hebdomadaire) ou
+/// le Canada (ISED, extrait mensuel lu en comparaisons, contrat ISED-STATS v1).
+enum ANFRMapMarket: String, CaseIterable, Identifiable, Sendable {
+    case fr = "FR"
+    case ca = "CA"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .fr: return String(localized: "France")
+        case .ca: return String(localized: "Canada")
+        }
+    }
+
+    /// Le registre publié, en sous-titre de la carte.
+    var source: String {
+        switch self {
+        case .fr: return "ANFR"
+        case .ca: return "ISED"
+        }
+    }
+
+    /// Types publiés : ISED ne dit aucune mise en service (contrat ISED-STATS §8).
+    var modTypes: [ANFRModType] {
+        switch self {
+        case .fr: return ANFRModType.allCases
+        case .ca: return ANFRModType.allCases.filter { $0 != .activated }
+        }
+    }
+
+    /// Opérateurs de la carte, dans l'ordre des filtres. Les clés canadiennes sont
+    /// celles de `CanadaOperatorKey` ; le serveur peut en préciser libellés et couleurs.
+    var operators: [ANFRStatsOperator] {
+        switch self {
+        case .fr: return ANFRStatsOperator.france
+        case .ca: return ANFRStatsOperator.canada
+        }
+    }
+
+    /// Une réponse d'un autre pays que celui demandé est refusée ; la France
+    /// historique ne renvoie pas toujours son marché.
+    func accepts(served: String?) -> Bool {
+        switch self {
+        case .fr: return served == nil || served == rawValue
+        case .ca: return served == rawValue
+        }
+    }
+
+    /// Le pays d'ouverture : le Canada pour un membre dont « Mon pays » est le Canada.
+    static var initial: ANFRMapMarket {
+        guard SQFeatures.isedChangesMapEnabled,
+              MapMarketStore.accountDefaultMarket()?.uppercased() == ANFRMapMarket.ca.rawValue else { return .fr }
+        return .ca
+    }
+}
+
 /// Opérateur d'un écran de statistiques : les quatre de la métropole, ou ceux
 /// que le serveur sert en outre-mer, avec leurs libellés et couleurs.
 struct ANFRStatsOperator: Identifiable, Hashable, Sendable {
@@ -115,6 +172,30 @@ struct ANFRStatsOperator: Identifiable, Hashable, Sendable {
     }
 
     static let france = ANFROperator.allCases.map(ANFRStatsOperator.init)
+
+    /// Les cinq clés canadiennes ; `REGIONAL` regroupe les autres titulaires.
+    static let canada: [ANFRStatsOperator] = [
+        ANFRStatsOperator(key: "BELL", label: "Bell", color: Color(hex: 0x0F5BDC)),
+        ANFRStatsOperator(key: "ROGERS", label: "Rogers", color: Color(hex: 0xD62D20)),
+        ANFRStatsOperator(key: "TELUS", label: "TELUS", color: Color(hex: 0x00A67E)),
+        ANFRStatsOperator(key: "VIDEOTRON_FREEDOM", label: "Vidéotron/Freedom", color: Color(hex: 0x7A3DF0)),
+        ANFRStatsOperator(key: "REGIONAL", label: String(localized: "Autres"), color: Color(hex: 0xD97706))
+    ]
+}
+
+/// `{ key, label, color }` servi par le serveur : `REGIONAL` et `DROM_OTHER` sont
+/// dits « Autres » dans la langue de l'app.
+struct ANFRServedOperator: Decodable, Sendable {
+    let key: String
+    let label: String?
+    let color: String?
+
+    var statsOperator: ANFRStatsOperator? {
+        guard !key.isEmpty else { return nil }
+        let name = key == "DROM_OTHER" || key == "REGIONAL" ? String(localized: "Autres") : (label ?? key)
+        let rgb = color.flatMap { UInt32($0.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) }
+        return ANFRStatsOperator(key: key, label: name, color: rgb.map { Color(hex: $0) } ?? SQColor.labelSecondary)
+    }
 }
 
 // MARK: - Modification type
@@ -140,6 +221,23 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         case .added: return String(localized: "Antenne ajoutée")
         case .modified: return String(localized: "Repassée en projet")
         }
+    }
+
+    /// Libellé dans un pays : au Canada, « modifié » est un changement de porteuses
+    /// ou d'azimuts, jamais un retour en projet, et il n'y a pas de mise en service.
+    func label(in market: ANFRMapMarket) -> String {
+        guard market == .ca else { return label }
+        switch self {
+        case .new: return String(localized: "Nouveau site")
+        case .added: return String(localized: "Émetteur ajouté")
+        case .deleted: return String(localized: "Émetteur retiré")
+        case .modified: return String(localized: "Émetteur modifié")
+        case .activated: return label
+        }
+    }
+
+    func glyph(in market: ANFRMapMarket) -> String {
+        market == .ca && self == .modified ? "slider.horizontal.3" : glyph
     }
 
     var glyph: String {
@@ -495,11 +593,18 @@ struct ANFRMapDiff: Decodable, Sendable {
     let siteCount: Int
     let antennaCount: Int
     let sites: [ANFRMapSite]
+    /// Marché annoncé (`meta.market`) : absent en France, `CA` au Canada.
+    var market: String? = nil
+    /// Opérateurs servis (Canada) : clés de marché avec libellés et couleurs.
+    var operators: [ANFRStatsOperator] = []
 
-    enum CodingKeys: String, CodingKey { case from, to, weeks, siteCount, antennaCount, sites }
+    enum CodingKeys: String, CodingKey { case from, to, weeks, siteCount, antennaCount, sites, meta, operators }
+    private enum MetaKeys: String, CodingKey { case market }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        market = (try? c.nestedContainer(keyedBy: MetaKeys.self, forKey: .meta))?.optional(String.self, .market)
+        operators = c.value([ANFRServedOperator].self, .operators, []).compactMap(\.statsOperator)
         from = c.value(String.self, .from, "")
         to = c.value(String.self, .to, "")
         weeks = c.value([String].self, .weeks, [])
@@ -534,6 +639,10 @@ struct ANFRSiteChangeSummary: Equatable, Sendable {
     let catchUp: Int
     /// Dans une comparaison, le relevé de son dernier changement.
     let lastChangeDate: String?
+    /// Opérateurs tels que servis : libellés ANFR bruts en France, clés de marché au Canada.
+    var rawOperators: [String] = []
+    /// Détail d'un site canadien (ISED-STATS §10) : absent en France.
+    var ised: ISEDSiteChanges? = nil
 
     var total: Int { counts.values.reduce(0, +) }
 
@@ -559,6 +668,7 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case info, antennas
         case supId, lat, lon, city, operators, changes, catchUp, lastChangeDate
+        case siteKeys, province, holderName, items
     }
     private enum InfoKeys: String, CodingKey {
         case sup_id, lat, lon, city
@@ -590,7 +700,14 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
                 hasOtherOperator: rawOperators.contains { ANFROperator.from(raw: $0) == nil },
                 counts: counts,
                 catchUp: max(c.value(Int.self, .catchUp, 0), 0),
-                lastChangeDate: c.optional(String.self, .lastChangeDate)
+                lastChangeDate: c.optional(String.self, .lastChangeDate),
+                rawOperators: rawOperators,
+                ised: c.contains(.items) ? ISEDSiteChanges(
+                    siteKeys: c.value([String].self, .siteKeys, []),
+                    province: c.optional(String.self, .province),
+                    holderName: c.optional(String.self, .holderName),
+                    items: c.value([ISEDChangeItem].self, .items, [])
+                ) : nil
             )
             return
         }
@@ -632,6 +749,29 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    /// Pays du support : un site canadien porte son détail ISED.
+    var market: ANFRMapMarket { summary?.ised != nil ? .ca : .fr }
+
+    /// Nom affiché : la commune ANFR remise en casse, ou le nom de site ISED tel que
+    /// publié (une adresse, un quartier), sans le « #N/A » d'ISED.
+    var displayName: String {
+        guard market == .ca else {
+            return city.isEmpty ? String(localized: "Support \(supId)") : ANFRText.city(city)
+        }
+        let name = city.trimmingCharacters(in: .whitespaces)
+        guard name.isEmpty || name == "#N/A" else { return name }
+        if let province = summary?.ised?.province, !province.isEmpty { return String(localized: "Site ISED, \(province)") }
+        return String(localized: "Site ISED")
+    }
+
+    /// Opérateurs du support dans son pays (liste, repère) : au Canada, les clés servies.
+    var mapOperators: [ANFRStatsOperator] {
+        guard market == .ca, let keys = summary?.rawOperators else { return operators.map(ANFRStatsOperator.init) }
+        return keys.map { key in
+            ANFRStatsOperator.canada.first { $0.key == key } ?? ANFRStatsOperator(key: key, label: key, color: SQColor.labelSecondary)
+        }
     }
 
     // MARK: Derived — porté d'Android (AnfrMarkerStyleResolver / AnfrSite)
@@ -832,14 +972,24 @@ struct ANFRMarkerStyle: Equatable {
     /// Vide quand le site n'a que des antennes d'un autre opérateur que les quatre suivis.
     let operators: [ANFROperator]
     let dominantOperator: ANFROperator?
+    /// Les mêmes dans le pays du support : clés canadiennes au Canada.
+    let mapOperators: [ANFRStatsOperator]
+    let market: ANFRMapMarket
     let modType: ANFRModType
     let generation: ANFRGeneration?
 
     var isMultiOperator: Bool { operators.count > 1 }
 
+    /// L'opérateur qui colore le repère.
+    var dominantMapOperator: ANFRStatsOperator? {
+        market == .ca ? mapOperators.first : dominantOperator.map(ANFRStatsOperator.init)
+    }
+
     init(site: ANFRMapSite) {
         operators = site.operators
         dominantOperator = site.dominantOperator
+        mapOperators = site.mapOperators
+        market = site.market
         modType = site.dominantModType
         generation = site.highestGeneration
     }
@@ -858,6 +1008,100 @@ extension ANFRSiteHistoryChange {
 extension ANFRSiteHistoryEntry {
     var operatorEnums: [ANFROperator] { operators.compactMap { ANFROperator.from(raw: $0) } }
     var modTypeEnums: [ANFRModType] { modTypes.map { ANFRModType.from(raw: $0) } }
+}
+
+// MARK: - Canada (ISED-STATS v1, §10)
+
+/// Ce qu'un site canadien de la carte des modifications dit de plus qu'un support ANFR.
+struct ISEDSiteChanges: Equatable, Sendable {
+    /// Lignes de licence du site physique ; `supId` est la plus petite.
+    let siteKeys: [String]
+    /// Code de la province (« QC », « ON »…).
+    let province: String?
+    /// Titulaire brut, seulement pour les autres titulaires (`REGIONAL`).
+    let holderName: String?
+    let items: [ISEDChangeItem]
+}
+
+/// Un émetteur changé : site physique + technologie + famille de bande.
+struct ISEDChangeItem: Decodable, Equatable, Sendable {
+    let type: ANFRModType
+    let technology: String
+    let band: String
+    let operatorKey: String
+    /// Pour un émetteur modifié : `carriers` ou `azimuths`.
+    let what: String?
+    /// Ligne de licence qui porte l'émetteur au relevé `to` ; `nil` s'il a été retiré.
+    let siteKey: String?
+
+    private enum CodingKeys: String, CodingKey { case type, technology, band, what, siteKey, `operator` }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = ANFRModType.from(raw: c.optional(String.self, .type))
+        technology = c.value(String.self, .technology, "")
+        band = c.value(String.self, .band, "")
+        operatorKey = c.value(String.self, .operator, "")
+        what = c.optional(String.self, .what)
+        siteKey = c.optional(String.self, .siteKey).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    init(type: ANFRModType, technology: String, band: String, operatorKey: String, what: String? = nil, siteKey: String? = nil) {
+        self.type = type
+        self.technology = technology
+        self.band = band
+        self.operatorKey = operatorKey
+        self.what = what
+        self.siteKey = siteKey
+    }
+
+    /// « 5G AWS », « 4G 1900 MHz » : la famille AWS n'a pas d'unité.
+    var title: String {
+        let band = Int(band) != nil ? "\(band) MHz" : band
+        return [technology, band].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// Ce qui a changé sur un émetteur modifié.
+    var whatLabel: String? {
+        switch what {
+        case "carriers": return String(localized: "Fréquences modifiées")
+        case "azimuths": return String(localized: "Azimuts modifiés")
+        default: return nil
+        }
+    }
+}
+
+/// Une ligne de licence ISED (`GET /api/ised/sites/{recordId}`).
+struct ISEDSiteRecord: Decodable, Sendable {
+    struct Frequency: Decodable, Sendable, Hashable {
+        let centerFrequencyMhz: Double?
+        let bandwidthMhz: Double?
+        let technology: String?
+        let bandLabel: String?
+    }
+
+    let recordId: String
+    let licenceeName: String?
+    let authorisationNumber: String?
+    let frequencies: [Frequency]
+    let antennaStructureHeightM: Double?
+    let transmitPowerDbm: Double?
+
+    private enum RootKeys: String, CodingKey { case site }
+    private enum SiteKeys: String, CodingKey {
+        case recordId, licenceeName, authorisationNumber, frequencyAssignments, antennaStructureHeightM, transmitPowerDbm
+    }
+
+    init(from decoder: Decoder) throws {
+        let root = try decoder.container(keyedBy: RootKeys.self)
+        let c = try root.nestedContainer(keyedBy: SiteKeys.self, forKey: .site)
+        recordId = c.value(String.self, .recordId, "")
+        licenceeName = c.optional(String.self, .licenceeName)
+        authorisationNumber = c.optional(String.self, .authorisationNumber)
+        frequencies = c.value([Frequency].self, .frequencyAssignments, [])
+        antennaStructureHeightM = c.optional(Double.self, .antennaStructureHeightM)
+        transmitPowerDbm = c.optional(Double.self, .transmitPowerDbm)
+    }
 }
 
 // MARK: - Semaines (GET /api/anfr/archives?weeks=N)
@@ -931,12 +1175,16 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
 /// Réponse de `/api/anfr/archives?weeks=N` : seule la clé `weeks` nous sert.
 struct ANFRArchiveWeeks: Decodable, Sendable {
     let weeks: [ANFRWeekSummary]
+    /// Marché annoncé (`meta.market`) : absent en France.
+    var market: String? = nil
 
-    private enum CodingKeys: String, CodingKey { case weeks }
+    private enum CodingKeys: String, CodingKey { case weeks, meta }
+    private enum MetaKeys: String, CodingKey { case market }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         weeks = c.value([ANFRWeekSummary].self, .weeks, []).filter { !$0.date.isEmpty }
+        market = (try? c.nestedContainer(keyedBy: MetaKeys.self, forKey: .meta))?.optional(String.self, .market)
     }
 
     init(weeks: [ANFRWeekSummary]) { self.weeks = weeks }

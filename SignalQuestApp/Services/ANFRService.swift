@@ -121,13 +121,18 @@ struct ANFRSiteHistoryChange: Decodable, Sendable, Identifiable {
 struct ANFRArchiveDates: Decodable, Sendable {
     let dates: [String]
     let current: String?
+    /// Marché annoncé (`meta.market`) : absent en France.
+    var market: String? = nil
 
-    enum CodingKeys: String, CodingKey { case dates, current }
+    enum CodingKeys: String, CodingKey { case dates, current, meta }
+    private enum MetaKeys: String, CodingKey { case market }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         dates = (try? c.decodeIfPresent([String].self, forKey: .dates)) ?? []
         current = (try? c.decodeIfPresent(String.self, forKey: .current)) ?? nil
+        market = (try? c.nestedContainer(keyedBy: MetaKeys.self, forKey: .meta))
+            .flatMap { try? $0.decodeIfPresent(String.self, forKey: .market) }
     }
 
     init(dates: [String], current: String?) {
@@ -162,6 +167,12 @@ protocol ANFRServicing: Sendable {
     func archiveDates() async throws -> ANFRArchiveDates
     /// Les `count` dernières semaines avec leurs compteurs par type (barres de la carte).
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary]
+    /// Les mêmes pour un pays de la carte : `market=CA` au Canada (ISED-STATS v1).
+    func mapDiff(from: String, to: String?, market: ANFRMapMarket) async throws -> ANFRMapDiff
+    func archiveDates(market: ANFRMapMarket) async throws -> ANFRArchiveDates
+    func archiveWeeks(count: Int, market: ANFRMapMarket) async throws -> [ANFRWeekSummary]
+    /// Une ligne de licence ISED, par sa `site_key` ou son `recordId`.
+    func isedSite(recordId: String) async throws -> ISEDSiteRecord
     /// Supports réorientés au relevé `date` (le dernier si `nil`) ; `nil` quand
     /// aucune réorientation n'est connue pour cette semaine.
     func reorientations(date: String?) async throws -> ANFRReorientationsWeek?
@@ -188,6 +199,26 @@ extension ANFRServicing {
 
     /// Les services qui n'affichent pas de barres n'ont rien à fournir.
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] { [] }
+
+    /// Les services sans Canada ne servent que la France.
+    func mapDiff(from: String, to: String?, market: ANFRMapMarket) async throws -> ANFRMapDiff {
+        guard market == .fr else { throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil) }
+        return try await mapDiff(from: from, to: to)
+    }
+
+    func archiveDates(market: ANFRMapMarket) async throws -> ANFRArchiveDates {
+        guard market == .fr else { throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil) }
+        return try await archiveDates()
+    }
+
+    func archiveWeeks(count: Int, market: ANFRMapMarket) async throws -> [ANFRWeekSummary] {
+        guard market == .fr else { return [] }
+        return try await archiveWeeks(count: count)
+    }
+
+    func isedSite(recordId: String) async throws -> ISEDSiteRecord {
+        throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+    }
 
     /// Les services sans couche des réorientations n'en connaissent aucune.
     func reorientations(date: String?) async throws -> ANFRReorientationsWeek? { nil }
@@ -324,6 +355,56 @@ final class ANFRService: ANFRServicing {
         }
         if let key { diskCache.write(data, key: key) }
         return diff
+    }
+
+    /// Canada : même règle de cache, sous une clé à part ; une réponse qui ne dit
+    /// pas son marché est refusée (ISED-STATS §7).
+    func mapDiff(from: String, to: String?, market: ANFRMapMarket) async throws -> ANFRMapDiff {
+        guard market == .ca else { return try await mapDiff(from: from, to: to) }
+        let key = to.map { "ca-diff-\(from)-\($0)" }
+        if let key, let cached = diskCache.read(key: key),
+           let diff = try? JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: cached), market.accepts(served: diff.market) {
+            return diff
+        }
+        let data = try await api.requestData(APIEndpoint(path: "/api/anfr/map-diff", query: [
+            URLQueryItem(name: "market", value: market.rawValue),
+            URLQueryItem(name: "from", value: from),
+            URLQueryItem(name: "to", value: to ?? "current")
+        ]))
+        guard let diff = try? JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: data),
+              market.accepts(served: diff.market) else {
+            throw APIError.decoding("map-diff")
+        }
+        if let key { diskCache.write(data, key: key) }
+        return diff
+    }
+
+    func archiveDates(market: ANFRMapMarket) async throws -> ANFRArchiveDates {
+        guard market == .ca else { return try await archiveDates() }
+        let dates = try await api.request(
+            APIEndpoint(path: "/api/anfr/archives", query: [URLQueryItem(name: "market", value: market.rawValue)]),
+            as: ANFRArchiveDates.self
+        )
+        guard market.accepts(served: dates.market) else { throw APIError.decoding("archives") }
+        return dates
+    }
+
+    func archiveWeeks(count: Int, market: ANFRMapMarket) async throws -> [ANFRWeekSummary] {
+        guard market == .ca else { return try await archiveWeeks(count: count) }
+        let weeks = try await api.request(
+            APIEndpoint(path: "/api/anfr/archives", query: [
+                URLQueryItem(name: "market", value: market.rawValue),
+                URLQueryItem(name: "weeks", value: String(min(max(count, 1), 26)))
+            ]),
+            as: ANFRArchiveWeeks.self
+        )
+        guard market.accepts(served: weeks.market) else { throw APIError.decoding("archives") }
+        return weeks.weeks
+    }
+
+    func isedSite(recordId: String) async throws -> ISEDSiteRecord {
+        let encoded = recordId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? recordId
+        return try await api.request(APIEndpoint(path: "/api/ised/sites/\(encoded)"), as: ISEDSiteRecord.self)
     }
 
     private static let currentKey = "current"
