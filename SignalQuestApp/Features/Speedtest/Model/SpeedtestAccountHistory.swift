@@ -28,13 +28,15 @@ extension SpeedtestAccountHistory {
     /// Détail serveur d'un test du compte, mis à la forme d'un test local pour
     /// réutiliser la même fiche. Les ordres de repli sont ceux de la carte : la
     /// moyenne d'abord, puis le débit brut, qu'Android remplit avec le pic.
-    static func runResult(from detail: SpeedtestDetail) -> SpeedtestRunResult {
+    /// `includesPrivateDetails` faux pour le test d'un autre membre : ni adresse,
+    /// ni position, ni modèle d'appareil (revue q34, constat 2).
+    static func runResult(from detail: SpeedtestDetail, includesPrivateDetails: Bool = true) -> SpeedtestRunResult {
         let download = detail.averageSpeed ?? detail.downloadAvg ?? detail.downloadSpeed ?? 0
         let upload = detail.uploadAvg ?? detail.uploadSpeed
         let technology = cellularTechnology(detail.networkType)
-        let coordinate = detail.latitude.flatMap { lat in
+        let coordinate = includesPrivateDetails ? detail.latitude.flatMap { lat in
             detail.longitude.map { Coordinates(latitude: lat, longitude: $0) }
-        }
+        } : nil
         return SpeedtestRunResult(
             id: UUID(uuidString: detail.id) ?? UUID(),
             label: detail.id,
@@ -65,14 +67,14 @@ extension SpeedtestAccountHistory {
             networkOperatorName: detail.mobileOperator,
             networkOperatorMcc: detail.mcc,
             networkOperatorMnc: detail.mnc,
-            address: detail.address,
+            address: includesPrivateDetails ? detail.address : nil,
             coordinate: coordinate,
             serverName: detail.server,
             downloadServerName: detail.downloadServerName,
             downloadServerId: detail.downloadServerId,
             createdAt: detail.timestamp ?? detail.createdAt ?? Date(),
             uploadMeasurementSource: detail.uploadMeasurementSource,
-            deviceModel: detail.deviceModel,
+            deviceModel: includesPrivateDetails ? detail.deviceModel : nil,
             measurementTrace: detail.measurementTrace,
             methodologyVersion: detail.methodologyVersion,
             pingServerHost: detail.pingServerHost,

@@ -106,7 +106,14 @@ struct SignalDetailSheet: View {
                 media
                 photoSiteLink
                 if isSpeedtest {
-                    FeedMeasureBlock(signal: signal)
+                    // La fiche unique du test, comme depuis l'historique (revue q34, lot C) ;
+                    // le bloc du fil tant qu'elle n'est pas chargée ou si le détail est caché.
+                    if let speedtestResult {
+                        SpeedtestDetailContent(result: speedtestResult)
+                            .padding(.horizontal, -SQSpace.lg)
+                    } else {
+                        FeedMeasureBlock(signal: signal)
+                    }
                 }
                 if let experience {
                     experienceSummary(experience)
@@ -131,7 +138,7 @@ struct SignalDetailSheet: View {
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
-        .task(id: item.sourceId) { await loadSpeedtestDetailIfNeeded() }
+        .task(id: speedtestId) { await loadSpeedtestDetailIfNeeded() }
         .task(id: experience?.testId) { await loadExperienceDetailIfNeeded() }
         .task(id: item.id) { await loadFirstCommentIfNeeded() }
         .presentationDetents([.medium, .large])
@@ -453,6 +460,8 @@ struct SignalDetailSheet: View {
     }
 
     private var detailPairs: [(String, String)] {
+        // La fiche du test dit déjà tout ce qu'il y a à savoir sur la mesure.
+        guard speedtestResult == nil else { return [] }
         var pairs: [(String, String)] = []
         if let signal {
             pairs += metricPairs(for: signal)
@@ -467,7 +476,6 @@ struct SignalDetailSheet: View {
         pairs += outagePairs
         pairs += photoPairs
         pairs += questPairs
-        pairs += speedtestPairs
         pairs += experiencePairs
         pairs.append(("Lieu", place ?? ""))
         // Une clé n'apparaît qu'une fois : le détail serveur et le résumé du
@@ -628,21 +636,19 @@ struct SignalDetailSheet: View {
         ]
     }
 
-    private var speedtestPairs: [(String, String)] {
-        guard let detail = speedtestDetail else { return [] }
-        let uploadSource = SpeedtestDetailContent.resultByteSource(
-            detail.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: detail.uploadMeasurementSource)
-        return [
-            ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
-            ("Appareil", item.canManage ? [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ") : ""),
-            ("Durée", SignalFormatters.duration(detail.testDuration)),
-            ("Latence moyenne", SignalFormatters.ms(detail.pingAvg)),
-            ("Latence médiane", SignalFormatters.ms(detail.pingMedian)),
-            ("Latence max", SignalFormatters.ms(detail.pingMax)),
-            ("Octets envoi", uploadSource == "tcp-acknowledged"
-                ? SpeedtestDetailContent.byteSourceLabel("tcp-acknowledged") : ""),
-            ("Position", coordinatesText(lat: detail.latitude, lon: detail.longitude))
-        ]
+    /// Le test d'un post speedtest : `sourceId` est l'identifiant du post, jamais
+    /// celui du test (revue q34, constat 13). Un post de membre joint à un test
+    /// le désigne par sa cible.
+    private var speedtestId: String? {
+        if case .string(let id)? = item.metadata?["speedtestId"], !id.isEmpty { return id }
+        guard item.targetType?.lowercased() == "speedtest" else { return nil }
+        return item.targetId.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Détail serveur mis à la forme de la fiche unique ; sans adresse, position
+    /// ni appareil quand le test est celui d'un autre membre.
+    private var speedtestResult: SpeedtestRunResult? {
+        speedtestDetail.map { SpeedtestAccountHistory.runResult(from: $0, includesPrivateDetails: item.canManage) }
     }
 
     // MARK: Comments
@@ -747,8 +753,8 @@ struct SignalDetailSheet: View {
                     .accessibilityIdentifier("signal.detail.openSession")
                 }
             }
-        } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
-           let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
+        } else if let lat = item.latitude ?? signal?.latitude ?? (item.canManage ? speedtestDetail?.latitude : nil),
+           let lng = item.longitude ?? signal?.longitude ?? (item.canManage ? speedtestDetail?.longitude : nil) {
             let center = CLLocationCoordinate2D(
                 latitude: item.canManage ? lat : (lat * 1000).rounded() / 1000,
                 longitude: item.canManage ? lng : (lng * 1000).rounded() / 1000
@@ -787,11 +793,10 @@ struct SignalDetailSheet: View {
     }
 
     private func loadSpeedtestDetailIfNeeded() async {
-        guard item.kind.lowercased() == "speedtest",
-              let sourceId = item.sourceId?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !sourceId.isEmpty, signal?.detailsHidden != true else { return }
+        guard isSpeedtest, let speedtestId = speedtestId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !speedtestId.isEmpty, signal?.detailsHidden != true else { return }
         do {
-            speedtestDetail = try await services.speedtest.details(id: sourceId)
+            speedtestDetail = try await services.speedtest.details(id: speedtestId)
             detailError = nil
         } catch APIError.http(_, "SPEEDTEST_DETAILS_HIDDEN", _, _, _) {
             detailsHiddenByServer = true
