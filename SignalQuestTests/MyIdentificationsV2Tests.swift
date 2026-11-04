@@ -614,4 +614,23 @@ private struct AzimuthAntennasService: AntennasServicing {
     func search(query: String) async throws -> [AntennaSite] { [] }
     func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] { [] }
     func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
+
+    // MARK: Corrections qui n'ont rien changé
+
+    /// Retrait : 200 avec `withdrawn: 0` n'est jamais un succès (07ccc689, ticket ck2uk3).
+    func testWithdrawWithZeroCountIsNotASuccess() throws {
+        let decode = { (json: String) in try JSONDecoder.signalQuest.decode(WithdrawResult.self, from: Data(json.utf8)) }
+        XCTAssertFalse(try decode(#"{"success":true,"siteId":"S1","withdrawn":0}"#).changed)
+        XCTAssertFalse(try decode(#"{"success":true,"siteId":"S1"}"#).changed)
+        XCTAssertTrue(try decode(#"{"success":true,"siteId":"S1","withdrawn":2}"#).changed)
+    }
+
+    /// edit-site après #954 : 404 IDENTIFICATION_NOT_FOUND dit la même chose que l'ancien 200
+    /// « moved: 0 » et propose de recharger ses identifications.
+    func testMoveOfAMissingIdentificationOffersAReload() {
+        let error = APIError.http(status: 404, code: "IDENTIFICATION_NOT_FOUND", message: "", requestId: nil, retryAfter: nil)
+        let text = IdentificationCorrectionText.failure(error)
+        XCTAssertEqual(text, IdentificationCorrectionText.nothingChanged)
+        XCTAssertTrue(IdentificationCorrectionText.needsReload(text))
+    }
 }

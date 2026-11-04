@@ -22,6 +22,9 @@ enum IdentificationCorrectionText {
         case .http(401, _, _, _, _), .missingAuthToken:
             // Le refresh a déjà échoué : l'app repasse seule sur l'écran de connexion.
             return String(localized: "Ta session a expiré. Reconnecte-toi, puis refais la correction.")
+        case .http(404, "IDENTIFICATION_NOT_FOUND"?, _, _, _):
+            // edit-site après #954 : plus de 200 « moved: 0 », même échec qu'avant.
+            return nothingChanged
         case .http(404, "TARGET_SITE_NOT_FOUND"?, _, _, _):
             return String(localized: "Ce support n’est plus sur la carte. Il a pu être retiré entre-temps : choisis-en un autre.")
         case .http(409, "CONSENSUS_TARGET_CHANGED"?, _, _, _):
