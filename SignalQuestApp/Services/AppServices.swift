@@ -545,6 +545,15 @@ final class AppServices: ObservableObject {
         if case .registered(_, .active) = outcome, E2EEV2ServerGate.autoActive {
             await rotateConversationsForNewDevice()
         }
+        // Appareil actif : HK créée par le premier, déclarée par les suivants (§5.1).
+        switch outcome {
+        case .active, .registered(_, .active):
+            guard let session = LocalAccountScope.sessionSnapshot(),
+                  let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
+            E2EEV2MessagingRuntime.traceV2("auto-history-key", await publication.run().traceStep)
+        default:
+            return
+        }
     }
 
     /// Appareils ajoutés vus dans le journal vérifié (E2EE-AUTO §3.5, §7) : la

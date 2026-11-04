@@ -2062,7 +2062,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
         path: String,
         body: Data,
         expectedOwnerScopeId: String,
-        capabilitySet: E2EEV2RequestCapabilitySet
+        capabilitySet: E2EEV2RequestCapabilitySet,
+        clockOffsetMs: Int64 = 0
     ) async -> E2EEV2TransportResult<Data> {
         guard body.count <= Self.maxJSONResponseBytes else {
             return localFailure("oversized-e2ee-json-request")
@@ -2073,7 +2074,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
             body: body,
             contentType: "application/json; charset=utf-8",
             expectedOwnerScopeId: expectedOwnerScopeId,
-            capabilitySet: capabilitySet
+            capabilitySet: capabilitySet,
+            clockOffsetMs: clockOffsetMs
         )
     }
 
