@@ -1,0 +1,788 @@
+{
+  "fixtureVersion": "1",
+  "note": "Contrat E2EE-AUTO §7.7 (révision 17). payloadUtf8 : charge content-payload-v2 déchiffrée (sans fk ni bourrage), JSON canonique. blobIds : liste de la règle (a), à comparer à encryptedBlobIds. delivery : valeur attendue de l’enveloppe v3 (notifyUserId toujours vide). Décomptes : événements déjà authentifiés ; ordre par sequence de la conversation ; senderIsAdmin null = chaîne d’appartenance pas encore rattrapée ; heures en millisecondes depuis l’époque Unix, en chaînes décimales.",
+  "pollRef": "0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY",
+  "valid": [
+    {
+      "case": "mediaPhoto",
+      "kind": "MEDIA",
+      "delivery": "message",
+      "blobIds": [
+        "opaque_blob_r17_photo000000000",
+        "opaque_blob_r17_photothumb0000"
+      ],
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photothumb0000\",\"ciphertextSha256\":\"79ea27134f5688b67ec60c4c734e390906a2bf2fb6c5eaf679af9f9ecb6b8048\",\"ciphertextSize\":\"24592\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne-miniature.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"kWjeJncnCyDck+mE7TON5Lgxc9iI7+Lhya7J4PLS0DI=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"fWTVbUiDRHQ=\",\"plaintextSha256\":\"a1db3d6ed0ad222d54422596c00e2b6d19a3a9a5dbc45519e6fa9362ac33bcd2\",\"plaintextSize\":\"24576\",\"width\":\"320\"}}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaMixedWithMention",
+      "kind": "MEDIA",
+      "delivery": "message",
+      "blobIds": [
+        "opaque_blob_r17_video000000000",
+        "opaque_blob_r17_videothumb0000",
+        "opaque_blob_r17_pdf00000000000"
+      ],
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_video000000000\",\"ciphertextSha256\":\"3297026693a19c7838b1d9162165f5603f30bcccef9cb927c3adb5e3eeca037d\",\"ciphertextSize\":\"31459200\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"12480\",\"fileName\":\"pylone.mp4\",\"height\":\"1080\",\"mediaKeyB64\":\"EQHOMxGKAcun9KrC/WhKB2VRqx723I0RTNwdvoNYDrE=\",\"mimeType\":\"video/mp4\",\"noncePrefixB64\":\"HXBgKSCkszQ=\",\"plaintextSha256\":\"1f04db67c43b2ab459f1aef455055edd63f15116079e440218a30f9a1e0ecad0\",\"plaintextSize\":\"31457280\",\"width\":\"1920\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_videothumb0000\",\"ciphertextSha256\":\"20b09f5cb10c32f6b4de99f0002d8b0e1c28f67ef7f4aeaf662b84a1bfac39db\",\"ciphertextSize\":\"18448\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"pylone-miniature.webp\",\"height\":\"180\",\"mediaKeyB64\":\"//f6jvu5Qq6y7pLwcPSvBurTC+gZb8V5wMKROOjOQcI=\",\"mimeType\":\"image/webp\",\"noncePrefixB64\":\"jy/Kr3eHp/Y=\",\"plaintextSha256\":\"8930e221effa92d6a2fef7a44d52b7aac461e253019f3f41eff340c5978c5b56\",\"plaintextSize\":\"18432\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_pdf00000000000\",\"ciphertextSha256\":\"ae94905b5128df4255d247927834e9761ca02b3c6f7c15bbf97f88f20496dc6d\",\"ciphertextSize\":\"524320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"arrete-ANFR.pdf\",\"height\":null,\"mediaKeyB64\":\"R9o6Gg9amaDQWRAKkvqmJiMj2OLasaQq/0XUxm7o0qk=\",\"mimeType\":\"application/pdf\",\"noncePrefixB64\":\"HHr+PDzShwI=\",\"plaintextSha256\":\"964a746121aa0cd42390e537e12efdb697280c82723e890844f648e35e1ea69e\",\"plaintextSize\":\"524288\",\"width\":null},\"thumbnail\":null}],\"caption\":\"Le pylône et l’arrêté, @bruno\"},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioFull",
+      "kind": "AUDIO",
+      "delivery": "message",
+      "blobIds": [
+        "opaque_blob_r17_voice000000000"
+      ],
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":{\"language\":\"fr\",\"text\":\"Je suis sous l’antenne, aucun débit en 5G.\"},\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"7350\",\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/mp4\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":\"f5euw9Xk7/X39Ozg0L2nkHhgSjYkFg0IBwwVIjNHXXWNpLrO3uvz9/bw5tfFsJqCalM+KxwQCQcJERwsP1Rrgw==\"},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioBare",
+      "kind": "AUDIO",
+      "delivery": "message",
+      "blobIds": [
+        "opaque_blob_r17_voice000000000"
+      ],
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":null,\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"7350\",\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/mp4\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":null},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollSingle",
+      "kind": "POLL",
+      "delivery": "message",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"closesAt\":null,\"multipleChoice\":false,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"},{\"id\":\"NcK3EvPUF8oi_Qvm5IdeIA\",\"label\":\"SFR\"}],\"question\":\"On se retrouve à quelle antenne ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollMultipleWithDeadline",
+      "kind": "POLL",
+      "delivery": "message",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"closesAt\":\"2026-09-21T14:00:00.000Z\",\"multipleChoice\":true,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"},{\"id\":\"NcK3EvPUF8oi_Qvm5IdeIA\",\"label\":\"SFR\"},{\"id\":\"vXGe3v8EOi8zYCA0WGB2rg\",\"label\":\"Bouygues Telecom\"},{\"id\":\"PrYhy8nGU1JGrt2Psa5p_A\",\"label\":\"Free\"}],\"question\":\"Quels opérateurs captez-vous ici ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "vote",
+      "kind": "POLL_VOTE",
+      "delivery": "annotation",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"optionIds\":[\"7FlXwjuwFDwJ73x_0sWG1A\",\"vXGe3v8EOi8zYCA0WGB2rg\"],\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_VOTE\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "voteRetract",
+      "kind": "POLL_VOTE",
+      "delivery": "annotation",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"optionIds\":[],\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_VOTE\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "close",
+      "kind": "POLL_CLOSE",
+      "delivery": "annotation",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_CLOSE\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardPostSpeedtest",
+      "kind": "CARD",
+      "delivery": "message",
+      "blobIds": [
+        "opaque_blob_r17_postimage00000"
+      ],
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"alice\",\"authorId\":\"user_alice_01J7ABCD23456789\",\"authorName\":\"Alice\",\"image\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_postimage00000\",\"ciphertextSha256\":\"127980e0e426ca86b65858582b938b8034c8583bd63f17444021564eb012492f\",\"ciphertextSize\":\"131088\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"publication.jpg\",\"height\":\"960\",\"mediaKeyB64\":\"S32bjoi51NospfyA+CqiM7lPqN8nvho4Jgl1ttjl0ZM=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"p9x+D7AeX1M=\",\"plaintextSha256\":\"0ee68aae648ffb69f9549ecd7fe9341cc48ca27c079c1845e9f80a573d63677d\",\"plaintextSize\":\"131072\",\"width\":\"1280\"},\"measure\":{\"downloadMbps\":\"842.5\",\"operator\":\"Orange\",\"pingMs\":\"18\",\"technology\":\"5G\",\"type\":\"SPEEDTEST\",\"uploadMbps\":\"96.25\"},\"postId\":\"cm0post1234567890abcdef\",\"postedAt\":\"2026-09-20T08:15:00.000Z\",\"text\":\"Nouveau record sous l’antenne de la gare 🚀\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardPostSessionAnonymous",
+      "kind": "CARD",
+      "delivery": "message",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":null,\"authorId\":null,\"authorName\":null,\"image\":null,\"measure\":{\"distanceMeters\":\"12450\",\"durationSeconds\":\"1860\",\"points\":\"412\",\"technologies\":[\"4G\",\"5G\"],\"type\":\"SESSION\"},\"postId\":\"cm0post0987654321fedcba\",\"postedAt\":\"2026-09-19T17:40:12.345Z\",\"text\":null}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardPostSignal",
+      "kind": "CARD",
+      "delivery": "message",
+      "blobIds": [],
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"bruno\",\"authorId\":\"user_bruno_01J7ABCD23456789\",\"authorName\":\"Bruno\",\"image\":null,\"measure\":{\"band\":\"n78\",\"operator\":\"SFR\",\"rsrp\":\"-97\",\"site\":\"Lyon Part-Dieu\",\"technology\":\"5G\",\"type\":\"SIGNAL\"},\"postId\":\"cm0post5555555555aaaaaa\",\"postedAt\":\"2026-09-18T10:00:00.000Z\",\"text\":\"Signal correct en intérieur\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    }
+  ],
+  "negative": [
+    {
+      "case": "mediaEmpty",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[],\"caption\":\"rien\"},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaOver20Blobs",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many0000000000\",\"ciphertextSha256\":\"89ec296bb5f4e0e30d52811297db899e7161bae1174df5599705f1f95004abeb\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-0.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"6rxYQuo3T5BKrlHP1dHVIbV4DO16FDHvlO5DidP2kM8=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"OUAl3RicPHk=\",\"plaintextSha256\":\"12a925c83c1c7b5b5c7c3d2a3b349ad3c4950b62a87a37c6cc426d1516dde357\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb00000\",\"ciphertextSha256\":\"6d5970c5dc174bec778ecb7ba28c3f392d0a65bb4ae4bf5387092fb2c136e224\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-0.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"fIM5intzE3dw41BimhFMZ0XCHsWGbleW9YnzYrKeqx8=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"LSgZf2ZqjPc=\",\"plaintextSha256\":\"5c85c99e611b31d4905be3d455be0d71b6b2969b72cb082796334490216d0c8f\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many1000000000\",\"ciphertextSha256\":\"1a09cd67931fd3f07a315f7580fef729667a8f02daa82d9215c9941db9555bcc\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-1.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"ecUpqD8tab7GDf+b7U3f1AI50BLvPQmZvtr7tksvH04=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"ety/AVC4jE4=\",\"plaintextSha256\":\"e57b6c77c3f6cf830af2f01349bfc72abdd09772a883488f16619f2f8891191e\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb10000\",\"ciphertextSha256\":\"b3cc0b70974f01b2fc56fc6327105f07465aed451a23d4f8650bf569274694fa\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-1.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"AvazSO9n8+LsG/py5aOCUD8NLezW95bUig9cI5rYRzA=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"UEEXILgzgnw=\",\"plaintextSha256\":\"cb4cf50e105e3b6a97b0d1332cd0385e05be7ba5525a4fdf4574774c4d602444\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many2000000000\",\"ciphertextSha256\":\"9f3a766d7f66eef7f775f89dd7f8b500cc74bae8a8ce813c796ba2bdcdafa4e3\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-2.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"7QpM+PwuVJWCpACXemoZvcMPcizL/pWV4awIWEluURw=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"3jJWqY6T+a0=\",\"plaintextSha256\":\"f6cc02dc89637a2d47bd1a408b7c645551887c20e5a25da2f2b628af4db3d908\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb20000\",\"ciphertextSha256\":\"2908de3f4d18e19c81c9f8a100eb3bb0da832fc549c02b450532a26b6b1bdd16\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-2.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"H3F69qFEjLeEqbJoMTZYyqM7WCnAllEDbXrIgN9B6V0=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"qALEnWkpVfk=\",\"plaintextSha256\":\"2927814eae7b6edc3fecdfbffc97875b66e00b003389245bfba0dff68cb7fd07\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many3000000000\",\"ciphertextSha256\":\"ffcae978b9b158a18a600f1f9df2ca251d2baafdd1e00c5a4331035a5e56171f\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-3.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"Gi2MSu26dum0xIt7F0HzpkHtpdQBu9F/gZvK2q/yl0Q=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"tZGEcECgt5w=\",\"plaintextSha256\":\"26263493e3c2c12d77232d83ecbd9883d0fb6a69c770549f90a1816d32995e4d\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb30000\",\"ciphertextSha256\":\"7d75a40f056f563d6e40f47ec71c274385f578a7b1c63246da5b6f7d9eaf4095\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-3.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"8xl53ppD40H/ulF8IRPmSxb8qlhfeStyQSRjOIfnJ0Y=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"0jpIhb5tJ0o=\",\"plaintextSha256\":\"f1fadd01727e6e5c0e37d513c4848e17651ea80fb6c72f411a8f18e5d07d85e3\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many4000000000\",\"ciphertextSha256\":\"95353053f9e2f5522bd4fc2cd11e7462619598fe9bda74c76124371ff7b49cea\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-4.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"JNRbOMMring2dgSzxEftauVMcaykowDZ+/z72xXGyBk=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"hY91Dh77tgg=\",\"plaintextSha256\":\"4af39bac4554a3607d0cb8190714cd9b87787b4bb298c3356a6827a20681d373\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb40000\",\"ciphertextSha256\":\"ff35e609489ccea61c75c940123d83abc856563cf5db4d6551a60d22f2678270\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-4.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"yOz8AcQ2tenLVIo8S/f19hOex+rQOXAubv/YOFLJF5w=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"aajT1wf4qBQ=\",\"plaintextSha256\":\"69872d616d72b3601696ea2d3aa15541572dc5f28e5e99a9cfa6d26ce166bfa6\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many5000000000\",\"ciphertextSha256\":\"fe6f967ca6f83ad9d74ad54256ca5efa9692d15597d6e17040e8482ea5491b7a\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-5.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"F+1udDJH2/hSbgYdnHcyE7gcW02h7Czb7Qthxp4wbcY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"2JLtMSQHnG8=\",\"plaintextSha256\":\"8186e3cdb052890cddbbd8d15704afaae123683917f3ccf1725cdfaae83f1d53\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb50000\",\"ciphertextSha256\":\"fe6ecf366ca128d84198500c115adb07b3d21ba26d51a39c80a3129f6e25a6be\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-5.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"oBiKALJS/MG4GzUpM7HeZGLrMbLmX/0tq0rCvGzeh2Q=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"CzQCeiYGt08=\",\"plaintextSha256\":\"fa59cc7e17ac226efff608efb679b422e74b0f4a30f6ece95165d975c635089f\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many6000000000\",\"ciphertextSha256\":\"3f69543baa534e58113d8f503e47c04b13d6bfbb17e47bc9453fbb10597179e2\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-6.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"nfC6Uf9yOnPp+x8KUNU9yJue8dNQfqLEagSBnxrpX6I=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"5SiVxCph7vc=\",\"plaintextSha256\":\"cde188dfb0bb3027c377ccbcd8b075232892ff912af60e7d32276d939c0132c3\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb60000\",\"ciphertextSha256\":\"353fc7d13d0f3bc1c79991f24024f33d90ed2b1df8531fefeca72e6471b88449\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-6.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"0mDTnKkWbP5TEU2pVstBZivmBuctV8eCpOd038XeDro=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"+ibqG3BLDC0=\",\"plaintextSha256\":\"ed2852472964b2a4c735b94f022376786213da8d2f89c4a4b6edd2f2cd934ae3\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many7000000000\",\"ciphertextSha256\":\"75bd430f3984f9090f061c04d3e67de53d6342fcfbb4965668691d3918d09c0a\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-7.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"03rA/jvylWTuU0SPKDTRq8AMjvrG2BarCLeJCDkCfnk=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"qQEPeDms/x0=\",\"plaintextSha256\":\"d8e9b6c126afd005924993826ec5dd178893e4fffd923d8f2ebf02d27d037e24\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb70000\",\"ciphertextSha256\":\"3f5b2cbe8eca69e63411b826191f214ffc52d1e8d9caa3832c8e397b6a652af2\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-7.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"B9bjm3ZQuZFi4TnDno4oY4rrrGOj7f251x32niBOD/0=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"i3FmuySnyGA=\",\"plaintextSha256\":\"31c783dd3e5ba978b02a27d7b0188c172bd0f6292a157142640907ab5293dc5c\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many8000000000\",\"ciphertextSha256\":\"01800d7af948dc5b6d551ee382f7ec15d11fdbd9f7b719c8da070899d042660d\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-8.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"26soObhR6KB376IKVfRDdKBOF+o/YTUC5eOTAHbuz50=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"fZTKmsVqaps=\",\"plaintextSha256\":\"7201f1375c9144823cf21ed293616d64bb28299b9d635bfbf6037fec13723819\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb80000\",\"ciphertextSha256\":\"b1e944a1b96002ec2b483247b74b0d88ef113398b90109e6b305cfae713fa995\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-8.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"EIWpqseRsoT9XVVpT0b657E9sqc+QLiAEFBMh8yH1P8=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"oyQryCjtugw=\",\"plaintextSha256\":\"b778fb333a4de0b4bcf3296b68baf0e5d247d7ba4c0a79c085c36eeec77d3489\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many9000000000\",\"ciphertextSha256\":\"d33efdb5215fce546d7c046c7edcbddc0847ffafebf967ea8844c6adffb12c52\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-9.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"Xw5X3AeiCtBM1cHBdJwnlHjhFsSPM9gYz3HtmlawKBU=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"53OlIr3hv+8=\",\"plaintextSha256\":\"729524e2965e0400c93df977f5dacde5e86dbc340aa44237ab4ba2025c29c97e\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb90000\",\"ciphertextSha256\":\"fa27045ace14948df38dac636d46ff0dcc7fce27c074e750ab94837c07fd6f42\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-9.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"xEux/aa16kvgahruCAkvlYVMfzEUPt+XHELRIKJFyeA=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"jQHg7Cg3640=\",\"plaintextSha256\":\"b7aba4266cc1823d3e1c1342f856304e438e5eb81ed64f8c6339d469512ac08a\",\"plaintextSize\":\"20000\",\"width\":\"320\"}},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_many1000000000\",\"ciphertextSha256\":\"21da91c4af839e9ee6f9ed201575b3980e54f6139f95cdcce85cdec17ccf4599\",\"ciphertextSize\":\"400032\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"photo-10.jpg\",\"height\":\"1200\",\"mediaKeyB64\":\"Wlfc/Qx1sAXDZTaY6fS5jZR9EY4sLhemh2vfzEqtxUc=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"ZgpNcIyn3IE=\",\"plaintextSha256\":\"9eb8a650cd46f4e4e15ad969aa16d8f15cc00d1b4a495cbdc1a2bdacf1ae9748\",\"plaintextSize\":\"400000\",\"width\":\"1600\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_manythumb10000\",\"ciphertextSha256\":\"bb5c7c37ee4be96461f9fcd1dc2661d51b1443670946aecae3c2bf206394e8a9\",\"ciphertextSize\":\"20016\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"miniature-10.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"3QjSIcvqeS6nbDmDnsTTIm8I0vv8GQPVgLgLNf4q78I=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"+FgN3U0xgTA=\",\"plaintextSha256\":\"4b3c1f059029b5ced6c87fc7354a3cb752d653467a6b394a89208ccad733a263\",\"plaintextSize\":\"20000\",\"width\":\"320\"}}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaDuplicateBlob",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":null},{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaThumbnailPng",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photothumb0000\",\"ciphertextSha256\":\"79ea27134f5688b67ec60c4c734e390906a2bf2fb6c5eaf679af9f9ecb6b8048\",\"ciphertextSize\":\"24592\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne-miniature.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"kWjeJncnCyDck+mE7TON5Lgxc9iI7+Lhya7J4PLS0DI=\",\"mimeType\":\"image/png\",\"noncePrefixB64\":\"fWTVbUiDRHQ=\",\"plaintextSha256\":\"a1db3d6ed0ad222d54422596c00e2b6d19a3a9a5dbc45519e6fa9362ac33bcd2\",\"plaintextSize\":\"24576\",\"width\":\"320\"}}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaThumbnailTooBig",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photothumb0000\",\"ciphertextSha256\":\"79ea27134f5688b67ec60c4c734e390906a2bf2fb6c5eaf679af9f9ecb6b8048\",\"ciphertextSize\":\"24592\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne-miniature.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"kWjeJncnCyDck+mE7TON5Lgxc9iI7+Lhya7J4PLS0DI=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"fWTVbUiDRHQ=\",\"plaintextSha256\":\"a1db3d6ed0ad222d54422596c00e2b6d19a3a9a5dbc45519e6fa9362ac33bcd2\",\"plaintextSize\":\"262145\",\"width\":\"320\"}}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mediaFileOver100MiB",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_video000000000\",\"ciphertextSha256\":\"3297026693a19c7838b1d9162165f5603f30bcccef9cb927c3adb5e3eeca037d\",\"ciphertextSize\":\"31459200\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"12480\",\"fileName\":\"pylone.mp4\",\"height\":\"1080\",\"mediaKeyB64\":\"EQHOMxGKAcun9KrC/WhKB2VRqx723I0RTNwdvoNYDrE=\",\"mimeType\":\"video/mp4\",\"noncePrefixB64\":\"HXBgKSCkszQ=\",\"plaintextSha256\":\"1f04db67c43b2ab459f1aef455055edd63f15116079e440218a30f9a1e0ecad0\",\"plaintextSize\":\"104857601\",\"width\":\"1920\"},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "manifestWidthWithoutHeight",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":null,\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "manifestFileNameWithPath",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_pdf00000000000\",\"ciphertextSha256\":\"ae94905b5128df4255d247927834e9761ca02b3c6f7c15bbf97f88f20496dc6d\",\"ciphertextSize\":\"524320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"../arrete.pdf\",\"height\":null,\"mediaKeyB64\":\"R9o6Gg9amaDQWRAKkvqmJiMj2OLasaQq/0XUxm7o0qk=\",\"mimeType\":\"application/pdf\",\"noncePrefixB64\":\"HHr+PDzShwI=\",\"plaintextSha256\":\"964a746121aa0cd42390e537e12efdb697280c82723e890844f648e35e1ea69e\",\"plaintextSize\":\"524288\",\"width\":null},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "manifestMimeTypeUppercase",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_pdf00000000000\",\"ciphertextSha256\":\"ae94905b5128df4255d247927834e9761ca02b3c6f7c15bbf97f88f20496dc6d\",\"ciphertextSize\":\"524320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"arrete-ANFR.pdf\",\"height\":null,\"mediaKeyB64\":\"R9o6Gg9amaDQWRAKkvqmJiMj2OLasaQq/0XUxm7o0qk=\",\"mimeType\":\"Application/PDF\",\"noncePrefixB64\":\"HHr+PDzShwI=\",\"plaintextSha256\":\"964a746121aa0cd42390e537e12efdb697280c82723e890844f648e35e1ea69e\",\"plaintextSize\":\"524288\",\"width\":null},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "manifestChunkSizeAsNumberText",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_pdf00000000000\",\"ciphertextSha256\":\"ae94905b5128df4255d247927834e9761ca02b3c6f7c15bbf97f88f20496dc6d\",\"ciphertextSize\":\"524320\",\"cryptoChunkSize\":\"0262144\",\"durationMs\":null,\"fileName\":\"arrete-ANFR.pdf\",\"height\":null,\"mediaKeyB64\":\"R9o6Gg9amaDQWRAKkvqmJiMj2OLasaQq/0XUxm7o0qk=\",\"mimeType\":\"application/pdf\",\"noncePrefixB64\":\"HHr+PDzShwI=\",\"plaintextSha256\":\"964a746121aa0cd42390e537e12efdb697280c82723e890844f648e35e1ea69e\",\"plaintextSize\":\"524288\",\"width\":null},\"thumbnail\":null}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "mentionsWithoutCaption",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"attachments\":[{\"file\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photo000000000\",\"ciphertextSha256\":\"bd0b9bdd6a783d7d13dbd41b3c4958b30b36c1be1a0d52c94e806f02299f7d31\",\"ciphertextSize\":\"1843328\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne.jpg\",\"height\":\"1536\",\"mediaKeyB64\":\"tWZY1TEIizjYWEorqOgvGIDB9Y8/qcKpiHF5j8OBPKY=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"DFe1SjjXB7o=\",\"plaintextSha256\":\"6d678728622707aec81e7a77a1e2195dcbb19abe19035743e4f698a35e560615\",\"plaintextSize\":\"1843200\",\"width\":\"2048\"},\"thumbnail\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_photothumb0000\",\"ciphertextSha256\":\"79ea27134f5688b67ec60c4c734e390906a2bf2fb6c5eaf679af9f9ecb6b8048\",\"ciphertextSize\":\"24592\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"antenne-miniature.jpg\",\"height\":\"240\",\"mediaKeyB64\":\"kWjeJncnCyDck+mE7TON5Lgxc9iI7+Lhya7J4PLS0DI=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"fWTVbUiDRHQ=\",\"plaintextSha256\":\"a1db3d6ed0ad222d54422596c00e2b6d19a3a9a5dbc45519e6fa9362ac33bcd2\",\"plaintextSize\":\"24576\",\"width\":\"320\"}}],\"caption\":null},\"counter\":\"7\",\"kind\":\"MEDIA\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioWebm",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":null,\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"7350\",\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/webm\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":null},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioNoDuration",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":null,\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/mp4\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":null},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioWaveformShort",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":null,\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"7350\",\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/mp4\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "audioTranscriptionStatus",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"caption\":null,\"transcription\":{\"language\":\"fr\",\"status\":\"COMPLETE\",\"text\":\"oui\"},\"voice\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_voice000000000\",\"ciphertextSha256\":\"c3886c0ee0c5131d45e5d6328d92c73878bcc05f0d40f3f46bf7982942b3b7a6\",\"ciphertextSize\":\"98320\",\"cryptoChunkSize\":\"262144\",\"durationMs\":\"7350\",\"fileName\":\"vocal.m4a\",\"height\":null,\"mediaKeyB64\":\"Wrl6/aZaezADUXcZ8Q677jg8FEJ4iQyVXIB1XUk4RGk=\",\"mimeType\":\"audio/mp4\",\"noncePrefixB64\":\"gCAH8breR6U=\",\"plaintextSha256\":\"512f725a5d9ca919e96ac714df03aecbaa87086527cb1d6755c9b6b0789af5cb\",\"plaintextSize\":\"98304\",\"width\":null},\"waveformB64\":null},\"counter\":\"7\",\"kind\":\"AUDIO\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollOneOption",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"closesAt\":null,\"multipleChoice\":false,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"}],\"question\":\"On se retrouve à quelle antenne ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollDuplicateOptionId",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"closesAt\":null,\"multipleChoice\":false,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"},{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"SFR\"}],\"question\":\"On se retrouve à quelle antenne ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollOptionIdNotRandomForm",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"closesAt\":null,\"multipleChoice\":false,\"options\":[{\"id\":\"opt_1\",\"label\":\"Oui\"},{\"id\":\"opt_2\",\"label\":\"Non\"}],\"question\":\"On se retrouve à quelle antenne ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollClosesAtWithoutMilliseconds",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"closesAt\":\"2026-09-21T14:00:00Z\",\"multipleChoice\":true,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"},{\"id\":\"NcK3EvPUF8oi_Qvm5IdeIA\",\"label\":\"SFR\"},{\"id\":\"vXGe3v8EOi8zYCA0WGB2rg\",\"label\":\"Bouygues Telecom\"},{\"id\":\"PrYhy8nGU1JGrt2Psa5p_A\",\"label\":\"Free\"}],\"question\":\"Quels opérateurs captez-vous ici ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "pollWithMention",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"closesAt\":null,\"multipleChoice\":false,\"options\":[{\"id\":\"7FlXwjuwFDwJ73x_0sWG1A\",\"label\":\"Orange\"},{\"id\":\"NcK3EvPUF8oi_Qvm5IdeIA\",\"label\":\"SFR\"}],\"question\":\"On se retrouve à quelle antenne ?\"},\"counter\":\"7\",\"kind\":\"POLL\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "voteAsReply",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"optionIds\":[\"7FlXwjuwFDwJ73x_0sWG1A\",\"vXGe3v8EOi8zYCA0WGB2rg\"],\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_VOTE\",\"mentions\":[],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "voteDuplicateOption",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"optionIds\":[\"7FlXwjuwFDwJ73x_0sWG1A\",\"7FlXwjuwFDwJ73x_0sWG1A\"],\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_VOTE\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "closeAsReply",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"targetRef\":\"0OpKBHgpc-oPfLHMWAzFWPeM6bLjQng3P9pciEwpGuY\"},\"counter\":\"7\",\"kind\":\"POLL_CLOSE\",\"mentions\":[],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardWithUrl",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"alice\",\"authorId\":\"user_alice_01J7ABCD23456789\",\"authorName\":\"Alice\",\"image\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_postimage00000\",\"ciphertextSha256\":\"127980e0e426ca86b65858582b938b8034c8583bd63f17444021564eb012492f\",\"ciphertextSize\":\"131088\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"publication.jpg\",\"height\":\"960\",\"mediaKeyB64\":\"S32bjoi51NospfyA+CqiM7lPqN8nvho4Jgl1ttjl0ZM=\",\"mimeType\":\"image/jpeg\",\"noncePrefixB64\":\"p9x+D7AeX1M=\",\"plaintextSha256\":\"0ee68aae648ffb69f9549ecd7fe9341cc48ca27c079c1845e9f80a573d63677d\",\"plaintextSize\":\"131072\",\"width\":\"1280\"},\"measure\":{\"downloadMbps\":\"842.5\",\"operator\":\"Orange\",\"pingMs\":\"18\",\"technology\":\"5G\",\"type\":\"SPEEDTEST\",\"uploadMbps\":\"96.25\"},\"postId\":\"cm0post1234567890abcdef\",\"postedAt\":\"2026-09-20T08:15:00.000Z\",\"text\":\"Nouveau record sous l’antenne de la gare 🚀\",\"url\":\"https://signalquest.fr/feed?post=cm0post1234567890abcdef\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardImageAsPng",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"alice\",\"authorId\":\"user_alice_01J7ABCD23456789\",\"authorName\":\"Alice\",\"image\":{\"algorithm\":\"AES_256_GCM_CHUNKED_HKDF_SHA256\",\"blobId\":\"opaque_blob_r17_postimage00000\",\"ciphertextSha256\":\"127980e0e426ca86b65858582b938b8034c8583bd63f17444021564eb012492f\",\"ciphertextSize\":\"131088\",\"cryptoChunkSize\":\"262144\",\"durationMs\":null,\"fileName\":\"publication.jpg\",\"height\":\"960\",\"mediaKeyB64\":\"S32bjoi51NospfyA+CqiM7lPqN8nvho4Jgl1ttjl0ZM=\",\"mimeType\":\"image/png\",\"noncePrefixB64\":\"p9x+D7AeX1M=\",\"plaintextSha256\":\"0ee68aae648ffb69f9549ecd7fe9341cc48ca27c079c1845e9f80a573d63677d\",\"plaintextSize\":\"131072\",\"width\":\"1280\"},\"measure\":{\"downloadMbps\":\"842.5\",\"operator\":\"Orange\",\"pingMs\":\"18\",\"technology\":\"5G\",\"type\":\"SPEEDTEST\",\"uploadMbps\":\"96.25\"},\"postId\":\"cm0post1234567890abcdef\",\"postedAt\":\"2026-09-20T08:15:00.000Z\",\"text\":\"Nouveau record sous l’antenne de la gare 🚀\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardMeasureNumberNotText",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"bruno\",\"authorId\":\"user_bruno_01J7ABCD23456789\",\"authorName\":\"Bruno\",\"image\":null,\"measure\":{\"band\":\"n78\",\"operator\":\"SFR\",\"rsrp\":\"97\",\"site\":null,\"technology\":null,\"type\":\"SIGNAL\"},\"postId\":\"cm0post5555555555aaaaaa\",\"postedAt\":\"2026-09-18T10:00:00.000Z\",\"text\":\"Signal correct en intérieur\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardMeasureUnknownType",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"bruno\",\"authorId\":\"user_bruno_01J7ABCD23456789\",\"authorName\":\"Bruno\",\"image\":null,\"measure\":{\"type\":\"DRIVE_TEST\"},\"postId\":\"cm0post5555555555aaaaaa\",\"postedAt\":\"2026-09-18T10:00:00.000Z\",\"text\":\"Signal correct en intérieur\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardPostedAtInvalid",
+      "expected": "MALFORMED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"1\",\"payload\":{\"authorHandle\":\"bruno\",\"authorId\":\"user_bruno_01J7ABCD23456789\",\"authorName\":\"Bruno\",\"image\":null,\"measure\":{\"band\":\"n78\",\"operator\":\"SFR\",\"rsrp\":\"-97\",\"site\":\"Lyon Part-Dieu\",\"technology\":\"5G\",\"type\":\"SIGNAL\"},\"postId\":\"cm0post5555555555aaaaaa\",\"postedAt\":\"2026-02-30T10:00:00.000Z\",\"text\":\"Signal correct en intérieur\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardOtherType",
+      "expected": "UNSUPPORTED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"SITE\",\"cardVersion\":\"1\",\"payload\":{}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "cardPostVersion2",
+      "expected": "UNSUPPORTED",
+      "payloadUtf8": "{\"body\":{\"cardType\":\"POST\",\"cardVersion\":\"2\",\"payload\":{\"authorHandle\":\"bruno\",\"authorId\":\"user_bruno_01J7ABCD23456789\",\"authorName\":\"Bruno\",\"image\":null,\"measure\":{\"band\":\"n78\",\"operator\":\"SFR\",\"rsrp\":\"-97\",\"site\":\"Lyon Part-Dieu\",\"technology\":\"5G\",\"type\":\"SIGNAL\"},\"postId\":\"cm0post5555555555aaaaaa\",\"postedAt\":\"2026-09-18T10:00:00.000Z\",\"text\":\"Signal correct en intérieur\"}},\"counter\":\"7\",\"kind\":\"CARD\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    }
+  ],
+  "tallies": [
+    {
+      "case": "lastVoteBySequenceWins",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "12",
+          "serverTimeMs": "1789995602000",
+          "optionIds": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A",
+            "PrYhy8nGU1JGrt2Psa5p_A"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "optionIds": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": false,
+        "closedBySequence": null,
+        "closePending": false,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ],
+          "user_chloe_01J7ABCD23456789": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "0"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "2"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "invalidVoteIgnoredWhole",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": false,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "optionIds": [
+            "NcK3EvPUF8oi_Qvm5IdeIA",
+            "vXGe3v8EOi8zYCA0WGB2rg"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "12",
+          "serverTimeMs": "1789995602000",
+          "optionIds": [
+            "2LAqJIPeKGYSU-LHdSfPhQ"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": false,
+        "closedBySequence": null,
+        "closePending": false,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "1"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "emptyVoteRetracts",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "optionIds": []
+        }
+      ],
+      "expected": {
+        "closed": false,
+        "closedBySequence": null,
+        "closePending": false,
+        "votes": {},
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "0"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "closeByAuthorStopsLaterVotes",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        {
+          "kind": "POLL_CLOSE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "senderIsAdmin": false
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "12",
+          "serverTimeMs": "1789995602000",
+          "optionIds": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        },
+        {
+          "kind": "POLL_CLOSE",
+          "senderId": "user_alice_01J7ABCD23456789",
+          "sequence": "13",
+          "serverTimeMs": "1789995603000",
+          "senderIsAdmin": false
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "14",
+          "serverTimeMs": "1789995604000",
+          "optionIds": [
+            "vXGe3v8EOi8zYCA0WGB2rg"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": true,
+        "closedBySequence": "13",
+        "closePending": false,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ],
+          "user_chloe_01J7ABCD23456789": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "1"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "1"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "closeByAdmin",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_CLOSE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "senderIsAdmin": true
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": true,
+        "closedBySequence": "10",
+        "closePending": false,
+        "votes": {},
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "0"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "closeUndecidableStaysPending",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": null
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_CLOSE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995600000",
+          "senderIsAdmin": null
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995601000",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": false,
+        "closedBySequence": null,
+        "closePending": true,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "1"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "closesAtJudgedOnServerTime",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": "1789995610000"
+      },
+      "nowServerMs": "1789995660000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995609999",
+          "optionIds": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_chloe_01J7ABCD23456789",
+          "sequence": "11",
+          "serverTimeMs": "1789995610000",
+          "optionIds": [
+            "NcK3EvPUF8oi_Qvm5IdeIA"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": true,
+        "closedBySequence": null,
+        "closePending": false,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "7FlXwjuwFDwJ73x_0sWG1A"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "1"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "0"
+          }
+        ]
+      }
+    },
+    {
+      "case": "openBeforeClosesAt",
+      "poll": {
+        "authorId": "user_alice_01J7ABCD23456789",
+        "optionIds": [
+          "7FlXwjuwFDwJ73x_0sWG1A",
+          "NcK3EvPUF8oi_Qvm5IdeIA",
+          "vXGe3v8EOi8zYCA0WGB2rg",
+          "PrYhy8nGU1JGrt2Psa5p_A"
+        ],
+        "multipleChoice": true,
+        "closesAtMs": "1789995610000"
+      },
+      "nowServerMs": "1789995605000",
+      "events": [
+        {
+          "kind": "POLL_VOTE",
+          "senderId": "user_bruno_01J7ABCD23456789",
+          "sequence": "10",
+          "serverTimeMs": "1789995601000",
+          "optionIds": [
+            "PrYhy8nGU1JGrt2Psa5p_A"
+          ]
+        }
+      ],
+      "expected": {
+        "closed": false,
+        "closedBySequence": null,
+        "closePending": false,
+        "votes": {
+          "user_bruno_01J7ABCD23456789": [
+            "PrYhy8nGU1JGrt2Psa5p_A"
+          ]
+        },
+        "counts": [
+          {
+            "id": "7FlXwjuwFDwJ73x_0sWG1A",
+            "count": "0"
+          },
+          {
+            "id": "NcK3EvPUF8oi_Qvm5IdeIA",
+            "count": "0"
+          },
+          {
+            "id": "vXGe3v8EOi8zYCA0WGB2rg",
+            "count": "0"
+          },
+          {
+            "id": "PrYhy8nGU1JGrt2Psa5p_A",
+            "count": "1"
+          }
+        ]
+      }
+    }
+  ]
+}
