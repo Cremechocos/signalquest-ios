@@ -549,4 +549,48 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertEqual(Array(cleaned[(start + 44)..<(start + 56)]), [UInt8](repeating: 0, count: 12))
         XCTAssertEqual(Array(cleaned.suffix(2)), [0xFF, 0xD9], "fin du JPEG intacte")
     }
+
+    /// r17 (f433bb4e5), trouvé par la preuve du 04/11 : tout le corps de `udta/loci` (3GPP,
+    /// écrit par ffmpeg) et la valeur de chaque clé `com.apple.quicktime.location.*`
+    /// (`name` d'AVFoundation, pas seulement `ISO6709`) ; le titre `©nam` et une clé
+    /// d'un autre préfixe restent.
+    func testLociAndEveryQuickTimeLocationKeyAreZeroed() {
+        let latin1: (String) -> Data = { Data($0.unicodeScalars.map { UInt8($0.value) }) }
+        func be32(_ v: Int) -> Data { Data([UInt8(v >> 24 & 0xFF), UInt8(v >> 16 & 0xFF), UInt8(v >> 8 & 0xFF), UInt8(v & 0xFF)]) }
+        let title = box("\u{A9}nam", Data([0, 8, 0x15, 0xC7]) + latin1("Le titre"))
+        // Version et drapeaux, langue, nom, rôle, longitude et latitude 16.16, altitude, astre, notes.
+        var lociBody = Data(count: 4) + Data([0x15, 0xC7]) + latin1("Concorde\0") + Data([0])
+        lociBody += be32(0x0002_523A) + be32(0x0030_DD97) + be32(0)
+        lociBody += latin1("Earth\0") + Data([0])
+        let loci = box("loci", lociBody)
+        let udta = box("udta", title + loci)
+        let names = ["com.apple.quicktime.make", "com.apple.quicktime.location.ISO6709", "com.apple.quicktime.location.name"]
+        let keys = box("keys", Data(count: 4) + be32(names.count) + names.reduce(Data()) { $0 + box("mdta", latin1($1)) })
+        let values = ["Apple", "+48.8656+002.3212/", "Place de la Concorde, Paris, France"]
+        let entries = values.enumerated().map { index, value in
+            be32(8 + 16 + value.utf8.count) + be32(index + 1) + box("data", be32(1) + Data(count: 4) + latin1(value))
+        }
+        let ilst = box("ilst", entries.reduce(Data(), +))
+        let meta = box("meta", keys + ilst)
+        let movie = box("ftyp", latin1("qt  ") + Data(count: 4)) + box("moov", udta + meta)
+
+        let bytes = [UInt8](movie)
+        let lociStart = movie.range(of: latin1("loci"))!.lowerBound - 4
+        let lociBodyRange = lociStart + 8 ..< lociStart + 8 + lociBody.count
+        let valueRanges = values.dropFirst().map { value -> Range<Int> in
+            let at = movie.range(of: latin1(value))!.lowerBound
+            return at ..< at + value.utf8.count
+        }
+        XCTAssertEqual(MediaLocationScrubber.plan(for: movie).zeroed, [lociBodyRange] + valueRanges)
+        let cleaned = [UInt8](MediaLocationScrubber.scrubbed(movie))
+        XCTAssertEqual(cleaned.count, bytes.count)
+        for range in [lociBodyRange] + valueRanges {
+            XCTAssertEqual(Array(cleaned[range]), [UInt8](repeating: 0, count: range.count))
+        }
+        let text = String(decoding: cleaned, as: UTF8.self)
+        XCTAssertTrue(text.contains("Le titre"), "©nam est un titre, pas un lieu")
+        XCTAssertTrue(text.contains("Apple"), "clé hors du préfixe location.")
+        XCTAssertFalse(text.contains("Concorde"))
+        XCTAssertEqual(Array(cleaned[lociStart ..< lociStart + 8]), Array(bytes[lociStart ..< lociStart + 8]), "en-tête de loci intact")
+    }
 }

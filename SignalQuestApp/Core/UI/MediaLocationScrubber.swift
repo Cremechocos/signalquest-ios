@@ -9,7 +9,8 @@ import Foundation
 ///   la valeur des tags XMP (700, 0x02BC) et IPTC (33723, 0x83BB) de tout IFD, comme le XMP partout ailleurs ;
 ///   les sous-IFD (Exif 0x8769, Interop 0xA005, SubIFDs 0x014A) reçoivent le même traitement ;
 /// - XMP, XMP étendu, IPTC (APP13) : tout le contenu après l'identifiant ;
-/// - ISO BMFF : la valeur de `©xyz` et de `com.apple.quicktime.location.ISO6709`, et le bloc
+/// - ISO BMFF : la valeur de `©xyz`, le corps de `loci` (3GPP) et la valeur de chaque clé
+///   `com.apple.quicktime.location.*` (`ISO6709`, `name`…) ; `©nam` reste ; le bloc
 ///   GPS de l'item Exif d'un HEIF, tout le corps de son item XMP (`mime`, `application/rdf+xml`) ;
 /// - TIFF : ce même traitement dans chaque IFD de la chaîne (une page chacun) ;
 /// - PNG : le bloc GPS de `eXIf`, et ce qui suit le mot-clé `XML:com.adobe.xmp` d'un `iTXt`,
@@ -260,7 +261,8 @@ enum MediaLocationScrubber {
     // MARK: ISO BMFF
 
     private static let containers: Set<String> = ["moov", "udta", "trak", "mdia", "minf", "stbl", "edts", "moof", "traf"]
-    private static let isoLocationKey = "com.apple.quicktime.location.ISO6709"
+    /// Préfixe exact des clés de lieu QuickTime (`ISO6709`, `name`, `body`, `note`, `role`, `date`…, r17).
+    private static let isoLocationKeyPrefix = "com.apple.quicktime.location."
 
     private static func scanBoxes(_ bytes: [UInt8], from start: Int, to end: Int, depth: Int, into ranges: inout [Range<Int>]) {
         guard depth <= maxBoxDepth else { return }
@@ -270,7 +272,7 @@ enum MediaLocationScrubber {
             switch box.type {
             case let type where containers.contains(type):
                 scanBoxes(bytes, from: box.body, to: box.end, depth: depth + 1, into: &ranges)
-            case "\u{A9}xyz":
+            case "\u{A9}xyz", "loci":
                 ranges.append(box.body ..< box.end)
             case "meta":
                 scanMeta(bytes, box, depth: depth + 1, into: &ranges)
@@ -324,12 +326,12 @@ enum MediaLocationScrubber {
             children.append(child)
             index = child.end
         }
-        // `keys` d'abord : l'index de la clé de lieu, puis sa valeur dans `ilst`.
-        if let keys = children.first(where: { $0.type == "keys" }), let locationIndex = keyIndex(bytes, keys),
+        // `keys` d'abord : les index des clés de lieu, puis leurs valeurs dans `ilst`.
+        if let keys = children.first(where: { $0.type == "keys" }), case let locationIndexes = keyIndexes(bytes, keys), !locationIndexes.isEmpty,
            let ilst = children.first(where: { $0.type == "ilst" }) {
             var item = ilst.body
             while item + 8 <= ilst.end, let entry = box(bytes, at: item, end: ilst.end) {
-                if uint32(bytes, at: entry.start + 4) == locationIndex {
+                if let index = uint32(bytes, at: entry.start + 4), locationIndexes.contains(index) {
                     var inner = entry.body
                     while inner + 8 <= entry.end, let data = box(bytes, at: inner, end: entry.end) {
                         if data.type == "data", data.start + 16 <= data.end { ranges.append(data.start + 16 ..< data.end) }
@@ -367,17 +369,18 @@ enum MediaLocationScrubber {
         }
     }
 
-    /// Index (à partir de 1) de la clé de lieu dans `keys` : version et drapeaux, nombre,
-    /// puis chaque clé (taille, espace de noms, valeur).
-    private static func keyIndex(_ bytes: [UInt8], _ keys: Box) -> Int? {
-        guard let count = uint32(bytes, at: keys.body + 4) else { return nil }
+    /// Index (à partir de 1) des clés de lieu dans `keys` : version et drapeaux, nombre,
+    /// puis chaque clé (taille, espace de noms, valeur). Une clé illisible arrête la lecture.
+    private static func keyIndexes(_ bytes: [UInt8], _ keys: Box) -> Set<Int> {
+        var found: Set<Int> = []
+        guard let count = uint32(bytes, at: keys.body + 4) else { return found }
         var index = keys.body + 8
         for number in 1...max(1, count) where count > 0 {
-            guard let size = uint32(bytes, at: index), size >= 8, index + size <= keys.end else { return nil }
-            if String(decoding: bytes[index + 8..<index + size], as: UTF8.self) == isoLocationKey { return number }
+            guard let size = uint32(bytes, at: index), size >= 8, index + size <= keys.end else { return found }
+            if String(decoding: bytes[index + 8..<index + size], as: UTF8.self).hasPrefix(isoLocationKeyPrefix) { found.insert(number) }
             index += size
         }
-        return nil
+        return found
     }
 
     /// Identifiants des items `Exif` et XMP de `iinf`. `infe` version 2 (16 bits) ou 3
