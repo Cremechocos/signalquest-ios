@@ -6,10 +6,11 @@ import Foundation
 /// garder », E2EE-AUTO §7.7). Mêmes plages que `MediaLocationScrubber.kt` d'Android, pour
 /// qu'une photo sorte pareille des deux apps :
 /// - Exif : le bloc GPS seul (compte, entrées, valeurs hors entrée) ; le pointeur 0x8825 reste ;
+///   la valeur des tags XMP (700, 0x02BC) et IPTC (33723, 0x83BB) de tout IFD, comme le XMP partout ailleurs ;
 /// - XMP, XMP étendu, IPTC (APP13) : tout le contenu après l'identifiant ;
 /// - ISO BMFF : la valeur de `©xyz` et de `com.apple.quicktime.location.ISO6709`, et le bloc
 ///   GPS de l'item Exif d'un HEIF, tout le corps de son item XMP (`mime`, `application/rdf+xml`) ;
-/// - TIFF : le bloc GPS de chaque IFD de la chaîne (une page chacun), 8 au plus ;
+/// - TIFF : ce même traitement dans chaque IFD de la chaîne (une page chacun), 8 au plus ;
 /// - PNG : le bloc GPS de `eXIf`, et ce qui suit le mot-clé `XML:com.adobe.xmp` d'un `iTXt`,
 ///   `tEXt` ou `zTXt` (flux zlib remplacé par un flux stocké d'espaces de même longueur),
 ///   CRC recalculé ; les textes d'un autre mot-clé restent ;
@@ -74,6 +75,11 @@ enum MediaLocationScrubber {
         } else if hasPrefix(bytes, Array("GIF87a".utf8), at: 0) || hasPrefix(bytes, Array("GIF89a".utf8), at: 0) {
             scanGIF(bytes, into: &plan.zeroed)
         }
+        // Une même plage atteinte deux fois (deux IFD vers un même bloc GPS) n'en fait qu'une,
+        // dans l'ordre du fichier : les plans se comparent à ceux d'Android.
+        var seen: Set<[Int]> = []
+        plan.zeroed = plan.zeroed.filter { seen.insert([$0.lowerBound, $0.upperBound]).inserted }
+            .sorted { ($0.lowerBound, $0.upperBound) < ($1.lowerBound, $1.upperBound) }
         return plan
     }
 
@@ -145,9 +151,9 @@ enum MediaLocationScrubber {
 
     // MARK: Exif (TIFF)
 
-    /// Les blocs GPS d'un en-tête TIFF : pour chaque IFD de la chaîne qui en pointe un, son
-    /// compte d'entrées, ses entrées, et les valeurs rangées hors des entrées (une latitude :
-    /// trois rationnels, 24 octets). Les IFD eux-mêmes restent.
+    /// Le lieu d'un en-tête TIFF, dans chaque IFD de la chaîne : le bloc GPS pointé (son compte
+    /// d'entrées, ses entrées, et les valeurs rangées hors des entrées : une latitude, trois
+    /// rationnels, 24 octets), et la valeur entière des tags XMP et IPTC. Les IFD restent.
     static func gpsRanges(_ bytes: [UInt8], tiff: Int, end: Int, into ranges: inout [Range<Int>]) {
         guard tiff + 8 <= end, end <= bytes.count else { return }
         let littleEndian: Bool
@@ -174,7 +180,10 @@ enum MediaLocationScrubber {
             for entry in 0..<count {
                 let at = tiff + offset + 2 + entry * 12
                 guard let tag = u16(at) else { break }
-                if tag == 0x8825, let gps = u32(at + 8), !gpsOffsets.contains(gps) { gpsOffsets.append(gps); break }
+                if tag == 0x8825, let gps = u32(at + 8), !gpsOffsets.contains(gps) { gpsOffsets.append(gps) }
+                if tag == 0x02BC || tag == 0x83BB, let value = valueRange(at: at, tiff: tiff, end: end, u16: u16, u32: u32) {
+                    ranges.append(value)
+                }
             }
             ifdOffset = u32(tiff + offset + 2 + count * 12)
         }
@@ -186,16 +195,27 @@ enum MediaLocationScrubber {
         guard let count = u16(gps), gps + 2 + count * 12 <= end else { return }
         ranges.append(gps ..< gps + 2)
         if count > 0 { ranges.append(gps + 2 ..< gps + 2 + count * 12) }
-        let typeSizes = [1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8]
         for entry in 0..<count {
             let at = gps + 2 + entry * 12
-            guard let type = u16(at + 2), let valueCount = u32(at + 4), let size = typeSizes[type] else { continue }
-            let length = size * valueCount
-            guard length > 4, let valueOffset = u32(at + 8) else { continue }
-            let value = tiff + valueOffset
-            guard value >= tiff, value + length <= end else { continue }
-            ranges.append(value ..< value + length)
+            // Les valeurs de 4 octets au plus sont dans l'entrée, déjà effacée.
+            if let value = valueRange(at: at, tiff: tiff, end: end, u16: u16, u32: u32), value.lowerBound != at + 8 {
+                ranges.append(value)
+            }
         }
+    }
+
+    private static let typeSizes = [1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8]
+
+    /// Valeur d'une entrée d'IFD : dans l'entrée elle-même jusqu'à 4 octets, sinon à son décalage.
+    private static func valueRange(at entry: Int, tiff: Int, end: Int, u16: (Int) -> Int?, u32: (Int) -> Int?) -> Range<Int>? {
+        guard let type = u16(entry + 2), let valueCount = u32(entry + 4), let size = typeSizes[type] else { return nil }
+        let length = size * valueCount
+        guard length > 0 else { return nil }
+        if length <= 4 { return entry + 8 ..< entry + 8 + length }
+        guard let valueOffset = u32(entry + 8) else { return nil }
+        let value = tiff + valueOffset
+        guard value >= tiff, value + length <= end else { return nil }
+        return value ..< value + length
     }
 
     // MARK: ISO BMFF

@@ -227,10 +227,11 @@ final class MediaLocationStripperTests: XCTestCase {
     }
 
     /// Noms de lieu en clair (décision du 04/11, messagerie et fil) : le XMP (dans un HEIC,
-    /// son item `mime` à part) et l'IPTC sont mis à zéro en entier, jusque dans les octets.
+    /// son item `mime` à part ; dans un TIFF, les tags 0x02BC et 0x83BB) et l'IPTC sont mis à
+    /// zéro en entier, jusque dans les octets.
     func testPlaceNamesAreRemovedToo() throws {
         let names = ["Villeurbanne", "Gratte-Ciel", "Lointainpays"]
-        for type in [UTType.jpeg, .png, .heic] {
+        for type in [UTType.jpeg, .png, .heic, .tiff] {
             for xmp in [false, true] {
                 let label = "\(type.identifier) xmp=\(xmp)"
                 let original = try placeNamedImage(type, xmp: xmp)
@@ -332,7 +333,7 @@ final class MediaLocationStripperTests: XCTestCase {
         var gps: [Range<Int>] = []
         MediaLocationScrubber.gpsRanges([UInt8](original), tiff: header + 4, end: header + exifBody.count, into: &gps)
         XCTAssertFalse(gps.isEmpty, "Le corps Exif doit porter un bloc GPS")
-        XCTAssertEqual(plan.zeroed, [header + exifBody.count ..< original.count] + gps)
+        XCTAssertEqual(plan.zeroed, (gps + [header + exifBody.count ..< original.count]).sorted { $0.lowerBound < $1.lowerBound })
         let clean = MediaLocationScrubber.scrubbed(original)
         XCTAssertNil(clean.range(of: Data("Testville".utf8)), "La ville de l'item XMP est encore lisible")
         XCTAssertNotNil(clean.range(of: Data("application/rdf+xml".utf8)))
