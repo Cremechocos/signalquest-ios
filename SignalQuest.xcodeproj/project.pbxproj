@@ -380,6 +380,7 @@
 		658A7AFE3AE3E2DBF9E452F2 /* MessageNotificationCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2B6F4A6B5D82D43D85F763 /* MessageNotificationCategory.swift */; };
 		669A95D9E954E5641284B736 /* QualityScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */; };
 		66CF67A62105B8047EEED4B5 /* ExperienceUseRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */; };
+		672183DACBB6AB9BEE7D08E2 /* MediaLocationScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67041DF58C8856842D09A83F /* MediaLocationScrubber.swift */; };
 		678B47CAC48F151310C54D0E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ECDB8C8F6B147454109FBCFA /* PrivacyInfo.xcprivacy */; };
 		67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */; };
 		6892B2A9907095297A350A62 /* ExperienceMeasures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92452FAF52C31A8F343410F8 /* ExperienceMeasures.swift */; };
@@ -1345,6 +1346,7 @@
 		665B9E57E78551D9CF39D82D /* SessionGenerationClassificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGenerationClassificationTests.swift; sourceTree = "<group>"; };
 		668760065DE520E85BAF4154 /* SQMapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapAnnotations.swift; sourceTree = "<group>"; };
 		6690D2BFDE61AEB06C68B10A /* CarPlayMapTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapTemplateBuilder.swift; sourceTree = "<group>"; };
+		67041DF58C8856842D09A83F /* MediaLocationScrubber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLocationScrubber.swift; sourceTree = "<group>"; };
 		670C9CDB66FCC050C0142C58 /* AuthSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionTests.swift; sourceTree = "<group>"; };
 		6714ECEA3256C6DAF0E2BCA0 /* SentinelleOwnerLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleOwnerLabel.swift; sourceTree = "<group>"; };
 		674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityScaleTests.swift; sourceTree = "<group>"; };
@@ -3375,6 +3377,7 @@
 		F55F4FFD817FC3C0B2C074D9 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				67041DF58C8856842D09A83F /* MediaLocationScrubber.swift */,
 				50FED3D2DDF9205A12D1BFF5 /* MediaLocationStripper.swift */,
 				DAA4065330269DDD9D644174 /* PhotoBlur.swift */,
 				7AA4B62730DEC85BED160A7E /* PhotoBlurCanvas.swift */,
@@ -4030,6 +4033,7 @@
 				920A9FE3A612D269FF9416BB /* MapViewportProjection.swift in Sources */,
 				30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */,
 				EE47E722A4FE5F89F50C9523 /* MarketRegistryService.swift in Sources */,
+				672183DACBB6AB9BEE7D08E2 /* MediaLocationScrubber.swift in Sources */,
 				5ADDC9DFF4FBCBFCFAB53774 /* MediaLocationStripper.swift in Sources */,
 				81DFFE9AA337FF36E5549415 /* MentionAutocomplete.swift in Sources */,
 				D1212A2119E013814872AB77 /* MessageComposerBar.swift in Sources */,

@@ -4230,23 +4230,18 @@ struct ConversationDetailView: View {
             return
         }
         defer { try? FileManager.default.removeItem(at: movie.url) }
-        // Sans le lieu de prise de vue (atomes QuickTime), pistes recopiées telles quelles.
-        guard let clean = try? await MediaLocationStripper.strippedMovie(at: movie.url) else {
-            showActionError(String(localized: "Impossible de retirer le lieu de prise de vue de cette vidéo."))
-            Haptics.error()
-            return
-        }
-        defer { try? FileManager.default.removeItem(at: clean) }
-        let size = (try? clean.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-        guard MessageAttachmentOutboxStore.fits(size), let data = try? Data(contentsOf: clean, options: .mappedIfSafe),
-              MessageAttachmentOutboxStore.fits(data.count) else {
+        let size = (try? movie.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        guard MessageAttachmentOutboxStore.fits(size), let raw = try? Data(contentsOf: movie.url, options: .mappedIfSafe),
+              MessageAttachmentOutboxStore.fits(raw.count) else {
             showActionError(size > 0
                 ? String(localized: "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte.")
                 : String(localized: "Cette vidéo est illisible."))
             Haptics.error()
             return
         }
-        let ext = clean.pathExtension
+        // Sans le lieu de prise de vue (atomes QuickTime), pistes intactes.
+        let data = await Task.detached(priority: .userInitiated) { MediaLocationStripper.strippedMovie(raw) }.value
+        let ext = movie.url.pathExtension.isEmpty ? "mov" : movie.url.pathExtension
         await queueAttachment(
             PendingAttachmentSend(
                 data: data, filename: "video.\(ext)",
@@ -4278,9 +4273,7 @@ struct ConversationDetailView: View {
             Haptics.error()
             return
         }
-        guard let data = await locationFree(raw, type: UTType(filenameExtension: url.pathExtension),
-                                            fileExtension: url.pathExtension),
-              MessageAttachmentOutboxStore.fits(data.count) else { return }
+        let data = await Self.locationFree(raw, type: UTType(filenameExtension: url.pathExtension))
         await queueAttachment(
             PendingAttachmentSend(
                 data: data, filename: url.lastPathComponent,
@@ -4294,26 +4287,13 @@ struct ConversationDetailView: View {
         replyTarget = nil
     }
 
-    /// Fichier sans lieu de prise de vue : GPS retiré d'une image, atomes de lieu
-    /// d'une vidéo. `nil` (erreur déjà affichée) si le lieu ne peut pas être retiré.
-    private func locationFree(_ data: Data, type: UTType?, fileExtension: String) async -> Data? {
-        if type?.conforms(to: .movie) == true {
-            if let clean = try? await MediaLocationStripper.strippedMovie(data: data, fileExtension: fileExtension) {
-                return clean
-            }
-            showActionError(String(localized: "Impossible de retirer le lieu de prise de vue de cette vidéo."))
-        } else if type?.conforms(to: .image) == true {
-            if let clean = await Task.detached(priority: .userInitiated, operation: {
-                MediaLocationStripper.strippedImage(data)
-            }).value {
-                return clean
-            }
-            showActionError(String(localized: "Impossible de retirer le lieu de prise de vue de cette image."))
-        } else {
-            return data
-        }
-        Haptics.error()
-        return nil
+    /// Fichier sans lieu de prise de vue : GPS et noms de lieu d'une image, atomes de lieu
+    /// d'une vidéo, mis à zéro sans changer la taille. Tout autre fichier part tel quel.
+    nonisolated private static func locationFree(_ data: Data, type: UTType?) async -> Data {
+        guard type?.conforms(to: .movie) == true || type?.conforms(to: .image) == true else { return data }
+        return await Task.detached(priority: .userInitiated) {
+            type?.conforms(to: .movie) == true ? MediaLocationStripper.strippedMovie(data) : MediaLocationStripper.strippedImage(data)
+        }.value
     }
 
     // MARK: Pièces jointes en attente (partage reçu, glisser-déposer, coller)
@@ -4385,7 +4365,7 @@ struct ConversationDetailView: View {
                 return
             }
             let ext = (fileName as NSString).pathExtension
-            guard let clean = await locationFree(data, type: type, fileExtension: ext) else { return }
+            let clean = await Self.locationFree(data, type: type)
             stagedAttachments.append(StagedAttachment(
                 data: clean,
                 filename: isVideo ? "video.\(ext.isEmpty ? "mov" : ext)" : fileName,
