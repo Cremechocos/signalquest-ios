@@ -567,15 +567,17 @@ final class CallManager: NSObject, ObservableObject {
     /// d'accès au micro : elle est faite à l'avance, au premier plan, une seule
     /// fois (iOS ne la montre plus ensuite).
     static func requestMicrophoneAccessIfUndetermined() async {
-        guard UIApplication.shared.applicationState == .active, !AppEnvironment.usesDemoData else { return }
-        let undetermined: Bool
-        if #available(iOS 17.0, *) {
-            undetermined = AVAudioApplication.shared.recordPermission == .undetermined
-        } else {
-            undetermined = AVAudioSession.sharedInstance().recordPermission == .undetermined
-        }
-        guard undetermined else { return }
+        guard UIApplication.shared.applicationState == .active, microphoneAccessUndetermined else { return }
         _ = await VoiceNoteRecorder.requestPermission()
+    }
+
+    /// Micro jamais demandé (hors données de démo) : Messages explique pourquoi avant de le demander.
+    static var microphoneAccessUndetermined: Bool {
+        guard !AppEnvironment.usesDemoData else { return false }
+        if #available(iOS 17.0, *) {
+            return AVAudioApplication.shared.recordPermission == .undetermined
+        }
+        return AVAudioSession.sharedInstance().recordPermission == .undetermined
     }
 
     /// Retour au premier plan pendant un appel : relance du micro s'il n'avait

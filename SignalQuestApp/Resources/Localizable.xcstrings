@@ -2255,6 +2255,22 @@
         }
       }
     },
+    "Ouvre le déverrouillage de tes conversations chiffrées avec l’ancien mot de passe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the unlock for your conversations encrypted with the old password"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le déverrouillage de tes conversations chiffrées avec l’ancien mot de passe"
+          }
+        }
+      }
+    },
     "Pages web" : {
       "localizations" : {
         "en" : {
@@ -2447,6 +2463,22 @@
         }
       }
     },
+    "Répondre aux appels écran verrouillé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Answer calls on the lock screen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondre aux appels écran verrouillé"
+          }
+        }
+      }
+    },
     "Réponse à un message anonyme" : {
       "localizations" : {
         "en" : {
@@ -2583,6 +2615,18 @@
       },
       "shouldTranslate" : false
     },
+    "SQFormal|Ouvre le déverrouillage de tes conversations chiffrées avec l’ancien mot de passe" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le déverrouillage de vos conversations chiffrées avec l’ancien mot de passe"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2638,6 +2682,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre vidéo chiffrée"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Tes anciens messages chiffrés sont verrouillés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos anciens messages chiffrés sont verrouillés"
           }
         }
       },
@@ -2722,6 +2778,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Visible de vous seul"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorise-le maintenant pour être entendu." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorisez-le maintenant pour être entendu."
           }
         }
       },
@@ -2901,6 +2969,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unknown technology"
+          }
+        }
+      }
+    },
+    "Tes anciens messages chiffrés sont verrouillés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your older encrypted messages are locked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes anciens messages chiffrés sont verrouillés"
           }
         }
       }
@@ -3481,6 +3565,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "since %@"
+          }
+        }
+      }
+    },
+    "iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorise-le maintenant pour être entendu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS can’t ask for the microphone during a call received on the lock screen. Allow it now so you can be heard."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorise-le maintenant pour être entendu."
           }
         }
       }

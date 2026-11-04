@@ -502,6 +502,12 @@ struct MessagesView: View {
     private let e2ee: E2EEServicing?
     @State private var showNewConversation = false
     @State private var showE2EEUnlock = false
+    /// Conversations v1 encore verrouillées : bandeau en tête de liste.
+    @State private var offersE2EEUnlock = false
+    /// Micro jamais demandé : carte d'explication avant la demande iOS.
+    @State private var offersMicrophoneAccess = false
+    /// « Plus tard » : la carte ne revient pas ; la demande viendra au premier appel ou vocal.
+    @AppStorage("messages_microphone_card_dismissed") private var microphoneCardDismissed = false
     @State private var routedConversationId: String?
     /// Quitter se confirme : le balayage suffisait à perdre la conversation (SOC-22).
     @State private var pendingLeave: MessageConversation?
@@ -695,6 +701,12 @@ struct MessagesView: View {
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
                 E2EEAutoLogAlertBanner()
+                if offersE2EEUnlock, !showingShelved, !showingRequests {
+                    e2eeUnlockBanner
+                }
+                if offersMicrophoneAccess, !microphoneCardDismissed, !showingShelved, !showingRequests {
+                    microphoneAccessCard
+                }
                 if needsV2Activation {
                     v2ActivationCard
                 }
@@ -913,7 +925,7 @@ struct MessagesView: View {
             await reloadDrafts()
             if model.conversations.isEmpty { await model.load() }
             await model.loadOrganization()
-            await maybePresentE2EEUnlock()
+            await refreshE2EEUnlockOffer()
             openNewConversationIfRequested()
             openRequestsIfRequested()
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
@@ -1035,8 +1047,8 @@ struct MessagesView: View {
         }
         .task(id: PushOwnerScope.current) { refreshV2Activation() }
         // Les appels se décrochent souvent écran verrouillé, où iOS ne peut pas
-        // demander l'accès au micro : la demande est faite ici, une fois.
-        .task { await CallManager.requestMicrophoneAccessIfUndetermined() }
+        // demander l'accès au micro : une carte explique pourquoi avant de le demander.
+        .task { offersMicrophoneAccess = CallManager.microphoneAccessUndetermined }
         .onAppear { refreshV2Activation() }
         .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
             refreshV2Activation()
@@ -1092,7 +1104,10 @@ struct MessagesView: View {
         .onChangeCompat(of: model.focus == nil) { _, ended in
             if ended, filter == .focus { filter = .all }
         }
-        .sheet(isPresented: $showE2EEUnlock, onDismiss: openNewConversationIfRequested) {
+        .sheet(isPresented: $showE2EEUnlock, onDismiss: {
+            openNewConversationIfRequested()
+            Task { await refreshE2EEUnlockOffer() }
+        }) {
             if let e2ee = e2ee, case .authenticated(let user) = session.state {
                 E2EEUnlockSheet(userId: user.id, service: e2ee) {
                     Task {
@@ -1104,27 +1119,108 @@ struct MessagesView: View {
         }
     }
 
-    /// Once the conversation list is loaded, if at least one is E2EE-enabled and
-    /// the master key isn't unlocked yet, present the unlock sheet automatically.
-    /// After a successful unlock all conversations share the same in-Keychain
-    /// private JWK — the per-conversation prompt becomes unnecessary.
-    private func maybePresentE2EEUnlock() async {
-        guard let e2ee, !Self.unlockOffered else { return }
+    /// Une conversation v1 encore verrouillée : un bandeau le dit en tête de
+    /// liste, sans ouvrir la feuille d'office (audit final, choix du 04/11).
+    /// Après le déverrouillage, toutes les conversations v1 partagent la clé.
+    private func refreshE2EEUnlockOffer() async {
+        guard let e2ee else { offersE2EEUnlock = false; return }
         // Le mot de passe v1 n'ouvre que les conversations v1 : un compte qui
         // n'a que des conversations v2 n'a rien à créer ni à déverrouiller.
         guard model.conversations.contains(where: {
             $0.e2eeEnabled == true && !EncryptedConversationSurfaces.isV2($0)
-        }) else { return }
-        let already = await e2ee.isUnlocked()
-        if !already && !showE2EEUnlock {
-            // Une fois par lancement : la feuille revenait à chaque retour sur
-            // la liste (SOC-23). Le bandeau d'une conversation chiffrée reste là.
-            Self.unlockOffered = true
-            showE2EEUnlock = true
-        }
+        }) else { offersE2EEUnlock = false; return }
+        offersE2EEUnlock = !(await e2ee.isUnlocked())
     }
 
-    @MainActor private static var unlockOffered = false
+    /// Bandeau des anciennes conversations chiffrées : la feuille s'ouvre au toucher.
+    private var e2eeUnlockBanner: some View {
+        Button {
+            Haptics.light()
+            showE2EEUnlock = true
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .accessibilityHidden(true)
+                }
+                Text("Tes anciens messages chiffrés sont verrouillés")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Déverrouiller")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 44)
+            .padding(.vertical, SQSpace.xs)
+            .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityHint(Text("Ouvre le déverrouillage de tes conversations chiffrées avec l’ancien mot de passe"))
+        .accessibilityIdentifier("messages.e2eeUnlock.banner")
+    }
+
+    /// Micro jamais demandé : la raison d'abord, puis la demande iOS au toucher.
+    private var microphoneAccessCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    Text("Répondre aux appels écran verrouillé")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text("iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorise-le maintenant pour être entendu.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            HStack(spacing: SQSpace.md) {
+                Button {
+                    Haptics.light()
+                    Task {
+                        await CallManager.requestMicrophoneAccessIfUndetermined()
+                        offersMicrophoneAccess = CallManager.microphoneAccessUndetermined
+                    }
+                } label: {
+                    Text("Autoriser")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("messages.microphone.allow")
+                Button {
+                    microphoneCardDismissed = true
+                } label: {
+                    Text("Plus tard")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("messages.microphone.later")
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.top, SQSpace.sm)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("messages.microphone.card")
+    }
 
     /// Opens the conversation requested by a notification tap (via AppRouter),
     /// loading the list first if needed. Falls back to just landing on the
