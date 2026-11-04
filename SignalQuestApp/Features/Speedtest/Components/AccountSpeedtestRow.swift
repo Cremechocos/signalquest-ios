@@ -61,9 +61,10 @@ struct AccountSpeedtestRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// « 5G · Orange »
+    /// « 5G · Orange » : le nom complet de l'opérateur, pas la clé « ORANGE » du serveur.
     var subtitleLine: String {
-        let operatorName = test.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = test.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let operatorName = raw.flatMap { SQBrand.operatorName($0) } ?? raw
         return [TechAccent.shortLabel(for: test.networkType), operatorName]
             .compactMap { $0?.isEmpty == false ? $0 : nil }
             .joined(separator: " · ")

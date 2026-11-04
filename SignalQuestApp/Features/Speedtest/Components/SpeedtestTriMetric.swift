@@ -212,12 +212,6 @@ struct SpeedtestResultFigures {
     }
 }
 
-/// Onglets de la feuille « Détails du test ».
-enum SpeedtestDetailsTab: Hashable, Identifiable {
-    case speed, latency, radio, server
-    var id: Self { self }
-}
-
 /// Apparition d'un bloc du résultat : il monte de 16 pt en 0,5 s, en décalé, une
 /// fois par test. Rien en « Réduire les animations ».
 private struct SpeedtestRise: ViewModifier {
@@ -243,7 +237,8 @@ struct SpeedtestResultSummary: View {
     let typical: SpeedtestVerdictCard.Typical?
     let restartTitle: String
     let onRestart: () -> Void
-    let onDetails: (SpeedtestDetailsTab) -> Void
+    /// Ouvre la fiche du test, la même que depuis l'historique.
+    let onDetails: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var shown = false
@@ -298,12 +293,12 @@ struct SpeedtestResultSummary: View {
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(spacing: SQSpace.lg)) : AnyLayout(HStackLayout(spacing: 0))
         layout {
-            rate(title: String(localized: "↓ Descendant"), average: result.downloadAverageMbps, max: result.downloadMaxMbps)
+            rate(title: "↓ \(String(localized: "Réception"))", average: result.downloadAverageMbps, max: result.downloadMaxMbps)
                 .modifier(SpeedtestRise(shown: shown, delay: 0.06))
             if !dynamicTypeSize.isAccessibilitySize {
                 Rectangle().fill(SQColor.separator).frame(width: 1).padding(.vertical, SQSpace.xs)
             }
-            rate(title: String(localized: "↑ Montant"), average: figures.uploadMbps, max: result.uploadMaxMbps)
+            rate(title: "↑ \(String(localized: "Envoi"))", average: figures.uploadMbps, max: result.uploadMaxMbps)
                 .modifier(SpeedtestRise(shown: shown, delay: 0.14))
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -352,7 +347,7 @@ struct SpeedtestResultSummary: View {
                     title: figures.latencyIsMinimum ? String(localized: "Latence min.") : String(localized: "Latence"),
                     value: "\(Int(latency.rounded()))", unit: "ms",
                     detail: result.jitterMs.map { String(localized: "gigue \(SQUnits.jitterValue($0)) ms") },
-                    tab: .latency, delay: 0.26, identifier: "speedtest.result.latency"
+                    delay: 0.26, identifier: "speedtest.result.latency"
                 )
             }
             // Un seul chiffre par cadre, de même taille que les autres : la pire latence pendant
@@ -364,7 +359,7 @@ struct SpeedtestResultSummary: View {
                     title: String(localized: "En charge"),
                     value: "\(worstMs)", unit: "ms",
                     detail: extra.map { String(localized: "\($0) ms de plus") },
-                    tab: .latency, delay: 0.32, identifier: "speedtest.result.underLoad"
+                    delay: 0.32, identifier: "speedtest.result.underLoad"
                 )
             }
             if let bytes = figures.transferredBytes(deviceCount: deviceBytes) {
@@ -372,7 +367,7 @@ struct SpeedtestResultSummary: View {
                     title: String(localized: "Données"),
                     value: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file), unit: nil,
                     detail: String(localized: "consommés"),
-                    tab: .speed, delay: 0.38, identifier: "speedtest.result.data"
+                    delay: 0.38, identifier: "speedtest.result.data"
                 )
             }
         }
@@ -381,10 +376,10 @@ struct SpeedtestResultSummary: View {
     }
 
     private func tile(title: String, value: String, unit: String?, detail: String?,
-                      tab: SpeedtestDetailsTab, delay: Double, identifier: String) -> some View {
+                      delay: Double, identifier: String) -> some View {
         Button {
             Haptics.selection()
-            onDetails(tab)
+            onDetails()
         } label: {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
@@ -450,18 +445,19 @@ struct SpeedtestResultSummary: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// « Orange · 5G NSA · Cloudflare Paris · 11:21 ».
+    /// « Orange · 5G NSA · Cloudflare Paris ». L'heure est déjà dans le sur-titre.
     private var contextLine: String {
         var parts: [String] = []
         if let name = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-            parts.append(name)
+            // Nom complet d'un opérateur mobile ; en Wi‑Fi c'est le FAI, gardé tel quel
+            // (le FAI « Free » n'est pas Free Mobile).
+            parts.append(result.connectionType == .cellular ? SQBrand.operatorName(name) ?? name : name)
         }
         parts.append(result.networkDisplayName)
         if let server = (result.downloadServerName ?? result.serverName)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !server.isEmpty {
             parts.append(server)
         }
-        parts.append(result.createdAt.formatted(date: .omitted, time: .shortened))
         var unique: [String] = []
         for part in parts where !unique.contains(part) { unique.append(part) }
         return unique.joined(separator: " · ")
@@ -485,7 +481,7 @@ struct SpeedtestResultSummary: View {
 
             Button {
                 Haptics.selection()
-                onDetails(.radio)
+                onDetails()
             } label: {
                 Text("Détails")
                     .font(SQFont.body(14, .bold, relativeTo: .subheadline))
@@ -519,7 +515,8 @@ struct SpeedtestLastTestCard: View {
                         .textCase(.uppercase)
                         .foregroundStyle(SQColor.labelSecondary)
                     Text(verbatim: summary)
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .monospacedDigit()
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2)
                 }
@@ -560,257 +557,5 @@ struct SpeedtestLastTestCard: View {
             text += " · \(SQUnits.milliseconds(ping))"
         }
         return text
-    }
-}
-
-// MARK: - Feuille « Détails du test »
-
-/// Quatre onglets (Débit, Latence, Radio, Serveur), mêmes groupes qu'Android.
-/// Une valeur absente ne donne pas de ligne « — » : elle est citée une fois en bas.
-struct SpeedtestTestDetailsSheet: View {
-    let result: SpeedtestRunResult
-    @State var tab: SpeedtestDetailsTab
-    let onClose: () -> Void
-
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var figures: SpeedtestResultFigures { SpeedtestResultFigures(result: result) }
-
-    struct DetailRow: Identifiable {
-        var id: String { key }
-        let key: String
-        let value: String?
-    }
-
-    struct DetailGroup: Identifiable {
-        var id: String { title }
-        let title: String
-        let rows: [DetailRow]
-        /// Lignes propres à un sens (Moyenne, MAX…) : une absence nomme aussi le sens.
-        var perDirection = false
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.md) {
-                MessageSheetHeader(title: "Détails du test", closeIdentifier: "speedtest.details.close", onClose: onClose)
-                MapSegmented(
-                    selection: $tab,
-                    options: [
-                        (.speed, String(localized: "Débit")),
-                        (.latency, String(localized: "Latence")),
-                        (.radio, String(localized: "Radio")),
-                        (.server, String(localized: "Serveur"))
-                    ],
-                    identifier: "speedtest.details.tabs"
-                )
-                .accessibilityElement(children: .contain)
-
-                let groups = Self.groups(for: tab, figures: figures)
-                ForEach(groups) { group in
-                    let rows = group.rows.filter { $0.value != nil }
-                    if !rows.isEmpty {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(verbatim: group.title)
-                                .font(SQFont.body(9.5, .bold, relativeTo: .caption2))
-                                .tracking(9.5 * 0.18)
-                                .textCase(.uppercase)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .padding(.bottom, SQSpace.xs)
-                                .sqHeader()
-                            ForEach(rows) { row in
-                                dotRow(row.key, row.value ?? "")
-                            }
-                        }
-                    }
-                }
-
-                let missing = Self.missing(in: groups)
-                if !missing.isEmpty {
-                    Text("Non relevés pendant ce test : \(missing.joined(separator: ", ")).")
-                        .font(SQFont.body(11.5, .regular, relativeTo: .caption))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("speedtest.details.missing")
-                }
-
-                if let tip = Self.tip(for: tab) {
-                    Text(verbatim: tip)
-                        .font(SQFont.body(11.5, .regular, relativeTo: .caption))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SQColor.chip, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-            }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.lg)
-            .padding(.bottom, SQSpace.xl)
-        }
-        .signalQuestBackground()
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .accessibilityIdentifier("speedtest.details")
-    }
-
-    private func dotRow(_ label: String, _ value: String) -> some View {
-        let labelText = Text(verbatim: label)
-            .font(SQType.subhead(.regular))
-            .foregroundStyle(SQColor.ink2)
-        let valueText = Text(verbatim: value)
-            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-            .foregroundStyle(SQColor.label)
-            .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
-            .fixedSize(horizontal: false, vertical: true)
-        return SwiftUI.Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                    labelText
-                    valueText
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, SQSpace.xs)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
-                    labelText.layoutPriority(1)
-                    SQDotLeader()
-                        .frame(minWidth: SQSpace.md, maxWidth: .infinity)
-                        .frame(height: 1)
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
-                    valueText.layoutPriority(1)
-                }
-                .frame(minHeight: 34)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: Contenu (testable)
-
-    static func groups(for tab: SpeedtestDetailsTab, figures: SpeedtestResultFigures) -> [DetailGroup] {
-        let result = figures.result
-        switch tab {
-        case .speed:
-            let down = figures.measured("download")
-            let up = figures.measured("upload")
-            return [
-                DetailGroup(title: String(localized: "↓ Descendant"), rows: [
-                    DetailRow(key: String(localized: "Moyenne"), value: speed(result.downloadAverageMbps)),
-                    DetailRow(key: "MAX", value: speed(result.downloadMaxMbps)),
-                    DetailRow(key: String(localized: "Données mesurées"), value: down.map { bytes($0.bytes) }),
-                    DetailRow(key: String(localized: "Durée utile"), value: down.map { seconds($0.usefulSeconds) })
-                ], perDirection: true),
-                DetailGroup(title: String(localized: "↑ Montant"), rows: [
-                    DetailRow(key: String(localized: "Moyenne"), value: speed(result.uploadAverageMbps)),
-                    DetailRow(key: "MAX", value: speed(result.uploadMaxMbps)),
-                    DetailRow(key: String(localized: "Données mesurées"), value: up.map { bytes($0.bytes) }),
-                    DetailRow(key: String(localized: "Durée utile"), value: up.map { seconds($0.usefulSeconds) })
-                ], perDirection: true)
-            ]
-        case .latency:
-            let idle = result.pingProtocol.map { String(localized: "Au repos · \($0)") } ?? String(localized: "Au repos")
-            return [
-                DetailGroup(title: idle, rows: [
-                    DetailRow(key: String(localized: "Minimum"), value: ms(result.pingMinMs)),
-                    DetailRow(key: String(localized: "Médiane"), value: ms(result.pingMedianMs)),
-                    DetailRow(key: String(localized: "Maximum"), value: ms(result.pingMaxMs)),
-                    DetailRow(key: String(localized: "Gigue"), value: result.jitterMs.flatMap { $0.isFinite && $0 >= 0 ? SQUnits.jitter($0) : nil })
-                ]),
-                DetailGroup(title: String(localized: "Sous charge"), rows: [
-                    DetailRow(key: String(localized: "Pendant la réception"), value: ms(result.pingDlMs)),
-                    DetailRow(key: String(localized: "Pendant l'envoi"), value: ms(result.pingUlMs))
-                ])
-            ]
-        case .radio:
-            let operatorName = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return [
-                DetailGroup(title: String(localized: "Pendant le test"), rows: [
-                    DetailRow(key: String(localized: "Opérateur"), value: operatorName?.isEmpty == false ? operatorName : nil),
-                    DetailRow(key: String(localized: "Réseau"), value: result.networkDisplayName),
-                    DetailRow(key: "MCC-MNC", value: result.observedPlmn.map { SpeedtestTestDetailsSheet.plmn($0) }),
-                    DetailRow(key: String(localized: "Itinérance"), value: result.isRoaming.map { $0 ? String(localized: "Oui") : String(localized: "Non") })
-                ])
-            ]
-        case .server:
-            return [
-                DetailGroup(title: String(localized: "Serveurs"), rows: [
-                    DetailRow(key: String(localized: "Réception"), value: text(result.downloadServerName ?? result.serverName)),
-                    DetailRow(key: String(localized: "Envoi"), value: text(result.uploadServerHost)),
-                    DetailRow(key: String(localized: "Latence"), value: text(result.pingServerHost))
-                ]),
-                DetailGroup(title: String(localized: "Méthode"), rows: [
-                    DetailRow(key: String(localized: "Moteur"), value: text(result.engine)),
-                    DetailRow(key: String(localized: "Méthodologie"), value: result.methodologyVersion.map { "v\($0)" })
-                ])
-            ]
-        }
-    }
-
-    /// Valeurs absentes, citées une seule fois : un groupe entièrement absent (pas
-    /// d'envoi mesuré) se nomme d'un mot, sinon chaque ligne manquante.
-    static func missing(in groups: [DetailGroup]) -> [String] {
-        var names: [String] = []
-        func add(_ name: String) { if !names.contains(name) { names.append(name) } }
-        for group in groups {
-            let absent = group.rows.filter { $0.value == nil }
-            guard !absent.isEmpty else { continue }
-            let groupName = group.title.trimmingCharacters(in: CharacterSet(charactersIn: "↓↑ ")).lowercased()
-            if absent.count == group.rows.count {
-                add(groupName)
-                continue
-            }
-            for row in absent {
-                // Les sigles (MAX, MCC-MNC) restent en capitales.
-                let key = row.key == row.key.uppercased() ? row.key : row.key.lowercased()
-                add(group.perDirection ? "\(key) (\(groupName))" : key)
-            }
-        }
-        return names
-    }
-
-    static func tip(for tab: SpeedtestDetailsTab) -> String? {
-        switch tab {
-        case .speed:
-            return String(localized: "Moyenne : données reçues divisées par la durée utile, après la montée en charge. MAX : la meilleure seconde.")
-        case .latency:
-            return String(localized: "Sous charge : la latence pendant que la ligne est pleine. Plus elle s'éloigne de la latence au repos, plus la visio ou le jeu en souffrent.")
-        case .radio:
-            return String(localized: "iOS ne donne pas accès au signal radio (puissance, bandes, cellule) : seuls l'opérateur et le type de réseau sont connus.")
-        case .server:
-            return nil
-        }
-    }
-
-    private static func speed(_ value: Double?) -> String? {
-        guard let value, value.isFinite, value > 0 else { return nil }
-        return SQUnits.throughput(mbps: value)
-    }
-
-    private static func ms(_ value: Double?) -> String? {
-        guard let value, value.isFinite, value >= 0 else { return nil }
-        return SQUnits.milliseconds(value)
-    }
-
-    private static func bytes(_ value: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
-    }
-
-    private static func seconds(_ value: Double) -> String {
-        "\(value.formatted(.number.precision(.fractionLength(1)))) s"
-    }
-
-    private static func text(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
-        return value
-    }
-
-    /// « 20801 » → « 208-01 » ; laissé tel quel s'il n'a pas la forme attendue.
-    static func plmn(_ value: String) -> String {
-        let digits = value.filter(\.isNumber)
-        guard digits.count == 5 || digits.count == 6 else { return value }
-        return "\(digits.prefix(3))-\(digits.dropFirst(3))"
     }
 }

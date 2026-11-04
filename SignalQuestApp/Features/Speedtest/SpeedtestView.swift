@@ -86,8 +86,6 @@ struct SpeedtestView: View {
     @State private var detailResult: SpeedtestRunResult?
     /// Débit habituel de l'opérateur autour du dernier test (carte verdict).
     @State private var typicalNearby: SpeedtestVerdictCard.Typical?
-    /// Onglet ouvert dans « Détails du test » (nil : feuille fermée).
-    @State private var detailsTab: SpeedtestDetailsTab?
     /// Tracé de la phase de débit en cours, sous l'anneau.
     @State private var sparkPoints: [SpeedtestSparkline.Point] = []
     @State private var sparkPhase = -1
@@ -223,11 +221,6 @@ struct SpeedtestView: View {
         .sheet(item: $selectedAccountTest) { test in
             AccountSpeedtestDetailSheet(testId: test.id) { [speedtest = services.speedtest] id in
                 try await speedtest.details(id: id)
-            }
-        }
-        .sheet(item: $detailsTab) { tab in
-            if let result {
-                SpeedtestTestDetailsSheet(result: result, tab: tab) { detailsTab = nil }
             }
         }
         .sheet(item: $sharePreviewResult) { selectedResult in
@@ -412,7 +405,8 @@ struct SpeedtestView: View {
                 typical: typicalNearby,
                 restartTitle: restartTitle,
                 onRestart: start,
-                onDetails: { detailsTab = $0 }
+                // Même fiche que depuis l'historique (choix du 04/11 : une seule fiche).
+                onDetails: { detailResult = result }
             )
             // Une apparition par test, pas à chaque retour sur l'onglet.
             .id(result.id)
@@ -554,8 +548,8 @@ struct SpeedtestView: View {
         }
         switch phase {
         case .ping: return String(localized: "Latence")
-        case .download: return String(localized: "Descendant")
-        case .upload: return String(localized: "Montant")
+        case .download: return String(localized: "Réception")
+        case .upload: return String(localized: "Envoi")
         default: return phase.dialTitle
         }
     }
@@ -607,8 +601,8 @@ struct SpeedtestView: View {
         let down = liveProgress.downloadAverageMbps.flatMap { $0 > 0 ? SQUnits.throughput(mbps: $0) : nil }
         return [
             .init(id: 0, title: String(localized: "Latence"), value: state(.ping) == .done ? ping : nil, state: state(.ping)),
-            .init(id: 1, title: String(localized: "Descendant"), value: state(.download) == .done ? down : nil, state: state(.download)),
-            .init(id: 2, title: String(localized: "Montant"), value: nil, state: state(.upload))
+            .init(id: 1, title: String(localized: "Réception"), value: state(.download) == .done ? down : nil, state: state(.download)),
+            .init(id: 2, title: String(localized: "Envoi"), value: nil, state: state(.upload))
         ]
     }
 

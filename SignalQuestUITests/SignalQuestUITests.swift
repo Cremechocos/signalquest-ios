@@ -354,15 +354,14 @@ final class SignalQuestUITests: XCTestCase {
         let labels = app.staticTexts.allElementsBoundByIndex.map { $0.label }.joined(separator: " | ")
         print("REAL_SPEEDTEST_LABELS: \(labels)")
 
-        // Deux grands chiffres, puis les détails dans une feuille à onglets :
-        // la tuile « Données » ouvre l'onglet Débit.
+        // Deux grands chiffres, puis la fiche du test (la même que depuis
+        // l'historique) : la tuile « Données » l'ouvre.
         XCTAssertTrue(app.descendants(matching: .any)["speedtest.result.saved"].firstMatch.exists)
         let data = app.descendants(matching: .any)["speedtest.result.data"].firstMatch
         for _ in 0..<4 where data.exists && !data.isHittable { app.swipeUp() }
         if data.exists { data.tap() }
-        XCTAssertTrue(app.descendants(matching: .any)["speedtest.details"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Moyenne"].exists)
-        XCTAssertTrue(app.staticTexts["MAX"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.detail.close"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.detail.method"].firstMatch.exists)
         XCTAssertFalse(app.staticTexts["P90"].exists)
         XCTAssertFalse(app.staticTexts["P95"].exists)
         XCTAssertFalse(app.staticTexts["Ping médian"].exists)

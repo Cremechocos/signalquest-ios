@@ -169,21 +169,47 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         XCTAssertNil(figures.transferredBytes(deviceCount: 0))
     }
 
-    /// Les valeurs absentes sont listées une fois : un groupe entier vide se
-    /// nomme par son titre, pas ligne par ligne.
-    func testMissingValuesAreListedOnce() {
-        let figures = SpeedtestResultFigures(result: sample(hasUpload: false))
-        let groups = SpeedtestTestDetailsSheet.groups(for: .speed, figures: figures)
-        let missing = SpeedtestTestDetailsSheet.missing(in: groups)
-        let upload = String(localized: "↑ Montant").trimmingCharacters(in: CharacterSet(charactersIn: "↓↑ ")).lowercased()
-        XCTAssertTrue(missing.contains(upload), "\(missing)")
-        XCTAssertEqual(missing.filter { $0 == upload }.count, 1)
-        XCTAssertFalse(missing.contains { $0.hasPrefix(String(localized: "Moyenne").lowercased()) && $0.contains(upload) })
+    /// Un ancien test (pas de courbe, pas de latence, pas d'envoi) ne garde que
+    /// ce qui a été mesuré : ni tuile « — », ni cadre de courbe vide, ni carte
+    /// Latence remplie de tirets. Sa fiche est donc nettement plus courte.
+    func testHistoricalTestHidesWhatWasNotMeasured() throws {
+        let full = sample()
+        let old = SpeedtestRunResult(
+            id: UUID(), label: "x",
+            downloadMbps: 148, downloadAverageMbps: 148, downloadMaxMbps: 161,
+            downloadP90Mbps: nil, downloadP95Mbps: nil,
+            uploadMbps: nil, uploadAverageMbps: nil, uploadMaxMbps: nil,
+            uploadP90Mbps: nil, uploadP95Mbps: nil,
+            pingMs: nil, pingMedianMs: nil, pingMinMs: nil, pingMaxMs: nil,
+            jitterMs: nil, pingDlMs: nil, jitterDlMs: nil, pingUlMs: nil, jitterUlMs: nil,
+            pingProtocol: nil, durationSeconds: 10,
+            connectionType: .cellular, cellularTechnology: .fourG,
+            networkOperatorName: "ORANGE", wifiSSID: nil,
+            city: nil, coordinate: nil, serverName: nil, downloadServerName: nil,
+            createdAt: Date(timeIntervalSince1970: 1_780_000_000),
+            downloadSeriesMbps: nil, uploadSeriesMbps: nil,
+            downloadGraceWindowCount: nil, uploadGraceWindowCount: nil,
+            uploadMeasurementSource: nil, deviceModel: nil, osVersion: nil
+        )
+        func height(_ result: SpeedtestRunResult, _ name: String) throws -> CGFloat {
+            let view = SpeedtestDetailContent(result: result)
+                .frame(width: 393)
+                .background(Color.white)
+                .environment(\.colorScheme, .light)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: "/tmp/sq_detail_\(name).png"))
+            return image.size.height
+        }
+        let fullHeight = try height(full, "full")
+        let oldHeight = try height(old, "historical")
+        XCTAssertLessThan(oldHeight, fullHeight - 300, "courbe et latence absentes : leurs cartes ne doivent pas s'afficher")
     }
 
     func testPlmnIsSplitAfterTheCountryCode() {
-        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("20801"), "208-01")
-        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("302720"), "302-720")
-        XCTAssertEqual(SpeedtestTestDetailsSheet.plmn("—"), "—")
+        XCTAssertEqual(SpeedtestDetailContent.plmn("20801"), "208-01")
+        XCTAssertEqual(SpeedtestDetailContent.plmn("302720"), "302-720")
+        XCTAssertEqual(SpeedtestDetailContent.plmn("—"), "—")
     }
 }

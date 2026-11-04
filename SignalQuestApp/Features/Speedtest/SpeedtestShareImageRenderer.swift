@@ -164,6 +164,9 @@ struct SpeedtestShareGraph: View {
     /// Unité de l'axe dans l'app (« Mbit/s », « Mbps » en anglais) ; `nil` retombe sur
     /// la même unité (`SQUnits`), jamais sur un « Mbps » figé.
     var unitLabel: String? = nil
+    /// Sommet de la série écrit en haut à gauche. La fiche le coupe : elle écrit
+    /// au-dessus du tracé le MAX de sa fenêtre, une autre valeur que ce sommet.
+    var showsPeakLabel = true
 
     /// Série affichée : mesures du moteur si ≥ 2 points ; sinon moyenne réelle
     /// plate (toujours une donnée mesurée, jamais une courbe fantaisie).
@@ -210,7 +213,9 @@ struct SpeedtestShareGraph: View {
     private var axisLabels: some View {
         let maxV = displaySeries.max() ?? 0
         return VStack(alignment: .leading, spacing: 0) {
-            if let unitLabel {
+            if !showsPeakLabel {
+                EmptyView()
+            } else if let unitLabel {
                 Text(verbatim: "\(maxV.formatted(.number.precision(.fractionLength(maxV >= 10 ? 0 : 1)))) \(unitLabel)")
             } else {
                 Text(verbatim: "\(axisLabel(maxV)) \(SQUnits.throughputUnit(mbps: 0))")

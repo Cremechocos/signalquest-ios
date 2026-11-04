@@ -1388,6 +1388,22 @@
         }
       }
     },
+    "Comment c’est mesuré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How it’s measured"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment c’est mesuré"
+          }
+        }
+      }
+    },
     "Contraste" : {
       "localizations" : {
         "en" : {
@@ -1879,6 +1895,38 @@
         }
       }
     },
+    "MCC-MNC" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCC-MNC"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCC-MNC"
+          }
+        }
+      }
+    },
+    "Max réception" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download max"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max réception"
+          }
+        }
+      }
+    },
     "Membre anonyme" : {
       "localizations" : {
         "en" : {
@@ -2003,6 +2051,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mono"
+          }
+        }
+      }
+    },
+    "Moyenne %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne %1$@ %2$@"
           }
         }
       }

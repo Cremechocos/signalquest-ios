@@ -94,6 +94,8 @@ struct SpeedtestDetailContent: View {
     var onDismiss: (() -> Void)?
     var visibilityStatus: SpeedtestVisibilityStatus? = nil
     @State private var graphDirection: GraphDirection = .download
+    /// « Comment c'est mesuré » : serveurs, méthode et octets, repliés par défaut.
+    @State private var showsMethod = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum GraphDirection: Hashable { case download, upload }
@@ -108,8 +110,10 @@ struct SpeedtestDetailContent: View {
                 SpeedtestVerdictCard(verdict: SpeedtestVerdict(result: result),
                                      measuredMbps: result.downloadAverageMbps)
             }
-            curveCard
-            latencyCard
+            // Une carte sans donnée n'est pas affichée (un ancien test n'a ni
+            // courbe ni latence en charge) : pas de cadre vide ni de « — ».
+            if hasCurve { curveCard }
+            if hasLatency { latencyCard }
             measureCard
             actions
         }
@@ -169,9 +173,9 @@ struct SpeedtestDetailContent: View {
 
     /// « Speedtest · Orange 5G SA », « Speedtest · Wi‑Fi ».
     private var kickerLine: String {
-        let op = result.networkOperatorName?.trimmedNonEmptyDetail
+        let op = operatorLabel
         var network = [op, generation].compactMap { $0 }.joined(separator: " ")
-        if network.isEmpty { network = result.networkShareDisplayName }
+        if network.isEmpty { network = networkLine }
         return [String(localized: "Speedtest"), network.trimmedNonEmptyDetail].compactMap { $0 }.joined(separator: " · ")
     }
 
@@ -187,6 +191,21 @@ struct SpeedtestDetailContent: View {
 
     private var deviceModel: String? { result.deviceModel?.trimmedNonEmptyDetail }
 
+    /// « Orange » plutôt que « ORANGE » en mobile ; en Wi‑Fi, le FAI tel quel
+    /// (le FAI « Free » n'est pas Free Mobile).
+    private var operatorLabel: String? {
+        guard let raw = result.networkOperatorName?.trimmedNonEmptyDetail else { return nil }
+        return result.connectionType == .cellular ? SQBrand.operatorName(raw) ?? raw : raw
+    }
+
+    /// Ligne « Réseau », avec le même nom d'opérateur que le sur-titre.
+    private var networkLine: String {
+        let line = result.networkShareDisplayName
+        guard let raw = result.networkOperatorName?.trimmedNonEmptyDetail,
+              let label = operatorLabel, label != raw else { return line }
+        return line.replacingOccurrences(of: raw, with: label)
+    }
+
     // MARK: Débits mesurés — jauge et trois valeurs
 
     private var speedSummaryCard: some View {
@@ -197,13 +216,27 @@ struct SpeedtestDetailContent: View {
                 dial(width: 240)
             }
             .frame(maxWidth: .infinity)
+            // Une tuile par valeur mesurée : une valeur absente retire sa tuile.
             let metrics = Group {
-                let upload = Self.formatSpeedParts(result.uploadAverageMbps)
-                triCell("Envoi", value: upload.value, unit: upload.unit)
-                triCell("Latence", value: Self.msText(result.primaryPingMs), unit: "ms")
-                triCell("Gigue", value: Self.jitterText(result.jitterMs), unit: "ms")
+                if let upload = Self.measured(result.uploadAverageMbps), upload > 0 {
+                    let parts = Self.formatSpeedParts(upload)
+                    triCell("Envoi", value: parts.value, unit: parts.unit)
+                }
+                // Sans courbe, le MAX n'a pas d'autre place : il garde sa tuile.
+                if !hasCurve, let peak = Self.measured(result.downloadMaxMbps), peak > 0 {
+                    let parts = Self.formatSpeedParts(peak)
+                    triCell("Max réception", value: parts.value, unit: parts.unit)
+                }
+                if let ping = Self.measured(result.primaryPingMs) {
+                    triCell("Latence", value: Self.msText(ping), unit: "ms")
+                }
+                if let jitter = Self.measured(result.jitterMs) {
+                    triCell("Gigue", value: Self.jitterText(jitter), unit: "ms")
+                }
             }
-            if dynamicTypeSize.isAccessibilitySize {
+            if !hasSummaryMetrics {
+                EmptyView()
+            } else if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) { metrics }
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -212,6 +245,18 @@ struct SpeedtestDetailContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var hasSummaryMetrics: Bool {
+        (Self.measured(result.uploadAverageMbps) ?? 0) > 0
+            || (!hasCurve && (Self.measured(result.downloadMaxMbps) ?? 0) > 0)
+            || Self.measured(result.primaryPingMs) != nil
+            || Self.measured(result.jitterMs) != nil
+    }
+
+    private static func measured(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, value >= 0 else { return nil }
+        return value
     }
 
     private func dial(width: CGFloat) -> some View {
@@ -262,6 +307,11 @@ struct SpeedtestDetailContent: View {
 
     // MARK: Débit pendant le test — mêmes courbes réelles que l'image de partage
 
+    private var hasCurve: Bool {
+        !(result.downloadSeriesMbps ?? []).isEmpty || !(result.uploadSeriesMbps ?? []).isEmpty
+            || result.measurementTrace?.phases.contains { $0.phase == "download" || $0.phase == "upload" } == true
+    }
+
     private var curveCard: some View {
         detailCard("Débit pendant le test") {
             MapSegmented(
@@ -304,6 +354,15 @@ struct SpeedtestDetailContent: View {
         graceCount: Int?,
         trace: SpeedtestPhaseTrace? = nil
     ) -> some View {
+        // Un seul maximum, écrit au-dessus du tracé : celui du texte (MAX sur sa
+        // fenêtre), et non le sommet de la courbe d'une seconde, qui diffère.
+        if let maxValue, maxValue.isFinite, maxValue > 0 {
+            let peak = Self.formatSpeedParts(maxValue)
+            Text("Max \(peak.value) \(peak.unit)")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+        }
         SpeedtestShareGraph(
             series: (series ?? []).filter { $0.isFinite && $0 >= 0 },
             averageMbps: average ?? 0,
@@ -315,17 +374,17 @@ struct SpeedtestDetailContent: View {
             timedSeries: trace?.recentSeries,
             timedAverageSeries: trace?.averageSeries,
             timeOriginMs: trace?.sampleStartMs,
-            unitLabel: SQUnits.throughputUnit(mbps: 0)
+            unitLabel: SQUnits.throughputUnit(mbps: 0),
+            showsPeakLabel: false
         )
         .frame(height: 120)
         // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
         // descripteur accessible, on la résume pour VoiceOver.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
-        if let average, average.isFinite, average > 0, let maxValue, maxValue.isFinite, maxValue > 0 {
+        if let average, average.isFinite, average > 0 {
             let avg = Self.formatSpeedParts(average)
-            let peak = Self.formatSpeedParts(maxValue)
-            Text("Moyenne \(avg.value) \(avg.unit) · max \(peak.value) \(peak.unit)")
+            Text("Moyenne \(avg.value) \(avg.unit)")
                 .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                 .monospacedDigit()
                 .foregroundStyle(SQColor.label)
@@ -334,89 +393,159 @@ struct SpeedtestDetailContent: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }
-        if let trace {
-            ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
-                Text(label).font(.caption).foregroundStyle(SQColor.labelSecondary)
-            }
-            Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
-                .font(.caption).foregroundStyle(SQColor.labelSecondary)
-            Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
-                .font(.caption).foregroundStyle(SQColor.labelSecondary)
-        } else if !(series ?? []).isEmpty {
-            Text("Courbe historique sans horodatage")
-                .font(.caption).foregroundStyle(SQColor.labelSecondary)
+    }
+
+    /// Lecture de la courbe et fenêtres de mesure, rangées dans « Comment c'est mesuré ».
+    @ViewBuilder
+    private func methodLines(_ trace: SpeedtestPhaseTrace) -> some View {
+        ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
+            Text(label)
         }
+        Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
+        Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
     }
 
     // MARK: Latence — au repos, gigue, et les deux latences en charge
 
+    /// Une ligne par valeur mesurée ; un ancien test sans latence n'a pas de carte.
+    private var hasLatency: Bool {
+        [result.primaryPingMs, result.jitterMs, result.pingDlMs, result.pingUlMs, result.pingMs]
+            .contains { Self.measured($0) != nil }
+    }
+
     private var latencyCard: some View {
         detailCard("Latence") {
             VStack(spacing: SQSpace.xxs) {
-                dotRow("Au repos", Self.msLabel(result.primaryPingMs), trailing: result.pingProtocol?.trimmedNonEmptyDetail)
+                if let idle = Self.measured(result.primaryPingMs) {
+                    dotRow("Au repos", Self.msLabel(idle), trailing: result.pingProtocol?.trimmedNonEmptyDetail)
+                }
                 if let minMs = result.pingMinMs, let maxMs = result.pingMaxMs {
                     dotRow("Min · max", "\(Int(minMs.rounded())) · \(Int(maxMs.rounded())) ms")
                 }
-                dotRow("Gigue", Self.msLabel(result.jitterMs, jitter: true))
-                // Les anciens tests n'ont pas de latence en charge : rien plutôt que « — gigue — ».
-                if result.pingDlMs != nil || result.jitterDlMs != nil {
-                    dotRow("En réception", Self.msLabel(result.pingDlMs), trailing: gigue(result.jitterDlMs))
+                if let jitter = Self.measured(result.jitterMs) {
+                    dotRow("Gigue", Self.msLabel(jitter, jitter: true))
                 }
-                if result.pingUlMs != nil || result.jitterUlMs != nil {
-                    dotRow("En envoi", Self.msLabel(result.pingUlMs), trailing: gigue(result.jitterUlMs))
+                if let loaded = Self.measured(result.pingDlMs) {
+                    dotRow("En réception", Self.msLabel(loaded), trailing: gigue(result.jitterDlMs))
                 }
-                if let average = result.pingMs {
+                if let loaded = Self.measured(result.pingUlMs) {
+                    dotRow("En envoi", Self.msLabel(loaded), trailing: gigue(result.jitterUlMs))
+                }
+                if let average = Self.measured(result.pingMs) {
                     dotRow("Latence moyenne", Self.msLabel(average))
                 }
-                if result.methodologyVersion == nil {
-                    dotRow("Mesure de latence", String(localized: "Valeur historique"))
-                }
             }
         }
     }
 
-    private func gigue(_ jitter: Double?) -> String {
-        let label = String(localized: "gigue")
-        guard let jitter, jitter.isFinite else { return "\(label) —" }
-        return "\(label) ±\(Self.jitterText(jitter))"
+    private func gigue(_ jitter: Double?) -> String? {
+        guard let jitter = Self.measured(jitter) else { return nil }
+        return "\(String(localized: "gigue")) ±\(Self.jitterText(jitter))"
     }
 
-    // MARK: Mesure — réseau, serveurs, appareil, octets réellement comptés
+    // MARK: Comment c'est mesuré — réseau, serveurs, appareil, méthode, octets
 
+    /// Repliée par défaut : le résultat se lit sans le détail technique, qui
+    /// reste à un toucher (choix du 04/11, option A de la planche).
     private var measureCard: some View {
-        detailCard("Détails de la mesure") {
-            VStack(spacing: SQSpace.xxs) {
-                dotRow("Réseau", result.networkShareDisplayName)
-                if let city = result.city?.trimmedNonEmptyDetail {
-                    dotRow("Lieu", city)
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            Button {
+                Haptics.selection()
+                withAnimation(.snappy(duration: 0.25)) { showsMethod.toggle() }
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Comment c’est mesuré")
+                        .font(SQFont.body(15, .bold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .rotationEffect(.degrees(showsMethod ? 180 : 0))
+                        .accessibilityHidden(true)
                 }
-                if let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmptyDetail {
-                    dotRow("Serveur de mesure", server)
-                }
-                if let device = deviceLine {
-                    dotRow("Appareil", device)
-                }
-                if let host = result.downloadServerHost {
-                    dotRow("Serveur de réception", endpoint(host, result.downloadServerPort))
-                }
-                if let host = result.uploadServerHost {
-                    dotRow("Serveur d’envoi", endpoint(host, result.uploadServerPort))
-                }
-                if let host = result.pingServerHost {
-                    dotRow("Serveur de latence", endpoint(host, result.pingServerPort))
-                }
-                if let version = result.methodologyVersion {
-                    dotRow("Méthodologie", String(version))
-                }
-                if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
-                    dotRow("Comptage de l’envoi", Self.byteSourceLabel(source))
-                }
-                // Octets comptés pendant la fenêtre de mesure, avec leur source.
-                ForEach(measuredByteRows, id: \.label) { row in
-                    dotRow(row.label, row.value, localized: false)
-                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showsMethod ? Text("Ouvert") : Text("Fermé"))
+            .accessibilityIdentifier("speedtest.detail.method")
+            if showsMethod {
+                measureRows
             }
         }
+        .padding(.horizontal, SQSpace.cardPadding)
+        .padding(.vertical, SQSpace.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    private var measureRows: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            dotRow("Réseau", networkLine)
+            if let plmn = result.observedPlmn?.trimmedNonEmptyDetail {
+                dotRow("MCC-MNC", Self.plmn(plmn))
+            }
+            if let roaming = result.isRoaming {
+                dotRow("Itinérance", roaming ? String(localized: "Oui") : String(localized: "Non"))
+            }
+            if let city = result.city?.trimmedNonEmptyDetail {
+                dotRow("Lieu", city)
+            }
+            if let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmptyDetail {
+                dotRow("Serveur de mesure", server)
+            }
+            if let device = deviceLine {
+                dotRow("Appareil", device)
+            }
+            if let host = result.downloadServerHost {
+                dotRow("Serveur de réception", endpoint(host, result.downloadServerPort))
+            }
+            if let host = result.uploadServerHost {
+                dotRow("Serveur d’envoi", endpoint(host, result.uploadServerPort))
+            }
+            if let host = result.pingServerHost {
+                dotRow("Serveur de latence", endpoint(host, result.pingServerPort))
+            }
+            if let engine = result.engine?.trimmedNonEmptyDetail {
+                dotRow("Moteur", engine)
+            }
+            if let version = result.methodologyVersion {
+                dotRow("Méthodologie", String(version))
+            }
+            if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
+                dotRow("Comptage de l’envoi", Self.byteSourceLabel(source))
+            }
+            // Octets comptés pendant la fenêtre de mesure, avec leur source.
+            ForEach(measuredByteRows, id: \.label) { row in
+                dotRow(row.label, row.value, localized: false)
+            }
+            ForEach(methodPhases, id: \.phase) { phase in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(phase.phase == "download" ? LocalizedStringKey("Réception") : LocalizedStringKey("Envoi"))
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.label)
+                    methodLines(phase)
+                        .font(.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, SQSpace.xs)
+            }
+        }
+    }
+
+    private var methodPhases: [SpeedtestPhaseTrace] {
+        ["download", "upload"].compactMap { name in
+            result.measurementTrace?.phases.first { $0.phase == name }
+        }
+    }
+
+    /// « 20801 » → « 208-01 » ; laissé tel quel s'il n'a pas la forme attendue.
+    static func plmn(_ value: String) -> String {
+        let digits = value.filter(\.isNumber)
+        guard digits.count == 5 || digits.count == 6 else { return value }
+        return "\(digits.prefix(3))-\(digits.dropFirst(3))"
     }
 
     private var measuredByteRows: [(label: String, value: String)] {
@@ -465,8 +594,11 @@ struct SpeedtestDetailContent: View {
         }
     }
 
+    /// « lyo.bbr.iperf.bytel.fr:9210 », coupable seulement après un point ou
+    /// avant le port (espace sans chasse) : jamais « :92 » puis « 10 ».
     private func endpoint(_ host: String, _ port: Int?) -> String {
-        port.map { "\(host):\($0)" } ?? host
+        let breakable = host.replacingOccurrences(of: ".", with: ".\u{200B}")
+        return port.map { "\(breakable)\u{200B}:\($0)" } ?? breakable
     }
 
     private var deviceLine: String? {
