@@ -173,7 +173,7 @@ final class AppServices: ObservableObject {
         PendingQueueFlusher(steps: [
             { [weak self] in await self?.speedtest.retryPendingSaves() },
             { [weak self] in await self?.feed.retryPendingPosts() },
-            { [weak self] in await self?.messages.retryPendingTextMessages() },
+            { [weak self] in await self?.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
             { [weak self] in await self?.retryPendingV2Sends() },
             { [weak self] in await self?.customSites.retryPending() },
@@ -419,6 +419,35 @@ final class AppServices: ObservableObject {
         default:
             break
         }
+        return result
+    }
+
+    /// File d'envoi des textes, puis ceux qu'elle a écrits en clair avant la bascule :
+    /// refusés (409 E2EE_AUTO_REQUIRED), ils repartent en v2.
+    func retryPendingTextMessages() async {
+        for record in await messages.retryPendingTextMessages() where record.request.e2ee == nil {
+            guard let text = record.request.content, !text.isEmpty else { continue }
+            _ = await resendAfterAutoEncryption(
+                text, conversationId: record.conversationId,
+                ttlSeconds: record.request.ttlSeconds ?? 0, clientRequestId: record.clientRequestId
+            )
+        }
+    }
+
+    /// Texte en clair refusé après la bascule (409 E2EE_AUTO_REQUIRED), hors du fil :
+    /// la conversation passe en auto, puis le texte repart en v2, sans la réponse qu'il
+    /// citait, comme depuis le fil (E2EE-AUTO §7.2, §8). Dès que la v2 le garde, le texte
+    /// en clair resté « non envoyé » dans la file est retiré. `nil` : la conversation n'a
+    /// pas pu passer en v2, le texte reste « non envoyé » et le fil le renverra.
+    func resendAfterAutoEncryption(
+        _ text: String, conversationId: String, ttlSeconds: Int, clientRequestId: String
+    ) async -> E2EEV2MessageSendResultV2? {
+        E2EEV2ServerGate.recordAutoActive()
+        guard e2eeV2Messaging.writesEnabled,
+              let conversation = try? await messages.conversation(id: conversationId),
+              await e2eeV2Messaging.migrateIfReady(conversation, trigger: .firstSend) == .v2 else { return nil }
+        let result = await sendV2TextOutsideThread(text, to: conversation, ttlSeconds: ttlSeconds)
+        await messages.discardPendingText(clientRequestId: clientRequestId)
         return result
     }
 
@@ -1314,6 +1343,11 @@ extension AppServices {
                     ? String(localized: "Connexion instable. Réessaie.")
                     : String(localized: "La conversation chiffrée n’a pas pu être créée."))
             }
+        }
+        // Après la bascule, le serveur refuse toute création v1 (E2EE-AUTO §7) : le dire
+        // plutôt que d'essayer. L'appareil sans clé v2 la prépare à l'ouverture suivante.
+        guard !E2EEV2ServerGate.autoActive else {
+            throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
         }
         return try await messages.createConversation(participantIds: [userId], title: nil, e2ee: true).conversationId
     }

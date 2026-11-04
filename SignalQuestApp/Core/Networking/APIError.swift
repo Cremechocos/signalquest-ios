@@ -267,6 +267,13 @@ extension Error {
     ///
     /// Restent temporaires : 401 (session à renouveler), 408 (délai), 425 et
     /// 429 (trop tôt, trop de requêtes), et toute erreur réseau ou 5xx.
+    /// `409 E2EE_AUTO_REQUIRED` : après la bascule, le serveur refuse un texte en clair
+    /// ou v1. La conversation doit passer en auto et le texte repartir en v2 (E2EE-AUTO §7.2).
+    var isAutoEncryptionRequired: Bool {
+        guard let api = self as? APIError, case .http(409, let code, _, _, _) = api else { return false }
+        return code == "E2EE_AUTO_REQUIRED"
+    }
+
     var isPermanentRequestFailure: Bool {
         guard let api = self as? APIError, case .http(let status, let code, _, _, _) = api else { return false }
         // DM-REQ-1 : le plafond quotidien de demandes est une décision du serveur, pas une panne passagère.

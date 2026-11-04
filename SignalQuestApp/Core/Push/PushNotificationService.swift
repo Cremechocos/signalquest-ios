@@ -995,11 +995,24 @@ extension PushNotificationService {
                 await Self.postReplyFailureNotice(conversationId: conversationId, conversationTitle: nil)
                 return
             }
+            let clientRequestId = "ios-message-\(UUID().uuidString.lowercased())"
+            let ttlSeconds = policy?.backgroundSendTTLSeconds ?? 0
             do {
                 _ = try await messages.sendText(
-                    text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil,
-                    ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0
+                    text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: clientRequestId,
+                    ttlSeconds: ttlSeconds
                 )
+            } catch where error.isAutoEncryptionRequired {
+                // Après la bascule : la conversation passe en auto et la réponse part en v2.
+                let result = await AppServicesHolder.services.resendAfterAutoEncryption(
+                    text, conversationId: conversationId, ttlSeconds: ttlSeconds, clientRequestId: clientRequestId
+                )
+                if result.map(Self.replyNeedsFailureNotice) ?? true {
+                    await Self.postReplyFailureNotice(
+                        conversationId: conversationId,
+                        conversationTitle: conversation.displayTitle(excluding: LocalAccountScope.currentUserId)
+                    )
+                }
             } catch where error.isPermanentRequestFailure {
                 // Refus définitif (exclu du groupe, conversation supprimée) : rien ne repartira,
                 // et l'écran verrouillé ne dit pas que la réponse est perdue (U04).

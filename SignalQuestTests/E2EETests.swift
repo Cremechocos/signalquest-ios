@@ -6172,6 +6172,59 @@ final class MessageTextOutboxTests: XCTestCase {
 
     /// 403 `MESSAGE_REQUEST_PENDING` en v1 : terminal. Le texte reste « non envoyé » avec sa raison, la file
     /// ne le rejoue jamais seule, et la conversation apprend qu'elle attend l'acceptation.
+    /// Texte écrit en clair hors ligne, rejoué après la bascule : le serveur répond 409
+    /// E2EE_AUTO_REQUIRED. La file le garde « non envoyé » et le rend à l'appelant, qui le
+    /// renvoie en v2 ; il n'est plus rejoué en clair.
+    func testAutoRequiredRefusalIsReturnedForAV2Resend() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("message-text-auto-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "message-outbox-auto-user")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-message-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials,
+                            session: URLSession(configuration: configuration))
+        let outbox = MessageTextOutboxStore(baseDirectory: root)
+        let service = MessagesService(api: api, textOutbox: outbox)
+        let conversation = MessageConversation(
+            id: "conversation-auto", title: "Fixture", isGroup: false, e2eeEnabled: false,
+            groupPhotoUrl: nil, createdAt: nil, updatedAt: nil, lastMessageAt: nil,
+            lastReadAt: nil, pinnedAt: nil, participants: [], lastMessage: nil
+        )
+        var online = false
+        var posted = 0
+        MockURLProtocol.requestHandler = { request in
+            guard online else { throw URLError(.notConnectedToInternet) }
+            posted += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"Conversation chiffrée","code":"E2EE_AUTO_REQUIRED"}"#.utf8))
+        }
+        do {
+            _ = try await service.sendText("bonjour", in: conversation, e2ee: nil,
+                                           idempotencyKey: "local-auto-0123456789abcdef")
+            XCTFail("Hors ligne, l'envoi doit rester en file")
+        } catch {}
+
+        online = true
+        let refused = await service.retryPendingTextMessages()
+        XCTAssertEqual(refused.map(\.clientRequestId), ["local-auto-0123456789abcdef"])
+        XCTAssertEqual(refused.first?.request.content, "bonjour")
+        let kept = try await outbox.pending(session: session)
+        XCTAssertNotNil(kept.first?.failureReason, "Gardé « non envoyé » tant que la v2 ne l'a pas repris")
+
+        let attempts = posted
+        let again = await service.retryPendingTextMessages()
+        XCTAssertTrue(again.isEmpty)
+        XCTAssertEqual(posted, attempts, "Jamais rejoué en clair sans geste")
+    }
+
     func testMessageRequestPendingIsTerminalAndNeverReplayed() async throws {
         let fixture = try requestFixture(userId: "message-request-pending-user")
         defer {

@@ -41,7 +41,9 @@ protocol MessagesServicing: Sendable {
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
     func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
-    func retryPendingTextMessages() async
+    /// Les textes refusés parce que la conversation doit passer en auto, gardés « non envoyés ».
+    @discardableResult
+    func retryPendingTextMessages() async -> [MessageTextOutboxRecord]
     /// Nombre de messages (textes et pièces jointes) que la file garde sans accusé du serveur.
     func pendingOutgoingCount() async -> Int
     /// Messages texte encore en file pour une conversation (en attente ou « non envoyés »).
@@ -193,7 +195,7 @@ extension MessagesServicing {
     }
 
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
-    func retryPendingTextMessages() async {}
+    func retryPendingTextMessages() async -> [MessageTextOutboxRecord] { [] }
     func pendingOutgoingCount() async -> Int { 0 }
     func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord] { [] }
     func discardPendingText(clientRequestId: String) async {}
@@ -749,18 +751,23 @@ final class MessagesService: MessagesServicing {
         return texts + attachments
     }
 
-    func retryPendingTextMessages() async {
-        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
-        guard let records = try? await textOutbox.pending(session: session) else { return }
+    @discardableResult
+    func retryPendingTextMessages() async -> [MessageTextOutboxRecord] {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return [] }
+        guard let records = try? await textOutbox.pending(session: session) else { return [] }
+        var autoRequired: [MessageTextOutboxRecord] = []
         // L'ordre ne compte qu'au sein d'une conversation : un envoi bloqué dans A
         // (exclusion d'un groupe, conversation supprimée, réseau) ne doit plus
         // retenir ceux de B (SOC-04).
         var blockedConversations = Set<String>()
         for record in records where record.failureReason == nil {
-            guard session.isCurrent else { return }
+            guard session.isCurrent else { return autoRequired }
             guard !blockedConversations.contains(record.conversationId) else { continue }
             do {
                 _ = try await submitPreparedText(record, session: session)
+            } catch where error.isAutoEncryptionRequired {
+                // Écrit en clair avant la bascule : marqué « non envoyé », l'appelant le renvoie en v2.
+                autoRequired.append(record)
             } catch where error.isPermanentRequestFailure {
                 // Marqué « non envoyé » par `submitPreparedText` : la conversation
                 // l'affichera avec Réessayer / Supprimer, les suivants continuent.
@@ -771,6 +778,7 @@ final class MessagesService: MessagesServicing {
                 blockedConversations.insert(record.conversationId)
             }
         }
+        return autoRequired
     }
 
     /// Messages texte encore en file pour une conversation : en attente d'envoi,
