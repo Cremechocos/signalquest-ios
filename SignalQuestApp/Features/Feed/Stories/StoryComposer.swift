@@ -17,30 +17,93 @@ enum StoryAudience: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// Fond d'une story sans photo, tiré de la charte Crème. Il part en `#RRGGBB` :
-/// le lecteur (iOS, web, Android) affiche toute couleur hex et choisit l'encre selon la luminosité.
+/// Fond d'une story sans média, commun aux trois apps : contracts/social/story-background-v1.json
+/// (figé le 04/11). La clé part telle quelle ; les couleurs et l'encre sont celles du contrat,
+/// sauf `brand`, résolu au thème de celui qui regarde.
 enum StoryBackground: String, CaseIterable, Identifiable {
-    case nuit, creme, brique, olive, ambre, encre
+    case brand, ocean, sunset, berry, violet, forest, night, nuit, creme, brique, olive, ambre, encre
 
     var id: String { rawValue }
-    var hex: String {
+
+    /// Ce qu'une story porte : une clé du contrat, un ancien `#RRGGBB` écrit par iOS
+    /// (sans casse), sinon `brand`, sans jamais d'erreur.
+    init(stored raw: String?) {
+        let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self = Self(rawValue: value) ?? Self.legacyHex[value.uppercased()] ?? .brand
+    }
+
+    /// `legacyHex` du contrat : les six fonds écrits par iOS avant lui.
+    static let legacyHex: [String: StoryBackground] = [
+        "#191410": .nuit, "#F3EDE2": .creme, "#B04A3C": .brique,
+        "#606B46": .olive, "#85602B": .ambre, "#332818": .encre,
+    ]
+
+    /// Encres `light` et `dark` du contrat.
+    static let lightInk: UInt32 = 0xFFFFFF
+    static let darkInk: UInt32 = 0x1C201E
+
+    /// Bornes du dégradé (égales pour un aplat) et encre. `brand` reprend le carmin Halo
+    /// du web, en dégradé : 7,47:1 au moins en clair, 4,78:1 en sombre.
+    func palette(_ scheme: ColorScheme) -> (from: UInt32, to: UInt32, ink: UInt32) {
         switch self {
-        case .nuit: return "#191410"
-        case .creme: return "#F3EDE2"
-        case .brique: return "#B04A3C"
-        case .olive: return "#606B46"
-        case .ambre: return "#85602B"
-        case .encre: return "#332818"
+        case .brand:
+            return scheme == .dark ? (0xFF5C7A, 0xFF3D60, Self.darkInk) : (0xA8123A, 0x8A0E30, Self.lightInk)
+        case .ocean: return (0x0A74A6, 0x00507A, Self.lightInk)
+        case .sunset: return (0xC2410C, 0x9A3412, Self.lightInk)
+        case .berry: return (0xC0246B, 0x8B355B, Self.lightInk)
+        case .violet: return (0x7B4FD6, 0x5B3F94, Self.lightInk)
+        case .forest: return (0x188038, 0x14532D, Self.lightInk)
+        case .night: return (0x1E293B, 0x0B1014, Self.lightInk)
+        case .nuit: return (0x191410, 0x191410, Self.lightInk)
+        case .creme: return (0xF3EDE2, 0xF3EDE2, Self.darkInk)
+        case .brique: return (0xB04A3C, 0xB04A3C, Self.lightInk)
+        case .olive: return (0x606B46, 0x606B46, Self.lightInk)
+        case .ambre: return (0x85602B, 0x85602B, Self.lightInk)
+        case .encre: return (0x332818, 0x332818, Self.lightInk)
         }
     }
+
+    /// Extrémités de `linear-gradient(160deg, …)` en CSS, sur la taille réelle du cadre :
+    /// la ligne passe par le centre et mesure |w·sin θ| + |h·cos θ|, jamais coin à coin.
+    static func gradientPoints(in size: CGSize, angleDeg: Double = 160) -> (start: UnitPoint, end: UnitPoint) {
+        guard size.width > 0, size.height > 0 else { return (.top, .bottom) }
+        let theta = angleDeg * .pi / 180
+        let dx = sin(theta), dy = -cos(theta)
+        let half = (abs(size.width * dx) + abs(size.height * dy)) / 2
+        let ux = dx * half / size.width, uy = dy * half / size.height
+        return (UnitPoint(x: 0.5 - ux, y: 0.5 - uy), UnitPoint(x: 0.5 + ux, y: 0.5 + uy))
+    }
+
     var label: String {
         switch self {
+        case .brand: return "SignalQuest"
+        case .ocean: return String(localized: "Océan")
+        case .sunset: return String(localized: "Coucher de soleil")
+        case .berry: return String(localized: "Baie")
+        case .violet: return String(localized: "Violet")
+        case .forest: return String(localized: "Forêt")
+        case .night: return String(localized: "Minuit")
         case .nuit: return String(localized: "Nuit")
         case .creme: return String(localized: "Crème")
         case .brique: return String(localized: "Brique")
         case .olive: return String(localized: "Olive")
         case .ambre: return String(localized: "Ambre")
         case .encre: return String(localized: "Encre")
+        }
+    }
+}
+
+/// Un fond de story peint comme le contrat le décrit, à toute taille (pastille ou plein écran).
+struct StoryBackgroundFill: View {
+    let background: StoryBackground
+    let scheme: ColorScheme
+
+    var body: some View {
+        let palette = background.palette(scheme)
+        GeometryReader { proxy in
+            let points = StoryBackground.gradientPoints(in: proxy.size)
+            LinearGradient(colors: [Color(hex: palette.from), Color(hex: palette.to)],
+                           startPoint: points.start, endPoint: points.end)
         }
     }
 }
@@ -77,7 +140,7 @@ final class StoryComposerViewModel: ObservableObject {
     @Published var attachRadio = false
     @Published var closeFriendIds: Set<String> = []
     /// Fond d'une story sans photo ; ignoré dès qu'une photo est choisie.
-    @Published var background: StoryBackground = .nuit
+    @Published var background: StoryBackground = .brand
     /// La liste d'amis proches est-elle bien revenue du serveur, et dans quel état ?
     /// Sans cela, une liste vide (chargement raté) serait enregistrée à la fermeture
     /// de l'éditeur et effacerait la vraie.
@@ -228,7 +291,7 @@ final class StoryComposerViewModel: ObservableObject {
                 visibility: audience.rawValue,
                 ttlHours: ttlHours,
                 hiddenUserIds: Array(hiddenUserIds),
-                background: mediaUrl == nil ? background.hex : nil,
+                background: mediaUrl == nil ? background.rawValue : nil,
                 attachRadio: attachRadio,
                 metadata: nil
             )
@@ -258,6 +321,8 @@ struct StoryComposer: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Thème de l'auteur, lu au-dessus du noir imposé à l'écran : il résout le fond `brand`.
+    @Environment(\.colorScheme) private var viewerScheme
     @State private var step: Step = .create
     @State private var showPremiumPaywall = false
     @State private var showPhotoEditor = false
@@ -343,7 +408,7 @@ struct StoryComposer: View {
 
     private var createStep: some View {
         VStack(spacing: SQSpace.md) {
-            StoryCanvas(model: model, author: author, editable: true, captionFocused: $captionFocused)
+            StoryCanvas(model: model, author: author, editable: true, viewerScheme: viewerScheme, captionFocused: $captionFocused)
                 .overlay(alignment: .top) { canvasTopBar }
                 .padding(.horizontal, SQSpace.sm)
                 // La story prend la place qui reste : les outils restent toujours visibles.
@@ -408,30 +473,37 @@ struct StoryComposer: View {
         .padding(SQSpace.sm)
     }
 
-    /// Six fonds de la charte, touchables sous la story.
+    /// Les treize fonds du contrat, touchables sous la story ; la rangée défile.
     private var backgroundPicker: some View {
-        HStack(spacing: SQSpace.xs) {
-            ForEach(StoryBackground.allCases) { background in
-                Button {
-                    Haptics.selection()
-                    model.background = background
-                } label: {
-                    Circle()
-                        .fill(StoryViewer.backgroundColor(background.hex)?.color ?? .black)
-                        .frame(width: 30, height: 30)
-                        .overlay(Circle().strokeBorder(SQColor.onGlass.opacity(0.35), lineWidth: 1))
-                        .overlay {
-                            if model.background == background {
-                                Circle().strokeBorder(SQColor.onGlass, lineWidth: 2.5).padding(-5)
-                            }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SQSpace.xs) {
+                    ForEach(StoryBackground.allCases) { background in
+                        Button {
+                            Haptics.selection()
+                            model.background = background
+                        } label: {
+                            StoryBackgroundFill(background: background, scheme: viewerScheme)
+                                .clipShape(Circle())
+                                .frame(width: 30, height: 30)
+                                .overlay(Circle().strokeBorder(SQColor.onGlass.opacity(0.35), lineWidth: 1))
+                                .overlay {
+                                    if model.background == background {
+                                        Circle().strokeBorder(SQColor.onGlass, lineWidth: 2.5).padding(-5)
+                                    }
+                                }
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .id(background)
+                        .accessibilityLabel(Text(verbatim: background.label))
+                        .accessibilityAddTraits(model.background == background ? .isSelected : [])
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: background.label))
-                .accessibilityAddTraits(model.background == background ? .isSelected : [])
+                .padding(.horizontal, SQSpace.sm)
             }
+            .onAppear { proxy.scrollTo(model.background, anchor: .center) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Fond de la story"))
@@ -537,7 +609,7 @@ struct StoryComposer: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     HStack(alignment: .center, spacing: SQSpace.md) {
-                        StoryCanvas(model: model, author: author, editable: false, captionFocused: $captionFocused)
+                        StoryCanvas(model: model, author: author, editable: false, viewerScheme: viewerScheme, captionFocused: $captionFocused)
                             .frame(width: 72)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
@@ -830,6 +902,7 @@ private struct StoryCanvas: View {
     @ObservedObject var model: StoryComposerViewModel
     let author: AuthUser?
     let editable: Bool
+    let viewerScheme: ColorScheme
     var captionFocused: FocusState<Bool>.Binding
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -887,9 +960,8 @@ private struct StoryCanvas: View {
                 }
                 .environment(\.colorScheme, .dark)
         } else {
-            let tint = StoryViewer.backgroundColor(model.background.hex)
             ZStack {
-                (tint?.color ?? .black)
+                StoryBackgroundFill(background: model.background, scheme: viewerScheme)
                     .contentShape(Rectangle())
                     .onTapGesture(perform: toggleFocus)
                 VStack(spacing: editable ? SQSpace.lg : SQSpace.xs) {
@@ -899,15 +971,18 @@ private struct StoryCanvas: View {
                 }
                 .padding(.horizontal, editable ? SQSpace.xl : SQSpace.xs)
             }
-            .environment(\.colorScheme, tint?.isLight == true ? .light : .dark)
+            .environment(\.colorScheme, inkIsDark ? .light : .dark)
         }
     }
 
     private var isTyping: Bool { editable && captionFocused.wrappedValue }
 
+    /// Sans photo, l'encre que le contrat fixe pour le fond ; sur une photo, le crème du verre.
     private var inkColor: Color {
-        model.previewImage == nil ? SQColor.label : SQColor.onGlass
+        model.previewImage == nil ? Color(hex: model.background.palette(viewerScheme).ink) : SQColor.onGlass
     }
+
+    private var inkIsDark: Bool { model.background.palette(viewerScheme).ink == StoryBackground.darkInk }
 
     @ViewBuilder
     private func caption(alignment: TextAlignment, font: Font) -> some View {

@@ -38,6 +38,8 @@ struct StoryViewer: View {
     @State private var index: Int = 0
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverOn
+    /// Thème de celui qui regarde : il résout le fond `brand` d'une story texte.
+    @Environment(\.colorScheme) private var viewerScheme
 
     /// Instant d'auto-avancement de la story courante (nil = minuteur suspendu :
     /// clavier/feuille ouverts ou VoiceOver actif). Source de vérité unique pour la
@@ -230,38 +232,23 @@ struct StoryViewer: View {
                 .accessibilityLabel(mediaLabel(for: story))
             }
         } else {
-            // Story texte : canevas « nuit » de la charte, typo display crème.
-            // Le crème du mode clair rendait illisibles le nom, l'heure et les
-            // boutons du lecteur, écrits en blanc pour les photos. Une couleur
-            // de fond choisie par l'auteur (hex) prend la place du canevas.
-            let custom = Self.backgroundColor(story.background)
+            // Story texte : le fond du contrat commun (clé, ancien #RRGGBB ou `brand`
+            // par défaut) et l'encre qu'il fixe pour ce fond.
+            let background = StoryBackground(stored: story.background)
+            let ink = background.palette(viewerScheme).ink
             ZStack {
-                (custom?.color ?? SQColor.bg).ignoresSafeArea()
+                StoryBackgroundFill(background: background, scheme: viewerScheme).ignoresSafeArea()
                 VStack(spacing: SQSpace.lg) {
                     SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 88)
                     Text(story.text ?? String(localized: "Story"))
                         .font(SQFont.display(28, .bold))
-                        .foregroundStyle(SQColor.label)
+                        .foregroundStyle(Color(hex: ink))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, SQSpace.xxl + 4)
                 }
             }
-            .environment(\.colorScheme, custom?.isLight == true ? .light : .dark)
+            .environment(\.colorScheme, ink == StoryBackground.darkInk ? .light : .dark)
         }
-    }
-
-    /// Couleur de fond d'une story texte, quand le serveur en porte une au
-    /// format `#RRGGBB`. Tout autre format est ignoré : le canevas de la charte reste.
-    /// `isLight` choisit l'encre du texte (sombre sur fond clair).
-    static func backgroundColor(_ raw: String?) -> (color: Color, isLight: Bool)? {
-        guard var hex = raw?.trimmingCharacters(in: .whitespacesAndNewlines), hex.hasPrefix("#") else { return nil }
-        hex.removeFirst()
-        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
-        let red = Double((value >> 16) & 0xFF) / 255
-        let green = Double((value >> 8) & 0xFF) / 255
-        let blue = Double(value & 0xFF) / 255
-        let luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
-        return (Color(hex: value), luminance > 0.6)
     }
 
     private func progressBars(now: Date) -> some View {

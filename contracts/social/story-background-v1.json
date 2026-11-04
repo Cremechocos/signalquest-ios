@@ -1,0 +1,150 @@
+{
+  "contract": "signalquest.social.story-background",
+  "version": 1,
+  "status": "figé le 04/11/2026 après relecture d'iOS, d'Android et du Web",
+  "decisions": {
+    "source": "Alexandre, 04/11/2026 : socle commun aux trois apps, liste unique rendue à l'identique partout",
+    "list": "réunion des deux palettes existantes (brand, 6 dégradés d'Android, 6 aplats d'iOS)",
+    "ink": "encre fixée par fond dans ce contrat, jamais calculée par l'app",
+    "angle": "160° en convention CSS",
+    "serverValidation": "refus à l'écriture d'une valeur hors contrat",
+    "brand": "valeur nommée résolue par chaque app selon son thème (décision d'Alexandre relayée par Android et la Centralisation, 04/11/2026) : seule clé dont le rendu dépend du spectateur"
+  },
+  "field": {
+    "path": "SocialStory.background (POST /api/social/stories, corps `background`)",
+    "values": "une clé de `backgrounds`, ou null ; jamais un #RRGGBB, sauf les six valeurs de `legacyHex` encore acceptées à l'écriture"
+  },
+  "inks": {
+    "light": "#FFFFFF",
+    "dark": "#1C201E"
+  },
+  "gradient": {
+    "kind": "linéaire, deux bornes, interpolation en sRGB",
+    "angleDeg": 160,
+    "angleConvention": "CSS : 0° vers le haut, sens horaire ; la ligne du dégradé passe par le centre du conteneur et ses extrémités sont résolues sur la taille réelle de celui-ci, comme `linear-gradient(160deg, from, to)` ; même rendu dans une pastille et en plein écran",
+    "endpoints": {
+      "rule": "comme CSS `linear-gradient` : jamais coin à coin",
+      "length": "L = |w·sin θ| + |h·cos θ| (w, h : taille réelle du conteneur ; θ = angleDeg)",
+      "direction": "vecteur unitaire (sin θ, −cos θ) en coordonnées écran (y vers le bas)",
+      "points": "départ = centre − direction·L/2, arrivée = centre + direction·L/2 ; recalculés à chaque taille (pastille, plein écran)"
+    }
+  },
+  "contrast": {
+    "minimum": 4.5,
+    "formula": "rapport WCAG 2.x, luminance relative (canaux sRGB linéarisés)",
+    "scope": "l'encre du fond tient le minimum contre TOUT point du fond ; pour un dégradé, sur toute l'étendue de `from` à `to` (le point le plus faible est mesuré, pas une extrémité seulement) ; vérifiable ici pour les 12 fonds à couleurs fixes, garanti par l'app pour `brand`"
+  },
+  "backgrounds": {
+    "brand": {
+      "kind": "named",
+      "resolution": "fond de marque de l'app, résolu au thème du SPECTATEUR (pas de l'auteur) ; aplat ou dégradé au choix de l'app (pour un dégradé : `gradient.angleDeg`) ; aucune couleur dans ce contrat",
+      "ink": "app",
+      "inkRule": "l'app résout la couleur ET son encre (par ex. onPrimary de Material contre primary), et garantit le minimum de `contrast` entre les deux sur tout le fond ; les encres `light`/`dark` ne s'imposent pas ici",
+      "examples": {
+        "normative": false,
+        "web": "clair #A8123A→#8A0E30 avec #FFFFFF (7,47:1 au moins) ; sombre #FF5C7A→#FF3D60 avec #1C201E (4,78:1 au moins)",
+        "android": "thème : aplat accent avec onAccent ; palette dynamique : scheme.primary → mélange à 14 % de blanc, avec onPrimary"
+      }
+    },
+    "ocean": {
+      "kind": "gradient",
+      "from": "#0A74A6",
+      "to": "#00507A",
+      "ink": "light",
+      "minContrast": 5.17
+    },
+    "sunset": {
+      "kind": "gradient",
+      "from": "#C2410C",
+      "to": "#9A3412",
+      "ink": "light",
+      "minContrast": 5.18
+    },
+    "berry": {
+      "kind": "gradient",
+      "from": "#C0246B",
+      "to": "#8B355B",
+      "ink": "light",
+      "minContrast": 5.67
+    },
+    "violet": {
+      "kind": "gradient",
+      "from": "#7B4FD6",
+      "to": "#5B3F94",
+      "ink": "light",
+      "minContrast": 5.34
+    },
+    "forest": {
+      "kind": "gradient",
+      "from": "#188038",
+      "to": "#14532D",
+      "ink": "light",
+      "minContrast": 5.02
+    },
+    "night": {
+      "kind": "gradient",
+      "from": "#1E293B",
+      "to": "#0B1014",
+      "ink": "light",
+      "minContrast": 14.63
+    },
+    "nuit": {
+      "kind": "solid",
+      "color": "#191410",
+      "ink": "light",
+      "minContrast": 18.28
+    },
+    "creme": {
+      "kind": "solid",
+      "color": "#F3EDE2",
+      "ink": "dark",
+      "minContrast": 14.14
+    },
+    "brique": {
+      "kind": "solid",
+      "color": "#B04A3C",
+      "ink": "light",
+      "minContrast": 5.4
+    },
+    "olive": {
+      "kind": "solid",
+      "color": "#606B46",
+      "ink": "light",
+      "minContrast": 5.69
+    },
+    "ambre": {
+      "kind": "solid",
+      "color": "#85602B",
+      "ink": "light",
+      "minContrast": 5.67
+    },
+    "encre": {
+      "kind": "solid",
+      "color": "#332818",
+      "ink": "light",
+      "minContrast": 14.41
+    }
+  },
+  "legacyHex": {
+    "rule": "valeurs écrites par iOS avant ce contrat ; un lecteur les rattache à leur clé (comparaison sans casse) ; le serveur les accepte encore à l'écriture pour ne pas refuser les builds iOS déjà publiées",
+    "map": {
+      "#191410": "nuit",
+      "#F3EDE2": "creme",
+      "#B04A3C": "brique",
+      "#606B46": "olive",
+      "#85602B": "ambre",
+      "#332818": "encre"
+    }
+  },
+  "fallback": "clé inconnue, absente, vide ou null (et tout #RRGGBB hors `legacyHex`) => `brand` ; jamais d'erreur montrée",
+  "server": {
+    "write": "accepte une clé de `backgrounds`, une valeur de `legacyHex` (stockée telle quelle) ou null (lu comme `brand`, pour les anciennes builds) ; toute autre valeur => 400 VALIDATION_ERROR, champ `background`",
+    "read": "rend la valeur stockée telle quelle"
+  },
+  "apps": {
+    "write": "toujours une clé explicite de `backgrounds`, y compris `brand` quand rien n'est choisi ; plus de #RRGGBB ; champ omis pour une story photo ou vidéo",
+    "read": "story sans média : clé => rendu du contrat ; `legacyHex` => sa clé ; sinon `fallback`. Story avec média : `background` ignoré"
+  },
+  "media": "une story avec média (photo, vidéo) n'a pas de fond : `background` est omis ou null à l'écriture, et ignoré à la lecture dès qu'un média existe ; le repli `brand` ne vaut que pour une story sans média",
+  "legacyReaders": "les builds iOS publiées avant ce contrat ne lisent que #RRGGBB : une clé (écrite par Android, le Web ou une nouvelle build iOS) y retombe sur le canevas par défaut, sans erreur, jusqu'à la mise à jour ; c'est déjà le cas des clés Android aujourd'hui"
+}

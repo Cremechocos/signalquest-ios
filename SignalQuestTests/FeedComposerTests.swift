@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 import XCTest
 @testable import SignalQuest
@@ -152,6 +153,100 @@ final class FeedComposerTests: XCTestCase {
 
         XCTAssertNil(StorySignalSummary(metadata: nil))
         XCTAssertNil(StorySignalSummary(metadata: ["signal": .object(["city": .string("Lyon")])]))
+    }
+
+    // MARK: Fonds de story (contracts/social/story-background-v1.json, copié à l'octet de 8004e3661)
+
+    private func storyBackgroundContract() throws -> [String: Any] {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("contracts/social/story-background-v1.json"))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private static func hex(_ raw: Any?) -> UInt32? {
+        guard let text = raw as? String, text.hasPrefix("#") else { return nil }
+        return UInt32(text.dropFirst(), radix: 16)
+    }
+
+    private static func luminance(_ rgb: (Double, Double, Double)) -> Double {
+        func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(rgb.0) + 0.7152 * linear(rgb.1) + 0.0722 * linear(rgb.2)
+    }
+
+    /// Contraste WCAG le plus faible entre l'encre et tout point du dégradé (interpolé en sRGB).
+    private static func minContrast(from: UInt32, to: UInt32, ink: UInt32) -> Double {
+        func rgb(_ v: UInt32) -> (Double, Double, Double) {
+            (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
+        }
+        let a = rgb(from), b = rgb(to), inkL = luminance(rgb(ink))
+        return (0...200).map { step -> Double in
+            let t = Double(step) / 200
+            let l = luminance((a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, a.2 + (b.2 - a.2) * t))
+            return (max(l, inkL) + 0.05) / (min(l, inkL) + 0.05)
+        }.min() ?? 0
+    }
+
+    func testStoryBackgroundsAreTheFrozenContract() throws {
+        let contract = try storyBackgroundContract()
+        let backgrounds = try XCTUnwrap(contract["backgrounds"] as? [String: [String: Any]])
+        let inks = try XCTUnwrap(contract["inks"] as? [String: String])
+        XCTAssertEqual(Set(StoryBackground.allCases.map(\.rawValue)), Set(backgrounds.keys))
+        XCTAssertEqual(StoryBackground.lightInk, Self.hex(inks["light"]))
+        XCTAssertEqual(StoryBackground.darkInk, Self.hex(inks["dark"]))
+        for background in StoryBackground.allCases where background != .brand {
+            let entry = try XCTUnwrap(backgrounds[background.rawValue])
+            let palette = background.palette(.light)
+            XCTAssertTrue(palette == background.palette(.dark), "\(background) ne dépend pas du thème")
+            switch entry["kind"] as? String {
+            case "gradient":
+                XCTAssertEqual(palette.from, Self.hex(entry["from"]), "\(background)")
+                XCTAssertEqual(palette.to, Self.hex(entry["to"]), "\(background)")
+            case "solid":
+                XCTAssertEqual(palette.from, Self.hex(entry["color"]), "\(background)")
+                XCTAssertEqual(palette.to, palette.from, "\(background)")
+            default:
+                XCTFail("\(background) : genre inconnu")
+            }
+            XCTAssertEqual(palette.ink, Self.hex(inks[entry["ink"] as? String ?? ""]), "\(background)")
+        }
+        XCTAssertEqual(backgrounds["brand"]?["kind"] as? String, "named")
+
+        let legacy = try XCTUnwrap((contract["legacyHex"] as? [String: Any])?["map"] as? [String: String])
+        XCTAssertEqual(StoryBackground.legacyHex.mapValues(\.rawValue), legacy)
+    }
+
+    /// Chaque fond, `brand` compris dans les deux thèmes, tient 4,5:1 sur toute son étendue.
+    func testStoryBackgroundInkKeepsTheContrastEverywhere() {
+        for background in StoryBackground.allCases {
+            for scheme in [ColorScheme.light, .dark] {
+                let p = background.palette(scheme)
+                XCTAssertGreaterThanOrEqual(Self.minContrast(from: p.from, to: p.to, ink: p.ink), 4.5, "\(background) \(scheme)")
+            }
+        }
+    }
+
+    func testStoryBackgroundReadsKeysLegacyHexAndFallsBackToBrand() {
+        XCTAssertEqual(StoryBackground(stored: "ocean"), .ocean)
+        XCTAssertEqual(StoryBackground(stored: "brand"), .brand)
+        XCTAssertEqual(StoryBackground(stored: "#F3EDE2"), .creme)
+        XCTAssertEqual(StoryBackground(stored: "#f3ede2"), .creme)
+        XCTAssertEqual(StoryBackground(stored: "#191410"), .nuit)
+        for other in [nil, "", "Ocean", "#FFFFFF", "#F3EDE", "rouge"] as [String?] {
+            XCTAssertEqual(StoryBackground(stored: other), .brand, String(describing: other))
+        }
+    }
+
+    /// Comme `linear-gradient(160deg, …)` : ligne par le centre, de longueur |w·sin θ| + |h·cos θ|.
+    func testStoryGradientEndpointsFollowCSS() {
+        let size = CGSize(width: 90, height: 160)
+        let points = StoryBackground.gradientPoints(in: size)
+        let theta = 160 * Double.pi / 180
+        let length = abs(90 * sin(theta)) + abs(160 * cos(theta))
+        let dx = (points.end.x - points.start.x) * 90, dy = (points.end.y - points.start.y) * 160
+        XCTAssertEqual((dx * dx + dy * dy).squareRoot(), length, accuracy: 1e-9)
+        XCTAssertEqual(atan2(dx, -dy), theta, accuracy: 1e-9)
+        XCTAssertEqual((points.start.x + points.end.x) / 2, 0.5, accuracy: 1e-12)
+        XCTAssertEqual((points.start.y + points.end.y) / 2, 0.5, accuracy: 1e-12)
     }
 
     /// Profil réglé sur « personne » : état « Profil privé », sans erreur ni
