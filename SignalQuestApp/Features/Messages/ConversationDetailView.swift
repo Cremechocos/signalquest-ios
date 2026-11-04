@@ -1840,7 +1840,7 @@ struct ConversationDetailView: View {
                     } else if shareCard.kind.lowercased() == "social_post" {
                         SharedPostCardBubble(
                             card: shareCard, mine: mine,
-                            onOpenPost: v2Cards[message.id].map { card in { router.route(toPost: card.postId) } }
+                            onOpenPost: v2Cards[message.id].map { card in { openEncryptedCardPost(card.postId) } }
                         )
                     } else if let signal = shareCard.signal {
                         SignalCardBubble(card: shareCard, signal: signal, mine: mine)
@@ -2407,9 +2407,10 @@ struct ConversationDetailView: View {
     /// partage/sondage) : la photo est alors rendue comme bulle à part entière.
     private func isPhotoOnlyMessage(_ message: MessageItem) -> Bool {
         let visible = message.attachments.filter { $0.url != nil }
+        // Une carte chiffrée (§7.7) porte son aperçu en pièce jointe : c'est une carte, pas une photo.
         guard visible.count == 1, isImageAttachment(visible[0]),
               message.deletedAt == nil,
-              message.metadata == nil,
+              message.metadata == nil, v2Cards[message.id] == nil,
               displayedContent(for: message).isEmpty else { return false }
         return true
     }
@@ -2966,6 +2967,19 @@ struct ConversationDetailView: View {
     private func location(for message: MessageItem) -> MessageLocationData? {
         guard message.deletedAt == nil, message.metadata != nil else { return nil }
         return renderCache.location(for: message)
+    }
+
+    /// Carte chiffrée (§7.7) : la publication s'ouvre ici, comme l'embed d'une
+    /// carte en clair ; changer d'onglet laissait la conversation au premier plan.
+    private func openEncryptedCardPost(_ postId: String) {
+        Task {
+            if let item = try? await services.feed.post(id: postId) {
+                lastSharedPostKey = postId
+                sharedPostDetail = SharedPostDetailTarget(id: postId, item: item)
+            } else {
+                showActionError(String(localized: "Publication introuvable ou supprimée."))
+            }
+        }
     }
 
     /// Au retour d'un sheet (commentaires / publication complète), rafraîchit
