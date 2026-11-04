@@ -59,7 +59,10 @@ final class MessagesViewModel: ObservableObject {
 
     func load() async {
         if AppEnvironment.usesDemoData {
-            conversations = (Array.demo + Array.demoSenderRequests).inDisplayOrder().filter { demo in
+            // Sans serveur pour retenir l'épingle ou la lecture, une rangée déjà
+            // affichée garde son état local ; le sondage ne l'efface plus.
+            let shown = Dictionary(conversations.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            conversations = (Array.demo + Array.demoSenderRequests).map { shown[$0.id] ?? $0 }.inDisplayOrder().filter { demo in
                 !shelvedConversations.contains { $0.id == demo.id }
             }
             if !organizationSeededForDemo {
