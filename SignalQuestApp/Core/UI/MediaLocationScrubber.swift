@@ -7,10 +7,11 @@ import Foundation
 /// qu'une photo sorte pareille des deux apps :
 /// - Exif : le bloc GPS seul (compte, entrées, valeurs hors entrée) ; le pointeur 0x8825 reste ;
 ///   la valeur des tags XMP (700, 0x02BC) et IPTC (33723, 0x83BB) de tout IFD, comme le XMP partout ailleurs ;
+///   les sous-IFD (Exif 0x8769, Interop 0xA005, SubIFDs 0x014A) reçoivent le même traitement ;
 /// - XMP, XMP étendu, IPTC (APP13) : tout le contenu après l'identifiant ;
 /// - ISO BMFF : la valeur de `©xyz` et de `com.apple.quicktime.location.ISO6709`, et le bloc
 ///   GPS de l'item Exif d'un HEIF, tout le corps de son item XMP (`mime`, `application/rdf+xml`) ;
-/// - TIFF : ce même traitement dans chaque IFD de la chaîne (une page chacun), 8 au plus ;
+/// - TIFF : ce même traitement dans chaque IFD de la chaîne (une page chacun) ;
 /// - PNG : le bloc GPS de `eXIf`, et ce qui suit le mot-clé `XML:com.adobe.xmp` d'un `iTXt`,
 ///   `tEXt` ou `zTXt` (flux zlib remplacé par un flux stocké d'espaces de même longueur),
 ///   CRC recalculé ; les textes d'un autre mot-clé restent ;
@@ -18,15 +19,14 @@ import Foundation
 ///   l'extension `XMP DataXMP`, jamais les octets de longueur de ses sous-blocs ;
 /// - ce qui suit l'image principale d'un JPEG (autre JPEG, vidéo) : traité de même, 4 images au plus.
 /// Une structure illisible arrête le parcours là où il en est, sans refuser l'envoi.
-/// Limites, les mêmes qu'Android : les sous-IFD (0x8769 et au-delà) ne sont pas parcourus ;
-/// un item Exif de HEIF n'est lu que dans sa première étendue (une valeur GPS rangée dans une
-/// étendue suivante n'est pas atteinte) ; la 5e image d'un JPEG et ce qui suit partent tels quels.
+/// Limite acceptée (Alexandre, 04/11) : la 5e image d'un JPEG et ce qui suit partent tels quels.
 enum MediaLocationScrubber {
     /// Images d'un même fichier traitées au plus (l'image principale et ce qui la suit).
     static let maxImages = 4
     static let maxBoxDepth = 8
-    /// IFD suivis au plus dans une chaîne TIFF (un fichier malformé peut boucler).
-    static let maxIFDs = 8
+    /// IFD distincts lus au plus dans un en-tête TIFF, pages, sous-IFD et IFD GPS compris ; les
+    /// IFD déjà vus ne sont pas relus, ce qui règle les boucles d'un fichier malformé.
+    static let maxTotalIFDs = 256
 
     /// Ce que le nettoyage change : plages mises à zéro, flux remplacés, chunks PNG dont
     /// le CRC est à recalculer.
@@ -111,13 +111,15 @@ enum MediaLocationScrubber {
             let payload = index + 4
             let end = index + 2 + length
             guard length >= 2, end <= bytes.count else { return }
-            if marker == 0xE1, hasPrefix(bytes, exifMagic, at: payload) {
+            // L'identifiant doit tenir dans le segment, pas seulement dans le fichier.
+            func starts(with magic: [UInt8]) -> Bool { payload + magic.count <= end && hasPrefix(bytes, magic, at: payload) }
+            if marker == 0xE1, starts(with: exifMagic) {
                 gpsRanges(bytes, tiff: payload + exifMagic.count, end: end, into: &ranges)
-            } else if marker == 0xE1, hasPrefix(bytes, xmpMagic, at: payload) {
+            } else if marker == 0xE1, starts(with: xmpMagic) {
                 ranges.append(payload + xmpMagic.count ..< end)
-            } else if marker == 0xE1, hasPrefix(bytes, xmpExtensionMagic, at: payload) {
+            } else if marker == 0xE1, starts(with: xmpExtensionMagic) {
                 ranges.append(payload + xmpExtensionMagic.count ..< end)
-            } else if marker == 0xED, hasPrefix(bytes, photoshopMagic, at: payload) {
+            } else if marker == 0xED, starts(with: photoshopMagic) {
                 ranges.append(payload + photoshopMagic.count ..< end)
             }
             index = end
@@ -154,9 +156,10 @@ enum MediaLocationScrubber {
 
     // MARK: Exif (TIFF)
 
-    /// Le lieu d'un en-tête TIFF, dans chaque IFD de la chaîne : le bloc GPS pointé (son compte
-    /// d'entrées, ses entrées, et les valeurs rangées hors des entrées : une latitude, trois
-    /// rationnels, 24 octets), et la valeur entière des tags XMP et IPTC. Les IFD restent.
+    /// Le lieu d'un en-tête TIFF, dans chaque IFD de la chaîne et dans leurs sous-IFD : le bloc
+    /// GPS pointé (son compte d'entrées, ses entrées, et les valeurs rangées hors des entrées :
+    /// une latitude, trois rationnels, 24 octets), et la valeur entière des tags XMP et IPTC.
+    /// Les IFD restent. Le champ « IFD suivant » d'un sous-IFD n'est pas suivi.
     static func gpsRanges(_ bytes: [UInt8], tiff: Int, end: Int, into ranges: inout [Range<Int>]) {
         guard tiff + 8 <= end, end <= bytes.count else { return }
         let littleEndian: Bool
@@ -174,23 +177,41 @@ enum MediaLocationScrubber {
             let b = bytes[at..<at + 4].map(Int.init)
             return littleEndian ? b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24 : b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]
         }
-        var gpsOffsets: [Int] = []
         var visited: Set<Int> = []
-        var ifdOffset = u32(tiff + 4)
-        // Chaque IFD finit par le décalage du suivant, 0 en fin de chaîne.
-        while let offset = ifdOffset, offset != 0, visited.count < maxIFDs, visited.insert(offset).inserted,
-              let count = u16(tiff + offset) {
+        /// Traite un IFD et ses sous-IFD ; rend le décalage de l'IFD suivant de la chaîne. Un IFD
+        /// GPS est un sous-IFD comme les autres (même budget), effacé en plus.
+        func walk(_ offset: Int, isGPS: Bool = false) -> Int? {
+            guard offset != 0, visited.count < maxTotalIFDs, visited.insert(offset).inserted,
+                  let count = u16(tiff + offset) else { return nil }
+            if isGPS { gpsBlock(bytes, tiff: tiff, gps: tiff + offset, end: end, u16: u16, u32: u32, into: &ranges) }
+            var children: [(offset: Int, isGPS: Bool)] = []
             for entry in 0..<count {
                 let at = tiff + offset + 2 + entry * 12
                 guard let tag = u16(at) else { break }
-                if tag == 0x8825, let gps = u32(at + 8), !gpsOffsets.contains(gps) { gpsOffsets.append(gps) }
-                if tag == 0x02BC || tag == 0x83BB, let value = valueRange(at: at, tiff: tiff, end: end, u16: u16, u32: u32) {
-                    ranges.append(value)
+                switch tag {
+                case 0x8825:
+                    if let gps = u32(at + 8) { children.append((gps, true)) }
+                case 0x02BC, 0x83BB:
+                    if let value = valueRange(at: at, tiff: tiff, end: end, u16: u16, u32: u32) { ranges.append(value) }
+                case 0x8769, 0xA005, 0x014A:
+                    // LONG ou IFD : un décalage dans l'entrée, ou un tableau de décalages ailleurs.
+                    guard let type = u16(at + 2), type == 4 || type == 13, let n = u32(at + 4), n > 0, n <= maxTotalIFDs,
+                          let first = u32(at + 8) else { continue }
+                    if n == 1 {
+                        children.append((first, false))
+                    } else {
+                        for index in 0..<n { if let child = u32(tiff + first + 4 * index) { children.append((child, false)) } }
+                    }
+                default:
+                    break
                 }
             }
-            ifdOffset = u32(tiff + offset + 2 + count * 12)
+            for child in children { _ = walk(child.offset, isGPS: child.isGPS) }
+            return u32(tiff + offset + 2 + count * 12)
         }
-        for gpsOffset in gpsOffsets { gpsBlock(bytes, tiff: tiff, gps: tiff + gpsOffset, end: end, u16: u16, u32: u32, into: &ranges) }
+        // Chaque IFD de la chaîne finit par le décalage du suivant, 0 en fin de chaîne.
+        var next = u32(tiff + 4)
+        while let offset = next { next = walk(offset) }
     }
 
     private static func gpsBlock(_ bytes: [UInt8], tiff: Int, gps: Int, end: Int, u16: (Int) -> Int?, u32: (Int) -> Int?,
@@ -207,7 +228,7 @@ enum MediaLocationScrubber {
         }
     }
 
-    private static let typeSizes = [1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8]
+    private static let typeSizes = [1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4]
 
     /// Valeur d'une entrée d'IFD : dans l'entrée elle-même jusqu'à 4 octets, sinon à son décalage.
     private static func valueRange(at entry: Int, tiff: Int, end: Int, u16: (Int) -> Int?, u32: (Int) -> Int?) -> Range<Int>? {
@@ -311,10 +332,23 @@ enum MediaLocationScrubber {
         if let xmp = items.xmp {
             ranges += itemExtents(bytes, iloc, itemId: xmp)
         }
-        // Le corps de l'item Exif commence par 4 octets : le décalage vers l'en-tête TIFF.
-        if let exif = items.exif, let extent = itemExtents(bytes, iloc, itemId: exif).first,
-           extent.lowerBound + 4 <= extent.upperBound, let shift = uint32(bytes, at: extent.lowerBound) {
-            gpsRanges(bytes, tiff: extent.lowerBound + 4 + shift, end: extent.upperBound, into: &ranges)
+        // Le corps de l'item Exif, ses étendues mises bout à bout, commence par 4 octets : le
+        // décalage vers l'en-tête TIFF. Les plages trouvées sont reportées sur le fichier.
+        guard let exif = items.exif else { return }
+        let extents = itemExtents(bytes, iloc, itemId: exif)
+        let body = extents.flatMap { bytes[$0] }
+        guard body.count >= 4, let shift = uint32(body, at: 0) else { return }
+        var bodyRanges: [Range<Int>] = []
+        gpsRanges(body, tiff: 4 + shift, end: body.count, into: &bodyRanges)
+        for range in bodyRanges {
+            var start = 0
+            for extent in extents {
+                let lower = max(range.lowerBound, start), upper = min(range.upperBound, start + extent.count)
+                if lower < upper {
+                    ranges.append(extent.lowerBound + lower - start ..< extent.lowerBound + upper - start)
+                }
+                start += extent.count
+            }
         }
     }
 

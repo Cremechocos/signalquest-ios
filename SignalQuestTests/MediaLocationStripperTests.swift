@@ -339,11 +339,98 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertNotNil(clean.range(of: Data("application/rdf+xml".utf8)))
     }
 
+    /// TIFF fait main (II) dont le lieu n'est atteint que par des sous-IFD : le GPS pointé
+    /// depuis l'ExifIFD (0x8769), un XMP dans le second élément d'un tableau SubIFDs (0x014A).
+    func testTIFFSubIFDsAreCleanedToo() throws {
+        func u16(_ value: Int) -> [UInt8] { [UInt8(value & 0xFF), UInt8(value >> 8)] }
+        func u32(_ value: Int) -> [UInt8] { u16(value & 0xFFFF) + u16(value >> 16) }
+        func ifd(_ entries: [(tag: Int, type: Int, count: Int, value: Int)]) -> [UInt8] {
+            u16(entries.count) + entries.flatMap { u16($0.tag) + u16($0.type) + u32($0.count) + u32($0.value) } + u32(0)
+        }
+        let place = Array("Place Sous-IFD".utf8)
+        let latitude = u32(12) + u32(1) + u32(34) + u32(1) + u32(56) + u32(1)
+        // Agencement : en-tête 8, IFD0 8 (2 entrées, 30 o), ExifIFD 38 (1 entrée, 18 o),
+        // GPS 56 (2 entrées, 30 o), latitude 86 (24 o), tableau SubIFDs 110 (8 o),
+        // sous-IFD A 118 (0 entrée, 6 o), sous-IFD B 124 (1 entrée, 18 o), XMP 142.
+        var file: [UInt8] = [0x49, 0x49, 0x2A, 0x00] + u32(8)
+        file += ifd([(0x014A, 4, 2, 110), (0x8769, 4, 1, 38)])
+        file += ifd([(0x8825, 4, 1, 56)])
+        file += ifd([(0x0001, 2, 2, 0x4E), (0x0002, 5, 3, 86)])
+        file += latitude + u32(118) + u32(124)
+        file += ifd([])
+        file += ifd([(0x02BC, 1, place.count, 142)]) + place
+        let original = Data(file)
+        XCTAssertNotNil(original.range(of: Data(latitude)))
+        XCTAssertNotNil(original.range(of: Data(place)))
+
+        XCTAssertEqual(MediaLocationScrubber.plan(for: original).zeroed, [56..<58, 58..<82, 86..<110, 142..<142 + place.count])
+        let clean = MediaLocationStripper.strippedImage(original)
+        XCTAssertEqual(clean.count, original.count)
+        XCTAssertNil(clean.range(of: Data(latitude)), "Le GPS pointé par l'ExifIFD est encore là")
+        XCTAssertNil(clean.range(of: Data(place)), "Le XMP du second SubIFD est encore là")
+    }
+
+    /// HEIF fait main dont l'item Exif a deux étendues, séparées par l'item XMP, et dont le
+    /// bloc GPS est à cheval sur la frontière : lues bout à bout, plages reportées sur le fichier.
+    func testHEIFExifItemSpreadOverTwoExtents() throws {
+        let jpeg = try geotaggedImage(.jpeg)
+        let exifStart = try XCTUnwrap(jpeg.range(of: Data("Exif\0\0".utf8))).upperBound
+        let exifLength = Int(jpeg[exifStart - 8]) << 8 | Int(jpeg[exifStart - 7])
+        let exifBody = Data(count: 4) + jpeg.subdata(in: exifStart..<exifStart - 8 + 2 + exifLength)
+        var gps: [Range<Int>] = []
+        MediaLocationScrubber.gpsRanges([UInt8](exifBody), tiff: 4, end: exifBody.count, into: &gps)
+        let entries = try XCTUnwrap(gps.first { $0.count > 2 })
+        let split = entries.lowerBound + entries.count / 2
+        let xmpBody = Data("<x:xmpmeta><photoshop:City>Testville</photoshop:City></x:xmpmeta>".utf8)
+        func u16(_ value: Int) -> Data { Data([UInt8(value >> 8), UInt8(value & 0xFF)]) }
+        func u32(_ value: Int) -> Data { u16(value >> 16) + u16(value & 0xFFFF) }
+        func infe(_ id: Int, _ type: String, _ name: String, _ contentType: String?) -> Data {
+            var payload = Data([2, 0, 0, 0]) + u16(id) + u16(0)
+            payload += Data(type.utf8) + Data(name.utf8) + Data([0])
+            if let contentType { payload += Data(contentType.utf8) + Data([0]) }
+            return box("infe", payload)
+        }
+        func file(_ mdat: Int) -> Data {
+            let iinf = box("iinf", Data(count: 4) + u16(2) + infe(1, "Exif", "Exif metadata", nil)
+                + infe(2, "mime", "XMP metadata payload", "application/rdf+xml"))
+            var entries = Data(count: 4) + Data([0x44, 0x00]) + u16(2)
+            entries += u16(1) + u16(0) + u16(2)
+            entries += u32(mdat) + u32(split)
+            entries += u32(mdat + split + xmpBody.count) + u32(exifBody.count - split)
+            entries += u16(2) + u16(0) + u16(1)
+            entries += u32(mdat + split) + u32(xmpBody.count)
+            return box("ftyp", Data("heic".utf8) + Data(count: 4)) + box("meta", Data(count: 4) + iinf + box("iloc", entries))
+        }
+        let mdat = file(0).count + 8
+        let original = file(mdat) + box("mdat", exifBody.prefix(split) + xmpBody + exifBody.suffix(from: split))
+
+        // Chaque plage du corps, décalée de sa place dans le fichier ; celle des entrées coupée en deux.
+        let second = mdat + split + xmpBody.count
+        var expected: [Range<Int>] = [mdat + split ..< second]
+        for range in gps {
+            if range.upperBound <= split { expected.append(mdat + range.lowerBound ..< mdat + range.upperBound) }
+            else if range.lowerBound >= split { expected.append(second + range.lowerBound - split ..< second + range.upperBound - split) }
+            else { expected += [mdat + range.lowerBound ..< mdat + split, second ..< second + range.upperBound - split] }
+        }
+        expected.sort { ($0.lowerBound, $0.upperBound) < ($1.lowerBound, $1.upperBound) }
+        XCTAssertEqual(MediaLocationScrubber.plan(for: original).zeroed, expected)
+        XCTAssertTrue(expected.contains { $0.lowerBound >= second && $0.upperBound <= original.count }, "Rien d'effacé dans la seconde étendue")
+    }
+
     /// Boîte ISO BMFF : taille sur 32 bits, type, contenu.
     private func box(_ type: String, _ payload: Data) -> Data {
         let size = UInt32(8 + payload.count)
         return Data([UInt8(size >> 24), UInt8(size >> 16 & 0xFF), UInt8(size >> 8 & 0xFF), UInt8(size & 0xFF)])
             + Data(type.unicodeScalars.map { UInt8($0.value) }) + payload
+    }
+
+    /// Trouvé par fuzzing : un segment plus court que son identifiant (l'identifiant déborde
+    /// sur le segment suivant) ne fait pas planter l'envoi et n'efface rien hors du segment.
+    func testSegmentShorterThanItsIdentifierIsIgnored() {
+        let xmp = Data("http://ns.adobe.com/xap/1.0/\0<x>Testville</x>".utf8)
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0x04]) + xmp + Data([0xFF, 0xD9])
+        XCTAssertTrue(MediaLocationScrubber.plan(for: jpeg).zeroed.isEmpty)
+        XCTAssertEqual(MediaLocationStripper.strippedImage(jpeg), jpeg)
     }
 
     func testNonImageDataIsUntouched() {
