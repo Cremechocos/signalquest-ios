@@ -115,7 +115,13 @@ struct CoverageCardView: View {
                 }
 
                 if let trace, !trace.isEmpty {
-                    FeedOpenCapsule(title: String(localized: "Voir le tracé"), symbol: "map", onOpenPost: onTap)
+                    // Contrat du tracé : la carte principale, sur cette session seule ; le post sinon.
+                    FeedOpenCapsule(
+                        title: String(localized: "Voir le tracé"),
+                        symbol: "map",
+                        destination: item.metadataString("sessionId").map { .link(.session(id: $0, title: nil)) } ?? .post,
+                        onOpenPost: onTap
+                    )
                 }
 
                 CardActionsBar(

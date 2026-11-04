@@ -418,6 +418,10 @@ protocol SessionsServicing: Sendable {
     /// tout d'un bloc, sans `page`.
     func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail
     func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse
+    /// Tracé seul d'une session, échantillonné par le serveur (10 à 5 000 points) :
+    /// la carte principale le montre quand un post du fil l'ouvre (contrat #958).
+    /// Accessible au propriétaire, ou si la session est visible ou partagée.
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint]
     // L'enregistrement de couverture est retiré d'iOS : les anciennes files
     // restent sur l'appareil, en lecture seule (`LocalCoverageArchiveReader`).
     // Ses méthodes d'écriture, qui ne faisaient plus que refuser, n'avaient
@@ -437,6 +441,10 @@ extension SessionsServicing {
 
     func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse {
         SessionPointsPageResponse(points: [], page: nil)
+    }
+
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
+        try await sessionDetail(id: id).points
     }
 }
 
@@ -476,6 +484,20 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
             ),
             as: CoverageSessionDetail.self
         )
+    }
+
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/coverage/sessions",
+                query: [
+                    URLQueryItem(name: "sessionId", value: id),
+                    URLQueryItem(name: "fields", value: "track"),
+                    URLQueryItem(name: "maxPoints", value: "5000")
+                ]
+            ),
+            as: CoverageSessionDetail.self
+        ).points
     }
 
     func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail {

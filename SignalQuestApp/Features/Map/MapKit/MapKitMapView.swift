@@ -290,6 +290,8 @@ struct MapKitMapView: UIViewRepresentable {
     var zoneCompare: MapZoneCompareOverlay? = nil
     /// Fin d'un glissé de l'épingle de comparaison.
     var onZoneCompareMove: ((CLLocationCoordinate2D) -> Void)? = nil
+    /// Session vue seule (« Voir le tracé » d'un post du fil) ; `nil` hors de ce mode.
+    var sessionTrace: MapSessionTrace? = nil
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
@@ -365,6 +367,7 @@ struct MapKitMapView: UIViewRepresentable {
             context.coordinator.lastViewportRefreshID = viewportRefreshID
             (map as? SQViewportMapView)?.requestViewportDelivery()
         }
+        context.coordinator.applySessionTrace(sessionTrace, isDark: colorScheme == .dark, on: map)
         container.zoneCompareView.onMoveEnd = onZoneCompareMove
         container.zoneCompareView.update(zoneCompare)
         if let zoneCompare, context.coordinator.lastZoneCompareFitToken != zoneCompare.fitToken {
@@ -403,6 +406,9 @@ struct MapKitMapView: UIViewRepresentable {
         var lastViewportRefreshID = -1
         weak var zoneCompareView: SQZoneCompareOverlayView?
         var lastZoneCompareFitToken: Int?
+        var sessionOverlay: SessionPointsOverlay?
+        var lastSessionKey: MapSessionTrace.Key?
+        var lastSessionFitToken: Int?
         private var isMovingCamera = false
         /// Dernier cap de carte propagé aux marqueurs. Les lobes d'azimut sont
         /// dessinés en repère écran : ils doivent contre-tourner quand la carte
@@ -663,7 +669,49 @@ struct MapKitMapView: UIViewRepresentable {
             if let dots = overlay as? SQMapKitDotsOverlay {
                 return SQMapKitDotsRenderer(overlay: dots)
             }
+            if let session = overlay as? SessionPointsOverlay {
+                return SessionPointsRenderer(overlay: session)
+            }
             return MKOverlayRenderer(overlay: overlay)
+        }
+
+        /// Tracé de la session vue seule, aux couleurs du contrat, au-dessus des
+        /// libellés ; recadré sur tout le trajet à chaque nouveau chargement.
+        func applySessionTrace(_ trace: MapSessionTrace?, isDark: Bool, on map: MKMapView) {
+            let key = trace.map { MapSessionTrace.Key(revision: $0.revision, style: $0.style, coloring: $0.coloring, isDark: isDark) }
+            if key != lastSessionKey {
+                lastSessionKey = key
+                if let sessionOverlay { map.removeOverlay(sessionOverlay) }
+                sessionOverlay = nil
+                if let trace, !trace.points.isEmpty {
+                    let overlay = SessionPointsOverlay(
+                        points: trace.points,
+                        coloring: trace.coloring,
+                        followsContract: true,
+                        connects: trace.style == .trace && trace.points.count >= 2,
+                        casing: (isDark ? UIColor(white: 0.1, alpha: 0.9) : UIColor.white).cgColor
+                    )
+                    map.addOverlay(overlay, level: .aboveLabels)
+                    sessionOverlay = overlay
+                }
+            }
+            guard let trace, !trace.points.isEmpty else {
+                lastSessionFitToken = nil
+                return
+            }
+            guard lastSessionFitToken != trace.fitToken else { return }
+            lastSessionFitToken = trace.fitToken
+            let rect = trace.points.reduce(MKMapRect.null) { rect, point in
+                rect.union(MKMapRect(origin: MKMapPoint(point.coordinate), size: MKMapSize(width: 1, height: 1)))
+            }
+            // Le bandeau du haut et les contrôles du bas ne cachent ni le départ ni l'arrivée.
+            let padding = UIEdgeInsets(top: map.safeAreaInsets.top + 96, left: 40,
+                                       bottom: trace.bottomInset, right: 40)
+            let minimum = 400 * MKMapPointsPerMeterAtLatitude(rect.origin.coordinate.latitude)
+            let fitted = rect.size.width < minimum && rect.size.height < minimum
+                ? MKMapRect(x: rect.midX - minimum / 2, y: rect.midY - minimum / 2, width: minimum, height: minimum)
+                : rect
+            map.setVisibleMapRect(fitted, edgePadding: padding, animated: true)
         }
 
         @objc func handleSpeedtestTap(_ recognizer: UITapGestureRecognizer) {
@@ -886,5 +934,25 @@ extension MKMapView {
             return label
         }()
         label.text = " \(text) "
+    }
+}
+
+/// Session vue seule sur la carte principale (contrat #958) : ses points dans
+/// l'ordre servi, le rendu choisi dans la feuille Carte et un jeton de cadrage.
+struct MapSessionTrace {
+    let points: [CoverageSessionPoint]
+    /// Change à chaque nouveau jeu de points ; évite de comparer les points eux-mêmes.
+    let revision: Int
+    let style: SessionTraceStyle
+    let coloring: SessionPointColoring
+    let fitToken: Int
+    /// Hauteur des contrôles du bas à laisser libre au cadrage.
+    let bottomInset: CGFloat
+
+    struct Key: Equatable {
+        let revision: Int
+        let style: SessionTraceStyle
+        let coloring: SessionPointColoring
+        let isDark: Bool
     }
 }

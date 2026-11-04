@@ -25,6 +25,12 @@ struct SessionTraceMapView: UIViewRepresentable {
     var onPointTap: ((CoverageSessionPoint?) -> Void)? = nil
     /// Point entouré sur la carte (celui qu'on lit).
     var selectedPoint: CoverageSessionPoint? = nil
+    /// Carte d'une session (contrat session-signal-trace v1) : tracé ou points,
+    /// teintes de l'échelle commune par techno et signal, sans coupure. `nil`
+    /// garde l'ancien rendu (« Mes mesures »).
+    var style: SessionTraceStyle? = nil
+    /// Marges du cadrage : en plein écran, les barres posées sur la carte.
+    var fitPadding = UIEdgeInsets(top: 44, left: 44, bottom: 44, right: 44)
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -44,7 +50,7 @@ struct SessionTraceMapView: UIViewRepresentable {
 
     func updateUIView(_ map: MKMapView, context: Context) {
         let signature = renderID.map {
-            SessionTraceRenderSignature(id: $0, coloring: coloring,
+            SessionTraceRenderSignature(id: $0, coloring: coloring, style: style,
                 colorScheme: context.environment.colorScheme,
                 contrast: context.environment.colorSchemeContrast,
                 operatorLabels: operatorLabels)
@@ -68,8 +74,10 @@ struct SessionTraceMapView: UIViewRepresentable {
         // Drive Test : un ruban coloré point par point ; sinon un nuage de perles.
         if !validPoints.isEmpty {
             let isDark = context.environment.colorScheme == .dark
+            let connects = (style.map { $0 == .trace } ?? drawPath) && coords.count >= 2
             map.addOverlay(SessionPointsOverlay(points: validPoints, coloring: coloring,
-                                                connects: drawPath && coords.count >= 2,
+                                                followsContract: style != nil,
+                                                connects: connects,
                                                 casing: (isDark ? UIColor(white: 0.1, alpha: 0.9) : UIColor.white).cgColor),
                            level: .aboveLabels)
         }
@@ -94,7 +102,7 @@ struct SessionTraceMapView: UIViewRepresentable {
             rect = rect.union(MKMapRect(origin: MKMapPoint(st.coordinate), size: MKMapSize(width: 1, height: 1)))
         }
         if !rect.isNull, !(keepsUserViewport && context.coordinator.userMovedMap) {
-            map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 44, left: 44, bottom: 44, right: 44), animated: false)
+            map.setVisibleMapRect(rect, edgePadding: fitPadding, animated: false)
             context.coordinator.didFit = true
         }
     }
@@ -200,6 +208,7 @@ struct SessionTraceMapView: UIViewRepresentable {
 struct SessionTraceRenderSignature: Equatable {
     let id: UUID
     let coloring: SessionPointColoring
+    var style: SessionTraceStyle? = nil
     let colorScheme: ColorScheme
     let contrast: ColorSchemeContrast
     var operatorLabels: [String: String] = [:]
@@ -209,26 +218,39 @@ struct SessionTraceRenderSignature: Equatable {
 /// un ruban continu pour un Drive Test, des perles cerclées sinon. Bornage par
 /// `boundingMapRect` + culling dans le renderer → fluide pour de gros volumes.
 final class SessionPointsOverlay: NSObject, MKOverlay {
-    struct Dot { let point: MKMapPoint; let color: CGColor }
+    struct Dot {
+        let point: MKMapPoint
+        let color: CGColor
+        /// « Sans réseau constaté » : segment en pointillé (contrat).
+        var dashed = false
+    }
 
     let dots: [Dot]
     /// Relie les points dans l'ordre (parcours d'un Drive Test).
     let connects: Bool
+    /// Contrat du tracé : aucune coupure, même sur un trou de mesure.
+    let cutsGaps: Bool
     /// Liseré clair (ou sombre) qui détache le tracé du fond de carte.
     let casing: CGColor
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
-    init(points: [CoverageSessionPoint], coloring: SessionPointColoring = .rsrp,
+    init(points: [CoverageSessionPoint], coloring: SessionPointColoring = .rsrp, followsContract: Bool = false,
          connects: Bool = false, casing: CGColor = UIColor.white.cgColor) {
         var rect = MKMapRect.null
         dots = points.map { p in
             let mp = MKMapPoint(p.coordinate)
             rect = rect.union(MKMapRect(origin: mp, size: MKMapSize(width: 0.5, height: 0.5)))
-            let color = coloring == .generation ? SessionGenerationColor.cg(p.tech) : SessionRSRPColor.cg(p.signalStrength)
-            return Dot(point: mp, color: color)
+            if coloring == .generation {
+                return Dot(point: mp, color: SessionGenerationColor.cg(p.tech))
+            }
+            guard followsContract else { return Dot(point: mp, color: SessionRSRPColor.cg(p.signalStrength)) }
+            // L'état d'un point vient de sa techno ET de son signal ; un segment prend celui de son arrivée.
+            let state = SQQualityScale.Signal(dbm: p.signalStrength, technology: p.tech)
+            return Dot(point: mp, color: state.uiColor.cgColor, dashed: state.isHatched)
         }
         self.connects = connects
+        self.cutsGaps = !followsContract
         self.casing = casing
         let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
         boundingMapRect = bounding
@@ -253,13 +275,14 @@ final class SessionPointsRenderer: MKOverlayRenderer {
     }
 
     /// Segments visibles du parcours, sans les trous de mesure.
-    private func visibleSegments(_ dots: [SessionPointsOverlay.Dot], cull: MKMapRect) -> [Int] {
+    private func visibleSegments(_ dots: [SessionPointsOverlay.Dot], cull: MKMapRect, cutsGaps: Bool) -> [Int] {
         guard dots.count >= 2 else { return [] }
         var indices: [Int] = []
         for i in 1..<dots.count {
             let a = dots[i - 1].point, b = dots[i].point
             let box = MKMapRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x) + 0.5, height: abs(a.y - b.y) + 0.5)
-            guard box.intersects(cull), a.distance(to: b) <= Self.maxGapMeters else { continue }
+            guard box.intersects(cull) else { continue }
+            if cutsGaps, a.distance(to: b) > Self.maxGapMeters { continue }
             indices.append(i)
         }
         return indices
@@ -267,7 +290,7 @@ final class SessionPointsRenderer: MKOverlayRenderer {
 
     private func drawRibbon(_ overlay: SessionPointsOverlay, screen: Double, cull: MKMapRect, in context: CGContext) {
         let dots = overlay.dots
-        let segments = visibleSegments(dots, cull: cull)
+        let segments = visibleSegments(dots, cull: cull, cutsGaps: overlay.cutsGaps)
         context.setLineCap(.round)
         context.setLineJoin(.round)
         guard !segments.isEmpty else {
@@ -292,19 +315,29 @@ final class SessionPointsRenderer: MKOverlayRenderer {
         context.setLineWidth(5.5 * screen)
         var run = CGMutablePath()
         var runColor: CGColor?
+        var runDashed = false
         var lastIndex = -1
         func flush() {
             guard let runColor, !run.isEmpty else { return }
             context.addPath(run)
             context.setStrokeColor(runColor)
+            if runDashed {
+                context.setLineCap(.butt)
+                context.setLineDash(phase: 0, lengths: [4 * screen, 6 * screen])
+            }
             context.strokePath()
+            if runDashed {
+                context.setLineDash(phase: 0, lengths: [])
+                context.setLineCap(.round)
+            }
         }
         for i in segments {
             let color = dots[i].color
-            if color != runColor || i != lastIndex + 1 {
+            if color != runColor || dots[i].dashed != runDashed || i != lastIndex + 1 {
                 flush()
                 run = CGMutablePath()
                 runColor = color
+                runDashed = dots[i].dashed
                 run.move(to: point(for: dots[i - 1].point))
             }
             run.addLine(to: point(for: dots[i].point))
@@ -336,6 +369,10 @@ enum SessionRSRPColor {
     static func ui(_ rsrp: Double?) -> UIColor { SQNetworkColors.rsrpUIColor(rsrp) }
     static func cg(_ rsrp: Double?) -> CGColor { ui(rsrp).cgColor }
 }
+
+/// Carte d'une session : le parcours en segments colorés (par défaut) ou ses
+/// points, chacun de la couleur de son propre état (contrat session-signal-trace v1).
+enum SessionTraceStyle: Hashable { case trace, points }
 
 /// Mode de coloration du nuage de points : RSRP (signal) ou GÉNÉRATION.
 /// IMPORTANT : carte RSRP et carte génération sont deux cartes DISTINCTES.

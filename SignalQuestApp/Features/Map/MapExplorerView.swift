@@ -1713,6 +1713,13 @@ struct MapExplorerView: View {
     /// Écran ANFR demandé depuis la feuille de filtres, ouvert à sa fermeture :
     /// naviguer pendant la transition de la feuille échouait.
     @State private var pendingANFR: MapANFRDestination?
+    /// Session vue seule depuis le fil (« Voir le tracé », contrat #958) : la
+    /// carte principale ne montre plus qu'elle jusqu'à « Quitter ».
+    @State private var sessionFocus: MapSessionFocus?
+    @State private var sessionTraceStyle: SessionTraceStyle = .trace
+    @State private var sessionTraceColoring: SessionPointColoring = .rsrp
+    @State private var sessionFitToken = 0
+    @State private var sessionLoadTask: Task<Void, Never>?
 
     private static let resetStoresOnce: Void = {
         MapRegionStore.reset()
@@ -1884,7 +1891,14 @@ struct MapExplorerView: View {
                     next.market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
                     _ = applyFilterSelection(next)
                 },
-                onOpenANFR: { pendingANFR = $0 }
+                onOpenANFR: { pendingANFR = $0 },
+                sessionSection: sessionFocus.flatMap { focus in
+                    focus.points.isEmpty ? nil : MapSessionTraceSection(
+                        style: $sessionTraceStyle,
+                        coloring: $sessionTraceColoring,
+                        points: focus.points
+                    )
+                }
             )
             .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
             .sqSheet()
@@ -2136,6 +2150,8 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
         // Alerte de partage de position : la fiche de l'ami.
         .onChangeCompat(of: router.pendingLiveFriendId) { _, _ in openLiveFriendFromRouterIfNeeded() }
+        // « Voir le tracé » d'un post : cette session seule.
+        .onChangeCompat(of: router.pendingMapSession) { _, _ in openSessionFromRouterIfNeeded() }
         .onAppear {
             viewportRefreshID &+= 1
             if !zoneCompareTipDone { zoneCompareTipVisits += 1 }
@@ -2151,6 +2167,7 @@ struct MapExplorerView: View {
             openCommunityOutageFromRouterIfNeeded()
             openCommunityOutageFromNotificationIfNeeded()
             openLiveFriendFromRouterIfNeeded()
+            openSessionFromRouterIfNeeded()
         }
     }
 
@@ -2213,6 +2230,47 @@ struct MapExplorerView: View {
         }
     }
 
+    /// Montre une session seule sur la carte principale : le reste de la carte
+    /// s'efface, le tracé se charge puis se cadre. La vue d'avant revient à la sortie.
+    private func openSessionFromRouterIfNeeded() {
+        guard let request = router.pendingMapSession else { return }
+        router.pendingMapSession = nil
+        sessionLoadTask?.cancel()
+        selectedItem = nil
+        // Le contrat ouvre toujours en tracé, coloré par le signal.
+        sessionTraceStyle = .trace
+        sessionTraceColoring = .rsrp
+        let returnRegion = sessionFocus?.returnRegion ?? lastRegion
+        sessionFocus = MapSessionFocus(id: request.id, title: request.title, returnRegion: returnRegion)
+        sessionLoadTask = Task {
+            do {
+                let points = try await services.sessions.sessionTrack(id: request.id).filter(\.hasValidCoordinate)
+                guard !Task.isCancelled, sessionFocus?.id == request.id else { return }
+                sessionFocus?.points = points
+                sessionFocus?.phase = .loaded
+                sessionFocus?.revision &+= 1
+                sessionFitToken &+= 1
+            } catch {
+                guard !error.isCancellation, sessionFocus?.id == request.id else { return }
+                switch error as? APIError {
+                case .http(403, _, _, _, _)?, .http(404, _, _, _, _)?:
+                    sessionFocus?.phase = .failed(String(localized: "Ce trajet n’est plus visible."))
+                default:
+                    sessionFocus?.phase = .failed(error.userFacingMessage)
+                }
+            }
+        }
+    }
+
+    /// Retour à la carte normale, cadrée comme avant l'ouverture du trajet.
+    private func closeSessionFocus() {
+        sessionLoadTask?.cancel()
+        sessionLoadTask = nil
+        let region = sessionFocus?.returnRegion
+        sessionFocus = nil
+        if let region { requestCamera(region: region) }
+    }
+
     /// Cadre la carte sur la coordonnée demandée depuis un test de l'historique.
     /// Consommée une fois : l'onglet peut réapparaître sans re-cadrer.
     private func focusFromRouterIfNeeded() {
@@ -2231,11 +2289,13 @@ struct MapExplorerView: View {
 
     private var mapLayer: some View {
         // Moteur unique : rendu MapKit (Apple Plan natif).
+        // Trajet vu seul : les couches de la carte s'effacent derrière lui. La
+        // parité de la version suffit à les retirer puis à les remettre.
         MapKitMapView(
-            annotations: renderedAnnotations,
-            coverageHeatFeatures: renderedCoverageFeatures,
-            speedtestFeatures: renderedSpeedtestFeatures,
-            renderVersion: renderVersion,
+            annotations: sessionFocus == nil ? renderedAnnotations : [],
+            coverageHeatFeatures: sessionFocus == nil ? renderedCoverageFeatures : [],
+            speedtestFeatures: sessionFocus == nil ? renderedSpeedtestFeatures : [],
+            renderVersion: renderVersion &* 2 &+ (sessionFocus == nil ? 0 : 1),
             viewportRefreshID: viewportRefreshID,
             colorScheme: colorScheme,
             // iPad : la mention légale d'Apple passe au-dessus de la rangée du bas
@@ -2263,7 +2323,17 @@ struct MapExplorerView: View {
                     sheetCover: horizontalSizeClass == .regular ? .none : .half
                 )
             },
-            onZoneCompareMove: { coordinate in zoneCompareTarget?.coordinate = coordinate }
+            onZoneCompareMove: { coordinate in zoneCompareTarget?.coordinate = coordinate },
+            sessionTrace: sessionFocus.map { focus in
+                MapSessionTrace(
+                    points: focus.points,
+                    revision: focus.revision,
+                    style: sessionTraceStyle,
+                    coloring: sessionTraceColoring,
+                    fitToken: sessionFitToken,
+                    bottomInset: mapControlsBottomInset + 120
+                )
+            }
         )
         // La carte file sous la barre de statut / Dynamic Island (comme Plans),
         // au lieu de laisser une bande systemBackground non-crème en haut (UI-09).
@@ -2570,9 +2640,14 @@ struct MapExplorerView: View {
                 zoneCompareTip
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            if showsCoverageKey { coverageFocusBanner }
-            MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
-            mapStatusToast
+            if sessionFocus != nil {
+                sessionFocusBanner
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                if showsCoverageKey { coverageFocusBanner }
+                MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
+                mapStatusToast
+            }
             HStack(alignment: .bottom) {
                 mapStatePill
                 Spacer(minLength: SQSpace.sm)
@@ -2583,6 +2658,7 @@ struct MapExplorerView: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.bottom, mapControlsBottomInset)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsCoverageKey)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: sessionFocus?.id)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDisplayLimit)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsZoneCompareTip)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDeducedCountry)
@@ -2995,6 +3071,59 @@ struct MapExplorerView: View {
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .tint(SQColor.brandRed)
+            }
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm + 1)
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
+            .padding(.horizontal, SQSpace.lg)
+        }
+    }
+
+    /// Bandeau du trajet vu seul : ce qu'on regarde, son signal en mots, et la
+    /// sortie vers la carte normale. Les réglages sont dans la feuille Carte.
+    @ViewBuilder
+    private var sessionFocusBanner: some View {
+        if let focus = sessionFocus {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                    .font(.system(size: 13, weight: .semibold))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: focus.title ?? String(localized: "Ce trajet seulement"))
+                        .font(SQFont.body(13, .semibold))
+                        .lineLimit(2)
+                    Group {
+                        switch focus.phase {
+                        case .loading:
+                            Text("Chargement du trajet…")
+                        case .loaded:
+                            Text(verbatim: SessionSignalTrace.displaySummary(
+                                focus.points.map { SessionSignalTrace.Point(technology: $0.tech, signalStrength: $0.signalStrength) }
+                            ))
+                        case .failed(let message):
+                            Text(verbatim: message)
+                        }
+                    }
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("map.session.banner")
+                Spacer(minLength: SQSpace.sm)
+                Button {
+                    Haptics.light()
+                    closeSessionFocus()
+                } label: {
+                    Text("Quitter").font(SQFont.body(13, .semibold)).frame(minHeight: 44)
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .tint(SQColor.brandRed)
+                .accessibilityHint(Text("Revenir à la carte complète"))
+                .accessibilityIdentifier("map.session.exit")
             }
             .foregroundStyle(SQColor.label)
             .padding(.horizontal, SQSpace.md)
@@ -5405,4 +5534,20 @@ struct MapItemSheet: View {
         guard let lat, let lon else { return nil }
         return String(format: "%.5f, %.5f", lat, lon)
     }
+}
+
+/// Session vue seule sur la carte principale, et la vue où revenir en sortant.
+struct MapSessionFocus {
+    enum Phase: Equatable {
+        case loading
+        case loaded
+        case failed(String)
+    }
+
+    let id: String
+    let title: String?
+    let returnRegion: MKCoordinateRegion
+    var points: [CoverageSessionPoint] = []
+    var phase: Phase = .loading
+    var revision = 0
 }

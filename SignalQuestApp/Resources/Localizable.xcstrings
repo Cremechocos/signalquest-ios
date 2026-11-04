@@ -1112,6 +1112,16 @@
         }
       }
     },
+    "Aucun point mesuré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No measured point"
+          }
+        }
+      }
+    },
     "Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil." : {
       "localizations" : {
         "en" : {
@@ -1236,6 +1246,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce sondage est trop long."
+          }
+        }
+      }
+    },
+    "Ce trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This route"
+          }
+        }
+      }
+    },
+    "Ce trajet n’est plus visible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This route is no longer visible."
+          }
+        }
+      }
+    },
+    "Ce trajet seulement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This route only"
           }
         }
       }
@@ -1428,6 +1468,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaleur"
+          }
+        }
+      }
+    },
+    "Chargement du trajet…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the route…"
           }
         }
       }
@@ -2387,6 +2437,16 @@
         }
       }
     },
+    "Revenir à la carte complète" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go back to the full map"
+          }
+        }
+      }
+    },
     "Réponse à un message anonyme" : {
       "localizations" : {
         "en" : {
@@ -2693,6 +2753,26 @@
         }
       }
     },
+    "Signal : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal: %@"
+          }
+        }
+      }
+    },
+    "Signal : %@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal: %1$@ → %2$@"
+          }
+        }
+      }
+    },
     "Signal · %@" : {
       "localizations" : {
         "en" : {
@@ -2815,6 +2895,16 @@
         }
       }
     },
+    "Techno inconnue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown technology"
+          }
+        }
+      }
+    },
     "Test de débit" : {
       "localizations" : {
         "en" : {
@@ -2905,6 +2995,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton texte restera visible sans ton nom, parce que des membres y ont répondu."
+          }
+        }
+      }
+    },
+    "Tracé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route"
           }
         }
       }
@@ -72240,7 +72341,6 @@
       }
     },
     "Points" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

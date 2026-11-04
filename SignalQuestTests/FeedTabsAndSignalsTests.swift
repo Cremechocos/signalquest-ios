@@ -963,3 +963,90 @@ final class FeedSampleRenderingHarness: XCTestCase {
         }
     }
 }
+
+/// Harnais visuel des plans (non lancé sans `SQ_LIVE_MAPS_OUT`) : ImageRenderer ne
+/// dessine ni MKMapSnapshotter ni MKMapView ; on monte donc les vues dans une
+/// vraie fenêtre de l'app hôte et on laisse MapKit charger ses tuiles.
+@MainActor
+final class FeedLiveMapsHarness: XCTestCase {
+    func testRenderLiveMaps() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let input = env["SQ_FEED_SAMPLES"], let output = env["SQ_LIVE_MAPS_OUT"] else {
+            throw XCTSkip("SQ_FEED_SAMPLES / SQ_LIVE_MAPS_OUT absents")
+        }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.makeKeyAndVisible()
+
+        func capture<V: View>(_ view: V, name: String, scheme: ColorScheme, wait: UInt64 = 7) async throws {
+            let host = UIHostingController(rootView: view.environment(\.colorScheme, scheme))
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: wait * 1_000_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: "\(output)/\(name).png"))
+        }
+
+        let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: input))) as? [[String: Any]])
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { _ in Date().addingTimeInterval(-3_600) }
+        let services = AppServices(config: .test)
+        for object in raw {
+            let name = (object["_name"] as? String) ?? ""
+            guard ["08", "09", "10"].contains(where: { name.hasPrefix($0) }) else { continue }
+            var clean = object
+            clean.removeValue(forKey: "_name")
+            let item = try decoder.decode(UnifiedSocialFeedItem.self, from: JSONSerialization.data(withJSONObject: clean))
+            for scheme in [ColorScheme.light, .dark] {
+                let card = ScrollView {
+                    FeedItemCard(item: item).padding(16)
+                }
+                .background(scheme == .dark ? Color.black : Color(red: 0.95, green: 0.94, blue: 0.91))
+                .environmentObject(services)
+                try await capture(card, name: "\(name)-\(scheme == .dark ? "sombre" : "clair")", scheme: scheme)
+            }
+        }
+
+        // Carte d'une session : tous les états du contrat, un trou de mesure, sans coupure.
+        let states: [(String, Double?)] = [
+            ("4G", -75), ("4G", -78), ("4G", -88), ("5G", -92), ("5G", -98), ("4G", -104),
+            ("Aucun", 0), ("Aucun", -125), ("4G", -112), ("4G", -116), ("Inconnu", -90), ("3G", -82), ("4G", -70)
+        ]
+        let points = states.enumerated().map { index, state -> String in
+            // Un saut de 3 km au milieu : le contrat v1 ne coupe pas le tracé.
+            let lat = 45.17 + Double(index) * 0.004 + (index >= 9 ? 0.027 : 0)
+            let lng = 5.70 + sin(Double(index) / 2) * 0.006
+            let dbm = state.1.map { "\"signalStrength\":\($0)," } ?? ""
+            return "{\"id\":\"p\(index)\",\"latitude\":\(lat),\"longitude\":\(lng),\(dbm)\"technology\":\"\(state.0)\"}"
+        }
+        let json = "{\"session\":{\"id\":\"s1\",\"name\":\"Trajet exemple\",\"source\":\"android\",\"points\":[\(points.joined(separator: ","))]}}"
+        let detail = try JSONDecoder().decode(CoverageSessionDetail.self, from: Data(json.utf8))
+        // La carte principale sur cette session seule, puis les réglages de la feuille Carte.
+        let cases: [(SessionTraceStyle, SessionPointColoring, ColorScheme, String)] = [
+            (.trace, .rsrp, .light, "trace-signal-clair"), (.trace, .rsrp, .dark, "trace-signal-sombre"),
+            (.points, .rsrp, .light, "points-signal-clair"), (.trace, .generation, .light, "trace-generation-clair")
+        ]
+        for (style, coloring, scheme, name) in cases {
+            let center = CLLocationCoordinate2D(latitude: 45.2, longitude: 5.7)
+            let map = MapKitMapView(
+                annotations: [], coverageHeatFeatures: [], speedtestFeatures: [],
+                renderVersion: 1, viewportRefreshID: 0, colorScheme: scheme, ornamentBottomInset: 0,
+                center: .constant(center), zoom: .constant(12),
+                onMoveEnd: { _, _ in }, onSelect: { _ in },
+                sessionTrace: MapSessionTrace(points: detail.points, revision: 1, style: style, coloring: coloring,
+                                              fitToken: 1, bottomInset: 300)
+            )
+            let view = VStack(spacing: 0) {
+                map.frame(height: 560)
+                MapSessionTraceSection(style: .constant(style), coloring: .constant(coloring), points: detail.points)
+                    .padding(16)
+                Spacer()
+            }
+            .background(scheme == .dark ? Color.black : Color(red: 0.95, green: 0.94, blue: 0.91))
+            try await capture(view, name: "session-main-map-\(name)", scheme: scheme, wait: 8)
+        }
+    }
+}

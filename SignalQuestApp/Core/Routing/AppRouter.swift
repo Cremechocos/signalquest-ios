@@ -175,6 +175,9 @@ final class AppRouter: ObservableObject {
     /// Ami dont la fiche s'ouvre sur la carte (alerte de partage de position en direct) ;
     /// la carte le cherche parmi les amis vivants et le cadre.
     @Published var pendingLiveFriendId: String?
+    /// Session à voir seule sur la carte principale (« Voir le tracé » d'un post
+    /// du fil, contrat #958) ; la carte la charge, la cadre et propose d'en sortir.
+    @Published var pendingMapSession: MapSessionRequest?
     /// Couche à allumer avec ce cadrage : speedtests et pannes sont éteints par
     /// défaut, « Voir sur la carte » cadrait sur un point invisible (MES-15).
     @Published var pendingMapLayer: MapDisplayItem.Kind?
@@ -226,7 +229,7 @@ final class AppRouter: ObservableObject {
             || openSentinelleTargetId != nil || openFriendRequests
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || openProfileScreen != nil || openANFRMap || openANFRStats != nil
-            || pendingMapFocus != nil || pendingLiveFriendId != nil || pendingDriveTest || pendingSpeedtestStart
+            || pendingMapFocus != nil || pendingLiveFriendId != nil || pendingMapSession != nil || pendingDriveTest || pendingSpeedtestStart
             || pendingShare != nil || pendingSharedPost != nil
     }
 
@@ -500,6 +503,12 @@ final class AppRouter: ObservableObject {
         if let id, !id.isEmpty { pendingLiveFriendId = id }
     }
 
+    func route(toMapSession id: String, title: String? = nil) {
+        guard !id.isEmpty else { return }
+        selectedTab = .map
+        pendingMapSession = MapSessionRequest(id: id, title: title)
+    }
+
     func route(toSite id: String?, market: String? = nil, operatorKey: String? = nil, commentId: String? = nil) {
         selectedTab = .map
         guard let id else { return }
@@ -569,4 +578,10 @@ final class AppRouter: ObservableObject {
         selectedTab = .profile
         openE2EEApprovalQR = payload
     }
+}
+
+/// Session demandée par le fil : son identifiant et, s'il est servi, le titre du post.
+struct MapSessionRequest: Equatable {
+    let id: String
+    let title: String?
 }

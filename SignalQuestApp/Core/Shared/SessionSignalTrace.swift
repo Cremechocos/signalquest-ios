@@ -35,6 +35,18 @@ enum SessionSignalTrace {
         return .range(best: order[best], worst: order[worst])
     }
 
+    /// Annonce écrite : « Signal : Excellent → Critique », « Signal : Bon », « Aucun point mesuré ».
+    static func displaySummary(_ points: [Point]) -> String {
+        switch summary(points) {
+        case .none:
+            return String(localized: "Aucun point mesuré")
+        case .range(let best, let worst) where best == worst:
+            return String(localized: "Signal : \(best.label)")
+        case .range(let best, let worst):
+            return String(localized: "Signal : \(best.label) → \(worst.label)")
+        }
+    }
+
     /// « Signal de Excellent à Critique », « Signal Bon », ou « aucun point mesuré ».
     static func spokenSummary(_ points: [Point]) -> String {
         switch summary(points) {

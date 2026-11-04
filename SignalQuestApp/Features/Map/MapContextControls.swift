@@ -81,6 +81,8 @@ struct MapLayersSheet: View {
     let onChooseMarket: (MarketRegistryEntry) -> Void
     /// Registre ANFR ; `nil` masque la ligne.
     let onOpenANFR: ((MapANFRDestination) -> Void)?
+    /// Session vue seule : ses réglages passent en tête de la feuille.
+    var sessionSection: MapSessionTraceSection? = nil
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -97,7 +99,8 @@ struct MapLayersSheet: View {
          antennaOperators: [MapAntennaLegendOperator] = [],
          onChooseOperator: @escaping (String) -> Void = { _ in },
          onChooseMarket: @escaping (MarketRegistryEntry) -> Void = { _ in },
-         onOpenANFR: ((MapANFRDestination) -> Void)? = nil) {
+         onOpenANFR: ((MapANFRDestination) -> Void)? = nil,
+         sessionSection: MapSessionTraceSection? = nil) {
         self.market = market
         self.operatorName = operatorName
         _layers = layers
@@ -113,6 +116,7 @@ struct MapLayersSheet: View {
         self.onChooseOperator = onChooseOperator
         self.onChooseMarket = onChooseMarket
         self.onOpenANFR = onOpenANFR
+        self.sessionSection = sessionSection
     }
 
     private var selectedEntry: MarketRegistryEntry? {
@@ -192,6 +196,7 @@ struct MapLayersSheet: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     MapSheetHeader(title: String(localized: "Carte"), subtitle: subtitle,
                                    closeIdentifier: "map.layers.close") { dismiss() }
+                    if let sessionSection { sessionSection }
                     operatorSection
                     layerSection
                     if layers.contains(.antenna) { antennaSection }
@@ -709,5 +714,81 @@ private struct MapDisplayLimitDetails: View {
             .padding(.bottom, SQSpace.xl)
         }
         .background(SQColor.surface)
+    }
+}
+
+// MARK: - Trajet vu seul
+
+/// Réglages de la session vue seule sur la carte (« Voir le tracé » d'un post,
+/// contrat #958) : tracé ou points, couleur du signal ou de la génération, et
+/// la légende des seuls niveaux présents. Rangés dans la feuille Carte, pas
+/// posés sur la carte.
+struct MapSessionTraceSection: View {
+    @Binding var style: SessionTraceStyle
+    @Binding var coloring: SessionPointColoring
+    let points: [CoverageSessionPoint]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Ce trajet").sqKicker().accessibilityAddTraits(.isHeader)
+            MapSegmented(selection: $style,
+                         options: [(.trace, String(localized: "Tracé")), (.points, String(localized: "Points"))],
+                         identifier: "map.layers.session.style")
+            MapSegmented(selection: $coloring,
+                         options: [(.rsrp, String(localized: "Signal")), (.generation, String(localized: "Génération"))],
+                         identifier: "map.layers.session.coloring")
+            if !legend.isEmpty {
+                MapFlowLayout(spacing: SQSpace.sm) {
+                    ForEach(legend, id: \.label) { entry in
+                        HStack(spacing: SQSpace.xs) {
+                            swatch(entry.color, dashed: entry.dashed)
+                            Text(verbatim: entry.label)
+                                .font(SQType.caption(.semibold))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .accessibilityIdentifier("map.layers.session.legend")
+            }
+        }
+    }
+
+    private struct LegendEntry {
+        let color: Color
+        let label: String
+        var dashed = false
+    }
+
+    /// Du meilleur au pire, puis les états sans mesure ; seulement ce que le trajet contient.
+    private var legend: [LegendEntry] {
+        switch coloring {
+        case .rsrp:
+            let present = Set(points.map { SQQualityScale.Signal(dbm: $0.signalStrength, technology: $0.tech) })
+            return SQQualityScale.Signal.allCases.filter(present.contains)
+                .map { LegendEntry(color: $0.color, label: $0.label, dashed: $0.isHatched) }
+        case .generation:
+            let order: [SQQualityScale.Generation] = [.fiveG, .fourG, .threeG, .twoG, .none]
+            let present = Set(points.map { SQQualityScale.Generation(technology: $0.tech) })
+            return order.filter(present.contains).map { generation in
+                let label: String
+                switch generation {
+                case .fiveG: label = "5G"
+                case .fourG: label = "4G"
+                case .threeG: label = "3G"
+                case .twoG: label = "2G"
+                case .none: label = String(localized: "Techno inconnue")
+                }
+                return LegendEntry(color: Color(hex: generation.hex), label: label)
+            }
+        }
+    }
+
+    private func swatch(_ color: Color, dashed: Bool) -> some View {
+        Capsule()
+            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .butt, dash: dashed ? [4, 3] : []))
+            .frame(width: 18, height: 4)
+            .accessibilityHidden(true)
     }
 }

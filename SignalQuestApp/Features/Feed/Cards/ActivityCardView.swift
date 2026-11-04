@@ -17,6 +17,8 @@ struct FeedActivity: Equatable {
         case bug(id: String)
         /// La feuille de la panne, sinon son site.
         case outage(id: String?, siteId: String?, market: String?)
+        /// La carte principale, sur cette session seule (contrat #958).
+        case session(id: String, title: String?)
     }
 
     /// Quête atteinte (#835) : ce que demandait la quête, lu dans le catalogue
@@ -357,6 +359,7 @@ extension FeedActivity.Link {
         case .progression: return String(localized: "Voir ma progression")
         case .bug: return String(localized: "Voir mon signalement")
         case .outage: return String(localized: "Voir la panne")
+        case .session: return String(localized: "Voir le tracé")
         }
     }
 
@@ -366,6 +369,7 @@ extension FeedActivity.Link {
         case .progression: return "chart.line.uptrend.xyaxis"
         case .bug: return "ladybug"
         case .outage: return "exclamationmark.triangle"
+        case .session: return "map"
         }
     }
 
@@ -376,6 +380,7 @@ extension FeedActivity.Link {
         case .progression: router.route(toProfileScreen: .progression)
         case .bug(let id): router.route(toBug: id)
         case .outage(let id, let siteId, let market): router.route(toCommunityOutageId: id, fallbackSiteId: siteId, market: market)
+        case .session(let id, let title): router.route(toMapSession: id, title: title)
         }
     }
 }

@@ -83,4 +83,37 @@ final class FeedAutomaticCardsRedesignTests: XCTestCase {
         let bare = try JSONDecoder().decode(SocialMapPoint.self, from: Data(#"{"latitude":1,"longitude":2}"#.utf8))
         XCTAssertNil(bare.technology)
     }
+
+    // MARK: Carte d'une session (filtre tracé / points)
+
+    private func sessionPoint(_ id: String, lat: Double, tech: String?, dbm: Double?) throws -> CoverageSessionPoint {
+        var fields: [String: Any] = ["id": id, "latitude": lat, "longitude": 5.72]
+        if let tech { fields["technology"] = tech }
+        if let dbm { fields["signalStrength"] = dbm }
+        return try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: JSONSerialization.data(withJSONObject: fields))
+    }
+
+    func testSessionMapColoursEachPointByItsContractState() throws {
+        let points = [
+            try sessionPoint("a", lat: 45.20, tech: "4G", dbm: -75),
+            try sessionPoint("b", lat: 45.21, tech: "Aucun", dbm: 0),
+            try sessionPoint("c", lat: 45.22, tech: "3G", dbm: -100),
+            try sessionPoint("d", lat: 45.23, tech: "Inconnu", dbm: -90)
+        ]
+        let overlay = SessionPointsOverlay(points: points, followsContract: true, connects: true)
+        let expected: [SQQualityScale.Signal] = [.excellent, .noService, .weak, .unknown]
+        XCTAssertEqual(overlay.dots.map(\.color), expected.map(\.uiColor.cgColor))
+        XCTAssertEqual(overlay.dots.map(\.dashed), [false, true, false, false])
+        // Contrat v1 : aucune coupure, même sur un trou de mesure.
+        XCTAssertFalse(overlay.cutsGaps)
+    }
+
+    func testMyMeasurementsKeepTheirFormerRendering() throws {
+        // Sans style, « Mes mesures » garde le RSRP seul et les coupures sur les trous.
+        let point = try sessionPoint("a", lat: 45.2, tech: "3G", dbm: -100)
+        let overlay = SessionPointsOverlay(points: [point])
+        XCTAssertEqual(overlay.dots.first?.color, SessionRSRPColor.cg(-100))
+        XCTAssertEqual(overlay.dots.first?.dashed, false)
+        XCTAssertTrue(overlay.cutsGaps)
+    }
 }
