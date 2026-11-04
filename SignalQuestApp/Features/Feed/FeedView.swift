@@ -1900,6 +1900,7 @@ struct PostShareSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     @State private var conversations: [MessageConversation] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -1911,7 +1912,14 @@ struct PostShareSheet: View {
     private var visibleConversations: [MessageConversation] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return conversations }
-        return conversations.filter { $0.displayTitle.localizedCaseInsensitiveContains(needle) }
+        return conversations.filter { title(of: $0).localizedCaseInsensitiveContains(needle) }
+    }
+
+    /// Titre sans soi-même, comme la liste des messages : « Camille, Inès » devenait « Inès ».
+    private func title(of conversation: MessageConversation) -> String {
+        var currentUserId: String?
+        if case .authenticated(let user) = session.state { currentUserId = user.id }
+        return conversation.displayTitle(excluding: currentUserId)
     }
 
     /// Lien web de la publication, seulement si elle est publique : un lien vers
@@ -2016,9 +2024,9 @@ struct PostShareSheet: View {
             Task { await share(conversation) }
         } label: {
             HStack(spacing: SQSpace.md) {
-                SQAvatar(url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl, name: conversation.displayTitle, size: 36)
+                SQAvatar(url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl, name: title(of: conversation), size: 36)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
+                    Text(title(of: conversation).isEmpty ? "Conversation" : title(of: conversation))
                         .font(SQType.body(.bold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
