@@ -89,6 +89,10 @@ struct E2EEV2ThreadPresentation: Equatable {
     var legacyCaptions: [String: String] = [:]
     /// Messages v1 qu'un import vérifié cite : l'importeur ne les renvoie pas.
     var importedV1Ids: Set<String> = []
+    /// Pièces chiffrées (E2EE-AUTO §7.7) par `blobId` : manifestes de la pièce et de sa miniature.
+    var media: [String: E2EEAutoMediaRef] = [:]
+    /// Enveloppe des messages qui citent des blobs, par identifiant : de quoi purger après un `DELETE` (§7.4).
+    var blobEnvelopes: [String: String] = [:]
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -165,6 +169,8 @@ enum E2EEV2ThreadPresenter {
         let legacyStartMs = old.messages.compactMap(\.createdAt).map { Int64(($0.timeIntervalSince1970 * 1_000).rounded(.down)) }.min()
         let blockEndMs = min(recent.map(\.serverTimeMs).min() ?? .max, legacyStartMs ?? .max) - 1
         var imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
+        var media: [String: E2EEAutoMediaRef] = [:]
+        var blobEnvelopes: [String: String] = [:]
         let messages = old.messages + shown.map { stored -> MessageItem in
             if let record = stored.historyImport {
                 imports[stored.messageRef] = importLabel(
@@ -176,11 +182,15 @@ enum E2EEV2ThreadPresenter {
                     importRefs: importRefs, blockEndMs: blockEndMs
                 )
             }
+            // Révision 17 : chaque pièce devient une pièce jointe dont l'adresse désigne son blob.
+            let body = stored.deleted ? nil : E2EEV2MessageStoreV2.r17Body(stored)
+            if let body, !body.blobIds.isEmpty { blobEnvelopes[stored.messageRef] = stored.envelopeId }
+            let attachments = body.map { E2EEAutoMediaRef.attachments(of: $0, into: &media) } ?? []
             return MessageItem(
                 id: stored.messageRef,
                 conversationId: conversationId,
                 senderId: stored.senderUserId,
-                kind: "TEXT",
+                kind: E2EEV2MessageStoreV2.displayedKinds.contains(stored.kind) ? stored.kind : "TEXT",
                 content: stored.deleted ? nil : stored.text,
                 e2eeVersion: 2,
                 e2eeIvB64: nil,
@@ -196,7 +206,7 @@ enum E2EEV2ThreadPresenter {
                 replyToId: stored.replyToRef,
                 threadReplyCount: nil,
                 sender: members[stored.senderUserId],
-                attachments: [],
+                attachments: attachments,
                 reactions: result.snapshot.reactions[stored.messageRef]?.map {
                     MessageReaction(emoji: $0.emoji, userId: $0.userId)
                 } ?? []
@@ -247,7 +257,9 @@ enum E2EEV2ThreadPresenter {
             hasOlder: shown.count < result.snapshot.messages.count,
             imports: imports,
             legacyCaptions: old.captions,
-            importedV1Ids: Set(importRefs.keys)
+            importedV1Ids: Set(importRefs.keys),
+            media: media,
+            blobEnvelopes: blobEnvelopes
         )
     }
 

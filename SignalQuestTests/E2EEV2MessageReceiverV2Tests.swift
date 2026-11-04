@@ -128,7 +128,7 @@ final class E2EEV2MessageReceiverV2Tests: XCTestCase {
         let ledgers = try ledgerStore()
         let receiver = try makeReceiver(fixture, ledgers: ledgers)
         let owner = fixture.session.ownerScopeId
-        let poll = Data(#"{"body":{},"counter":"2","kind":"POLL","mentions":[],"replyToRef":null,"schema":"signalquest.e2ee-content","sentAtMs":"1790000000000","version":"2"}"#.utf8)
+        let poll = Data(#"{"body":{},"counter":"2","kind":"STICKER","mentions":[],"replyToRef":null,"schema":"signalquest.e2ee-content","sentAtMs":"1790000000000","version":"2"}"#.utf8)
         let first = try delivered(from: phone, seeded: seeded, clientRequestId: "message_bruno_0000000001", counter: 1)
         let unknown = try raw(from: phone, seeded: seeded, clientRequestId: "message_bruno_0000000002", counter: 2, payload: poll, sequence: 2)
         let third = try delivered(from: phone, seeded: seeded, clientRequestId: "message_bruno_0000000003", counter: 3, sequence: 3)

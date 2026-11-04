@@ -74,13 +74,36 @@ enum E2EEV2NotificationPresentationPolicy {
         case .reaction: fullText = String(localized: "Nouvelle réaction chiffrée")
         // Aucun push n'est envoyé pour un import (E2EE-AUTO §8) : jamais son contenu.
         case .historyImport: fullText = String(localized: "Nouveau message chiffré")
+        case .r17(let body): fullText = r17Text(body, ephemeral: ephemeral)
         }
         var result = presentation(fullText: fullText, privacy: privacy, senderName: senderName)
         switch payload.body {
         case .edit, .delete, .historyImport: result.playsSound = false
-        case .text, .reaction: break
+        case .r17(let body) where body.delivery == .annotation: result.playsSound = false
+        case .text, .reaction, .r17: break
         }
         return result
+    }
+
+    /// Révision 17 : la nature seule (« Photo », « Message vocal »…), jamais un nom de
+    /// fichier ; la légende d'un message non éphémère, comme un texte.
+    static func r17Text(_ body: E2EEAutoContentR17.Body, ephemeral: Bool) -> String {
+        switch body {
+        case .media(let caption, let attachments):
+            if !ephemeral, let caption {
+                let normalized = caption.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+                if !normalized.isEmpty { return String(normalized.prefix(240)) }
+            }
+            let kinds = Set(attachments.map { E2EEAutoContentR17.presentation(mimeType: $0.file.mimeType) })
+            if attachments.count > 1 { return String(localized: "Pièces jointes chiffrées") }
+            if kinds == [.image] { return String(localized: "Photo chiffrée") }
+            if kinds == [.video] { return String(localized: "Vidéo chiffrée") }
+            return String(localized: "Fichier chiffré")
+        case .audio: return String(localized: "Message vocal chiffré")
+        case .poll: return String(localized: "Sondage chiffré")
+        case .card: return String(localized: "Publication partagée chiffrée")
+        case .pollVote, .pollClose: return String(localized: "Nouveau message chiffré")
+        }
     }
 
     /// Expéditeur authentifié, contenu jamais lu (mode « expéditeur seulement »).

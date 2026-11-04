@@ -26,11 +26,17 @@ enum E2EEV2MessageComposerV2 {
         }
         // Une réaction part en v3, en annotation (D.16) ; le reste en v2, sauf
         // sous une époque marquée : tout en v3, en `message` (E2EE-AUTO §7.3, révision 15).
+        // Révision 17 : les blobs cités, dans l'ordre du contenu (règle (a)), et la livraison de la nature.
+        var blobIds: [String] = []
+        if case .r17(let body) = parsed.body { blobIds = body.blobIds }
         var context = E2EEV2MessageContextV2(
             conversationId: conversationId, epochNumber: epoch.epochNumber, senderDeviceId: device.deviceId,
-            clientRequestId: clientRequestId, counter: parsed.counter, ttlSeconds: ttlSeconds, encryptedBlobIds: []
+            clientRequestId: clientRequestId, counter: parsed.counter, ttlSeconds: ttlSeconds, encryptedBlobIds: blobIds
         )
-        if case .reaction = parsed.body {
+        if case .r17(let body) = parsed.body {
+            context.envelopeVersion = E2EEV2MessageCryptoV2.annotationEnvelopeVersion
+            context.delivery = body.delivery
+        } else if case .reaction = parsed.body {
             context.envelopeVersion = E2EEV2MessageCryptoV2.annotationEnvelopeVersion
             context.delivery = .annotation
             context.notifyUserId = notifyUserId

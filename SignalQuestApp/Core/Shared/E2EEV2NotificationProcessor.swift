@@ -273,8 +273,8 @@ enum E2EEV2NotificationProcessor {
                   epoch.memberIds.contains(senderUserId),
                   conversation.latestMemberIds.contains(senderUserId) ||
                     conversation.departures[senderUserId].map({ nowMs - $0 <= replacedEpochWindowMs }) == true,
-                  // Jalon A : aucun blob.
-                  envelope.encryptedBlobIds.isEmpty else {
+                  // Révision 17 : au plus 20 blobs, contrôlés contre le contenu une fois ouvert.
+                  envelope.encryptedBlobIds.count <= E2EEAutoContentR17.maxBlobs else {
                 return .generic(.invalidDelivery)
             }
             // Jamais ce que l'app a déjà reçu (§4.2) ; ce que l'extension a
@@ -290,6 +290,12 @@ enum E2EEV2NotificationProcessor {
                 }
                 defer { epochKey.resetBytes(in: 0..<epochKey.count) }
                 let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epochKey, context: messageContext)
+                // Règle (a) (§7.4) : seuls les blobs cités par le contenu, dans son ordre.
+                let citedBlobIds: [String]
+                if case .r17(let body) = opened.payload.body { citedBlobIds = body.blobIds } else { citedBlobIds = [] }
+                guard citedBlobIds == envelope.encryptedBlobIds, Set(citedBlobIds).count == citedBlobIds.count else {
+                    return .generic(.invalidDelivery)
+                }
                 let sentAtMs = opened.payload.sentAtMs
                 if envelope.ttlSeconds > 0, sentAtMs + Int64(envelope.ttlSeconds) * 1_000 <= nowMs {
                     return .generic(.expired)

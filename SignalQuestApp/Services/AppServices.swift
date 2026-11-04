@@ -176,6 +176,7 @@ final class AppServices: ObservableObject {
             { [weak self] in await self?.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
             { [weak self] in await self?.retryPendingV2Sends() },
+            { [weak self] in await self?.retryPendingMediaSends() },
             { [weak self] in await self?.customSites.retryPending() },
             { [weak self] in await self?.experienceTests.retryPending() },
             { [weak self] in await self?.bugReports.retryPending() },
@@ -384,6 +385,20 @@ final class AppServices: ObservableObject {
                 break
             }
         }
+    }
+
+    /// Pièces jointes chiffrées restées dans leur file durable (E2EE-AUTO §7.4, §7.7), puis
+    /// les purges de blobs à envoyer : même identifiant à chaque essai, jamais deux signatures.
+    func retryPendingMediaSends(outbox: E2EEAutoMediaOutbox = .shared) async {
+        guard e2eeV2Messaging.writesEnabled, let (client, ownerScopeId) = e2eeV2Messaging.blobClient() else { return }
+        let messaging = e2eeV2Messaging
+        await outbox.retryAll(ownerScopeId: ownerScopeId, client: client, cache: .shared) { draft, record in
+            await messaging.send(
+                draft, clientRequestId: record.clientRequestId, conversationId: record.conversationId,
+                isGroup: record.isGroup, participantIds: record.participantIds
+            )
+        }
+        await outbox.drainPurges(ownerScopeId: ownerScopeId, client: client)
     }
 
     /// Texte chiffré v2 écrit hors du fil (réponse depuis une notification, Siri) : gardé dans la

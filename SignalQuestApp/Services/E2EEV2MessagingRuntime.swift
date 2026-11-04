@@ -144,6 +144,17 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// Client des blobs chiffrés de la session courante (E2EE-AUTO §7.4).
+    func blobClient() -> (client: E2EEAutoBlobClient, ownerScopeId: String)? {
+        guard readsEnabled, let parts = current() else { return nil }
+        let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: parts.session)
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("e2ee-blobs", isDirectory: true)
+        return (
+            E2EEAutoBlobClient(requests: E2EEAutoBlobClient.live(transport: transport, ownerScopeId: parts.session.ownerScopeId), workDirectory: work),
+            parts.session.ownerScopeId
+        )
+    }
+
     /// Comptes à relire : après une approbation, une révocation, un numéro de
     /// sécurité accepté ; tous si `nil`.
     func invalidateDevices(_ userIds: [String]? = nil) async {

@@ -107,6 +107,12 @@ struct ConversationDetailView: View {
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
     @State private var v2Imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
+    /// Pièces chiffrées du fil (E2EE-AUTO §7.7), par `blobId`.
+    @State private var v2Media: [String: E2EEAutoMediaRef] = [:]
+    /// Enveloppe des messages qui citent des blobs : purgés après leur suppression (§7.4).
+    @State private var v2BlobEnvelopes: [String: String] = [:]
+    /// Bulles locales des pièces chiffrées en cours d'envoi → clé de leur envoi dans la file durable.
+    @State private var pendingE2EEMedia: [String: String] = [:]
     /// Anciens messages v1 ou en clair d'une conversation passée en auto (E2EE-AUTO §8).
     @State private var v2Legacy: [MessageItem] = []
     @State private var v2LegacyCaptions: [String: String] = [:]
@@ -1419,6 +1425,7 @@ struct ConversationDetailView: View {
                 canLiveShare: EncryptedConversationSurfaces.allowsLiveShare(isE2EE: isE2EE, isV2: conversationIsV2),
                 isEditing: editTarget != nil,
                 hasStagedAttachments: !stagedAttachments.isEmpty && editTarget == nil,
+                encryptedMedia: usesV2,
                 seedText: composerSeed,
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
@@ -2357,7 +2364,13 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func attachmentsView(for message: MessageItem, mine: Bool, standalone: Bool = false) -> some View {
         ForEach(message.attachments.filter { $0.url != nil }) { attachment in
-            if isImageAttachment(attachment) {
+            if let url = attachment.url, url.scheme == E2EEAutoMediaRef.scheme || url.isFileURL {
+                // Pièce chiffrée (E2EE-AUTO §7.7), ou en cours d'envoi depuis cet appareil.
+                E2EEAutoAttachmentView(
+                    attachment: attachment, media: attachment.id.flatMap { v2Media[$0] }, mine: mine,
+                    standalone: standalone, load: loadEncryptedMedia
+                )
+            } else if isImageAttachment(attachment) {
                 attachmentImage(attachment, message: message, mine: mine, standalone: standalone)
             } else if isAudioAttachment(attachment), let url = attachment.url {
                 // Lue dans l'app : elle s'ouvrait comme un fichier hors de l'app (SOC-06).
@@ -2443,7 +2456,8 @@ struct ConversationDetailView: View {
         var initialIndex = 0
         for message in messages where message.deletedAt == nil {
             for attachment in message.attachments where isImageAttachment(attachment) {
-                guard let url = attachment.url else { continue }
+                // Une pièce chiffrée s'ouvre dans son propre aperçu, jamais par une URL.
+                guard let url = attachment.url, url.scheme?.hasPrefix("http") == true else { continue }
                 let target = MessageImageTarget(
                     id: attachment.id ?? url.absoluteString,
                     url: url,
@@ -3069,8 +3083,10 @@ struct ConversationDetailView: View {
                 pendingSends[localId] = nil
                 sendStatus[localId] = nil
             }
-            let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
-            let restored = await restoredV2Messages(accepted: accepted)
+            let localPending = messages.filter {
+                pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil || pendingE2EEMedia[$0.id] != nil
+            }
+            let restored = await restoredV2Messages(accepted: accepted) + restoredMediaMessages(accepted: accepted)
             let hidden = E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: conversation.id)
             let knownIds = Set(messages.map(\.id))
             let thread = presentation.messages.filter { !hidden.contains($0.id) }
@@ -3081,6 +3097,8 @@ struct ConversationDetailView: View {
             if next != messages { messages = next }
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
+            if v2Media != presentation.media { v2Media = presentation.media }
+            v2BlobEnvelopes = presentation.blobEnvelopes
             if v2LegacyCaptions != presentation.legacyCaptions { v2LegacyCaptions = presentation.legacyCaptions }
             v2ImportedV1Ids = presentation.importedV1Ids
             v2LastIncomingEnvelopeId = presentation.lastIncomingEnvelopeId
@@ -3195,7 +3213,9 @@ struct ConversationDetailView: View {
             // Les bulles locales encore en cours d'envoi (ou en échec, rejouables)
             // ne sont pas encore sur le serveur : un rechargement ne doit pas les
             // faire disparaître.
-            let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
+            let localPending = messages.filter {
+                pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil || pendingE2EEMedia[$0.id] != nil
+            }
             messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()) + (await restoredPendingAttachments()))
             computeUnreadDividerIfNeeded()
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
@@ -3998,6 +4018,10 @@ struct ConversationDetailView: View {
     /// Idempotency-Key à chaque tentative pour qu'un rejeu après échec réseau ne
     /// crée jamais de doublon côté serveur.
     private func performSend(localId: String) async {
+        if pendingE2EEMedia[localId] != nil {
+            await performE2EEMediaSend(localId: localId)
+            return
+        }
         if pendingAttachmentSends[localId] != nil {
             await performAttachmentSend(localId: localId)
             return
@@ -4134,13 +4158,17 @@ struct ConversationDetailView: View {
         if let attachment = pendingAttachmentSends[localId] {
             await discardOutboxRecords(for: attachment)
         }
+        if let key = pendingE2EEMedia[localId], let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId {
+            await E2EEAutoMediaOutbox.shared.remove(key, ownerScopeId: scope)
+        }
+        pendingE2EEMedia[localId] = nil
         pendingSends[localId] = nil
         pendingAttachmentSends[localId] = nil
         sendStatus[localId] = nil
         withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
     }
 
-    private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0, createdAt: Date = Date()) -> MessageItem {
+    private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0, createdAt: Date = Date(), attachments: [MessageAttachment] = []) -> MessageItem {
         MessageItem(
             id: id,
             conversationId: conversation.id,
@@ -4159,7 +4187,7 @@ struct ConversationDetailView: View {
             replyToId: replyToId,
             threadReplyCount: nil,
             sender: nil,
-            attachments: [],
+            attachments: attachments,
             reactions: []
         )
     }
@@ -4194,6 +4222,11 @@ struct ConversationDetailView: View {
 
     /// Plusieurs photos choisies d'un coup : envoyées l'une après l'autre, la légende sur la première.
     private func sendPhotos(_ items: [PhotosPickerItem], caption: String) async {
+        // Chiffré : un seul message avec toutes les pièces (20 au plus, §7.7).
+        if usesV2 {
+            await sendE2EEPicked(items, caption: caption)
+            return
+        }
         for (index, item) in items.enumerated() {
             await sendAttachment(item: item, caption: index == 0 ? caption : "")
         }
@@ -4201,8 +4234,12 @@ struct ConversationDetailView: View {
 
     private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {
         do {
-            guard !isE2EE else {
+            guard !isE2EE || usesV2 else {
                 throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            }
+            if usesV2 {
+                await sendE2EEPicked([item], caption: rawCaption)
+                return
             }
             if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
                 await sendVideo(item: item, caption: rawCaption)
@@ -4258,12 +4295,27 @@ struct ConversationDetailView: View {
     /// Document choisi dans Fichiers : part tel quel, en pièce jointe « fichier » (téléchargement
     /// forcé côté serveur), dans la limite de 10 Mo.
     private func sendFile(at url: URL, caption rawCaption: String) async {
-        guard !isE2EE else {
+        guard !isE2EE || usesV2 else {
             showFilesUnavailable()
             return
         }
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        if usesV2 {
+            // Chiffré : jusqu'à 100 Mio ; une image ou une vidéo y perd aussi son lieu (§7.7).
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            guard size <= Int(E2EEAutoContentR17.maxFileBytes), let raw = try? Data(contentsOf: url, options: .mappedIfSafe) else {
+                showActionError(size > Int(E2EEAutoContentR17.maxFileBytes)
+                    ? String(localized: "Ce fichier dépasse 100 Mo.")
+                    : String(localized: "Ce fichier est illisible."))
+                Haptics.error()
+                return
+            }
+            let name = url.lastPathComponent
+            let source = await Task.detached(priority: .userInitiated) { E2EEAutoMediaPreparation.file(raw, fileName: name) }.value
+            await sendE2EEMedia([source], caption: rawCaption)
+            return
+        }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         guard MessageAttachmentOutboxStore.fits(size), let raw = try? Data(contentsOf: url),
               MessageAttachmentOutboxStore.fits(raw.count) else {
@@ -4305,6 +4357,13 @@ struct ConversationDetailView: View {
     private func sendStaged(caption: String) async {
         let items = stagedAttachments
         stagedAttachments = []
+        if usesV2 {
+            let sources = await Task.detached(priority: .userInitiated) {
+                items.map { E2EEAutoMediaPreparation.file($0.data, fileName: $0.filename) }
+            }.value
+            await sendE2EEMedia(sources, caption: caption)
+            return
+        }
         guard !isE2EE else {
             showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             Haptics.error()
@@ -4329,7 +4388,7 @@ struct ConversationDetailView: View {
     private func stage(data: Data, fileName: String, uti: String) async {
         let type = UTType(uti) ?? UTType(filenameExtension: (fileName as NSString).pathExtension)
         let isImage = type?.conforms(to: .image) == true
-        guard !isE2EE else {
+        guard !isE2EE || usesV2 else {
             if isImage {
                 showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             } else {
@@ -4449,7 +4508,7 @@ struct ConversationDetailView: View {
 
     /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
     private func sendCapturedPhoto(_ data: Data, caption: String) async {
-        guard !isE2EE else {
+        guard !isE2EE || usesV2 else {
             showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             Haptics.error()
             return
@@ -4458,6 +4517,15 @@ struct ConversationDetailView: View {
     }
 
     private func sendPhoto(rawData raw: Data, caption rawCaption: String) async {
+        if usesV2 {
+            guard let source = await Task.detached(priority: .userInitiated, operation: { E2EEAutoMediaPreparation.photo(raw) }).value else {
+                showActionError(String(localized: "Image illisible."))
+                Haptics.error()
+                return
+            }
+            await sendE2EEMedia([source], caption: rawCaption)
+            return
+        }
         // Décodage/redimensionnement/encodage hors du main thread pour ne pas
         // geler l'UI pendant l'envoi (image plein format).
         guard let prepared = await Task.detached(priority: .userInitiated, operation: {
@@ -4479,6 +4547,149 @@ struct ConversationDetailView: View {
         draftAutosaver?.discard()
         clearComposer()
         replyTarget = nil
+    }
+
+    // MARK: Pièces jointes chiffrées (E2EE-AUTO §7.4, §7.7)
+
+    /// Pièce chiffrée du fil, déchiffrée sur l'appareil (téléchargée au besoin).
+    private func loadEncryptedMedia(_ manifest: E2EEAutoContentR17.Manifest) async -> E2EEAutoMediaCache.Result {
+        guard let (client, ownerScopeId) = services.e2eeV2Messaging.blobClient() else { return .unavailable }
+        return await E2EEAutoMediaCache.shared.file(for: manifest, ownerScopeId: ownerScopeId, client: client)
+    }
+
+    /// Photos et vidéos de la photothèque, en un seul message chiffré.
+    private func sendE2EEPicked(_ items: [PhotosPickerItem], caption: String) async {
+        var sources: [E2EEAutoMediaSource] = []
+        for item in items.prefix(E2EEAutoContentR17.maxBlobs / 2) {
+            if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                guard let movie = try? await item.loadTransferable(type: PickedMovie.self) else {
+                    showActionError(String(localized: "Vidéo indisponible. Réessaie avec du réseau."))
+                    Haptics.error()
+                    return
+                }
+                defer { try? FileManager.default.removeItem(at: movie.url) }
+                let size = (try? movie.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                guard size <= Int(E2EEAutoContentR17.maxFileBytes),
+                      let source = await E2EEAutoMediaPreparation.video(at: movie.url, fileName: movie.url.lastPathComponent) else {
+                    showActionError(size > Int(E2EEAutoContentR17.maxFileBytes)
+                        ? String(localized: "Cette vidéo dépasse 100 Mo. Choisis-en une plus courte.")
+                        : String(localized: "Cette vidéo est illisible."))
+                    Haptics.error()
+                    return
+                }
+                sources.append(source)
+            } else {
+                guard let raw = try? await item.loadTransferable(type: Data.self),
+                      let source = await Task.detached(priority: .userInitiated, operation: { E2EEAutoMediaPreparation.photo(raw) }).value else {
+                    showActionError(String(localized: "Photo indisponible. Réessaie avec du réseau."))
+                    Haptics.error()
+                    return
+                }
+                sources.append(source)
+            }
+        }
+        await sendE2EEMedia(sources, caption: caption)
+    }
+
+    /// Garde l'envoi dans la file durable, pose sa bulle, puis chiffre et envoie.
+    private func sendE2EEMedia(_ sources: [E2EEAutoMediaSource], caption rawCaption: String) async {
+        guard !sources.isEmpty, let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
+        let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
+        let record: E2EEAutoMediaOutbox.Record
+        do {
+            record = try await E2EEAutoMediaOutbox.shared.stage(
+                sources, caption: caption.isEmpty ? nil : caption, replyToRef: replyTarget?.id, ttlSeconds: ephemeralTTL,
+                conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId), ownerScopeId: scope
+            )
+        } catch {
+            showActionError(String(localized: "Cette pièce jointe n’a pas pu être préparée."))
+            Haptics.error()
+            return
+        }
+        let localId = "local-\(record.key)"
+        pendingE2EEMedia[localId] = record.key
+        sendStatus[localId] = .sending
+        messages = Self.normalized(messages + [await optimisticMediaMessage(localId: localId, record: record, ownerScopeId: scope)])
+        draftAutosaver?.discard()
+        clearComposer()
+        replyTarget = nil
+        Haptics.light()
+        await performE2EEMediaSend(localId: localId)
+    }
+
+    /// Bulle locale : les sources en clair de l'appareil, jamais retéléchargées.
+    private func optimisticMediaMessage(localId: String, record: E2EEAutoMediaOutbox.Record, ownerScopeId: String) async -> MessageItem {
+        var attachments: [MessageAttachment] = []
+        for entry in record.entries {
+            let blob = entry.file
+            let url = await E2EEAutoMediaOutbox.shared.sourceURL(blob, clientRequestId: record.clientRequestId, ownerScopeId: ownerScopeId)
+            let kind: String = switch E2EEAutoContentR17.presentation(mimeType: blob.mimeType) {
+            case .image: "IMAGE"
+            case .video: "VIDEO"
+            case .file: "FILE"
+            }
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+            attachments.append(MessageAttachment(
+                id: blob.blobId, kind: kind, url: url, fileName: blob.fileName, contentType: blob.mimeType,
+                size: size, width: blob.width, height: blob.height
+            ))
+        }
+        return makeOptimisticMessage(
+            id: localId, text: record.caption ?? "", replyToId: record.replyToRef, ttlSeconds: record.ttlSeconds,
+            createdAt: Date(timeIntervalSince1970: Double(record.createdAtMs) / 1_000), attachments: attachments
+        )
+    }
+
+    private func performE2EEMediaSend(localId: String) async {
+        guard let key = pendingE2EEMedia[localId] else { return }
+        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .sending }
+        guard let (client, ownerScopeId) = services.e2eeV2Messaging.blobClient() else {
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+            return
+        }
+        let messaging = services.e2eeV2Messaging
+        let outcome = await E2EEAutoMediaOutbox.shared.process(
+            clientRequestId: key, ownerScopeId: ownerScopeId, client: client, cache: .shared
+        ) { draft, record in
+            await messaging.send(
+                draft, clientRequestId: record.clientRequestId, conversationId: record.conversationId,
+                isGroup: record.isGroup, participantIds: record.participantIds
+            )
+        }
+        switch outcome {
+        case .sent:
+            await loadV2()
+            pendingE2EEMedia[localId] = nil
+            sendStatus[localId] = nil
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
+        case .retry:
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+            Haptics.error()
+        case .failed(let reason):
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+            showActionError(reason)
+            Haptics.error()
+        }
+    }
+
+    /// Envois de pièces chiffrées restés dans la file durable : bulles « Non envoyé ». Ceux que le
+    /// serveur a déjà acceptés en sortent (leur message est dans le fil).
+    private func restoredMediaMessages(accepted: Set<String>) async -> [MessageItem] {
+        guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return [] }
+        var restored: [MessageItem] = []
+        for record in await E2EEAutoMediaOutbox.shared.records(ownerScopeId: scope) where record.conversationId == conversation.id {
+            if accepted.contains(record.clientRequestId) {
+                await E2EEAutoMediaOutbox.shared.remove(record.clientRequestId, ownerScopeId: scope)
+                continue
+            }
+            let localId = "local-\(record.key)"
+            guard pendingE2EEMedia[localId] == nil else { continue }
+            pendingE2EEMedia[localId] = record.key
+            sendStatus[localId] = .failed
+            restored.append(await optimisticMediaMessage(localId: localId, record: record, ownerScopeId: scope))
+        }
+        return restored
     }
 
     /// Pose tout de suite la bulle de la pièce jointe (en cours d'envoi), puis la téléverse.
@@ -4724,7 +4935,14 @@ struct ConversationDetailView: View {
         if usesV2 {
             // v2 : « pour tous » est une suppression signée (§5) ; « pour moi » reste local.
             if forEveryone {
-                _ = await sendV2(.delete(targetRef: message.id), replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString)
+                let deleted = await sendV2(.delete(targetRef: message.id), replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString)
+                // Ses blobs sont purgés après le `DELETE` accepté (§7.4, point 6), gardés en file sinon.
+                if deleted, let envelopeId = v2BlobEnvelopes[message.id], let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId {
+                    await E2EEAutoMediaOutbox.shared.enqueuePurge(envelopeId: envelopeId, ownerScopeId: scope)
+                    if let (client, owner) = services.e2eeV2Messaging.blobClient(), owner == scope {
+                        await E2EEAutoMediaOutbox.shared.drainPurges(ownerScopeId: owner, client: client)
+                    }
+                }
             } else {
                 E2EEV2HiddenMessagesStore.hide(messageRef: message.id, conversationId: conversation.id)
                 messages.removeAll { $0.id == message.id }

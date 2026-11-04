@@ -432,6 +432,7 @@ final class AuthService: AuthServicing {
         E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
         RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
         PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
+        E2EEAutoMediaCache.purge(ownerScopeId: ownerScopeId)
         CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
         SQAddress.purge(ownerScopeId: ownerScopeId)

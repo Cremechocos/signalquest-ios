@@ -83,9 +83,13 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
         case reaction(targetRef: String, emoji: String, action: ReactionAction)
         /// E2EE-AUTO §8 : un message v1 importé, sans réponse ni mention.
         case historyImport(E2EEV2HistoryImportBody)
+        /// E2EE-AUTO §7.7 (révision 17) : pièces jointes, vocal, sondage, vote,
+        /// clôture ou carte, lus et écrits par `E2EEAutoContentR17`.
+        case r17(E2EEAutoContentR17.Body)
 
         var kind: String {
             switch self {
+            case .r17(let body): return body.kind
             case .text: return "TEXT"
             case .edit: return "EDIT"
             case .delete: return "DELETE"
@@ -114,6 +118,11 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
             bodyJSON = .object(["targetRef": .string(targetRef), "emoji": .string(emoji), "action": .string(action.rawValue)])
         case .historyImport(let value):
             bodyJSON = value.json
+        case .r17(let value):
+            let content = E2EEAutoContentR17.Content(
+                sentAtMs: sentAtMs, counter: counter, replyToRef: replyToRef, mentions: mentions, body: value
+            )
+            bodyJSON = E2EEAutoContentR17.json(content).objectValue?["body"] ?? .null
         }
         return .object([
             "schema": .string(Self.schema),
@@ -139,6 +148,8 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
         guard data.count <= maxBytes, let root = (try? E2EEV2CanonicalJSON.parseCanonical(data))?.objectValue,
               root["schema"]?.stringValue == schema, let version = root["version"]?.stringValue,
               let kind = root["kind"]?.stringValue else { return false }
+        // Révision 17 : sa lecture dit seule ce qui est « non pris en charge » (carte d'un autre type).
+        if version == "2", E2EEAutoContentR17.kinds.contains(kind) { return E2EEAutoContentR17.read(data) == .unsupported }
         return version != "2" || !["TEXT", "EDIT", "DELETE", "REACTION", "HISTORY_IMPORT"].contains(kind)
     }
 
@@ -206,6 +217,12 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
                 throw E2EEV2MessageV2Error.invalidPayload
             }
             body = .historyImport(value)
+        case _ where E2EEAutoContentR17.kinds.contains(kind):
+            guard case .ok(let content) = E2EEAutoContentR17.read(data), content.replyToRef == replyToRef,
+                  content.mentions == mentions else {
+                throw E2EEV2MessageV2Error.invalidPayload
+            }
+            body = .r17(content.body)
         default:
             throw E2EEV2MessageV2Error.invalidPayload
         }
@@ -461,6 +478,9 @@ enum E2EEV2MessageCryptoV2 {
             guard context.delivery == .message else { throw E2EEV2MessageV2Error.invalidEnvelope }
         case .reaction:
             guard context.delivery == .annotation else { throw E2EEV2MessageV2Error.invalidEnvelope }
+        case .r17(let body):
+            // §7.7 : chaque nature a sa livraison ; l'autre la rend illisible.
+            guard context.delivery == body.delivery else { throw E2EEV2MessageV2Error.invalidEnvelope }
         case .edit, .delete:
             break
         }

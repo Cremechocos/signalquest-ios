@@ -1,0 +1,511 @@
+{
+  "fixtureVersion": 1,
+  "note": "Transport des blobs et import v1 (contrat E2EE-AUTO §7.4 et §8, révision 16). createRequest : corps de POST /api/e2ee/v2/blobs, partCount et taille de chaque part. downloadRange : offset et length de la lecture. contentMatch : règle (a), blobId des manifestes du contenu contre encryptedBlobIds. importEligibility : états des pièces v1 (importable, lost, pending) et décision de l’importeur ; attachmentMissing = afficher « pièce jointe non importée ».",
+  "createRequest": {
+    "valid": [
+      {
+        "name": "oneByte",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1",
+          "partSize": "5242880"
+        },
+        "partCount": "1",
+        "partSizes": [
+          "1"
+        ]
+      },
+      {
+        "name": "smallerThanOnePart",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880"
+        },
+        "partCount": "1",
+        "partSizes": [
+          "1048576"
+        ]
+      },
+      {
+        "name": "exactlyOnePart",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "5242880",
+          "partSize": "5242880"
+        },
+        "partCount": "1",
+        "partSizes": [
+          "5242880"
+        ]
+      },
+      {
+        "name": "twoPartsShortLast",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "5242881",
+          "partSize": "5242880"
+        },
+        "partCount": "2",
+        "partSizes": [
+          "5242880",
+          "1"
+        ]
+      },
+      {
+        "name": "maxPartSize",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "20971520",
+          "partSize": "8388608"
+        },
+        "partCount": "3",
+        "partSizes": [
+          "8388608",
+          "8388608",
+          "4194304"
+        ]
+      },
+      {
+        "name": "maxBlob",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "134217728",
+          "partSize": "5242880"
+        },
+        "partCount": "26",
+        "partSizes": [
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "5242880",
+          "3145728"
+        ]
+      }
+    ],
+    "negative": [
+      {
+        "name": "versionNumber",
+        "body": {
+          "version": 1,
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "extraKey",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880",
+          "chunkSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "missingPartSize",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "blobIdTooShort",
+        "body": {
+          "version": "1",
+          "blobId": "blob_short",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "algorithmUnknown",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "sha256Uppercase",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "ciphertextSize": "1048576",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "sizeZero",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "0",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "sizeLeadingZero",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "01048576",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "sizeNumber",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": 1048576,
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "sizeOverMax",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "134217729",
+          "partSize": "5242880"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "partSizeBelowMin",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "5242879"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      },
+      {
+        "name": "partSizeOverMax",
+        "body": {
+          "version": "1",
+          "blobId": "blob_0123456789abcdef",
+          "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+          "ciphertextSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ciphertextSize": "1048576",
+          "partSize": "8388609"
+        },
+        "expected": "E2EE_BLOB_REQUEST_INVALID"
+      }
+    ]
+  },
+  "downloadRange": [
+    {
+      "name": "whole",
+      "ciphertextSize": "1048576",
+      "offset": "0",
+      "length": "1048576",
+      "expected": "OK"
+    },
+    {
+      "name": "lastByte",
+      "ciphertextSize": "1048576",
+      "offset": "1048575",
+      "length": "1",
+      "expected": "OK"
+    },
+    {
+      "name": "maxLength",
+      "ciphertextSize": "20971520",
+      "offset": "0",
+      "length": "8388608",
+      "expected": "OK"
+    },
+    {
+      "name": "pastEnd",
+      "ciphertextSize": "1048576",
+      "offset": "1048575",
+      "length": "2",
+      "expected": "E2EE_BLOB_RANGE_INVALID"
+    },
+    {
+      "name": "zeroLength",
+      "ciphertextSize": "1048576",
+      "offset": "0",
+      "length": "0",
+      "expected": "E2EE_BLOB_RANGE_INVALID"
+    },
+    {
+      "name": "overMaxLength",
+      "ciphertextSize": "20971520",
+      "offset": "0",
+      "length": "8388609",
+      "expected": "E2EE_BLOB_RANGE_INVALID"
+    },
+    {
+      "name": "offsetLeadingZero",
+      "ciphertextSize": "1048576",
+      "offset": "00",
+      "length": "1",
+      "expected": "E2EE_BLOB_RANGE_INVALID"
+    },
+    {
+      "name": "offsetNegative",
+      "ciphertextSize": "1048576",
+      "offset": "-1",
+      "length": "1",
+      "expected": "E2EE_BLOB_RANGE_INVALID"
+    }
+  ],
+  "contentMatch": [
+    {
+      "name": "importNoBlobs",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [],
+      "encryptedBlobIds": [],
+      "expected": "OK"
+    },
+    {
+      "name": "importTwoBlobs",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_bbbbbbbbbbbbbbbb"
+      ],
+      "encryptedBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_bbbbbbbbbbbbbbbb"
+      ],
+      "expected": "OK"
+    },
+    {
+      "name": "importOrderSwapped",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_bbbbbbbbbbbbbbbb"
+      ],
+      "encryptedBlobIds": [
+        "blob_bbbbbbbbbbbbbbbb",
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "expected": "UNREADABLE_IMPORT"
+    },
+    {
+      "name": "importEnvelopeExtraBlob",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "encryptedBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_bbbbbbbbbbbbbbbb"
+      ],
+      "expected": "UNREADABLE_IMPORT"
+    },
+    {
+      "name": "importManifestNotInEnvelope",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_bbbbbbbbbbbbbbbb"
+      ],
+      "encryptedBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "expected": "UNREADABLE_IMPORT"
+    },
+    {
+      "name": "importEnvelopeEmpty",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "encryptedBlobIds": [],
+      "expected": "UNREADABLE_IMPORT"
+    },
+    {
+      "name": "importDuplicateBothSides",
+      "kind": "HISTORY_IMPORT",
+      "manifestBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "encryptedBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa",
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "expected": "UNREADABLE_IMPORT"
+    },
+    {
+      "name": "textNoBlobs",
+      "kind": "TEXT",
+      "manifestBlobIds": [],
+      "encryptedBlobIds": [],
+      "expected": "OK"
+    },
+    {
+      "name": "textWithBlob",
+      "kind": "TEXT",
+      "manifestBlobIds": [],
+      "encryptedBlobIds": [
+        "blob_aaaaaaaaaaaaaaaa"
+      ],
+      "expected": "UNREADABLE"
+    }
+  ],
+  "importEligibility": [
+    {
+      "name": "textNoAttachment",
+      "sourceKind": "TEXT",
+      "attachments": [],
+      "expected": {
+        "decision": "IMPORT",
+        "importedIndexes": [],
+        "attachmentMissing": false
+      }
+    },
+    {
+      "name": "oneImportable",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [
+        "importable"
+      ],
+      "expected": {
+        "decision": "IMPORT",
+        "importedIndexes": [
+          "0"
+        ],
+        "attachmentMissing": false
+      }
+    },
+    {
+      "name": "oneLost",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [
+        "lost"
+      ],
+      "expected": {
+        "decision": "IMPORT",
+        "importedIndexes": [],
+        "attachmentMissing": true
+      }
+    },
+    {
+      "name": "onePending",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [
+        "pending"
+      ],
+      "expected": {
+        "decision": "WAIT"
+      }
+    },
+    {
+      "name": "importableAndLost",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [
+        "importable",
+        "lost"
+      ],
+      "expected": {
+        "decision": "IMPORT",
+        "importedIndexes": [
+          "0"
+        ],
+        "attachmentMissing": false
+      }
+    },
+    {
+      "name": "lostAndPending",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [
+        "lost",
+        "pending"
+      ],
+      "expected": {
+        "decision": "WAIT"
+      }
+    },
+    {
+      "name": "attachmentKindNoAttachment",
+      "sourceKind": "ATTACHMENT",
+      "attachments": [],
+      "expected": {
+        "decision": "IMPORT",
+        "importedIndexes": [],
+        "attachmentMissing": true
+      }
+    }
+  ]
+}

@@ -234,6 +234,14 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// États d'une pièce jointe chiffrée (E2EE-AUTO §7.7), sans pile serveur.
+    static var showsAutoAttachmentsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-attachments")
+        #else
+        false
+        #endif
+    }
     static var showsAutoDevicesQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-auto-devices") || hasArgument("--qa-auto-devices-recent")

@@ -92,6 +92,26 @@ final class E2EEAutoContentR17Tests: XCTestCase {
         XCTAssertEqual(E2EEAutoContentR17.presentation(mimeType: "application/pdf"), .file)
     }
 
+    /// La charge v2 lit et réécrit la révision 17 à l'octet ; ses refus restent
+    /// illisibles, ou « non pris en charge » quand le vecteur le dit.
+    func testContentPayloadV2ReadsRevision17() throws {
+        for item in try cases("valid") {
+            let name = try XCTUnwrap(item["case"] as? String)
+            let payload = Data(try XCTUnwrap(item["payloadUtf8"] as? String).utf8)
+            let parsed = try E2EEV2ContentPayloadV2.parse(payload)
+            guard case .r17(let body) = parsed.body else { return XCTFail("\(name) : pas révision 17") }
+            XCTAssertEqual(body.kind, item["kind"] as? String, name)
+            XCTAssertEqual(try parsed.encoded(), payload, "\(name) : réécriture v2")
+            XCTAssertFalse(E2EEV2ContentPayloadV2.isUnsupported(payload), name)
+        }
+        for item in try cases("negative") {
+            let name = try XCTUnwrap(item["case"] as? String)
+            let payload = Data(try XCTUnwrap(item["payloadUtf8"] as? String).utf8)
+            XCTAssertThrowsError(try E2EEV2ContentPayloadV2.parse(payload), name)
+            XCTAssertEqual(E2EEV2ContentPayloadV2.isUnsupported(payload), item["expected"] as? String == "UNSUPPORTED", name)
+        }
+    }
+
     /// L'empreinte des vecteurs copiés est celle du dépôt serveur.
     func testVectorChecksums() throws {
         let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

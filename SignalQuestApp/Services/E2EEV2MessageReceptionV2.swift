@@ -494,9 +494,17 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
         }
         // Compteur de la charge égal à celui de l'AAD ; jalon A : aucun blob,
         // sauf ceux d'un import, contrôlés avec lui (E2EE-AUTO §8).
-        let isImport: Bool
-        if case .historyImport = payload.body { isImport = true } else { isImport = false }
-        guard payload.counter == envelope.counter, isImport || envelope.encryptedBlobIds.isEmpty else {
+        // Révision 17 : règle (a), les blobs du contenu égaux à ceux de l'enveloppe (§7.4).
+        let blobsMatch: Bool
+        switch payload.body {
+        case .historyImport: blobsMatch = true
+        case .r17(let body):
+            blobsMatch = E2EEAutoBlobTransport.contentMatch(
+                kind: body.kind, manifestBlobIds: body.blobIds, encryptedBlobIds: envelope.encryptedBlobIds
+            ) == .ok
+        default: blobsMatch = envelope.encryptedBlobIds.isEmpty
+        }
+        guard payload.counter == envelope.counter, blobsMatch else {
             return counted(.rejected("invalid-e2ee-payload"))
         }
         // D.16 : `delivery` convient au `kind`, `notifyUserId` seulement pour un ADD.
@@ -534,7 +542,8 @@ enum E2EEV2MessageAuthorization {
     static func allows(_ message: E2EEV2ReceivedMessageV2, targetAuthorUserId: String?) -> Bool {
         switch message.payload.body {
         // Une réaction vient de n'importe quel membre (D.16).
-        case .text, .reaction, .historyImport: return true
+        // Un vote ou une clôture vient de tout membre : le décompte dit ce qui compte (§7.7).
+        case .text, .reaction, .historyImport, .r17: return true
         case .edit, .delete: return targetAuthorUserId == message.senderUserId
         }
     }

@@ -615,6 +615,8 @@ struct RootView: View {
                 E2EEAutoNewDeviceAlertQAScreen()
             } else if AppEnvironment.showsAutoHistoryRequestQA || AppEnvironment.showsAutoHistoryApprovalQA {
                 E2EEAutoHistoryRequestQAScreen(approval: AppEnvironment.showsAutoHistoryApprovalQA)
+            } else if AppEnvironment.showsAutoAttachmentsQA {
+                E2EEAutoAttachmentsQAScreen()
             } else if AppEnvironment.showsAutoDevicesQA {
                 E2EEAutoDevicesQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {

@@ -22,6 +22,8 @@ struct MessageComposerBar: View {
     /// Des pièces jointes attendent dans le plateau au-dessus : envoyer reste
     /// possible sans texte, et le micro cède la place au bouton d'envoi.
     var hasStagedAttachments = false
+    /// Conversation chiffrée en v2 : photos, vidéos et fichiers partent en blobs chiffrés (E2EE-AUTO §7.7).
+    var encryptedMedia = false
     let seedText: String
     let seedToken: Int
     @Binding var ephemeralEnabled: Bool
@@ -180,9 +182,9 @@ struct MessageComposerBar: View {
                         Label("Partager en direct", systemImage: "dot.radiowaves.left.and.right")
                     }
                 }
-                // Documents et vidéos : par la route des pièces jointes, jamais chiffrés.
+                // Documents et vidéos : en clair par la route des pièces jointes, chiffrés en blobs en v2.
                 Button {
-                    if isE2EE { onFilesUnavailable() } else { showsFileImporter = true }
+                    if isE2EE && !encryptedMedia { onFilesUnavailable() } else { showsFileImporter = true }
                 } label: {
                     Label("Joindre un fichier", systemImage: "doc")
                 }
@@ -216,7 +218,7 @@ struct MessageComposerBar: View {
                     .foregroundStyle(SQColor.label)
                     .focused($fieldFocused)
                     .padding(.leading, SQSpace.cardPadding)
-                    .padding(.trailing, isE2EE ? SQSpace.cardPadding : SQSpace.xs)
+                    .padding(.trailing, isE2EE && !encryptedMedia ? SQSpace.cardPadding : SQSpace.xs)
                     .padding(.vertical, SQSpace.sm)
                     .frame(minHeight: 44)
                     .disabled(!canSend)
@@ -224,7 +226,7 @@ struct MessageComposerBar: View {
 
                 // Le trombone vit dans le champ ; la photo part avec le texte
                 // déjà tapé en légende.
-                if !isE2EE {
+                if !isE2EE || encryptedMedia {
                     // Absent sur simulateur et sur les appareils sans caméra.
                     if Self.cameraAvailable {
                         Button { showsCamera = true } label: {

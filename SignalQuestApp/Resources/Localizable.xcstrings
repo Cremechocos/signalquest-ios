@@ -1116,6 +1116,22 @@
         }
       }
     },
+    "Ce fichier dépasse 100 Mo." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is over 100 MB."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier dépasse 100 Mo."
+          }
+        }
+      }
+    },
     "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
       "localizations" : {
         "en" : {
@@ -1196,6 +1212,70 @@
         }
       }
     },
+    "Cette pièce jointe est illisible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This attachment can’t be read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette pièce jointe est illisible."
+          }
+        }
+      }
+    },
+    "Cette pièce jointe n’a pas pu être envoyée à temps." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This attachment couldn’t be sent in time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette pièce jointe n’a pas pu être envoyée à temps."
+          }
+        }
+      }
+    },
+    "Cette pièce jointe n’a pas pu être envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This attachment couldn’t be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette pièce jointe n’a pas pu être envoyée."
+          }
+        }
+      }
+    },
+    "Cette pièce jointe n’a pas pu être préparée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This attachment couldn’t be prepared."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette pièce jointe n’a pas pu être préparée."
+          }
+        }
+      }
+    },
     "Cette session n’est plus publique." : {
       "localizations" : {
         "en" : {
@@ -1208,6 +1288,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette session n’est plus publique."
+          }
+        }
+      }
+    },
+    "Cette vidéo dépasse 100 Mo. Choisis-en une plus courte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video is over 100 MB. Choose a shorter one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette vidéo dépasse 100 Mo. Choisis-en une plus courte."
           }
         }
       }
@@ -1340,6 +1436,38 @@
         }
       }
     },
+    "Fichier chiffré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted file"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier chiffré"
+          }
+        }
+      }
+    },
+    "Fichier chiffré %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted file %1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier chiffré %@, %@"
+          }
+        }
+      }
+    },
     "Froid" : {
       "localizations" : {
         "en" : {
@@ -1459,6 +1587,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de retirer le lieu de prise de vue de cette image."
+          }
+        }
+      }
+    },
+    "Indisponible pour l’instant. Toucher pour réessayer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable for now. Tap to try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible pour l’instant. Toucher pour réessayer."
           }
         }
       }
@@ -1762,6 +1906,54 @@
         }
       }
     },
+    "Photo chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo chiffrée"
+          }
+        }
+      }
+    },
+    "Pièce jointe supprimée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attachment deleted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pièce jointe supprimée"
+          }
+        }
+      }
+    },
+    "Pièces jointes chiffrées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted attachments"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pièces jointes chiffrées"
+          }
+        }
+      }
+    },
     "Protéger l’historique avec une passkey" : {
       "localizations" : {
         "en" : {
@@ -1774,6 +1966,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Protéger l’historique avec une passkey"
+          }
+        }
+      }
+    },
+    "Publication partagée chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted shared post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication partagée chiffrée"
           }
         }
       }
@@ -1848,6 +2056,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette passkey n’ouvre que vos anciens messages. Pour les plus récents, demandez à un autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Cette vidéo dépasse 100 Mo. Choisis-en une plus courte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette vidéo dépasse 100 Mo. Choisissez-en une plus courte."
           }
         }
       },
@@ -1937,6 +2157,30 @@
       },
       "shouldTranslate" : false
     },
+    "SQFormal|Ta photo chiffrée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre photo chiffrée"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ta vidéo chiffrée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre vidéo chiffrée"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Ton compte a déjà dix passkeys pour l’historique." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1944,6 +2188,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre compte a déjà dix passkeys pour l’historique."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ton espace pour les pièces jointes chiffrées est plein." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre espace pour les pièces jointes chiffrées est plein."
           }
         }
       },
@@ -2025,6 +2281,22 @@
         }
       }
     },
+    "Sondage chiffré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted poll"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sondage chiffré"
+          }
+        }
+      }
+    },
     "Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages." : {
       "localizations" : {
         "en" : {
@@ -2073,6 +2345,38 @@
         }
       }
     },
+    "Ta photo chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your encrypted photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta photo chiffrée"
+          }
+        }
+      }
+    },
+    "Ta vidéo chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your encrypted video"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta vidéo chiffrée"
+          }
+        }
+      }
+    },
     "Ton compte a déjà dix passkeys pour l’historique." : {
       "localizations" : {
         "en" : {
@@ -2085,6 +2389,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton compte a déjà dix passkeys pour l’historique."
+          }
+        }
+      }
+    },
+    "Ton espace pour les pièces jointes chiffrées est plein." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your encrypted attachment storage is full."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton espace pour les pièces jointes chiffrées est plein."
           }
         }
       }
@@ -2165,6 +2485,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser ma passkey"
+          }
+        }
+      }
+    },
+    "Vidéo chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted video"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo chiffrée"
           }
         }
       }

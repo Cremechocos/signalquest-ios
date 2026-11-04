@@ -364,6 +364,9 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
                 MessageSyncLog.logger.error("Owner-scoped E2EE erasure incomplete: \(String(describing: error), privacy: .private)")
             }
         }
+        // Pièces jointes chiffrées en attente (sources, blobs, clés) et déchiffrées.
+        try? await E2EEAutoMediaOutbox.shared.purge(ownerScopeId: ownerScopeId)
+        E2EEAutoMediaCache.purge(ownerScopeId: ownerScopeId)
     }
 
     func isConversationUnlocked(conversationId: String) async -> Bool {
@@ -2262,6 +2265,38 @@ final class E2EEV2APITransport: @unchecked Sendable {
         }
     }
 
+    /// Plage d'un blob chiffré (E2EE-AUTO §7.4, lecture) : `GET` signé, octets
+    /// bruts de la longueur demandée, taille totale annoncée par
+    /// `x-sq-e2ee-blob-size`. Tout écart est refusé avant d'aller plus loin.
+    func getEncryptedBlobBytes(
+        path: String,
+        offset: Int64,
+        length: Int,
+        expectedTotalSize: Int64,
+        expectedOwnerScopeId: String
+    ) async -> E2EEV2TransportResult<Data> {
+        guard offset >= 0, (1...Int(E2EEAutoBlobTransport.maxRangeBytes)).contains(length),
+              offset + Int64(length) <= expectedTotalSize else {
+            return localFailure("invalid-e2ee-blob-range-request")
+        }
+        var headersMatch = false
+        let result = await execute(
+            path: path,
+            query: [URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "length", value: String(length))],
+            method: .get, body: nil, contentType: nil, expectedOwnerScopeId: expectedOwnerScopeId,
+            capabilitySet: .media, maxSuccessBytes: length,
+            onResponse: { response in
+                headersMatch = response.value(forHTTPHeaderField: "x-sq-e2ee-blob-size") == String(expectedTotalSize)
+                    && response.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("application/octet-stream") == true
+            }
+        )
+        if case .success(var data, let status, _) = result, status != 200 || !headersMatch || data.count != length {
+            data.resetBytes(in: 0..<data.count)
+            return localFailure("invalid-e2ee-blob-range-response")
+        }
+        return result
+    }
+
     private func execute(
         path: String,
         query: [URLQueryItem] = [],
@@ -2273,6 +2308,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
         useResetCandidate: Bool = false,
         signs: Bool = true,
         clockOffsetMs: Int64 = 0,
+        maxSuccessBytes: Int = E2EEV2APITransport.maxJSONResponseBytes,
         onResponse: ((HTTPURLResponse) -> Void)? = nil
     ) async -> E2EEV2TransportResult<Data> {
         guard validPath(path), validOwner(expectedOwnerScopeId), E2EEV2SignedTarget.isEncodedPath(path) else {
@@ -2336,7 +2372,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
                 return authenticationFailure("account-scope-changed")
             }
             onResponse?(response)
-            return responseResult(data: data, response: response)
+            return responseResult(data: data, response: response, maxSuccessBytes: maxSuccessBytes)
         } catch {
             return exceptionResult(error)
         }
@@ -2356,10 +2392,11 @@ final class E2EEV2APITransport: @unchecked Sendable {
 
     private func responseResult(
         data: Data,
-        response: HTTPURLResponse
+        response: HTTPURLResponse,
+        maxSuccessBytes: Int = E2EEV2APITransport.maxJSONResponseBytes
     ) -> E2EEV2TransportResult<Data> {
         if (200..<300).contains(response.statusCode) {
-            guard data.count <= Self.maxJSONResponseBytes else {
+            guard data.count <= maxSuccessBytes else {
                 return localFailure("oversized-e2ee-json-response")
             }
             let replay = response.value(forHTTPHeaderField: "X-SQ-Idempotent-Replay") == "1"

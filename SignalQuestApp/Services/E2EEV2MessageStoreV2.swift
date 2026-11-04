@@ -65,6 +65,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     }
 
     static let importKind = "HISTORY_IMPORT"
+    /// Natures affichées dans le fil (révision 17 comprise) ; les autres modifient un message.
+    static let displayedKinds: Set<String> = ["TEXT", "MEDIA", "AUDIO", "POLL", "CARD"]
 
     /// Plafond d'emojis actifs par (utilisateur, cible) : un 21e `ADD` est ignoré (D.16).
     static let maxReactionsPerUser = 20
@@ -110,7 +112,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         if file != stored { try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId) }
         let visible = file.messages.values
             .filter {
-                ["TEXT", Self.importKind].contains($0.kind) && !file.equivocal.contains($0.messageRef)
+                (Self.displayedKinds.contains($0.kind) || $0.kind == Self.importKind) && !file.equivocal.contains($0.messageRef)
                     && ($0.expiresAtMs.map { $0 > nowMs } ?? true)
             }
             .sorted { $0.sequence < $1.sequence }
@@ -185,6 +187,9 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
                 reaction = (emoji, action.rawValue)
             case .historyImport:
                 (target, text) = (nil, nil)
+            // Révision 17 : la légende ou la question en texte ; un vote ou une clôture vise son sondage.
+            case .r17(let body):
+                (target, text) = (Self.r17Target(body), Self.r17Text(body))
             }
             // Un message servi comme import sans en être un reste un import, illisible.
             let isImport = message.historyImport != nil
@@ -223,7 +228,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         guard !expired.isEmpty else { return file }
         var file = file
         let expiredRefs = Set(expired.map(\.messageRef))
-        let expiredTexts = Set(expired.filter { $0.kind == "TEXT" }.map(\.messageRef))
+        let expiredTexts = Set(expired.filter { displayedKinds.contains($0.kind) }.map(\.messageRef))
         let replayed = Set(expired.compactMap(\.targetRef)).subtracting(expiredTexts)
         file.messages = file.messages.filter {
             !expiredRefs.contains($0.key) && !($0.value.targetRef.map(expiredTexts.contains) ?? false)
@@ -238,7 +243,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     /// charge, ceux du message comme ceux de ses éditions, même arrivées après
     /// elle. Une action d'un autre membre est ignorée et gardée sans contenu (§5.3).
     private static func settle(_ ref: String, in messages: inout [String: Stored], equivocal: Set<String>) {
-        guard var target = messages[ref], target.kind == "TEXT" else { return }
+        guard var target = messages[ref], displayedKinds.contains(target.kind) else { return }
         let related = messages.values.filter { $0.targetRef == ref }
         // Seules les éditions et suppressions sont réservées à l'auteur : une
         // réaction ou un vote d'un autre membre, au jalon B, gardera son contenu.
@@ -264,7 +269,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
                 erase(ownEdits, in: &messages)
                 break
             }
-            if action.kind == "EDIT" {
+            // Une pièce jointe, un vocal, un sondage ou une carte ne se modifient pas (§7.7).
+            if action.kind == "EDIT", target.kind == "TEXT" {
                 target.text = action.text
                 target.editedAtMs = action.sentAtMs
             }
@@ -274,9 +280,34 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
 
     private static func originalText(of stored: Stored) -> String? {
         guard let data = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
-              let payload = try? E2EEV2ContentPayloadV2.parse(data),
-              case .text(let value) = payload.body else { return stored.text }
-        return value
+              let payload = try? E2EEV2ContentPayloadV2.parse(data) else { return stored.text }
+        switch payload.body {
+        case .text(let value): return value
+        case .r17(let body): return r17Text(body)
+        default: return stored.text
+        }
+    }
+
+    private static func r17Text(_ body: E2EEAutoContentR17.Body) -> String? {
+        switch body {
+        case .media(let caption, _), .audio(let caption, _, _, _): return caption
+        case .poll(let question, _, _, _): return question
+        case .card, .pollVote, .pollClose: return nil
+        }
+    }
+
+    private static func r17Target(_ body: E2EEAutoContentR17.Body) -> String? {
+        switch body {
+        case .pollVote(let ref, _), .pollClose(let ref): return ref
+        case .media, .audio, .poll, .card: return nil
+        }
+    }
+
+    /// Le contenu révision 17 d'un message gardé, relu de sa charge ; `nil` après sa suppression.
+    static func r17Body(_ stored: Stored) -> E2EEAutoContentR17.Body? {
+        guard let data = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
+              let payload = try? E2EEV2ContentPayloadV2.parse(data), case .r17(let body) = payload.body else { return nil }
+        return body
     }
 
     private static func erase(_ edits: [Stored], in messages: inout [String: Stored]) {
@@ -380,7 +411,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     private static func text(of message: E2EEV2ReceivedMessageV2) -> String? {
         switch message.payload.body {
         case .text(let value), .edit(_, let value): return value
-        case .delete, .reaction, .historyImport: return nil
+        case .delete, .reaction, .historyImport, .r17: return nil
         }
     }
 
