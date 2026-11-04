@@ -4634,7 +4634,8 @@ struct ConversationDetailView: View {
                 defer { try? FileManager.default.removeItem(at: movie.url) }
                 let size = (try? movie.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                 guard size <= Int(E2EEAutoContentR17.maxFileBytes),
-                      let source = await E2EEAutoMediaPreparation.video(at: movie.url, fileName: movie.url.lastPathComponent) else {
+                      // Le fichier temporaire du sélecteur porte un UUID : « video.<ext> », comme « photo.jpg ».
+                      let source = await E2EEAutoMediaPreparation.video(at: movie.url, fileName: "video.\(movie.url.pathExtension)") else {
                     showActionError(size > Int(E2EEAutoContentR17.maxFileBytes)
                         ? String(localized: "Cette vidéo dépasse 100 Mo. Choisis-en une plus courte.")
                         : String(localized: "Cette vidéo est illisible."))
