@@ -2364,7 +2364,10 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func attachmentsView(for message: MessageItem, mine: Bool, standalone: Bool = false) -> some View {
         ForEach(message.attachments.filter { $0.url != nil }) { attachment in
-            if let url = attachment.url, url.scheme == E2EEAutoMediaRef.scheme || url.isFileURL {
+            if let url = attachment.url, url.scheme == E2EEAutoMediaRef.scheme || url.isFileURL, isAudioAttachment(attachment) {
+                // Vocal chiffré (E2EE-AUTO §7.7, `AUDIO`).
+                E2EEAutoVoiceBubble(attachment: attachment, media: attachment.id.flatMap { v2Media[$0] }, mine: mine, load: loadEncryptedMedia)
+            } else if let url = attachment.url, url.scheme == E2EEAutoMediaRef.scheme || url.isFileURL {
                 // Pièce chiffrée (E2EE-AUTO §7.7), ou en cours d'envoi depuis cet appareil.
                 E2EEAutoAttachmentView(
                     attachment: attachment, media: attachment.id.flatMap { v2Media[$0] }, mine: mine,
@@ -4202,6 +4205,10 @@ struct ConversationDetailView: View {
     /// contenu dans son outbox protégée, donc un échec ou kill processus reste reprenable.
     private func sendVoiceNote(url: URL, duration: TimeInterval) async {
         defer { try? FileManager.default.removeItem(at: url) }
+        if usesV2 {
+            await sendE2EEVoice(url)
+            return
+        }
         // Même limite que les images : le chiffrement des pièces jointes
         // n'est pas encore disponible partout. Le dire plutôt que d'envoyer
         // un audio en clair dans une conversation chiffrée.
@@ -4591,14 +4598,40 @@ struct ConversationDetailView: View {
         await sendE2EEMedia(sources, caption: caption)
     }
 
+    /// Vocal chiffré : la bulle part tout de suite, la transcription de l'émetteur (sur
+    /// l'appareil seulement) est jointe avant l'envoi s'il y en a une.
+    private func sendE2EEVoice(_ url: URL) async {
+        guard let prepared = await Task.detached(priority: .userInitiated, operation: { E2EEAutoVoice.source(at: url) }).value,
+              let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else {
+            showActionError(String(localized: "Ce message vocal n’a pas pu être préparé."))
+            Haptics.error()
+            return
+        }
+        // Le fichier du recorder disparaît au retour : la transcription lit une copie.
+        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("transcribe-\(UUID().uuidString).m4a")
+        try? prepared.source.data.write(to: copy, options: .completeFileProtection)
+        defer { try? FileManager.default.removeItem(at: copy) }
+        await sendE2EEMedia(
+            [prepared.source], caption: "",
+            voice: .init(waveformB64: prepared.waveformB64, transcriptionLanguage: nil, transcriptionText: nil)
+        ) { record in
+            if let transcription = await E2EEAutoVoiceTranscriber.transcribe(copy, askPermission: true) {
+                await E2EEAutoMediaOutbox.shared.setTranscription(transcription, key: record.key, ownerScopeId: scope)
+            }
+        }
+    }
+
     /// Garde l'envoi dans la file durable, pose sa bulle, puis chiffre et envoie.
-    private func sendE2EEMedia(_ sources: [E2EEAutoMediaSource], caption rawCaption: String) async {
+    private func sendE2EEMedia(
+        _ sources: [E2EEAutoMediaSource], caption rawCaption: String,
+        voice: E2EEAutoMediaOutbox.Voice? = nil, beforeSend: ((E2EEAutoMediaOutbox.Record) async -> Void)? = nil
+    ) async {
         guard !sources.isEmpty, let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
         let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
         let record: E2EEAutoMediaOutbox.Record
         do {
             record = try await E2EEAutoMediaOutbox.shared.stage(
-                sources, caption: caption.isEmpty ? nil : caption, replyToRef: replyTarget?.id, ttlSeconds: ephemeralTTL,
+                sources, voice: voice, caption: caption.isEmpty ? nil : caption, replyToRef: replyTarget?.id, ttlSeconds: ephemeralTTL,
                 conversationId: conversation.id, isGroup: conversation.isGroup,
                 participantIds: conversation.participants.map(\.userId), ownerScopeId: scope
             )
@@ -4615,6 +4648,7 @@ struct ConversationDetailView: View {
         clearComposer()
         replyTarget = nil
         Haptics.light()
+        await beforeSend?(record)
         await performE2EEMediaSend(localId: localId)
     }
 
@@ -4624,10 +4658,12 @@ struct ConversationDetailView: View {
         for entry in record.entries {
             let blob = entry.file
             let url = await E2EEAutoMediaOutbox.shared.sourceURL(blob, clientRequestId: record.clientRequestId, ownerScopeId: ownerScopeId)
-            let kind: String = switch E2EEAutoContentR17.presentation(mimeType: blob.mimeType) {
-            case .image: "IMAGE"
-            case .video: "VIDEO"
-            case .file: "FILE"
+            let kind: String = if record.voice != nil { "AUDIO" } else {
+                switch E2EEAutoContentR17.presentation(mimeType: blob.mimeType) {
+                case .image: "IMAGE"
+                case .video: "VIDEO"
+                case .file: "FILE"
+                }
             }
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
             attachments.append(MessageAttachment(

@@ -307,6 +307,18 @@ actor E2EEAutoMediaOutbox {
         return record
     }
 
+    /// Transcription de l'émetteur, ajoutée avant le premier envoi : un vocal déjà parti ne change plus.
+    func setTranscription(_ transcription: E2EEAutoContentR17.Transcription, key: String, ownerScopeId: String) {
+        guard var file = try? read(ownerScopeId),
+              let index = file.records.firstIndex(where: { $0.key == key }),
+              let voice = file.records[index].voice,
+              file.records[index].entries.allSatisfy({ !$0.file.uploaded }) else { return }
+        file.records[index].voice = Voice(
+            waveformB64: voice.waveformB64, transcriptionLanguage: transcription.language, transcriptionText: transcription.text
+        )
+        try? write(file, ownerScopeId)
+    }
+
     func records(ownerScopeId: String) -> [Record] {
         (try? read(ownerScopeId).records) ?? []
     }

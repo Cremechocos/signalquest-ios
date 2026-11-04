@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import XCTest
 @testable import SignalQuest
@@ -293,6 +294,113 @@ final class E2EEAutoBlobTransportTests: XCTestCase {
         let line = try XCTUnwrap(sums.split(separator: "\n").first { $0.hasSuffix("  blob-transport-v1.json") })
         let data = try Data(contentsOf: dir.appendingPathComponent("blob-transport-v1.json"))
         XCTAssertEqual(String(line.prefix(64)), SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+    }
+
+    // MARK: Vocal (§7.7, AUDIO)
+
+    /// Un vocal AAC de 1,5 s, silencieux puis fort : la forme d'onde doit monter.
+    private func recordedVoice() throws -> URL {
+        let url = directory.appendingPathComponent("recorded.m4a")
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC), AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1,
+        ]
+        let file = try AVAudioFile(forWriting: url, settings: settings)
+        let format = file.processingFormat
+        let frames = AVAudioFrameCount(format.sampleRate * 1.5)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        buffer.frameLength = frames
+        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
+        for index in 0..<Int(frames) {
+            let amplitude: Float = Double(index) < format.sampleRate * 0.75 ? 0.02 : 0.8
+            channel[index] = amplitude * sin(Float(index) * 2 * .pi * 440 / Float(format.sampleRate))
+        }
+        try file.write(from: buffer)
+        return url
+    }
+
+    func testVoiceSourceIsAACInMP4WithA64ByteWaveform() throws {
+        let prepared = try XCTUnwrap(E2EEAutoVoice.source(at: try recordedVoice()))
+        XCTAssertEqual(prepared.source.mimeType, "audio/mp4")
+        XCTAssertEqual(prepared.source.fileName, "voice.m4a")
+        XCTAssertNil(prepared.source.width)
+        let duration = try XCTUnwrap(prepared.source.durationMs)
+        XCTAssertEqual(Double(duration), 1_500, accuracy: 80)
+        let waveform = try XCTUnwrap(prepared.waveformB64)
+        XCTAssertEqual(waveform.count, 88)
+        let bytes = [UInt8](try XCTUnwrap(Data(base64Encoded: waveform)))
+        XCTAssertEqual(bytes.count, 64)
+        XCTAssertLessThan(Int(bytes[10]), 40, "début silencieux")
+        XCTAssertGreaterThan(Int(bytes[50]), 200, "fin forte")
+        XCTAssertEqual(E2EEAutoVoice.levels(fromWaveformB64: waveform).count, 64)
+    }
+
+    func testWaveformAndTranscriptionBounds() {
+        XCTAssertNil(E2EEAutoVoice.waveformB64(Array(repeating: 0.5, count: 63)))
+        let clamped = E2EEAutoVoice.waveformB64([-1, 2] + Array(repeating: 0, count: 62))
+        XCTAssertEqual(Data(base64Encoded: clamped ?? "").map { [UInt8]($0).prefix(2) }, [0, 255])
+        XCTAssertEqual(E2EEAutoVoice.levels(fromWaveformB64: "AAAA"), [])
+        XCTAssertEqual(E2EEAutoVoiceTranscriber.languageTag(Locale(identifier: "fr_FR")), "fr-FR")
+        XCTAssertEqual(E2EEAutoVoiceTranscriber.languageTag(Locale(identifier: "en")), "en")
+        XCTAssertNil(E2EEAutoVoiceTranscriber.languageTag(Locale(identifier: "x")))
+        let long = String(repeating: "é", count: 40_000)
+        let bounded = E2EEAutoVoiceTranscriber.bounded(long)
+        XCTAssertLessThanOrEqual(bounded.utf8.count, 65_536)
+        XCTAssertEqual(bounded.count, 32_768, "aucun caractère coupé")
+        XCTAssertEqual(E2EEAutoVoiceTranscriber.bounded("court"), "court")
+    }
+
+    func testOutboxSendsAVoiceWithTheSenderTranscriptionOnlyBeforeItsFirstAttempt() async throws {
+        let server = FakeBlobServer()
+        let client = E2EEAutoBlobClient(requests: server.requests, workDirectory: directory)
+        let outbox = E2EEAutoMediaOutbox(rootURL: directory.appendingPathComponent("outbox"), keyStore: InMemoryTokenStore())
+        let cache = E2EEAutoMediaCache(rootURL: directory.appendingPathComponent("cache"))
+        let owner = "user:voice-test"
+        let prepared = try XCTUnwrap(E2EEAutoVoice.source(at: try recordedVoice()))
+        func stage() async throws -> E2EEAutoMediaOutbox.Record {
+            try await outbox.stage(
+                [prepared.source], voice: .init(waveformB64: prepared.waveformB64, transcriptionLanguage: nil, transcriptionText: nil),
+                caption: nil, replyToRef: nil, ttlSeconds: 0, conversationId: "conv_0123456789abcdef",
+                isGroup: false, participantIds: ["a", "b"], ownerScopeId: owner
+            )
+        }
+        let spoken = E2EEAutoContentR17.Transcription(language: "fr-FR", text: "On se retrouve à l’antenne.")
+        // Transcription jointe avant l'envoi : elle part dans la charge.
+        let record = try await stage()
+        await outbox.setTranscription(spoken, key: record.key, ownerScopeId: owner)
+        let drafts = DraftBox()
+        let sent = await outbox.process(clientRequestId: record.clientRequestId, ownerScopeId: owner, client: client, cache: cache) { draft, _ in
+            await drafts.append(draft)
+            return .alreadyAccepted(messageRef: String(repeating: "A", count: 43))
+        }
+        XCTAssertEqual(sent, .sent)
+        let sentDrafts = await drafts.items
+        let first = try XCTUnwrap(sentDrafts.first)
+        guard case .r17(.audio(let caption, let voice, let waveform, let transcription)) = first.body else { return XCTFail("AUDIO attendu") }
+        XCTAssertNil(caption)
+        XCTAssertEqual(voice.mimeType, "audio/mp4")
+        XCTAssertEqual(voice.durationMs, prepared.source.durationMs)
+        XCTAssertEqual(waveform, prepared.waveformB64)
+        XCTAssertEqual(transcription, spoken)
+        let payload = try E2EEV2ContentPayloadV2(sentAtMs: 1, counter: 1, replyToRef: nil, mentions: [], body: first.body).encoded()
+        XCTAssertEqual(try E2EEV2ContentPayloadV2.parse(payload).body, first.body, "la charge se relit")
+        // Un vocal déjà tenté ne change plus : le même clientRequestId porte la même charge.
+        let retried = try await stage()
+        let failing = DraftBox()
+        let firstTry = await outbox.process(clientRequestId: retried.clientRequestId, ownerScopeId: owner, client: client, cache: cache) { draft, _ in
+            await failing.append(draft)
+            return .failure(.init(kind: .retryable, message: "offline"))
+        }
+        XCTAssertEqual(firstTry, .retry)
+        await outbox.setTranscription(spoken, key: retried.key, ownerScopeId: owner)
+        _ = await outbox.process(clientRequestId: retried.clientRequestId, ownerScopeId: owner, client: client, cache: cache) { draft, _ in
+            await failing.append(draft)
+            return .alreadyAccepted(messageRef: String(repeating: "B", count: 43))
+        }
+        let attempts = await failing.items
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(attempts[0], attempts[1])
+        guard case .r17(.audio(_, _, _, let none)) = attempts[1].body else { return XCTFail("AUDIO attendu") }
+        XCTAssertNil(none)
     }
 }
 

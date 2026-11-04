@@ -7,6 +7,9 @@ import UIKit
 struct E2EEAutoMediaRef: Equatable {
     let file: E2EEAutoContentR17.Manifest
     let thumbnail: E2EEAutoContentR17.Manifest?
+    /// Vocal : forme d'onde et transcription de l'émetteur, telles qu'envoyées.
+    var waveformB64: String?
+    var transcription: E2EEAutoContentR17.Transcription?
 
     static let scheme = "sq-e2ee-blob"
 
@@ -15,8 +18,11 @@ struct E2EEAutoMediaRef: Equatable {
 
     /// Les pièces d'un message révision 17, sous la forme commune `MessageAttachment`.
     static func attachments(of body: E2EEAutoContentR17.Body, into media: inout [String: E2EEAutoMediaRef]) -> [MessageAttachment] {
-        func attachment(_ manifest: E2EEAutoContentR17.Manifest, thumbnail: E2EEAutoContentR17.Manifest?, kind: String) -> MessageAttachment {
-            media[manifest.blobId] = .init(file: manifest, thumbnail: thumbnail)
+        func attachment(
+            _ manifest: E2EEAutoContentR17.Manifest, thumbnail: E2EEAutoContentR17.Manifest?, kind: String,
+            waveformB64: String? = nil, transcription: E2EEAutoContentR17.Transcription? = nil
+        ) -> MessageAttachment {
+            media[manifest.blobId] = .init(file: manifest, thumbnail: thumbnail, waveformB64: waveformB64, transcription: transcription)
             return MessageAttachment(
                 id: manifest.blobId, kind: kind, url: url(blobId: manifest.blobId), fileName: manifest.fileName,
                 contentType: manifest.mimeType, size: Int(manifest.plaintextSize), width: manifest.width, height: manifest.height
@@ -32,8 +38,8 @@ struct E2EEAutoMediaRef: Equatable {
                 }
                 return attachment(item.file, thumbnail: item.thumbnail, kind: kind)
             }
-        case .audio(_, let voice, _, _):
-            return [attachment(voice, thumbnail: nil, kind: "AUDIO")]
+        case .audio(_, let voice, let waveformB64, let transcription):
+            return [attachment(voice, thumbnail: nil, kind: "AUDIO", waveformB64: waveformB64, transcription: transcription)]
         case .card(let card):
             return card.image.map { [attachment($0, thumbnail: nil, kind: "IMAGE")] } ?? []
         case .poll, .pollVote, .pollClose:
@@ -259,6 +265,162 @@ struct E2EEAutoAttachmentView: View {
     }
 }
 
+/// Vocal chiffré : déchiffré sur l'appareil puis lu dans l'app. La transcription de
+/// l'émetteur s'affiche avec sa mention ; sans elle, « Transcrire » la fait ici, sur
+/// l'appareil seulement, et l'affiche sans mention (§7.7).
+struct E2EEAutoVoiceBubble: View {
+    let attachment: MessageAttachment
+    let media: E2EEAutoMediaRef?
+    let mine: Bool
+    let load: (E2EEAutoContentR17.Manifest) async -> E2EEAutoMediaCache.Result
+
+    private enum Phase: Equatable {
+        case loading, ready(VoiceNoteFile), deleted, unavailable
+    }
+
+    private enum LocalTranscription: Equatable {
+        case none, running, done(String), unavailable
+    }
+
+    @State private var phase = Phase.loading
+    @State private var local = LocalTranscription.none
+
+    private var foreground: Color { mine ? SQColor.onInk : SQColor.label }
+    private var secondary: Color { mine ? SQColor.onInk.opacity(0.85) : SQColor.labelSecondary }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            switch phase {
+            case .ready(let file):
+                VoiceNoteBubble(url: file.url, levels: file.levels, duration: file.duration, mine: mine, sequenceKey: attachment.id)
+            case .deleted:
+                Label(String(localized: "Pièce jointe supprimée"), systemImage: "trash.slash")
+                    .font(SQType.subhead)
+                    .foregroundStyle(secondary)
+                    .frame(minHeight: 44)
+            case .loading, .unavailable:
+                placeholder
+            }
+            transcriptionView
+        }
+        .padding(.horizontal, SQSpace.sm)
+        .padding(.vertical, SQSpace.xs)
+        .task(id: attachment.id) { await prepare() }
+    }
+
+    private var placeholder: some View {
+        Button {
+            guard phase == .unavailable else { return }
+            Task { await prepare() }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                ZStack {
+                    Circle().fill(mine ? SQColor.onInk : SQColor.brandRed).frame(width: 34, height: 34)
+                    if phase == .unavailable {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(mine ? SQColor.label : SQColor.onAccent)
+                    } else {
+                        SQSpinner().controlSize(.small).tint(mine ? SQColor.label : SQColor.onAccent)
+                    }
+                }
+                Text(phase == .unavailable ? String(localized: "Message vocal indisponible") : String(localized: "Message vocal chiffré"))
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(foreground)
+            }
+            .frame(minWidth: 180, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(phase == .unavailable ? String(localized: "Toucher pour réessayer") : "")
+    }
+
+    @ViewBuilder
+    private var transcriptionView: some View {
+        if let sender = media?.transcription {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Transcription de l’expéditeur"))
+                    .font(SQType.micro)
+                    .foregroundStyle(secondary)
+                Text(sender.text)
+                    .font(SQType.subhead)
+                    .foregroundStyle(foreground)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: 260, alignment: .leading)
+            .accessibilityElement(children: .combine)
+        } else if case .ready(let file) = phase {
+            switch local {
+            case .none:
+                Button {
+                    Task { await transcribe(file.url) }
+                } label: {
+                    Label(String(localized: "Transcrire"), systemImage: "text.quote")
+                        .font(SQType.micro)
+                        .foregroundStyle(secondary)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(String(localized: "Sur cet appareil, sans envoyer le son"))
+            case .running:
+                HStack(spacing: SQSpace.xs) {
+                    ProgressView().controlSize(.mini).tint(secondary)
+                    Text(String(localized: "Transcription…")).font(SQType.micro).foregroundStyle(secondary)
+                }
+                .frame(minHeight: 44)
+            case .done(let text):
+                Text(text)
+                    .font(SQType.subhead)
+                    .foregroundStyle(foreground)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: 260, alignment: .leading)
+            case .unavailable:
+                Text(String(localized: "Transcription indisponible sur cet appareil pour cette langue."))
+                    .font(SQType.micro)
+                    .foregroundStyle(secondary)
+                    .frame(maxWidth: 260, alignment: .leading)
+            }
+        }
+    }
+
+    private func prepare() async {
+        if case .ready = phase { return }
+        phase = .loading
+        let url: URL
+        if let local = attachment.url, local.isFileURL {
+            url = local
+        } else if let media {
+            switch await load(media.file) {
+            case .file(let file): url = file
+            case .deleted: phase = .deleted; return
+            case .unavailable: phase = .unavailable; return
+            }
+        } else {
+            phase = .unavailable
+            return
+        }
+        let sent = E2EEAutoVoice.levels(fromWaveformB64: media?.waveformB64)
+        let duration = media?.file.durationMs.map { Double($0) / 1_000 }
+        let analyzed = await Task.detached(priority: .userInitiated) { try? VoiceNoteCache.analyze(url) }.value
+        guard let analyzed else { phase = .unavailable; return }
+        phase = .ready(VoiceNoteFile(
+            url: url,
+            levels: sent.isEmpty ? analyzed.levels : VoiceNoteRecorder.waveform(from: sent, bars: 32),
+            duration: duration ?? analyzed.duration
+        ))
+    }
+
+    private func transcribe(_ url: URL) async {
+        local = .running
+        if let result = await E2EEAutoVoiceTranscriber.transcribe(url, askPermission: true) {
+            local = .done(result.text)
+        } else {
+            local = .unavailable
+        }
+    }
+}
+
 /// Aperçu du système (images, vidéos, PDF…) d'un fichier local déjà déchiffré.
 /// Dans une feuille SwiftUI, l'aperçu n'a pas de bouton « OK » à lui : on y met « Fermer ».
 struct QuickLookPreview: UIViewControllerRepresentable {
@@ -326,10 +488,51 @@ struct E2EEAutoAttachmentsQAScreen: View {
         ), media: local == nil ? .init(file: manifest, thumbnail: thumbnail) : nil, mine: mine)
     }
 
+    /// Vocal AAC de 3 s, d'intensité croissante.
+    private static func voice() -> URL {
+        let url = folder.appendingPathComponent("voice.m4a")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: url)
+        let settings: [String: Any] = [AVFormatIDKey: Int(kAudioFormatMPEG4AAC), AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1]
+        guard let file = try? AVAudioFile(forWriting: url, settings: settings) else { return url }
+        let format = file.processingFormat
+        let frames = AVAudioFrameCount(format.sampleRate * 3)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames), let channel = buffer.floatChannelData?[0] else { return url }
+        buffer.frameLength = frames
+        for index in 0..<Int(frames) {
+            let position = Float(index) / Float(frames)
+            channel[index] = (0.1 + 0.7 * position) * sin(Float(index) * 2 * .pi * 220 / Float(format.sampleRate))
+        }
+        try? file.write(from: buffer)
+        return url
+    }
+
     private let files: [String: URL] = [
         "blob_qa_photo": picture("photo.jpg", hue: 0.08, size: CGSize(width: 1280, height: 960)),
         "blob_qa_video_thumb": picture("video-thumb.jpg", hue: 0.55, size: CGSize(width: 480, height: 270)),
+        "blob_qa_voice": voice(),
+        "blob_qa_voice_bare": voice(),
     ]
+
+    private var voices: [Row] {
+        let waveform = E2EEAutoVoice.waveformB64((0..<64).map { 0.15 + 0.85 * abs(sin(Float($0) / 5)) })
+        func voice(_ id: String, transcription: E2EEAutoContentR17.Transcription?, mine: Bool) -> Row {
+            let manifest = Self.manifest(id, "voice.m4a", "audio/mp4", size: 48_000)
+            let file = E2EEAutoContentR17.Manifest(
+                blobId: id, mediaKeyB64: "", noncePrefixB64: "", plaintextSize: 48_000, ciphertextSize: 48_000,
+                plaintextSha256: "", ciphertextSha256: "", fileName: manifest.fileName, mimeType: manifest.mimeType,
+                width: nil, height: nil, durationMs: 3_000
+            )
+            return Row(id: id, attachment: MessageAttachment(
+                id: id, kind: "AUDIO", url: E2EEAutoMediaRef.url(blobId: id), fileName: "voice.m4a",
+                contentType: "audio/mp4", size: 48_000, width: nil, height: nil
+            ), media: .init(file: file, thumbnail: nil, waveformB64: waveform, transcription: transcription), mine: mine)
+        }
+        return [
+            voice("blob_qa_voice", transcription: .init(language: "fr-FR", text: "Je suis devant le pylône, la 5G passe enfin."), mine: false),
+            voice("blob_qa_voice_bare", transcription: nil, mine: true),
+        ]
+    }
 
     private var rows: [Row] {
         [
@@ -348,6 +551,13 @@ struct E2EEAutoAttachmentsQAScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SQSpace.md) {
+                    ForEach(voices) { row in
+                        E2EEAutoVoiceBubble(attachment: row.attachment, media: row.media, mine: row.mine) { manifest in
+                            files[manifest.blobId].map { .file($0) } ?? .unavailable
+                        }
+                        .background(row.mine ? SQColor.brandRed : SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                        .frame(maxWidth: .infinity, alignment: row.mine ? .trailing : .leading)
+                    }
                     ForEach(rows) { row in
                         E2EEAutoAttachmentView(attachment: row.attachment, media: row.media, mine: row.mine, standalone: true) { manifest in
                             if manifest.blobId == "blob_qa_deleted" { return .deleted }

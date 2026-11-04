@@ -272,6 +272,7 @@
 		48BEA49C02811CE2EB09D373 /* AppPrivacyShield.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98EFA20D5BA8CABB5D2C2BB8 /* AppPrivacyShield.swift */; };
 		48C419E3E4CA1E519CB37A9B /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 2FB40D9CA1FEA6EDBD36D021 /* FirebaseCrashlytics */; };
 		49393BB586B4C19FD9E60E20 /* DriveShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B933A8239586F1CAADD6442F /* DriveShareCard.swift */; };
+		49731ACF42F21D7E6227D627 /* E2EEAutoVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D6BCE14A953DA264ECD36B /* E2EEAutoVoice.swift */; };
 		49749D17012B3EE7413E3935 /* AntennaSightOrigin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A899BFC066AEE77CFF06B5D /* AntennaSightOrigin.swift */; };
 		4A25941995D0EC7FD14AEC6C /* SQRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */; };
 		4A47DAD1AD56717BCE3405C7 /* PhotoUploadPreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D216600CE3DCF8B267BD70 /* PhotoUploadPreparation.swift */; };
@@ -1845,6 +1846,7 @@
 		E8361FAF02337A96883CF699 /* DriveShareTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveShareTrace.swift; sourceTree = "<group>"; };
 		E8AF34B4A9C770ABA9AB668B /* ProfileTodoQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTodoQATests.swift; sourceTree = "<group>"; };
 		E8C4B217FF4AF158F90193C6 /* PhotoErrorRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoErrorRecoveryTests.swift; sourceTree = "<group>"; };
+		E8D6BCE14A953DA264ECD36B /* E2EEAutoVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoVoice.swift; sourceTree = "<group>"; };
 		E8F9D2F40F28C9CB1247B4F5 /* TileCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileCache.swift; sourceTree = "<group>"; };
 		E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitClient.swift; sourceTree = "<group>"; };
 		E9545822191F18F53E0EDD61 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
@@ -2948,6 +2950,7 @@
 				E0315ECC7AF54CD300A54A82 /* E2EEAutoPasskeyBackup.swift */,
 				0614C8D69784703247FDAA99 /* E2EEAutoSafetyCode.swift */,
 				34AD85F97CB2E3AB1B15167B /* E2EEAutoStrictMode.swift */,
+				E8D6BCE14A953DA264ECD36B /* E2EEAutoVoice.swift */,
 				8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */,
 				56D690C4D6BDE693AEB92D28 /* E2EEV2AccountIdentity.swift */,
 				9E033DEB487CB440000810F0 /* E2EEV2ConversationCreation.swift */,
@@ -3972,6 +3975,7 @@
 				ECD06E336CCD0CDEA157CB74 /* E2EEAutoSafetyCode.swift in Sources */,
 				4155ED18B181CDA43F529A5A /* E2EEAutoSafetyCodeView.swift in Sources */,
 				E4788619D462C59A6E9B03A6 /* E2EEAutoStrictMode.swift in Sources */,
+				49731ACF42F21D7E6227D627 /* E2EEAutoVoice.swift in Sources */,
 				F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */,
 				2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */,
 				505D859D72F614CC8E5C784C /* E2EEUnlockSheet.swift in Sources */,

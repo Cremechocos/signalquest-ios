@@ -90,6 +90,8 @@
 	<string>SignalQuest utilise le micro pour les appels audio ou vidéo que tu démarres ou acceptes, et pour enregistrer des notes vocales à ta demande.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SignalQuest transcrit sur ton appareil les messages vocaux chiffrés. Le son n’est jamais envoyé ailleurs pour cela.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSUserActivityTypes</key>

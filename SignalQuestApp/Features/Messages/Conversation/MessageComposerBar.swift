@@ -154,7 +154,8 @@ struct MessageComposerBar: View {
 
     /// Le micro prend la place du bouton d'envoi tant qu'il n'y a rien à envoyer.
     private var showsMic: Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasStagedAttachments && !isSending && !isE2EE
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasStagedAttachments && !isSending
+            && (!isE2EE || encryptedMedia)
     }
 
     /// « + » rond, champ blanc avec le trombone dedans, puis micro rond ou

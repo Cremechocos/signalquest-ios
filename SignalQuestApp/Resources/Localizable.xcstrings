@@ -1132,6 +1132,22 @@
         }
       }
     },
+    "Ce message vocal n’a pas pu être préparé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This voice message couldn’t be prepared."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message vocal n’a pas pu être préparé."
+          }
+        }
+      }
+    },
     "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
       "localizations" : {
         "en" : {
@@ -1831,6 +1847,22 @@
         }
       }
     },
+    "Message vocal indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice message unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message vocal indisponible"
+          }
+        }
+      }
+    },
     "Mettre à jour la passkey" : {
       "localizations" : {
         "en" : {
@@ -2297,6 +2329,22 @@
         }
       }
     },
+    "Sur cet appareil, sans envoyer le son" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this device, without sending the audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur cet appareil, sans envoyer le son"
+          }
+        }
+      }
+    },
     "Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages." : {
       "localizations" : {
         "en" : {
@@ -2437,6 +2485,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton texte restera visible sans ton nom, parce que des membres y ont répondu."
+          }
+        }
+      }
+    },
+    "Transcription de l’expéditeur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sender’s transcription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription de l’expéditeur"
+          }
+        }
+      }
+    },
+    "Transcription indisponible sur cet appareil pour cette langue." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription isn’t available on this device for this language."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription indisponible sur cet appareil pour cette langue."
+          }
+        }
+      }
+    },
+    "Transcription…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribing…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription…"
+          }
+        }
+      }
+    },
+    "Transcrire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrire"
           }
         }
       }

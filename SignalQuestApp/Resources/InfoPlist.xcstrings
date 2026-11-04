@@ -121,6 +121,23 @@
           }
         }
       }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest transcribes encrypted voice messages on your device. The audio is never sent anywhere for this."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest transcrit sur ton appareil les messages vocaux chiffrés. Le son n’est jamais envoyé ailleurs pour cela."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
