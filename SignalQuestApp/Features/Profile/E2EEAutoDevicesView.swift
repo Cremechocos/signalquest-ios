@@ -19,6 +19,10 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         var readLabels: () async -> [String: E2EEAutoDeviceLabels.Display]? = { nil }
         /// Mode renforcé (§6) ; l'écran ne l'adopte qu'à la relecture du journal.
         var setMode: (_ mode: E2EEAutoLog.Mode) async -> E2EEAutoModeSetting.Outcome = { _ in .failed("e2ee-auto-mode-unavailable") }
+        /// Passkey (§5.5) : ce que l'app propose, puis la feuille système et le dépôt.
+        var passkeyOffer: () async -> E2EEAutoPasskeyContract.Offer = { .none }
+        var protectWithPasskey: (_ offer: E2EEAutoPasskeyContract.Offer) async -> PasskeyResult = { _ in .failed }
+        var dismissPasskeyOffer: () -> Void = {}
         var nowMs: () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
     }
 
@@ -31,6 +35,16 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         case refused
         /// Réseau, serveur : nouvel essai.
         case unavailable
+    }
+
+    enum PasskeyResult: Equatable {
+        case done
+        case cancelled
+        /// Le gestionnaire de passkeys ne prend pas en charge `prf`.
+        case unsupported
+        /// Dix passkeys déjà enregistrées.
+        case limit
+        case failed
     }
 
     struct Row: Identifiable, Equatable {
@@ -61,6 +75,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     @Published var confirmationMessage: String?
     /// Mode du compte, lu au journal vérifié.
     @Published private(set) var mode: E2EEAutoLog.Mode = .normal
+    @Published private(set) var passkeyOffer: E2EEAutoPasskeyContract.Offer = .none
     /// Auto-révocation écrite : la vue ferme la session.
     @Published private(set) var signedOut = false
 
@@ -119,6 +134,32 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         await load()
     }
 
+    func protectWithPasskey() async {
+        guard !isActing, passkeyOffer != .none else { return }
+        isActing = true
+        errorMessage = nil
+        defer { isActing = false }
+        switch await dependencies.protectWithPasskey(passkeyOffer) {
+        case .done:
+            confirmationMessage = String(localized: "Ta passkey protège maintenant ton historique.")
+        case .cancelled:
+            return
+        case .unsupported:
+            dependencies.dismissPasskeyOffer()
+            errorMessage = String(localized: "Ton gestionnaire de passkeys ne permet pas de protéger l’historique.")
+        case .limit:
+            errorMessage = String(localized: "Ton compte a déjà dix passkeys pour l’historique.")
+        case .failed:
+            errorMessage = String(localized: "Impossible de protéger l’historique avec la passkey. Réessaie dans un instant.")
+        }
+        passkeyOffer = await dependencies.passkeyOffer()
+    }
+
+    func dismissPasskeyOffer() {
+        dependencies.dismissPasskeyOffer()
+        passkeyOffer = .none
+    }
+
     func load() async {
         if rows.isEmpty { phase = .loading }
         switch await dependencies.readOwnAccount() {
@@ -128,6 +169,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
                 labels = read
                 if let kept = self.account { apply(kept) }
             }
+            passkeyOffer = await dependencies.passkeyOffer()
         case .refused:
             rows = []
             revokedRows = []
@@ -224,8 +266,66 @@ extension E2EEAutoDevicesViewModel {
             setMode: { mode in
                 guard let setting = E2EEAutoModeSetting.live(session: session, api: api) else { return .failed("e2ee-auto-mode-unavailable") }
                 return await setting.set(mode)
-            }
+            },
+            passkeyOffer: {
+                guard let backup = E2EEAutoPasskeyBackup.live(session: session, api: api) else { return .none }
+                return await backup.offer(
+                    prfAvailable: E2EEAutoPasskeyAuthenticator.isAvailable,
+                    creationDismissed: UserDefaults.standard.bool(forKey: passkeyDismissedKey(namespace))
+                )
+            },
+            protectWithPasskey: { offer in
+                guard let backup = E2EEAutoPasskeyBackup.live(session: session, api: api) else { return .failed }
+                return await protect(offer: offer, backup: backup, userId: userId)
+            },
+            dismissPasskeyOffer: { UserDefaults.standard.set(true, forKey: passkeyDismissedKey(namespace)) }
         ))
+    }
+
+    /// « Plus tard » : la création n'est proposée qu'une fois sur cet appareil (§5.5).
+    static func passkeyDismissedKey(_ namespace: String) -> String { "e2ee-auto-passkey-offer-dismissed-v1:\(namespace)" }
+
+    /// Création : nouvelle passkey et nouveau `prfSalt`. Mise à jour : une passkey
+    /// périmée listée, avec son propre `prfSalt`, puis la même enveloppe remplacée.
+    private static func protect(offer: E2EEAutoPasskeyContract.Offer, backup: E2EEAutoPasskeyBackup, userId: String) async -> PasskeyResult {
+        let authenticator = E2EEAutoPasskeyAuthenticator()
+        let output: E2EEAutoPasskeyAuthenticator.Output
+        let salt: Data
+        do {
+            switch offer {
+            case .none:
+                return .failed
+            case .create:
+                var bytes = [UInt8](repeating: 0, count: 32)
+                guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return .failed }
+                salt = Data(bytes)
+                output = try await authenticator.create(
+                    userName: String(localized: "Historique chiffré SignalQuest"),
+                    userHandle: E2EEAutoPasskeyAuthenticator.userHandle(userId: userId), salt: salt
+                )
+            case .update(let credentialIds):
+                let listed = (await backup.list() ?? []).filter { credentialIds.contains($0.credentialId) }
+                let candidates = listed.compactMap { item -> (Data, Data, String)? in
+                    guard let raw = E2EEAutoPasskeyAuthenticator.rawCredentialId(item.credentialId),
+                          let salt = Data(base64Encoded: item.wrap.prfSaltB64) else { return nil }
+                    return (raw, salt, item.credentialId)
+                }
+                output = try await authenticator.assert(candidates.map { ($0.0, $0.1) })
+                guard let chosen = candidates.first(where: { $0.2 == output.credentialId }) else { return .failed }
+                salt = chosen.1
+            }
+        } catch E2EEAutoPasskeyAuthenticator.Failure.cancelled {
+            return .cancelled
+        } catch E2EEAutoPasskeyAuthenticator.Failure.prfUnsupported {
+            return .unsupported
+        } catch {
+            return .failed
+        }
+        switch await backup.protect(credentialId: output.credentialId, prfSalt: salt, prfOutput: output.prfOutput) {
+        case .protected: return .done
+        case .limit: return .limit
+        default: return .failed
+        }
     }
 }
 
@@ -283,6 +383,7 @@ struct E2EEAutoDevicesView: View {
                 }
             case .loaded:
                 devicesSection
+                passkeySection
                 strictModeSection
                 if !model.revokedRows.isEmpty {
                     Section {
@@ -373,6 +474,45 @@ struct E2EEAutoDevicesView: View {
             Button("OK") { model.confirmationMessage = nil }
         } message: {
             Text(model.confirmationMessage ?? "")
+        }
+    }
+
+    /// Passkey (§5.5), proposée une fois, ou à mettre à jour après une rotation de HK.
+    @ViewBuilder
+    private var passkeySection: some View {
+        switch model.passkeyOffer {
+        case .none:
+            EmptyView()
+        case .create, .update:
+            let updating = model.passkeyOffer != .create
+            Section {
+                Button {
+                    Task { await model.protectWithPasskey() }
+                } label: {
+                    Group {
+                        if updating {
+                            Label("Mettre à jour la passkey", systemImage: "person.badge.key")
+                        } else {
+                            Label("Protéger l’historique avec une passkey", systemImage: "person.badge.key")
+                        }
+                    }
+                    .frame(minHeight: 44)
+                }
+                .disabled(model.isActing)
+                .accessibilityIdentifier("e2eeAuto.devices.passkey")
+                if !updating {
+                    Button("Plus tard") { model.dismissPasskeyOffer() }
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minHeight: 44)
+                        .disabled(model.isActing)
+                }
+            } footer: {
+                if updating {
+                    Text("Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages.")
+                } else {
+                    Text("Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil.")
+                }
+            }
         }
     }
 
@@ -638,7 +778,8 @@ struct E2EEAutoDevicesView: View {
 
 /// Banc visuel (simulateur Debug) : un compte de démonstration, sans réseau.
 /// `--qa-auto-devices`, `--qa-auto-devices-recent` (garde des 24 h),
-/// `--qa-auto-devices-refused` (journal refusé), `--qa-auto-devices-unlabeled` (sans libellés).
+/// `--qa-auto-devices-refused` (journal refusé), `--qa-auto-devices-unlabeled` (sans libellés),
+/// `--qa-auto-devices-passkey` (création proposée), `--qa-auto-devices-passkey-update` (passkey périmée).
 struct E2EEAutoDevicesQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     static func model() -> E2EEAutoDevicesViewModel {
@@ -678,7 +819,11 @@ struct E2EEAutoDevicesQAScreen: View {
             ownDeviceId: { ownId },
             readOwnAccount: { refused ? .refused : .verified(account) },
             revoke: { _, _ in .revoked(ownDevice: false) },
-            readLabels: { unlabeled ? nil : labels }
+            readLabels: { unlabeled ? nil : labels },
+            passkeyOffer: {
+                if AppEnvironment.hasQAFlag("auto-devices-passkey-update") { return .update(credentialIds: ["AQID"]) }
+                return AppEnvironment.hasQAFlag("auto-devices-passkey") ? .create : .none
+            }
         ))
     }
     #endif

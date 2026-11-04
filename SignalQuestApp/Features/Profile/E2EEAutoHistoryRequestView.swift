@@ -22,7 +22,16 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     nonisolated static let pollWindow: TimeInterval = 15 * 60
     nonisolated static let listInterval: Duration = .seconds(60)
 
-    /// Ce que le coordinateur utilise de `E2EEAutoHistoryRequests`.
+    /// Récupération de HK par une passkey (§5.5), avant « C'est moi ».
+    enum PasskeyRecovery: Equatable, Sendable {
+        case present(hkPubB64: String)
+        /// Passkey périmée : l'ancien historique seulement, la demande reste à faire.
+        case older
+        case cancelled
+        case failed
+    }
+
+    /// Ce que le coordinateur utilise de `E2EEAutoHistoryRequests` (et de la passkey).
     struct Client: Sendable {
         var start: @Sendable () async -> E2EEAutoHistoryRequests.RequestOutcome
         var check: @Sendable () async -> E2EEAutoHistoryRequests.RequestOutcome
@@ -30,15 +39,47 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         var ownFingerprint: @Sendable () async -> [String]?
         var openRequests: @Sendable () async -> E2EEAutoHistoryRequests.Listing
         var approve: @Sendable (_ requestId: String) async -> E2EEAutoHistoryRequests.ApproveOutcome
+        /// Une passkey du compte peut-elle ouvrir une HK du journal ici ?
+        var hasPasskey: @Sendable () async -> Bool = { false }
+        var usePasskey: @Sendable () async -> PasskeyRecovery = { .failed }
 
-        static func live(_ requests: E2EEAutoHistoryRequests) -> Client {
+        static func live(_ requests: E2EEAutoHistoryRequests, passkey: E2EEAutoPasskeyBackup?) -> Client {
             Client(
                 start: { await requests.start() },
                 check: { await requests.check() },
                 hasOpenRequest: { await requests.hasOpenRequest },
                 ownFingerprint: { await requests.ownFingerprint() },
                 openRequests: { await requests.openRequests() },
-                approve: { await requests.approve(requestId: $0) }
+                approve: { await requests.approve(requestId: $0) },
+                hasPasskey: {
+                    guard let passkey, E2EEAutoPasskeyAuthenticator.isAvailable else { return false }
+                    return await !passkey.recoverable().isEmpty
+                },
+                usePasskey: {
+                    guard let passkey else { return .failed }
+                    let listed = await passkey.recoverable()
+                    // Une passkey à jour d'abord : une périmée n'ouvrirait que l'ancien historique.
+                    let current = listed.filter(\.current)
+                    let candidates = (current.isEmpty ? listed : current).compactMap { item -> (Data, Data, E2EEAutoPasskeyContract.Listed)? in
+                        guard let raw = E2EEAutoPasskeyAuthenticator.rawCredentialId(item.credentialId),
+                              let salt = Data(base64Encoded: item.wrap.prfSaltB64) else { return nil }
+                        return (raw, salt, item)
+                    }
+                    let output: E2EEAutoPasskeyAuthenticator.Output
+                    do {
+                        output = try await E2EEAutoPasskeyAuthenticator().assert(candidates.map { ($0.0, $0.1) })
+                    } catch E2EEAutoPasskeyAuthenticator.Failure.cancelled {
+                        return .cancelled
+                    } catch {
+                        return .failed
+                    }
+                    guard let chosen = candidates.first(where: { $0.2.credentialId == output.credentialId })?.2 else { return .failed }
+                    switch await passkey.recover(chosen, prfOutput: output.prfOutput) {
+                    case .present(let hkPubB64): return .present(hkPubB64: hkPubB64)
+                    case .older: return .older
+                    case .logRefused, .retryLater, .failed: return .failed
+                    }
+                }
             )
         }
     }
@@ -57,6 +98,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     enum RequesterPhase: Equatable {
+        /// Après la synchro : une passkey du compte peut ouvrir l'historique (§5.3, avant « C'est moi »).
+        case passkey
         case waiting
         /// Plus de relecture automatique après 15 min : « Vérifier ».
         case paused
@@ -72,6 +115,10 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         var startedAt: Date
         /// Appareil en attente (mode renforcé, §6) : « C'est moi » l'active.
         var activating = false
+        /// Dernier essai de passkey sans résultat utilisable.
+        var passkeyIssue: PasskeyRecovery?
+        /// La feuille de la passkey est ouverte : l'écran reste celui de la passkey.
+        var usingPasskey = false
     }
 
     enum ApprovalPhase: Equatable {
@@ -146,7 +193,40 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
                 }
                 do { try await dependencies.sleep(Self.pollInterval) } catch { return }
             }
+            // §5.3 point 2 : la passkey avant « C'est moi ».
+            if await client.hasPasskey() {
+                requester = Requester(fingerprint: await client.ownFingerprint() ?? [], phase: .passkey, startedAt: dependencies.now())
+                return
+            }
         }
+        await handle(await client.start(), client: client)
+    }
+
+    /// « Utiliser ma passkey » : la feuille système, puis HK vérifiée contre le journal.
+    func usePasskey() async {
+        guard let client = dependencies.client(), requester?.phase == .passkey else { return }
+        requester?.phase = .checking
+        requester?.usingPasskey = true
+        let outcome = await client.usePasskey()
+        requester?.usingPasskey = false
+        switch outcome {
+        case .present(let hkPubB64):
+            requester?.passkeyIssue = nil
+            await handle(.present(hkPubB64: hkPubB64), client: client)
+        case .cancelled:
+            requester?.passkeyIssue = nil
+            requester?.phase = .passkey
+        case .older, .failed:
+            requester?.passkeyIssue = outcome
+            requester?.phase = .passkey
+        }
+    }
+
+    /// « Demander à un autre appareil » : la demande « C'est moi » part.
+    func askAnotherDevice() async {
+        guard let client = dependencies.client(), requester?.phase == .passkey else { return }
+        requester?.phase = .checking
+        requester?.startedAt = dependencies.now()
         await handle(await client.start(), client: client)
     }
 
@@ -318,7 +398,7 @@ extension E2EEAutoHistoryRequestCoordinator {
                 guard SQFeatures.e2eeAutoLogEnabled, let session = LocalAccountScope.sessionSnapshot() else { return nil }
                 if let cached, cached.namespace == session.ownerNamespace { return cached.client }
                 guard let requests = E2EEAutoHistoryRequests.live(session: session, api: api) else { return nil }
-                let client = Client.live(requests)
+                let client = Client.live(requests, passkey: E2EEAutoPasskeyBackup.live(session: session, api: api))
                 cached = (session.ownerNamespace, client)
                 return client
             },
@@ -362,6 +442,8 @@ struct E2EEAutoHistoryRequesterView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         GradientButton(String(localized: "OK")) { coordinator.hideRequester() }
                             .accessibilityIdentifier("e2eeAuto.historyRequest.done")
+                    } else if requester.phase == .passkey || requester.usingPasskey {
+                        passkeyContent(requester)
                     } else {
                         Group {
                             if requester.activating {
@@ -401,6 +483,42 @@ struct E2EEAutoHistoryRequesterView: View {
         }
     }
 
+    /// §5.3 : une passkey du compte avant « C'est moi ».
+    @ViewBuilder
+    private func passkeyContent(_ requester: E2EEAutoHistoryRequestCoordinator.Requester) -> some View {
+        Text("Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil.")
+            .font(SQType.body)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        switch requester.passkeyIssue {
+        case .older?:
+            Label(String(localized: "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil."), systemImage: "clock.arrow.circlepath")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+        case .failed?:
+            Label(String(localized: "La passkey n’a pas pu ouvrir ton historique."), systemImage: "exclamationmark.triangle.fill")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.dangerInk)
+                .fixedSize(horizontal: false, vertical: true)
+        default:
+            EmptyView()
+        }
+        GradientButton(String(localized: "Utiliser ma passkey"), isBusy: requester.usingPasskey) {
+            Task { await coordinator.usePasskey() }
+        }
+        .disabled(requester.usingPasskey)
+        .accessibilityIdentifier("e2eeAuto.historyRequest.passkey")
+        GradientButton(String(localized: "Demander à un autre appareil"), style: .ghost) {
+            Task { await coordinator.askAnotherDevice() }
+        }
+        .disabled(requester.usingPasskey)
+        .accessibilityIdentifier("e2eeAuto.historyRequest.askDevice")
+        GradientButton(String(localized: "Continuer sans l’historique"), style: .ghost) { coordinator.hideRequester() }
+            .disabled(requester.usingPasskey)
+            .accessibilityIdentifier("e2eeAuto.historyRequest.later")
+    }
+
     @ViewBuilder
     private func status(_ phase: E2EEAutoHistoryRequestCoordinator.RequesterPhase) -> some View {
         switch phase {
@@ -432,7 +550,7 @@ struct E2EEAutoHistoryRequesterView: View {
                 .fixedSize(horizontal: false, vertical: true)
             GradientButton(String(localized: "Refaire une demande")) { Task { await coordinator.requestAgain() } }
                 .accessibilityIdentifier("e2eeAuto.historyRequest.again")
-        case .received:
+        case .received, .passkey:
             EmptyView()
         }
     }
@@ -579,16 +697,22 @@ struct E2EEAutoHistoryFingerprintCard: View {
 
 /// Banc visuel (simulateur Debug) : `--qa-auto-history-request` (demandeur),
 /// `--qa-auto-history-approval` (« C'est moi ») ; avec `--qa-auto-history-activation`,
-/// la variante du mode renforcé (§6).
+/// la variante du mode renforcé (§6) ; avec `--qa-auto-history-passkey`, la passkey (§5.5)
+/// et `--qa-auto-history-passkey-older` après une passkey périmée.
 struct E2EEAutoHistoryRequestQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     nonisolated private static let activation = AppEnvironment.hasQAFlag("auto-history-activation")
+    nonisolated private static let passkey = AppEnvironment.hasQAFlag("auto-history-passkey")
+        || AppEnvironment.hasQAFlag("auto-history-passkey-older")
+    /// Horloge du banc : l'attente de synchro passe aussitôt pour la passkey.
+    private final class Clock: @unchecked Sendable { var date = Date() }
+    nonisolated private static let clock = Clock()
     @StateObject private var coordinator = E2EEAutoHistoryRequestCoordinator(dependencies: .init(
         client: {
             .init(
                 start: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
                 check: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
-                hasOpenRequest: { true },
+                hasOpenRequest: { !Self.passkey },
                 ownFingerprint: { ["48213", "09177", "66402", "31958"] },
                 openRequests: {
                     .requests([.init(
@@ -597,13 +721,19 @@ struct E2EEAutoHistoryRequestQAScreen: View {
                         activate: Self.activation
                     )])
                 },
-                approve: { _ in .served }
+                approve: { _ in .served },
+                hasPasskey: { Self.passkey },
+                usePasskey: { .older }
             )
         },
         historyKeyHeld: { _ in false },
         continueWithHistoryKey: {},
         removeDelivered: { _ in },
-        sleep: { try await Task.sleep(for: $0 == E2EEAutoHistoryRequestCoordinator.pollInterval ? .seconds(3_600) : $0) }
+        sleep: { duration in
+            if Self.passkey { Self.clock.date.addTimeInterval(TimeInterval(duration.components.seconds)); return }
+            try await Task.sleep(for: duration == E2EEAutoHistoryRequestCoordinator.pollInterval ? .seconds(3_600) : duration)
+        },
+        now: { Self.clock.date }
     ))
     let approval: Bool
     #else
@@ -620,7 +750,17 @@ struct E2EEAutoHistoryRequestQAScreen: View {
             }
         }
         .task {
-            if approval { await coordinator.refreshApprovals() } else { await coordinator.refresh() }
+            if approval {
+                await coordinator.refreshApprovals()
+            } else if Self.passkey {
+                coordinator.historyKeyMissing(hkPubB64: "hk")
+                if AppEnvironment.hasQAFlag("auto-history-passkey-older") {
+                    while coordinator.requester?.phase != .passkey { try? await Task.sleep(for: .milliseconds(50)) }
+                    await coordinator.usePasskey()
+                }
+            } else {
+                await coordinator.refresh()
+            }
         }
         #else
         EmptyView()

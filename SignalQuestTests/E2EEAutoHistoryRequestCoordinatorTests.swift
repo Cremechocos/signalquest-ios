@@ -26,6 +26,9 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         var listing: E2EEAutoHistoryRequests.Listing = .requests([])
         var approveOutcome: E2EEAutoHistoryRequests.ApproveOutcome = .served
         var approved: [String] = []
+        var hasPasskey = false
+        var passkeyOutcomes: [Coordinator.PasskeyRecovery] = []
+        var passkeyUses = 0
 
         @MainActor
         func coordinator() -> Coordinator {
@@ -37,7 +40,9 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
                         hasOpenRequest: { self.hasOpenRequest },
                         ownFingerprint: { ["48213", "09177", "66402", "31958"] },
                         openRequests: { self.listing },
-                        approve: { self.approved.append($0); return self.approveOutcome }
+                        approve: { self.approved.append($0); return self.approveOutcome },
+                        hasPasskey: { self.hasPasskey },
+                        usePasskey: { self.passkeyUses += 1; return self.passkeyOutcomes.isEmpty ? .failed : self.passkeyOutcomes.removeFirst() }
                     )
                 },
                 historyKeyHeld: { _ in
@@ -176,5 +181,43 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         coordinator.closeApproval()
         await coordinator.refreshApprovals()
         XCTAssertNil(coordinator.approval)
+    }
+
+    /// §5.3 point 2 : après la synchro, une passkey du compte passe avant « C'est moi ».
+    func testPasskeyComesBeforeTheRequest() async {
+        let world = World()
+        world.hasPasskey = true
+        let coordinator = world.coordinator()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        XCTAssertEqual(world.starts, 0)
+        XCTAssertEqual(coordinator.requester?.phase, .passkey)
+
+        world.passkeyOutcomes = [.present(hkPubB64: "hk")]
+        await coordinator.usePasskey()
+        XCTAssertEqual(world.passkeyUses, 1)
+        XCTAssertEqual(world.continued, 1)
+        XCTAssertEqual(world.starts, 0)
+        XCTAssertEqual(coordinator.requester?.phase, .received)
+    }
+
+    /// Passkey périmée ou annulée : l'écran reste, « Demander à un autre appareil » ouvre la demande.
+    func testStalePasskeyFallsBackToARequest() async {
+        let world = World()
+        world.hasPasskey = true
+        let coordinator = world.coordinator()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        world.passkeyOutcomes = [.cancelled, .older]
+        await coordinator.usePasskey()
+        XCTAssertEqual(coordinator.requester?.phase, .passkey)
+        XCTAssertNil(coordinator.requester?.passkeyIssue)
+        await coordinator.usePasskey()
+        XCTAssertEqual(coordinator.requester?.passkeyIssue, .older)
+        XCTAssertEqual(world.continued, 0)
+
+        await coordinator.askAnotherDevice()
+        XCTAssertEqual(world.starts, 1)
+        XCTAssertEqual(coordinator.requester?.phase, .waiting)
     }
 }

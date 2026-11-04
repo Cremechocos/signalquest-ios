@@ -1052,6 +1052,22 @@
         }
       }
     },
+    "Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With a passkey, your encrypted history also opens on Android or in a browser, without going through another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil."
+          }
+        }
+      }
+    },
     "Cadre" : {
       "localizations" : {
         "en" : {
@@ -1164,6 +1180,22 @@
         }
       }
     },
+    "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This passkey only opens your older messages. For the most recent ones, ask another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil."
+          }
+        }
+      }
+    },
     "Cette session n’est plus publique." : {
       "localizations" : {
         "en" : {
@@ -1244,6 +1276,22 @@
         }
       }
     },
+    "Demander à un autre appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask another device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demander à un autre appareil"
+          }
+        }
+      }
+    },
     "Disponible sur cet appareil dans %lld h." : {
       "localizations" : {
         "en" : {
@@ -1319,6 +1367,22 @@
         }
       }
     },
+    "Historique chiffré SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest encrypted history"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historique chiffré SignalQuest"
+          }
+        }
+      }
+    },
     "Il faut au moins deux appareils actifs pour l’activer." : {
       "localizations" : {
         "en" : {
@@ -1347,6 +1411,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de changer le mode. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "Impossible de protéger l’historique avec la passkey. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t protect your history with the passkey. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de protéger l’historique avec la passkey. Réessaie dans un instant."
           }
         }
       }
@@ -1395,6 +1475,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Intensité"
+          }
+        }
+      }
+    },
+    "La passkey n’a pas pu ouvrir ton historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The passkey couldn’t open your history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passkey n’a pas pu ouvrir ton historique."
           }
         }
       }
@@ -1591,6 +1687,22 @@
         }
       }
     },
+    "Mettre à jour la passkey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update the passkey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à jour la passkey"
+          }
+        }
+      }
+    },
     "Mode renforcé" : {
       "localizations" : {
         "en" : {
@@ -1650,6 +1762,22 @@
         }
       }
     },
+    "Protéger l’historique avec une passkey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protect your history with a passkey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protéger l’historique avec une passkey"
+          }
+        }
+      }
+    },
     "Quotidienne" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1677,6 +1805,18 @@
         }
       }
     },
+    "SQFormal|Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec une passkey, votre historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1701,6 +1841,18 @@
       },
       "shouldTranslate" : false
     },
+    "SQFormal|Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette passkey n’ouvre que vos anciens messages. Pour les plus récents, demandez à un autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Impossible de changer le mode. Réessaie dans un instant." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1713,6 +1865,30 @@
       },
       "shouldTranslate" : false
     },
+    "SQFormal|Impossible de protéger l’historique avec la passkey. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de protéger l’historique avec la passkey. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|La passkey n’a pas pu ouvrir ton historique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La passkey n’a pas pu ouvrir votre historique."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1720,6 +1896,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le mode renforcé protège votre compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de vos appareils ne l’a pas activé. Touchez « C’est moi » sur cet autre appareil : une notification vient d’y arriver."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre clé d’historique a changé : mettez à jour la passkey pour qu’elle ouvre aussi vos nouveaux messages."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre passkey peut ouvrir votre historique ici, sans passer par un autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ta passkey protège maintenant ton historique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre passkey protège maintenant votre historique."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ton compte a déjà dix passkeys pour l’historique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte a déjà dix passkeys pour l’historique."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ton gestionnaire de passkeys ne permet pas de protéger l’historique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre gestionnaire de passkeys ne permet pas de protéger l’historique."
           }
         }
       },
@@ -1789,6 +2025,86 @@
         }
       }
     },
+    "Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your history key changed: update the passkey so it also opens your new messages."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages."
+          }
+        }
+      }
+    },
+    "Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your passkey can open your history here, without going through another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil."
+          }
+        }
+      }
+    },
+    "Ta passkey protège maintenant ton historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your passkey now protects your history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta passkey protège maintenant ton historique."
+          }
+        }
+      }
+    },
+    "Ton compte a déjà dix passkeys pour l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account already has ten passkeys for the history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte a déjà dix passkeys pour l’historique."
+          }
+        }
+      }
+    },
+    "Ton gestionnaire de passkeys ne permet pas de protéger l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your passkey manager can’t protect the history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton gestionnaire de passkeys ne permet pas de protéger l’historique."
+          }
+        }
+      }
+    },
     "Ton texte restera visible sans ton nom, parce que des membres y ont répondu." : {
       "localizations" : {
         "en" : {
@@ -1833,6 +2149,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente."
+          }
+        }
+      }
+    },
+    "Utiliser ma passkey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use my passkey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser ma passkey"
           }
         }
       }
