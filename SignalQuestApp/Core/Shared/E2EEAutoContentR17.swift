@@ -80,7 +80,8 @@ enum E2EEAutoContentR17 {
         let label: String
     }
 
-    enum Measure: Equatable, Sendable {
+    /// `Codable` : la file durable des envois garde la carte jusqu'à l'accusé.
+    enum Measure: Equatable, Sendable, Codable {
         /// Décimaux à deux chiffres après la virgule au plus, en texte.
         case speedtest(downloadMbps: String, uploadMbps: String?, pingMs: String?, technology: String?, operator: String?)
         case session(points: Int64?, distanceMeters: Int64?, durationSeconds: Int64?, technologies: [String])

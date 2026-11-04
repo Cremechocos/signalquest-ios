@@ -109,6 +109,7 @@ struct ConversationDetailView: View {
     @State private var v2Imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
     /// Pièces chiffrées du fil (E2EE-AUTO §7.7), par `blobId`.
     @State private var v2Media: [String: E2EEAutoMediaRef] = [:]
+    @State private var v2Cards: [String: E2EEAutoContentR17.PostCard] = [:]
     /// Enveloppe des messages qui citent des blobs : purgés après leur suppression (§7.4).
     @State private var v2BlobEnvelopes: [String: String] = [:]
     /// Bulles locales des pièces chiffrées en cours d'envoi → clé de leur envoi dans la file durable.
@@ -1837,7 +1838,10 @@ struct ConversationDetailView: View {
                             }
                         )
                     } else if shareCard.kind.lowercased() == "social_post" {
-                        SharedPostCardBubble(card: shareCard, mine: mine)
+                        SharedPostCardBubble(
+                            card: shareCard, mine: mine,
+                            onOpenPost: v2Cards[message.id].map { card in { router.route(toPost: card.postId) } }
+                        )
                     } else if let signal = shareCard.signal {
                         SignalCardBubble(card: shareCard, signal: signal, mine: mine)
                     } else {
@@ -2940,6 +2944,8 @@ struct ConversationDetailView: View {
     /// dans `renderCache` : appelé jusqu'à deux fois par bulle porteuse dans le
     /// chemin de rendu, il ne s'exécute désormais qu'une fois par message.
     private func shareCard(for message: MessageItem) -> ShareCardData? {
+        // Carte chiffrée (§7.7) : un instantané sans URL, jamais rechargé du serveur.
+        if message.deletedAt == nil, let card = v2Cards[message.id] { return E2EEAutoPostShare.shareCardData(card) }
         guard message.deletedAt == nil, message.metadata != nil else { return nil }
         return renderCache.shareCard(for: message)
     }
@@ -3106,6 +3112,7 @@ struct ConversationDetailView: View {
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
             if v2Media != presentation.media { v2Media = presentation.media }
+            if v2Cards != presentation.cards { v2Cards = presentation.cards }
             for (messageId, poll) in presentation.polls where pollsByMessageId[messageId] != poll {
                 pollsByMessageId[messageId] = poll
             }

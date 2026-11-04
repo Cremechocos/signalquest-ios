@@ -512,6 +512,7 @@ struct E2EEAutoAttachmentsQAScreen: View {
         "blob_qa_video_thumb": picture("video-thumb.jpg", hue: 0.55, size: CGSize(width: 480, height: 270)),
         "blob_qa_voice": voice(),
         "blob_qa_voice_bare": voice(),
+        "blob_qa_card": picture("card.jpg", hue: 0.6, size: CGSize(width: 1280, height: 960)),
     ]
 
     private var voices: [Row] {
@@ -534,6 +535,23 @@ struct E2EEAutoAttachmentsQAScreen: View {
         ]
     }
 
+    /// Cartes de publication chiffrées (`CARD` `POST`) : l'aperçu passe comme pièce, la carte sans URL.
+    private var cards: [(id: String, card: E2EEAutoContentR17.PostCard, image: Row?, mine: Bool)] {
+        let image = Self.manifest("blob_qa_card", "image.jpg", "image/jpeg", size: 120_000, width: 1280, height: 960)
+        return [
+            ("card_qa_speedtest", .init(
+                postId: "cmh1post00000000000000001", authorId: "cmh1user00000000000000001", authorName: "Camille", authorHandle: "camille",
+                postedAt: "2026-11-04T08:15:00.000Z", text: "Enfin la 5G au pied de la Bastille, ça dépote.", image: image,
+                measure: .speedtest(downloadMbps: "842.5", uploadMbps: "95.12", pingMs: "18", technology: "5G", operator: "Free Mobile")
+            ), Self.row(image, kind: "IMAGE"), false),
+            ("card_qa_signal", .init(
+                postId: "cmh1post00000000000000002", authorId: nil, authorName: nil, authorHandle: "lea",
+                postedAt: "2026-11-03T18:02:00.000Z", text: nil, image: nil,
+                measure: .signal(rsrp: -97, band: "n78", site: "Grenoble Bastille", operator: "Orange", technology: "5G")
+            ), nil, true),
+        ]
+    }
+
     private var rows: [Row] {
         [
             Self.row(Self.manifest("blob_qa_photo", "photo.jpg", "image/jpeg", size: 412_000, width: 1280, height: 960), kind: "IMAGE"),
@@ -551,6 +569,19 @@ struct E2EEAutoAttachmentsQAScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SQSpace.md) {
+                    ForEach(cards, id: \.id) { item in
+                        VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
+                            if let row = item.image {
+                                E2EEAutoAttachmentView(attachment: row.attachment, media: row.media, mine: item.mine) { manifest in
+                                    files[manifest.blobId].map { .file($0) } ?? .unavailable
+                                }
+                            }
+                            SharedPostCardBubble(card: E2EEAutoPostShare.shareCardData(item.card), mine: item.mine, onOpenPost: {})
+                        }
+                        .padding(SQSpace.sm)
+                        .background(item.mine ? SQColor.brandRed : SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                        .frame(maxWidth: .infinity, alignment: item.mine ? .trailing : .leading)
+                    }
                     ForEach(voices) { row in
                         E2EEAutoVoiceBubble(attachment: row.attachment, media: row.media, mine: row.mine) { manifest in
                             files[manifest.blobId].map { .file($0) } ?? .unavailable

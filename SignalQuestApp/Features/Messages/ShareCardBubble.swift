@@ -211,6 +211,8 @@ struct SignalCardBubble: View {
 struct SharedPostCardBubble: View {
     let card: ShareCardData
     let mine: Bool
+    /// Carte chiffrée sans URL (§7.7) : le lien se reconstruit depuis l'identifiant de la publication.
+    var onOpenPost: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
     @State private var externalURL: URL?
 
@@ -228,13 +230,13 @@ struct SharedPostCardBubble: View {
                     .lineLimit(4)
             }
             media
-            if let url = card.openURL {
+            if card.openURL != nil || onOpenPost != nil {
                 Rectangle()
                     .fill(mine ? SQColor.onInk.opacity(0.22) : SQColor.separator)
                     .frame(height: 0.5)
                 Button {
                     Haptics.selection()
-                    open(url)
+                    if let onOpenPost { onOpenPost() } else if let url = card.openURL { open(url) }
                 } label: {
                     HStack(spacing: SQSpace.xs) {
                         Text("Voir la publication")

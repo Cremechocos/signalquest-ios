@@ -19902,6 +19902,22 @@
         }
       }
     },
+    "Publication SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication SignalQuest"
+          }
+        }
+      }
+    },
     "Publication de %@ : %@" : {
       "localizations" : {
         "en" : {

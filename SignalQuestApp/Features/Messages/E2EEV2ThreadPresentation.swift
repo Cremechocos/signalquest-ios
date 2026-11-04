@@ -95,6 +95,8 @@ struct E2EEV2ThreadPresentation: Equatable {
     var blobEnvelopes: [String: String] = [:]
     /// Sondages chiffrés (§7.7) par identifiant de message, décomptés sur l'appareil.
     var polls: [String: MessagePoll] = [:]
+    /// Publications partagées chiffrées (§7.7, `CARD` `POST`) par identifiant de message.
+    var cards: [String: E2EEAutoContentR17.PostCard] = [:]
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -176,6 +178,7 @@ enum E2EEV2ThreadPresenter {
         var media: [String: E2EEAutoMediaRef] = [:]
         var blobEnvelopes: [String: String] = [:]
         var polls: [String: MessagePoll] = [:]
+        var cards: [String: E2EEAutoContentR17.PostCard] = [:]
         let messages = old.messages + shown.map { stored -> MessageItem in
             if let record = stored.historyImport {
                 imports[stored.messageRef] = importLabel(
@@ -196,6 +199,7 @@ enum E2EEV2ThreadPresenter {
                     ownUserId: ownUserId, isGroup: isGroup, groupAdmins: groupAdmins, nowMs: nowMs
                 )
             }
+            if let body, case .card(let card) = body { cards[stored.messageRef] = card }
             let attachments = body.map { E2EEAutoMediaRef.attachments(of: $0, into: &media) } ?? []
             return MessageItem(
                 id: stored.messageRef,
@@ -271,7 +275,8 @@ enum E2EEV2ThreadPresenter {
             importedV1Ids: Set(importRefs.keys),
             media: media,
             blobEnvelopes: blobEnvelopes,
-            polls: polls
+            polls: polls,
+            cards: cards
         )
     }
 

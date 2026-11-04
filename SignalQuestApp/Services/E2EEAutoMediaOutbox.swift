@@ -195,6 +195,18 @@ actor E2EEAutoMediaOutbox {
         let transcriptionText: String?
     }
 
+    /// Carte d'une publication partagée (§7.7, `CARD` `POST`), sans son image : l'aperçu
+    /// chiffré, s'il existe, est la seule pièce de l'envoi.
+    struct Card: Codable, Equatable, Sendable {
+        let postId: String
+        let authorId: String?
+        let authorName: String?
+        let authorHandle: String?
+        let postedAt: String
+        let text: String?
+        let measure: E2EEAutoContentR17.Measure?
+    }
+
     struct Record: Codable, Equatable, Sendable {
         var clientRequestId: String
         let conversationId: String
@@ -207,6 +219,7 @@ actor E2EEAutoMediaOutbox {
         let createdAtMs: Int64
         var entries: [Entry]
         var voice: Voice?
+        var card: Card?
         /// Refus définitif : la bulle reste « Non envoyé », la reprise ne la rejoue plus.
         var failureReason: String?
         /// Premier `clientRequestId`, gardé quand des blobs refusés imposent un nouvel identifiant :
@@ -216,6 +229,18 @@ actor E2EEAutoMediaOutbox {
         var key: String { localKey ?? clientRequestId }
 
         var body: E2EEAutoContentR17.Body? {
+            if let card {
+                guard entries.count <= 1 else { return nil }
+                var image: E2EEAutoContentR17.Manifest?
+                if let entry = entries.first {
+                    guard let manifest = entry.file.manifest, entry.thumbnail == nil else { return nil }
+                    image = manifest
+                }
+                return .card(.init(
+                    postId: card.postId, authorId: card.authorId, authorName: card.authorName, authorHandle: card.authorHandle,
+                    postedAt: card.postedAt, text: card.text, image: image, measure: card.measure
+                ))
+            }
             if let voice {
                 guard entries.count == 1, let manifest = entries[0].file.manifest else { return nil }
                 var transcription: E2EEAutoContentR17.Transcription?
@@ -270,7 +295,7 @@ actor E2EEAutoMediaOutbox {
 
     /// Garde un envoi avant tout réseau : sources écrites, liste scellée.
     func stage(
-        _ sources: [E2EEAutoMediaSource], voice: Voice? = nil, caption: String?, mentions: [String] = [], replyToRef: String?,
+        _ sources: [E2EEAutoMediaSource], voice: Voice? = nil, card: Card? = nil, caption: String?, mentions: [String] = [], replyToRef: String?,
         ttlSeconds: Int, conversationId: String, isGroup: Bool, participantIds: [String], ownerScopeId: String,
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) throws -> Record {
@@ -299,7 +324,7 @@ actor E2EEAutoMediaOutbox {
         let record = Record(
             clientRequestId: clientRequestId, conversationId: conversationId, isGroup: isGroup, participantIds: participantIds,
             caption: caption, mentions: caption == nil ? [] : mentions, replyToRef: replyToRef, ttlSeconds: ttlSeconds,
-            createdAtMs: nowMs, entries: entries, voice: voice, localKey: clientRequestId
+            createdAtMs: nowMs, entries: entries, voice: voice, card: card, localKey: clientRequestId
         )
         var file = try read(ownerScopeId)
         file.records.append(record)

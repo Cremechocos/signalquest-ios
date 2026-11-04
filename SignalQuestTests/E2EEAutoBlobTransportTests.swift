@@ -1,5 +1,6 @@
 import AVFoundation
 import CryptoKit
+import UIKit
 import XCTest
 @testable import SignalQuest
 
@@ -401,6 +402,44 @@ final class E2EEAutoBlobTransportTests: XCTestCase {
         XCTAssertEqual(attempts[0], attempts[1])
         guard case .r17(.audio(_, _, _, let none)) = attempts[1].body else { return XCTFail("AUDIO attendu") }
         XCTAssertNil(none)
+    }
+
+    func testOutboxSendsACardWithItsEncryptedImageAsTheOnlyBlob() async throws {
+        let server = FakeBlobServer()
+        let client = E2EEAutoBlobClient(requests: server.requests, workDirectory: directory)
+        let outbox = E2EEAutoMediaOutbox(rootURL: directory.appendingPathComponent("outbox"), keyStore: InMemoryTokenStore())
+        let owner = "user:card-test"
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 48)).image { context in
+            UIColor.orange.setFill(); context.fill(CGRect(x: 0, y: 0, width: 64, height: 48))
+        }
+        let source = try XCTUnwrap(E2EEAutoPostShare.preview(image))
+        let card = E2EEAutoMediaOutbox.Card(
+            postId: "cmh1post00000000000000001", authorId: "cmh1user00000000000000001", authorName: "Alice", authorHandle: "alice",
+            postedAt: "2026-09-20T08:15:00.000Z", text: "Belle antenne",
+            measure: .speedtest(downloadMbps: "842.5", uploadMbps: nil, pingMs: "18", technology: "5G", operator: nil)
+        )
+        let record = try await outbox.stage(
+            [source], card: card, caption: nil, replyToRef: nil, ttlSeconds: 0, conversationId: "conv_0123456789abcdef",
+            isGroup: false, participantIds: ["a", "b"], ownerScopeId: owner
+        )
+        let drafts = DraftBox()
+        let sent = await outbox.process(clientRequestId: record.clientRequestId, ownerScopeId: owner, client: client) { draft, _ in
+            await drafts.append(draft)
+            return .alreadyAccepted(messageRef: String(repeating: "A", count: 43))
+        }
+        XCTAssertEqual(sent, .sent)
+        let sentDrafts = await drafts.items
+        let draft = try XCTUnwrap(sentDrafts.first)
+        guard case .r17(.card(let post)) = draft.body else { return XCTFail("CARD attendu") }
+        let preview = try XCTUnwrap(post.image)
+        XCTAssertEqual(preview.mimeType, "image/jpeg")
+        XCTAssertEqual(preview.width, source.width)
+        XCTAssertEqual(post.measure, card.measure)
+        XCTAssertEqual(E2EEAutoContentR17.Body.card(post).blobIds, [preview.blobId], "l'image est la seule pièce citée")
+        let payload = try E2EEV2ContentPayloadV2(sentAtMs: 1, counter: 1, replyToRef: nil, mentions: [], body: draft.body).encoded()
+        XCTAssertEqual(try E2EEV2ContentPayloadV2.parse(payload).body, draft.body, "la charge se relit")
+        let calls = await server.calls
+        XCTAssertEqual(calls.filter { $0 == "complete" }.count, 1, "un seul blob envoyé")
     }
 }
 

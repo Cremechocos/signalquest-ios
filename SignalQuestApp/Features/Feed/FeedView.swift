@@ -1899,6 +1899,7 @@ struct PostShareSheet: View {
     var onShared: (String, MessageConversation) -> Void = { _, _ in }
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var services: AppServices
     @State private var conversations: [MessageConversation] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -1992,16 +1993,24 @@ struct PostShareSheet: View {
         .sqSheet(background: SQColor.bg)
     }
 
+    /// Conversation v2 : la carte part chiffrée par l'app (E2EE-AUTO §7.7, `CARD` `POST`).
+    private func sharesEncrypted(_ conversation: MessageConversation) -> Bool {
+        EncryptedConversationSurfaces.isV2(conversation) && services.e2eeV2Messaging.writesEnabled
+            && E2EEAutoPostShare.canShare(post)
+    }
+
     /// Une conversation : avatar, nom, puis « Envoyer ». Une conversation
-    /// chiffrée reste visible mais grisée, avec la raison.
+    /// chiffrée qu'on ne peut pas servir reste visible mais grisée, avec la raison.
     private func conversationRow(_ conversation: MessageConversation) -> some View {
         // Le partage de publication est inséré en CLAIR (aperçu texte,
         // auteur, image) côté serveur : on ne le propose donc PAS vers
-        // une conversation chiffrée, pour ne pas briser la promesse
-        // E2EE sous un badge « Chiffrée » (SEC-1).
-        let isE2EE = conversation.e2eeEnabled == true
+        // une conversation chiffrée v1, pour ne pas briser la promesse
+        // E2EE sous un badge « Chiffrée » (SEC-1). En v2, l'app chiffre la carte.
+        let encrypted = sharesEncrypted(conversation)
+        let isE2EE = conversation.e2eeEnabled == true && !encrypted
         let subtitle: String? = isE2EE
             ? String(localized: "Conversation chiffrée · pas de partage de publication")
+            : encrypted ? String(localized: "Conversation chiffrée")
             : (conversation.isGroup ? String(localized: "\(conversation.participants.count) membres") : nil)
         return Button {
             Task { await share(conversation) }
@@ -2015,7 +2024,7 @@ struct PostShareSheet: View {
                         .lineLimit(1)
                     if let subtitle {
                         HStack(spacing: 4) {
-                            if isE2EE {
+                            if isE2EE || encrypted {
                                 Image(systemName: "lock.fill").font(.system(size: 10)).accessibilityHidden(true)
                             }
                             Text(subtitle)
@@ -2059,10 +2068,22 @@ struct PostShareSheet: View {
     }
 
     private func share(_ conversation: MessageConversation) async {
-        guard busyConversationId == nil, conversation.e2eeEnabled != true else { return }
+        let encrypted = sharesEncrypted(conversation)
+        guard busyConversationId == nil, conversation.e2eeEnabled != true || encrypted else { return }
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
         errorMessage = nil
+        if encrypted {
+            // Pas d'annulation proposée : elle passerait par une suppression chiffrée, faite depuis la conversation.
+            if await E2EEAutoPostShare.send(post, to: conversation, messaging: services.e2eeV2Messaging) {
+                Haptics.success()
+                dismiss()
+            } else {
+                Haptics.error()
+                errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
+            }
+            return
+        }
         if let messageId = await onShare(conversation) {
             onShared(messageId, conversation)
             dismiss()
