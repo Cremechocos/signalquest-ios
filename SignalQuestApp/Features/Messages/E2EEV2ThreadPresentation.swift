@@ -93,6 +93,8 @@ struct E2EEV2ThreadPresentation: Equatable {
     var media: [String: E2EEAutoMediaRef] = [:]
     /// Enveloppe des messages qui citent des blobs, par identifiant : de quoi purger après un `DELETE` (§7.4).
     var blobEnvelopes: [String: String] = [:]
+    /// Sondages chiffrés (§7.7) par identifiant de message, décomptés sur l'appareil.
+    var polls: [String: MessagePoll] = [:]
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -130,6 +132,8 @@ enum E2EEV2ThreadPresenter {
         limit: Int? = nil,
         legacy: [MessageItem] = [],
         legacyReadings: [String: String] = [:],
+        isGroup: Bool = false,
+        groupAdmins: (Int) -> Set<String>? = { _ in nil },
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2ThreadPresentation {
         // Les imports forment un bloc placé avant tout message non importé (E2EE-AUTO §8).
@@ -171,6 +175,7 @@ enum E2EEV2ThreadPresenter {
         var imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
         var media: [String: E2EEAutoMediaRef] = [:]
         var blobEnvelopes: [String: String] = [:]
+        var polls: [String: MessagePoll] = [:]
         let messages = old.messages + shown.map { stored -> MessageItem in
             if let record = stored.historyImport {
                 imports[stored.messageRef] = importLabel(
@@ -185,6 +190,12 @@ enum E2EEV2ThreadPresenter {
             // Révision 17 : chaque pièce devient une pièce jointe dont l'adresse désigne son blob.
             let body = stored.deleted ? nil : E2EEV2MessageStoreV2.r17Body(stored)
             if let body, !body.blobIds.isEmpty { blobEnvelopes[stored.messageRef] = stored.envelopeId }
+            if let body, case .poll = body {
+                polls[stored.messageRef] = poll(
+                    body, stored: stored, events: result.snapshot.pollEvents[stored.messageRef] ?? [],
+                    ownUserId: ownUserId, isGroup: isGroup, groupAdmins: groupAdmins, nowMs: nowMs
+                )
+            }
             let attachments = body.map { E2EEAutoMediaRef.attachments(of: $0, into: &media) } ?? []
             return MessageItem(
                 id: stored.messageRef,
@@ -259,7 +270,45 @@ enum E2EEV2ThreadPresenter {
             legacyCaptions: old.captions,
             importedV1Ids: Set(importRefs.keys),
             media: media,
-            blobEnvelopes: blobEnvelopes
+            blobEnvelopes: blobEnvelopes,
+            polls: polls
+        )
+    }
+
+    /// Sondage chiffré dans la forme de la bulle commune. Une clôture compte si elle vient
+    /// de l'auteur, ou d'un administrateur du groupe à l'époque de la clôture ; une
+    /// conversation à deux n'a pas d'administrateur. `pollId` est la référence du message.
+    static func poll(
+        _ body: E2EEAutoContentR17.Body, stored: E2EEV2MessageStoreV2.Stored, events: [E2EEV2MessageStoreV2.Stored],
+        ownUserId: String?, isGroup: Bool, groupAdmins: (Int) -> Set<String>?, nowMs: Int64
+    ) -> MessagePoll? {
+        guard case .poll(let question, let options, let multipleChoice, let closesAt) = body else { return nil }
+        let closesAtMs = closesAt.flatMap(E2EEAutoContentR17.isoMs)
+        let pollEvents: [E2EEAutoContentR17.PollEvent] = events.compactMap { event in
+            switch E2EEV2MessageStoreV2.r17Body(event) {
+            case .pollVote(_, let optionIds)?:
+                return .vote(senderId: event.senderUserId, sequence: event.sequence, serverTimeMs: event.serverTimeMs, optionIds: optionIds)
+            case .pollClose?:
+                let isAdmin = isGroup ? groupAdmins(event.epochNumber).map { $0.contains(event.senderUserId) } : false
+                return .close(senderId: event.senderUserId, sequence: event.sequence, serverTimeMs: event.serverTimeMs, senderIsAdmin: isAdmin)
+            default:
+                return nil
+            }
+        }
+        let tally = E2EEAutoContentR17.tally(
+            authorId: stored.senderUserId, optionIds: options.map(\.id), multipleChoice: multipleChoice,
+            closesAtMs: closesAtMs, events: pollEvents, nowServerMs: nowMs
+        )
+        let counts = Dictionary(tally.counts.map { ($0.id, $0.count) }, uniquingKeysWith: { first, _ in first })
+        let closedAt: Date? = tally.closedBySequence.flatMap { sequence in
+            events.first { $0.sequence == sequence }.map { date($0.serverTimeMs) }
+        } ?? (tally.closed ? closesAtMs.map(date) : nil)
+        return MessagePoll(
+            pollId: stored.messageRef, question: question,
+            options: options.map { PollOption(id: $0.id, text: $0.label, count: counts[$0.id] ?? 0) },
+            multiSelect: multipleChoice, createdById: stored.senderUserId, closedAt: closedAt,
+            endsAt: closesAtMs.map(date), totalVotes: tally.votes.count,
+            votesByMe: ownUserId.flatMap { tally.votes[$0] } ?? []
         )
     }
 

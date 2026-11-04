@@ -490,7 +490,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 result, conversationId: conversationId, members: members, deviceOwners: owners,
                 refusals: used.refusals.filter { participantIds.contains($0.key) },
                 ownUserId: LocalAccountScope.currentUserId,
-                limit: limit, legacy: legacy, legacyReadings: legacyReadings
+                limit: limit, legacy: legacy, legacyReadings: legacyReadings,
+                isGroup: isGroup,
+                groupAdmins: { parts.messaging.storedGroupAdmins(conversationId: conversationId, epochNumber: $0) }
             )
             // Même règle que l'envoi (§12), sans l'exclusion des navigateurs :
             // dans le doute, le bouton reste masqué.
@@ -713,6 +715,12 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     func groupAdmins(conversationId: String) -> Set<String>? {
         guard writesEnabled, let parts = current() else { return nil }
         return parts.messaging.storedGroupRoles(conversationId: conversationId)?.admins
+    }
+
+    /// Administrateurs d'un groupe v2 à l'époque d'un message (§7.7) ; `nil` si indécidable.
+    func groupAdmins(conversationId: String, epochNumber: Int) -> Set<String>? {
+        guard let parts = current() else { return nil }
+        return parts.messaging.storedGroupAdmins(conversationId: conversationId, epochNumber: epochNumber)
     }
 
     /// Départ d'un groupe v2 : le successeur est nommé d'abord, par son propre

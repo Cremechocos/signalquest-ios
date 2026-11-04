@@ -9,6 +9,9 @@ struct NewPollView: View {
     let e2ee: E2EEServicing?
     /// « Dans Équipe terrain » sous le titre.
     var subtitle: String? = nil
+    /// Conversation chiffrée v2 (E2EE-AUTO §7.7) : le sondage part chiffré par ce
+    /// chemin ; renvoie le message d'erreur à afficher, `nil` si c'est parti.
+    var encryptedCreate: ((_ question: String, _ options: [String], _ multiSelect: Bool, _ endsAt: Date?) async -> String?)? = nil
     /// Renvoie le message créé + le sondage (avec textes d'options déjà résolus,
     /// même en E2EE) pour un affichage immédiat et correct.
     let onCreated: (MessageItem, MessagePoll) -> Void
@@ -157,6 +160,18 @@ struct NewPollView: View {
         guard canCreate else { return }
         isBusy = true
         defer { isBusy = false }
+        if let encryptedCreate {
+            if let failure = await encryptedCreate(
+                question.trimmingCharacters(in: .whitespacesAndNewlines), trimmedOptions, multiSelect, hasDeadline ? deadline : nil
+            ) {
+                errorMessage = failure
+                Haptics.error()
+            } else {
+                Haptics.success()
+                dismiss()
+            }
+            return
+        }
         do {
             let response = try await service.createPoll(
                 conversationId: conversation.id,

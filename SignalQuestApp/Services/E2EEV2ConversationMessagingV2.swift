@@ -384,6 +384,23 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         return (context.head.admins, context.head.arrivalOrder.filter { context.head.members.contains($0) })
     }
 
+    /// Administrateurs d'un groupe v2 à une époque (E2EE-AUTO §7.7, clôture d'un sondage) :
+    /// la chaîne rejouée jusqu'au changement lié à cette époque. `nil` quand la chaîne
+    /// ou l'époque locale n'y sont pas encore : la clôture reste alors indécidable.
+    func storedGroupAdmins(conversationId: String, epochNumber: Int) -> Set<String>? {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(),
+              let context = try? membershipContext(conversationId: conversationId, isGroup: true) else { return nil }
+        let number: Int?
+        if let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: session.ownerNamespace),
+           current.epochNumber == epochNumber {
+            number = current.membershipChangeNumber
+        } else {
+            number = (try? stateStore.acceptedEpochs(conversationId: conversationId, ownerNamespace: session.ownerNamespace))?
+                .first { $0.epochNumber == epochNumber }?.membershipChangeNumber
+        }
+        return number.flatMap(context.membershipAt)?.admins
+    }
+
     /// Rotation hors envoi (§3.3) : appareil ajouté ou révoqué, exigence
     /// publiée par le serveur. Synchronise, puis décide comme avant un envoi ;
     /// une époque adoptée ou une chaîne en retard refont la décision.

@@ -1148,6 +1148,22 @@
         }
       }
     },
+    "Ce sondage est trop long." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This poll is too long."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce sondage est trop long."
+          }
+        }
+      }
+    },
     "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
       "localizations" : {
         "en" : {
@@ -1783,6 +1799,22 @@
         }
       }
     },
+    "Le sondage n’a pas pu être envoyé. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The poll couldn’t be sent. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le sondage n’a pas pu être envoyé. Réessaie."
+          }
+        }
+      }
+    },
     "Luminosité" : {
       "localizations" : {
         "en" : {
@@ -2148,6 +2180,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le mode renforcé protège votre compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de vos appareils ne l’a pas activé. Touchez « C’est moi » sur cet autre appareil : une notification vient d’y arriver."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Le sondage n’a pas pu être envoyé. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le sondage n’a pas pu être envoyé. Réessayez."
           }
         }
       },

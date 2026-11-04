@@ -769,7 +769,12 @@ struct ConversationDetailView: View {
             }
         }
         .sheet(isPresented: $showNewPoll) {
-            NewPollView(conversation: conversation, service: service, e2ee: e2ee, subtitle: sheetSubtitle) { message, poll in
+            NewPollView(
+                conversation: conversation, service: service, e2ee: e2ee, subtitle: sheetSubtitle,
+                encryptedCreate: usesV2 ? { question, labels, multiSelect, endsAt in
+                    await createE2EEPoll(question: question, labels: labels, multiSelect: multiSelect, endsAt: endsAt)
+                } : nil
+            ) { message, poll in
                 // Seed direct du sondage (textes d'options déjà résolus) pour un
                 // affichage immédiat, sans dépendre du parsing/déchiffrement du
                 // message optimiste.
@@ -3101,6 +3106,9 @@ struct ConversationDetailView: View {
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
             if v2Media != presentation.media { v2Media = presentation.media }
+            for (messageId, poll) in presentation.polls where pollsByMessageId[messageId] != poll {
+                pollsByMessageId[messageId] = poll
+            }
             v2BlobEnvelopes = presentation.blobEnvelopes
             if v2LegacyCaptions != presentation.legacyCaptions { v2LegacyCaptions = presentation.legacyCaptions }
             v2ImportedV1Ids = presentation.importedV1Ids
@@ -3875,6 +3883,10 @@ struct ConversationDetailView: View {
     private func pollCanClose(_ poll: MessagePoll) -> Bool {
         guard let uid = currentUserId else { return false }
         if poll.createdById == uid { return true }
+        // Chiffré : les administrateurs d'après la chaîne signée, jamais le rôle servi.
+        if usesV2 {
+            return conversation.isGroup && services.e2eeV2Messaging.groupAdmins(conversationId: conversation.id)?.contains(uid) == true
+        }
         // Owner/admin de groupe peuvent aussi clôturer (cf. route close).
         guard conversation.isGroup else { return false }
         let role = conversation.participants.first { $0.userId == uid }?.role
@@ -3882,6 +3894,14 @@ struct ConversationDetailView: View {
     }
 
     private func vote(messageId: String, pollId: String, optionIds: [String]) async {
+        if usesV2 {
+            // Vote chiffré (§7.7) : une annotation sur le sondage ; le décompte se refait à la relecture.
+            if await sendV2(.r17(.pollVote(targetRef: messageId, optionIds: optionIds)), replyToId: nil,
+                            ttlSeconds: ephemeralTTL, clientRequestId: UUID().uuidString) {
+                Haptics.selection()
+            }
+            return
+        }
         do {
             let updated = try await service.votePoll(
                 pollId: pollId,
@@ -3897,6 +3917,13 @@ struct ConversationDetailView: View {
     }
 
     private func closePoll(messageId: String, pollId: String) async {
+        if usesV2 {
+            if await sendV2(.r17(.pollClose(targetRef: messageId)), replyToId: nil,
+                            ttlSeconds: ephemeralTTL, clientRequestId: UUID().uuidString) {
+                Haptics.success()
+            }
+            return
+        }
         do {
             let updated = try await service.closePoll(pollId: pollId, in: conversation)
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
@@ -3905,6 +3932,15 @@ struct ConversationDetailView: View {
             showActionError(error.userFacingMessage)
             Haptics.error()
         }
+    }
+
+    /// Sondage chiffré (E2EE-AUTO §7.7) ; renvoie le message d'erreur du formulaire.
+    private func createE2EEPoll(question: String, labels: [String], multiSelect: Bool, endsAt: Date?) async -> String? {
+        guard let body = E2EEAutoContentR17.newPoll(question: question, labels: labels, multipleChoice: multiSelect, closesAt: endsAt) else {
+            return String(localized: "Ce sondage est trop long.")
+        }
+        let sent = await sendV2(.r17(body), replyToId: nil, ttlSeconds: ephemeralTTL, clientRequestId: UUID().uuidString)
+        return sent ? nil : String(localized: "Le sondage n’a pas pu être envoyé. Réessaie.")
     }
 
     /// Réinjecte les textes déchiffrés (question/options) dans une réponse de

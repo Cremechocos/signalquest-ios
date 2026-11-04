@@ -62,6 +62,8 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let equivocalRefs: Set<String>
         /// Réactions actives par message affiché non supprimé, dans l'ordre de leur ajout.
         var reactions: [String: [Reaction]] = [:]
+        /// Votes et clôtures (révision 17) par sondage affiché non supprimé, dans l'ordre du serveur.
+        var pollEvents: [String: [Stored]] = [:]
     }
 
     static let importKind = "HISTORY_IMPORT"
@@ -118,8 +120,20 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             .sorted { $0.sequence < $1.sequence }
         return Snapshot(
             cursor: file.cursor, messages: visible, equivocalRefs: file.equivocal,
-            reactions: Self.reactions(file, shown: Set(visible.filter { !$0.deleted }.map(\.messageRef)))
+            reactions: Self.reactions(file, shown: Set(visible.filter { !$0.deleted }.map(\.messageRef))),
+            pollEvents: Self.pollEvents(file, polls: Set(visible.filter { !$0.deleted && $0.kind == "POLL" }.map(\.messageRef)))
         )
+    }
+
+    /// Un vote ou une clôture dont le sondage n'est pas encore là attend, sans rien afficher.
+    private static func pollEvents(_ file: ConversationFile, polls: Set<String>) -> [String: [Stored]] {
+        var events: [String: [Stored]] = [:]
+        for event in file.messages.values.sorted(by: { $0.sequence < $1.sequence })
+        where ["POLL_VOTE", "POLL_CLOSE"].contains(event.kind) && !file.equivocal.contains(event.messageRef) && !event.deleted {
+            guard let target = event.targetRef, polls.contains(target) else { continue }
+            events[target, default: []].append(event)
+        }
+        return events
     }
 
     /// D.16 : par (utilisateur, cible, emoji), le dernier événement dans

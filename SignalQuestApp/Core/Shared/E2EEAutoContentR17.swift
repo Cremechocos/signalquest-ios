@@ -557,6 +557,33 @@ enum E2EEAutoContentR17 {
 
     // MARK: - Sondage
 
+    /// Nouveau sondage : `id` de 16 octets aléatoires en base64url sans remplissage,
+    /// `closesAt` à la milliseconde en `Z`. `nil` hors des bornes (§7.7).
+    static func newPoll(question: String, labels: [String], multipleChoice: Bool, closesAt: Date?) -> Body? {
+        guard (1...4_096).contains(question.utf8.count), pollOptions.contains(labels.count),
+              labels.allSatisfy({ (1...1_024).contains($0.utf8.count) }) else { return nil }
+        var generator = SystemRandomNumberGenerator()
+        var ids: [String] = []
+        while ids.count < labels.count {
+            let bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
+            let id = Data(bytes).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            if !ids.contains(id) { ids.append(id) }
+        }
+        let deadline = closesAt.map { date -> String in
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            formatter.timeZone = TimeZone(identifier: "UTC")
+            return formatter.string(from: Date(timeIntervalSince1970: (date.timeIntervalSince1970 * 1_000).rounded(.down) / 1_000))
+        }
+        guard deadline.map({ isoMs($0) != nil }) ?? true else { return nil }
+        return .poll(
+            question: question, options: zip(ids, labels).map { PollOption(id: $0, label: $1) },
+            multipleChoice: multipleChoice, closesAt: deadline
+        )
+    }
+
     enum PollEvent: Equatable, Sendable {
         case vote(senderId: String, sequence: Int64, serverTimeMs: Int64, optionIds: [String])
         /// `senderIsAdmin` : selon la chaîne d'appartenance rejouée jusqu'au changement

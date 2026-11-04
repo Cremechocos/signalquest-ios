@@ -170,10 +170,12 @@ struct MessageComposerBar: View {
                 }
                 // Les contenus structurés et médias v1 exposeraient encore
                 // leurs métadonnées : ils restent masqués jusqu'au runtime v2.
-                if !isE2EE {
+                if !isE2EE || encryptedMedia {
                     Button { onPoll() } label: {
                         Label("Créer un sondage", systemImage: "chart.bar")
                     }
+                }
+                if !isE2EE {
                     Button { onShareLocation() } label: {
                         Label("Partager ma position", systemImage: "location.fill")
                     }
