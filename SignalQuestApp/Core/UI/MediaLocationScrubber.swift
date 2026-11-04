@@ -18,6 +18,9 @@ import Foundation
 ///   l'extension `XMP DataXMP`, jamais les octets de longueur de ses sous-blocs ;
 /// - ce qui suit l'image principale d'un JPEG (autre JPEG, vidéo) : traité de même, 4 images au plus.
 /// Une structure illisible arrête le parcours là où il en est, sans refuser l'envoi.
+/// Limites, les mêmes qu'Android : les sous-IFD (0x8769 et au-delà) ne sont pas parcourus ;
+/// un item Exif de HEIF n'est lu que dans sa première étendue (une valeur GPS rangée dans une
+/// étendue suivante n'est pas atteinte) ; la 5e image d'un JPEG et ce qui suit partent tels quels.
 enum MediaLocationScrubber {
     /// Images d'un même fichier traitées au plus (l'image principale et ce qui la suit).
     static let maxImages = 4
