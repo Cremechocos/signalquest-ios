@@ -621,7 +621,10 @@ struct SignalDetailSheet: View {
             ("Gravité", severity == .degraded ? String(localized: "Réseau dégradé") : String(localized: "Plus de réseau")),
             ("État", stateText),
             ("Touché", OutageTechnologies.detail(services: services, csv: metaString("outageTechnologies"))),
-            ("Confirmations", confirmations)
+            ("Confirmations", confirmations),
+            // Le code du site a quitté la carte du fil (revue q34, constat 10) : il reste ici.
+            ("Code opérateur", metaString("outageOperatorSiteId") ?? ""),
+            ("Code ANFR", metaString("outageAnfrCode") ?? "")
         ]
     }
 

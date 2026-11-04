@@ -397,6 +397,8 @@ struct SocialSignalSummary: Codable, Equatable {
     let maxSignalDbm: Double?
     let pointsCount: Int?
     let siteLabel: String?
+    /// Nom du support identifié (enrichissement serveur), quand il en a un.
+    let siteName: String?
     let identifierType: String?
     let identifierValue: String?
     let identifierSource: String?
@@ -419,7 +421,7 @@ struct SocialSignalSummary: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case detailsHidden, detailsHiddenReason, mapPoints
-        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
+        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, siteName, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
         case `operator` = "operator"
     }
 
@@ -454,6 +456,7 @@ struct SocialSignalSummary: Codable, Equatable {
         maxSignalDbm = try c.decodeIfPresent(Double.self, forKey: .maxSignalDbm)
         pointsCount = try c.decodeIfPresent(Int.self, forKey: .pointsCount)
         siteLabel = try c.decodeIfPresent(String.self, forKey: .siteLabel)
+        siteName = try c.decodeIfPresent(String.self, forKey: .siteName)
         identifierType = try c.decodeIfPresent(String.self, forKey: .identifierType)
         identifierValue = c.decodeFlexibleString(forKey: .identifierValue)
         identifierSource = try c.decodeIfPresent(String.self, forKey: .identifierSource)
@@ -551,6 +554,18 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         return label
     }
     var isPinned: Bool { pinnedAt != nil }
+
+    /// Commune à montrer dans l'en-tête d'une carte : celle du résumé, sinon le lieu
+    /// lisible, sinon la commune du site qu'une photo porte en metadata (revue q34, constats 5 et 7).
+    var cardPlace: String? {
+        if let city = signal?.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty { return city }
+        if let place = readablePlaceLabel { return place }
+        if case .string(let commune)? = metadata?["siteCommune"] {
+            let trimmed = commune.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return nil
+    }
 
     /// Type de carte à afficher. Un post de membre joint à un speedtest (stocké
     /// `telecom`) arrive en `validation` avec `targetType = speedtest` : c'est un

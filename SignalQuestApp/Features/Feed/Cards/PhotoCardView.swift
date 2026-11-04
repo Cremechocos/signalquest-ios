@@ -25,7 +25,7 @@ struct PhotoCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 CardHeader(
                     author: item.author,
-                    place: item.signal?.city ?? item.readablePlaceLabel,
+                    place: item.cardPlace,
                     createdAt: item.createdAt,
                     kindBadge: "Photo d’antenne",
                     kindColor: SQColor.success,

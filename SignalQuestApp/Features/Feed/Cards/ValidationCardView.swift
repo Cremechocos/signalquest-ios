@@ -126,17 +126,30 @@ struct ValidationCardView: View {
         }
     }
 
+    /// Opérateur en toutes lettres et fréquence en MHz ; le lieu est dans l'en-tête.
     private var subtitle: String {
-        [signal?.siteLabel, signal?.operator, signal?.frequency]
+        let frequency = signal?.frequency.map { Double($0) != nil ? "\($0) MHz" : $0 }
+        return [signal?.operator.map { SQBrand.operatorName($0) ?? $0 }, frequency]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
 
+    /// Nom du site identifié, s'il dit autre chose que la commune de l'en-tête.
+    private var siteName: String? {
+        let city = signal?.city?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [signal?.siteName, signal?.siteLabel]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty && $0 != city }
+    }
+
     /// Identifiant, puis la méthode quand on la connaît.
     private var metrics: [FeedMetricGrid.Metric] {
-        // Identifiant absent : pas de tuile « — » (revue q34, constat 4).
+        // Le site plutôt que l'eNB brut ; l'identifiant reste dans le détail et ne
+        // sert ici que faute de nom. Identifiant absent : pas de tuile « — » (revue q34, constats 4).
         var metrics: [FeedMetricGrid.Metric] = []
-        if let identifier = (signal?.identifierValue ?? signal?.cellId)?.trimmingCharacters(in: .whitespacesAndNewlines),
+        if let siteName {
+            metrics.append(.init(label: String(localized: "Site"), value: siteName, highlight: true))
+        } else if let identifier = (signal?.identifierValue ?? signal?.cellId)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !identifier.isEmpty {
             metrics.append(.init(label: identifierTileLabel, value: identifier, highlight: true))
         }

@@ -893,6 +893,20 @@ final class FeedAutomaticPostKindTests: XCTestCase {
         XCTAssertNil(FeedActivity(item: try item(kind: "validation", targetType: "validation")))
     }
 
+    /// La commune d'une photo vient de sa metadata quand le résumé n'en a pas (constat 7).
+    func testCardPlaceFallsBackToTheSiteCommune() throws {
+        XCTAssertEqual(try item(kind: "photo", targetType: "photo", metadata: #"{"siteCommune":" Grenoble "}"#).cardPlace, "Grenoble")
+        XCTAssertNil(try item(kind: "photo", targetType: "photo").cardPlace)
+    }
+
+    /// La description d'un badge n'existe qu'en français : rien en anglais (constat 6).
+    func testBadgeDescriptionIsShownOnlyInFrench() throws {
+        let badge = try item(kind: "badge", targetType: "badge",
+                             metadata: #"{"activityType":"badge_earned","badgeName":"Explorateur","badgeDescription":"Visiter 10 sites"}"#)
+        XCTAssertEqual(FeedActivity(item: badge, appIsFrench: true)?.badgeDescription, "Visiter 10 sites")
+        XCTAssertNil(FeedActivity(item: badge, appIsFrench: false)?.badgeDescription)
+    }
+
     /// « Orange WIFI » devient « Wi-Fi (Orange) » ; en mobile, le nom complet (constat 1).
     func testNetworkLabelNamesWiFiAndTheFullOperator() {
         XCTAssertEqual(FeedMeasureBlock.networkLabel(operator: "Orange", technology: "WIFI"), "Wi-Fi (Orange)")

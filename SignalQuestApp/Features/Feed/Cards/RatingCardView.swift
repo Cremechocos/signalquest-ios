@@ -50,11 +50,11 @@ struct RatingCardView: View {
                     }
                 }
 
-                // Contexte antenne (le sujet noté).
-                FeedMetricGrid(metrics: [
-                    .init(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true),
-                    .init(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
-                ])
+                // Le signal noté, en mots selon l'échelle commune ; la valeur brute
+                // est en pied de carte (revue q34, constat 9).
+                if let quality {
+                    FeedMetricGrid(metrics: [.init(label: String(localized: "Signal"), value: quality, highlight: true)])
+                }
 
                 if let footer = footer {
                     Text(footer)
@@ -86,30 +86,29 @@ struct RatingCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
-    /// Libellé de la tuile identifiant selon le type d'identification.
-    private var identifierTileLabel: String {
-        switch signal?.identifierType?.lowercased() {
-        case "enb": return "eNB"
-        case "gnb": return "gNB"
-        case "pci": return "PCI"
-        case "cellid", "ci": return "Cell"
-        default: return "Ident."
-        }
+    /// « Moyen » pour −95 dBm en 4G ; rien sans mesure.
+    private var quality: String? {
+        guard let rsrp = signal?.rsrp else { return nil }
+        // Un avis porte toujours un RSRP (4G ou 5G) : la techno, souvent « 4G LTE »,
+        // n'a pas à passer par les alias de l'échelle.
+        let level = SQQualityScale.Signal(rsrp: rsrp)
+        return level == .unknown ? nil : level.label
     }
 
     private var trendTag: (label: String, color: Color)? {
         switch signal?.ratingTrend?.lowercased() {
         case "improved": return (String(localized: "En hausse"), SQColor.success)
         case "degraded": return (String(localized: "En baisse"), SQColor.danger)
-        case "same": return (String(localized: "Stable"), SQColor.labelSecondary)
+        case "same", "stable": return (String(localized: "Stable"), SQColor.labelSecondary)
         default: return nil
         }
     }
 
     private var footer: String? {
         var parts: [String] = []
-        if let op = signal?.operator { parts.append(op) }
+        if let op = signal?.operator { parts.append(SQBrand.operatorName(op) ?? op) }
         if let tech = signal?.technology { parts.append(tech) }
+        if let rsrp = signal?.rsrp, quality != nil { parts.append(SignalFormatters.dbm(rsrp)) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

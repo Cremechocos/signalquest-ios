@@ -34,6 +34,9 @@ struct FeedActivity: Equatable {
     let subtitle: String?
     let link: Link?
     let quest: Quest?
+    /// Ce que récompense le badge. Le catalogue du serveur n'existe qu'en français :
+    /// rien en anglais plutôt qu'une phrase dans une autre langue (revue q34, constat 6).
+    let badgeDescription: String?
 
     /// `nil` pour une publication ordinaire : elle garde sa carte de post.
     init?(item: UnifiedSocialFeedItem, appIsFrench: Bool = SQAddress.appIsFrench) {
@@ -76,6 +79,7 @@ struct FeedActivity: Equatable {
         // Un récap officiel ne fait gagner de points à personne.
         self.points = family == .officialRecap ? nil : int("points").flatMap { $0 > 0 ? $0 : nil }
         // Une clé retirée du catalogue n'a aucun de ces champs : la carte garde son repli.
+        self.badgeDescription = family == .badge && appIsFrench ? string("badgeDescription") : nil
         self.quest = family == .quest
             ? Self.quest(cadence: string("cadence"), metric: string("questMetric"), target: int("questTargetValue"),
                          description: appIsFrench ? string("questDescription") : nil)
@@ -226,7 +230,7 @@ struct ActivityCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
-                    place: item.readablePlaceLabel,
+                    place: item.cardPlace,
                     createdAt: item.createdAt,
                     // Le compte SignalQuest se distingue d'un membre ordinaire (F-11).
                     kindBadge: activity.family == .officialRecap ? String(localized: "Officiel") : nil,
@@ -314,6 +318,13 @@ struct ActivitySummaryRow: View {
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if let description = activity.badgeDescription {
+                Text(verbatim: description)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
         }
     }

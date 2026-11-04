@@ -141,23 +141,6 @@ struct OutageCardView: View {
         return out
     }
 
-    /// Le code du site.
-    ///
-    /// Le numéro de site de l'opérateur d'abord quand on l'a — c'est celui que l'opérateur emploie
-    /// au téléphone —, sinon le code ANFR. JAMAIS l'un sous l'étiquette de l'autre.
-    private var siteCode: (label: String, value: String)? {
-        if let operatorSiteId = string("outageOperatorSiteId") {
-            return (String(localized: "Code opérateur"), operatorSiteId)
-        }
-        if let anfr = string("outageAnfrCode") {
-            return (String(localized: "Code ANFR"), anfr)
-        }
-        if let siteId = string("siteId") {
-            return (String(localized: "Site"), siteId)
-        }
-        return nil
-    }
-
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
@@ -293,15 +276,11 @@ struct OutageCardView: View {
 
     @ViewBuilder
     private var tiles: some View {
-        SQMetricTile.filling(
-            label: String(localized: "Opérateur"),
-            value: string("operator") ?? string("operatorKey") ?? "—",
-            highlight: true
-        )
-        .feedTileSpeech(label: String(localized: "Opérateur"), value: string("operator") ?? string("operatorKey") ?? "—")
-        if let siteCode {
-            SQMetricTile.filling(label: siteCode.label, value: siteCode.value)
-                .feedTileSpeech(label: siteCode.label, value: siteCode.value)
+        // Opérateur en toutes lettres, sans tiret quand il manque ; le code du site
+        // (« OP-1 ») reste dans le détail de la panne (revue q34, constat 10).
+        if let operatorName {
+            SQMetricTile.filling(label: String(localized: "Opérateur"), value: operatorName, highlight: true)
+                .feedTileSpeech(label: String(localized: "Opérateur"), value: operatorName)
         }
         // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
         // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
@@ -320,6 +299,11 @@ struct OutageCardView: View {
             valueLineLimit: 3
         )
         .feedTileSpeech(label: String(localized: "Touché"), value: affected)
+    }
+
+    private var operatorName: String? {
+        guard let raw = string("operator") ?? string("operatorKey") else { return nil }
+        return SQBrand.operatorName(raw) ?? raw
     }
 
     /// Ce que l'opérateur en dit, quand il en dit quelque chose — sinon le décompte communautaire.
