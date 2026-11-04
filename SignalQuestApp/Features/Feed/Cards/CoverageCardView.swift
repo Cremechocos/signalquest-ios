@@ -29,6 +29,14 @@ struct CoverageCardView: View {
     /// la même règle que le détail, jamais de repli sur une position isolée.
     private var trace: [CLLocationCoordinate2D]? { SignalDetailSheet.trace(kind: item.kind, signal: signal) }
 
+    /// Points du tracé avec leur signal (#957) ; vide quand le serveur ne sert pas
+    /// encore la techno par point : le tracé garde alors une seule couleur.
+    private var tracePoints: [SessionSignalTrace.Point] {
+        let points = signal?.mapPoints ?? []
+        guard points.contains(where: { $0.technology != nil }) else { return [] }
+        return points.map { SessionSignalTrace.Point(technology: $0.technology, signalStrength: $0.signalStrength) }
+    }
+
     /// Meilleure génération détectée (5G > 4G > 3G > 2G) plutôt que le premier élément
     /// du tableau (ordre arbitraire) : une session 5G NSA détecte « 4G » ET « 5G » — il ne
     /// faut pas afficher « 4G ». Sert de repli quand le backend n'expose pas `technology`.
@@ -59,27 +67,26 @@ struct CoverageCardView: View {
                 )
 
                 if let trace, !trace.isEmpty {
-                    CoverageRouteThumbnail(postId: item.id, coordinates: trace, lineColor: accent)
-                        // En haut : le bas gauche porte la mention « Plans » d'Apple, à laisser visible.
-                        // Fond opaque sous la teinte translucide : sinon les étiquettes du plan transparaissent.
-                        .overlay(alignment: .topLeading) {
-                            techTag
-                                .background(SQColor.surface, in: Capsule(style: .continuous))
-                                .padding(SQSpace.sm)
-                        }
-                    coverageHeading
+                    FeedKindLine(symbol: "point.topleft.down.curvedto.point.bottomright.up",
+                                 title: String(localized: "Session de couverture"), points: item.earnedPoints)
+                    CoverageRouteThumbnail(
+                        postId: item.id, coordinates: trace, lineColor: accent,
+                        states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
+                        spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
+                    )
+                    if !tracePoints.isEmpty { traceLegend }
                 } else {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             coverageHeading
-                            if !subtitleNamesTech { techTag }
+                            if !subtitleNamesTech && !hasSessionAggregate { techTag }
                         }
                     } else {
                         HStack(alignment: .center, spacing: SQSpace.md) {
                             coverageHeading
                             Spacer()
-                            if !subtitleNamesTech { techTag }
+                            if !subtitleNamesTech && !hasSessionAggregate { techTag }
                         }
                     }
                 }
@@ -87,6 +94,10 @@ struct CoverageCardView: View {
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 FeedMetricGrid(metrics: metrics)
+
+                if hasSessionAggregate {
+                    FeedNetworkLine(operator: signal?.operator, technologies: sessionTechnologies, detail: measuresDetail)
+                }
 
                 if let footer = footer {
                     Text(footer)
@@ -101,6 +112,10 @@ struct CoverageCardView: View {
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let trace, !trace.isEmpty {
+                    FeedOpenCapsule(title: String(localized: "Voir le tracé"), symbol: "map", onOpenPost: onTap)
                 }
 
                 CardActionsBar(
@@ -130,13 +145,15 @@ struct CoverageCardView: View {
         // sans tracé → un tiret, sans mise en avant ; non servie → pas de tuile (« mesuré à zéro »
         // et « pas de mesure » ne se confondent pas).
         let distance = Self.distanceMetric(meters: signal?.distanceMeters, hasTrace: !(trace ?? []).isEmpty)
-        return Array([distance].compactMap { $0 }) + [
-            .init(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds)),
-            // Des points de mesure, pas des points de jeu (F-18).
-            .init(label: "Mesures", value: signal?.pointsCount.map { $0.formatted() } ?? "—")
-            // Le signal en dBm (moyen, min, max) reste dans le détail : sans repère, il
-            // n'apprend rien à qui fait défiler.
+        var metrics = Array([distance].compactMap { $0 }) + [
+            .init(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
         ]
+        // Le signal moyen, à côté du tracé coloré qui lui sert de repère (refonte du 04/11).
+        // Le nombre de mesures passe sur la ligne réseau (« · 3 mesures »).
+        if let average = signal?.averageSignalDbm {
+            metrics.append(.init(label: "Moyenne du signal", value: SignalFormatters.dbm(average)))
+        }
+        return metrics
     }
 
     static func distanceMetric(meters: Double?, hasTrace: Bool) -> FeedMetricGrid.Metric? {
@@ -144,6 +161,37 @@ struct CoverageCardView: View {
         return hasTrace && meters > 0
             ? .init(label: "Distance", value: SignalFormatters.meters(meters), highlight: true)
             : .init(label: "Distance", value: "—")
+    }
+
+    /// Générations rencontrées pendant la session, de la plus récente à la plus ancienne.
+    private var sessionTechnologies: [String] {
+        let techs = signal?.detectedTechs ?? []
+        return techs.isEmpty ? [signal?.technology].compactMap { $0 } : techs
+    }
+
+    /// « 3 mesures » : des points de mesure, pas des points de jeu (F-18).
+    private var measuresDetail: String? {
+        guard let count = signal?.pointsCount, count > 0 else { return nil }
+        return String(localized: "\(count) mesures")
+    }
+
+    /// Les niveaux réellement présents sur le tracé, dans l'ordre de l'échelle.
+    private var traceLegend: some View {
+        let present = Set(SessionSignalTrace.states(tracePoints))
+        let order: [SQQualityScale.Signal] = [.excellent, .good, .fair, .weak, .poor, .noService]
+        return FlowRow(spacing: SQSpace.md) {
+            ForEach(order.filter { present.contains($0) }, id: \.self) { level in
+                HStack(spacing: SQSpace.xs2) {
+                    Capsule(style: .continuous)
+                        .fill(level.color)
+                        .frame(width: 16, height: 4)
+                    Text(verbatim: level.label)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     private var tagTech: String { signal?.technology ?? bestDetectedTech ?? "—" }
@@ -188,7 +236,8 @@ struct CoverageCardView: View {
     /// et sa pastille disent déjà l'essentiel. Avant que le serveur serve l'opérateur,
     /// ce sous-titre ne valait que le repli « Parcours radio ».
     private var shownSubtitle: String? {
-        hasSessionAggregate && !(trace ?? []).isEmpty ? nil : subtitle
+        // Session : opérateur et générations sont sur la ligne réseau, sous les tuiles.
+        hasSessionAggregate ? nil : subtitle
     }
 
     /// Mesures et distance sont déjà dans les tuiles : le sous-titre dit les
@@ -245,6 +294,9 @@ private struct CoverageRouteThumbnail: View {
     let postId: String
     let coordinates: [CLLocationCoordinate2D]
     let lineColor: Color
+    /// État de chaque point (contrat session-signal-trace) ; nil : une seule couleur.
+    var states: [SQQualityScale.Signal]? = nil
+    var spokenSummary: String? = nil
 
     private static let aspect: CGFloat = 16 / 9
 
@@ -266,8 +318,23 @@ private struct CoverageRouteThumbnail: View {
                 }
             }
             .overlay {
-                RouteShape(points: RouteSnapshotCache.project(coordinates, in: rect))
-                    .stroke(lineColor, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                let points = RouteSnapshotCache.project(coordinates, in: rect)
+                if let states, states.count == points.count {
+                    // Chaque segment prend l'état de son point d'arrivée ; « sans réseau
+                    // constaté » en pointillé ardoise, jamais une teinte de l'échelle.
+                    ZStack {
+                        ForEach(1..<points.count, id: \.self) { index in
+                            let state = states[index]
+                            RouteShape(points: [points[index - 1], points[index]])
+                                .stroke(state.color, style: state.isHatched
+                                    ? StrokeStyle(lineWidth: 4, lineCap: .round, dash: [4, 6])
+                                    : StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                        }
+                    }
+                } else {
+                    RouteShape(points: points)
+                        .stroke(lineColor, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                }
             }
             .overlay {
                 GeometryReader { proxy in
@@ -285,6 +352,7 @@ private struct CoverageRouteThumbnail: View {
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             .accessibilityElement()
             .accessibilityLabel(Text("Carte du parcours"))
+            .accessibilityValue(Text(verbatim: spokenSummary ?? ""))
             .accessibilityAddTraits(.isImage)
             .accessibilityIdentifier("feed.coverage.route")
     }

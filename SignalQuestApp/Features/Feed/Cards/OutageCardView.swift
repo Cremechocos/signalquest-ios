@@ -59,8 +59,6 @@ struct OutageCardView: View {
             : String(localized: "Plus de réseau")
     }
 
-    private var kindBadge: String { OutageFeedBadge.label(severity: severity, state: state) }
-
     /// L'état, dit du point de vue de qui lit — pas du modèle de données.
     private var stateTag: (label: String, color: Color)? {
         if operatorConfirmed {
@@ -89,31 +87,9 @@ struct OutageCardView: View {
             sms: flag("outageAffectsSms")
         )
         if !label.isEmpty { return label }
-        // Vide, et pas « — » : c'est `affected` qui décide du repli, une fois les générations
-        // ajoutées. Un tiret posé ici ferait lire « — · 4G » sur une panne dont on connaît la
-        // génération mais pas les services.
+        // Vide, et pas « — » : sans drapeau ni phrase, la carte n'affiche aucune ligne de services.
         return string("outageServices") ?? ""
     }
-
-    /// « Internet, Voix · 4G, 5G » — services ET générations sur UNE ligne, dans UNE tuile.
-    ///
-    /// Le serveur joint les jetons de génération par une virgule dans la metadata : un tableau y
-    /// aurait disparu en silence, `inputJsonRecord` ne gardant que les scalaires. Clé absente sur
-    /// les pannes ouvertes avant ce champ, et sur celles où personne n'a su répondre — la ligne se
-    /// réduit alors aux services, sans séparateur orphelin ni « inconnu ».
-    ///
-    /// Une seule tuile et non deux : la grille en compte trois par rangée, et une quatrième
-    /// « Technologies » repartait sur une rangée à elle avec deux vides à sa droite. C'est aussi
-    /// la même ligne, au caractère près, que la fiche antenne, la feuille de panne et la page
-    /// « Pannes signalées » — la même panne doit se lire pareil partout.
-    private var affected: String {
-        let line = OutageTechnologies.detail(
-            services: affectedServices,
-            csv: string("outageTechnologies")
-        )
-        return line.isEmpty ? "—" : line
-    }
-
 
     /// Les précisions du constat : bandes puis secteurs, telles que la personne les a désignées.
     ///
@@ -148,7 +124,8 @@ struct OutageCardView: View {
                     author: item.author,
                     place: place,
                     createdAt: item.createdAt,
-                    kindBadge: kindBadge,
+                    // L'état est dans le bandeau : une étiquette en plus le répétait.
+                    kindBadge: nil,
                     kindColor: ink,
                     onAuthorTap: onAuthorTap,
                     isPinned: item.isPinned
@@ -156,16 +133,11 @@ struct OutageCardView: View {
 
                 hero
 
-                // Trois tuiles de même hauteur, alignées en haut : la tuile
-                // « Touché » sur trois lignes creusait un vide au-dessus des autres (F-21).
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(spacing: SQSpace.sm) { tiles }
-                    } else {
-                        HStack(alignment: .top, spacing: SQSpace.sm) { tiles }
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                // L'opérateur et les générations touchées, puis ce qui ne marche plus
+                // (refonte du 04/11) : plus de tuiles « Opérateur » et « Touché ».
+                FeedNetworkLine(operator: operatorName, technologies: outageTechnologies)
+
+                serviceChips
 
                 // Les précisions sous la grille, et non dans une quatrième tuile : la grille en
                 // compte trois par rangée, et une quatrième tuile facultative repartirait sur une
@@ -202,6 +174,13 @@ struct OutageCardView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                // Le constat se fait depuis Android ; iOS lit la panne.
+                FeedOpenCapsule(
+                    title: String(localized: "Voir la panne"),
+                    destination: .link(.outage(id: string("outageId"), siteId: string("siteId"), market: string("marketCode"))),
+                    onOpenPost: onTap
+                )
 
                 CardActionsBar(
                     item: item,
@@ -247,18 +226,25 @@ struct OutageCardView: View {
             : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.md))
         return layout {
             Image(systemName: isResolved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(ink)
-                .frame(width: 40, height: 40)
-                .background(accent.opacity(0.13), in: Circle())
+                .frame(width: 36, height: 36)
+                .background(SQColor.surface, in: Circle())
                 // Moment 3 : la coche ARRIVE. Le pictogramme et sa pastille changent ensemble.
                 .sqLikePop(trigger: isResolved)
                 .accessibilityHidden(true)
-            Text(headline)
-                .font(SQFont.display(19, .bold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(stacked ? nil : 2)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline)
+                    .font(SQFont.display(17, .bold, relativeTo: .headline))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let since = bannerDetail {
+                    Text(verbatim: since)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if !stacked { Spacer(minLength: 0) }
             if let stateTag {
                 SQEditorialTag(text: stateTag.label, color: stateTag.color)
@@ -268,37 +254,79 @@ struct OutageCardView: View {
                     .sqLikePop(trigger: stateTag.label)
             }
         }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Le bandeau porte la teinte de l'état : danger, ambre, ou olive une fois rétabli.
+        .background(accent.opacity(0.13), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // Fondu de tout ce qui change d'un état à l'autre : la teinte de la pastille, l'encre du
         // pictogramme, le mot de l'étiquette. Déclencheur = `state`, dont dérivent les trois.
         .sqAnimation(SQMotion.smooth, value: state)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("feed.outage.banner")
     }
 
-    @ViewBuilder
-    private var tiles: some View {
-        // Opérateur en toutes lettres, sans tiret quand il manque ; le code du site
-        // (« OP-1 ») reste dans le détail de la panne (revue q34, constat 10).
-        if let operatorName {
-            SQMetricTile.filling(label: String(localized: "Opérateur"), value: operatorName, highlight: true)
-                .feedTileSpeech(label: String(localized: "Opérateur"), value: operatorName)
+    /// « Depuis le 1 nov., 11:00 · 1 confirmation ».
+    private var bannerDetail: String? {
+        var parts: [String] = []
+        if let started = string("outageStartedAt").flatMap(Self.parseDate) {
+            parts.append(String(localized: "depuis \(started.formatted(date: .abbreviated, time: .shortened))"))
         }
-        // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
-        // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
-        // formulaire ne demande pas les paires, et les afficher comme telles
-        // affirmerait un croisement que personne n'a déclaré.
-        // TROIS lignes, et non deux : mesuré par rendu de la tuile réelle (390 pt de
-        // large, grille à 3 colonnes). À la taille de texte par défaut, deux suffisent
-        // et la troisième ne change rien — « Internet, / Voix · 4G, 5G ». Au premier
-        // cran d'accessibilité (`dynamicTypeSize .accessibility1`), la limite à deux
-        // coupait la ligne à « Voix · 4G,… » : les générations, qui sont l'information
-        // ajoutée ici, disparaissaient précisément chez les gens qui grossissent le
-        // texte. Avec trois, elle se pose entière sur « Internet, / Voix · / 4G, 5G ».
-        SQMetricTile.filling(
-            label: String(localized: "Touché"),
-            value: affected,
-            valueLineLimit: 3
-        )
-        .feedTileSpeech(label: String(localized: "Touché"), value: affected)
+        if let count = int("outageConfirmCount"), count > 0 {
+            parts.append(String(localized: "\(count) confirmations"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private static func parseDate(_ raw: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: raw) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: raw)
+    }
+
+    /// Jetons de génération de la metadata (« 4G,5G ») pour la ligne réseau.
+    private var outageTechnologies: [String] {
+        (string("outageTechnologies") ?? "").split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Internet, appels et SMS : coupé (ou perturbé) contre « OK ». Seulement sur une
+    /// panne en cours dont le serveur donne les trois drapeaux ; sinon la phrase de repli.
+    @ViewBuilder
+    private var serviceChips: some View {
+        let flags = [("outageAffectsData", "antenna.radiowaves.left.and.right", String(localized: "Internet")),
+                     ("outageAffectsVoice", "phone", String(localized: "Appels")),
+                     ("outageAffectsSms", "message", String(localized: "SMS"))]
+        let hasFlags = flags.contains { item.metadata?[$0.0] != nil }
+        if isResolved {
+            EmptyView()
+        } else if hasFlags {
+            FlowRow(spacing: SQSpace.xs2) {
+                ForEach(flags, id: \.0) { key, symbol, name in
+                    let hit = flag(key)
+                    Label {
+                        Text(verbatim: hit
+                            ? (severity == "degraded" ? String(localized: "\(name) perturbé") : String(localized: "\(name) coupé"))
+                            : String(localized: "\(name) OK"))
+                    } icon: {
+                        Image(systemName: symbol).accessibilityHidden(true)
+                    }
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(hit ? ink : SQColor.labelSecondary)
+                    .padding(.horizontal, SQSpace.sm2)
+                    .padding(.vertical, SQSpace.xs + 1)
+                    .background(hit ? accent.opacity(0.13) : SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("feed.outage.services")
+        } else if !affectedServices.isEmpty {
+            Text(verbatim: affectedServices)
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
     }
 
     private var operatorName: String? {
@@ -308,11 +336,8 @@ struct OutageCardView: View {
 
     /// Ce que l'opérateur en dit, quand il en dit quelque chose — sinon le décompte communautaire.
     private var footer: String? {
-        if let raison = string("outageOperatorRaison") { return raison }
-        guard let count = int("outageConfirmCount"), count > 0 else { return nil }
-        return count == 1
-            ? String(localized: "1 personne a constaté la panne.")
-            : String(localized: "\(count) personnes ont constaté la panne.")
+        // Le décompte des constats est dans le bandeau.
+        string("outageOperatorRaison")
     }
 }
 
@@ -349,14 +374,5 @@ enum OutageFeedBadge {
 
     private static func isResolved(_ state: String?) -> Bool {
         OutageState(rawServerValue: state) == .resolved
-    }
-}
-
-private extension SQMetricTile {
-    /// Tuile du fil qui prend la hauteur de sa rangée.
-    static func filling(label: String, value: String, highlight: Bool = false, valueLineLimit: Int = 2) -> SQMetricTile {
-        var tile = SQMetricTile.wrapping(label: label, value: value, highlight: highlight, valueLineLimit: valueLineLimit)
-        tile.fillsHeight = true
-        return tile
     }
 }

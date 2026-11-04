@@ -81,6 +81,16 @@
         }
       }
     },
+    "%@ OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ OK"
+          }
+        }
+      }
+    },
     "%@ a créé la conversation." : {
       "localizations" : {
         "en" : {
@@ -125,6 +135,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ aucun"
+          }
+        }
+      }
+    },
+    "%@ coupé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ down"
           }
         }
       }
@@ -240,6 +260,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ n’a pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même."
+          }
+        }
+      }
+    },
+    "%@ perturbé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ disrupted"
           }
         }
       }
@@ -988,6 +1018,26 @@
         }
       }
     },
+    "A ajouté un site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added a site"
+          }
+        }
+      }
+    },
+    "A noté son réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rated their network"
+          }
+        }
+      }
+    },
     "Abandonner" : {
       "localizations" : {
         "en" : {
@@ -1048,6 +1098,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer un nouvel appareil ?"
+          }
+        }
+      }
+    },
+    "Antenne %@ identifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ antenna identified"
           }
         }
       }
@@ -1416,6 +1476,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contraste"
+          }
+        }
+      }
+    },
+    "Correct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Okay"
           }
         }
       }
@@ -2071,6 +2141,17 @@
         }
       }
     },
+    "Moyenne du signal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average signal"
+          }
+        }
+      }
+    },
     "Noir" : {
       "localizations" : {
         "en" : {
@@ -2083,6 +2164,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Noir"
+          }
+        }
+      }
+    },
+    "Nouveau badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New badge"
           }
         }
       }
@@ -2114,6 +2205,16 @@
         }
       }
     },
+    "Pages web" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web pages"
+          }
+        }
+      }
+    },
     "Photo chiffrée" : {
       "localizations" : {
         "en" : {
@@ -2126,6 +2227,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo chiffrée"
+          }
+        }
+      }
+    },
+    "Photo d’un support" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo of a mast"
           }
         }
       }
@@ -2158,6 +2269,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pièces jointes chiffrées"
+          }
+        }
+      }
+    },
+    "Plutôt bien" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rather good"
+          }
+        }
+      }
+    },
+    "Plutôt mal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rather poor"
+          }
+        }
+      }
+    },
+    "Pointe" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peak"
           }
         }
       }
@@ -2201,6 +2343,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Daily"
+          }
+        }
+      }
+    },
+    "Quête de la semaine accomplie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekly quest completed"
+          }
+        }
+      }
+    },
+    "Quête de saison accomplie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seasonal quest completed"
+          }
+        }
+      }
+    },
+    "Quête du jour accomplie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily quest completed"
+          }
+        }
+      }
+    },
+    "Quête d’événement accomplie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Event quest completed"
           }
         }
       }
@@ -2485,6 +2667,16 @@
       },
       "shouldTranslate" : false
     },
+    "Saisonnière" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seasonal"
+          }
+        }
+      }
+    },
     "Saturation" : {
       "localizations" : {
         "en" : {
@@ -2497,6 +2689,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Saturation"
+          }
+        }
+      }
+    },
+    "Signal · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal · %@"
           }
         }
       }
@@ -2609,6 +2811,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta vidéo chiffrée"
+          }
+        }
+      }
+    },
+    "Test de débit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed test"
+          }
+        }
+      }
+    },
+    "Test de débit en Wi-Fi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi speed test"
+          }
+        }
+      }
+    },
+    "Test de débit joint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attached speed test"
           }
         }
       }
@@ -2741,6 +2973,26 @@
         }
       }
     },
+    "Très bien" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very good"
+          }
+        }
+      }
+    },
+    "Très mal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very poor"
+          }
+        }
+      }
+    },
     "Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte." : {
       "localizations" : {
         "en" : {
@@ -2869,6 +3121,46 @@
         }
       }
     },
+    "Voir la panne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View the outage"
+          }
+        }
+      }
+    },
+    "Voir le détail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View details"
+          }
+        }
+      }
+    },
+    "Voir le test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View the test"
+          }
+        }
+      }
+    },
+    "Voir le tracé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View the route"
+          }
+        }
+      }
+    },
     "a ajouté %@ sur la carte" : {
       "localizations" : {
         "en" : {
@@ -2946,6 +3238,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appui long sur le preset Canada"
+          }
+        }
+      }
+    },
+    "affichées en" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "loaded in"
           }
         }
       }
@@ -3058,6 +3360,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifié"
+          }
+        }
+      }
+    },
+    "aucun point mesuré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no measured point"
+          }
+        }
+      }
+    },
+    "depuis %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "since %@"
+          }
+        }
+      }
+    },
+    "le nord" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "north"
+          }
+        }
+      }
+    },
+    "le nord-est" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "northeast"
+          }
+        }
+      }
+    },
+    "le nord-ouest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "northwest"
+          }
+        }
+      }
+    },
+    "le sud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "south"
+          }
+        }
+      }
+    },
+    "le sud-est" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "southeast"
+          }
+        }
+      }
+    },
+    "le sud-ouest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "southwest"
+          }
+        }
+      }
+    },
+    "l’est" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "east"
+          }
+        }
+      }
+    },
+    "l’ouest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "west"
           }
         }
       }
@@ -3398,6 +3800,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir la session"
+          }
+        }
+      }
+    },
+    "réponse, app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "response, app"
+          }
+        }
+      }
+    },
+    "réponse, navigateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "response, browser"
+          }
+        }
+      }
+    },
+    "sans coupure jusqu’à" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "without stalling up to"
+          }
+        }
+      }
+    },
+    "secteur %@ identifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sector %@ identified"
+          }
+        }
+      }
+    },
+    "signal %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "signal %@"
+          }
+        }
+      }
+    },
+    "signal de %@ à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "signal from %1$@ to %2$@"
+          }
+        }
+      }
+    },
+    "terminé en" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "finished in"
+          }
+        }
+      }
+    },
+    "vers %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facing %@"
+          }
+        }
+      }
+    },
+    "Échelle de débit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed scale"
+          }
+        }
+      }
+    },
+    "à %@, vers %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ away, facing %2$@"
           }
         }
       }

@@ -30,31 +30,32 @@ struct ExperienceCardView: View {
                     isPinned: item.isPinned
                 )
 
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            heading
-                            techTag
-                        }
-                    } else {
-                        HStack(alignment: .center, spacing: SQSpace.md) {
-                            heading
-                            Spacer()
-                            techTag
-                        }
-                    }
-                }
+                FeedKindLine(symbol: "play.rectangle", title: String(localized: "Test d’expérience"), points: item.earnedPoints)
 
-                let metrics = experience.highlights.feedMetrics
-                if metrics.isEmpty {
-                    // Publié sans aucune des cinq valeurs (lecture sans score, envoi vidéo seul).
+                // Ce que la connexion permet, une ligne par usage mesuré, sans score :
+                // les notes restent dans le détail (refonte du 04/11).
+                let rows = experience.highlights.feedRows
+                if rows.isEmpty {
+                    // Publié sans aucune des valeurs (lecture sans score, envoi vidéo seul).
                     Text("Les mesures de ce test sont dans son détail.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    FeedMetricGrid(metrics: metrics)
+                    VStack(spacing: SQSpace.sm) {
+                        ForEach(rows, id: \.title) { row in
+                            ExperienceFeedRowView(row: row)
+                        }
+                    }
                 }
+
+                if experience.connectionType == "wifi" {
+                    FeedNetworkLine(operator: nil, technology: "WIFI")
+                } else {
+                    FeedNetworkLine(operator: experience.operatorKey, technology: experience.technology)
+                }
+
+                FeedOpenCapsule(title: String(localized: "Voir le détail"), onOpenPost: onTap)
 
                 CardActionsBar(
                     item: item,
@@ -72,28 +73,6 @@ struct ExperienceCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
-    @ViewBuilder
-    private var techTag: some View {
-        if let tech = experience.technology {
-            SQEditorialTag(text: tech, color: TechAccent.color(for: tech))
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var heading: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Test d’expérience")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-            if let context = experience.networkContext {
-                Text(verbatim: context)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
 }
 
 extension FeedExperience {
@@ -162,5 +141,77 @@ extension ExperienceTestKind {
         case "interrupted": return String(localized: "Interrompu")
         default: return String(localized: "Échec")
         }
+    }
+}
+
+/// Une ligne de la carte d'un test d'expérience : l'usage, ce qu'il dit, la valeur.
+struct ExperienceFeedRow: Equatable {
+    let symbol: String
+    let title: String
+    let caption: String
+    let value: String
+}
+
+extension ExperienceHighlights {
+    /// Ce que la connexion permet, sans score : une ligne par valeur mesurée.
+    var feedRows: [ExperienceFeedRow] {
+        var rows: [ExperienceFeedRow] = []
+        if let videoMaxQualityLabel {
+            rows.append(.init(symbol: "play.rectangle", title: String(localized: "Vidéo"),
+                              caption: String(localized: "sans coupure jusqu’à"), value: videoMaxQualityLabel))
+        }
+        if let pageMedianMs {
+            rows.append(.init(symbol: "globe", title: String(localized: "Pages web"),
+                              caption: String(localized: "affichées en"), value: Self.feedDuration(pageMedianMs)))
+        }
+        if let gameMedianMs {
+            // Une ouverture TCP (apps) et un aller-retour HTTP (web) ne se comparent pas (contrat, §4).
+            rows.append(.init(symbol: "gamecontroller", title: String(localized: "Jeu et appels"),
+                              caption: gameIsHTTPRoundTrip ? String(localized: "réponse, navigateur") : String(localized: "réponse, app"),
+                              value: ExperiencePresentation.format(.ms, .int(gameMedianMs), .current)))
+        }
+        if let uploadPhotoMs {
+            rows.append(.init(symbol: "arrow.up.circle", title: String(localized: "Envoi photo"),
+                              caption: String(localized: "terminé en"), value: Self.feedDuration(uploadPhotoMs)))
+        }
+        return rows
+    }
+
+    private static func feedDuration(_ ms: Int) -> String { ExperiencePresentation.format(.duration, .int(ms), .current) }
+}
+
+struct ExperienceFeedRowView: View {
+    let row: ExperienceFeedRow
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: row.symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(width: 28, height: 28)
+                .background(SQColor.surface, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: row.title)
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.label)
+                Text(verbatim: row.caption)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: SQSpace.sm)
+            Text(verbatim: row.value)
+                .font(SQFont.display(18, .bold, relativeTo: .headline))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm2)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(row.title), \(row.caption) \(row.value)"))
+        .accessibilityIdentifier("feed.experience.row")
     }
 }

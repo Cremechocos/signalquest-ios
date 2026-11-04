@@ -27,11 +27,13 @@ struct PhotoCardView: View {
                     author: item.author,
                     place: item.cardPlace,
                     createdAt: item.createdAt,
-                    kindBadge: "Photo d’antenne",
+                    kindBadge: nil,
                     kindColor: SQColor.success,
                     onAuthorTap: onAuthorTap,
                     isPinned: item.isPinned
                 )
+
+                FeedKindLine(symbol: "camera", title: String(localized: "Photo d’un support"), points: item.earnedPoints)
 
                 if let text = item.cardText {
                     Text(text)
@@ -47,6 +49,14 @@ struct PhotoCardView: View {
 
                 heroImage
                     .overlay(alignment: .bottomLeading) { siteCaption }
+
+                FeedNetworkLine(operator: item.signal?.operator ?? item.metadataString("operator"), technology: nil)
+
+                if let siteId = item.metadataString("siteId") {
+                    FeedOpenCapsule(title: String(localized: "Voir le site"),
+                                    destination: .link(.site(id: siteId, market: item.metadataString("marketCode"))),
+                                    prominent: false, onOpenPost: onTap)
+                }
 
                 CardActionsBar(
                     item: item,
@@ -102,25 +112,52 @@ struct PhotoCardView: View {
         .accessibilityLabel(photoAccessibilityLabel)
     }
 
-    /// « Orange · support 1552054 » sur un voile sombre, lisible sur toute photo.
+    /// Commune et prise de vue (« à 120 m, vers le nord-est ») sur la photo, chacune
+    /// masquée sans valeur. L'opérateur passe sous la photo (refonte du 04/11).
     @ViewBuilder
     private var siteCaption: some View {
-        // Opérateur seul : le code du site (« ANFR-… ») reste dans le détail (lot F, F-02).
-        let parts = [item.signal?.operator].compactMap { $0 }.filter { !$0.isEmpty }
-        if !parts.isEmpty {
-            HStack(spacing: SQSpace.xs) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .accessibilityHidden(true)
-                Text(verbatim: parts.joined(separator: " · "))
-                    .font(SQType.caption(.semibold))
-                    .lineLimit(1)
+        let chips = [item.metadataString("siteCommune"), Self.shotLabel(
+            meters: item.metadataNumber("photoDistanceMeters"), degrees: item.metadataNumber("photoDirectionDegrees")
+        )].compactMap { $0 }
+        if !chips.isEmpty {
+            FlowRow(spacing: SQSpace.xs2) {
+                ForEach(chips, id: \.self) { chip in
+                    Text(verbatim: chip)
+                        .font(SQType.caption(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.sm2)
+                        .padding(.vertical, SQSpace.xs)
+                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                }
             }
-            .foregroundStyle(SQColor.onGlass)
-            .padding(.horizontal, SQSpace.sm2)
-            .padding(.vertical, SQSpace.xs)
-            .background(SQColor.glassDense, in: Capsule(style: .continuous))
             .padding(SQSpace.sm2)
+        }
+    }
+
+    /// « à 120 m, vers le nord-est », « à 120 m » ou « vers le nord-est ».
+    static func shotLabel(meters: Double?, degrees: Double?) -> String? {
+        let distance = meters.flatMap { $0 > 0 ? SignalFormatters.meters($0) : nil }
+        let direction = degrees.flatMap { $0.isFinite ? compass($0) : nil }
+        switch (distance, direction) {
+        case let (distance?, direction?): return String(localized: "à \(distance), vers \(direction)")
+        case let (distance?, nil): return String(localized: "à \(distance)")
+        case let (nil, direction?): return String(localized: "vers \(direction)")
+        default: return nil
+        }
+    }
+
+    /// Huit points cardinaux, de 22,5° de part et d'autre.
+    static func compass(_ degrees: Double) -> String {
+        let normalized = (degrees.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        switch Int(((normalized + 22.5) / 45).rounded(.down)) % 8 {
+        case 0: return String(localized: "le nord")
+        case 1: return String(localized: "le nord-est")
+        case 2: return String(localized: "l’est")
+        case 3: return String(localized: "le sud-est")
+        case 4: return String(localized: "le sud")
+        case 5: return String(localized: "le sud-ouest")
+        case 6: return String(localized: "l’ouest")
+        default: return String(localized: "le nord-ouest")
         }
     }
 

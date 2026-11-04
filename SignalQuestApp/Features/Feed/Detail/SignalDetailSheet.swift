@@ -729,6 +729,13 @@ struct SignalDetailSheet: View {
         return points.count >= 2 ? points : []
     }
 
+    /// État de chaque point du tracé (contrat session-signal-trace), comme la carte du fil.
+    private func traceStates(count: Int) -> [SQQualityScale.Signal]? {
+        let points = signal?.mapPoints ?? []
+        guard points.count == count, points.contains(where: { $0.technology != nil }) else { return nil }
+        return SessionSignalTrace.states(points.map { .init(technology: $0.technology, signalStrength: $0.signalStrength) })
+    }
+
     @ViewBuilder
     private var map: some View {
         if detailsHidden {
@@ -738,7 +745,7 @@ struct SignalDetailSheet: View {
                 .accessibilityIdentifier("signal.detail.hidden")
         } else if let trace = Self.trace(kind: item.kind, signal: signal) {
             if !trace.isEmpty {
-                SignalTraceMap(coordinates: trace, color: UIColor(accent))
+                SignalTraceMap(coordinates: trace, color: UIColor(accent), states: traceStates(count: trace.count))
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                     .accessibilityElement()
@@ -815,6 +822,8 @@ struct SignalDetailSheet: View {
 private struct SignalTraceMap: UIViewRepresentable {
     let coordinates: [CLLocationCoordinate2D]
     let color: UIColor
+    /// Un état par point : chaque segment prend celui de son point d'arrivée.
+    var states: [SQQualityScale.Signal]? = nil
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
@@ -831,7 +840,15 @@ private struct SignalTraceMap: UIViewRepresentable {
         context.coordinator.color = color
         map.removeOverlays(map.overlays)
         let line = MKPolyline(coordinates: coordinates, count: coordinates.count)
-        map.addOverlay(line)
+        if let states, states.count == coordinates.count, coordinates.count >= 2 {
+            for index in 1..<coordinates.count {
+                let segment = TraceSegment(coordinates: [coordinates[index - 1], coordinates[index]], count: 2)
+                segment.state = states[index]
+                map.addOverlay(segment)
+            }
+        } else {
+            map.addOverlay(line)
+        }
         map.setVisibleMapRect(line.boundingMapRect, edgePadding: UIEdgeInsets(top: 24, left: 24, bottom: 24, right: 24), animated: false)
     }
 
@@ -845,10 +862,20 @@ private struct SignalTraceMap: UIViewRepresentable {
             guard let line = overlay as? MKPolyline else { return MKOverlayRenderer(overlay: overlay) }
             let renderer = MKPolylineRenderer(polyline: line)
             renderer.strokeColor = color
+            if let state = (line as? TraceSegment)?.state {
+                renderer.strokeColor = state.uiColor
+                // « Sans réseau constaté » : pointillé ardoise, jamais une teinte de l'échelle.
+                if state.isHatched { renderer.lineDashPattern = [4, 6] }
+            }
             renderer.lineWidth = 4
             renderer.lineCap = .round
             renderer.lineJoin = .round
             return renderer
         }
     }
+}
+
+/// Segment du tracé et l'état de son point d'arrivée.
+private final class TraceSegment: MKPolyline {
+    var state: SQQualityScale.Signal?
 }

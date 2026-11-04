@@ -24,7 +24,7 @@ struct ValidationCardView: View {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
-                    place: signal?.city ?? item.readablePlaceLabel,
+                    place: nil, // La commune est sous le titre, avec le secteur.
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.success,
@@ -32,25 +32,26 @@ struct ValidationCardView: View {
                     isPinned: item.isPinned
                 )
 
-                Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            validationHeading
-                            technologyTag
-                        }
-                    } else {
-                        HStack(alignment: .center, spacing: SQSpace.md) {
-                            validationHeading
-                            Spacer()
-                            technologyTag
-                        }
+                FeedKindLine(symbol: "checkmark", title: String(localized: "Antenne identifiée"), tint: .success,
+                             points: item.earnedPoints)
+
+                // Le support identifié en titre, sans identifiant brut : eNB, PCI et
+                // Cell restent dans le détail (refonte du 04/11).
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    Text(verbatim: title)
+                        .font(SQFont.display(20, .bold, relativeTo: .title3))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let placeLine {
+                        Text(verbatim: placeLine)
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                .accessibilityElement(children: .combine)
 
-                // Tuile mise en avant en accent brique (DA), pas en couleur techno.
-                if !metrics.isEmpty {
-                    FeedMetricGrid(metrics: metrics)
-                }
+                FeedNetworkLine(operator: signal?.operator, technology: signal?.technology, detail: frequency)
 
                 if let count = signal?.validationCount, count > 0 {
                     Text("\(count) confirmations")
@@ -65,6 +66,12 @@ struct ValidationCardView: View {
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let siteId = item.metadataString("siteId") {
+                    FeedOpenCapsule(title: String(localized: "Voir sur la carte"), symbol: "map",
+                                    destination: .link(.site(id: siteId, market: item.metadataString("marketCode"))),
+                                    onOpenPost: onTap)
                 }
 
                 CardActionsBar(
@@ -83,79 +90,33 @@ struct ValidationCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
-    /// Techno trouvée ; rien plutôt qu'un tiret quand le serveur ne la donne pas.
-    @ViewBuilder
-    private var technologyTag: some View {
-        if let technology = signal?.technology?.trimmingCharacters(in: .whitespacesAndNewlines), !technology.isEmpty {
-            SQEditorialTag(text: technology, color: accent)
+    /// Le nom du support, sinon « Antenne Orange identifiée ».
+    private var title: String {
+        if let siteName { return siteName }
+        if let op = signal?.operator.map({ SQBrand.operatorName($0) ?? $0 }) {
+            return String(localized: "Antenne \(op) identifiée")
         }
+        return String(localized: "Antenne identifiée")
     }
 
-    private var validationHeading: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Identification antenne")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-            Text(subtitle)
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    /// Commune et secteur identifié : ce que l'identification a apporté.
+    private var placeLine: String? {
+        let sector = item.metadataString("sector") ?? signal?.sectors?.first.map(String.init)
+        let parts = [signal?.city ?? item.readablePlaceLabel,
+                     sector.map { String(localized: "secteur \($0) identifié") }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// Libellé de la tuile identifiant selon le type d'identification.
-    private var identifierTileLabel: String {
-        switch signal?.identifierType?.lowercased() {
-        case "enb": return "eNB"
-        case "gnb": return "gNB"
-        case "pci": return "PCI"
-        case "cellid", "ci": return "Cell"
-        default: return String(localized: "Ident.")
-        }
+    private var frequency: String? {
+        guard let raw = signal?.frequency?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        return Double(raw) != nil ? "\(raw) MHz" : raw
     }
 
-    /// Méthode d'identification lisible (Auto / Manuel / Import), nil si inconnue.
-    private var identifierMethodLabel: String? {
-        switch signal?.identifierSource?.lowercased() {
-        case "auto": return "Auto"
-        case "manual", "manuel": return String(localized: "Manuel")
-        // Imports de logs externes (NetMonster, eNB Analytics…) : provenance honnête.
-        case .some(let s) where s.contains("sync") || s.contains("import"): return "Import"
-        default: return nil
-        }
-    }
-
-    /// Opérateur en toutes lettres et fréquence en MHz ; le lieu est dans l'en-tête.
-    private var subtitle: String {
-        let frequency = signal?.frequency.map { Double($0) != nil ? "\($0) MHz" : $0 }
-        return [signal?.operator.map { SQBrand.operatorName($0) ?? $0 }, frequency]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-    }
-
-    /// Nom du site identifié, s'il dit autre chose que la commune de l'en-tête.
+    /// Nom du site identifié, s'il dit autre chose que la commune.
     private var siteName: String? {
         let city = signal?.city?.trimmingCharacters(in: .whitespacesAndNewlines)
         return [signal?.siteName, signal?.siteLabel]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty && $0 != city }
-    }
-
-    /// Identifiant, puis la méthode quand on la connaît.
-    private var metrics: [FeedMetricGrid.Metric] {
-        // Le site plutôt que l'eNB brut ; l'identifiant reste dans le détail et ne
-        // sert ici que faute de nom. Identifiant absent : pas de tuile « — » (revue q34, constats 4).
-        var metrics: [FeedMetricGrid.Metric] = []
-        if let siteName {
-            metrics.append(.init(label: String(localized: "Site"), value: siteName, highlight: true))
-        } else if let identifier = (signal?.identifierValue ?? signal?.cellId)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !identifier.isEmpty {
-            metrics.append(.init(label: identifierTileLabel, value: identifier, highlight: true))
-        }
-        if let method = identifierMethodLabel {
-            metrics.append(.init(label: "Méthode", value: method))
-        }
-        return metrics
     }
 }

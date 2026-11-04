@@ -1707,6 +1707,7 @@ struct FeedView: View {
         // Signaler compris (CardActionsBar) : plus de « Signaler » en tête (F-50).
         .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
         .environment(\.feedHashtagAction, { filter(byHashtag: $0) })
+        .environment(\.feedOpenLink, { $0.open(with: services.router) })
         .sqFadeUp()
         .accessibilityIdentifier("feed.item.\(item.id)")
         .onAppear {

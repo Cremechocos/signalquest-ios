@@ -33,35 +33,30 @@ struct RatingCardView: View {
                     isPinned: item.isPinned
                 )
 
-                // Héro : étoiles + tendance.
-                HStack(alignment: .center, spacing: SQSpace.md) {
-                    HStack(spacing: 3) {
-                        ForEach(1...5, id: \.self) { index in
-                            Image(systemName: index <= stars ? "star.fill" : "star")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(index <= stars ? SQColor.warning : SQColor.labelTertiary)
-                        }
+                FeedKindLine(symbol: "star.fill", title: String(localized: "A noté son réseau"), tint: .warning,
+                             points: item.earnedPoints)
+
+                // Où l'avis a été donné, et ce qu'il dit, posé sur le point (refonte du 04/11).
+                // Sans position servie, les étoiles reviennent en tête.
+                if let coordinate = item.cardCoordinate {
+                    FeedPlaceSnapshot(cacheKey: item.id, coordinate: coordinate) {
+                        FeedMapBubble { verdict(starSize: 17) }
                     }
                     .accessibilityElement()
-                    .accessibilityLabel("Note \(stars) sur 5")
-                    Spacer()
-                    if let trend = trendTag {
-                        SQEditorialTag(text: trend.label, color: trend.color)
-                    }
+                    .accessibilityLabel(Text(verbatim: spokenVerdict))
+                    .accessibilityAddTraits(.isImage)
+                    .accessibilityIdentifier("feed.rating.map")
+                } else {
+                    verdict(starSize: 22)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text(verbatim: spokenVerdict))
                 }
 
-                // Le signal noté, en mots selon l'échelle commune ; la valeur brute
-                // est en pied de carte (revue q34, constat 9).
-                if let quality {
-                    FeedMetricGrid(metrics: [.init(label: String(localized: "Signal"), value: quality, highlight: true)])
+                if !metrics.isEmpty {
+                    FeedMetricGrid(metrics: metrics)
                 }
 
-                if let footer = footer {
-                    Text(footer)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                FeedNetworkLine(operator: signal?.operator, technology: signal?.technology, detail: frequency)
 
                 if let text = item.cardText {
                     Text(text)
@@ -86,6 +81,59 @@ struct RatingCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
+    /// Les étoiles et leur traduction en mots, de 1 « Très mal » à 5 « Très bien ».
+    private func verdict(starSize: CGFloat) -> some View {
+        VStack(spacing: SQSpace.xxs) {
+            HStack(spacing: 3) {
+                ForEach(1...5, id: \.self) { index in
+                    Image(systemName: index <= stars ? "star.fill" : "star")
+                        .font(.system(size: starSize, weight: .semibold))
+                        .foregroundStyle(index <= stars ? SQColor.warning : SQColor.labelTertiary)
+                }
+            }
+            if let words = Self.starsWords(stars) {
+                Text(verbatim: words)
+                    .font(SQFont.display(14, .bold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+            }
+        }
+    }
+
+    private var spokenVerdict: String {
+        [String(localized: "Note \(stars) sur 5"), Self.starsWords(stars)].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// Les étoiles en mots, communs aux trois apps.
+    static func starsWords(_ stars: Int) -> String? {
+        switch stars {
+        case 1: return String(localized: "Très mal")
+        case 2: return String(localized: "Plutôt mal")
+        case 3: return String(localized: "Correct")
+        case 4: return String(localized: "Plutôt bien")
+        case 5: return String(localized: "Très bien")
+        default: return nil
+        }
+    }
+
+    /// Le signal en mots et en dBm, puis la tendance ; rien sans valeur.
+    private var metrics: [FeedMetricGrid.Metric] {
+        var metrics: [FeedMetricGrid.Metric] = []
+        if let quality, let rsrp = signal?.rsrp {
+            // Le mot en valeur, le dBm dans le libellé : deux tuiles tiennent sur une rangée.
+            metrics.append(.init(label: String(localized: "Signal · \(SignalFormatters.dbm(rsrp))"), value: quality, highlight: true))
+        }
+        if let trend = trendTag {
+            metrics.append(.init(label: String(localized: "Tendance"), value: trend.label))
+        }
+        return metrics
+    }
+
+    /// « 1 800 MHz » quand le serveur la donne en MHz.
+    private var frequency: String? {
+        guard let raw = signal?.frequency?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        return Double(raw) != nil ? "\(raw) MHz" : raw
+    }
+
     /// « Moyen » pour −95 dBm en 4G ; rien sans mesure.
     private var quality: String? {
         guard let rsrp = signal?.rsrp else { return nil }
@@ -102,13 +150,5 @@ struct RatingCardView: View {
         case "same", "stable": return (String(localized: "Stable"), SQColor.labelSecondary)
         default: return nil
         }
-    }
-
-    private var footer: String? {
-        var parts: [String] = []
-        if let op = signal?.operator { parts.append(SQBrand.operatorName(op) ?? op) }
-        if let tech = signal?.technology { parts.append(tech) }
-        if let rsrp = signal?.rsrp, quality != nil { parts.append(SignalFormatters.dbm(rsrp)) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

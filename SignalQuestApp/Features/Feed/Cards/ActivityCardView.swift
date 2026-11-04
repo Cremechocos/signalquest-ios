@@ -15,6 +15,8 @@ struct FeedActivity: Equatable {
         case site(id: String, market: String?)
         case progression
         case bug(id: String)
+        /// La feuille de la panne, sinon son site.
+        case outage(id: String?, siteId: String?, market: String?)
     }
 
     /// Quête atteinte (#835) : ce que demandait la quête, lu dans le catalogue
@@ -34,6 +36,9 @@ struct FeedActivity: Equatable {
     let subtitle: String?
     let link: Link?
     let quest: Quest?
+    /// Niveau atteint et niveau quitté, pour un passage de niveau.
+    let level: Int?
+    let previousLevel: Int?
     /// Ce que récompense le badge. Le catalogue du serveur n'existe qu'en français :
     /// rien en anglais plutôt qu'une phrase dans une autre langue (revue q34, constat 6).
     let badgeDescription: String?
@@ -88,6 +93,8 @@ struct FeedActivity: Equatable {
         // La phrase traduite remplace le français du serveur partout où il
         // servait de titre ou de repli (F8).
         let key = FeedTextKey(key: item.textKey, args: item.textArgs)
+        self.level = family == .level ? (int("newLevel") ?? key?.integer("level").map { Int(clamping: $0) }) : nil
+        self.previousLevel = family == .level ? int("oldLevel") : nil
         let text = (key?.text ?? item.text).trimmingCharacters(in: .whitespacesAndNewlines)
         let quoted = Self.quotedName(in: item.text)
         let siteLink = string("siteId").map { Link.site(id: $0, market: string("marketCode")) }
@@ -239,11 +246,16 @@ struct ActivityCardView: View {
                     isPinned: item.isPinned
                 )
 
-                ActivitySummaryRow(activity: activity)
-
-                if let technology = item.signal?.technology, activity.family == .customSite {
-                    SQEditorialTag(text: [item.signal?.operator, technology].compactMap { $0 }.joined(separator: " · "),
-                                   color: TechAccent.color(for: technology))
+                switch activity.family {
+                case .customSite:
+                    CustomSiteActivityContent(item: item, activity: activity)
+                case .quest, .level, .badge:
+                    ProgressionActivityContent(activity: activity)
+                    if let link = activity.link {
+                        FeedOpenCapsule(title: link.title, destination: .link(link), prominent: false, onOpenPost: onTap)
+                    }
+                default:
+                    ActivitySummaryRow(activity: activity)
                 }
 
                 CardActionsBar(
@@ -344,6 +356,7 @@ extension FeedActivity.Link {
         case .site: return String(localized: "Voir le site")
         case .progression: return String(localized: "Voir ma progression")
         case .bug: return String(localized: "Voir mon signalement")
+        case .outage: return String(localized: "Voir la panne")
         }
     }
 
@@ -352,6 +365,7 @@ extension FeedActivity.Link {
         case .site: return "mappin.and.ellipse"
         case .progression: return "chart.line.uptrend.xyaxis"
         case .bug: return "ladybug"
+        case .outage: return "exclamationmark.triangle"
         }
     }
 
@@ -361,6 +375,205 @@ extension FeedActivity.Link {
         case .site(let id, let market): router.route(toSite: id, market: market)
         case .progression: router.route(toProfileScreen: .progression)
         case .bug(let id): router.route(toBug: id)
+        case .outage(let id, let siteId, let market): router.route(toCommunityOutageId: id, fallbackSiteId: siteId, market: market)
+        }
+    }
+}
+
+/// Site ajouté sur la carte : un plan avec son repère, son nom, la commune, qui
+/// l'utilise et à qui il appartient (refonte du 04/11). Le plan est centré sur
+/// la position servie, arrondie par le serveur.
+private struct CustomSiteActivityContent: View {
+    let item: UnifiedSocialFeedItem
+    let activity: FeedActivity
+
+    private var operators: String? {
+        guard case .array(let values)? = item.metadata?["hostedOperators"] else {
+            return item.metadataString("mobileOperator") ?? item.signal?.operator
+        }
+        let names = values.compactMap { value -> String? in
+            guard case .string(let key) = value, !key.isEmpty else { return nil }
+            return SQBrand.operatorName(key) ?? key
+        }
+        return names.isEmpty ? nil : names.joined(separator: ", ")
+    }
+
+    private var metrics: [FeedMetricGrid.Metric] {
+        var metrics: [FeedMetricGrid.Metric] = []
+        if let operators { metrics.append(.init(label: String(localized: "Opérateurs"), value: operators)) }
+        if let owner = item.metadataString("infraOwnerOperator") {
+            metrics.append(.init(label: String(localized: "Propriétaire"), value: SQBrand.operatorName(owner) ?? owner))
+        }
+        return metrics
+    }
+
+    var body: some View {
+        FeedKindLine(symbol: "plus", title: String(localized: "A ajouté un site"), points: activity.points)
+
+        if let coordinate = item.cardCoordinate {
+            FeedPlaceSnapshot(cacheKey: item.id, coordinate: coordinate, aspect: 16 / 7,
+                              marker: "antenna.radiowaves.left.and.right") { EmptyView() }
+                .accessibilityHidden(true)
+        }
+
+        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            Text(verbatim: activity.subtitle ?? activity.title)
+                .font(SQFont.display(20, .bold, relativeTo: .title3))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+            if let place = item.cardPlace ?? item.metadataString("placeLabel") {
+                Text(verbatim: place)
+                    .font(SQType.subhead)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+
+        if !metrics.isEmpty {
+            FeedMetricGrid(metrics: metrics)
+        }
+
+        if let description = item.metadataString("customSiteDescription") {
+            Text(verbatim: description)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Quête, niveau et badge : une célébration sobre, olive et ambre (PRODUCT.md).
+private struct ProgressionActivityContent: View {
+    let activity: FeedActivity
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        switch activity.family {
+        case .level:
+            FeedKindLine(symbol: "arrow.up", title: String(localized: "Nouveau niveau"), tint: .success, points: activity.points)
+            levelLine
+        case .quest:
+            emblemRow { questRing } text: {
+                // Sans nom de quête servi, la phrase d'accomplissement devient le titre.
+                if let name = activity.subtitle {
+                    Text(verbatim: questKicker).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                    Text(verbatim: name)
+                        .font(SQFont.display(20, .bold, relativeTo: .title3))
+                        .foregroundStyle(SQColor.label)
+                } else {
+                    Text(verbatim: questKicker)
+                        .font(SQFont.display(20, .bold, relativeTo: .title3))
+                        .foregroundStyle(SQColor.label)
+                }
+                if let goal = activity.quest?.goal ?? activity.quest?.description {
+                    Text(verbatim: goal).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                }
+                if let chip = questChip {
+                    SQEditorialTag(text: chip, color: SQColor.success).padding(.top, SQSpace.xxs)
+                }
+            }
+        default:
+            emblemRow { medal } text: {
+                Text("Nouveau badge").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                Text(verbatim: activity.subtitle ?? activity.title)
+                    .font(SQFont.display(20, .bold, relativeTo: .title3))
+                    .foregroundStyle(SQColor.label)
+                if let description = activity.badgeDescription {
+                    Text(verbatim: description).font(SQType.caption).foregroundStyle(SQColor.ink2)
+                }
+                if let points = activity.points {
+                    SQEditorialTag(text: String(localized: "+\(points) pts"), color: SQColor.success)
+                        .accessibilityLabel(String(localized: "\(points) points gagnés"))
+                        .padding(.top, SQSpace.xxs)
+                }
+            }
+        }
+    }
+
+    private func emblemRow<Emblem: View, Content: View>(@ViewBuilder _ emblem: () -> Emblem,
+                                                        @ViewBuilder text: () -> Content) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.md))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.lg))
+        return layout {
+            emblem().accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xxs) { text() }
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("feed.activity")
+    }
+
+    /// « Quête du jour accomplie », selon la cadence quand le serveur la donne.
+    private var questKicker: String {
+        switch activity.quest?.cadence {
+        case .daily?: return String(localized: "Quête du jour accomplie")
+        case .weekly?: return String(localized: "Quête de la semaine accomplie")
+        case .seasonal?: return String(localized: "Quête de saison accomplie")
+        case .event?: return String(localized: "Quête d’événement accomplie")
+        default: return String(localized: "Quête accomplie")
+        }
+    }
+
+    private var questChip: String? {
+        let cadence: String?
+        switch activity.quest?.cadence {
+        case .daily?: cadence = String(localized: "Quotidienne")
+        case .weekly?: cadence = String(localized: "Hebdomadaire")
+        case .seasonal?: cadence = String(localized: "Saisonnière")
+        case .event?: cadence = String(localized: "Événement")
+        default: cadence = nil
+        }
+        let parts = [cadence, activity.points.map { String(localized: "+\($0) pts") }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private var questRing: some View {
+        ZStack {
+            Circle().stroke(SQColor.successSoft, lineWidth: 7)
+            Circle().stroke(SQColor.success, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            Image(systemName: "checkmark")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(SQColor.success)
+        }
+        .frame(width: 64, height: 64)
+        .padding(4)
+    }
+
+    private var medal: some View {
+        Image(systemName: "medal.fill")
+            .font(.system(size: 30, weight: .semibold))
+            .foregroundStyle(SQColor.warning)
+            .frame(width: 72, height: 72)
+            .background(SQColor.warningSoft, in: Circle())
+    }
+
+    /// « 11 › Niveau 12 », l'ancien niveau en retrait.
+    @ViewBuilder
+    private var levelLine: some View {
+        if let level = activity.level {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                if let old = activity.previousLevel {
+                    Text(verbatim: old.formatted())
+                        .font(SQFont.display(26, .bold, relativeTo: .title))
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .accessibilityHidden(true)
+                }
+                Text(String(localized: "Niveau \(level)"))
+                    .font(SQFont.display(36, .heavy, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .minimumScaleFactor(0.7)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: activity.title))
+        } else {
+            Text(verbatim: activity.title)
+                .font(SQFont.display(20, .bold, relativeTo: .title3))
+                .foregroundStyle(SQColor.label)
         }
     }
 }

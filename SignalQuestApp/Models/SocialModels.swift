@@ -481,6 +481,10 @@ struct SocialSignalSummary: Codable, Equatable {
 struct SocialMapPoint: Codable, Equatable {
     let latitude: Double
     let longitude: Double
+    /// Signal du point en dBm et sa techno (« 4G », « Aucun »…), servis pour les
+    /// sessions (contrat session-signal-trace v1, #957) ; absents ailleurs.
+    var signalStrength: Double? = nil
+    var technology: String? = nil
 }
 
 struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
