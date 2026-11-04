@@ -525,4 +525,28 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertEqual(Array(cleaned[26...]), [UInt8](repeating: 0, count: bytes.count - 26))
         XCTAssertEqual(Array(cleaned[..<26]), Array(bytes[..<26]), "IFD0 intact")
     }
+
+    /// r17 : une valeur hors ligne qui commence dans son segment mais en déborde est
+    /// effacée jusqu'à la fin du segment, pas sautée (degrés et minutes lisibles).
+    func testOutOfLineValueCutByTheSegmentEndIsZeroedToThatEnd() {
+        func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8)] }
+        func le32(_ v: Int) -> [UInt8] { le16(v & 0xFFFF) + le16(v >> 16) }
+        // IFD0 en 8 vers le bloc GPS en 26 (une entrée, 18 octets) ; latitude annoncée en 44, sur 24 octets.
+        var tiff = Array("II".utf8) + [42, 0] + le32(8)
+        tiff += le16(1) + le16(0x8825) + le16(4) + le32(1) + le32(26) + le32(0)
+        tiff += le16(1) + le16(2) + le16(5) + le32(3) + le32(44) + le32(0)
+        tiff += le32(45) + le32(1) + le32(7)
+        XCTAssertEqual(tiff.count, 56)
+        // Dans un APP1 qui s'arrête au milieu de la latitude, suivi du reste du JPEG.
+        let exif = Array("Exif".utf8) + [0, 0] + tiff
+        let app1 = [UInt8]([0xFF, 0xE1]) + [UInt8((exif.count + 2) >> 8), UInt8((exif.count + 2) & 0xFF)] + exif
+        let jpeg = [UInt8]([0xFF, 0xD8]) + app1 + [0xFF, 0xD9]
+        let start = 2 + 4 + 6
+        let plan = MediaLocationScrubber.plan(for: Data(jpeg)).zeroed
+        XCTAssertTrue(plan.contains(start + 44 ..< start + 56), "partie lisible de la latitude, jusqu'à la fin du segment")
+        XCTAssertTrue(plan.allSatisfy { $0.upperBound <= start + 56 }, "jamais au-delà du segment")
+        let cleaned = [UInt8](MediaLocationScrubber.scrubbed(Data(jpeg)))
+        XCTAssertEqual(Array(cleaned[(start + 44)..<(start + 56)]), [UInt8](repeating: 0, count: 12))
+        XCTAssertEqual(Array(cleaned.suffix(2)), [0xFF, 0xD9], "fin du JPEG intacte")
+    }
 }

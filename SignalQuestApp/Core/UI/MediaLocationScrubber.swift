@@ -252,8 +252,9 @@ enum MediaLocationScrubber {
         if length <= 4 { return entry + 8 + length <= end ? entry + 8 ..< entry + 8 + length : nil }
         guard let valueOffset = u32(entry + 8) else { return nil }
         let value = tiff + valueOffset
-        guard value >= tiff, value + length <= end else { return nil }
-        return value ..< value + length
+        // Coupée par la fin du segment : sa partie lisible part quand même (r17, 48b0b324c).
+        guard value >= tiff, value < end else { return nil }
+        return value ..< min(value + length, end)
     }
 
     // MARK: ISO BMFF
