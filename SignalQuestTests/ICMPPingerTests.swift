@@ -97,6 +97,16 @@ final class ICMPPingerTests: XCTestCase {
         XCTAssertFalse(ICMPPacket.isEchoReply(foreign, family: AF_INET, sequence: 5))
     }
 
+    /// Deux séries en parallèle (candidats Auto) partagent signature et séquences :
+    /// seule l'adresse de l'expéditeur dit à quelle série l'écho appartient.
+    func testRejectsTheReplyOfAnotherHostPingedInParallel() throws {
+        let target = try ICMPPinger.resolve(host: "192.0.2.10").storage
+        let same = try ICMPPinger.resolve(host: "192.0.2.10").storage
+        let other = try ICMPPinger.resolve(host: "192.0.2.11").storage
+        XCTAssertTrue(ICMPPacket.isSameHost(same, target, family: AF_INET))
+        XCTAssertFalse(ICMPPacket.isSameHost(other, target, family: AF_INET))
+    }
+
     func testRejectsTruncatedDatagram() {
         XCTAssertFalse(ICMPPacket.isEchoReply(Data([0, 0, 0]), family: AF_INET, sequence: 0))
     }

@@ -1263,87 +1263,79 @@ final class SpeedtestTests: XCTestCase {
         )
     }
 
-    /// La sonde de latence chargée vise le HAUT de la plage : le download part du bas
-    /// et l'upload prend le voisin immédiat, donc le haut n'entre en concurrence avec
-    /// aucun des deux — ni avec le port-walk.
-    func testLoadedLatencyProbeTargetsTopOfRange() {
-        XCTAssertEqual(
-            iperfLoadedLatencyProbePort(avoiding: [5_201], min: 5_200, max: 5_209),
-            5_209
-        )
-        // Le haut de plage est déjà pris : on descend d'un cran, jamais sur un actif.
-        XCTAssertEqual(
-            iperfLoadedLatencyProbePort(avoiding: [5_209], min: 5_200, max: 5_209),
-            5_208
-        )
-        // Deux ports de données occupés pendant l'upload.
-        XCTAssertEqual(
-            iperfLoadedLatencyProbePort(avoiding: [5_209, 5_208], min: 5_200, max: 5_209),
-            5_207
-        )
-    }
-
-    /// Le cas qui motive tout le correctif : sur un POP mono-port, l'ancienne
-    /// `iperfSiblingPort` renvoyait LE PORT DE DONNÉES ACTIF — la sonde ouvrait donc
-    /// une connexion dessus et faisait tomber le démon en pleine mesure. Plusieurs
-    /// POPs publics du catalogue n'exposent qu'un seul port : on renonce désormais à
-    /// l'échantillon plutôt que de fausser latence ET débit.
-    func testLoadedLatencyProbeGivesUpRatherThanHittingActivePort() {
-        XCTAssertNil(iperfLoadedLatencyProbePort(avoiding: [5_201], min: 5_201, max: 5_201))
-        // Plage à deux ports, tous deux occupés : rien de libre, on renonce.
-        XCTAssertNil(
-            iperfLoadedLatencyProbePort(avoiding: [5_200, 5_201], min: 5_200, max: 5_201)
-        )
-        // Comparaison directe avec l'ancien comportement, pour mémoire.
-        XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
-    }
-
-    /// Les POPs Bouygues annoncent 9200-9240 mais n'ouvrent que quelques ports (pas
-    /// 9240 à Lyon le 20/10) : les candidats partent des ports vus ouverts, du plus
-    /// haut au plus bas, puis des ports jamais sondés, sans port de données ni port
-    /// vu fermé.
-    func testLoadedLatencyProbeCandidatesPreferPortsSeenOpen() {
-        let seenOpen = iperfLoadedLatencyProbeCandidates(
-            avoiding: [9_210, 9_216], knownOpen: [9_210, 9_216, 9_225, 9_219],
-            sampled: [9_200, 9_210, 9_216, 9_219, 9_225, 9_240], min: 9_200, max: 9_240
-        )
-        XCTAssertEqual(seenOpen.verified, [9_225, 9_219])
-        XCTAssertEqual(seenOpen.unverified, [9_239, 9_238, 9_237, 9_236, 9_235, 9_234, 9_233, 9_232])
-
-        let mono = iperfLoadedLatencyProbeCandidates(
-            avoiding: [5_201], knownOpen: [5_201], sampled: [5_201], min: 5_201, max: 5_201
-        )
-        XCTAssertTrue(mono.verified.isEmpty)
-        XCTAssertTrue(mono.unverified.isEmpty)
-    }
-
-    /// Sans port vu ouvert en dehors des ports de données, la sonde vérifie les ports
-    /// jamais sondés et garde le plus haut qui répond ; aucun ne répond : pas de port.
-    func testLoadedLatencyProbePortIsConfirmedOpen() async {
+    /// Aucune connexion avant le vrai test : `portPreferred` d'abord, puis le dernier
+    /// port qui a mesuré ; un POP dont aucun port n'a mesuré est écarté.
+    func testIPerfEndpointNeedsNoConnectionAndRemembersTheLastGoodPort() async {
         let server = IPerfPublicServer(
-            id: "lyon", hostname: "lyo.example.net", name: "Lyon", latitude: 0, longitude: 0,
-            code: "LYO", countryCode: "FR", provider: .community,
-            portMin: 9_200, portMax: 9_240, portPreferred: 9_210
+            id: "endpoint_memory", hostname: "endpoint-memory.example.invalid", name: "Mémoire",
+            latitude: 0, longitude: 0, code: "MEM", countryCode: "FR", provider: .community,
+            portMin: 9_200, portMax: 9_240, portPreferred: 9_201
         )
-        let endpoint = IPerfEndpoint(port: 9_210, openPorts: [9_210])
-        let open = Set<UInt16>(9_220...9_239).union([9_210])
-        let unverified = iperfLoadedLatencyProbeCandidates(
-            avoiding: [9_210, 9_211], knownOpen: [9_210],
-            sampled: Set(iperfDiscoveryPorts(min: 9_200, max: 9_240, preferred: 9_210)),
-            min: 9_200, max: 9_240
-        ).unverified
-        let expected = unverified.filter(open.contains).max()
-        XCTAssertNotNil(expected)
-        let lyon = await SpeedtestService.resolveIPerfLoadedProbePort(
-            server: server, endpoint: endpoint, avoiding: [9_210, 9_211],
-            tcpProbe: OpenPortsProbe(open: open)
+        await IPerfEndpointCache.shared.invalidate(server.hostname)
+        let fresh = await resolveIPerfEndpoint(for: server)
+        XCTAssertEqual(fresh?.port, 9_201)
+        XCTAssertEqual(fresh?.openPorts, [])
+
+        await IPerfEndpointCache.shared.store(IPerfEndpoint(port: 9_210), for: server)
+        let remembered = await resolveIPerfEndpoint(for: server)
+        XCTAssertEqual(remembered?.port, 9_201, "le port annoncé reste essayé en premier")
+        XCTAssertEqual(remembered?.openPorts, [9_210])
+
+        await IPerfEndpointCache.shared.store(nil, for: server)
+        let failed = await resolveIPerfEndpoint(for: server)
+        XCTAssertNil(failed)
+        await IPerfEndpointCache.shared.invalidate(server.hostname)
+    }
+
+    /// Après l'échec du port préféré : le dernier bon port, puis les voisins, chacun
+    /// une seule fois et jamais le port préféré.
+    func testFallbackPortOrderTriesTheLastGoodPortBeforeSiblings() {
+        let siblings = iperfSiblingCandidatePorts(preferred: 9_201, min: 9_200, max: 9_240)
+        let order = iperfFallbackPortOrder(preferred: 9_201, known: [9_210], siblings: siblings)
+        XCTAssertEqual(order.first, 9_210)
+        XCTAssertFalse(order.contains(9_201))
+        XCTAssertEqual(order.count, Set(order).count)
+        XCTAssertEqual(Set(order), Set(siblings).union([9_210]))
+        XCTAssertEqual(iperfFallbackPortOrder(preferred: 5_201, known: [5_201], siblings: []), [])
+    }
+
+    /// Auto : la distance d'abord, l'ICMP départage les POPs qui y répondent. Un POP
+    /// qui filtre l'ICMP (Bouygues) garde sa place au lieu de reculer derrière un POP
+    /// plus lointain.
+    func testAutoRankingKeepsDistanceForICMPSilentPopsAndOrdersMeasuredOnes() throws {
+        let servers = try XCTUnwrap(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(id: "near_silent", host: "a.example.net"),
+            catalogServer(id: "mid_slow", host: "b.example.net"),
+            catalogServer(id: "far_silent", host: "c.example.net"),
+            catalogServer(id: "farthest_fast", host: "d.example.net"),
+        ])))
+        let ranked = rankIPerfAutoCandidates([
+            IPerfLatencyCandidate(server: servers[3], latencyMs: 8, sourceOrder: 3),
+            IPerfLatencyCandidate(server: servers[0], latencyMs: nil, sourceOrder: 0),
+            IPerfLatencyCandidate(server: servers[2], latencyMs: nil, sourceOrder: 2),
+            IPerfLatencyCandidate(server: servers[1], latencyMs: 30, sourceOrder: 1),
+        ])
+        XCTAssertEqual(ranked.map { $0.server.id }, ["near_silent", "farthest_fast", "far_silent", "mid_slow"])
+    }
+
+    /// Un ancien choix devient indisponible : l'endpoint d'un autre POP n'en souffre pas.
+    func testAFailedPopDoesNotHideAnotherPopOnTheSameRun() async {
+        let failed = IPerfPublicServer(
+            id: "failed_pop", hostname: "failed-pop.example.invalid", name: "KO",
+            latitude: 0, longitude: 0, code: "KO", countryCode: "FR", provider: .community,
+            portMin: 5_200, portMax: 5_209, portPreferred: 5_209
         )
-        XCTAssertEqual(lyon, expected)
-        let closed = await SpeedtestService.resolveIPerfLoadedProbePort(
-            server: server, endpoint: endpoint, avoiding: [9_210, 9_211],
-            tcpProbe: OpenPortsProbe(open: [9_210])
+        let next = IPerfPublicServer(
+            id: "next_pop", hostname: "next-pop.example.invalid", name: "Suivant",
+            latitude: 0, longitude: 0, code: "NX", countryCode: "FR", provider: .community,
+            portMin: 5_200, portMax: 5_209, portPreferred: 5_201
         )
-        XCTAssertNil(closed)
+        await IPerfEndpointCache.shared.store(nil, for: failed)
+        let failedEndpoint = await resolveIPerfEndpoint(for: failed)
+        let nextEndpoint = await resolveIPerfEndpoint(for: next)
+        XCTAssertNil(failedEndpoint)
+        XCTAssertEqual(nextEndpoint?.port, 5_201)
+        await IPerfEndpointCache.shared.invalidate(failed.hostname)
     }
 
     // MARK: Catalogue iPerf3 servi par l'API
@@ -1908,15 +1900,5 @@ final class SpeedtestTests: XCTestCase {
             }
             listener.start(queue: .global())
         }
-    }
-}
-
-/// Sonde TCP factice : connexion réussie sur les seuls ports donnés.
-private struct OpenPortsProbe: SpeedtestTCPProbing {
-    let open: Set<UInt16>
-
-    func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double {
-        guard open.contains(port) else { throw URLError(.cannotConnectToHost) }
-        return 20
     }
 }

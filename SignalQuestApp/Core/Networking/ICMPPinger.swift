@@ -194,12 +194,6 @@ private struct ICMPSocketHandle {
         sequence: UInt16,
         timeout: TimeInterval
     ) -> ICMPPinger.Sample? {
-        var tv = timeval(
-            tv_sec: Int(timeout),
-            tv_usec: Int32((timeout - floor(timeout)) * 1_000_000)
-        )
-        setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-
         let packet = ICMPPacket.echoRequest(family: family, sequence: sequence)
         var storage = target.storage
         let sent: Int = withUnsafePointer(to: &storage) { pointer in
@@ -212,7 +206,7 @@ private struct ICMPSocketHandle {
         guard sent > 0 else { return nil }
 
         // Le chronomètre démarre ICI, une fois le paquet parti : tout ce qui précède
-        // (résolution, ouverture de socket, options) est hors mesure.
+        // (résolution, ouverture de socket) est hors mesure.
         let start = DispatchTime.now()
         let deadline = Date().addingTimeInterval(timeout)
 
@@ -220,13 +214,29 @@ private struct ICMPSocketHandle {
         // Une réponse d'un autre écho (autre séquence, ou trafic ICMP concurrent) ne
         // doit pas être comptée : on relit jusqu'à trouver LA nôtre ou expirer.
         while Date() < deadline {
+            // Chaque relecture n'attend que le temps RESTANT : l'écho d'un autre hôte
+            // réveille `recvfrom`, et un délai complet à chaque fois repoussait
+            // l'abandon bien au-delà de `timeout`.
+            let remaining = max(0.001, deadline.timeIntervalSinceNow)
+            var tv = timeval(
+                tv_sec: Int(remaining),
+                tv_usec: Int32((remaining - floor(remaining)) * 1_000_000)
+            )
+            setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+            var sender = sockaddr_storage()
+            var senderLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
             let received = buffer.withUnsafeMutableBytes { raw in
-                recvfrom(descriptor, raw.baseAddress, raw.count, 0, nil, nil)
+                withUnsafeMutablePointer(to: &sender) { pointer in
+                    pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { address in
+                        recvfrom(descriptor, raw.baseAddress, raw.count, 0, address, &senderLength)
+                    }
+                }
             }
             guard received > 0 else { return nil }
             let elapsedNs = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
             let payload = Data(buffer[0..<received])
-            if ICMPPacket.isEchoReply(payload, family: family, sequence: sequence) {
+            if ICMPPacket.isEchoReply(payload, family: family, sequence: sequence),
+               ICMPPacket.isSameHost(sender, target.storage, family: family) {
                 return ICMPPinger.Sample(rttMs: Double(elapsedNs) / 1_000_000, sequence: sequence)
             }
         }
@@ -313,6 +323,22 @@ enum ICMPPacket {
         guard replySequence == sequence else { return false }
 
         return Array(bytes[8..<(8 + signature.count)]) == signature
+    }
+
+    /// L'écho vient-il de l'hôte visé ? En `SOCK_DGRAM`, Darwin livre à chaque socket
+    /// ICMP les réponses des autres : deux séries lancées en parallèle (les candidats
+    /// Auto) partagent signature et séquences, et la série d'un hôte qui filtre l'ICMP
+    /// comptait l'écho d'un autre — à 0,0 ms.
+    static func isSameHost(_ sender: sockaddr_storage, _ target: sockaddr_storage, family: Int32) -> Bool {
+        var sender = sender, target = target
+        if family == AF_INET6 {
+            let a = withUnsafeBytes(of: &sender) { $0.load(as: sockaddr_in6.self).sin6_addr }
+            let b = withUnsafeBytes(of: &target) { $0.load(as: sockaddr_in6.self).sin6_addr }
+            return withUnsafeBytes(of: a) { x in withUnsafeBytes(of: b) { y in x.elementsEqual(y) } }
+        }
+        let a = withUnsafeBytes(of: &sender) { $0.load(as: sockaddr_in.self).sin_addr.s_addr }
+        let b = withUnsafeBytes(of: &target) { $0.load(as: sockaddr_in.self).sin_addr.s_addr }
+        return a == b
     }
 
     /// Retire l'en-tête IPv4 si la pile l'a livré. En `SOCK_DGRAM` le comportement

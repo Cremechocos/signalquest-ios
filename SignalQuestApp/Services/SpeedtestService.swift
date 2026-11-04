@@ -326,6 +326,9 @@ private enum SpeedtestEngineConfig {
     /// l'ICMP : l'écho d'échauffement plus un. Coût du constat : ~2,7 s, puis 0 s
     /// pendant 15 min grâce à `IPerfEndpointCache`.
     static let icmpGiveUpAfterLeadingLosses: Int = 2
+    /// POPs iPerf3 essayés par run avant le repli Cloudflare (Auto : les candidats
+    /// suivants ; manuel : le choix, puis son repli Auto).
+    static let iperfMaxServerAttempts: Int = 3
     /// Probes de rattrapage (cadence rapprochée) quand le budget principal
     /// n'a pas produit assez d'échantillons valides sur un réseau perdant.
     static let pingSalvageAttempts: Int = 3
@@ -593,7 +596,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         location: Coordinates?,
         settings: SpeedtestRunSettings,
         progress: SpeedtestProgressHandler?,
-        forceIPerfForCloudflareFallback: Bool
+        forceIPerfForCloudflareFallback: Bool,
+        iperfServerAttempt: Int = 0
     ) async throws -> SpeedtestRunResult {
         let startedAt = SpeedtestTraceScope.current?.startedAt ?? Date()
         // Vide la mémoire des sondages de ports si le réseau n'est plus le même :
@@ -719,8 +723,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     fallbackReason: "no_iperf_pop"
                 )
             }
-            if let cloudflareMs,
-               cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < (candidate.latencyMs ?? .infinity) {
+            // Sans écho ICMP (tous les POP Bouygues), la latence du candidat est
+            // inconnue, pas infinie : Cloudflare ne gagne alors pas d'office.
+            if let cloudflareMs, let candidateMs = candidate.latencyMs,
+               cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < candidateMs {
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
                     location: location,
@@ -847,34 +853,21 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let dlGraphWarmupState = ProgressState()
         let omitMs = Double(omitSeconds) * 1_000
 
-        // Ping / jitter en charge pendant le DL — sur un port voisin (pas le port
-        // de mesure) pour ne pas RST le démon iPerf3 en cours de test.
+        // Ping / jitter en charge pendant le DL — en ICMP seulement. Une connexion
+        // TCP sur un port VOISIN occupait un démon iPerf3 mono-place du même POP,
+        // c'est-à-dire le test d'un autre utilisateur ; sans écho ICMP (POP qui le
+        // filtre), pas de latence sous charge plutôt que cette gêne.
         let dlLoadedHost = iperfServer.hostname
-        // Port confirmé ouvert, cherché pendant la montée en charge, puis réutilisé
-        // par l'upload : il évite le port du DL et celui que l'upload prendra.
-        // `nil` = aucun port libre ne répond (POP mono-port compris) : on renonce à
-        // l'échantillon plutôt que de faire tomber le démon en pleine mesure.
-        let ulPlannedPort = endpoint.openPorts.first(where: { $0 != port })
-            ?? iperfSiblingPort(preferred: port, min: iperfServer.portMin, max: iperfServer.portMax)
-        let loadedProbePortTask = Task.detached(priority: .utility) { [tcpProbe, port] in
-            await SpeedtestService.resolveIPerfLoadedProbePort(
-                server: iperfServer, endpoint: endpoint, avoiding: [port, ulPlannedPort], tcpProbe: tcpProbe
-            )
-        }
         let dlLoadedOmit = omitSeconds
         let dlLoadedStart = speedtestMonotonicSeconds()
         let dlLoadedDeadline = dlLoadedStart + (Double(omitSeconds + durationSeconds) + 2)
-        let dlLoadedProbe = tcpProbe
         let dlLoadedPingsTask = Task.detached(priority: .utility) {
-            guard let dlLoadedPort = await loadedProbePortTask.value else { return [Double]() }
             let wait = Double(dlLoadedOmit) - (speedtestMonotonicSeconds() - dlLoadedStart)
             if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
             guard !Task.isCancelled else { return [Double]() }
-            return await SpeedtestService.collectIPerfLoadedPings(
+            return await SpeedtestService.collectIPerfLoadedIcmpPings(
                 host: dlLoadedHost,
-                port: dlLoadedPort,
-                deadline: dlLoadedDeadline,
-                tcpProbe: dlLoadedProbe
+                deadline: dlLoadedDeadline
             )
         }
         // Sur les chemins d'erreur du DL, la sonde continuait à pinger jusqu'à
@@ -945,6 +938,22 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             // Sauf si l'utilisateur a arrêté : l'annulation ferme les connexions et
             // remonte ici une erreur qui n'est pas une `CancellationError`.
             if Task.isCancelled { throw CancellationError() }
+            // Aucun port n'a mesuré : le POP est retenu indisponible (15 min), ce qui
+            // l'écarte du tour suivant. Auto passe ainsi au candidat suivant, un choix
+            // manuel à son repli Auto, avant tout repli Cloudflare. Borné : chaque POP
+            // essayé peut coûter quelques secondes.
+            await IPerfEndpointCache.shared.store(nil, for: iperfServer)
+            if iperfServerAttempt + 1 < SpeedtestEngineConfig.iperfMaxServerAttempts {
+                sqDebugLog("[SpeedtestService] DL iPerf3 KO sur \(iperfServer.id) (\(error)) — POP suivant")
+                return try await runAttempt(
+                    pathStatus: pathStatus,
+                    location: location,
+                    settings: settings,
+                    progress: progress,
+                    forceIPerfForCloudflareFallback: forceIPerfForCloudflareFallback,
+                    iperfServerAttempt: iperfServerAttempt + 1
+                )
+            }
             if forceIPerfForCloudflareFallback { throw error }
             sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error)) — bascule Cloudflare")
             return try await runCloudflareTest(
@@ -960,6 +969,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             )
         }
         port = dlPort
+        // Le port qui a mesuré est essayé juste après `portPreferred` au test suivant.
+        await IPerfEndpointCache.shared.store(IPerfEndpoint(port: dlPort), for: iperfServer)
         let pingOutcome = idlePing ?? PingOutcome(values: streamConnectRtts.values, protocolName: "TCP")
         let pingValue = SpeedMetricCalculator.average(pingOutcome.values)
         let pingMedianValue = SpeedMetricCalculator.median(pingOutcome.values)
@@ -1049,8 +1060,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // Pause courte : laisse le serveur fermer proprement la session reverse.
         try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.interPhaseDelayMs * 1_000_000))
 
-        // Port UL : de préférence un port CONFIRMÉ ouvert au probe initial
-        // (≠ port DL, occupé côté démon) — zéro re-scan entre les phases.
+        // Port UL : de préférence le dernier port qui a mesuré (≠ port DL, occupé
+        // côté démon, et refusé 5-6 s après un test terminé chez OVH).
         let ulPreferredPort = endpoint.openPorts.first(where: { $0 != port })
             ?? iperfSiblingPort(
                 preferred: port,
@@ -1058,30 +1069,16 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 max: iperfServer.portMax
             )
         let ulStreamAttempts = SpeedtestEngineConfig.uploadStreamLadder(requested: parallelStreams)
-        // Loaded pings sur un 3e port si possible, jamais le port d'upload actif.
+        // Latence sous charge en ICMP, comme pendant le DL.
         let ulLoadedHost = iperfServer.hostname
-        // Deux ports de données sont occupés à ce stade (celui du DL et celui de l'UL) :
-        // la sonde doit les éviter tous les deux, et renoncer si la plage ne le permet pas.
-        let resolvedLoadedPort = await loadedProbePortTask.value
-        let ulLoadedPort = resolvedLoadedPort.flatMap { $0 != port && $0 != ulPreferredPort ? $0 : nil }
-            ?? endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
-            ?? iperfLoadedLatencyProbePort(
-                avoiding: [port, ulPreferredPort],
-                min: iperfServer.portMin,
-                max: iperfServer.portMax
-            )
         let ulLoadedOmit = omitSeconds
         let ulLoadedDeadline = speedtestMonotonicSeconds() + (Double(omitSeconds + durationSeconds) + 3)
-        let ulLoadedProbe = tcpProbe
         let ulLoadedPingsTask = Task.detached(priority: .utility) {
-            guard let ulLoadedPort else { return [Double]() }
             try? await Task.sleep(nanoseconds: UInt64(ulLoadedOmit) * 1_000_000_000)
             guard !Task.isCancelled else { return [Double]() }
-            return await SpeedtestService.collectIPerfLoadedPings(
+            return await SpeedtestService.collectIPerfLoadedIcmpPings(
                 host: ulLoadedHost,
-                port: ulLoadedPort,
-                deadline: ulLoadedDeadline,
-                tcpProbe: ulLoadedProbe
+                deadline: ulLoadedDeadline
             )
         }
         defer { ulLoadedPingsTask.cancel() }
@@ -1272,7 +1269,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let endpoint: IPerfEndpoint
     }
 
-    /// Découvre puis mesure le port réellement joignable de quatre POPs au plus.
+    /// Classe quatre POPs au plus, sans aucune connexion à leurs démons iPerf3 : la
+    /// distance d'abord, l'ICMP là où il répond (`rankIPerfAutoCandidates`).
     private func resolveAutoIPerfCandidate(
         location: Coordinates?,
         servers: [IPerfPublicServer],
@@ -1286,18 +1284,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
         guard !shortlist.isEmpty else { return nil }
 
-        let probe = tcpProbe
         let reachable = await withTaskGroup(of: ReachableIPerfObservation?.self) { group in
             for (index, server) in shortlist.enumerated() {
                 group.addTask {
                     guard let endpoint = await resolveIPerfEndpoint(for: server) else {
                         return nil
                     }
-                    let latency = try? await probe.connectLatencyMs(
-                        host: server.hostname,
-                        port: endpoint.port,
-                        timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
-                    )
+                    let latency = await SpeedtestService.autoCandidateIcmpLatencyMs(host: server.hostname)
                     return ReachableIPerfObservation(
                         candidate: IPerfLatencyCandidate(
                             server: server,
@@ -1320,7 +1313,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         for observation in reachable {
             endpointByServer[observation.candidate.server.id] = observation.endpoint
         }
-        for observation in rankIPerfLatencyCandidates(reachable.map(\.candidate)) {
+        for observation in rankIPerfAutoCandidates(reachable.map(\.candidate)) {
             guard !Task.isCancelled else { return nil }
             let server = observation.server
             guard let endpoint = endpointByServer[server.id] else { continue }
@@ -2271,8 +2264,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     /// qui a réussi le download est déjà connu — un probe 1.5 s bloquait
     /// artificiellement le démarrage de l’upload.
     ///
-    /// **Fallback** : seulement si le preferred échoue, on sonde les autres
-    /// ports de la plage puis on réessaie.
+    /// **Fallback** : seulement si le preferred échoue, les ports déjà connus puis
+    /// les voisins de la plage, chacun par un VRAI test — jamais de connexion vide :
+    /// un démon iPerf3 mono-place la prend pour un client et refuse ensuite le port.
+    /// Un refus coûte un RTT, un port occupé un échange, un port muet 3 s
+    /// (`iperfFirstControlStateTimeoutSeconds`).
     private func runIPerf3WithPortFallback(
         serverId: String,
         hostname: String,
@@ -2299,6 +2295,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         var lastError: Error?
         var attempt = 0
+        // Connexion TCP jamais établie, sans refus : le pare-feu jette les paquets,
+        // et il jettera ceux des autres ports. Un port sans démon répond, lui, RST.
+        var hostDropsConnects = false
 
         // Chaque port essayé devient une tentative du lot IPERF-2. Un « Arrêter »
         // n'en est pas une : ni le port ni le serveur n'y sont pour rien.
@@ -2332,7 +2331,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 note(nil)
                 return result
             } catch {
-                if !(Task.isCancelled || error is CancellationError) { note(error) }
+                if !(Task.isCancelled || error is CancellationError) {
+                    note(error)
+                    let state = progress.snapshot
+                    let (stage, _, code) = IPerfAttempt.classify(
+                        error, reached: state.reached, sawBytes: state.sawBytes, isDownload: isDownload)
+                    if stage == .connect, code == .timeout { hostDropsConnects = true }
+                }
                 throw error
             }
         }
@@ -2351,33 +2356,20 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
             if isRetryableIPerfTransportError(error) {
                 lastError = error
-                // Le port préféré vient d'échouer : il est mémorisé pour 10 min, et un
-                // démon iPerf3 public est souvent mono-slot. Sans cette invalidation, le
-                // test SUIVANT de la rafale (lancé moins d'une seconde après) rejouait le
-                // même port occupé et retombait sur le repli Cloudflare, à chaque fois.
-                await IPerfEndpointCache.shared.invalidate(hostname)
             } else {
                 throw error
             }
         }
 
-        // 2) Preferred KO → ports déjà confirmés ouverts au probe initial
-        // (zéro re-scan en cours de test), sinon sonde rapide des siblings.
+        // 2) Preferred KO → dernier port qui a mesuré, puis les voisins.
         try Task.checkCancellation()
-        let orderedPorts: [UInt16]
-        let knownCandidates = knownOpenPorts.filter { $0 != preferredPort }
-        if !knownCandidates.isEmpty {
-            orderedPorts = knownCandidates
-        } else {
-            let probedOpen = await probeOpenTCPPorts(
-                host: hostname,
-                ports: siblingPorts,
-                timeoutSeconds: 0.9
-            )
-            orderedPorts = probedOpen.isEmpty ? siblingPorts : probedOpen
-        }
+        let orderedPorts = iperfFallbackPortOrder(
+            preferred: preferredPort,
+            known: knownOpenPorts,
+            siblings: siblingPorts
+        )
 
-        for candidatePort in orderedPorts {
+        for candidatePort in orderedPorts where !hostDropsConnects {
             try Task.checkCancellation()
             onPortAttempt?(candidatePort, attempt)
             attempt += 1
@@ -3073,8 +3065,41 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         return PingOutcome(values: Array(values), protocolName: "ICMP")
     }
 
-    /// RTT TCP sous charge (pendant DL/UL iPerf) : connect latency uniquement,
-    /// sans handshake iPerf3, pour peupler pingDl/Ul + jitterDl/Ul.
+    /// Latence ICMP d'un candidat Auto : la seule sonde qui ne touche pas au démon
+    /// iPerf3. `nil` sans écho, l'hôte étant alors retenu muet (15 min) — ce qui
+    /// épargne aussi la série à vide si ce POP est choisi.
+    static func autoCandidateIcmpLatencyMs(host: String) async -> Double? {
+        guard await !IPerfEndpointCache.shared.isICMPSilent(host) else { return nil }
+        let pinger = ICMPPinger(host: host, timeout: SpeedtestEngineConfig.pingTimeoutSeconds)
+        // Deux échos : le plus court des deux écarte la mise en route du chemin radio,
+        // et chaque écho de plus retarde tout le run Auto.
+        let samples = (try? await pinger.ping(
+            count: 2,
+            intervalMs: SpeedtestEngineConfig.pingIntervalMs,
+            giveUpAfterLeadingLosses: SpeedtestEngineConfig.icmpGiveUpAfterLeadingLosses
+        )) ?? []
+        guard let best = samples.map(\.rttMs).filter({ $0 > 0 }).min() else {
+            if !Task.isCancelled { await IPerfEndpointCache.shared.markICMPSilent(host) }
+            return nil
+        }
+        return best
+    }
+
+    /// RTT ICMP sous charge (pendant DL/UL iPerf), pour peupler pingDl/Ul +
+    /// jitterDl/Ul. Vide quand l'hôte filtre l'ICMP.
+    private static func collectIPerfLoadedIcmpPings(host: String, deadline: TimeInterval) async -> [Double] {
+        guard await !IPerfEndpointCache.shared.isICMPSilent(host) else { return [] }
+        let interval = SpeedtestEngineConfig.pingIntervalMs
+        let remainingMs = (deadline - speedtestMonotonicSeconds()) * 1_000
+        let count = Int(remainingMs / (interval + SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 / 4))
+        guard count > 0 else { return [] }
+        let pinger = ICMPPinger(host: host, timeout: SpeedtestEngineConfig.pingTimeoutSeconds)
+        let samples = (try? await pinger.ping(count: count, intervalMs: interval)) ?? []
+        return samples.map(\.rttMs).filter { $0 > 0 && $0 < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 }
+    }
+
+    /// RTT TCP sous charge (Cloudflare, LibreSpeed : serveurs HTTPS, pas iPerf3) :
+    /// connect latency uniquement, pour peupler pingDl/Ul + jitterDl/Ul.
     private static func collectIPerfLoadedPings(
         host: String,
         port: UInt16,
@@ -3101,40 +3126,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
         }
         return values
-    }
-
-    /// Port de sonde sous charge confirmé ouvert (`iperfLoadedLatencyProbeCandidates`) :
-    /// un port vu ouvert au sondage initial, sinon le plus haut des ports jamais
-    /// sondés qui accepte une connexion, essayés ensemble avec la sonde du test.
-    /// `nil` quand aucun ne répond : pas d'échantillon plutôt qu'un port fermé.
-    static func resolveIPerfLoadedProbePort(
-        server: IPerfPublicServer,
-        endpoint: IPerfEndpoint,
-        avoiding busyPorts: Set<UInt16>,
-        tcpProbe: SpeedtestTCPProbing
-    ) async -> UInt16? {
-        let candidates = iperfLoadedLatencyProbeCandidates(
-            avoiding: busyPorts,
-            knownOpen: endpoint.openPorts,
-            sampled: Set(iperfDiscoveryPorts(min: server.portMin, max: server.portMax, preferred: server.portPreferred)),
-            min: server.portMin,
-            max: server.portMax
-        )
-        if let verified = candidates.verified.first { return verified }
-        guard !candidates.unverified.isEmpty else { return nil }
-        let host = server.hostname
-        let open = await withTaskGroup(of: UInt16?.self) { group in
-            for port in candidates.unverified {
-                group.addTask {
-                    let ms = try? await tcpProbe.connectLatencyMs(host: host, port: port, timeoutSeconds: 1.0)
-                    return ms != nil ? port : nil
-                }
-            }
-            var open: [UInt16] = []
-            for await port in group { if let port { open.append(port) } }
-            return open
-        }
-        return open.max()
     }
 
     private func measureTcpPings(
@@ -3805,6 +3796,19 @@ func rankIPerfLatencyCandidates(_ candidates: [IPerfLatencyCandidate]) -> [IPerf
     }
 }
 
+/// Ordre Auto : la distance d'abord, l'ICMP ensuite là où il répond. Les POPs
+/// mesurés se classent entre eux par latence dans les places qu'ils occupent ; un
+/// POP qui filtre l'ICMP (tous les Bouygues) garde sa place géographique au lieu de
+/// reculer derrière un POP plus lointain qui, lui, répond.
+func rankIPerfAutoCandidates(_ candidates: [IPerfLatencyCandidate]) -> [IPerfLatencyCandidate] {
+    func isMeasured(_ candidate: IPerfLatencyCandidate) -> Bool {
+        candidate.latencyMs.map { $0.isFinite && $0 >= 0 } ?? false
+    }
+    let byDistance = candidates.sorted { $0.sourceOrder < $1.sourceOrder }
+    var measured = rankIPerfLatencyCandidates(byDistance.filter(isMeasured)).makeIterator()
+    return byDistance.map { isMeasured($0) ? measured.next() ?? $0 : $0 }
+}
+
 func iperfAutoCandidateShortlist(
     from location: Coordinates?,
     servers: [IPerfPublicServer] = activeIPerfServers,
@@ -3822,8 +3826,8 @@ func iperfAutoCandidateShortlist(
 
 struct IPerfEndpoint: Sendable {
     let port: UInt16
-    /// Ports confirmés ouverts au probe initial — réutilisés entre DL et UL
-    /// pour éviter un re-scan TCP de la plage en cours de test.
+    /// Ports qui ont déjà mesuré (le dernier bon port), essayés juste après `port`
+    /// et préférés pour l'upload.
     let openPorts: [UInt16]
 
     init(port: UInt16, openPorts: [UInt16] = []) {
@@ -3832,14 +3836,9 @@ struct IPerfEndpoint: Sendable {
     }
 }
 
-/// Mémoire courte des sondages de ports, positive ET négative.
-///
-/// Sans elle, chaque `run()` re-sondait tout : ~13 ports par serveur, et le dernier
-/// filet essaie CHAQUE serveur du catalogue trié par distance. Dans un pays où les
-/// iPerf3 sont injoignables — le cas nominal hors d'Europe — cela faisait jusqu'à
-/// ~30 s de scan et plusieurs centaines de connexions TCP **par test**, répété à
-/// chaque itération de la boucle Drive Test. Vu du réseau de l'opérateur, cela
-/// ressemble d'ailleurs à du scan de ports.
+/// Mémoire courte des VRAIS tests, positive ET négative : le dernier port qui a
+/// mesuré, ou `nil` quand aucun port n'a pu mesurer (le POP est alors écarté, et
+/// Auto passe au suivant sans le réessayer à chaque itération du Drive Test).
 ///
 /// L'échec est mis en cache plus longtemps que le succès : un serveur injoignable
 /// le reste, alors qu'un port ouvert peut se remplir.
@@ -3925,43 +3924,32 @@ actor IPerfEndpointCache {
     }
 }
 
-/// Probe TCP parallèle de la plage de ports du serveur, mémoïsé par hôte et
-/// configuration de ports du catalogue.
-/// Les ports « busy » (ACCESS_DENIED) sont gérés ensuite par
-/// `runIPerf3WithPortFallback` au moment du vrai test.
+/// Ports à essayer pour un POP, SANS AUCUNE connexion : `portPreferred` puis le
+/// dernier port qui a mesuré. `nil` quand un vrai test récent n'a abouti sur aucun
+/// port.
+///
+/// L'ancien sondage ouvrait jusqu'à 18 connexions TCP vides par serveur. Un démon
+/// iPerf3 mono-place prend chacune pour un client et refuse ensuite le port un court
+/// instant (mesuré par le backend le 19/10) : la sonde gênait le test qui la suivait,
+/// et ceux des autres utilisateurs du POP. Elle ne validait de toute façon que le
+/// connect TCP — un port muet la passait. Refus, occupation et silence sont gérés par
+/// `runIPerf3WithPortFallback`, au moment du vrai test.
 func resolveIPerfEndpoint(for server: IPerfPublicServer) async -> IPerfEndpoint? {
-    if let hit = await IPerfEndpointCache.shared.cached(server) {
-        return hit
+    guard let hit = await IPerfEndpointCache.shared.cached(server) else {
+        return IPerfEndpoint(port: server.portPreferred)
     }
-    let resolved = await resolveIPerfEndpointUncached(for: server)
-    await IPerfEndpointCache.shared.store(resolved, for: server)
-    return resolved
+    guard let lastGood = hit?.port else { return nil }
+    return IPerfEndpoint(
+        port: server.portPreferred,
+        openPorts: lastGood == server.portPreferred ? [] : [lastGood]
+    )
 }
 
-private func resolveIPerfEndpointUncached(for server: IPerfPublicServer) async -> IPerfEndpoint? {
-    let ports = iperfDiscoveryPorts(
-        min: server.portMin,
-        max: server.portMax,
-        preferred: server.portPreferred
-    )
-    let openPorts = await probeOpenTCPPorts(host: server.hostname, ports: ports, timeoutSeconds: 1.0)
-    guard !openPorts.isEmpty else {
-        // Aucun port ouvert — retourner nil pour permettre au fallback serveur
-        // de tenter un autre hôte au lieu de perdre 30s en port scanning séquentiel.
-        return nil
-    }
-    // ⚠️ Cette sonde ne valide QUE le connect TCP, jamais le handshake iPerf3. Un
-    // port MUET (TCP ouvert, démon qui ne répond jamais) la passe donc sans
-    // encombre. Prendre `openPorts.first` revenait à élire ce port muet, puis à le
-    // figer 10 minutes dans le cache : sur Clouvider Londres, ouvert mais muet de
-    // 5200 à 5206, chaque test de la fenêtre payait le timeout avant de récupérer.
-    //
-    // `portPreferred` est, lui, vérifié par un handshake réel : quand il est ouvert,
-    // il prime. On le remonte aussi en tête de `openPorts`, qui sert ensuite à
-    // choisir le port d'upload.
-    let preferred = openPorts.contains(server.portPreferred) ? server.portPreferred : openPorts[0]
-    let ordered = [preferred] + openPorts.filter { $0 != preferred }
-    return IPerfEndpoint(port: preferred, openPorts: ordered)
+/// Ordre du port-walk après l'échec du port préféré : les ports déjà connus (le
+/// dernier qui a mesuré), puis les voisins, sans doublon ni le port préféré.
+func iperfFallbackPortOrder(preferred: UInt16, known: [UInt16], siblings: [UInt16]) -> [UInt16] {
+    var seen: Set<UInt16> = [preferred]
+    return (known + siblings).filter { seen.insert($0).inserted }
 }
 
 private let iperfPortSamplingThreshold = 15
@@ -4032,67 +4020,10 @@ func iperfSiblingCandidatePorts(
         .filter { $0 != preferred }
 }
 
-private func probeOpenTCPPorts(host: String, ports: [UInt16], timeoutSeconds: TimeInterval) async -> [UInt16] {
-    await withTaskGroup(of: UInt16?.self) { group in
-        for port in ports {
-            group.addTask {
-                await tcpPortIsOpen(host: host, port: port, timeoutSeconds: timeoutSeconds) ? port : nil
-            }
-        }
-        var open: [UInt16] = []
-        for await result in group {
-            if let port = result { open.append(port) }
-        }
-        return open.sorted()
-    }
-}
-
-private func tcpPortIsOpen(host: String, port: UInt16, timeoutSeconds: TimeInterval) async -> Bool {
-    // Port 0 est le seul rawValue invalide : un port improbable = fermé, pas un crash.
-    guard let nwPort = NWEndpoint.Port(rawValue: port) else { return false }
-    let gate = ConcurrencyGate()
-    return await withCheckedContinuation { continuation in
-        let queue = DispatchQueue(label: "fr.signalquest.speedtest.portprobe.\(port)")
-        let connection = NWConnection(
-            host: NWEndpoint.Host(host),
-            port: nwPort,
-            using: iperfTCPParameters()
-        )
-        connection.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                if !gate.testAndSet() {
-                    connection.cancel()
-                    continuation.resume(returning: true)
-                }
-            case .failed:
-                if !gate.testAndSet() {
-                    connection.cancel()
-                    continuation.resume(returning: false)
-                }
-            case .waiting(let error):
-                if isImmediateConnectRefusal(error), !gate.testAndSet() {
-                    connection.cancel()
-                    continuation.resume(returning: false)
-                }
-            default:
-                break
-            }
-        }
-        queue.asyncAfter(deadline: .now() + timeoutSeconds) {
-            if !gate.testAndSet() {
-                connection.cancel()
-                continuation.resume(returning: false)
-            }
-        }
-        connection.start(queue: queue)
-    }
-}
-
 /// Un refus (RST) ne fait PAS échouer une `NWConnection` : elle passe en `.waiting`
-/// et réessaie au prochain changement de chemin. Pour une sonde ou un connect iPerf3
-/// c'est pourtant une réponse définitive — attendre le délai (1,2 s pour une sonde,
-/// 5 s pour un connect iPerf3) ne faisait que retarder le passage au port suivant.
+/// et réessaie au prochain changement de chemin. Pour un connect iPerf3 c'est
+/// pourtant une réponse définitive — attendre le délai (5 s) ne faisait que retarder
+/// le passage au port suivant.
 /// Les autres attentes (pas de réseau, pas de route) gardent leur délai.
 func isImmediateConnectRefusal(_ error: NWError) -> Bool {
     if case .posix(let code) = error, code == .ECONNREFUSED { return true }
@@ -4144,79 +4075,13 @@ func isRetryableIPerfTransportError(_ error: Error) -> Bool {
 /// Port voisin public (hors classe service) — tests / helpers.
 ///
 /// Sert à choisir un port de DONNÉES de repli (l'upload, qui ne peut pas réutiliser
-/// le port du download). Pour une SONDE de latence, utiliser
-/// `iperfLoadedLatencyProbePort` : elle seule sait renoncer.
+/// le port du download).
 func iperfSiblingPort(preferred: UInt16, min portMin: UInt16, max portMax: UInt16) -> UInt16 {
     let lo = min(portMin, portMax)
     let hi = max(portMin, portMax)
     guard hi > lo else { return preferred }
     if preferred < hi { return preferred &+ 1 }
     return lo
-}
-
-/// Port de SONDE pour la latence sous charge — jamais un port de données actif.
-///
-/// Vise le HAUT de la plage. Le download part du bas et l'upload prend le voisin
-/// immédiat : le haut ne gêne donc ni l'un ni l'autre, et surtout il n'entre pas en
-/// concurrence avec le port-walk. `iperfSiblingPort` visait `actif + 1`,
-/// c'est-à-dire précisément le port que le walk et l'upload allaient réclamer
-/// ensuite — un conflit qu'on s'infligeait à soi-même.
-///
-/// Renvoie `nil` quand la plage ne permet pas d'éviter les ports occupés : on saute
-/// alors l'échantillon plutôt que d'ouvrir une connexion sur le port de données, ce
-/// qui RST le démon iPerf3 en pleine mesure et fausse à la fois la latence ET le
-/// débit. Le cas n'a rien de théorique : plusieurs POPs publics du catalogue
-/// n'exposent qu'un seul port, et l'ancienne fonction y renvoyait le port actif.
-///
-/// Miroir de `computeLoadedLatencyProbePort` côté Android : les deux doivent rester
-/// alignés, faute de quoi les latences chargées des deux plateformes cessent d'être
-/// comparables.
-func iperfLoadedLatencyProbePort(
-    avoiding busyPorts: Set<UInt16>,
-    min portMin: UInt16,
-    max portMax: UInt16
-) -> UInt16? {
-    let lo = min(portMin, portMax)
-    let hi = max(portMin, portMax)
-    guard hi > lo else { return nil }
-    var candidate = hi
-    while candidate >= lo {
-        if !busyPorts.contains(candidate) { return candidate }
-        if candidate == lo { break }
-        candidate -= 1
-    }
-    return nil
-}
-
-/// Ports à essayer pour la sonde de latence sous charge, du plus sûr au moins sûr.
-///
-/// Le haut de la plage n'est pas forcément ouvert : les POPs Bouygues annoncent
-/// 9200-9240 mais n'y font tourner que quelques démons (9 à 11 à Lyon le 20/10,
-/// pas 9240), et la sonde y échouait à chaque échantillon, sans ligne « Sous
-/// charge » à la fin. D'abord les ports déjà vus ouverts au sondage initial, du
-/// plus haut au plus bas (l'upload prend le plus bas) ; puis, à vérifier, les
-/// ports jamais sondés en partant du haut. Jamais un port de données ni un port
-/// déjà vu fermé ; vide sur un POP à port unique.
-func iperfLoadedLatencyProbeCandidates(
-    avoiding busyPorts: Set<UInt16>,
-    knownOpen: [UInt16],
-    sampled: Set<UInt16>,
-    min portMin: UInt16,
-    max portMax: UInt16,
-    limit: Int = 8
-) -> (verified: [UInt16], unverified: [UInt16]) {
-    let lo = min(portMin, portMax)
-    let hi = max(portMin, portMax)
-    let verified = knownOpen.filter { !busyPorts.contains($0) && (lo...hi).contains($0) }
-        .sorted(by: >)
-    var unverified: [UInt16] = []
-    var candidate = hi
-    while candidate >= lo, unverified.count < limit {
-        if !busyPorts.contains(candidate), !sampled.contains(candidate) { unverified.append(candidate) }
-        if candidate == lo { break }
-        candidate -= 1
-    }
-    return (verified, unverified)
 }
 
 private func connectNW(_ connection: NWConnection, queue: DispatchQueue, timeoutSeconds: TimeInterval) async throws {
