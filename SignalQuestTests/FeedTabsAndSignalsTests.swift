@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 import MapKit
 import CoreLocation
 @testable import SignalQuest
@@ -860,5 +861,91 @@ final class CoverageCardRulesTests: XCTestCase {
         XCTAssertFalse(CoverageCardView.subtitle("Orange · 4G", names: "5G"), "a different technology stays visible")
         XCTAssertFalse(CoverageCardView.subtitle("Orange · 5G NSA", names: "5G"), "compared technology by technology, not as text")
         XCTAssertFalse(CoverageCardView.subtitle(nil, names: "4G"))
+    }
+}
+
+/// Revue q34, lot A : un post est lu d'après ce qu'il est, pas d'après le `kind`
+/// servi, et la ligne réseau d'un speedtest nomme le Wi-Fi et l'opérateur sans jargon.
+final class FeedAutomaticPostKindTests: XCTestCase {
+    private func item(kind: String, targetType: String?, signalType: String? = nil, metadata: String = "{}") throws -> UnifiedSocialFeedItem {
+        let target = targetType.map { "\"\($0)\"" } ?? "null"
+        let signal = signalType.map { "{\"type\":\"\($0)\"}" } ?? "null"
+        return try JSONDecoder().decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"p1","kind":"\(kind)","author":{"id":"u1"},"text":"t","targetType":\(target),"signal":\(signal),
+         "metadata":\(metadata),"commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false}
+        """.utf8))
+    }
+
+    /// Post « telecom » : servi en `validation`, rattaché à un speedtest (constat 3).
+    func testMemberPostOnASpeedtestIsShownAsASpeedtest() throws {
+        XCTAssertEqual(try item(kind: "validation", targetType: "speedtest").cardKind, "speedtest")
+        XCTAssertEqual(try item(kind: "validation", targetType: nil, signalType: "speedtest").cardKind, "speedtest")
+        XCTAssertEqual(try item(kind: "validation", targetType: "validation", signalType: "validation").cardKind, "validation")
+        XCTAssertEqual(try item(kind: "PHOTO", targetType: nil).cardKind, "photo")
+    }
+
+    /// Site communautaire sans activityType : targetType suffit (constat 5).
+    func testCustomSiteIsRecognisedByItsTarget() throws {
+        let site = try item(kind: "validation", targetType: "custom_site", metadata: #"{"customSiteName":"Pylône"}"#)
+        XCTAssertEqual(FeedActivity(item: site)?.family, .customSite)
+        XCTAssertEqual(FeedActivity(item: site)?.subtitle, "Pylône")
+        XCTAssertNil(FeedActivity(item: try item(kind: "validation", targetType: "validation")))
+    }
+
+    /// « Orange WIFI » devient « Wi-Fi (Orange) » ; en mobile, le nom complet (constat 1).
+    func testNetworkLabelNamesWiFiAndTheFullOperator() {
+        XCTAssertEqual(FeedMeasureBlock.networkLabel(operator: "Orange", technology: "WIFI"), "Wi-Fi (Orange)")
+        XCTAssertEqual(FeedMeasureBlock.networkLabel(operator: nil, technology: "wifi"), "Wi-Fi")
+        XCTAssertEqual(FeedMeasureBlock.networkLabel(operator: "BOUYGUES", technology: "5G NSA"),
+                       "\(SQBrand.operatorName("BOUYGUES") ?? "BOUYGUES") 5G NSA")
+        XCTAssertEqual(FeedMeasureBlock.networkLabel(operator: "  ", technology: nil), nil)
+    }
+}
+
+/// Planche de revue des posts automatiques (q34) : rend chaque élément d'un fichier
+/// d'échantillons (`SQ_FEED_SAMPLES`, tableau d'éléments tels que servis) dans le fil,
+/// en clair, en sombre et en grande taille de texte, vers `SQ_FEED_OUT`. Sans ces
+/// variables, le test ne fait rien.
+@MainActor
+final class FeedSampleRenderingHarness: XCTestCase {
+    func testRenderSamples() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let input = env["SQ_FEED_SAMPLES"], let output = env["SQ_FEED_OUT"] else {
+            throw XCTSkip("SQ_FEED_SAMPLES / SQ_FEED_OUT absents")
+        }
+        let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: input))) as? [[String: Any]])
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: text) { return date }
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: text) ?? Date()
+        }
+        let language = Locale.preferredLanguages.first?.prefix(2) ?? "fr"
+        for (index, object) in raw.enumerated() {
+            let name = (object["_name"] as? String) ?? "item\(index)"
+            var clean = object
+            clean.removeValue(forKey: "_name")
+            let item = try decoder.decode(UnifiedSocialFeedItem.self, from: JSONSerialization.data(withJSONObject: clean))
+            let variants: [(String, ColorScheme, DynamicTypeSize)] = [
+                ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility3),
+            ]
+            for (suffix, scheme, size) in variants {
+                let view = FeedItemCard(item: item)
+                    .padding(16)
+                    .frame(width: 393)
+                    .background(scheme == .dark ? Color.black : Color(red: 0.95, green: 0.94, blue: 0.91))
+                    .environment(\.colorScheme, scheme)
+                    .environment(\.dynamicTypeSize, size)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 2
+                let image = try XCTUnwrap(renderer.uiImage, name)
+                let path = "\(output)/\(name)-\(language)-\(suffix).png"
+                try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: path))
+            }
+        }
     }
 }

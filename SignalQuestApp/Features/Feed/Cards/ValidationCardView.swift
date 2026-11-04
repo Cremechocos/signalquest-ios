@@ -36,19 +36,21 @@ struct ValidationCardView: View {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             validationHeading
-                            SQEditorialTag(text: signal?.technology ?? "—", color: accent)
+                            technologyTag
                         }
                     } else {
                         HStack(alignment: .center, spacing: SQSpace.md) {
                             validationHeading
                             Spacer()
-                            SQEditorialTag(text: signal?.technology ?? "—", color: accent)
+                            technologyTag
                         }
                     }
                 }
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
-                FeedMetricGrid(metrics: metrics)
+                if !metrics.isEmpty {
+                    FeedMetricGrid(metrics: metrics)
+                }
 
                 if let count = signal?.validationCount, count > 0 {
                     Text("\(count) confirmations")
@@ -79,6 +81,14 @@ struct ValidationCardView: View {
             .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
+    }
+
+    /// Techno trouvée ; rien plutôt qu'un tiret quand le serveur ne la donne pas.
+    @ViewBuilder
+    private var technologyTag: some View {
+        if let technology = signal?.technology?.trimmingCharacters(in: .whitespacesAndNewlines), !technology.isEmpty {
+            SQEditorialTag(text: technology, color: accent)
+        }
     }
 
     private var validationHeading: some View {
@@ -124,9 +134,12 @@ struct ValidationCardView: View {
 
     /// Identifiant, puis la méthode quand on la connaît.
     private var metrics: [FeedMetricGrid.Metric] {
-        var metrics = [FeedMetricGrid.Metric(
-            label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true
-        )]
+        // Identifiant absent : pas de tuile « — » (revue q34, constat 4).
+        var metrics: [FeedMetricGrid.Metric] = []
+        if let identifier = (signal?.identifierValue ?? signal?.cellId)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !identifier.isEmpty {
+            metrics.append(.init(label: identifierTileLabel, value: identifier, highlight: true))
+        }
         if let method = identifierMethodLabel {
             metrics.append(.init(label: "Méthode", value: method))
         }

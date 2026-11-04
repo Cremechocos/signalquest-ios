@@ -804,8 +804,7 @@ struct FeedMeasureBlock: View {
         download = signal?.downloadMbps
         upload = signal?.uploadMbps
         ping = signal?.pingMs
-        let parts = [signal?.servingOperator ?? signal?.operator, signal?.technology].compactMap { $0 }
-        operatorAndTech = parts.isEmpty ? nil : parts.joined(separator: " ")
+        operatorAndTech = Self.networkLabel(operator: signal?.servingOperator ?? signal?.operator, technology: signal?.technology)
         roamingSim = signal?.isRoaming == true ? signal?.simOperator : nil
     }
 
@@ -862,6 +861,18 @@ struct FeedMeasureBlock: View {
         .accessibilityLabel(Text("Speedtest"))
         .accessibilityValue(Text(spoken))
         .accessibilityIdentifier("feed.speedtest.measure")
+    }
+
+    /// « Orange France 4G LTE » en mobile ; « Wi-Fi (Free) » en Wi-Fi, où le nom est
+    /// celui du fournisseur d'accès et jamais un opérateur mobile (revue q34, constat 1).
+    static func networkLabel(operator rawOperator: String?, technology: String?) -> String? {
+        let trimmed = rawOperator?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed?.isEmpty == false ? trimmed : nil
+        if TechAccent.shortLabel(for: technology) == "Wi-Fi" {
+            return name.map { "Wi-Fi (\($0))" } ?? "Wi-Fi"
+        }
+        let parts = [name.map { SQBrand.operatorName($0) ?? $0 }, technology].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
     /// Débit de réception réellement mesuré ; zéro ou absent ne s'affiche pas.

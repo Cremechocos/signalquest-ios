@@ -100,6 +100,6 @@ struct FeedItemCard: View {
         // The backend sometimes returns the historical SocialPost type
         // ("antenna_photo") and sometimes the v2 kind ("photo"). We normalise
         // here so the rest of the code only deals with a small set.
-        item.kind.lowercased()
+        item.cardKind
     }
 }

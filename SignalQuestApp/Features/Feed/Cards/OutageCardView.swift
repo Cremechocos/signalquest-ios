@@ -256,7 +256,13 @@ struct OutageCardView: View {
     /// (`CardActionsBar`), déclenchés sur un changement de valeur, et tous deux s'effacent sous
     /// Reduce Motion (`SQReduceMotionAnimation`, et le `reduce` de `SQLikePopModifier`).
     private var hero: some View {
-        HStack(alignment: .center, spacing: SQSpace.md) {
+        // En grande taille de texte, titre et état passent l'un sous l'autre : côte à côte,
+        // ils se coupaient en « Plus de r… » et « À confir… » (revue q34, constat 10).
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.md))
+        return layout {
             Image(systemName: isResolved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(ink)
@@ -268,9 +274,9 @@ struct OutageCardView: View {
             Text(headline)
                 .font(SQFont.display(19, .bold))
                 .foregroundStyle(SQColor.label)
-                .lineLimit(2)
+                .lineLimit(stacked ? nil : 2)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            if !stacked { Spacer(minLength: 0) }
             if let stateTag {
                 SQEditorialTag(text: stateTag.label, color: stateTag.color)
                     // Moment 2 : le mot de l'état vient de changer (« À confirmer » → « Confirmée »,

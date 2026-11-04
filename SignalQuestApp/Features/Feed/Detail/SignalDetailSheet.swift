@@ -46,7 +46,7 @@ struct SignalDetailSheet: View {
     private var signal: SocialSignalSummary? { item.signal }
     private var detailsHidden: Bool { signal?.detailsHidden == true || detailsHiddenByServer }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
-    private var isSpeedtest: Bool { item.kind.lowercased() == "speedtest" }
+    private var isSpeedtest: Bool { item.cardKind == "speedtest" }
     private var place: String? { signal?.city ?? item.readablePlaceLabel }
     private var experience: FeedExperience? { FeedExperience(item: item) }
 
@@ -501,7 +501,7 @@ struct SignalDetailSheet: View {
     }
 
     private func metricPairs(for signal: SocialSignalSummary) -> [(String, String)] {
-        switch item.kind.lowercased() {
+        switch item.cardKind {
         case "speedtest":
             let detail = speedtestDetail
             return [

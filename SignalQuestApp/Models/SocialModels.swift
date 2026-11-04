@@ -552,6 +552,17 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     }
     var isPinned: Bool { pinnedAt != nil }
 
+    /// Type de carte à afficher. Un post de membre joint à un speedtest (stocké
+    /// `telecom`) arrive en `validation` avec `targetType = speedtest` : c'est un
+    /// speedtest, pas une identification d'antenne (revue q34, constat 3).
+    var cardKind: String {
+        let kind = kind.lowercased()
+        if kind == "validation", targetType?.lowercased() == "speedtest" || signal?.type?.lowercased() == "speedtest" {
+            return "speedtest"
+        }
+        return kind
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll, generated, textKey, textArgs
     }

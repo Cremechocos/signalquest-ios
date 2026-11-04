@@ -57,7 +57,10 @@ struct FeedActivity: Equatable {
         switch (kind, activity) {
         case ("post", _) where source.hasPrefix("netmonster"): family = .officialRecap
         case ("telecom", _): family = .telecom
+        // Un site communautaire arrive en `validation` : targetType le distingue
+        // même quand activityType manque (revue q34, constat 5).
         case ("site", _), (_, "custom_site_created"): family = .customSite
+        case ("validation", _) where item.targetType?.lowercased() == "custom_site": family = .customSite
         case ("badge", "quest_claim"): family = .quest
         case ("badge", "level_up"): family = .level
         case ("badge", "badge_earned"): family = .badge
