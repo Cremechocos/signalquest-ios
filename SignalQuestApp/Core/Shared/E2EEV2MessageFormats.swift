@@ -824,7 +824,7 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
     var importedFromMessageId: String? = nil
 
     static func parse(_ value: E2EEV2JSON) -> E2EEV2DeliveredMessageV2? {
-        guard let root = value.objectValue, Set(root.keys).subtracting(["importedFromMessageId"]) == keys,
+        guard let root = value.objectValue, Set(root.keys).subtracting(["importedFromMessageId", "delivery"]) == keys,
               let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
               let sequence = root["sequence"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger), sequence >= 1,
               let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
@@ -833,6 +833,13 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
               let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
+        // D.16 : le serveur ajoute `delivery` à chaque message lu depuis le
+        // 20/10 (« message » pour une enveloppe v2). Facultatif, mais toujours
+        // égal à celui de l'enveloppe signée : sinon la page est refusée.
+        if let served = root["delivery"] {
+            guard let delivery = served.stringValue.flatMap(E2EEV2Delivery.init(rawValue:)), delivery != .liveShare,
+                  delivery == signed.envelope.delivery else { return nil }
+        }
         var importedFrom: String?
         if let served = root["importedFromMessageId"] {
             guard let id = served.stringValue, E2EEV2Canonical.isOpaque(id) else { return nil }

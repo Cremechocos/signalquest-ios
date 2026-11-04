@@ -640,6 +640,41 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
                                                          envelopeId: "envelope_01J7ABCD00000004"), "Sans sa conversation")
     }
 
+    /// D.16 : le serveur ajoute `delivery` à chaque message lu (« message » pour
+    /// une enveloppe v2). La page reste lisible avec ou sans, jamais en désaccord.
+    func testDeliveredMessageAcceptsServedDeliveryMatchingTheEnvelope() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let epoch = E2EEV2StoredEpochKey(
+            conversationId: "conversation_01J7ABCD23456789", epochId: "epoch_01J7ABCD23456789", epochNumber: 1,
+            keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(Data(repeating: 4, count: 32)), epochKey: Data(repeating: 4, count: 32)
+        )
+        let payload = try E2EEV2ContentPayloadV2(
+            sentAtMs: 1_790_000_000_000, counter: 1, replyToRef: nil, mentions: [], body: .text("Message")
+        ).encoded()
+        let signed = try E2EEV2MessageComposerV2.compose(
+            payload: payload, conversationId: epoch.conversationId, clientRequestId: "message_01J7ABCD00000004",
+            ttlSeconds: 0, epoch: epoch, device: fixture.descriptor, fk: Data(repeating: 5, count: 32),
+            nonce: Data(repeating: 6, count: 12), sign: fixture.signer()
+        )
+        func item(delivery: String?) -> E2EEV2JSON {
+            var fields: [String: E2EEV2JSON] = [
+                "envelopeId": .string("envelope_01J7ABCD00000004"), "sequence": .string("4"),
+                "senderUserId": .string(fixture.user), "senderDeviceId": .string(fixture.descriptor.deviceId),
+                "envelope": signed.json, "serverTagB64": .string(Data(repeating: 9, count: 32).base64EncodedString()),
+                "serverTimeMs": .string("1790000000250"), "keyId": .string(tagKeyId),
+            ]
+            if let delivery { fields["delivery"] = .string(delivery) }
+            return .object(fields)
+        }
+        XCTAssertNotNil(E2EEV2DeliveredMessageV2.parse(item(delivery: nil)), "Sans delivery")
+        XCTAssertNotNil(E2EEV2DeliveredMessageV2.parse(item(delivery: "message")), "delivery servie par le serveur")
+        let page = E2EEV2CanonicalJSON.encode(.object(["messages": .array([item(delivery: "message")]), "hasMore": .bool(false)]))
+        XCTAssertEqual(E2EEV2DeliveredMessageV2.parsePage(page, after: 0)?.messages.map(\.sequence), [4])
+        for refused in ["annotation", "live_share", "MESSAGE", ""] {
+            XCTAssertNil(E2EEV2DeliveredMessageV2.parse(item(delivery: refused)), refused)
+        }
+    }
+
     // MARK: Aides
 
     private func draft(_ text: String) -> E2EEV2MessageSenderV2.Draft {
