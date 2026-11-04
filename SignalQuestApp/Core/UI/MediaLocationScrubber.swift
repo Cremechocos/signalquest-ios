@@ -216,9 +216,23 @@ enum MediaLocationScrubber {
 
     private static func gpsBlock(_ bytes: [UInt8], tiff: Int, gps: Int, end: Int, u16: (Int) -> Int?, u32: (Int) -> Int?,
                                  into ranges: inout [Range<Int>]) {
-        guard let count = u16(gps), gps + 2 + count * 12 <= end else { return }
+        guard gps >= tiff, gps < end else { return }
+        // Tableau d'entrées qui déborde : effacé jusqu'à la fin du bloc TIFF (la fin du
+        // fichier pour un TIFF), avec les valeurs hors ligne de ses entrées entières (r17).
+        let count = u16(gps) ?? 0
+        let blockEnd = gps + 2 + count * 12
+        guard blockEnd <= end else {
+            ranges.append(gps ..< end)
+            for entry in 0..<max(0, (end - gps - 2) / 12) {
+                let at = gps + 2 + entry * 12
+                if let value = valueRange(at: at, tiff: tiff, end: end, u16: u16, u32: u32), value.lowerBound != at + 8 {
+                    ranges.append(value)
+                }
+            }
+            return
+        }
         ranges.append(gps ..< gps + 2)
-        if count > 0 { ranges.append(gps + 2 ..< gps + 2 + count * 12) }
+        if count > 0 { ranges.append(gps + 2 ..< blockEnd) }
         for entry in 0..<count {
             let at = gps + 2 + entry * 12
             // Les valeurs de 4 octets au plus sont dans l'entrée, déjà effacée.

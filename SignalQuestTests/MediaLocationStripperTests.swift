@@ -504,4 +504,25 @@ final class MediaLocationStripperTests: XCTestCase {
         let straddling: [UInt8] = [0x21, 0xFF, 1, 0x58, 77] + Array("P DataXMP".utf8) + [67] + [UInt8](repeating: 0x55, count: 67) + [0]
         XCTAssertTrue(MediaLocationScrubber.plan(for: handmadeGIF(straddling)).zeroed.isEmpty)
     }
+
+    /// r17 : un bloc GPS dont le tableau d'entrées déborde la fin du fichier est effacé
+    /// de son début à la fin, avec les valeurs hors ligne de ses entrées entières.
+    func testTruncatedGPSBlockIsZeroedToTheEndOfTheFile() {
+        func le16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8)] }
+        func le32(_ v: Int) -> [UInt8] { le16(v & 0xFFFF) + le16(v >> 16) }
+        // IFD0 en 8 : une entrée GPSInfo vers 50 ; latitude hors ligne en 26 ; bloc GPS en 50.
+        var bytes = Array("II".utf8) + [42, 0] + le32(8)
+        bytes += le16(1) + le16(0x8825) + le16(4) + le32(1) + le32(50) + le32(0)
+        bytes += le32(45) + le32(1) + le32(7) + le32(1) + le32(30) + le32(1)
+        bytes += le16(3)
+        bytes += le16(1) + le16(2) + le32(2) + Array("N".utf8) + [0, 0, 0]
+        bytes += le16(2) + le16(5) + le32(3) + le32(26)
+        bytes += le16(4) + le16(5) + [3, 0]
+        let data = Data(bytes)
+        XCTAssertEqual(MediaLocationScrubber.plan(for: data).zeroed, [26 ..< 50, 50 ..< bytes.count])
+        let cleaned = MediaLocationScrubber.scrubbed(data)
+        XCTAssertEqual(cleaned.count, data.count)
+        XCTAssertEqual(Array(cleaned[26...]), [UInt8](repeating: 0, count: bytes.count - 26))
+        XCTAssertEqual(Array(cleaned[..<26]), Array(bytes[..<26]), "IFD0 intact")
+    }
 }
