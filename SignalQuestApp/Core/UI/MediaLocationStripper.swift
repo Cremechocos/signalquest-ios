@@ -28,7 +28,10 @@ enum MediaLocationStripper {
     /// Copie de l'image sans lieu (GPS EXIF et XMP, noms de lieu IPTC et XMP), pixels
     /// inchangés. `nil` si l'image porte un lieu qu'on ne sait pas retirer : mieux vaut
     /// refuser que l'envoyer.
-    static func strippedImage(_ data: Data) -> Data? {
+    static func strippedImage(_ original: Data) -> Data? {
+        // Ce qui suit l'image principale d'un JPEG (gain map HDR, vidéo d'une Motion
+        // Photo) peut porter un lieu, et ni la lecture ni la copie d'ImageIO ne le voient.
+        let data = jpegPrimaryImage(original) ?? original
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let type = CGImageSourceGetType(source) else { return data }
         guard hasLocation(data) else { return data }
@@ -98,6 +101,36 @@ enum MediaLocationStripper {
         guard let prefix = CGImageMetadataTagCopyPrefix(tag) as String?,
               let name = CGImageMetadataTagCopyName(tag) as String? else { return false }
         return (prefix == "exif" && name.hasPrefix("GPS")) || placeNameXMPTags.contains("\(prefix):\(name)")
+    }
+
+    /// Le JPEG coupé à la fin de son image principale (marqueur EOI), `nil` si `data`
+    /// n'est pas un JPEG lisible ou n'a rien après. Les segments se suivent par leur
+    /// longueur ; après un SOS, les données compressées vont jusqu'au prochain marqueur
+    /// qui n'est ni un octet de bourrage (FF00) ni un RST (FFD0 à FFD7).
+    static func jpegPrimaryImage(_ data: Data) -> Data? {
+        let bytes = [UInt8](data)
+        guard bytes.count > 4, bytes[0] == 0xFF, bytes[1] == 0xD8 else { return nil }
+        var index = 2
+        while index + 1 < bytes.count {
+            guard bytes[index] == 0xFF else { return nil }
+            let marker = bytes[index + 1]
+            if marker == 0xFF { index += 1; continue }
+            if marker == 0xD9 {
+                let end = index + 2
+                return end < bytes.count ? Data(bytes[0..<end]) : nil
+            }
+            if marker == 0x01 || (0xD0...0xD7).contains(marker) { index += 2; continue }
+            guard index + 3 < bytes.count else { return nil }
+            let length = Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])
+            guard length >= 2 else { return nil }
+            index += 2 + length
+            guard marker == 0xDA else { continue }
+            while index + 1 < bytes.count {
+                if bytes[index] == 0xFF, bytes[index + 1] != 0x00, !(0xD0...0xD7).contains(bytes[index + 1]) { break }
+                index += 1
+            }
+        }
+        return nil
     }
 
     /// Les métadonnées sans balise de lieu.

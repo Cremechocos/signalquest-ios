@@ -224,6 +224,44 @@ final class MediaLocationStripperTests: XCTestCase {
         }
     }
 
+    /// JPEG de Pixel : un second JPEG (gain map HDR) ou la vidéo d'une Motion Photo suit
+    /// l'image principale, invisible à ImageIO, et peut porter un lieu. Coupé avant l'envoi,
+    /// même quand l'image principale n'en a pas ; la date et le modèle restent (§7.7).
+    func testJPEGLosesWhatFollowsItsPrimaryImage() throws {
+        let video = Data("ftypisom moov udta \u{A9}xyz+45.7578+004.8320/".utf8)
+        for primaryHasGPS in [false, true] {
+            let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 6, bitsPerComponent: 8, bytesPerRow: 0,
+                                                  space: CGColorSpaceCreateDeviceRGB(),
+                                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+            context.setFillColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 6))
+            let primary = NSMutableData()
+            let destination = try XCTUnwrap(CGImageDestinationCreateWithData(primary, UTType.jpeg.identifier as CFString, 1, nil))
+            var properties: [CFString: Any] = [
+                kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:11:04 09:00:00"],
+                kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFModel: "Pixel 9"],
+            ]
+            if primaryHasGPS {
+                properties[kCGImagePropertyGPSDictionary] = [kCGImagePropertyGPSLatitude: 45.7578, kCGImagePropertyGPSLatitudeRef: "N"]
+            }
+            CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), properties as CFDictionary)
+            XCTAssertTrue(CGImageDestinationFinalize(destination))
+            let original = (primary as Data) + (try geotaggedImage(.jpeg)) + video
+            XCTAssertTrue(containsGPSPointer(original))
+
+            let clean = try XCTUnwrap(MediaLocationStripper.strippedImage(original), "primaryHasGPS=\(primaryHasGPS)")
+            XCTAssertFalse(containsGPSPointer(clean), "primaryHasGPS=\(primaryHasGPS)")
+            XCTAssertNil(clean.range(of: Data("+45.7578".utf8)), "primaryHasGPS=\(primaryHasGPS)")
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(clean as CFData, nil))
+            let read = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+            XCTAssertEqual((read[kCGImagePropertyTIFFDictionary] as? [CFString: Any])?[kCGImagePropertyTIFFModel] as? String, "Pixel 9")
+            XCTAssertEqual((read[kCGImagePropertyExifDictionary] as? [CFString: Any])?[kCGImagePropertyExifDateTimeOriginal] as? String,
+                           "2026:11:04 09:00:00")
+        }
+        // Un JPEG ordinaire n'a rien après son image : rien n'est coupé.
+        XCTAssertNil(MediaLocationStripper.jpegPrimaryImage(try geotaggedImage(.jpeg)))
+    }
+
     func testNonImageDataIsUntouched() {
         let text = Data("bonjour".utf8)
         XCTAssertEqual(MediaLocationStripper.strippedImage(text), text)
