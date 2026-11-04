@@ -71,22 +71,27 @@ enum E2EEAutoHistoryRequestContract {
         return views.count == raw.count ? views : nil
     }
 
-    /// Servir sans activation : `{ request, activation: null }`, la demande close.
-    static func parseFulfil(_ data: Data, requestId: String) -> Bool {
+    /// `{ request, activation }` : `activation` nul sans `ACTIVATE` ; sinon `{ entry, link, head }`
+    /// que `writtenActivation` doit reconnaître comme l'`ACTIVATE` signé ici. La demande est close.
+    static func parseFulfil(_ data: Data, requestId: String, writtenActivation: (([String: Any]) -> Bool)? = nil) -> Bool {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              Set(object.keys) == ["request", "activation"], object["activation"] is NSNull,
-              let request = view(object["request"]) else { return false }
-        return request.requestId == requestId && request.status == .fulfilled
+              Set(object.keys) == ["request", "activation"], let request = view(object["request"]),
+              request.requestId == requestId, request.status == .fulfilled else { return false }
+        guard let writtenActivation else { return object["activation"] is NSNull }
+        guard let written = object["activation"] as? [String: Any], Set(written.keys) == ["entry", "link", "head"] else { return false }
+        return writtenActivation(written)
     }
 
     static func createBody(activate: Bool) throws -> Data {
         try JSONSerialization.data(withJSONObject: ["activate": activate], options: [.sortedKeys])
     }
 
-    /// Corps exact du `fulfil` ; `activation` vient avec le mode renforcé (§6).
-    static func fulfilBody(_ wrap: E2EEAutoHistory.Wrap) throws -> Data {
+    /// Corps exact du `fulfil` : `activation` pour une demande `activate: true` (§6), où
+    /// `historyWrap` est nul si l'approbateur ne détient pas HK.
+    static func fulfilBody(_ wrap: E2EEAutoHistory.Wrap?, activation: [String: String]? = nil) throws -> Data {
         try JSONSerialization.data(
-            withJSONObject: ["historyWrap": wrap.jsonObject, "activation": NSNull()] as [String: Any], options: [.sortedKeys]
+            withJSONObject: ["historyWrap": wrap?.jsonObject ?? NSNull(), "activation": activation ?? NSNull()] as [String: Any],
+            options: [.sortedKeys]
         )
     }
 
@@ -102,6 +107,8 @@ actor E2EEAutoHistoryRequests {
     struct OpenRequest: Codable, Equatable, Sendable {
         let requestId: String
         let expiresAtMs: Int64
+        /// Demande d'un appareil en attente (mode renforcé, §6) : son service l'active.
+        var activate: Bool? = nil
     }
 
     struct Dependencies: Sendable {
@@ -131,6 +138,9 @@ actor E2EEAutoHistoryRequests {
         case waiting(OpenRequest)
         /// La demande est close sans HK utilisable : en refaire une.
         case closed
+        /// Appareil activé par « C'est moi » sans HK (approbateur qui ne l'avait pas) :
+        /// la suite habituelle de HK reprend, avec une nouvelle demande si le compte en a une.
+        case activated
         /// Appareil en attente (mode renforcé, §6) : sa demande porte `activate`.
         case notActive
         case retryLater(afterSeconds: Int?)
@@ -148,6 +158,8 @@ actor E2EEAutoHistoryRequests {
         /// 4 groupes de 5 chiffres (§7, `shortFingerprint`).
         let fingerprint: [String]
         let expiresAtMs: Int64
+        /// Appareil en attente (mode renforcé, §6) : « C'est moi » l'active.
+        var activate = false
         var id: String { requestId }
     }
 
@@ -170,6 +182,8 @@ actor E2EEAutoHistoryRequests {
         case noHistoryKey
         /// Le demandeur n'est pas (ou plus) un appareil du journal vérifié.
         case unknownDevice
+        /// Activer demande un approbateur inscrit depuis 24 h (§3.2).
+        case tooRecent
         case notActive
         case retryLater(afterSeconds: Int?)
         case logRefused
@@ -186,21 +200,26 @@ actor E2EEAutoHistoryRequests {
     // MARK: - Demandeur
 
     /// Ouvre (ou retrouve) la demande de cet appareil, sauf s'il détient déjà HK.
+    /// Un appareil en attente (mode renforcé, §6) demande aussitôt, avec `activate: true`,
+    /// même s'il a déjà HK par la synchro : seul « C'est moi » l'active.
     func start() async -> RequestOutcome {
         let context: (device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState)
-        switch await ownContext() {
+        switch await ownContext(allowPending: true) {
         case .success(let value): context = value
         case .failure(let failure): return failure.outcome
         }
-        if let settled = await settleIfHeld(context) { return settled }
-        if let open = dependencies.openRequest(), open.expiresAtMs > dependencies.nowMs() { return .waiting(open) }
-        guard let body = try? E2EEAutoHistoryRequestContract.createBody(activate: false) else { return .failed("e2ee-auto-history-request-body") }
+        let activate = context.account.devices[context.device.deviceId]?.status == .pending
+        if !activate, let settled = await settleIfHeld(context) { return settled }
+        if let open = dependencies.openRequest(), open.expiresAtMs > dependencies.nowMs(), (open.activate ?? false) == activate {
+            return .waiting(open)
+        }
+        guard let body = try? E2EEAutoHistoryRequestContract.createBody(activate: activate) else { return .failed("e2ee-auto-history-request-body") }
         switch await post(E2EEAutoHistoryRequestContract.requestsPath, body) {
         case .success(let data, _, _):
             // 201 nouvelle, 200 celle déjà ouverte (une seule par appareil).
             guard let view = E2EEAutoHistoryRequestContract.parseView(data), view.deviceId == context.device.deviceId,
-                  !view.activate, view.status == .open else { return .failed("invalid-e2ee-auto-history-request-response") }
-            let open = OpenRequest(requestId: view.requestId, expiresAtMs: view.expiresAtMs)
+                  view.activate == activate, view.status == .open else { return .failed("invalid-e2ee-auto-history-request-response") }
+            let open = OpenRequest(requestId: view.requestId, expiresAtMs: view.expiresAtMs, activate: activate ? true : nil)
             dependencies.recordOpenRequest(open)
             return .waiting(open)
         case .failure(let failure):
@@ -211,12 +230,13 @@ actor E2EEAutoHistoryRequests {
     /// Relit la demande ouverte : l'enveloppe servie est vérifiée face au journal,
     /// ouverte, et HK rangée puis déclarée.
     func check() async -> RequestOutcome {
-        let context: (device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState)
-        switch await ownContext() {
+        var context: (device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState)
+        switch await ownContext(allowPending: true) {
         case .success(let value): context = value
         case .failure(let failure): return failure.outcome
         }
-        if let settled = await settleIfHeld(context) { return settled }
+        let pending = context.account.devices[context.device.deviceId]?.status == .pending
+        if !pending, let settled = await settleIfHeld(context) { return settled }
         // Révision 11 : « ouverte » se juge ici ; une demande expirée ou oubliée n'accepte plus rien.
         guard let open = dependencies.openRequest() else { return .closed }
         guard open.expiresAtMs > dependencies.nowMs() else {
@@ -233,8 +253,17 @@ actor E2EEAutoHistoryRequests {
                 dependencies.recordOpenRequest(nil)
                 return .closed
             case .fulfilled:
+                // L'`ACTIVATE` est écrit avec le service (§5.3) : le journal relu le montre,
+                // sinon la demande reste retenue pour la prochaine relecture.
+                if pending {
+                    switch await ownContext(allowPending: true) {
+                    case .success(let value): context = value
+                    case .failure(let failure): return failure.outcome
+                    }
+                    guard context.account.devices[context.device.deviceId]?.status == .active else { return .retryLater(afterSeconds: nil) }
+                }
                 dependencies.recordOpenRequest(nil)
-                guard let wrap else { return .closed }
+                guard let wrap else { return open.activate == true ? .activated : .closed }
                 return await receive(wrap, open: open, context: context)
             }
         case .failure(let failure):
@@ -309,7 +338,7 @@ actor E2EEAutoHistoryRequests {
         _ = await put(E2EEAutoHistoryKeyContract.historyStatusPath(deviceId: device.deviceId), body)
     }
 
-    private func ownContext() async -> Result<(device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState), Failure> {
+    private func ownContext(allowPending: Bool = false) async -> Result<(device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState), Failure> {
         let device: E2EEV2DeviceDescriptor
         do { device = try dependencies.device() } catch { return .failure(Failure(.failed("e2ee-auto-device-unavailable"))) }
         let account: E2EEAutoLog.AccountState
@@ -323,7 +352,7 @@ actor E2EEAutoHistoryRequests {
         }
         switch own.status {
         case .active: return .success((device, account))
-        case .pending: return .failure(Failure(.notActive))
+        case .pending: return allowPending ? .success((device, account)) : .failure(Failure(.notActive))
         case .revoked: return .failure(Failure(.failed("e2ee-auto-device-revoked")))
         }
     }
@@ -354,16 +383,26 @@ actor E2EEAutoHistoryRequests {
         case .success(let value): context = value
         case .failure(let failure): return Self.listing(failure.outcome)
         }
-        // Sans HK, rien à servir : l'écran « C'est moi » ne s'affiche pas ici.
-        guard let current = context.account.historyKeyPubB64, dependencies.scalar(current) != nil else { return .requests([]) }
+        // Sans HK, rien à servir, sauf activer un appareil en attente (§6) si cet appareil
+        // est inscrit depuis 24 h ; sinon l'écran « C'est moi » ne s'affiche pas ici.
+        let holdsHistoryKey = context.account.historyKeyPubB64.map { dependencies.scalar($0) != nil } ?? false
+        let canActivate = canActivate(context)
+        guard holdsHistoryKey || canActivate else { return .requests([]) }
+        let nowMs = dependencies.nowMs()
         switch await dependencies.get(E2EEAutoHistoryRequestContract.requestsPath) {
         case .success(let data, _, _):
             guard let views = E2EEAutoHistoryRequestContract.parseList(data) else { return .failed("invalid-e2ee-auto-history-requests-response") }
             let now = dependencies.nowMs()
             return .requests(views.compactMap { view -> Pending? in
-                // `activate: true` attend le mode renforcé (§6) : il faut aussi signer l'`ACTIVATE`.
-                guard view.status == .open, !view.activate, view.expiresAtMs > now, view.deviceId != context.device.deviceId,
-                      let requester = context.account.devices[view.deviceId], requester.status == .active else { return nil }
+                // `activate: true` vise un appareil en attente du journal, les autres un appareil actif.
+                guard view.status == .open, view.expiresAtMs > now, view.deviceId != context.device.deviceId,
+                      let requester = context.account.devices[view.deviceId],
+                      view.activate
+                        ? E2EEAutoActivationContract.refusal(
+                            account: context.account, approverDeviceId: context.device.deviceId, deviceId: view.deviceId, nowMs: nowMs
+                        ) == nil
+                        : requester.status == .active && holdsHistoryKey
+                else { return nil }
                 return pending(view, requester: requester)
             })
         case .failure(let failure):
@@ -400,26 +439,55 @@ actor E2EEAutoHistoryRequests {
             case .fulfilled: return .alreadyServed
             case .cancelled, .expired: return .closed
             }
-            guard !view.activate else { return .failed("e2ee-auto-history-request-activation") }
             guard view.deviceId != context.device.deviceId, let requester = context.account.devices[view.deviceId],
-                  requester.status == .active else { return .unknownDevice }
-            guard let current = context.account.historyKeyPubB64, let scalar = dependencies.scalar(current) else { return .noHistoryKey }
+                  requester.status == (view.activate ? .pending : .active) else { return .unknownDevice }
+            let scalar = context.account.historyKeyPubB64.flatMap { dependencies.scalar($0) }
+            let activation: [String: String]?
+            if view.activate {
+                switch E2EEAutoActivationContract.refusal(
+                    account: context.account, approverDeviceId: context.device.deviceId, deviceId: requester.deviceId, nowMs: dependencies.nowMs()
+                ) {
+                case nil: break
+                case .approverTooRecent?: return .tooRecent
+                case .approverNotActive?: return .notActive
+                case .notPending?: return .unknownDevice
+                }
+                guard let signed = try? E2EEAutoActivationContract.activation(
+                    account: context.account, approverDeviceId: context.device.deviceId, deviceId: requester.deviceId, sign: dependencies.sign
+                ) else { return .failed("e2ee-auto-activation-signature") }
+                activation = signed
+            } else {
+                guard scalar != nil else { return .noHistoryKey }
+                activation = nil
+            }
             let body: Data
             do {
-                guard let keyData = Data(base64Encoded: requester.identityKeyB64) else { return .unknownDevice }
-                let recipientKey = try P256.KeyAgreement.PublicKey(x963Representation: keyData)
-                let wrap = try E2EEAutoHistory.seal(
-                    scalar: scalar, userId: dependencies.userId, senderDeviceId: context.device.deviceId,
-                    recipient: requester.deviceId, keyVersion: requester.keyVersion, requestId: requestId,
-                    addHash: requester.addEntryHash, recipientAgreementKey: recipientKey, sign: dependencies.sign
-                )
-                body = try E2EEAutoHistoryRequestContract.fulfilBody(wrap)
+                var wrap: E2EEAutoHistory.Wrap?
+                if let scalar {
+                    guard let keyData = Data(base64Encoded: requester.identityKeyB64) else { return .unknownDevice }
+                    let recipientKey = try P256.KeyAgreement.PublicKey(x963Representation: keyData)
+                    wrap = try E2EEAutoHistory.seal(
+                        scalar: scalar, userId: dependencies.userId, senderDeviceId: context.device.deviceId,
+                        recipient: requester.deviceId, keyVersion: requester.keyVersion, requestId: requestId,
+                        addHash: requester.addEntryHash, recipientAgreementKey: recipientKey, sign: dependencies.sign
+                    )
+                }
+                body = try E2EEAutoHistoryRequestContract.fulfilBody(wrap, activation: activation)
             } catch {
                 return .failed("e2ee-auto-history-wrap-seal")
             }
             switch await post(E2EEAutoHistoryRequestContract.fulfilPath(requestId), body) {
             case .success(let data, _, _):
-                return E2EEAutoHistoryRequestContract.parseFulfil(data, requestId: requestId)
+                let account = context.account, approverId = context.device.deviceId, deviceId = requester.deviceId
+                let check: (([String: Any]) -> Bool)? = activation.map { signed in
+                    { written in
+                        E2EEAutoActivationContract.parseWritten(
+                            written, account: account, prevUserEntryHash: signed["prevUserEntryHash"] ?? "",
+                            approverDeviceId: approverId, deviceId: deviceId
+                        )
+                    }
+                }
+                return E2EEAutoHistoryRequestContract.parseFulfil(data, requestId: requestId, writtenActivation: check)
                     ? .served : .failed("invalid-e2ee-auto-history-fulfil-response")
             case .failure(let failure):
                 switch failure.code {
@@ -427,6 +495,7 @@ actor E2EEAutoHistoryRequests {
                     if case .string("fulfilled")? = failure.details?["status"] { return .alreadyServed }
                     return .closed
                 case "E2EE_HISTORY_REQUEST_NOT_FOUND": return .closed
+                case "E2EE_DEVICE_TOO_RECENT": return .tooRecent
                 case "E2EE_HISTORY_KEY_STALE", "E2EE_RECIPIENT_KEY_STALE", "E2EE_LOG_STALE":
                     // Relire le compte et ré-envelopper, une seule fois (§5.3 point 10).
                     guard attempt == 0 else { return .retryLater(afterSeconds: nil) }
@@ -439,6 +508,12 @@ actor E2EEAutoHistoryRequests {
         return .retryLater(afterSeconds: nil)
     }
 
+    /// Garde des 24 h de l'`ACTIVATE` (§3.2) : sans elle, aucune activation à lister.
+    private func canActivate(_ context: (device: E2EEV2DeviceDescriptor, account: E2EEAutoLog.AccountState)) -> Bool {
+        guard let own = context.account.devices[context.device.deviceId] else { return false }
+        return dependencies.nowMs() - own.addedAtMs >= E2EEAutoLog.signerMinAgeMs
+    }
+
     private func pending(_ view: E2EEAutoHistoryRequestContract.View, requester: E2EEAutoLog.DeviceState) -> Pending? {
         let fingerprint = E2EEAutoSafetyCode.deviceFingerprint(
             userId: dependencies.userId, deviceId: requester.deviceId, signingKeyB64: requester.signingKeyB64
@@ -446,7 +521,7 @@ actor E2EEAutoHistoryRequests {
         guard let groups = E2EEAutoSafetyCode.shortFingerprint(fingerprint) else { return nil }
         return Pending(
             requestId: view.requestId, deviceId: requester.deviceId, platform: requester.platform,
-            addedAtMs: requester.addedAtMs, fingerprint: groups, expiresAtMs: view.expiresAtMs
+            addedAtMs: requester.addedAtMs, fingerprint: groups, expiresAtMs: view.expiresAtMs, activate: view.activate
         )
     }
 

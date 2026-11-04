@@ -17,6 +17,8 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         var revoke: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason) async -> E2EEAutoDeviceRevocation.Outcome
         /// Libellés et activités (§4.2, révision 12) ; nil : inconnus, sans message.
         var readLabels: () async -> [String: E2EEAutoDeviceLabels.Display]? = { nil }
+        /// Mode renforcé (§6) ; l'écran ne l'adopte qu'à la relecture du journal.
+        var setMode: (_ mode: E2EEAutoLog.Mode) async -> E2EEAutoModeSetting.Outcome = { _ in .failed("e2ee-auto-mode-unavailable") }
         var nowMs: () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
     }
 
@@ -57,6 +59,8 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     @Published private(set) var othersRevocableAtMs: Int64?
     @Published var errorMessage: String?
     @Published var confirmationMessage: String?
+    /// Mode du compte, lu au journal vérifié.
+    @Published private(set) var mode: E2EEAutoLog.Mode = .normal
     /// Auto-révocation écrite : la vue ferme la session.
     @Published private(set) var signedOut = false
 
@@ -85,6 +89,36 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         return max(1, Int((remaining + 3_599_999) / 3_600_000))
     }
 
+    var activeCount: Int { rows.filter { $0.status == .active }.count }
+
+    /// Changer le mode : même garde que révoquer les autres (actif, inscrit depuis 24 h),
+    /// et `STRICT` demande deux appareils actifs (§6).
+    var canChangeMode: Bool {
+        canRevokeOthers && (mode == .strict || activeCount >= 2)
+    }
+
+    func setMode(_ mode: E2EEAutoLog.Mode) async {
+        guard !isActing, mode != self.mode, canChangeMode else { return }
+        isActing = true
+        errorMessage = nil
+        defer { isActing = false }
+        switch await dependencies.setMode(mode) {
+        case .set:
+            break
+        case .tooRecent:
+            errorMessage = String(localized: "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien.")
+        case .needsTwoDevices:
+            errorMessage = String(localized: "Le mode renforcé demande au moins deux appareils actifs.")
+        case .notActive:
+            errorMessage = String(localized: "Cet appareil attend encore son activation : il ne peut pas changer le mode.")
+        case .logRefused:
+            errorMessage = String(localized: "Le journal des appareils n’a pas pu être vérifié. Le mode n’a pas changé.")
+        case .retryLater, .failed:
+            errorMessage = String(localized: "Impossible de changer le mode. Réessaie dans un instant.")
+        }
+        await load()
+    }
+
     func load() async {
         if rows.isEmpty { phase = .loading }
         switch await dependencies.readOwnAccount() {
@@ -106,6 +140,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
 
     func apply(_ account: E2EEAutoLog.AccountState) {
         self.account = account
+        mode = account.mode
         let ownId = dependencies.ownDeviceId()
         let nowMs = dependencies.nowMs()
         let all = account.devices.values.map { device in
@@ -185,7 +220,11 @@ extension E2EEAutoDevicesViewModel {
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
                 return await revocation.revoke(deviceId: deviceId, reason: reason)
             },
-            readLabels: E2EEAutoDeviceLabels.live(session: session, api: api)
+            readLabels: E2EEAutoDeviceLabels.live(session: session, api: api),
+            setMode: { mode in
+                guard let setting = E2EEAutoModeSetting.live(session: session, api: api) else { return .failed("e2ee-auto-mode-unavailable") }
+                return await setting.set(mode)
+            }
         ))
     }
 }
@@ -244,6 +283,7 @@ struct E2EEAutoDevicesView: View {
                 }
             case .loaded:
                 devicesSection
+                strictModeSection
                 if !model.revokedRows.isEmpty {
                     Section {
                         ForEach(model.revokedRows) { row in
@@ -333,6 +373,30 @@ struct E2EEAutoDevicesView: View {
             Button("OK") { model.confirmationMessage = nil }
         } message: {
             Text(model.confirmationMessage ?? "")
+        }
+    }
+
+    /// Mode renforcé (§6) : l'interrupteur montre le mode du journal vérifié, jamais l'intention.
+    private var strictModeSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { model.mode == .strict },
+                set: { on in Task { await model.setMode(on ? .strict : .normal) } }
+            )) {
+                Label("Mode renforcé", systemImage: "lock.shield")
+                    .frame(minHeight: 44)
+            }
+            .disabled(!model.canChangeMode || model.isActing)
+            .accessibilityIdentifier("e2eeAuto.devices.strictMode")
+        } footer: {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente.")
+                if let hours = model.hoursBeforeRevokingOthers {
+                    Text("Disponible sur cet appareil dans \(hours) h.")
+                } else if model.mode == .normal && model.activeCount < 2 {
+                    Text("Il faut au moins deux appareils actifs pour l’activer.")
+                }
+            }
         }
     }
 

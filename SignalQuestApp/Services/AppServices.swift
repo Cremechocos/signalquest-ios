@@ -546,9 +546,16 @@ final class AppServices: ObservableObject {
             await rotateConversationsForNewDevice()
         }
         // Appareil actif : HK créée par le premier, déclarée par les suivants (§5.1).
+        // En attente (mode renforcé, §6) : la demande d'activation part aussitôt.
         switch outcome {
         case .active, .registered(_, .active):
             await runE2EEAutoHistoryKeySteps()
+        case .pending, .registered(_, .pending):
+            guard let session = LocalAccountScope.sessionSnapshot() else { return }
+            NotificationCenter.default.post(
+                name: E2EEAutoHistoryRequestCoordinator.historyKeyMissing, object: nil,
+                userInfo: ["activate": true, "ownerNamespace": session.ownerNamespace]
+            )
         default:
             return
         }

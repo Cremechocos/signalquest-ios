@@ -11,7 +11,8 @@ import UserNotifications
 /// visible : la notification n'en est que le réveil.
 @MainActor
 final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
-    /// HK du compte absente de cet appareil (publication `.missing`).
+    /// HK du compte absente de cet appareil (publication `.missing`), ou, avec
+    /// `activate: true`, appareil inscrit en attente (mode renforcé, §6).
     nonisolated static let historyKeyMissing = Notification.Name("SignalQuest.E2EEAuto.HistoryKeyMissing")
     /// Push `e2ee_history_request` ou `e2ee_history_request_closed` : relire.
     nonisolated static let requestsChanged = Notification.Name("SignalQuest.E2EEAuto.HistoryRequestsChanged")
@@ -69,6 +70,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         let fingerprint: [String]
         var phase: RequesterPhase
         var startedAt: Date
+        /// Appareil en attente (mode renforcé, §6) : « C'est moi » l'active.
+        var activating = false
     }
 
     enum ApprovalPhase: Equatable {
@@ -78,6 +81,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         case closed
         case noHistoryKey
         case unknownDevice
+        case tooRecent
         case failed
     }
 
@@ -114,6 +118,21 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             await self?.runRequester(hkPubB64: hkPubB64)
             self?.requesterTask = nil
         }
+    }
+
+    /// Appareil en attente : pas d'attente de synchro, HK ne l'activerait pas.
+    func activationNeeded() {
+        guard requesterTask == nil, requester == nil else { return }
+        requesterHidden = false
+        requesterTask = Task { [weak self] in
+            await self?.runActivation()
+            self?.requesterTask = nil
+        }
+    }
+
+    private func runActivation() async {
+        guard let client = dependencies.client() else { return }
+        await handle(await client.start(), client: client)
     }
 
     private func runRequester(hkPubB64: String) async {
@@ -176,14 +195,23 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             // Écran affiché : il le dit ; sinon rien ne s'affiche.
             if presentsRequester { requester?.phase = .received } else { requester = nil }
             await dependencies.continueWithHistoryKey()
-        case .waiting:
+        case .waiting(let open):
             if requester == nil {
-                requester = Requester(fingerprint: await client.ownFingerprint() ?? [], phase: .waiting, startedAt: dependencies.now())
+                requester = Requester(
+                    fingerprint: await client.ownFingerprint() ?? [], phase: .waiting, startedAt: dependencies.now(),
+                    activating: open.activate == true
+                )
             } else {
                 requester?.phase = .waiting
+                requester?.activating = open.activate == true
             }
         case .closed:
             requester?.phase = .closed
+        case .activated:
+            // Activé sans HK : la suite habituelle la publie ou la redemande (§5.3).
+            requester = nil
+            requesterHidden = false
+            await dependencies.continueWithHistoryKey()
         case .noHistoryKey, .notActive:
             // Pas de HK au compte : l'appareil la publie (§5.1) ; en attente : mode renforcé (§6).
             requester = nil
@@ -245,6 +273,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             dependencies.removeDelivered(current.pending.requestId)
         case .noHistoryKey: approval?.phase = .noHistoryKey
         case .unknownDevice: approval?.phase = .unknownDevice
+        case .tooRecent: approval?.phase = .tooRecent
         case .notActive, .retryLater, .logRefused, .failed: approval?.phase = .failed
         }
     }
@@ -314,7 +343,13 @@ struct E2EEAutoHistoryRequesterView: View {
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .accessibilityHidden(true)
-                Text("Ouvrir ton historique sur cet appareil")
+                Group {
+                    if coordinator.requester?.activating == true {
+                        Text("Activer cet appareil")
+                    } else {
+                        Text("Ouvrir ton historique sur cet appareil")
+                    }
+                }
                     .font(SQType.display)
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)
@@ -328,7 +363,13 @@ struct E2EEAutoHistoryRequesterView: View {
                         GradientButton(String(localized: "OK")) { coordinator.hideRequester() }
                             .accessibilityIdentifier("e2eeAuto.historyRequest.done")
                     } else {
-                        Text("Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver.")
+                        Group {
+                            if requester.activating {
+                                Text("Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver.")
+                            } else {
+                                Text("Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver.")
+                            }
+                        }
                             .font(SQType.body)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -339,7 +380,9 @@ struct E2EEAutoHistoryRequesterView: View {
                             )
                         }
                         status(requester.phase)
-                        GradientButton(String(localized: "Continuer sans l’historique"), style: .ghost) { coordinator.hideRequester() }
+                        GradientButton(
+                            requester.activating ? String(localized: "Plus tard") : String(localized: "Continuer sans l’historique"), style: .ghost
+                        ) { coordinator.hideRequester() }
                             .accessibilityIdentifier("e2eeAuto.historyRequest.later")
                         Text("La demande reste ouverte 24 h.")
                             .font(SQType.caption)
@@ -410,7 +453,13 @@ struct E2EEAutoHistoryApprovalView: View {
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .accessibilityHidden(true)
-                Text("Ouvrir l’historique sur un nouvel appareil ?")
+                Group {
+                    if coordinator.approval?.pending.activate == true {
+                        Text("Activer un nouvel appareil ?")
+                    } else {
+                        Text("Ouvrir l’historique sur un nouvel appareil ?")
+                    }
+                }
                     .font(SQType.display)
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)
@@ -428,7 +477,7 @@ struct E2EEAutoHistoryApprovalView: View {
 
     @ViewBuilder
     private func content(_ approval: E2EEAutoHistoryRequestCoordinator.Approval) -> some View {
-        if let result = Self.resultText(approval.phase) {
+        if let result = Self.resultText(approval.phase, activate: approval.pending.activate) {
             Text(result)
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
@@ -436,7 +485,13 @@ struct E2EEAutoHistoryApprovalView: View {
             GradientButton(String(localized: "OK")) { coordinator.closeApproval() }
                 .accessibilityIdentifier("e2eeAuto.historyApproval.done")
         } else {
-            Text("Un appareil de ton compte demande l’historique de tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte.")
+            Group {
+                if approval.pending.activate {
+                    Text("Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte.")
+                } else {
+                    Text("Un appareil de ton compte demande l’historique de tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte.")
+                }
+            }
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -471,10 +526,15 @@ struct E2EEAutoHistoryApprovalView: View {
         }
     }
 
-    static func resultText(_ phase: E2EEAutoHistoryRequestCoordinator.ApprovalPhase) -> String? {
+    static func resultText(_ phase: E2EEAutoHistoryRequestCoordinator.ApprovalPhase, activate: Bool = false) -> String? {
         switch phase {
         case .ready, .acting, .failed: return nil
-        case .served: return String(localized: "C’est fait : l’historique s’ouvre sur l’autre appareil.")
+        case .served:
+            return activate
+                ? String(localized: "C’est fait : l’autre appareil est activé.")
+                : String(localized: "C’est fait : l’historique s’ouvre sur l’autre appareil.")
+        case .tooRecent:
+            return String(localized: "Cet appareil a été ajouté il y a moins de 24 h : confirme depuis un appareil plus ancien.")
         case .closed: return String(localized: "Cette demande n’est plus ouverte.")
         case .noHistoryKey: return String(localized: "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils.")
         case .unknownDevice: return String(localized: "Cet appareil n’est plus sur ton compte.")
@@ -518,20 +578,23 @@ struct E2EEAutoHistoryFingerprintCard: View {
 }
 
 /// Banc visuel (simulateur Debug) : `--qa-auto-history-request` (demandeur),
-/// `--qa-auto-history-approval` (« C'est moi »).
+/// `--qa-auto-history-approval` (« C'est moi ») ; avec `--qa-auto-history-activation`,
+/// la variante du mode renforcé (§6).
 struct E2EEAutoHistoryRequestQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
+    nonisolated private static let activation = AppEnvironment.hasQAFlag("auto-history-activation")
     @StateObject private var coordinator = E2EEAutoHistoryRequestCoordinator(dependencies: .init(
         client: {
             .init(
-                start: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max)) },
-                check: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max)) },
+                start: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
+                check: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
                 hasOpenRequest: { true },
                 ownFingerprint: { ["48213", "09177", "66402", "31958"] },
                 openRequests: {
                     .requests([.init(
                         requestId: "hreq_qa_000000000000002", deviceId: "android_device_qa_0000001", platform: .android,
-                        addedAtMs: 1_793_000_000_000, fingerprint: ["48213", "09177", "66402", "31958"], expiresAtMs: Int64.max
+                        addedAtMs: 1_793_000_000_000, fingerprint: ["48213", "09177", "66402", "31958"], expiresAtMs: Int64.max,
+                        activate: Self.activation
                     )])
                 },
                 approve: { _ in .served }

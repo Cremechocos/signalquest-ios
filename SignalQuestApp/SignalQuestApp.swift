@@ -655,9 +655,12 @@ struct RootView: View {
                         refreshHistoryRequests(active: phase == .active)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoHistoryRequestCoordinator.historyKeyMissing).receive(on: RunLoop.main)) { note in
-                        guard let hkPubB64 = note.userInfo?["hkPubB64"] as? String,
-                              note.userInfo?["ownerNamespace"] as? String == LocalAccountScope.sessionSnapshot()?.ownerNamespace else { return }
-                        historyRequests.historyKeyMissing(hkPubB64: hkPubB64)
+                        guard note.userInfo?["ownerNamespace"] as? String == LocalAccountScope.sessionSnapshot()?.ownerNamespace else { return }
+                        if note.userInfo?["activate"] as? Bool == true {
+                            historyRequests.activationNeeded()
+                        } else if let hkPubB64 = note.userInfo?["hkPubB64"] as? String {
+                            historyRequests.historyKeyMissing(hkPubB64: hkPubB64)
+                        }
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoHistoryRequestCoordinator.requestsChanged).receive(on: RunLoop.main)) { note in
                         let closed = note.userInfo?["closedRequestId"] as? String

@@ -73,6 +73,8 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         var readCount = 0
         /// Réponses par « MÉTHODE chemin », consommées dans l'ordre.
         var routes: [String: [E2EEV2TransportResult<Data>]] = [:]
+        /// Réponse calculée sur le corps reçu (l'`ACTIVATE` écrit à partir de la signature envoyée).
+        var echoes: [String: (Data) -> E2EEV2TransportResult<Data>] = [:]
         var held: [String: Data] = [:]
         var open: E2EEAutoHistoryRequests.OpenRequest?
         private(set) var calls: [String] = []
@@ -85,6 +87,7 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         private func answer(_ key: String, body: Data?) -> E2EEV2TransportResult<Data> {
             calls.append(key)
             if let body { bodies[key] = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:] }
+            if let body, let echo = echoes[key] { return echo(body) }
             guard var queue = routes[key], !queue.isEmpty else {
                 return key.hasPrefix("PUT") ? .success(value: Data("{}".utf8), statusCode: 200, idempotentReplay: false)
                     : .failure(.init(kind: .retryable, statusCode: 503, message: "x"))
@@ -296,5 +299,134 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         let listing = await E2EEAutoHistoryRequests(fake.dependencies(approver)).openRequests()
         XCTAssertEqual(listing, .requests([]))
         XCTAssertFalse(fake.calls.contains("GET \(E2EEAutoHistoryRequestContract.requestsPath)"))
+    }
+
+    // MARK: - Mode renforcé (§6)
+
+    private static let day = E2EEAutoLog.signerMinAgeMs
+
+    /// Le demandeur est en attente (`ADD_PENDING`) ; l'approbateur, inscrit à 5 000 ms.
+    private func strictAccount(activated: Bool = false) -> E2EEAutoLog.AccountState {
+        var account = account()
+        account.mode = .strict
+        var state = requester.state(activated ? .active : .pending, platform: .android, addedAtMs: 7_000)
+        if activated { state.activatedAtMs = 7_000 + Self.day + 10 }
+        account.devices[requester.id] = state
+        return account
+    }
+
+    /// L'`ACTIVATE` que le serveur écrirait à partir du corps reçu, signé par l'approbateur.
+    private func writtenActivation(_ body: Data, signer: String? = nil) -> E2EEV2TransportResult<Data> {
+        let object = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]
+        let activation = object["activation"] as? [String: Any] ?? [:]
+        let state = requester.state(.pending, platform: .android, addedAtMs: 7_000)
+        let entry = E2EEAutoLog.Entry(
+            seq: 31, userId: Self.userId, prevUserEntryHash: activation["prevUserEntryHash"] as? String ?? "", op: .activate,
+            deviceId: requester.id, platform: "android", identityKeyB64: state.identityKeyB64, signingKeyB64: state.signingKeyB64,
+            keyVersion: "1", detail: "\(signer ?? approver.id):\(activation["signatureB64"] as? String ?? "")", createdAtMs: 9
+        ).canonical
+        let link = ["SQ-E2EE-AUTO-LOG-LINK", "1", "31", E2EEAutoLog.digest("prev"), "ENTRY", E2EEAutoLog.digest("tag"),
+                    E2EEAutoLog.digest(entry), "0"].joined(separator: "\n")
+        return Self.json([
+            "request": Self.view(device: requester.id, status: "fulfilled", activate: true),
+            "activation": ["entry": entry, "link": link, "head": ["text": "t", "signatureB64": "s"]],
+        ])
+    }
+
+    /// En attente, la demande part aussitôt avec `activate: true`, même avec HK déjà synchronisée.
+    func testPendingDeviceAsksForActivationEvenWithTheKey() async {
+        let create = "POST \(E2EEAutoHistoryRequestContract.requestsPath)"
+        let fake = Fake(reads: [.verified(strictAccount())])
+        fake.held[hkPubB64] = scalar
+        fake.routes[create] = [Self.json(Self.view(device: requester.id, activate: true))]
+        let outcome = await E2EEAutoHistoryRequests(fake.dependencies(requester)).start()
+        XCTAssertEqual(outcome, .waiting(.init(requestId: Self.requestId, expiresAtMs: 900_000 + 86_400_000, activate: true)))
+        XCTAssertEqual(fake.bodies[create]?["activate"] as? Bool, true)
+        XCTAssertFalse(fake.calls.contains { $0.hasPrefix("DELETE") || $0.hasPrefix("PUT") })
+    }
+
+    /// L'approbateur inscrit depuis 24 h voit la demande d'activation, décrite par le journal ;
+    /// plus récent, il ne la voit pas.
+    func testActivationRequestIsListedOnlyForAnOldEnoughApprover() async {
+        let list = "GET \(E2EEAutoHistoryRequestContract.requestsPath)"
+        let fake = Fake(reads: [.verified(strictAccount())])
+        fake.nowMs = 5_000 + Self.day
+        fake.routes[list] = [Self.json(["requests": [Self.view(device: requester.id, activate: true)]])]
+        let listing = await E2EEAutoHistoryRequests(fake.dependencies(approver)).openRequests()
+        guard case .requests(let items) = listing else { return XCTFail("\(listing)") }
+        XCTAssertEqual(items.map(\.deviceId), [requester.id])
+        XCTAssertEqual(items.first?.activate, true)
+
+        let recent = Fake(reads: [.verified(strictAccount())])
+        recent.nowMs = 5_000 + Self.day - 1
+        recent.routes[list] = [Self.json(["requests": [Self.view(device: requester.id, activate: true)]])]
+        let none = await E2EEAutoHistoryRequests(recent.dependencies(approver)).openRequests()
+        XCTAssertEqual(none, .requests([]))
+        XCTAssertFalse(recent.calls.contains(list))
+    }
+
+    /// « C'est moi » sur une demande d'activation : l'`ACTIVATE` signé par l'approbateur
+    /// sur la dernière entrée, recopiant la cible du journal, et HK dans la même opération.
+    func testApproverSignsTheActivationAndSendsTheKey() async throws {
+        let account = strictAccount()
+        let fake = Fake(reads: [.verified(account)])
+        fake.nowMs = 5_000 + Self.day
+        fake.held[hkPubB64] = scalar
+        fake.routes["GET \(requestPath)"] = [Self.json(["request": Self.view(device: requester.id, activate: true), "historyWrap": NSNull()])]
+        fake.echoes["POST \(fulfilPath)"] = { self.writtenActivation($0) }
+        let outcome = await E2EEAutoHistoryRequests(fake.dependencies(approver)).approve(requestId: Self.requestId)
+        XCTAssertEqual(outcome, .served)
+
+        let body = try XCTUnwrap(fake.bodies["POST \(fulfilPath)"])
+        let activation = try XCTUnwrap(body["activation"] as? [String: Any])
+        XCTAssertEqual(Set(activation.keys), ["prevUserEntryHash", "signatureB64"])
+        XCTAssertEqual(activation["prevUserEntryHash"] as? String, account.lastEntryHash)
+        let target = account.devices[requester.id]!
+        let payload = E2EEAutoLog.Payload.activate(
+            userId: Self.userId, prevUserEntryHash: account.lastEntryHash!, approverDeviceId: approver.id, deviceId: requester.id,
+            identityKeyB64: target.identityKeyB64, signingKeyB64: target.signingKeyB64, keyVersion: 1
+        )
+        XCTAssertTrue(E2EEAutoLog.verify(
+            publicKeyB64: approver.descriptor.publicSigningKeyB64, payload: payload,
+            signatureB64: try XCTUnwrap(activation["signatureB64"] as? String)
+        ))
+        let wrap = try XCTUnwrap(E2EEAutoHistory.parseWrap(try XCTUnwrap(body["historyWrap"] as? [String: Any])))
+        XCTAssertEqual(wrap.addHash, target.addEntryHash, "addHash = entryHash de l'ADD_PENDING")
+    }
+
+    /// Sans HK, l'approbateur active quand même, `historyWrap` nul ; une réponse dont
+    /// l'`ACTIVATE` n'est pas celui signé ici est refusée.
+    func testActivationWithoutTheKeyAndForgedResponse() async throws {
+        let fake = Fake(reads: [.verified(strictAccount())])
+        fake.nowMs = 5_000 + Self.day
+        let open = Self.json(["request": Self.view(device: requester.id, activate: true), "historyWrap": NSNull()])
+        fake.routes["GET \(requestPath)"] = [open, open]
+        fake.echoes["POST \(fulfilPath)"] = { self.writtenActivation($0) }
+        let outcome = await E2EEAutoHistoryRequests(fake.dependencies(approver)).approve(requestId: Self.requestId)
+        XCTAssertEqual(outcome, .served)
+        XCTAssertTrue(fake.bodies["POST \(fulfilPath)"]?["historyWrap"] is NSNull)
+
+        fake.echoes["POST \(fulfilPath)"] = { self.writtenActivation($0, signer: self.requester.id) }
+        let forged = await E2EEAutoHistoryRequests(fake.dependencies(approver)).approve(requestId: Self.requestId)
+        XCTAssertEqual(forged, .failed("invalid-e2ee-auto-history-fulfil-response"))
+    }
+
+    /// Activé sans HK : la demande se ferme et la suite habituelle reprend ; tant que
+    /// le journal ne montre pas l'`ACTIVATE`, la demande reste retenue.
+    func testActivatedRequesterContinuesOnlyOnceTheLogShowsIt() async {
+        let read = Self.json(["request": Self.view(device: requester.id, status: "fulfilled", activate: true), "historyWrap": NSNull()])
+        let stale = Fake(reads: [.verified(strictAccount())])
+        stale.open = .init(requestId: Self.requestId, expiresAtMs: 900_000 + 86_400_000, activate: true)
+        stale.routes["GET \(requestPath)"] = [read]
+        let waiting = await E2EEAutoHistoryRequests(stale.dependencies(requester)).check()
+        XCTAssertEqual(waiting, .retryLater(afterSeconds: nil))
+        XCTAssertNotNil(stale.open)
+
+        let fake = Fake(reads: [.verified(strictAccount()), .verified(strictAccount(activated: true))])
+        fake.open = .init(requestId: Self.requestId, expiresAtMs: 900_000 + 86_400_000, activate: true)
+        fake.routes["GET \(requestPath)"] = [read]
+        let outcome = await E2EEAutoHistoryRequests(fake.dependencies(requester)).check()
+        XCTAssertEqual(outcome, .activated)
+        XCTAssertNil(fake.open)
     }
 }

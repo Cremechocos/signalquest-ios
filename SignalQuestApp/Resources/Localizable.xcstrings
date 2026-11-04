@@ -1020,6 +1020,38 @@
         }
       }
     },
+    "Activer cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer cet appareil"
+          }
+        }
+      }
+    },
+    "Activer un nouvel appareil ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate a new device?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer un nouvel appareil ?"
+          }
+        }
+      }
+    },
     "Cadre" : {
       "localizations" : {
         "en" : {
@@ -1064,6 +1096,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Carte du parcours"
+          }
+        }
+      }
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago: change the mode from an older device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien."
+          }
+        }
+      }
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h : confirme depuis un appareil plus ancien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago: confirm from an older device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : confirme depuis un appareil plus ancien."
+          }
+        }
+      }
+    },
+    "Cet appareil attend encore son activation : il ne peut pas changer le mode." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is still waiting to be activated: it can’t change the mode."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil attend encore son activation : il ne peut pas changer le mode."
           }
         }
       }
@@ -1148,6 +1228,38 @@
         }
       }
     },
+    "C’est fait : l’autre appareil est activé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done: the other device is activated."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est fait : l’autre appareil est activé."
+          }
+        }
+      }
+    },
+    "Disponible sur cet appareil dans %lld h." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available on this device in %lld h."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible sur cet appareil dans %lld h."
+          }
+        }
+      }
+    },
     "Doux" : {
       "localizations" : {
         "en" : {
@@ -1207,6 +1319,38 @@
         }
       }
     },
+    "Il faut au moins deux appareils actifs pour l’activer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You need at least two active devices to turn it on."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il faut au moins deux appareils actifs pour l’activer."
+          }
+        }
+      }
+    },
+    "Impossible de changer le mode. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t change the mode. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le mode. Réessaie dans un instant."
+          }
+        }
+      }
+    },
     "Impossible de retirer le lieu de prise de vue de cette vidéo." : {
       "localizations" : {
         "en" : {
@@ -1251,6 +1395,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Intensité"
+          }
+        }
+      }
+    },
+    "Le journal des appareils n’a pas pu être vérifié. Le mode n’a pas changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device log couldn’t be verified. The mode hasn’t changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal des appareils n’a pas pu être vérifié. Le mode n’a pas changé."
+          }
+        }
+      }
+    },
+    "Le mode renforcé demande au moins deux appareils actifs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strict mode needs at least two active devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode renforcé demande au moins deux appareils actifs."
+          }
+        }
+      }
+    },
+    "Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strict mode protects your account: this device can’t receive or send encrypted messages until another of your devices activates it. Tap “It’s me” on that other device: a notification just arrived there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver."
           }
         }
       }
@@ -1399,6 +1591,22 @@
         }
       }
     },
+    "Mode renforcé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strict mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode renforcé"
+          }
+        }
+      }
+    },
     "Mono" : {
       "localizations" : {
         "en" : {
@@ -1469,6 +1677,54 @@
         }
       }
     },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : changez le mode depuis un appareil plus ancien."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h : confirme depuis un appareil plus ancien." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : confirmez depuis un appareil plus ancien."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Impossible de changer le mode. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de changer le mode. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode renforcé protège votre compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de vos appareils ne l’a pas activé. Touchez « C’est moi » sur cet autre appareil : une notification vient d’y arriver."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "SQFormal|Ton texte restera visible sans ton nom, parce que des membres y ont répondu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1476,6 +1732,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre texte restera visible sans votre nom, parce que des membres y ont répondu."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil attend d’être activé sur votre compte, en mode renforcé. Une fois activé, il lira et enverra vos messages chiffrés. Touchez « C’est moi » seulement si c’est le vôtre et que son écran affiche la même empreinte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un nouvel appareil ne lit ni n’envoie vos messages chiffrés tant qu’un de vos appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente."
           }
         }
       },
@@ -1521,6 +1801,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton texte restera visible sans ton nom, parce que des membres y ont répondu."
+          }
+        }
+      }
+    },
+    "Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device is waiting to be activated on your account, in strict mode. Once activated, it will read and send your encrypted messages. Tap “It’s me” only if it’s yours and its screen shows the same fingerprint."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte."
+          }
+        }
+      }
+    },
+    "Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new device can’t read or send your encrypted messages until one of your devices activates it with “It’s me”. Turning this off doesn’t activate any waiting device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente."
           }
         }
       }
