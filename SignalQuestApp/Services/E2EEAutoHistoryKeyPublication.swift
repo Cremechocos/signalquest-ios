@@ -100,16 +100,25 @@ actor E2EEAutoHistoryKeyPublication {
     /// Premier appareil d'un compte sans HK : il la crée et la publie. Sinon,
     /// il déclare `present` dès qu'il détient la dernière.
     func run() async -> Outcome {
-        await publish(replacingLostKey: false)
+        await publish(.first)
     }
 
     /// « Continuer sans l'historique » (§5.1, HK perdue) : nouvelle HK après
     /// celle du journal, que l'appareil n'a pas. L'ancien historique est perdu.
     func replaceLostKey() async -> Outcome {
-        await publish(replacingLostKey: true)
+        await publish(.replaceLost)
     }
 
-    private func publish(replacingLostKey: Bool) async -> Outcome {
+    /// Rotation après un `REVOKE` vérifié (§5.6 étape 1) : HK′ publiée par-dessus la
+    /// HK détenue, par un appareil inscrit depuis 24 h. Le CAS départage ; le perdant
+    /// recevra HK′ par un transfert sur sa preuve.
+    func rotate() async -> Outcome {
+        await publish(.rotate)
+    }
+
+    private enum Mode { case first, replaceLost, rotate }
+
+    private func publish(_ mode: Mode) async -> Outcome {
         let device: E2EEV2DeviceDescriptor
         do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
         var account: E2EEAutoLog.AccountState
@@ -126,8 +135,18 @@ actor E2EEAutoHistoryKeyPublication {
             let current = account.historyKeyPubB64
             settlePendingKey(current: current)
             if let current {
-                if dependencies.holds(current) { return await reportPresent(device: device, hkPubB64: current) }
-                guard replacingLostKey else { return .missing(hkPubB64: current) }
+                let held = dependencies.holds(current)
+                switch mode {
+                case .rotate:
+                    // Plus de rotation due (une autre a gagné) : rien à publier.
+                    guard account.rotationDueRevokeSeq != nil, held else {
+                        return held ? await reportPresent(device: device, hkPubB64: current) : .missing(hkPubB64: current)
+                    }
+                case .first:
+                    return held ? await reportPresent(device: device, hkPubB64: current) : .missing(hkPubB64: current)
+                case .replaceLost:
+                    if held { return await reportPresent(device: device, hkPubB64: current) }
+                }
                 guard dependencies.nowMs() >= signer.addedAtMs + E2EEAutoLog.signerMinAgeMs else { return .tooRecent }
             }
             guard let previousEntry = account.lastEntryHash else { return .failed("e2ee-auto-history-key-state") }

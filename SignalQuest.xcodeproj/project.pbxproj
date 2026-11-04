@@ -14,6 +14,7 @@
 		019BDBFC5EB0DC2A9D370F15 /* ExperienceTestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77AF908E7E251A70F3725E8 /* ExperienceTestsView.swift */; };
 		01CA0252CB25A0F8AFCDB2E6 /* E2EEV2JalonAVectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */; };
 		02593AF0CFF83B2C69D9F79A /* SentinelleCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0421A119135C490C2075C09 /* SentinelleCharts.swift */; };
+		02620CF2091DEA2F5715F0AB /* E2EEAutoHistoryRotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593A64D9449DD3D8BC9002FB /* E2EEAutoHistoryRotationTests.swift */; };
 		027E3130C3FF0E1E4C1FC6FC /* E2EEV2ThreadPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FD7F46C63A1733CA825E36 /* E2EEV2ThreadPresentationTests.swift */; };
 		0293550C16599D9A28374FB9 /* MapHTTPRuntimeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E51CEABE03315848B6AED88 /* MapHTTPRuntimeQATests.swift */; };
 		03F729FEA4C26B4411AEDEEC /* E2EEAutoSwitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAF1A1E74BF431984A6A304 /* E2EEAutoSwitchTests.swift */; };
@@ -913,6 +914,7 @@
 		F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */; };
 		F99EE69800479C9567228302 /* E2EEV2ConversationCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E033DEB487CB440000810F0 /* E2EEV2ConversationCreation.swift */; };
 		F9B3AE432F895F5A425CA10E /* E2EEV2AccountKeyViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54422F6B3106A98C858A217F /* E2EEV2AccountKeyViewModelTests.swift */; };
+		FA0A4B864AE7E567E269269C /* E2EEAutoHistoryRotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF62D16F7D84BB868FDD6993 /* E2EEAutoHistoryRotation.swift */; };
 		FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */; };
 		FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */; };
 		FB57CD4C24B26102CCD880A0 /* SpeedtestBurstSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8ED2F3CAFB9F5358E68F4 /* SpeedtestBurstSummary.swift */; };
@@ -1308,6 +1310,7 @@
 		580487B685558C2106751EDD /* E2EEAutoEnrollmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoEnrollmentTests.swift; sourceTree = "<group>"; };
 		5886D2D8C4F18B7D0DE4C671 /* ReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportSheet.swift; sourceTree = "<group>"; };
 		58AB64F341F6AD8B854F92E0 /* OutageThreadSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageThreadSection.swift; sourceTree = "<group>"; };
+		593A64D9449DD3D8BC9002FB /* E2EEAutoHistoryRotationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryRotationTests.swift; sourceTree = "<group>"; };
 		5AECE142FCC30F85CEB64842 /* SpeedtestVisibilityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestVisibilityViewModel.swift; sourceTree = "<group>"; };
 		5AEDFB065EC3512D77D7569B /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
 		5B45485E64C72BC0A432936C /* E2EEUnlockSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEUnlockSheet.swift; sourceTree = "<group>"; };
@@ -1680,6 +1683,7 @@
 		BE44C25500ECF25987251638 /* ExperienceEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceEngineTests.swift; sourceTree = "<group>"; };
 		BEAB0F4B51977FF72375533F /* NotificationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsService.swift; sourceTree = "<group>"; };
 		BF5C473D670B7B2938ABCB45 /* ReportsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsService.swift; sourceTree = "<group>"; };
+		BF62D16F7D84BB868FDD6993 /* E2EEAutoHistoryRotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryRotation.swift; sourceTree = "<group>"; };
 		BF7FA8662B2C47A117D383F0 /* PasswordResetLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetLink.swift; sourceTree = "<group>"; };
 		BF805633BAE21D89DE4B0C1D /* E2EEV2ConversationSyncV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2ConversationSyncV2.swift; sourceTree = "<group>"; };
 		BFE8FE2CEE60ECD0C8EE8109 /* ExperienceSharePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceSharePreviewSheet.swift; sourceTree = "<group>"; };
@@ -2908,6 +2912,7 @@
 				1E85FD8A1D86AAFF92C4011C /* E2EEAutoHistoryKeyPublication.swift */,
 				35F81A90CD5159E6AB1813BA /* E2EEAutoHistoryKeyStore.swift */,
 				2E8E1B972AA493A6BC3FAE77 /* E2EEAutoHistoryRequests.swift */,
+				BF62D16F7D84BB868FDD6993 /* E2EEAutoHistoryRotation.swift */,
 				A244C5805C73822B3611FE54 /* E2EEAutoLogAlerts.swift */,
 				C55375AB91078EE45BE10E38 /* E2EEAutoLogReader.swift */,
 				EAEAEBF52D5A5342EAD4FF02 /* E2EEAutoNewDeviceAlerts.swift */,
@@ -3070,6 +3075,7 @@
 				0372B71199E513FF758E6BEA /* E2EEAutoHistoryKeyStoreTests.swift */,
 				83C0194FE83FD14BE9D1932F /* E2EEAutoHistoryRequestCoordinatorTests.swift */,
 				F40508DB28A98E798C53FB25 /* E2EEAutoHistoryRequestsTests.swift */,
+				593A64D9449DD3D8BC9002FB /* E2EEAutoHistoryRotationTests.swift */,
 				8521CC0A027DA12FE7738211 /* E2EEAutoHistoryVectorTests.swift */,
 				4250A7E59A4218FAF21ABD2E /* E2EEAutoLiveShareTests.swift */,
 				99C9901D890216AE19A1F278 /* E2EEAutoLogAlertViewModelTests.swift */,
@@ -3913,6 +3919,7 @@
 				A6B29F7CFFF85405D3972A10 /* E2EEAutoHistoryKeyStore.swift in Sources */,
 				CC0826BB1EFA3B3708EC02AC /* E2EEAutoHistoryRequestView.swift in Sources */,
 				30927A97B091625EFE529F5B /* E2EEAutoHistoryRequests.swift in Sources */,
+				FA0A4B864AE7E567E269269C /* E2EEAutoHistoryRotation.swift in Sources */,
 				5279FADBDDEFACF77C8273ED /* E2EEAutoImportCaption.swift in Sources */,
 				9693E4183275D6246795B09F /* E2EEAutoLegacyHistory.swift in Sources */,
 				7D7C394DF6DA13B772D8755D /* E2EEAutoLog.swift in Sources */,
@@ -4458,6 +4465,7 @@
 				5C3CB7FC236F647E64EC8F5F /* E2EEAutoHistoryKeyStoreTests.swift in Sources */,
 				DB1974530B67BF35F7A2A279 /* E2EEAutoHistoryRequestCoordinatorTests.swift in Sources */,
 				AF44A3A283CA1AFDD0648FCD /* E2EEAutoHistoryRequestsTests.swift in Sources */,
+				02620CF2091DEA2F5715F0AB /* E2EEAutoHistoryRotationTests.swift in Sources */,
 				A520A04B888E2E2DD3CB176C /* E2EEAutoHistoryVectorTests.swift in Sources */,
 				A3DF4FE123DE79DC6A33AA44 /* E2EEAutoLiveShareTests.swift in Sources */,
 				0A139E4A03D3B8AEEB3D5CA0 /* E2EEAutoLogAlertViewModelTests.swift in Sources */,

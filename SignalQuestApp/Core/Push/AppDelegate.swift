@@ -131,6 +131,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             }
             return .newData
         }
+        // HK′ déposée pour cet appareil après une révocation (E2EE-AUTO §5.6) :
+        // relue tout de suite, avec ses vérifications sur le journal.
+        if (userInfo["type"] as? String) == "e2ee_history_transfer" {
+            guard let requestId = userInfo["requestId"] as? String,
+                  E2EEAutoHistory.rotationRequestSeq(requestId) != nil else { return .noData }
+            await AppServicesHolder.services.runE2EEAutoHistoryKeySteps()
+            return .newData
+        }
         if (userInfo["type"] as? String) == "e2ee_v2_envelope",
            let envelopeId = userInfo["envelopeId"] as? String,
            let push = AppDelegate.sharedPush {

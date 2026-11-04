@@ -239,6 +239,28 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         XCTAssertEqual(outcome, fake.created.first.map { .present(hkPubB64: $0) })
     }
 
+    /// Rotation après un REVOKE (§5.6) : HK′ par-dessus la HK détenue, seulement si la
+    /// rotation est encore due ; sinon la HK courante reste simplement déclarée.
+    func testRotationPublishesOverTheHeldKeyOnlyWhileDue() async {
+        let current = Self.newKey()
+        var due = account(hk: current)
+        due.rotationDueRevokeSeq = 40
+        let fake = Fake(reads: [.verified(account(hk: current))])
+        fake.held = [current]
+        fake.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        let settled = await publication(fake).rotate()
+        XCTAssertEqual(settled, .present(hkPubB64: current))
+        XCTAssertTrue(fake.posts.isEmpty, "rotation plus due : rien de publié")
+
+        let rotating = Fake(reads: [.verified(due)])
+        rotating.held = [current]
+        rotating.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        rotating.responses = [echo()]
+        let outcome = await publication(rotating).rotate()
+        XCTAssertEqual(rotating.posts.first?["previousHkPubB64"] as? String, current, "comparaison-échange sur la HK détenue")
+        XCTAssertEqual(outcome, rotating.created.first.map { .present(hkPubB64: $0) })
+    }
+
     func testPendingDeviceAndRefusalsPublishNothingFurther() async {
         let pendingDevice = Fake(reads: [.verified(account(status: .pending))])
         let notActive = await publication(pendingDevice).run()

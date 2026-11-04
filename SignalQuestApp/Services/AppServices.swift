@@ -554,12 +554,17 @@ final class AppServices: ObservableObject {
         }
     }
 
-    /// HK publiée ou déclarée (§5.1) ; détenue, les époques manquantes sont
-    /// restaurées puis celles reçues ici sauvegardées (§5.2). Absente de cet
-    /// appareil, la demande « C'est moi » part après l'attente de la synchro (§5.3).
+    /// Rotation après un `REVOKE` d'abord (§5.6 : preuve, HK′, chaîne, transferts,
+    /// réception), puis HK publiée ou déclarée (§5.1) ; détenue, les époques
+    /// manquantes sont restaurées, y compris par les HK anciennes de la chaîne, puis
+    /// celles reçues ici sauvegardées (§5.2). Absente de cet appareil, la demande
+    /// « C'est moi » part après l'attente de la synchro (§5.3).
     func runE2EEAutoHistoryKeySteps() async {
         guard let session = LocalAccountScope.sessionSnapshot(),
               let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
+        if let rotation = E2EEAutoHistoryRotation.live(session: session, api: api) {
+            E2EEV2MessagingRuntime.traceV2("auto-history-rotation", await rotation.run().traceStep)
+        }
         let historyKey = await publication.run()
         E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
         if case .missing(let hkPubB64) = historyKey {
