@@ -773,6 +773,8 @@ struct PhotoEditorView: View {
         geometry.blurRegions = []
         let preview = PhotoEditRenderer.render(image, edits: geometry)
         croppedPreview = preview
+        // Les visages sont repérés sur la photo redressée : les zones déjà tracées passent au même angle.
+        edits.anchorBlurRegions(base: baseSize)
         guard !edits.facesChecked else { return }
         isDetecting = true
         let faces = await PhotoBlur.detectFaces(in: preview).map { Self.toBase($0, crop: edits.crop) }

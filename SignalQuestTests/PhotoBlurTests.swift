@@ -133,6 +133,49 @@ final class PhotoBlurTests: XCTestCase {
         let after = try pixels(try XCTUnwrap(UIImage(data: blurred.jpeg)))
         XCTAssertLessThan(contrast(after, row: 100, from: 60, to: 140), 20)
     }
+
+    /// Redresser après avoir tracé une zone : le motif flouté tourne et grossit,
+    /// la zone doit le suivre (ticket cmw1flou0redressement001).
+    func testBlurFollowsTheContentWhenStraightenedAfterwards() throws {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        // Fond blanc, damier près du coin haut droit : le « visage » à cacher.
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 200), format: format).image { context in
+            UIColor.white.setFill(); context.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
+            for x in stride(from: 144, to: 176, by: 4) {
+                for y in stride(from: 24, to: 56, by: 4) where (x / 4 + y / 4) % 2 == 0 {
+                    UIColor.black.setFill(); context.fill(CGRect(x: x, y: y, width: 4, height: 4))
+                }
+            }
+        }
+        func sharpEdges(_ output: UIImage) throws -> Int {
+            let data = try pixels(output)
+            let height = data.bytes.count / (data.width * 4)
+            var count = 0
+            for y in 0..<height {
+                for x in 0..<(data.width - 1) {
+                    let a = Int(data.bytes[(y * data.width + x) * 4]), b = Int(data.bytes[(y * data.width + x + 1) * 4])
+                    if abs(a - b) > 150 { count += 1 }
+                }
+            }
+            return count
+        }
+        var edits = PhotoEdits(blurRegions: [CGRect(x: 0.65, y: 0.05, width: 0.3, height: 0.3)])
+        XCTAssertEqual(try sharpEdges(PhotoEditRenderer.render(image, edits: edits)), 0, "à 0°, le damier est caché")
+        for degrees in [10.0, -10, 30] {
+            edits.straighten = degrees
+            XCTAssertEqual(try sharpEdges(PhotoEditRenderer.render(image, edits: edits)), 0, "redressé de \(degrees)°, le damier ressort")
+        }
+        XCTAssertGreaterThan(try sharpEdges(PhotoEditRenderer.render(image, edits: PhotoEdits(straighten: 10))), 50,
+                             "contrôle : sans zone, le damier se voit")
+        // Ouvrir l'outil Flouter ramène les zones à l'angle actuel, sans rien découvrir.
+        edits.anchorBlurRegions(base: image.size)
+        XCTAssertEqual(edits.blurAngle, 30)
+        XCTAssertEqual(edits.blurRegionsStraightened(base: image.size), edits.blurRegions)
+        XCTAssertEqual(try sharpEdges(PhotoEditRenderer.render(image, edits: edits)), 0)
+        edits.straighten = 0
+        XCTAssertEqual(try sharpEdges(PhotoEditRenderer.render(image, edits: edits)), 0, "retour à 0° après ancrage")
+    }
 }
 
 /// Éditeur « Modifier » (E1) : géométrie du cadre et rendu non destructif.

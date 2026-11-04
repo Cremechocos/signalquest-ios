@@ -7,7 +7,8 @@ import UIKit
 ///
 /// Tout est exprimé dans l'**espace de base** : l'image droite après ses quarts
 /// de tour, en coordonnées normalisées (0…1, origine en haut à gauche). Le cadre
-/// et les zones de flou survivent donc à un changement de redressement ou de cadre.
+/// survit donc à un changement de redressement ou de cadre ; les zones de flou gardent
+/// le redressement sous lequel elles ont été tracées (`blurAngle`) et suivent la photo.
 struct PhotoEdits: Equatable, Sendable {
     /// Quarts de tour à gauche (0…3).
     var quarterTurns = 0
@@ -15,8 +16,10 @@ struct PhotoEdits: Equatable, Sendable {
     var straighten: Double = 0
     /// Cadre retenu, normalisé dans l'espace de base.
     var crop = CGRect(x: 0, y: 0, width: 1, height: 1)
-    /// Zones floutées, normalisées dans l'espace de base.
+    /// Zones floutées, normalisées dans l'espace de base redressé de `blurAngle`.
     var blurRegions: [CGRect] = []
+    /// Redressement sous lequel les zones ont été tracées ou repérées.
+    var blurAngle: Double = 0
     /// Les visages ont déjà été cherchés : rouvrir l'éditeur ne rajoute pas ceux qu'on a retirés.
     var facesChecked = false
     /// Filtre prédéfini et son intensité (0…1), puis réglages (E2).
@@ -53,6 +56,30 @@ struct PhotoEdits: Equatable, Sendable {
         quarterTurns = (quarterTurns + 1) % 4
         crop = Self.rotatedLeft(crop)
         blurRegions = blurRegions.map(Self.rotatedLeft)
+    }
+
+    /// Zones à l'angle de redressement actuel. Le contenu sous une zone tourne et grossit
+    /// avec le redressement : la zone le suit, élargie à son rectangle englobant pour ne
+    /// jamais rien laisser dépasser.
+    func blurRegionsStraightened(base: CGSize) -> [CGRect] {
+        guard straighten != blurAngle, base.width > 0, base.height > 0 else { return blurRegions }
+        let scale = Self.straightenScale(for: base, degrees: straighten) / Self.straightenScale(for: base, degrees: blurAngle)
+        let transform = CGAffineTransform(rotationAngle: CGFloat((straighten - blurAngle) * .pi / 180))
+            .scaledBy(x: scale, y: scale)
+        return blurRegions.map { region in
+            let corners = [CGPoint(x: region.minX, y: region.minY), CGPoint(x: region.maxX, y: region.minY),
+                           CGPoint(x: region.minX, y: region.maxY), CGPoint(x: region.maxX, y: region.maxY)]
+                .map { CGPoint(x: ($0.x - 0.5) * base.width, y: ($0.y - 0.5) * base.height).applying(transform) }
+                .map { CGPoint(x: $0.x / base.width + 0.5, y: $0.y / base.height + 0.5) }
+            let xs = corners.map(\.x), ys = corners.map(\.y)
+            return CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
+        }
+    }
+
+    /// Ramène les zones à l'angle actuel, avant d'en tracer ou d'en repérer d'autres.
+    mutating func anchorBlurRegions(base: CGSize) {
+        blurRegions = blurRegionsStraightened(base: base)
+        blurAngle = straighten
     }
 
     /// Un point (x, y) de l'ancienne base devient (y, 1 − x) après un quart de tour à gauche.
@@ -118,7 +145,7 @@ enum PhotoEditRenderer {
             image.draw(in: CGRect(x: -upright.width / 2, y: -upright.height / 2, width: upright.width, height: upright.height))
         }
         let colored = PhotoColor.render(straightened, matrix: edits.colorMatrix)
-        let blurred = PhotoBlur.render(colored, regions: edits.blurRegions)
+        let blurred = PhotoBlur.render(colored, regions: edits.blurRegionsStraightened(base: base))
         guard edits.crop != PhotoEdits.fullFrame, let source = blurred.cgImage else { return blurred }
         let pixels = CGSize(width: source.width, height: source.height)
         let rect = CGRect(x: edits.crop.minX * pixels.width, y: edits.crop.minY * pixels.height,
