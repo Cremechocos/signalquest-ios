@@ -2331,7 +2331,8 @@ struct MapExplorerView: View {
                     style: sessionTraceStyle,
                     coloring: sessionTraceColoring,
                     fitToken: sessionFitToken,
-                    bottomInset: mapControlsBottomInset + 120
+                    // Bandeau, pastille d'état et boutons flottants.
+                    bottomInset: mapControlsBottomInset + 200
                 )
             }
         )
@@ -2381,7 +2382,7 @@ struct MapExplorerView: View {
                 VStack(spacing: SQSpace.sm2) {
                     mapTopControlBar
                         .padding(.horizontal, SQSpace.md)
-                    if filters.contains(.friend), services.auth.hasStoredCredentials() {
+                    if sessionFocus == nil, filters.contains(.friend), services.auth.hasStoredCredentials() {
                         if showsFriendsStatusPanel {
                             friendsStatusPanel
                                 .padding(.horizontal, SQSpace.md)
@@ -2632,18 +2633,18 @@ struct MapExplorerView: View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
             marketSwitchNotice
-            if showsDeducedCountry {
-                deducedCountryBanner
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            if showsZoneCompareTip {
-                zoneCompareTip
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
             if sessionFocus != nil {
                 sessionFocusBanner
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
+                if showsDeducedCountry {
+                    deducedCountryBanner
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if showsZoneCompareTip {
+                    zoneCompareTip
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 if showsCoverageKey { coverageFocusBanner }
                 MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
                 mapStatusToast
