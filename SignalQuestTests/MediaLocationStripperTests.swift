@@ -473,4 +473,35 @@ final class MediaLocationStripperTests: XCTestCase {
         let text = Data("bonjour".utf8)
         XCTAssertEqual(MediaLocationStripper.strippedImage(text), text)
     }
+
+    /// GIF 1 × 1 sans palette globale, autour des extensions données.
+    private func handmadeGIF(_ extensions: [UInt8]) -> Data {
+        var bytes = Array("GIF89a".utf8) + [1, 0, 1, 0, 0, 0, 0]
+        bytes += extensions
+        bytes += [0x2C, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3B]
+        return Data(bytes)
+    }
+
+    /// Disposition réelle : un premier sous-bloc de 11 octets (identifiant et code
+    /// d'authentification), puis les données dans les sous-blocs suivants. Seules
+    /// les données partent, jamais les octets de longueur ; une autre extension
+    /// d'application, ou un identifiant à cheval sur deux sous-blocs, reste intacte.
+    func testGIFXMPDataIsZeroedInItsOwnSubBlocksOnly() {
+        let place = Array("<x>Testville 45.1</x>".utf8)
+        let netscape: [UInt8] = [0x21, 0xFF, 11] + Array("NETSCAPE2.0".utf8) + [3, 1, 0, 0, 0]
+        let xmp: [UInt8] = [0x21, 0xFF, 11] + Array("XMP DataXMP".utf8)
+            + [UInt8(place.count)] + place + [2, 0x41, 0x42, 0]
+        let data = handmadeGIF(netscape + xmp)
+        let start = 13 + netscape.count + 3 + 11
+        XCTAssertEqual(MediaLocationScrubber.plan(for: data).zeroed, [start + 1 ..< start + 1 + place.count, start + 2 + place.count ..< start + 4 + place.count])
+        let cleaned = MediaLocationScrubber.scrubbed(data)
+        XCTAssertEqual(cleaned.count, data.count)
+        XCTAssertNil(cleaned.range(of: Data("Testville".utf8)))
+        XCTAssertNotNil(cleaned.range(of: Data("NETSCAPE2.0".utf8)), "autre extension intacte")
+        XCTAssertEqual(cleaned[start], UInt8(place.count), "longueur de sous-bloc gardée")
+
+        // Identifiant éclaté : « X » seul, puis la longueur 77 (« M ») et « P DataXMP »… : 79 octets d'« XMP DataXMP » qui ne sont pas l'identifiant.
+        let straddling: [UInt8] = [0x21, 0xFF, 1, 0x58, 77] + Array("P DataXMP".utf8) + [67] + [UInt8](repeating: 0x55, count: 67) + [0]
+        XCTAssertTrue(MediaLocationScrubber.plan(for: handmadeGIF(straddling)).zeroed.isEmpty)
+    }
 }
