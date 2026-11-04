@@ -560,6 +560,19 @@ struct ProfileView: View {
                 }
             }
 
+            // Données publiques ANFR / ISED, jusque-là atteintes seulement par la carte.
+            menuSection("Antennes") {
+                Button { push(ProfileDestination.antennaStats) } label: {
+                    menuRow(title: "Statistiques des antennes", icon: "chart.bar.xaxis")
+                }
+                .accessibilityIdentifier("profile.menu.antennaStats")
+                menuSeparator
+                Button { push(ProfileDestination.antennaChanges) } label: {
+                    menuRow(title: "Carte des modifications", icon: "map")
+                }
+                .accessibilityIdentifier("profile.menu.antennaChanges")
+            }
+
             menuSection("Contributions") {
                 Button { push(ProfileDestination.measurements) } label: {
                     menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
@@ -873,6 +886,8 @@ struct ProfileView: View {
                 router.route(toSite: favorite.siteId, market: favorite.market)
             }
         case .sentinelle: SentinelleView(service: services.sentinelle)
+        case .antennaStats: ANFRStatsView(service: services.anfr)
+        case .antennaChanges: ANFRMapView(service: services.anfr)
         case .measurements: MyMeasurementsView(service: services.sessions)
         case .photos: PhotosView(service: services.photos)
         case .pendingPhotos: PhotosView(service: services.photos, initialFilter: .pending)
@@ -974,7 +989,7 @@ private extension View {
 
 /// Écrans ouverts depuis le Profil, poussés par `pushed`.
 private enum ProfileDestination: Hashable {
-    case favorites, sentinelle, measurements, photos, pendingPhotos, antennaReports, outages, territories
+    case favorites, sentinelle, antennaStats, antennaChanges, measurements, photos, pendingPhotos, antennaReports, outages, territories
     case sessions, radioLogs, identifications
     case settings, privacy, subscription, glossary, bugs, adminBugs
     case rewards, leaderboards
