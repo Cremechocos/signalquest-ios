@@ -171,6 +171,59 @@ final class MediaLocationStripperTests: XCTestCase {
     }
 
     /// Ce qui n'est pas une image (un PDF, du texte) passe tel quel.
+    /// Image sans GPS, mais avec des noms de lieu en clair : IPTC, ou XMP seul.
+    private func placeNamedImage(_ type: UTType, xmp: Bool) throws -> Data {
+        let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 6, bitsPerComponent: 8, bytesPerRow: 0,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 8, height: 6))
+        let image = try XCTUnwrap(context.makeImage())
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil))
+        if xmp {
+            let metadata = CGImageMetadataCreateMutable()
+            for (path, value) in [("photoshop:City", "Villeurbanne"), ("photoshop:Country", "Lointainpays"),
+                                  ("Iptc4xmpCore:Location", "Gratte-Ciel"), ("dc:title", "Pylone")] {
+                XCTAssertTrue(CGImageMetadataSetValueWithPath(metadata, nil, path as CFString, value as CFString), path)
+            }
+            CGImageDestinationAddImageAndMetadata(destination, image, metadata, nil)
+        } else {
+            let iptc: [CFString: Any] = [
+                kCGImagePropertyIPTCCity: "Villeurbanne", kCGImagePropertyIPTCSubLocation: "Gratte-Ciel",
+                kCGImagePropertyIPTCProvinceState: "Rhone-Alpes", kCGImagePropertyIPTCCountryPrimaryLocationName: "Lointainpays",
+            ]
+            CGImageDestinationAddImage(destination, image, [kCGImagePropertyIPTCDictionary: iptc] as CFDictionary)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return data as Data
+    }
+
+    /// Noms de lieu en clair (décision du 04/11, messagerie et fil) : détectés et retirés
+    /// jusque dans les octets, le reste des métadonnées gardé. Le TIFF passe par la
+    /// réécriture : sa copie gardait les noms en balises brutes, invisibles à la relecture.
+    func testPlaceNamesAreRemovedToo() throws {
+        let names = ["Villeurbanne", "Gratte-Ciel", "Lointainpays"]
+        for type in [UTType.jpeg, .png, .heic, .tiff] {
+            for xmp in [false, true] {
+                let label = "\(type.identifier) xmp=\(xmp)"
+                let original = try placeNamedImage(type, xmp: xmp)
+                XCTAssertTrue(names.contains { original.range(of: Data($0.utf8)) != nil }, label)
+                XCTAssertTrue(MediaLocationStripper.hasLocation(original), label)
+                let clean = try XCTUnwrap(MediaLocationStripper.strippedImage(original), label)
+                XCTAssertFalse(MediaLocationStripper.hasLocation(clean), label)
+                for name in names {
+                    XCTAssertNil(clean.range(of: Data(name.utf8)), "\(label) \(name)")
+                }
+                if xmp, type != .tiff {
+                    let source = try XCTUnwrap(CGImageSourceCreateWithData(clean as CFData, nil), label)
+                    let metadata = try XCTUnwrap(CGImageSourceCopyMetadataAtIndex(source, 0, nil), label)
+                    XCTAssertEqual(CGImageMetadataCopyStringValueWithPath(metadata, nil, "dc:title" as CFString) as String?, "Pylone", label)
+                }
+            }
+        }
+    }
+
     func testNonImageDataIsUntouched() {
         let text = Data("bonjour".utf8)
         XCTAssertEqual(MediaLocationStripper.strippedImage(text), text)
