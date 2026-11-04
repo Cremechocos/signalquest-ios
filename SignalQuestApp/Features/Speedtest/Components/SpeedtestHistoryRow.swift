@@ -4,27 +4,31 @@ struct SpeedtestHistoryRow: View {
     let result: SpeedtestRunResult
     /// Encore dans la file d'envoi : pastille « À envoyer ».
     var isPending = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            Image(systemName: networkSymbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(SQColor.ink2)
-                .frame(width: 34, height: 34)
-                .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
-                .accessibilityHidden(true)
+            // Aux tailles d'accessibilité, la place va au texte : « 1,083 Gb/s » ne se coupe pas.
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: networkSymbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.ink2)
+                    .frame(width: 34, height: 34)
+                    .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                    .accessibilityHidden(true)
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(titleLine)
                     .font(SQFont.body(15, .bold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitleLine)
                     .font(SQFont.body(12.5))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
                 if isPending {
                     Text("À envoyer")
@@ -69,7 +73,8 @@ struct SpeedtestHistoryRow: View {
         if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
             parts.append(SQUnits.milliseconds(ping))
         }
-        return parts.joined(separator: " · ")
+        // Une valeur ne se coupe jamais (« 27 oct. », « 12 ms ») : la ligne passe à la ligne entre deux valeurs.
+        return parts.map { $0.replacingOccurrences(of: " ", with: "\u{00A0}") }.joined(separator: " · ")
     }
 
     /// Sous-titre réseau : « 5G NSA · Orange », « WiFi · Freebox »… Repli sur

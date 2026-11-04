@@ -384,12 +384,17 @@ struct SignalQuestHomeView: View {
         @ViewBuilder trailing: () -> Trailing = { EmptyView() }
     ) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(SQColor.ink2)
-                .accessibilityHidden(true)
+            // Aux tailles d'accessibilité, la place va au titre.
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(SQColor.ink2)
+                    .accessibilityHidden(true)
+            }
+            // Le surtitre en capitales espacées ne se coupe pas au milieu d'un mot : plafonné à AX3.
             Text(title).sqKicker()
                 .foregroundStyle(SQColor.ink2)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility3)
                 .sqHeader()
             Spacer(minLength: SQSpace.sm)
             trailing()
@@ -1408,7 +1413,10 @@ struct SignalQuestHomeView: View {
                 .font(SQType.callout)
                 .foregroundStyle(SQColor.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: SQSpace.sm) {
+            // Aux tailles d'accessibilité, les boutons s'empilent : côte à côte, « compte » se couperait.
+            let buttonsLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: SQSpace.sm)) : AnyLayout(HStackLayout(spacing: SQSpace.sm))
+            buttonsLayout {
                 GradientButton("Créer un compte") { showSignup = true }
                     .accessibilityIdentifier("home.guest.signup")
                 GradientButton("Se connecter", style: .secondary) { router.selectedTab = .profile }

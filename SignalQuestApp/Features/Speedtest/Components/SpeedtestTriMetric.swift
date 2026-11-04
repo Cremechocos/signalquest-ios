@@ -501,6 +501,7 @@ struct SpeedtestResultSummary: View {
 struct SpeedtestLastTestCard: View {
     let result: SpeedtestRunResult
     let action: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Button {
@@ -518,7 +519,8 @@ struct SpeedtestLastTestCard: View {
                         .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
@@ -542,19 +544,20 @@ struct SpeedtestLastTestCard: View {
         result.createdAt.formatted(.relative(presentation: .named, unitsStyle: .wide))
     }
 
-    /// « ↓ 612 · ↑ 74 Mbit/s · 21 ms ».
+    /// « ↓ 612 · ↑ 74 Mbit/s · 21 ms ». Une valeur ne se coupe jamais (U+00A0) :
+    /// la ligne passe à la ligne entre deux valeurs.
     private var summary: String {
         let down = result.downloadAverageMbps
-        var text = "↓ \(SQUnits.throughputValue(mbps: down))"
+        var text = "↓\u{00A0}\(SQUnits.throughputValue(mbps: down))"
         if let up = result.uploadAverageMbps, up > 0 {
             text += SQUnits.throughputUnit(mbps: up) == SQUnits.throughputUnit(mbps: down)
-                ? " · ↑ \(SQUnits.throughput(mbps: up))"
-                : " \(SQUnits.throughputUnit(mbps: down)) · ↑ \(SQUnits.throughput(mbps: up))"
+                ? " · ↑\u{00A0}\(SQUnits.throughput(mbps: up))"
+                : "\u{00A0}\(SQUnits.throughputUnit(mbps: down)) · ↑\u{00A0}\(SQUnits.throughput(mbps: up))"
         } else {
-            text += " \(SQUnits.throughputUnit(mbps: down))"
+            text += "\u{00A0}\(SQUnits.throughputUnit(mbps: down))"
         }
         if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
-            text += " · \(SQUnits.milliseconds(ping))"
+            text += " · \(SQUnits.milliseconds(ping).replacingOccurrences(of: " ", with: "\u{00A0}"))"
         }
         return text
     }
