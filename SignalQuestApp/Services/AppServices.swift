@@ -550,7 +550,13 @@ final class AppServices: ObservableObject {
         case .active, .registered(_, .active):
             guard let session = LocalAccountScope.sessionSnapshot(),
                   let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
-            E2EEV2MessagingRuntime.traceV2("auto-history-key", await publication.run().traceStep)
+            let historyKey = await publication.run()
+            E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
+            // HK détenue : époques manquantes restaurées, puis celles reçues ici sauvegardées (§5.2).
+            guard case .present = historyKey,
+                  let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
+            E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep)
+            E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
         default:
             return
         }
