@@ -28,6 +28,8 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     /// (dépôt expiré ou déjà consommé) : seule la clé de récupération la rend.
     @Published private(set) var accountKeyMissing = false
     @Published private(set) var identityGeneration: Int?
+    /// Appareil qui a établi l'identité du compte : celui-ci après un code e-mail.
+    @Published private(set) var identityEstablisherId: String?
     @Published private(set) var isLoading = false
     @Published private(set) var isActing = false
     @Published var errorMessage: String?
@@ -74,6 +76,12 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
 
     var identityEstablished: Bool { identityGeneration != nil }
 
+    /// Identité établie par un autre appareil : l'étape 2 est son approbation,
+    /// et non le code e-mail que cet appareil vient de saisir.
+    var identityEstablishedElsewhere: Bool {
+        identityEstablished && identityEstablisherId != currentDeviceId
+    }
+
     /// Le certificat fait foi ; sans lui (appareil en attente, liste illisible),
     /// la plateforme déclarée au registre.
     func platform(of device: E2EEV2RemoteDevice) -> String {
@@ -100,6 +108,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             devices = []
             activationEnabled = false
             identityGeneration = nil
+            identityEstablisherId = nil
             return
         }
         // Lot A1 : UIK d'une demande par QR restée en cours, reçue dès le chargement.
@@ -115,6 +124,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             certifiedPlatforms = await lifecycle.certifiedPlatforms() ?? [:]
             activationEnabled = inventory.activationEnabled
             identityGeneration = inventory.identity?.generation
+            identityEstablisherId = inventory.identity?.establishedByDeviceId
             if inventory.activationEnabled, currentDeviceCanRevoke {
                 E2EEV2NotificationContextEvents.requestRefresh(.identity)
                 // §2.6 : clé d'accord de 30 jours ou plus, recertifiée en passant
@@ -430,7 +440,7 @@ struct E2EEV2ActivationScreen: View {
 
                     VStack(alignment: .leading, spacing: SQSpace.md) {
                         stepRow(1, String(localized: "Cet appareil se prépare"), done: step.rawValue > 1)
-                        stepRow(2, model.identityEstablished
+                        stepRow(2, model.identityEstablishedElsewhere
                                 ? String(localized: "Ton autre appareil l’approuve")
                                 : String(localized: "Code reçu par e-mail"), done: step.rawValue > 2)
                         stepRow(3, String(localized: "C’est prêt"), done: step == .ready)

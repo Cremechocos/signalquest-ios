@@ -2398,8 +2398,9 @@ private struct NewConversationSheet: View {
                     }
                     .sqSurface(SQColor.surface, in: cardShape)
                     // La limite se dit AVANT de créer : on la découvrait au premier
-                    // envoi de photo refusé (SOC-07).
-                    if e2ee {
+                    // envoi de photo refusé (SOC-07). Seule la v1 la garde : la v2
+                    // envoie photos, fichiers, vocaux et sondages (§7.7).
+                    if e2ee, !services.e2eeV2Messaging.writesEnabled {
                         Text("Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
