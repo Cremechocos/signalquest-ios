@@ -185,6 +185,7 @@
 		2FDBEFA88298D442C4E3CB9A /* TerritoryOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E86C823EC944D48AC73885F /* TerritoryOverlay.swift */; };
 		30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FDE918733D1625D560F628 /* MarketRegistryModels.swift */; };
 		306027019A477AF7E9AFCA0F /* CallsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9C7190AEB0D08E27839A20 /* CallsService.swift */; };
+		30927A97B091625EFE529F5B /* E2EEAutoHistoryRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E8E1B972AA493A6BC3FAE77 /* E2EEAutoHistoryRequests.swift */; };
 		309AA7F7D0C860BD375B8FC1 /* MessageDraftsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD67A7B51B7000BB42264042 /* MessageDraftsQATests.swift */; };
 		30AADFD8ABCE36A575345C84 /* CarPlaySentinelleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99AAD8ABBA3C0988CFEC53F8 /* CarPlaySentinelleTests.swift */; };
 		30D67A276CDDCEECAFF039C0 /* E2EEV2MembershipEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECBBEE8B56400DBF41B9BB01 /* E2EEV2MembershipEvents.swift */; };
@@ -643,6 +644,7 @@
 		AE81F6A9F6B4B5AFAF56AEC6 /* QuestLayoutQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A7BAA01EBC785D3B4AAD54 /* QuestLayoutQATests.swift */; };
 		AECC873B5E62108D2B222016 /* ExperienceEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE44C25500ECF25987251638 /* ExperienceEngineTests.swift */; };
 		AEE432A92D4D21D58FF3351B /* PrivacyZoneEditorRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD80B7A1D3D2A91F76703AF /* PrivacyZoneEditorRequest.swift */; };
+		AF44A3A283CA1AFDD0648FCD /* E2EEAutoHistoryRequestsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40508DB28A98E798C53FB25 /* E2EEAutoHistoryRequestsTests.swift */; };
 		AF48C78CE4288133C08989E4 /* SentinelleBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2EBD9C272198901276D84C /* SentinelleBoxView.swift */; };
 		AF5BAD69202B5C4F35BE1864 /* SpeedtestIcmpLiveProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E5F3734600F0C6CC5DEEFF /* SpeedtestIcmpLiveProgressTests.swift */; };
 		AFB2A6601565F8DBE9C1ED71 /* LocationPrimingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D1A47CF6B448FBD08CC23C /* LocationPrimingSheet.swift */; };
@@ -1148,6 +1150,7 @@
 		2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionPolicyTests.swift; sourceTree = "<group>"; };
 		2E03EF30DC08FEA39216CD0B /* UserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserService.swift; sourceTree = "<group>"; };
 		2E77FAF7EF72C921A19826A6 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
+		2E8E1B972AA493A6BC3FAE77 /* E2EEAutoHistoryRequests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryRequests.swift; sourceTree = "<group>"; };
 		2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogSiteModels.swift; sourceTree = "<group>"; };
 		2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQRadius.swift; sourceTree = "<group>"; };
 		2FC6A2458D5BCC866A93A543 /* ANFRDromStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRDromStatsTests.swift; sourceTree = "<group>"; };
@@ -1857,6 +1860,7 @@
 		F378A97EE08A97DD345A432F /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		F39F4F70B46A0A5DEC1FD984 /* SQShareCardBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQShareCardBuilderTests.swift; sourceTree = "<group>"; };
 		F3B11B2DAF5DED109A1CA2CE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F40508DB28A98E798C53FB25 /* E2EEAutoHistoryRequestsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryRequestsTests.swift; sourceTree = "<group>"; };
 		F46B89349A48401E7563977C /* SignalQuestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestApp.swift; sourceTree = "<group>"; };
 		F47AE72407AC9406E2699806 /* GamificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationView.swift; sourceTree = "<group>"; };
 		F47CD806E692BAA9C67319EE /* DriveSpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedtestDetailSheet.swift; sourceTree = "<group>"; };
@@ -2898,6 +2902,7 @@
 				945166A7A50265C9FF4A1A16 /* E2EEAutoHistoryImporter.swift */,
 				1E85FD8A1D86AAFF92C4011C /* E2EEAutoHistoryKeyPublication.swift */,
 				35F81A90CD5159E6AB1813BA /* E2EEAutoHistoryKeyStore.swift */,
+				2E8E1B972AA493A6BC3FAE77 /* E2EEAutoHistoryRequests.swift */,
 				A244C5805C73822B3611FE54 /* E2EEAutoLogAlerts.swift */,
 				C55375AB91078EE45BE10E38 /* E2EEAutoLogReader.swift */,
 				EAEAEBF52D5A5342EAD4FF02 /* E2EEAutoNewDeviceAlerts.swift */,
@@ -3058,6 +3063,7 @@
 				0EB2D54B6F4D8077F7837E9D /* E2EEAutoHistoryImportTests.swift */,
 				AA07A87CFD16FD6F67862130 /* E2EEAutoHistoryKeyPublicationTests.swift */,
 				0372B71199E513FF758E6BEA /* E2EEAutoHistoryKeyStoreTests.swift */,
+				F40508DB28A98E798C53FB25 /* E2EEAutoHistoryRequestsTests.swift */,
 				8521CC0A027DA12FE7738211 /* E2EEAutoHistoryVectorTests.swift */,
 				4250A7E59A4218FAF21ABD2E /* E2EEAutoLiveShareTests.swift */,
 				99C9901D890216AE19A1F278 /* E2EEAutoLogAlertViewModelTests.swift */,
@@ -3899,6 +3905,7 @@
 				7384B91088A60E16ACFED51A /* E2EEAutoHistoryImporter.swift in Sources */,
 				2A7793BA6E535751500E7C1B /* E2EEAutoHistoryKeyPublication.swift in Sources */,
 				A6B29F7CFFF85405D3972A10 /* E2EEAutoHistoryKeyStore.swift in Sources */,
+				30927A97B091625EFE529F5B /* E2EEAutoHistoryRequests.swift in Sources */,
 				5279FADBDDEFACF77C8273ED /* E2EEAutoImportCaption.swift in Sources */,
 				9693E4183275D6246795B09F /* E2EEAutoLegacyHistory.swift in Sources */,
 				7D7C394DF6DA13B772D8755D /* E2EEAutoLog.swift in Sources */,
@@ -4442,6 +4449,7 @@
 				6A03266C68D8F8BDD2D72AEB /* E2EEAutoHistoryImporterTests.swift in Sources */,
 				29FD44707AF68BE3D75B4598 /* E2EEAutoHistoryKeyPublicationTests.swift in Sources */,
 				5C3CB7FC236F647E64EC8F5F /* E2EEAutoHistoryKeyStoreTests.swift in Sources */,
+				AF44A3A283CA1AFDD0648FCD /* E2EEAutoHistoryRequestsTests.swift in Sources */,
 				A520A04B888E2E2DD3CB176C /* E2EEAutoHistoryVectorTests.swift in Sources */,
 				A3DF4FE123DE79DC6A33AA44 /* E2EEAutoLiveShareTests.swift in Sources */,
 				0A139E4A03D3B8AEEB3D5CA0 /* E2EEAutoLogAlertViewModelTests.swift in Sources */,

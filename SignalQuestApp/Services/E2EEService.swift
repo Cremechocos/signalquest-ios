@@ -1305,6 +1305,33 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         throw lastError
     }
 
+    /// Versions des clés d'accord dont l'appareil garde la clé privée : la courante,
+    /// la préparée (version suivante, que le serveur peut déjà connaître) et les anciennes
+    /// (E2EE-AUTO §5.4 : une rotation a pu passer entre la demande et l'envoi).
+    func heldAgreementKeyVersions(ownerNamespace: String) throws -> [Int] {
+        let record = try requiredRecord(ownerNamespace: ownerNamespace)
+        let current = record.descriptor.keyVersion
+        return [current] + (record.pendingIdentityKey == nil ? [] : [current + 1])
+            + (record.retiredIdentityKeys ?? []).map(\.keyVersion)
+    }
+
+    /// Ouvre une enveloppe d'historique (E2EE-AUTO §5.4) déjà acceptée par
+    /// `E2EEAutoHistory.check`, avec la clé d'accord de sa version, sans l'exporter.
+    func openHistoryWrap(_ wrap: E2EEAutoHistory.Wrap, userId: String, ownerNamespace: String) throws -> Data {
+        let record = try requiredRecord(ownerNamespace: ownerNamespace)
+        guard record.descriptor.deviceId == wrap.recipient else { throw E2EEV2DeviceIdentityError.invalidRecord }
+        let raw: String?
+        switch wrap.keyVersion {
+        case record.descriptor.keyVersion: raw = record.identityPrivateRawB64
+        case record.descriptor.keyVersion + 1: raw = record.pendingIdentityKey?.privateRawB64
+        default: raw = record.retiredIdentityKeys?.last(where: { $0.keyVersion == wrap.keyVersion })?.privateRawB64
+        }
+        guard let raw else { throw E2EEV2DeviceIdentityError.invalidRecord }
+        return try E2EEAutoHistory.open(
+            wrap, userId: userId, agreementKey: P256.KeyAgreement.PrivateKey(rawRepresentation: decoded(raw))
+        )
+    }
+
     /// Clé courante d'abord, puis la préparée, puis les anciennes, de la plus récente.
     private func agreementKeys(_ record: Record) throws -> [P256.KeyAgreement.PrivateKey] {
         let raws = [record.identityPrivateRawB64]
@@ -2073,6 +2100,24 @@ final class E2EEV2APITransport: @unchecked Sendable {
             method: .put,
             body: body,
             contentType: "application/json; charset=utf-8",
+            expectedOwnerScopeId: expectedOwnerScopeId,
+            capabilitySet: capabilitySet,
+            clockOffsetMs: clockOffsetMs
+        )
+    }
+
+    /// `DELETE` signé au corps vide (E2EE-AUTO §5.3 : annuler une demande d'historique).
+    func deleteJSON(
+        path: String,
+        expectedOwnerScopeId: String,
+        capabilitySet: E2EEV2RequestCapabilitySet,
+        clockOffsetMs: Int64 = 0
+    ) async -> E2EEV2TransportResult<Data> {
+        await execute(
+            path: path,
+            method: .delete,
+            body: nil,
+            contentType: nil,
             expectedOwnerScopeId: expectedOwnerScopeId,
             capabilitySet: capabilitySet,
             clockOffsetMs: clockOffsetMs
