@@ -107226,6 +107226,450 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Ouvrir ton historique sur cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open your history on this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir ton historique sur cet appareil"
+          }
+        }
+      }
+    },
+    "SQFormal|Ouvrir ton historique sur cet appareil" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir votre historique sur cet appareil"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your history is open on this device. Your older messages are on their way."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre historique est ouvert sur cet appareil. Vos anciens messages arrivent."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your new messages already arrive here. To read older ones, tap “It’s me” on another of your devices: a notification just arrived there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver."
+          }
+        }
+      }
+    },
+    "SQFormal|Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touchez « C’est moi » sur un autre de vos appareils : une notification vient d’y arriver."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Vérifie que l’autre appareil affiche cette empreinte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check that the other device shows this fingerprint"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifie que l’autre appareil affiche cette empreinte"
+          }
+        }
+      }
+    },
+    "SQFormal|Vérifie que l’autre appareil affiche cette empreinte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez que l’autre appareil affiche cette empreinte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Continuer sans l’historique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue without history"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer sans l’historique"
+          }
+        }
+      }
+    },
+    "La demande reste ouverte 24 h." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request stays open for 24 hours."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande reste ouverte 24 h."
+          }
+        }
+      }
+    },
+    "En attente de confirmation…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for confirmation…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de confirmation…"
+          }
+        }
+      }
+    },
+    "Vérification impossible pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can’t check right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification impossible pour le moment."
+          }
+        }
+      }
+    },
+    "Toujours en attente de confirmation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Still waiting for confirmation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours en attente de confirmation."
+          }
+        }
+      }
+    },
+    "Vérifier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier"
+          }
+        }
+      }
+    },
+    "La demande a pris fin sans réponse." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request ended without an answer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande a pris fin sans réponse."
+          }
+        }
+      }
+    },
+    "Refaire une demande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refaire une demande"
+          }
+        }
+      }
+    },
+    "Ouvrir l’historique sur un nouvel appareil ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open history on a new device?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l’historique sur un nouvel appareil ?"
+          }
+        }
+      }
+    },
+    "Un appareil de ton compte demande l’historique de tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device on your account is asking for the history of your encrypted messages. Tap “It’s me” only if it’s yours and its screen shows the same fingerprint."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil de ton compte demande l’historique de tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte."
+          }
+        }
+      }
+    },
+    "SQFormal|Un appareil de ton compte demande l’historique de tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil de votre compte demande l’historique de vos messages chiffrés. Touchez « C’est moi » seulement si c’est le vôtre et que son écran affiche la même empreinte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible pour le moment. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not possible right now. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible pour le moment. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible pour le moment. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible pour le moment. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Pas maintenant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas maintenant"
+          }
+        }
+      }
+    },
+    "Si ce n’est pas toi, retire cet appareil dans Réglages > Appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it isn’t you, remove this device in Settings > Devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ce n’est pas toi, retire cet appareil dans Réglages > Appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|Si ce n’est pas toi, retire cet appareil dans Réglages > Appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ce n’est pas vous, retirez cet appareil dans Réglages > Appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "C’est fait : l’historique s’ouvre sur l’autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done: the history is opening on the other device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est fait : l’historique s’ouvre sur l’autre appareil."
+          }
+        }
+      }
+    },
+    "Cette demande n’est plus ouverte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This request is no longer open."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette demande n’est plus ouverte."
+          }
+        }
+      }
+    },
+    "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn’t have the history yet. Confirm from another of your devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas encore l’historique. Confirmez depuis un autre de vos appareils."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil n’est plus sur ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is no longer on your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’est plus sur ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil n’est plus sur ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’est plus sur votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

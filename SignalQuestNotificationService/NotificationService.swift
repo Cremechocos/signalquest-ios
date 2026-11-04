@@ -62,6 +62,10 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             }
             return
         }
+        if (info["type"] as? String)?.lowercased() == "e2ee_history_request" {
+            contentHandler(Self.historyRequestContent(request.content))
+            return
+        }
         guard (info["type"] as? String)?.lowercased() == "e2ee_v2_envelope" else {
             // Message : « Répondre » et « Marquer comme lu » selon la conversation.
             contentHandler(MessageNotificationCategory.categorized(request.content))
@@ -126,6 +130,22 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             processing.cancel()
             deadline.cancel()
         }
+    }
+
+    /// « C'est moi » (E2EE-AUTO §5.3) : le texte de l'app pour le compte connecté,
+    /// sans tutoiement ni vouvoiement (le ton n'est pas lu ici). Un push d'un autre
+    /// compte devient neutre ; sans compte connu, le texte constant du serveur reste.
+    private static func historyRequestContent(_ original: UNNotificationContent) -> UNNotificationContent {
+        guard let content = original.mutableCopy() as? UNMutableNotificationContent,
+              let current = try? E2EEV2NotificationContextStore.configured()?.load()?.ownerScopeId else { return original }
+        if original.userInfo["recipientOwnerScope"] as? String == current {
+            content.title = String(localized: "Ouvrir l’historique sur un nouvel appareil ?")
+            content.body = String(localized: "Un appareil de ce compte demande l’historique des messages chiffrés. Confirmation dans SignalQuest.")
+        } else {
+            content.title = "SignalQuest"
+            content.body = String(localized: "Nouveau contenu privé")
+        }
+        return content
     }
 
     override func serviceExtensionTimeWillExpire() {

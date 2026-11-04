@@ -246,6 +246,19 @@ actor E2EEAutoHistoryRequests {
         }
     }
 
+    /// Une demande de cet appareil est gardée ouverte (sans la relire).
+    var hasOpenRequest: Bool {
+        dependencies.openRequest().map { $0.expiresAtMs > dependencies.nowMs() } ?? false
+    }
+
+    /// Empreinte courte de cet appareil, celle que l'approbateur lit au journal (§5.3 point 4).
+    func ownFingerprint() -> [String]? {
+        guard let device = try? dependencies.device() else { return nil }
+        return E2EEAutoSafetyCode.shortFingerprint(E2EEAutoSafetyCode.deviceFingerprint(
+            userId: dependencies.userId, deviceId: device.deviceId, signingKeyB64: device.publicSigningKeyB64
+        ))
+    }
+
     /// HK arrivée par la synchro ou la passkey pendant l'attente : la demande est annulée.
     func cancel() async {
         guard let open = dependencies.openRequest() else { return }
@@ -341,6 +354,8 @@ actor E2EEAutoHistoryRequests {
         case .success(let value): context = value
         case .failure(let failure): return Self.listing(failure.outcome)
         }
+        // Sans HK, rien à servir : l'écran « C'est moi » ne s'affiche pas ici.
+        guard let current = context.account.historyKeyPubB64, dependencies.scalar(current) != nil else { return .requests([]) }
         switch await dependencies.get(E2EEAutoHistoryRequestContract.requestsPath) {
         case .success(let data, _, _):
             guard let views = E2EEAutoHistoryRequestContract.parseList(data) else { return .failed("invalid-e2ee-auto-history-requests-response") }

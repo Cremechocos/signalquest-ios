@@ -118,6 +118,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                 payload: receipt.payload
             ) ? .newData : .noData
         }
+        // « C'est moi » clos ailleurs (E2EE-AUTO §5.3) : la notification livrée
+        // sous son `apns-collapse-id` se retire, et l'app relit ses demandes.
+        if (userInfo["type"] as? String) == "e2ee_history_request_closed" {
+            guard let requestId = userInfo["requestId"] as? String,
+                  E2EEAutoHistoryRequestContract.isRequestId(requestId) else { return .noData }
+            UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [requestId])
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: E2EEAutoHistoryRequestCoordinator.requestsChanged, object: nil, userInfo: ["closedRequestId": requestId]
+                )
+            }
+            return .newData
+        }
         if (userInfo["type"] as? String) == "e2ee_v2_envelope",
            let envelopeId = userInfo["envelopeId"] as? String,
            let push = AppDelegate.sharedPush {

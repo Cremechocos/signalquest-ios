@@ -183,6 +183,22 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// « C'est moi », côté demandeur (E2EE-AUTO §5.3).
+    static var showsAutoHistoryRequestQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-history-request")
+        #else
+        false
+        #endif
+    }
+    /// « C'est moi », côté approbateur.
+    static var showsAutoHistoryApprovalQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-auto-history-approval")
+        #else
+        false
+        #endif
+    }
     /// Alerte « Nouvel appareil » ; avec `--qa-auto-devices-recent`, sous la garde des 24 h.
     static var showsAutoNewDeviceQA: Bool {
         #if DEBUG && targetEnvironment(simulator)

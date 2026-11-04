@@ -235,6 +235,7 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         let stranger = Device(id: "web_device_unknown_00001")
         let pending = Device(id: "ios_device_pending_00001")
         let fake = Fake(reads: [.verified(account(extra: [pending.state(.pending)]))])
+        fake.held[hkPubB64] = scalar
         fake.routes["GET \(E2EEAutoHistoryRequestContract.requestsPath)"] = [Self.json(["requests": [
             Self.view(device: requester.id),
             Self.view("hreq_000000000000000003", device: stranger.id),
@@ -286,5 +287,14 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         let outcome = await E2EEAutoHistoryRequests(fake.dependencies(approver)).approve(requestId: Self.requestId)
         XCTAssertEqual(outcome, .noHistoryKey)
         XCTAssertFalse(fake.calls.contains("POST \(fulfilPath)"))
+    }
+
+    /// Sans HK, l'appareil ne pourrait rien servir : aucune liste, aucune lecture.
+    func testApproverWithoutTheHistoryKeyListsNothing() async {
+        let fake = Fake(reads: [.verified(account())])
+        fake.routes["GET \(E2EEAutoHistoryRequestContract.requestsPath)"] = [Self.json(["requests": [Self.view(device: requester.id)]])]
+        let listing = await E2EEAutoHistoryRequests(fake.dependencies(approver)).openRequests()
+        XCTAssertEqual(listing, .requests([]))
+        XCTAssertFalse(fake.calls.contains("GET \(E2EEAutoHistoryRequestContract.requestsPath)"))
     }
 }

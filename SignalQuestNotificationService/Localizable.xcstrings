@@ -221,6 +221,40 @@
           }
         }
       }
+    },
+    "Ouvrir l’historique sur un nouvel appareil ?": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open history on a new device?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l’historique sur un nouvel appareil ?"
+          }
+        }
+      }
+    },
+    "Un appareil de ce compte demande l’historique des messages chiffrés. Confirmation dans SignalQuest.": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device on this account is asking for the encrypted message history. Confirm in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil de ce compte demande l’historique des messages chiffrés. Confirmation dans SignalQuest."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

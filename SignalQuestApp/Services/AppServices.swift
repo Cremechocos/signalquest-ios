@@ -548,18 +548,30 @@ final class AppServices: ObservableObject {
         // Appareil actif : HK créée par le premier, déclarée par les suivants (§5.1).
         switch outcome {
         case .active, .registered(_, .active):
-            guard let session = LocalAccountScope.sessionSnapshot(),
-                  let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
-            let historyKey = await publication.run()
-            E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
-            // HK détenue : époques manquantes restaurées, puis celles reçues ici sauvegardées (§5.2).
-            guard case .present = historyKey,
-                  let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
-            E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep)
-            E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
+            await runE2EEAutoHistoryKeySteps()
         default:
             return
         }
+    }
+
+    /// HK publiée ou déclarée (§5.1) ; détenue, les époques manquantes sont
+    /// restaurées puis celles reçues ici sauvegardées (§5.2). Absente de cet
+    /// appareil, la demande « C'est moi » part après l'attente de la synchro (§5.3).
+    func runE2EEAutoHistoryKeySteps() async {
+        guard let session = LocalAccountScope.sessionSnapshot(),
+              let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
+        let historyKey = await publication.run()
+        E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
+        if case .missing(let hkPubB64) = historyKey {
+            NotificationCenter.default.post(
+                name: E2EEAutoHistoryRequestCoordinator.historyKeyMissing, object: nil,
+                userInfo: ["hkPubB64": hkPubB64, "ownerNamespace": session.ownerNamespace]
+            )
+        }
+        guard case .present = historyKey,
+              let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
+        E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep)
+        E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
     }
 
     /// Appareils ajoutés vus dans le journal vérifié (E2EE-AUTO §3.5, §7) : la

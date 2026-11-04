@@ -848,6 +848,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             center.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
             return completionHandler([])
         }
+        // Demande « C'est moi » app ouverte : l'écran vient de la liste relue (§5.3).
+        if Self.string(info, "type")?.lowercased() == "e2ee_history_request" {
+            NotificationCenter.default.post(name: E2EEAutoHistoryRequestCoordinator.requestsChanged, object: nil)
+        }
         // Message v2 reçu app ouverte : la notification ne nomme pas la
         // conversation (§2.6) ; l'écran ouvert sur une conversation v2 se relève.
         if Self.string(info, "type")?.lowercased() == "e2ee_v2_envelope" {
@@ -922,6 +926,14 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         if type?.lowercased() == "e2ee_v2_device_approval", e2eeDeviceApprovalId == nil {
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
             return completion()
+        }
+        // « C'est moi » : l'app au premier plan relit ses demandes, rien à router.
+        if type?.lowercased() == "e2ee_history_request" {
+            Task { @MainActor in
+                NotificationCenter.default.post(name: E2EEAutoHistoryRequestCoordinator.requestsChanged, object: nil)
+                completion()
+            }
+            return
         }
         let action = response.actionIdentifier
         if action == MessageNotificationCategory.replyAction || action == MessageNotificationCategory.markReadAction {

@@ -519,6 +519,8 @@ struct RootView: View {
     @StateObject private var newDeviceAlerts = E2EEAutoNewDeviceAlertCoordinator()
     /// Fourche ou retour en arrière du journal gardé ici (E2EE-AUTO §3.5) : passe avant les autres invites.
     @StateObject private var logAlerts = E2EEAutoLogAlertCoordinator()
+    /// « C'est moi » (E2EE-AUTO §5.3) : demande de cet appareil et demandes des autres.
+    @StateObject private var historyRequests = E2EEAutoHistoryRequestCoordinator.live(services: AppServicesHolder.services)
     @EnvironmentObject private var addressStore: SQAddressStore
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
@@ -569,6 +571,23 @@ struct RootView: View {
         }
     }
 
+    private var showsHistoryApproval: Bool {
+        historyRequests.approval != nil && newDeviceAlerts.presented == nil && !logAlerts.isPresented
+    }
+
+    private var showsHistoryRequester: Bool {
+        historyRequests.presentsRequester && historyRequests.approval == nil && newDeviceAlerts.presented == nil && !logAlerts.isPresented
+    }
+
+    /// Demandes relues au premier plan puis toutes les 60 s ; rien en arrière-plan.
+    private func refreshHistoryRequests(active: Bool) {
+        guard active, SQFeatures.e2eeAutoLogEnabled, isAuthenticated, !AppEnvironment.usesDemoData else {
+            historyRequests.resignedActive()
+            return
+        }
+        historyRequests.becameActive()
+    }
+
     var body: some View {
         let _ = SQRenderProbe.hit("root")
         Group {
@@ -594,6 +613,8 @@ struct RootView: View {
                 E2EEAutoSafetyCodeQAScreen()
             } else if AppEnvironment.showsAutoNewDeviceQA {
                 E2EEAutoNewDeviceAlertQAScreen()
+            } else if AppEnvironment.showsAutoHistoryRequestQA || AppEnvironment.showsAutoHistoryApprovalQA {
+                E2EEAutoHistoryRequestQAScreen(approval: AppEnvironment.showsAutoHistoryApprovalQA)
             } else if AppEnvironment.showsAutoDevicesQA {
                 E2EEAutoDevicesQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {
@@ -616,8 +637,9 @@ struct RootView: View {
                         refreshV2ActivationPrompt()
                         refreshAddressPrompt()
                         refreshNewDeviceAlert()
+                        refreshHistoryRequests(active: true)
                     }
-                    .onDisappear { mainApplicationAppeared = false }
+                    .onDisappear { mainApplicationAppeared = false; historyRequests.resignedActive() }
                     .onChangeCompat(of: addressStore.chosen) { _, _ in refreshAddressPrompt() }
                     // Un ton choisi dans Réglages s'applique au changement d'onglet : l'écran
                     // qu'on quitte n'a plus rien à perdre.
@@ -630,6 +652,18 @@ struct RootView: View {
                     }
                     .onChangeCompat(of: scenePhase) { _, phase in
                         if phase == .active { refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert() }
+                        refreshHistoryRequests(active: phase == .active)
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: E2EEAutoHistoryRequestCoordinator.historyKeyMissing).receive(on: RunLoop.main)) { note in
+                        guard let hkPubB64 = note.userInfo?["hkPubB64"] as? String,
+                              note.userInfo?["ownerNamespace"] as? String == LocalAccountScope.sessionSnapshot()?.ownerNamespace else { return }
+                        historyRequests.historyKeyMissing(hkPubB64: hkPubB64)
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: E2EEAutoHistoryRequestCoordinator.requestsChanged).receive(on: RunLoop.main)) { note in
+                        let closed = note.userInfo?["closedRequestId"] as? String
+                        Task {
+                            if let closed { await historyRequests.requestClosed(closed) } else { await historyRequests.refresh() }
+                        }
                     }
                     .onChangeCompat(of: callManager.showCallScreen) { _, shown in
                         if !shown { refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert() }
@@ -643,7 +677,8 @@ struct RootView: View {
                     // Calque plutôt que `fullScreenCover` : l'écran d'appel, présenté
                     // plus haut, doit pouvoir passer devant. Deux présentations
                     // modales concurrentes, et l'appel entrant restait invisible.
-                    .accessibilityHidden(showsV2Activation || showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented)
+                    .accessibilityHidden(showsV2Activation || showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
+                                         || showsHistoryApproval || showsHistoryRequester)
                     .overlay {
                         if showsAddressPrompt {
                             SQAddressFormPrompt(onClose: {
@@ -696,8 +731,23 @@ struct RootView: View {
                             .transition(.move(edge: .bottom))
                         }
                     }
+                    .overlay {
+                        // Après la fourche et l'alerte « Nouvel appareil » : celle-ci
+                        // offre « Ce n'est pas moi » pour le même appareil.
+                        if showsHistoryApproval {
+                            E2EEAutoHistoryApprovalView(coordinator: historyRequests)
+                                .accessibilityAddTraits(.isModal)
+                                .transition(.move(edge: .bottom))
+                        } else if showsHistoryRequester {
+                            E2EEAutoHistoryRequesterView(coordinator: historyRequests)
+                                .accessibilityAddTraits(.isModal)
+                                .transition(.move(edge: .bottom))
+                        }
+                    }
                     .sqAnimation(SQMotion.smooth, value: newDeviceAlerts.presented)
                     .sqAnimation(SQMotion.smooth, value: logAlerts.isPresented)
+                    .sqAnimation(SQMotion.smooth, value: showsHistoryApproval)
+                    .sqAnimation(SQMotion.smooth, value: showsHistoryRequester)
             } else {
                 switch session.state {
                 case .checking:
@@ -743,7 +793,7 @@ struct RootView: View {
         }
         .onChangeCompat(of: isAuthenticated) { _, authenticated in
             if authenticated { guestBrowsing = false; guestLease?.release(); guestLease = nil }
-            else { newDeviceAlerts.reset(); logAlerts.reset() }
+            else { newDeviceAlerts.reset(); logAlerts.reset(); historyRequests.reset() }
         }
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
