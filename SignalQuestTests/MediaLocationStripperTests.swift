@@ -505,6 +505,38 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertTrue(MediaLocationScrubber.plan(for: handmadeGIF(straddling)).zeroed.isEmpty)
     }
 
+    /// r20, forme Adobe (exiftool, outils Adobe) : paquet XMP brut après l'identifiant,
+    /// puis la queue `01 FF … 01 00 00`. La zone est réécrite en sous-blocs nuls, la
+    /// queue reste, la taille aussi, et un lecteur qui marche la chaîne finit au même
+    /// terminateur. Un reste d'un octet donne `FE` et 254 zéros, puis `01 00`.
+    func testGIFAdobeXMPPacketIsRewrittenAsNullSubBlocks() {
+        let tail: [UInt8] = [0x01] + (1...255).reversed().map { UInt8($0) } + [0, 0]
+        func walk(_ bytes: [UInt8], from start: Int) -> Int {
+            var at = start
+            while bytes[at] != 0 { at += 1 + Int(bytes[at]) }
+            return at
+        }
+        for zone in [300, 257] {
+            var packet = Array("<x:xmpmeta><photoshop:City>Testville</photoshop:City>".utf8)
+            packet += [UInt8](repeating: 0x61, count: zone - packet.count)
+            let data = handmadeGIF([0x21, 0xFF, 11] + Array("XMP DataXMP".utf8) + packet + tail)
+            let start = 13 + 3 + 11
+            let plan = MediaLocationScrubber.plan(for: data)
+            XCTAssertTrue(plan.zeroed.isEmpty)
+            XCTAssertEqual(plan.replaced.map(\.offset), [start])
+            XCTAssertEqual(plan.replaced.first?.bytes.count, zone)
+            let cleaned = [UInt8](MediaLocationScrubber.scrubbed(data))
+            XCTAssertEqual(cleaned.count, data.count)
+            XCTAssertNil(Data(cleaned).range(of: Data("Testville".utf8)))
+            XCTAssertEqual(Array(cleaned[(start + zone)...].prefix(tail.count)), tail, "queue intacte")
+            XCTAssertEqual(walk(cleaned, from: start), walk([UInt8](data), from: start), "même terminateur")
+            let expected: [UInt8] = zone == 300
+                ? [0xFF] + [UInt8](repeating: 0, count: 255) + [43] + [UInt8](repeating: 0, count: 43)
+                : [0xFE] + [UInt8](repeating: 0, count: 254) + [0x01, 0x00]
+            XCTAssertEqual(Array(cleaned[start ..< start + zone]), expected)
+        }
+    }
+
     /// r17 : un bloc GPS dont le tableau d'entrées déborde la fin du fichier est effacé
     /// de son début à la fin, avec les valeurs hors ligne de ses entrées entières.
     func testTruncatedGPSBlockIsZeroedToTheEndOfTheFile() {

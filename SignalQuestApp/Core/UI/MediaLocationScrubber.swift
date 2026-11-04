@@ -17,7 +17,8 @@ import Foundation
 ///   `tEXt` ou `zTXt` (flux zlib remplacé par un flux stocké d'espaces de même longueur),
 ///   CRC recalculé ; les textes d'un autre mot-clé restent ;
 /// - WebP : le bloc GPS du chunk `EXIF`, tout le chunk `XMP ` ; GIF : les données de
-///   l'extension `XMP DataXMP`, jamais les octets de longueur de ses sous-blocs ;
+///   l'extension `XMP DataXMP`, jamais les octets de longueur de ses sous-blocs ; sa
+///   forme Adobe (paquet brut et queue de 258 octets, r20) réécrite en sous-blocs nuls ;
 /// - ce qui suit l'image principale d'un JPEG (autre JPEG, vidéo) : traité de même, 4 images au plus.
 /// Une structure illisible arrête le parcours là où il en est, sans refuser l'envoi.
 /// Limite acceptée (Alexandre, 04/11) : la 5e image d'un JPEG et ce qui suit partent tels quels.
@@ -77,7 +78,7 @@ enum MediaLocationScrubber {
         } else if hasPrefix(bytes, Array("RIFF".utf8), at: 0), hasPrefix(bytes, Array("WEBP".utf8), at: 8) {
             scanWebP(bytes, into: &plan.zeroed)
         } else if hasPrefix(bytes, Array("GIF87a".utf8), at: 0) || hasPrefix(bytes, Array("GIF89a".utf8), at: 0) {
-            scanGIF(bytes, into: &plan.zeroed)
+            scanGIF(bytes, into: &plan)
         }
         // Une même plage atteinte deux fois (deux IFD vers un même bloc GPS) n'en fait qu'une,
         // dans l'ordre du fichier : les plans se comparent à ceux d'Android.
@@ -553,7 +554,10 @@ enum MediaLocationScrubber {
 
     private static let gifXMPIdentifier = Array("XMP DataXMP".utf8)
 
-    private static func scanGIF(_ bytes: [UInt8], into ranges: inout [Range<Int>]) {
+    /// Queue de la forme Adobe (r20) : `01`, puis `FF` à `01` décroissants (256 octets).
+    private static let gifAdobeTail: [UInt8] = [0x01] + (1...255).reversed().map { UInt8($0) }
+
+    private static func scanGIF(_ bytes: [UInt8], into plan: inout Plan) {
         guard bytes.count >= 13 else { return }
         var index = 13
         if bytes[10] & 0x80 != 0 { index += 3 << (Int(bytes[10] & 0x07) + 1) }
@@ -564,7 +568,7 @@ enum MediaLocationScrubber {
                 let size = Int(bytes[at])
                 if size == 0 { return at + 1 }
                 guard at + 1 + size <= bytes.count else { return nil }
-                if zeroing { ranges.append(at + 1 ..< at + 1 + size) }
+                if zeroing { plan.zeroed.append(at + 1 ..< at + 1 + size) }
                 at += 1 + size
             }
             return nil
@@ -575,7 +579,17 @@ enum MediaLocationScrubber {
                 guard index + 2 < bytes.count else { return }
                 let label = bytes[index + 1]
                 if label == 0xFF, bytes[index + 2] == 11, hasPrefix(bytes, gifXMPIdentifier, at: index + 3) {
-                    guard let next = subBlocks(from: index + 3 + 11, zeroing: true) else { return }
+                    let start = index + 3 + 11
+                    // Forme Adobe (r20) : paquet brut, puis la queue qui finit à `fin − 2` ou
+                    // `fin − 1`. La zone est réécrite en sous-blocs nuls, la queue reste.
+                    if let next = subBlocks(from: start, zeroing: false),
+                       let tail = [next - 1 - 257, next - 1 - 256].first(where: { $0 >= start && hasPrefix(bytes, gifAdobeTail, at: $0) }),
+                       tail - start >= 2 {
+                        plan.replaced.append((offset: start, bytes: gifNullSubBlocks(tail - start)))
+                        index = next
+                        continue
+                    }
+                    guard let next = subBlocks(from: start, zeroing: true) else { return }
                     index = next
                 } else {
                     guard let next = subBlocks(from: index + 2, zeroing: false) else { return }
@@ -591,6 +605,25 @@ enum MediaLocationScrubber {
                 return
             }
         }
+    }
+
+    /// `count` octets de sous-blocs à données nulles : `FF` et 255 zéros, puis `r − 1`
+    /// et `r − 1` zéros ; un reste d'un octet fait du bloc plein précédent `FE` et 254
+    /// zéros, puis `01` et un zéro (un `00` seul terminerait l'extension).
+    private static func gifNullSubBlocks(_ count: Int) -> [UInt8] {
+        var out: [UInt8] = []
+        var rest = count
+        while rest >= 256 {
+            out += [0xFF] + [UInt8](repeating: 0, count: 255)
+            rest -= 256
+        }
+        if rest == 1 {
+            out.removeLast(256)
+            out += [0xFE] + [UInt8](repeating: 0, count: 254) + [0x01, 0x00]
+        } else if rest > 0 {
+            out += [UInt8(rest - 1)] + [UInt8](repeating: 0, count: rest - 1)
+        }
+        return out
     }
 
     // MARK: Octets
