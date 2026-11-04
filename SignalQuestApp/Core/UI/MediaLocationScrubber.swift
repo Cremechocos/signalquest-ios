@@ -81,7 +81,7 @@ enum MediaLocationScrubber {
         // Une même plage atteinte deux fois (deux IFD vers un même bloc GPS) n'en fait qu'une,
         // dans l'ordre du fichier : les plans se comparent à ceux d'Android.
         var seen: Set<[Int]> = []
-        plan.zeroed = plan.zeroed.filter { seen.insert([$0.lowerBound, $0.upperBound]).inserted }
+        plan.zeroed = plan.zeroed.filter { !$0.isEmpty && seen.insert([$0.lowerBound, $0.upperBound]).inserted }
             .sorted { ($0.lowerBound, $0.upperBound) < ($1.lowerBound, $1.upperBound) }
         return plan
     }
@@ -235,7 +235,7 @@ enum MediaLocationScrubber {
         guard let type = u16(entry + 2), let valueCount = u32(entry + 4), let size = typeSizes[type] else { return nil }
         let length = size * valueCount
         guard length > 0 else { return nil }
-        if length <= 4 { return entry + 8 ..< entry + 8 + length }
+        if length <= 4 { return entry + 8 + length <= end ? entry + 8 ..< entry + 8 + length : nil }
         guard let valueOffset = u32(entry + 8) else { return nil }
         let value = tiff + valueOffset
         guard value >= tiff, value + length <= end else { return nil }

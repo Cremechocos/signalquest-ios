@@ -433,6 +433,42 @@ final class MediaLocationStripperTests: XCTestCase {
         XCTAssertEqual(MediaLocationStripper.strippedImage(jpeg), jpeg)
     }
 
+    /// Contrat r17 (a014cdf19) : un iloc tronqué après l'entrée de l'item Exif garde cette
+    /// entrée ; le débordement n'arrête que la lecture de l'iloc, l'Exif déjà lu reste effacé.
+    func testTruncatedIlocKeepsTheExifItemAlreadyRead() throws {
+        let jpeg = try geotaggedImage(.jpeg)
+        let exifStart = try XCTUnwrap(jpeg.range(of: Data("Exif\0\0".utf8))).upperBound
+        let exifLength = Int(jpeg[exifStart - 8]) << 8 | Int(jpeg[exifStart - 7])
+        let exifBody = Data(count: 4) + jpeg.subdata(in: exifStart..<exifStart - 8 + 2 + exifLength)
+        func u16(_ value: Int) -> Data { Data([UInt8(value >> 8), UInt8(value & 0xFF)]) }
+        func u32(_ value: Int) -> Data { u16(value >> 16) + u16(value & 0xFFFF) }
+        func file(_ mdat: Int) -> Data {
+            var infe = Data([2, 0, 0, 0]) + u16(1) + u16(0)
+            infe += Data("Exif".utf8) + Data([0])
+            // Deux items annoncés, une seule entrée : l'iloc s'arrête net après l'item Exif.
+            var entries = Data(count: 4) + Data([0x44, 0x00]) + u16(2)
+            entries += u16(1) + u16(0) + u16(1) + u32(mdat) + u32(exifBody.count)
+            return box("ftyp", Data("heic".utf8) + Data(count: 4))
+                + box("meta", Data(count: 4) + box("iinf", Data(count: 4) + u16(1) + box("infe", infe)) + box("iloc", entries))
+        }
+        let mdat = file(0).count + 8
+        let original = file(mdat) + box("mdat", exifBody)
+        var gps: [Range<Int>] = []
+        MediaLocationScrubber.gpsRanges([UInt8](original), tiff: mdat + 4, end: mdat + exifBody.count, into: &gps)
+        XCTAssertFalse(gps.isEmpty)
+        XCTAssertEqual(MediaLocationScrubber.plan(for: original).zeroed, gps.sorted { $0.lowerBound < $1.lowerBound })
+    }
+
+    /// Trouvé par fuzzing : une entrée d'IFD tronquée en fin de fichier, à valeur en ligne,
+    /// ne donne aucune plage hors du fichier.
+    func testInlineValueOfATruncatedEntryStaysInTheFile() {
+        // II, IFD0 à 8 : une entrée XMP (0x02BC, BYTE, 4) dont la valeur manque.
+        let tiff = Data([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0xBC, 0x02, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x41])
+        let plan = MediaLocationScrubber.plan(for: tiff)
+        XCTAssertTrue(plan.zeroed.allSatisfy { $0.upperBound <= tiff.count })
+        XCTAssertEqual(MediaLocationStripper.strippedImage(tiff).count, tiff.count)
+    }
+
     func testNonImageDataIsUntouched() {
         let text = Data("bonjour".utf8)
         XCTAssertEqual(MediaLocationStripper.strippedImage(text), text)
