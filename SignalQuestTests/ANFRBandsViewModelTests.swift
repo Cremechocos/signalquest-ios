@@ -702,6 +702,48 @@ final class ANFRMapViewModelTests: XCTestCase {
             XCTAssertFalse(error.isCancellation)
         }
     }
+
+    /// Le relevé courant est revalidé par `If-None-Match` : un 304 sert la copie du disque
+    /// sans retélécharger ses mégaoctets ; une copie purgée fait redemander sans validateur.
+    func testCurrentSnapshotIsRevalidatedWithItsETag() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("anfr-etag-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-anfr-map-reader")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let body = Data("""
+        {"source":"current","siteCount":1,"sites":[
+         {"info":{"sup_id":"1","lat":"45.0","lon":"5.0","city":"LYON"},"antennas":[{"id":"a","adm_lb_nom":"ORANGE","type":"new"}]}]}
+        """.utf8)
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            if request.value(forHTTPHeaderField: "If-None-Match") == "\"anfr-map-v1\"" {
+                return (HTTPURLResponse(url: request.url!, statusCode: 304, httpVersion: nil, headerFields: ["ETag": "\"anfr-map-v1\""])!, Data())
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                    headerFields: ["Content-Type": "application/json", "ETag": "\"anfr-map-v1\""])!, body)
+        }
+        let cache = ANFRSnapshotDiskCache(directory: directory)
+        let service = ANFRService(api: api, diskCache: cache)
+
+        let first = try await service.mapSnapshot(date: nil)
+        XCTAssertEqual(first.sites.count, 1)
+        XCTAssertNil(seen.all[0].0.value(forHTTPHeaderField: "If-None-Match"), "première ouverture : rien à revalider")
+
+        let second = try await service.mapSnapshot(date: nil)
+        XCTAssertEqual(seen.all[1].0.value(forHTTPHeaderField: "If-None-Match"), "\"anfr-map-v1\"")
+        XCTAssertEqual(second.sites.count, 1, "304 : la copie du disque sert")
+        XCTAssertFalse(second.servedFromCache, "le serveur a confirmé la copie : ce n'est pas un repli hors ligne")
+
+        try FileManager.default.removeItem(at: directory.appendingPathComponent("map-current.json"))
+        let third = try await service.mapSnapshot(date: nil)
+        XCTAssertEqual(third.sites.count, 1)
+        XCTAssertEqual(seen.all.count, 4, "copie purgée : 304 puis une demande complète")
+        XCTAssertNil(seen.all.last?.0.value(forHTTPHeaderField: "If-None-Match"))
+    }
 }
 
 // MARK: - Azimuts et réorientations (ANFR-AZ)

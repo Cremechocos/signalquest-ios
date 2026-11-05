@@ -307,9 +307,21 @@ final class ANFRService: ANFRServicing {
             return snapshot
         }
         let query = date.map { [URLQueryItem(name: "date", value: $0)] } ?? []
-        let data: Data
+        var endpoint = APIEndpoint(path: "/api/anfr/map-snapshot", query: query)
+        // Relevé courant inchangé (six jours sur sept) : le serveur répond 304 sans corps,
+        // au lieu de renvoyer ses 3 à 4 Mo à chaque ouverture de la carte.
+        let cachedTag = date == nil
+            ? diskCache.read(key: Self.currentETagKey).flatMap { String(data: $0, encoding: .utf8) }.flatMap { $0.isEmpty ? nil : $0 }
+            : nil
+        if let cachedTag { endpoint.headers["If-None-Match"] = cachedTag }
+        let response: (data: Data, etag: String?)
         do {
-            data = try await api.requestData(APIEndpoint(path: "/api/anfr/map-snapshot", query: query))
+            response = try await api.requestDataWithETag(endpoint)
+        } catch APIError.http(let status, _, _, _, _) where status == 304 && cachedTag != nil {
+            if let cached = diskCache.read(key: Self.currentKey).flatMap(Self.decode) { return cached }
+            // Copie purgée par le système : on oublie le validateur et on redemande.
+            diskCache.write(Data(), key: Self.currentETagKey)
+            return try await mapSnapshot(date: nil)
         } catch {
             if date == nil, !error.isCancellation, var cached = diskCache.read(key: Self.currentKey).flatMap(Self.decode) {
                 cached.servedFromCache = true
@@ -317,8 +329,10 @@ final class ANFRService: ANFRServicing {
             }
             throw error
         }
-        guard let snapshot = Self.decode(data) else { throw APIError.decoding("map-snapshot") }
-        diskCache.write(data, key: date ?? Self.currentKey)
+        guard let snapshot = Self.decode(response.data) else { throw APIError.decoding("map-snapshot") }
+        diskCache.write(response.data, key: date ?? Self.currentKey)
+        // Après la copie : un validateur ne désigne jamais une copie absente.
+        if date == nil { diskCache.write(Data((response.etag ?? "").utf8), key: Self.currentETagKey) }
         return snapshot
     }
 
@@ -408,6 +422,7 @@ final class ANFRService: ANFRServicing {
     }
 
     private static let currentKey = "current"
+    private static let currentETagKey = "current-etag"
 
     private static func decode(_ data: Data) -> ANFRMapSnapshot? {
         try? JSONDecoder.signalQuest.decode(ANFRMapSnapshot.self, from: data)

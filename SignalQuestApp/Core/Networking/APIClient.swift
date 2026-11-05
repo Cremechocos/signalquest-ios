@@ -90,6 +90,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     private struct Response {
         let data: Data
         let context: CredentialStore.Snapshot
+        /// Validateur renvoyé par le serveur, rejoué en `If-None-Match` par les caches métier.
+        var etag: String?
     }
     private struct SingleAttemptResponse {
         let data: Data
@@ -202,6 +204,15 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         let result = try await performWithRefresh(endpoint, context: context)
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
         return result.data
+    }
+
+    /// Comme `requestData`, avec l'`ETag` de la réponse. Un 304 (l'appelant a envoyé
+    /// `If-None-Match`) sort en `APIError.http(status: 304, …)` : la copie locale vaut.
+    func requestDataWithETag(_ endpoint: APIEndpoint) async throws -> (data: Data, etag: String?) {
+        let context = credentials.snapshot()
+        let result = try await performWithRefresh(endpoint, context: context)
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return (result.data, result.etag)
     }
 
     /// Tentative réseau brute et unique. Contrairement à `request`, cette voie
@@ -712,7 +723,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         // L'échec de persistance du token reste une erreur de stockage, pas un
         // faux succès auth ni une panne réseau (contrat de connexion existant).
         let captured = try credentials.captureFromResponse(response, for: context, startsNewSession: !endpoint.authenticated)
-        return Response(data: data, context: captured)
+        return Response(data: data, context: captured, etag: http.value(forHTTPHeaderField: "ETag"))
     }
 
     /// Plafond d'une lecture (GET) sans délai propre. Hors couverture, la session
