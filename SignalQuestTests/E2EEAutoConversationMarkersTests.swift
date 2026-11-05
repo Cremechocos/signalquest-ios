@@ -26,6 +26,19 @@ final class E2EEAutoConversationMarkersTests: XCTestCase {
         }
     }
 
+    /// Le protocole servi se lit sans jamais faire échouer la liste.
+    func testProtocolVersionReadsTolerantly() throws {
+        func decode(_ extra: String) throws -> MessageConversation {
+            try JSONDecoder().decode(MessageConversation.self, from: Data(
+                #"{"id":"conv_a","isGroup":false,"e2eeEnabled":true,"participants":[]\#(extra)}"#.utf8
+            ))
+        }
+        XCTAssertEqual(try decode(#","e2eeProtocolVersion":2"#).e2eeProtocolVersion, 2)
+        XCTAssertEqual(try decode(#","e2eeProtocolVersion":1"#).e2eeProtocolVersion, 1)
+        XCTAssertNil(try decode(#","e2eeProtocolVersion":"2""#).e2eeProtocolVersion)
+        XCTAssertNil(try decode("").e2eeProtocolVersion)
+    }
+
     func testScenariosRetainTheSmallestNumberAndDecide() throws {
         let scenarios = try XCTUnwrap(try vector()["scenarios"] as? [[String: Any]])
         XCTAssertEqual(scenarios.count, 7)

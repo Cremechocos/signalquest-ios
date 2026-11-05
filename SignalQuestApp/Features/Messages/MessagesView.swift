@@ -1127,8 +1127,10 @@ struct MessagesView: View {
         guard let e2ee else { offersE2EEUnlock = false; return }
         // Le mot de passe v1 n'ouvre que les conversations v1 : un compte qui
         // n'a que des conversations v2 n'a rien à créer ni à déverrouiller.
+        // Une conversation que le serveur sert en v2 n'est jamais v1, même sans
+        // état local (appareil neuf) : le mot de passe v1 ne l'ouvrirait pas.
         guard model.conversations.contains(where: {
-            $0.e2eeEnabled == true && !EncryptedConversationSurfaces.isV2($0)
+            $0.e2eeEnabled == true && $0.e2eeProtocolVersion != 2 && !EncryptedConversationSurfaces.isV2($0)
         }) else { offersE2EEUnlock = false; return }
         offersE2EEUnlock = !(await e2ee.isUnlocked())
     }
@@ -2483,18 +2485,22 @@ private struct NewConversationSheet: View {
                             .font(SQType.body)
                             .padding(.horizontal, SQSpace.md)
                             .frame(minHeight: 48)
-                        Divider().padding(.leading, SQSpace.md)
-                        Toggle(isOn: $e2ee) {
-                            HStack(spacing: SQSpace.xs) {
-                                Text("Conversation chiffrée")
-                                    .font(SQType.body(.semibold))
-                                    .foregroundStyle(SQColor.label)
-                                SQInfoButton(term: .endToEndEncryption)
+                        // Une fois la bascule faite, toute conversation naît chiffrée
+                        // (E2EE-AUTO §7) : le serveur refuserait la création en clair.
+                        if !E2EEV2ServerGate.autoActive {
+                            Divider().padding(.leading, SQSpace.md)
+                            Toggle(isOn: $e2ee) {
+                                HStack(spacing: SQSpace.xs) {
+                                    Text("Conversation chiffrée")
+                                        .font(SQType.body(.semibold))
+                                        .foregroundStyle(SQColor.label)
+                                    SQInfoButton(term: .endToEndEncryption)
+                                }
                             }
+                            .tint(SQColor.brandRed)
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 52)
                         }
-                        .tint(SQColor.brandRed)
-                        .padding(.horizontal, SQSpace.md)
-                        .frame(minHeight: 52)
                     }
                     .sqSurface(SQColor.surface, in: cardShape)
                     // La limite se dit AVANT de créer : on la découvrait au premier
@@ -2740,10 +2746,11 @@ private struct NewConversationSheet: View {
                     participantIds: selected.map(\.id), isGroup: isGroup,
                     title: isGroup && !normalizedTitle.isEmpty ? normalizedTitle : nil, excludesWeb: false
                 ) {
-                case .created:
+                case .created(let conversationId, _):
                     Haptics.success()
                     await onCreated()
                     dismiss()
+                    onOpenExisting(conversationId)
                     return
                 // Une fois la bascule faite, jamais de repli v1 (E2EE-AUTO §7).
                 case .failure(let failure) where !E2EEV2ServerGate.autoActive
@@ -2769,7 +2776,7 @@ private struct NewConversationSheet: View {
                         : String(localized: "La conversation chiffrée n’a pas pu être créée."))
                 }
             }
-            _ = try await service.createConversation(
+            let created = try await service.createConversation(
                 participantIds: selected.map(\.id),
                 title: normalizedTitle.isEmpty ? nil : normalizedTitle,
                 e2ee: e2ee
@@ -2777,6 +2784,8 @@ private struct NewConversationSheet: View {
             Haptics.success()
             await onCreated()
             dismiss()
+            // « Démarrer » ouvre la conversation créée, comme une conversation existante.
+            onOpenExisting(created.conversationId)
         } catch {
             // Création v1 refusée faute de mot de passe de chiffrement : la feuille
             // de création de clé, puis la création repart (au lieu de l'erreur brute).
