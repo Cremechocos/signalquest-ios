@@ -808,6 +808,7 @@ struct ConversationDetailView: View {
             ForwardMessageSheet(
                 text: payload.text,
                 sourceIsEncrypted: payload.sourceIsEncrypted,
+                media: payload.media,
                 service: service,
                 e2ee: e2ee,
                 currentUserId: currentUserId,
@@ -1564,6 +1565,12 @@ struct ConversationDetailView: View {
         return text.isEmpty ? nil : text
     }
 
+    private func forwardableMedia(for message: MessageItem) -> E2EEAutoContentR17.Body? {
+        guard usesV2, message.deletedAt == nil, !message.id.hasPrefix("local-"), v2Cards[message.id] == nil else { return nil }
+        let caption = displayedContent(for: message)
+        return E2EEAutoMediaRef.forwardBody(of: message.attachments, caption: caption, media: v2Media)
+    }
+
     /// Fichiers et vidéos : pas encore dans une conversation chiffrée (la route des pièces jointes ne les chiffre pas).
     private func showFilesUnavailable() {
         showActionError(String(localized: "Les fichiers et les vidéos ne sont pas encore disponibles dans une conversation chiffrée : seul le texte l’est."))
@@ -2250,6 +2257,13 @@ struct ConversationDetailView: View {
         if let forwardable = textOnlyContent(for: message) {
             Button {
                 forwardTarget = ForwardPayload(text: forwardable, sourceIsEncrypted: isE2EE)
+            } label: {
+                Label("Transférer", systemImage: "arrowshape.turn.up.right")
+            }
+        } else if let media = forwardableMedia(for: message) {
+            // Pièces chiffrées : le transfert cite les mêmes blobs (§7.8 G), vers une conversation v2 seulement.
+            Button {
+                forwardTarget = ForwardPayload(text: displayedContent(for: message), sourceIsEncrypted: true, media: media)
             } label: {
                 Label("Transférer", systemImage: "arrowshape.turn.up.right")
             }
@@ -6587,6 +6601,8 @@ private struct ForwardPayload: Identifiable {
     let text: String
     /// Le message vient d'une conversation chiffrée : il ne peut aller que vers une autre conversation chiffrée.
     let sourceIsEncrypted: Bool
+    /// Pièces chiffrées à transférer en citant leurs blobs (§7.8 G).
+    var media: E2EEAutoContentR17.Body?
 }
 
 /// Emojis courants pour réagir à un message au-delà des six de la palette rapide. Pas de
@@ -6642,6 +6658,8 @@ private struct EmojiReactionSheet: View {
 private struct ForwardMessageSheet: View {
     let text: String
     let sourceIsEncrypted: Bool
+    /// Pièces chiffrées : seules les conversations v2 peuvent citer leurs blobs.
+    let media: E2EEAutoContentR17.Body?
     let service: MessagesServicing
     let e2ee: E2EEServicing?
     let currentUserId: String?
@@ -6663,6 +6681,7 @@ private struct ForwardMessageSheet: View {
             $0.id != excludedConversationId
                 && EncryptedConversationSurfaces.allowsForward(fromEncrypted: sourceIsEncrypted, toEncrypted: $0.e2eeEnabled == true)
                 && routes[$0.id] != .unavailable
+                && (media == nil || routes[$0.id] == .v2)
         }
     }
 
@@ -6680,7 +6699,9 @@ private struct ForwardMessageSheet: View {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 MessageSheetHeader(
                     title: "Transférer",
-                    subtitle: String(text.prefix(80)),
+                    subtitle: text.isEmpty && media != nil
+                        ? String(localized: "Pièce jointe chiffrée")
+                        : String(text.prefix(80)),
                     closeIdentifier: "forward.close"
                 ) { dismiss() }
                 content
@@ -6706,7 +6727,9 @@ private struct ForwardMessageSheet: View {
         } else if targets.isEmpty {
             EmptyStateView(
                 title: "Aucune conversation",
-                message: sourceIsEncrypted
+                message: media != nil
+                    ? "Une pièce jointe chiffrée ne se transfère que vers une conversation chiffrée de bout en bout."
+                    : sourceIsEncrypted
                     ? "Un message chiffré ne se transfère que vers une autre conversation chiffrée."
                     : "Tu n’as pas d’autre conversation où transférer ce message.",
                 systemImage: "bubble.left.and.bubble.right"
@@ -6778,10 +6801,13 @@ private struct ForwardMessageSheet: View {
                 )
             case .v2:
                 let result = await services.e2eeV2Messaging.send(
-                    .init(body: .text(text), replyToRef: nil, mentions: [], ttlSeconds: 0),
+                    .init(body: media.map { .r17($0) } ?? .text(text), replyToRef: nil, mentions: [], ttlSeconds: 0),
                     clientRequestId: UUID().uuidString, conversationId: target.id, isGroup: target.isGroup,
                     participantIds: target.participants.map(\.userId)
                 )
+                if media != nil, case .failure(let failure) = result, failure.code == "E2EE_BLOB_INVALID" {
+                    throw ForwardFailure(message: String(localized: "Cette pièce jointe n’est plus disponible : elle ne peut pas être transférée."))
+                }
                 if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result, keptForRetry: false) {
                     throw ForwardFailure(message: failure)
                 }

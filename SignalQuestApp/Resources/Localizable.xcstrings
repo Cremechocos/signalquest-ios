@@ -110288,6 +110288,38 @@
           }
         }
       }
+    },
+    "Une pièce jointe chiffrée ne se transfère que vers une conversation chiffrée de bout en bout." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An encrypted attachment can only be forwarded to an end-to-end encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une pièce jointe chiffrée ne se transfère que vers une conversation chiffrée de bout en bout."
+          }
+        }
+      }
+    },
+    "Cette pièce jointe n’est plus disponible : elle ne peut pas être transférée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This attachment is no longer available, so it can’t be forwarded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette pièce jointe n’est plus disponible : elle ne peut pas être transférée."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

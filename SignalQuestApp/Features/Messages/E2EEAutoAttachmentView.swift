@@ -46,6 +46,27 @@ struct E2EEAutoMediaRef: Equatable {
             return []
         }
     }
+
+    /// Transfert par réutilisation des blobs (§7.8 G) : le nouveau contenu reprend
+    /// les manifestes, clés comprises, sans rien renvoyer. Toutes les pièces doivent
+    /// être chiffrées et connues ; un vocal part seul, sans la transcription de
+    /// l'expéditeur d'origine (elle serait attribuée à celui qui transfère).
+    static func forwardBody(
+        of attachments: [MessageAttachment], caption: String?, media: [String: E2EEAutoMediaRef]
+    ) -> E2EEAutoContentR17.Body? {
+        guard !attachments.isEmpty, attachments.count <= E2EEAutoContentR17.maxBlobs / 2 else { return nil }
+        var refs: [E2EEAutoMediaRef] = []
+        for attachment in attachments {
+            guard attachment.url?.scheme == scheme, let id = attachment.id, let ref = media[id] else { return nil }
+            refs.append(ref)
+        }
+        let caption = caption.flatMap { $0.isEmpty ? nil : $0 }
+        if attachments.count == 1, attachments[0].kind == "AUDIO" {
+            return .audio(caption: caption, voice: refs[0].file, waveformB64: refs[0].waveformB64, transcription: nil)
+        }
+        guard !attachments.contains(where: { $0.kind == "AUDIO" }) else { return nil }
+        return .media(caption: caption, attachments: refs.map { .init(file: $0.file, thumbnail: $0.thumbnail) })
+    }
 }
 
 /// Une pièce jointe chiffrée dans le fil : déchiffrée sur l'appareil, jamais

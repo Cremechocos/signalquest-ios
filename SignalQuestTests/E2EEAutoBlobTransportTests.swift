@@ -288,6 +288,56 @@ final class E2EEAutoBlobTransportTests: XCTestCase {
         XCTAssertEqual(value14, [])
     }
 
+    /// §7.8 G : un transfert reprend les manifestes reçus, clés comprises, et cite les mêmes blobs.
+    func testForwardReusesTheReceivedManifestsAndBlobs() throws {
+        let photo = manifest(try encrypted(bytes: 2_000).0)
+        let video = E2EEAutoContentR17.Manifest(
+            try encrypted(bytes: 3_000).0.manifest, fileName: "clip.mp4", mimeType: "video/mp4", width: 640, height: 360, durationMs: 4_000
+        )
+        let poster = manifest(try encrypted(bytes: 500).0)
+        let received = E2EEAutoContentR17.Body.media(
+            caption: "Antenne", attachments: [.init(file: photo, thumbnail: nil), .init(file: video, thumbnail: poster)]
+        )
+        var media: [String: E2EEAutoMediaRef] = [:]
+        let attachments = E2EEAutoMediaRef.attachments(of: received, into: &media)
+
+        let forwarded = try XCTUnwrap(E2EEAutoMediaRef.forwardBody(of: attachments, caption: "Antenne", media: media))
+        XCTAssertEqual(forwarded, received)
+        XCTAssertEqual(forwarded.blobIds, [photo.blobId, video.blobId, poster.blobId])
+        let payload = E2EEV2ContentPayloadV2(sentAtMs: 1, counter: 1, replyToRef: nil, mentions: [], body: .r17(forwarded))
+        XCTAssertEqual(try E2EEV2ContentPayloadV2.parse(payload.encoded()).body, .r17(forwarded))
+        XCTAssertEqual(
+            E2EEAutoMediaRef.forwardBody(of: attachments, caption: "", media: media),
+            .media(caption: nil, attachments: [.init(file: photo, thumbnail: nil), .init(file: video, thumbnail: poster)])
+        )
+
+        // Vocal : seul, sans la transcription de l'expéditeur d'origine.
+        let voice = E2EEAutoContentR17.Manifest(
+            try encrypted(bytes: 800).0.manifest, fileName: "voice.m4a", mimeType: "audio/mp4", width: nil, height: nil, durationMs: 2_000
+        )
+        let waveform = Data(repeating: 7, count: 64).base64EncodedString()
+        var voiceMedia: [String: E2EEAutoMediaRef] = [:]
+        let voiceAttachments = E2EEAutoMediaRef.attachments(
+            of: .audio(caption: nil, voice: voice, waveformB64: waveform, transcription: .init(language: "fr-FR", text: "salut")),
+            into: &voiceMedia
+        )
+        XCTAssertEqual(
+            E2EEAutoMediaRef.forwardBody(of: voiceAttachments, caption: nil, media: voiceMedia),
+            .audio(caption: nil, voice: voice, waveformB64: waveform, transcription: nil)
+        )
+
+        // Rien sans manifeste connu, ni pour une pièce locale, ni pour un vocal mêlé à d'autres pièces.
+        XCTAssertNil(E2EEAutoMediaRef.forwardBody(of: attachments, caption: nil, media: [:]))
+        XCTAssertNil(E2EEAutoMediaRef.forwardBody(of: [], caption: nil, media: media))
+        media.merge(voiceMedia) { first, _ in first }
+        XCTAssertNil(E2EEAutoMediaRef.forwardBody(of: attachments + voiceAttachments, caption: nil, media: media))
+        let local = MessageAttachment(
+            id: photo.blobId, kind: "IMAGE", url: URL(fileURLWithPath: "/tmp/photo.jpg"), fileName: "photo.jpg",
+            contentType: "image/jpeg", size: 2_000, width: 10, height: 10
+        )
+        XCTAssertNil(E2EEAutoMediaRef.forwardBody(of: [local], caption: nil, media: media))
+    }
+
     func testVectorChecksum() throws {
         let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("contracts/e2ee-auto")
