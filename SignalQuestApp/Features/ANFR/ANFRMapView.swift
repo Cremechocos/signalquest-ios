@@ -990,47 +990,12 @@ private struct ANFRMapContent: View {
                 mapStack
             }
         }
-        // La carte passe sous une barre transparente : le titre commun aux deux pays
-        // tient dans une pastille d'une ligne ; le registre publié est cité dans le
-        // panneau et la légende.
+        // Pas de barre : la carte va jusqu'en haut, sous des boutons ronds et le titre
+        // en pastille ; le registre publié est cité dans le panneau et la légende.
         .navigationTitle("Carte des modifications")
-        .toolbarTitleInlineCompat()
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Carte des modifications")
-                    .font(SQType.callout(.semibold))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .allowsTightening(true)
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.xs + 2)
-                    .background(.regularMaterial, in: Capsule(style: .continuous))
-                    .accessibilityAddTraits(.isHeader)
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
-                if isRegularWidth {
-                    Button {
-                        Haptics.light()
-                        showsSidePanel.toggle()
-                    } label: {
-                        Image(systemName: "sidebar.right")
-                    }
-                    .accessibilityLabel(showsSidePanel ? "Masquer le panneau" : "Afficher le panneau")
-                    .accessibilityIdentifier("anfr.map.list")
-                }
-                Button {
-                    Haptics.light()
-                    if cameFromStats { dismiss() } else { showsStats = true }
-                } label: {
-                    Image(systemName: "chart.bar.xaxis")
-                }
-                .accessibilityLabel("Statistiques des antennes")
-                .accessibilityIdentifier("anfr.map.stats")
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : UIKit coupe le balayage retour, rétabli ici.
+        .sqKeepsSwipeBack()
         .navigationDestination(isPresented: $showsStats) {
             ANFRStatsView(service: services.anfr, cameFromMap: true, market: model.market == .ca ? .ca : .fr)
         }
@@ -1118,6 +1083,47 @@ private struct ANFRMapContent: View {
         ZStack {
             mapLayer
             controlsLayer
+            topBar
+        }
+    }
+
+    /// Retour, titre et statistiques flottent sur la carte, comme dans Plans.
+    private var topBar: some View {
+        VStack {
+            ZStack {
+                Text("Carte des modifications")
+                    .font(SQType.callout(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .allowsTightening(true)
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 36)
+                    .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+                    .sqShadowCard()
+                    .padding(.horizontal, 44 + SQSpace.sm)
+                    .accessibilityAddTraits(.isHeader)
+                HStack(spacing: SQSpace.sm) {
+                    MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.map.back") { dismiss() }
+                        .sqShadowCard()
+                    Spacer(minLength: 0)
+                    // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
+                    if isRegularWidth {
+                        MapChipIconButton(systemImage: "sidebar.right",
+                                          label: showsSidePanel ? "Masquer le panneau" : "Afficher le panneau",
+                                          identifier: "anfr.map.list") { showsSidePanel.toggle() }
+                            .sqShadowCard()
+                    }
+                    MapChipIconButton(systemImage: "chart.bar.xaxis", label: "Statistiques des antennes",
+                                      identifier: "anfr.map.stats") {
+                        if cameFromStats { dismiss() } else { showsStats = true }
+                    }
+                    .sqShadowCard()
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.top, SQSpace.xs)
+            Spacer(minLength: 0)
         }
     }
 
@@ -1178,7 +1184,7 @@ private struct ANFRMapContent: View {
                 clusterSelection = ANFRClusterSelection(sites: sites)
             }
         )
-        .ignoresSafeArea(edges: [.top, .bottom])
+        .ignoresSafeArea()
     }
 
     // MARK: Controls overlay
@@ -2676,6 +2682,22 @@ final class ANFRMapHostView: UIView {
         map.frame = bounds
         onLayout?()
     }
+
+    /// La carte va jusqu'au bord gauche : ses gestes attendent l'échec du balayage
+    /// retour, sinon le doigt posé au bord fait glisser la carte au lieu de revenir.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        var responder: UIResponder? = self
+        while let current = responder, !(current is UIViewController) { responder = current.next }
+        guard let pop = (responder as? UIViewController)?.navigationController?.interactivePopGestureRecognizer else { return }
+        requireFailure(of: pop, in: map)
+    }
+
+    private func requireFailure(of pop: UIGestureRecognizer, in view: UIView) {
+        view.gestureRecognizers?.forEach { $0.require(toFail: pop) }
+        view.subviews.forEach { requireFailure(of: pop, in: $0) }
+    }
 }
 
 /// Carte ANFR rendue avec MapKit (Apple Plan natif). Pastilles colorées par
@@ -2793,14 +2815,14 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 51.2, longitude: -5.3))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 41.3, longitude: 9.7))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                // Petites marges : le dock est dans layoutMargins ; en haut, la carte passe sous la barre.
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
+                // Petites marges : le dock est dans layoutMargins ; en haut, la carte passe sous les boutons.
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + 44 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
             case .canada:
                 // La bande habitée, de Vancouver à Halifax : en portrait, la largeur décide du zoom.
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 56, longitude: -128))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 42, longitude: -58))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + 44 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
             case .region(let center, let radius):
                 map.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: radius * 2.6, longitudinalMeters: radius * 2.6), animated: animated)
             case .site(let coordinate, let aboveSheet):
