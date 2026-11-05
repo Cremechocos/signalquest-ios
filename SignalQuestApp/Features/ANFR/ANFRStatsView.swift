@@ -286,6 +286,7 @@ struct ANFRStatsView: View {
     /// Relevé lu au doigt sur la courbe de la carte.
     @State private var scrubDate: Date?
     @State private var showFilters = false
+    @State private var showShare = false
     @Environment(\.locale) private var locale
     @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.controlSize) private var controlSize
@@ -381,6 +382,11 @@ struct ANFRStatsView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showShare) {
+            if let stats = model.stats {
+                ANFRStatsShareSheet(stats: stats, market: model.market, initialBandKey: model.selectedFilter.key)
+            }
+        }
         .onAppear {
             withAnimation(reduceMotion ? nil : SQMotion.slow.delay(0.1)) { appeared = true }
         }
@@ -411,6 +417,12 @@ struct ANFRStatsView: View {
             HStack {
                 MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.stats.back") { dismiss() }
                 Spacer(minLength: SQSpace.md)
+                // Le web n'a pas d'image pour le Canada.
+                if model.stats != nil, model.market != .ca {
+                    MapChipIconButton(systemImage: "square.and.arrow.up", label: "Partager l’image", identifier: "anfr.stats.share") {
+                        showShare = true
+                    }
+                }
                 if model.stats != nil {
                     MapChipIconButton(systemImage: "slider.horizontal.3", label: "Filtres", identifier: "anfr.stats.filters") {
                         showFilters = true

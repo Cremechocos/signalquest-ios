@@ -67,6 +67,7 @@
 		0E2FA15498AD22C352AF080E /* DirectionsRequestHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1613623BA44BAF57928D049E /* DirectionsRequestHandler.swift */; };
 		0E8299FE9A7316E0FA5E5E2A /* E2EEV2MessageStoreV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C7B036D5161831FA23F2DE8 /* E2EEV2MessageStoreV2Tests.swift */; };
 		0E91F86BD082D7967A904E1B /* GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */; };
+		0EB3A07330E4BD04960B5AEA /* ANFRShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15C9BD73BA0CBDA0985842E /* ANFRShareCardTests.swift */; };
 		0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */; };
 		0EEF1C07C36C03F62FB62C7C /* CommunityOutageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */; };
 		0F303A7E35909C0794F276C8 /* CommentsPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */; };
@@ -487,6 +488,7 @@
 		7F82C52EAB453600AF770D3E /* PhotoErrorRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C4B217FF4AF158F90193C6 /* PhotoErrorRecoveryTests.swift */; };
 		7F8972229A3D4A6455A909F8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 6E03409117483C26347387EE /* Localizable.xcstrings */; };
 		7FB7A5B2F83C4E56A19F4906 /* E2EEV2IdentityVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2629F4B36B61CD15821C3DF /* E2EEV2IdentityVerification.swift */; };
+		7FC68DFA9FF9BC01E433EDD3 /* ANFRStatsShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579D7839EA63C04065285898 /* ANFRStatsShareCard.swift */; };
 		800642086F5F1E09F077B979 /* E2EEV2MembershipWriterV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91CFEC13DD81BAA3E6CA242 /* E2EEV2MembershipWriterV2Tests.swift */; };
 		80197564C8BB4C623E4BA2B5 /* SessionSignalTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0E2CCF988F937F07105764 /* SessionSignalTrace.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
@@ -1333,6 +1335,7 @@
 		56D690C4D6BDE693AEB92D28 /* E2EEV2AccountIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2AccountIdentity.swift; sourceTree = "<group>"; };
 		56E9B10F3C150DF7BA948B47 /* PasswordResetFieldFeedbackQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetFieldFeedbackQATests.swift; sourceTree = "<group>"; };
 		5723505E7140ACE78C7A67FA /* CarPlaySceneManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneManifestTests.swift; sourceTree = "<group>"; };
+		579D7839EA63C04065285898 /* ANFRStatsShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRStatsShareCard.swift; sourceTree = "<group>"; };
 		57D22679EFB8F1BAF06D20F4 /* OnboardingRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingRoutingTests.swift; sourceTree = "<group>"; };
 		57FDE918733D1625D560F628 /* MarketRegistryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketRegistryModels.swift; sourceTree = "<group>"; };
 		580487B685558C2106751EDD /* E2EEAutoEnrollmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoEnrollmentTests.swift; sourceTree = "<group>"; };
@@ -1892,6 +1895,7 @@
 		F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		F0631318601783BCBA1EBFF7 /* E2EEV2EpochRotationV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2EpochRotationV2.swift; sourceTree = "<group>"; };
 		F06E026EA0B3667BF1129FCF /* NotificationsHTTPQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsHTTPQATests.swift; sourceTree = "<group>"; };
+		F15C9BD73BA0CBDA0985842E /* ANFRShareCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRShareCardTests.swift; sourceTree = "<group>"; };
 		F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaPhotoQATests.swift; sourceTree = "<group>"; };
 		F1E8601B1C76C24BA49EBF1C /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		F2015AC272F9D96F13C28D48 /* SQNetworkColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQNetworkColors.swift; sourceTree = "<group>"; };
@@ -1978,6 +1982,7 @@
 				8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */,
 				2C527B3C2A1021E22E74D4D2 /* ANFRMapView.swift */,
 				8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */,
+				579D7839EA63C04065285898 /* ANFRStatsShareCard.swift */,
 				805212969955D9E456D8238A /* ANFRStatsView.swift */,
 				0B53171FE6A5D2F4D56CD5A2 /* ISEDSiteChangesSheet.swift */,
 			);
@@ -3054,6 +3059,7 @@
 				BBB8ACBAA6C439B8BBD42B0A /* ANFRBandStatsTests.swift */,
 				DFDCF405C41F61A45C664C0D /* ANFRBandsViewModelTests.swift */,
 				2FC6A2458D5BCC866A93A543 /* ANFRDromStatsTests.swift */,
+				F15C9BD73BA0CBDA0985842E /* ANFRShareCardTests.swift */,
 				6272799437D816FFE9DACCBD /* AntennaLeaderReportTests.swift */,
 				B4EBB8F2A133C7E7E8BFE147 /* AntennaMarkerDecodeTests.swift */,
 				FCC9C691A3F3F1874DAD506F /* AntennaMarkerRenderTests.swift */,
@@ -3856,6 +3862,7 @@
 				066B6DDEB1907946214C4A5C /* ANFRModels.swift in Sources */,
 				CB8D5E02EEF4BDE6C61A5B90 /* ANFRService.swift in Sources */,
 				479DAA09F0F70F020AB8CA4F /* ANFRSiteDetailSheet.swift in Sources */,
+				7FC68DFA9FF9BC01E433EDD3 /* ANFRStatsShareCard.swift in Sources */,
 				963DE4BE9799715D9F0BE77D /* ANFRStatsView.swift in Sources */,
 				DF096DA80BE358FA48F3E8C4 /* APIClient.swift in Sources */,
 				BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */,
@@ -4461,6 +4468,7 @@
 				D8BBBE58DB8D297BDE5309E5 /* ANFRBandStatsTests.swift in Sources */,
 				80AAAAD0BBB45AD9789B812A /* ANFRBandsViewModelTests.swift in Sources */,
 				CD364DE1A13B9877DEC434D6 /* ANFRDromStatsTests.swift in Sources */,
+				0EB3A07330E4BD04960B5AEA /* ANFRShareCardTests.swift in Sources */,
 				FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */,
 				98F094F8C9ECBFF7928001B1 /* ActiveCellularServiceTests.swift in Sources */,
 				04C40798186FDC0CA90ABD9C /* AndroidDataPresenceTests.swift in Sources */,
