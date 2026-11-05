@@ -767,6 +767,18 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     /// déconnexion locale ne les attend pas ; la révocation reste rejouable.
     static let signOutDeadline: Duration = .seconds(3)
 
+    /// Push `e2ee_device_added` (révision 21) : le `seq` annoncé est attendu,
+    /// puis l'app relit son propre compte. `false` pour tout autre push.
+    @discardableResult
+    private static func expectAddedDevice(_ info: [AnyHashable: Any]) -> Bool {
+        guard let seq = E2EEAutoNewDeviceAlerts.pushSeq(info) else { return false }
+        if let session = LocalAccountScope.sessionSnapshot() {
+            E2EEAutoNewDeviceAlerts().expect(seq: seq, ownerNamespace: session.ownerNamespace)
+            NotificationCenter.default.post(name: E2EEAutoNewDeviceAlerts.pushReceived, object: nil)
+        }
+        return true
+    }
+
     func acceptsPush(_ info: [AnyHashable: Any]) -> Bool {
         let decision = PushRecipientPolicy.evaluate(info)
         guard decision == .acceptTargeted || decision == .acceptPublic else {
@@ -852,6 +864,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         if Self.string(info, "type")?.lowercased() == "e2ee_history_request" {
             NotificationCenter.default.post(name: E2EEAutoHistoryRequestCoordinator.requestsChanged, object: nil)
         }
+        // Appareil ajouté au compte, app ouverte : l'alerte vient du journal relu (révision 21).
+        Self.expectAddedDevice(info)
         // Message v2 reçu app ouverte : la notification ne nomme pas la
         // conversation (§2.6) ; l'écran ouvert sur une conversation v2 se relève.
         if Self.string(info, "type")?.lowercased() == "e2ee_v2_envelope" {
@@ -925,6 +939,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let e2eeDeviceApprovalId = Self.e2eeDeviceApprovalID(info)
         if type?.lowercased() == "e2ee_v2_device_approval", e2eeDeviceApprovalId == nil {
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            return completion()
+        }
+        // « Nouvel appareil » touché : l'alerte vient du journal relu, rien à router.
+        if Self.expectAddedDevice(info) {
             return completion()
         }
         // « C'est moi » : l'app au premier plan relit ses demandes, rien à router.

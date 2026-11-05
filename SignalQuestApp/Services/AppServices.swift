@@ -601,6 +601,20 @@ final class AppServices: ObservableObject {
         E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
     }
 
+    /// Push `e2ee_device_added` reçu, ou premier plan avec un `seq` encore attendu
+    /// (révision 21) : son propre compte relu. L'appareil ajouté part de cette
+    /// lecture (alerte « Nouvel appareil », rotations), jamais du push.
+    func readOwnDevicesAfterAddedPush() async {
+        let alerts = E2EEAutoNewDeviceAlerts()
+        guard SQFeatures.e2eeAutoLogEnabled, let session = LocalAccountScope.sessionSnapshot(),
+              session.ownerScopeId.hasPrefix("user:"), alerts.awaitedSeq(ownerNamespace: session.ownerNamespace) != nil,
+              let reader = E2EEAutoLogReader.live(session: session, api: api) else { return }
+        let userId = String(session.ownerScopeId.dropFirst("user:".count))
+        guard case .verified(let account) = await E2EEAutoDeviceRevocation.ownAccount(reader: reader, userId: userId),
+              session.isCurrent else { return }
+        alerts.reached(account.lastSeq, ownerNamespace: session.ownerNamespace)
+    }
+
     /// Appareils ajoutés vus dans le journal vérifié (E2EE-AUTO §3.5, §7) : la
     /// ligne locale « les appareils de X ont changé » dans les conversations
     /// communes, puis le filet de secours des rotations, une fois la bascule

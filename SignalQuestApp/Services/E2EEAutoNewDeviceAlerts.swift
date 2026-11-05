@@ -33,4 +33,35 @@ struct E2EEAutoNewDeviceAlerts {
             defaults.set(rest, forKey: key(ownerNamespace))
         }
     }
+
+    // MARK: - Push `e2ee_device_added` (révision 21)
+
+    /// Le push n'est qu'un réveil : ni son `deviceId` ni son `seq` ne sont crus.
+    /// Son propre compte est relu et l'appareil ajouté vient du journal vérifié ;
+    /// le `seq` reste attendu tant que la tête vérifiée ne l'a pas atteint.
+    static let pushType = "e2ee_device_added"
+    static let pushReceived = Notification.Name("SignalQuest.E2EEAuto.DeviceAddedPush.v1")
+
+    static func pushSeq(_ info: [AnyHashable: Any]) -> Int64? {
+        guard info["type"] as? String == pushType, let seq = info["seq"] as? String else { return nil }
+        return E2EEAutoLog.decimal(seq, in: 1...E2EEV2Canonical.maxSafeInteger)
+    }
+
+    private func seqKey(_ ownerNamespace: String) -> String { "e2ee-auto-device-added-seq-v1:\(ownerNamespace)" }
+
+    func awaitedSeq(ownerNamespace: String) -> Int64? {
+        (defaults.object(forKey: seqKey(ownerNamespace)) as? NSNumber)?.int64Value
+    }
+
+    /// Le plus grand `seq` annoncé : l'atteindre couvre aussi les précédents.
+    func expect(seq: Int64, ownerNamespace: String) {
+        guard seq > awaitedSeq(ownerNamespace: ownerNamespace) ?? 0 else { return }
+        defaults.set(NSNumber(value: seq), forKey: seqKey(ownerNamespace))
+    }
+
+    /// `lastSeq` du compte vérifié : au-delà du `seq` attendu, plus rien à relire.
+    func reached(_ lastSeq: Int64, ownerNamespace: String) {
+        guard let awaited = awaitedSeq(ownerNamespace: ownerNamespace), lastSeq >= awaited else { return }
+        defaults.removeObject(forKey: seqKey(ownerNamespace))
+    }
 }

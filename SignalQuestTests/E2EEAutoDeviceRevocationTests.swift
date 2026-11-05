@@ -368,6 +368,40 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         XCTAssertNil(store.defaults.object(forKey: "e2ee-auto-new-devices-v1:ns"))
     }
 
+    /// Révision 21 : corps APNs relevé dans la PR #969 ; seul un `seq` canonique réveille la lecture.
+    func testDeviceAddedPushOnlyAnnouncesACanonicalSeq() {
+        let push: [AnyHashable: Any] = [
+            "aps": ["alert": ["title": "SignalQuest", "body": "Un nouvel appareil a été ajouté à ton compte"], "mutable-content": 1],
+            "type": "e2ee_device_added", "deviceId": "dev-1", "seq": "42", "recipientOwnerScope": "user:abc",
+        ]
+        XCTAssertEqual(E2EEAutoNewDeviceAlerts.pushSeq(push), 42)
+        for seq in ["042", "-1", "0", "4.2", "", "9007199254740992"] {
+            var bad = push
+            bad["seq"] = seq
+            XCTAssertNil(E2EEAutoNewDeviceAlerts.pushSeq(bad), seq)
+        }
+        var number = push
+        number["seq"] = 42
+        XCTAssertNil(E2EEAutoNewDeviceAlerts.pushSeq(number), "le contrat envoie une chaîne")
+        var other = push
+        other["type"] = "e2ee_history_request"
+        XCTAssertNil(E2EEAutoNewDeviceAlerts.pushSeq(other))
+    }
+
+    func testDeviceAddedSeqStaysAwaitedUntilTheVerifiedAccountReachesIt() {
+        let store = alertStore()
+        XCTAssertNil(store.awaitedSeq(ownerNamespace: "ns"))
+        store.expect(seq: 40, ownerNamespace: "ns")
+        store.expect(seq: 42, ownerNamespace: "ns")
+        store.expect(seq: 41, ownerNamespace: "ns")
+        XCTAssertEqual(store.awaitedSeq(ownerNamespace: "ns"), 42, "le plus grand couvre les autres")
+        XCTAssertNil(store.awaitedSeq(ownerNamespace: "other"), "un seq par compte")
+        store.reached(41, ownerNamespace: "ns")
+        XCTAssertEqual(store.awaitedSeq(ownerNamespace: "ns"), 42, "tête vérifiée pas encore à jour : relu plus tard")
+        store.reached(57, ownerNamespace: "ns")
+        XCTAssertNil(store.awaitedSeq(ownerNamespace: "ns"))
+    }
+
     @MainActor
     func testNewDeviceAlertShowsOnlyLiveDevicesOfTheVerifiedAccount() async throws {
         let store = alertStore()

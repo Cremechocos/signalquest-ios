@@ -571,6 +571,13 @@ struct RootView: View {
         }
     }
 
+    /// `seq` annoncé par un push et pas encore atteint : relu au premier plan.
+    private func readOwnDevicesAfterAddedPush() {
+        guard isAuthenticated, !AppEnvironment.usesDemoData else { return }
+        let services = services
+        Task { await services.readOwnDevicesAfterAddedPush() }
+    }
+
     private var showsHistoryApproval: Bool {
         historyRequests.approval != nil && newDeviceAlerts.presented == nil && !logAlerts.isPresented
     }
@@ -653,7 +660,10 @@ struct RootView: View {
                         refreshV2ActivationPrompt()
                     }
                     .onChangeCompat(of: scenePhase) { _, phase in
-                        if phase == .active { refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert() }
+                        if phase == .active {
+                            refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert()
+                            readOwnDevicesAfterAddedPush()
+                        }
                         refreshHistoryRequests(active: phase == .active)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoHistoryRequestCoordinator.historyKeyMissing).receive(on: RunLoop.main)) { note in
@@ -675,6 +685,10 @@ struct RootView: View {
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoNewDeviceAlerts.didChange).receive(on: RunLoop.main)) { _ in
                         refreshNewDeviceAlert()
+                    }
+                    // Push « Nouvel appareil » (révision 21) : son propre compte relu.
+                    .onReceive(NotificationCenter.default.publisher(for: E2EEAutoNewDeviceAlerts.pushReceived).receive(on: RunLoop.main)) { _ in
+                        readOwnDevicesAfterAddedPush()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoLogAlerts.didChange).receive(on: RunLoop.main)) { _ in
                         refreshNewDeviceAlert()

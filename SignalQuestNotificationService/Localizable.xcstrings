@@ -205,6 +205,23 @@
         }
       }
     },
+    "Nouvel appareil sur ce compte": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New device on this account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel appareil sur ce compte"
+          }
+        }
+      }
+    },
     "Ouvre SignalQuest pour afficher le message.": {
       "extractionState" : "manual",
       "localizations" : {
@@ -235,6 +252,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir l’historique sur un nouvel appareil ?"
+          }
+        }
+      }
+    },
+    "Un appareil a été ajouté à ce compte. Vérification dans SignalQuest.": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device was added to this account. Check it in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil a été ajouté à ce compte. Vérification dans SignalQuest."
           }
         }
       }

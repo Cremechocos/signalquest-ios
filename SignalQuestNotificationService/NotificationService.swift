@@ -66,6 +66,10 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             contentHandler(Self.historyRequestContent(request.content))
             return
         }
+        if (info["type"] as? String)?.lowercased() == "e2ee_device_added" {
+            contentHandler(Self.deviceAddedContent(request.content))
+            return
+        }
         guard (info["type"] as? String)?.lowercased() == "e2ee_v2_envelope" else {
             // Message : « Répondre » et « Marquer comme lu » selon la conversation.
             contentHandler(MessageNotificationCategory.categorized(request.content))
@@ -141,6 +145,22 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
         if original.userInfo["recipientOwnerScope"] as? String == current {
             content.title = String(localized: "Ouvrir l’historique sur un nouvel appareil ?")
             content.body = String(localized: "Un appareil de ce compte demande l’historique des messages chiffrés. Confirmation dans SignalQuest.")
+        } else {
+            content.title = "SignalQuest"
+            content.body = String(localized: "Nouveau contenu privé")
+        }
+        return content
+    }
+
+    /// Révision 21 : texte constant, le même pour tous ; l'app vérifie l'appareil
+    /// dans le journal avant de le montrer. Sans tu ni vous : l'extension ne
+    /// connaît pas le réglage d'adresse.
+    private static func deviceAddedContent(_ original: UNNotificationContent) -> UNNotificationContent {
+        guard let content = original.mutableCopy() as? UNMutableNotificationContent else { return original }
+        let current = try? E2EEV2NotificationContextStore.configured()?.load()?.ownerScopeId
+        if let current, original.userInfo["recipientOwnerScope"] as? String == current {
+            content.title = String(localized: "Nouvel appareil sur ce compte")
+            content.body = String(localized: "Un appareil a été ajouté à ce compte. Vérification dans SignalQuest.")
         } else {
             content.title = "SignalQuest"
             content.body = String(localized: "Nouveau contenu privé")
