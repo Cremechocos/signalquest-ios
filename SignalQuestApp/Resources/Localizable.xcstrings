@@ -110120,6 +110120,22 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "%@ vers %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ around %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ vers %2$@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -32,4 +32,11 @@ final class SQDateTimeFormatTests: XCTestCase {
         XCTAssertEqual(render(.none, "en_US"), "12:36 AM")
         XCTAssertEqual(render(.medium, "en_US"), "Nov 2, 2026 at 12:36 AM")
     }
+
+    /// Tuiles publiques v1 (#982) : heure tronquée par le serveur, jamais « 11:00 ».
+    func testServerHourIsShownAsAnApproximateHour() {
+        let text = SignalFormatters.dateAroundHour(night)
+        XCTAssertFalse(text.contains(":"), text)
+        XCTAssertTrue(text.hasPrefix("2 nov. 2026 vers "), text)
+    }
 }

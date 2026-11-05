@@ -89,6 +89,18 @@ enum SignalFormatters {
         }
         return includingTime ? dayTimeFormatter.string(from: date) : dayFormatter.string(from: date)
     }
+
+    /// Heure tronquée par le serveur (tuiles publiques, `timestampPrecision` "hour") :
+    /// « 5 nov. 2026 vers 11 h », jamais « 11:00 ».
+    static func dateAroundHour(_ date: Date) -> String {
+        String(localized: "\(dayFormatter.string(from: date)) vers \(hourFormatter.string(from: date))")
+    }
+
+    nonisolated(unsafe) private static let hourFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("j")
+        return formatter
+    }()
 }
 
 /// Date et heure en toutes lettres : « 2 nov. 2026 à 00:36 », « 00:36 ».

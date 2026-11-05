@@ -5322,7 +5322,7 @@ struct MapItemSheet: View {
                 kicker: [String(localized: "Speedtest"), detail?.mobileOperator ?? local?.operatorName, tech],
                 value: downloadAverage.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
                 unit: downloadAverage.map { String(localized: "\(SQUnits.throughputUnit(mbps: $0)) en réception") },
-                caption: [formatDate(detail?.timestamp ?? local?.timestamp), distanceText]
+                caption: [formatDate(detail?.timestamp) ?? local?.timestamp.map(SignalFormatters.dateAroundHour), distanceText]
             )
             tiles([
                 ("Envoi", uploadAverage.map { SQUnits.throughputValue(mbps: $0) }, uploadAverage.map { SQUnits.throughputUnit(mbps: $0) }),
@@ -5362,7 +5362,7 @@ struct MapItemSheet: View {
                          details?.band.map { SQUnits.band($0, technology: details?.tech) }],
                 value: rsrp.map { "\(Int($0.rounded()))" } ?? "—",
                 unit: rsrp.map { _ in String(localized: "dBm · signal \(quality.label.lowercased())") },
-                caption: [aggregated, formatDate(details?.timestamp), distanceText]
+                caption: [aggregated, details?.timestamp.map(SignalFormatters.dateAroundHour), distanceText]
             )
             tiles([
                 ("RSRQ", details?.rsrq.map { "\(Int($0.rounded()))" }, "dB"),
