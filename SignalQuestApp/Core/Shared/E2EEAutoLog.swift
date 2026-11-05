@@ -881,3 +881,102 @@ enum E2EEAutoHistoryKey {
         return signature.base64EncodedString()
     }
 }
+
+// MARK: - Tête publiée par la sonde (§3.7, révision 21 §7.8 E)
+
+/// Tête du journal vue par la sonde extérieure, signée par elle. Suit
+/// `packages/core/e2ee-auto-probe-head.ts` ; le vecteur `probe-head-v1` fait foi.
+enum E2EEAutoProbeHead {
+    static let url = URL(string: "https://probe.signalquest.fr/e2ee-log-head.json")!
+    static let version = 1
+    /// Au-delà, le fichier ne déclenche rien : nouvel essai au jour suivant (§7.8 E5).
+    static let maxAgeMs: Int64 = 7 * 24 * 3_600_000
+    /// Une comparaison par jour au plus (§3.7).
+    static let checkIntervalMs: Int64 = 24 * 3_600_000
+
+    /// Clés publiques de la sonde épinglées (§7.8 E3), `keyId` → X9.63 en `b64` :
+    /// tirée sur la VM Oracle le 05/11/2026, copie de `E2EE_AUTO_PROBE_KEYS`.
+    static let pinnedKeys: [String: String] = [
+        "07DNoE99WBlZwEM8jaTxHVPzaX3d5GGq8eoIhphvQ34": "BEChdq7bwoBjvAlvbCqiRwRn2lL2n/tfCbAWd//2lBKj4sjoOqDKMztLb8I2giYREYKqGlF6kGwe3T6kjaM10B8=",
+    ]
+
+    struct File: Equatable, Sendable {
+        let keyId: String
+        let headText: String
+        let headSignatureB64: String
+        let seenAtMs: Int64
+        let seenAtText: String
+        let signatureB64: String
+        let head: E2EEAutoLog.Head
+    }
+
+    enum Invalid: String, Error, Sendable {
+        case format = "PROBE_FORMAT"
+        case keyUnknown = "PROBE_KEY_UNKNOWN"
+        case signature = "PROBE_SIGNATURE"
+        case headLogKey = "HEAD_LOG_KEY"
+        case headSignature = "HEAD_SIGNATURE"
+    }
+
+    enum Check: Equatable, Sendable {
+        case ok(E2EEAutoLog.Head)
+        /// Plus de 7 jours, ou daté du futur au-delà de la tolérance : comme un fichier absent.
+        case stale(E2EEAutoLog.Head)
+        /// Comme un fichier absent : aucune alerte, jamais une fourche.
+        case invalid(Invalid)
+    }
+
+    /// `keyId` d'une clé de la sonde, comme le `logKeyId` (§3.4).
+    static func keyId(_ probeKeyB64: String) -> String {
+        E2EEAutoLog.logKeyId(probeKeyB64)
+    }
+
+    /// Charge signée par la sonde (§7.8 E2), sans fin de ligne finale.
+    static func payload(keyId: String, headText: String, seenAtMs: String) -> String {
+        let headHash = SHA256.hash(data: Data(headText.utf8)).map { String(format: "%02x", $0) }.joined()
+        return ["SQ-E2EE-AUTO-PROBE-HEAD", String(version), keyId, headHash, seenAtMs].joined(separator: "\n")
+    }
+
+    /// Fichier à clés exactes ; aucune signature vérifiée ici.
+    static func parse(_ data: Data) -> File? {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              Set(root.keys) == ["v", "keyId", "head", "seenAtMs", "signatureB64"],
+              let v = root["v"] as? NSNumber, CFGetTypeID(v) == CFNumberGetTypeID(), !CFNumberIsFloatType(v), v.intValue == version,
+              let keyId = root["keyId"] as? String, E2EEAutoLog.isDigest(keyId),
+              let head = root["head"] as? [String: Any], Set(head.keys) == ["text", "signatureB64"],
+              let headText = head["text"] as? String,
+              let headSignatureB64 = head["signatureB64"] as? String, E2EEAutoLog.canonicalBase64(headSignatureB64) != nil,
+              let seenAtText = root["seenAtMs"] as? String,
+              let seenAtMs = E2EEAutoLog.decimal(seenAtText, in: 0...E2EEV2Canonical.maxSafeInteger),
+              let signatureB64 = root["signatureB64"] as? String, E2EEAutoLog.canonicalBase64(signatureB64) != nil,
+              let parsedHead = E2EEAutoLog.parseHead(headText) else { return nil }
+        return File(keyId: keyId, headText: headText, headSignatureB64: headSignatureB64, seenAtMs: seenAtMs,
+                    seenAtText: seenAtText, signatureB64: signatureB64, head: parsedHead)
+    }
+
+    /// Lecture par l'app (§7.8 E5) : forme, clé de la sonde épinglée, signature de la
+    /// sonde, puis signature de la tête par `logKeyB64`, la clé du journal en vigueur
+    /// au `seq` de la tête ; nil saute ce dernier contrôle. L'âge de la tête elle-même
+    /// n'est pas jugé ici : une tête signée engage, même vieille (§3.4).
+    static func verify(_ data: Data, probeKeys: [String: String] = pinnedKeys, logKeyB64: String?, nowMs: Int64) -> Check {
+        guard let file = parse(data) else { return .invalid(.format) }
+        guard let probeKeyB64 = probeKeys[file.keyId], E2EEAutoLog.isPublicKey(probeKeyB64), keyId(probeKeyB64) == file.keyId else {
+            return .invalid(.keyUnknown)
+        }
+        guard E2EEAutoLog.verify(
+            publicKeyB64: probeKeyB64,
+            payload: payload(keyId: file.keyId, headText: file.headText, seenAtMs: file.seenAtText),
+            signatureB64: file.signatureB64
+        ) else { return .invalid(.signature) }
+        if let logKeyB64 {
+            switch E2EEAutoLog.checkHead(text: file.headText, signatureB64: file.headSignatureB64, logKeyB64: logKeyB64, nowMs: nowMs) {
+            case .invalid(.logKey): return .invalid(.headLogKey)
+            case .invalid: return .invalid(.headSignature)
+            case .ok, .stale: break
+            }
+        }
+        let tooOld = nowMs - file.seenAtMs > maxAgeMs
+        let inFuture = file.seenAtMs - nowMs > E2EEAutoLog.clockToleranceMs
+        return tooOld || inFuture ? .stale(file.head) : .ok(file.head)
+    }
+}

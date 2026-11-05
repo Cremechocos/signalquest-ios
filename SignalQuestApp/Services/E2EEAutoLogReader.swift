@@ -262,6 +262,8 @@ actor E2EEAutoLogReader {
     typealias FetchLinks = @Sendable (_ after: Int64) async throws -> (data: Data, serverDate: Date?)
     /// Entrées de seq dans `]after, upTo]` ; nil : compte non servi (404).
     typealias FetchAccount = @Sendable (_ userId: String, _ after: Int64, _ upTo: Int64) async throws -> Data?
+    /// Fichier de la sonde ; nil : absent, injoignable ou refusé (§7.8 E5).
+    typealias FetchProbe = @Sendable () async -> Data?
 
     let ownerScopeId: String
     private let pinnedLogKeyB64: String
@@ -269,6 +271,8 @@ actor E2EEAutoLogReader {
     private let store: E2EEAutoLogStore
     private let fetchLinks: FetchLinks
     private let fetchAccount: FetchAccount
+    private let fetchProbe: FetchProbe
+    private let probeKeys: [String: String]
     private let now: @Sendable () -> Date
     /// Heure de fin d'attente après un `429`, par quota : survit au relancement.
     private let defaults: UserDefaults
@@ -281,6 +285,7 @@ actor E2EEAutoLogReader {
     /// Appareils apparus depuis la dernière lecture vérifiée de leur compte
     /// (`ADD` hors `GENESIS`, `ACTIVATE`), par compte : repris par `takeAddedDevices`.
     private var addedDevices: [String: Set<String>] = [:]
+    private var checkingProbe = false
 
     init(
         ownerScopeId: String,
@@ -289,6 +294,8 @@ actor E2EEAutoLogReader {
         store: E2EEAutoLogStore = E2EEAutoLogStore(),
         fetchLinks: @escaping FetchLinks,
         fetchAccount: @escaping FetchAccount,
+        fetchProbe: @escaping FetchProbe = { nil },
+        probeKeys: [String: String] = E2EEAutoProbeHead.pinnedKeys,
         now: @escaping @Sendable () -> Date = Date.init,
         defaults: UserDefaults = .standard
     ) {
@@ -298,6 +305,8 @@ actor E2EEAutoLogReader {
         self.store = store
         self.fetchLinks = fetchLinks
         self.fetchAccount = fetchAccount
+        self.fetchProbe = fetchProbe
+        self.probeKeys = probeKeys
         self.now = now
         self.defaults = defaults
     }
@@ -335,8 +344,26 @@ actor E2EEAutoLogReader {
                 case .failure(let failure) where isAccountNotFound(failure): return nil
                 case .failure(let failure): throw failure
                 }
-            }
+            },
+            fetchProbe: fetchProbeHead
         )
+    }
+
+    static let maxProbeBytes = 16_384
+
+    /// GET de la sonde, hors session : sans cookie ni cache, `200` seulement.
+    @Sendable static func fetchProbeHead() async -> Data? {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 20
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        guard let (data, response) = try? await session.data(from: E2EEAutoProbeHead.url),
+              (response as? HTTPURLResponse)?.statusCode == 200, data.count <= maxProbeBytes else { return nil }
+        return data
     }
 
     /// Seul ce code est décisif ; tout autre `404` de `log/accounts` est non concluant (révision 13).
@@ -656,6 +683,64 @@ actor E2EEAutoLogReader {
         case behind
         /// Même `seq`, autre condensat : même alerte qu'une fourche.
         case fork
+    }
+
+    enum ProbeCheck: Equatable, Sendable {
+        /// Déjà comparée depuis moins de 24 h, alerte gardée ou maillons pas encore lus.
+        case skipped
+        /// Fichier absent, injoignable, invalide, trop vieux, ou relecture non concluante :
+        /// aucune alerte, nouvel essai au jour suivant (§7.8 E5).
+        case ignored
+        case agree
+        /// Alerte de fourche levée et gardée.
+        case fork
+    }
+
+    /// Comparaison avec la tête publiée par la sonde, une fois par jour au plus,
+    /// après `refreshLinks` (§3.7, §7.8 E5). Seuls `seq` et `linkHash` comptent ;
+    /// une sonde en avance fait relire les maillons, et seule une relecture
+    /// concluante peut conclure à une fourche.
+    func checkProbeIfDue() async -> ProbeCheck {
+        guard !checkingProbe, chain != nil, var anchor = try? store.anchor(ownerScopeId: ownerScopeId), anchor.alert == nil else {
+            return .skipped
+        }
+        let startedAtMs = nowMs
+        if let last = anchor.probeCheckedAtMs, last <= startedAtMs, startedAtMs - last < E2EEAutoProbeHead.checkIntervalMs {
+            return .skipped
+        }
+        checkingProbe = true
+        defer { checkingProbe = false }
+        anchor.probeCheckedAtMs = startedAtMs
+        guard (try? store.saveAnchor(anchor, ownerScopeId: ownerScopeId)) != nil else { return .ignored }
+
+        // La sonde d'abord, sans la clé du journal : un fichier faux ne fait rien relire.
+        guard let data = await fetchProbe(),
+              case .ok(let probe) = E2EEAutoProbeHead.verify(data, probeKeys: probeKeys, logKeyB64: nil, nowMs: nowMs) else {
+            return .ignored
+        }
+        var reread = false
+        if let chain, probe.seq > chain.seq {
+            guard case .current? = try? await refreshLinks() else { return .ignored }
+            reread = true
+        }
+        guard let chain else { return .ignored }
+        // La tête de la sonde se vérifie par la clé du journal en vigueur à son `seq`.
+        let logKeyB64 = probe.seq <= chain.seq
+            ? fileChain(store.load(ownerScopeId: ownerScopeId), upTo: probe.seq)?.logKeyB64
+            : chain.logKeyB64
+        guard let logKeyB64,
+              case .ok = E2EEAutoProbeHead.verify(data, probeKeys: probeKeys, logKeyB64: logKeyB64, nowMs: nowMs) else {
+            return .ignored
+        }
+        switch compareProbe(seq: probe.seq, linkHash: probe.linkHash) {
+        case .agree: return .agree
+        case .behind where !reread: return .ignored
+        case .behind, .fork:
+            // Deux têtes signées par la clé du journal ne se contredisent jamais, et le journal ne raccourcit pas.
+            guard let current = try? store.anchor(ownerScopeId: ownerScopeId), current.alert == nil,
+                  (try? raise(.init(error: .fork, seq: probe.seq), anchor: current)) != nil else { return .ignored }
+            return .fork
+        }
     }
 
     /// Tête de la sonde face aux maillons vérifiés ici. Après une relecture, une

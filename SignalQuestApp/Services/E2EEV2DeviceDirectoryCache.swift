@@ -76,7 +76,11 @@ actor E2EEV2DeviceDirectoryCache {
     /// rend plus aucun appareil.
     static func autoRead(_ reader: E2EEAutoLogReader) -> @Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet {
         { userIds in
-            if case .alert = try await reader.refreshLinks() {
+            let status = try await reader.refreshLinks()
+            // Comparaison avec la sonde, une fois par jour au plus (§3.7) : une fourche bloque comme une alerte.
+            let blocked: Bool
+            if case .alert = status { blocked = true } else { blocked = await reader.checkProbeIfDue() == .fork }
+            if blocked {
                 return E2EEV2CertifiedDeviceSet(
                     devicesByUser: [:], refusals: Dictionary(uniqueKeysWithValues: userIds.map { ($0, .invalidDeviceList) })
                 )

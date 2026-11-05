@@ -1,0 +1,906 @@
+{
+  "fixtureVersion": 1,
+  "description": "Tête publiée par la sonde (E2EE-AUTO §7.8 E, révision 21). Charge, fichier à clés exactes, lecture par l'app, comparaison (seq, linkHash) et écriture du Worker. Clé de test publique : une tête qu'elle signe ne prouve rien.",
+  "keyIdDefinition": "keyId = b64url(SHA-256(clé publique de la sonde en X9.63 non compressé, 65 octets)), sans remplissage, comme le logKeyId du §3.4. Ce vecteur fait foi.",
+  "probeKey": {
+    "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+    "publicKeyB64": "BCNmH7nn41wH6N2nhGDjgmmdpctg/UIguMA9k6EcdUtf3h24UxoWGxdyfuIOEPYph+Ve8GMKr8q6J9x2cq+Mn3U="
+  },
+  "otherProbeKey": {
+    "keyId": "a0J0jjYrM-B9c-XQ57Fv2jYgAeBMPizM1FHXl36pwSw",
+    "publicKeyB64": "BHiw6MAyIne7t4r7Zly5GmlxQpEihYmySF9twTzHIlfXF2wNGj8JQ3XSvwq8ca8c4W1mmFlLHGy8ORyphK8qtho="
+  },
+  "logKey": {
+    "logKeyId": "4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns",
+    "publicKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ="
+  },
+  "maxAgeMs": "604800000",
+  "clockToleranceMs": "600000",
+  "payload": {
+    "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+    "headText": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+    "headSha256Hex": "27380cbaf91c1626399f058384483146914ff5e9a23f43e26348a96ffb6fdae0",
+    "seenAtMs": "1790007240000",
+    "text": "SQ-E2EE-AUTO-PROBE-HEAD\n1\ne1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o\n27380cbaf91c1626399f058384483146914ff5e9a23f43e26348a96ffb6fdae0\n1790007240000",
+    "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+  },
+  "chain": {
+    "links": [
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nGxx8anlIONjMEb8drYDRk3vbKnQYztqlqo3m5AN1SJA\nACCOUNT\nR27gP0zCGVvu3vqkFiaONkBhkGlNUIhwAiwdaQDua98\n_2LqS8SVYJfYPFE3eUu3Hi8-V8zaca57DkkzKdYFhtA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nObanguziQzE6MLa3xp2FCNhpRuTiLprzR9_P5CJ5Y_Q\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nFm4eKpp9AppHa4AK5gjChn3rkDBIDzqclnOcP65ONRY\n0"
+    ],
+    "forkedLinks": [
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nGxx8anlIONjMEb8drYDRk3vbKnQYztqlqo3m5AN1SJA\nACCOUNT\nR27gP0zCGVvu3vqkFiaONkBhkGlNUIhwAiwdaQDua98\n_2LqS8SVYJfYPFE3eUu3Hi8-V8zaca57DkkzKdYFhtA\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nObanguziQzE6MLa3xp2FCNhpRuTiLprzR9_P5CJ5Y_Q\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\n1",
+      "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nEvRzNiSf2TrMu39hzUgtZdwCTyd1GyhmRFfvz6WU5iU\n0"
+    ]
+  },
+  "valid": [
+    {
+      "name": "basic",
+      "nowMs": 1790010840000,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": "ok",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "COMPARE"
+    },
+    {
+      "name": "emptyLog",
+      "nowMs": 1790010840000,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n0\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+          "signatureB64": "MEUCIQCsJG10zaCHxAUHOzZ/C6WAdeHHESrxgQcbJpV9jHa0QQIgVQ5XBh5TnrcALw3kSVnAiqOFTA8MBmqG7WvcUzRb4uk="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEQCID3r15HYDwHrIoE7WM94WO+yHzQyfk491yL/cxxba67JAiBL05ziITh8ZKGkNrmp77a87RSo3p4swgsCFO2XYB2zSg=="
+      },
+      "expected": {
+        "status": "ok",
+        "seq": 0,
+        "linkHash": "AZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M"
+      },
+      "appBehavior": "COMPARE"
+    },
+    {
+      "name": "oldServerHeadRecentlySeen",
+      "nowMs": 1790259200000,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790255600000",
+        "signatureB64": "MEUCIQDU9gJzNbSGiK1xoEK58T4y145ArTDnYyY+mZs8+yyKIQIgDVw1rOk3nlCD3hNuWy8B+TM4WXYuc2BDaryFHFgS/h0="
+      },
+      "expected": {
+        "status": "ok",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "COMPARE"
+    },
+    {
+      "name": "sevenDaysExactly",
+      "nowMs": 1790612040000,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": "ok",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "COMPARE"
+    },
+    {
+      "name": "olderThanSevenDays",
+      "nowMs": 1790612040001,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": "stale",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "seenInFutureWithinTolerance",
+      "nowMs": 1790006640000,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": "ok",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "COMPARE"
+    },
+    {
+      "name": "seenInFutureBeyondTolerance",
+      "nowMs": 1790006639999,
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": "stale",
+        "seq": 5,
+        "linkHash": "1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc"
+      },
+      "appBehavior": "IGNORE"
+    }
+  ],
+  "negative": [
+    {
+      "name": "unknownKey",
+      "file": {
+        "v": 1,
+        "keyId": "a0J0jjYrM-B9c-XQ57Fv2jYgAeBMPizM1FHXl36pwSw",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCgyhoYc/cRfm1/0xnH2gCC++7S0YVijrSsXmZrE0yBsQIgHq1+fK36TFE4cdCmsCAI0kgcSS6j7iM0HgiTkmQq4sg="
+      },
+      "expected": "PROBE_KEY_UNKNOWN",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "keyIdOfPinnedKeySignedByOther",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQDqwfFzjMP2RLVmGlv8wrwo9cq1vhaDlBdX+kbRMzC8LAIgCpSA0qATwmQYD9YPVoInjBgFWdNtAUoX6IIj3Ujl9C0="
+      },
+      "expected": "PROBE_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "wrongDigest",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQDi5UPLPWZupO4jL9QbwE/xCHXvzZIsce0xAg2bTF9dIgIgT6DIgocTZCUvQltH/QGUiW9kO3XExUGmRyVPwuT9HHk="
+      },
+      "expected": "PROBE_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "wrongSeenAtMs",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCU01cshHLSuNM6d6Txd1I+phBNP1Wz8DNN20sjbElipgIgP4Egj0UfDwbGrFcT0Blyx93zIXOHyFKg3mWRB0fkyI0="
+      },
+      "expected": "PROBE_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "wrongSignature",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEQCIHUoXNp7Zqebx9AAlsYTtBwU48i4Py38aSqXkr45GfcfAiBDkGiotIDzH7OY6LDuzd4gqm395eYN1cihFBf4nAAcOg=="
+      },
+      "expected": "PROBE_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "highS",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEYCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIhAO/vaM59Mindzcwu1/4BBSU8zvaLqfAq2ZY2j7LtOFQR"
+      },
+      "expected": "PROBE_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "extraTopLevelKey",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA=",
+        "extra": "1"
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "extraHeadKey",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM=",
+          "seq": "5"
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "missingSeenAtMs",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "versionAsString",
+      "file": {
+        "v": "1",
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "versionTwo",
+      "file": {
+        "v": 2,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "seenAtMsAsNumber",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": 1790007240000,
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "seenAtMsLeadingZero",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "01790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "headTextNotAHead",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nFm4eKpp9AppHa4AK5gjChn3rkDBIDzqclnOcP65ONRY\n0",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "headTextTrailingNewline",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000\n",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEQCICtSQ7HRZAaM41yhTNjF7fhUzD1ouWrcYUykcMaBXe8NAiATlDiod0w0sIYoI27Yj4Xvlg5GRcHEXr1gixQEWIqVAg=="
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "signatureNotCanonicalB64",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA"
+      },
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "notAnObject",
+      "file": [
+        {
+          "v": 1,
+          "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+          "head": {
+            "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+            "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+          },
+          "seenAtMs": "1790007240000",
+          "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+        }
+      ],
+      "expected": "PROBE_FORMAT",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "headSignedByOtherLogKey",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n6B4Rwpv6Nr4Kmb5Ai_hqLsx_C1LgGZoNsajfy5KgU4s\n1790007200000",
+          "signatureB64": "MEUCIQCLtmDJznyARihBnLW+Ob3RYqqZUiqnVQasE+jUROjgpAIgLgE6bKSluXxKy72ds/1VWdu0nVjsM9TlKUCdHDGkG4c="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEQCIB+j/2O7B/qRcjCGUXUvxciBJruIWCn7DlhQ3r4GvvTyAiByIBESl1cluzdaKC9xiLL24mpyzYazdpX+N276OpkCAA=="
+      },
+      "expected": "HEAD_LOG_KEY",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    },
+    {
+      "name": "headSignatureWrong",
+      "file": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": "HEAD_SIGNATURE",
+      "nowMs": 1790010840000,
+      "appBehavior": "IGNORE"
+    }
+  ],
+  "compare": [
+    {
+      "name": "sameText",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "expected": {
+        "status": "AGREE"
+      }
+    },
+    {
+      "name": "sameSeqSameLinkHashOtherCreatedAt",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790010800000",
+        "signatureB64": "MEUCIQCU49CT4+UES+LnoqZWESo2fgAf2XnZU+MIcbSNr+5pPgIgB2jeoMXkymEK6lSGhgEihrQHgptZi572XF7neCXhcdw="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "expected": {
+        "status": "AGREE"
+      }
+    },
+    {
+      "name": "sameSeqOtherLinkHash",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\nxfgGHB1H4LQcqivW_cLUGEACbZra7DR7qbasn6dRWd4\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEQCIBhuU9TK7m+D5TX5zuD0zXbsSc0g+5xCSP6DdhbuDAjIAiBB8SHh/y8G0UBGZTvP4BZnj15RB7QBPKFiFfrVzJ+3TA=="
+      },
+      "expected": {
+        "status": "FORK"
+      }
+    },
+    {
+      "name": "appAhead",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+      },
+      "expected": {
+        "status": "REREAD",
+        "upToSeq": 5,
+        "shorter": "PROBE"
+      }
+    },
+    {
+      "name": "probeAhead",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "expected": {
+        "status": "REREAD",
+        "upToSeq": 5,
+        "shorter": "APP"
+      }
+    },
+    {
+      "name": "emptyApp",
+      "appHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n0\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQCsJG10zaCHxAUHOzZ/C6WAdeHHESrxgQcbJpV9jHa0QQIgVQ5XBh5TnrcALw3kSVnAiqOFTA8MBmqG7WvcUzRb4uk="
+      },
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+      },
+      "expected": {
+        "status": "REREAD",
+        "upToSeq": 4,
+        "shorter": "APP"
+      }
+    }
+  ],
+  "afterReread": [
+    {
+      "name": "probeBehindOnChain",
+      "chainSeq": 5,
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+      },
+      "expected": "AGREE"
+    },
+    {
+      "name": "probeAheadOnChain",
+      "chainSeq": 5,
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790010800000",
+        "signatureB64": "MEUCIQCU49CT4+UES+LnoqZWESo2fgAf2XnZU+MIcbSNr+5pPgIgB2jeoMXkymEK6lSGhgEihrQHgptZi572XF7neCXhcdw="
+      },
+      "expected": "AGREE"
+    },
+    {
+      "name": "probeAheadOnFork",
+      "chainSeq": 5,
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\nxfgGHB1H4LQcqivW_cLUGEACbZra7DR7qbasn6dRWd4\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEQCIBhuU9TK7m+D5TX5zuD0zXbsSc0g+5xCSP6DdhbuDAjIAiBB8SHh/y8G0UBGZTvP4BZnj15RB7QBPKFiFfrVzJ+3TA=="
+      },
+      "expected": "FORK"
+    },
+    {
+      "name": "probeOnEmptyLog",
+      "chainSeq": 5,
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n0\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+        "signatureB64": "MEUCIQCsJG10zaCHxAUHOzZ/C6WAdeHHESrxgQcbJpV9jHa0QQIgVQ5XBh5TnrcALw3kSVnAiqOFTA8MBmqG7WvcUzRb4uk="
+      },
+      "expected": "AGREE"
+    },
+    {
+      "name": "chainStaysBelowProbe",
+      "chainSeq": 4,
+      "probeHead": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+        "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+      },
+      "expected": "FORK"
+    }
+  ],
+  "worker": [
+    {
+      "name": "firstPublish",
+      "published": null,
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": 200,
+        "stored": "incoming"
+      }
+    },
+    {
+      "name": "seqAdvances",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+          "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+        },
+        "seenAtMs": "1790003640000",
+        "signatureB64": "MEQCIHKhS326VLa0NCUxO++lpCFA1PvjFQXl9SVSLo+oklOUAiBdvyHevzIN4ZwC6f7Icnh+LWl2bUHntVmnpcrW/6s5lQ=="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "expected": {
+        "status": 200,
+        "stored": "incoming"
+      }
+    },
+    {
+      "name": "seqBehind",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n4\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790000000000",
+          "signatureB64": "MEUCIQDjBXcfP7ZJfgav3WycTYll0tVlMMFAwafTfstYJ6uDrgIgfcZmP/pSE6jRaJCtTkIjaydFhzzxNedmhBaIiaYXFho="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEUCIQD2Ei1ZCmAhY6FTtTYCAkWPYupgXWRNVEOXmybnIbO4SQIgIc4iP+JO8CvmdBGKuyE5h6iyYcUmZZQUa+MrIGMSEe8="
+      },
+      "expected": {
+        "status": 409,
+        "stored": "published"
+      }
+    },
+    {
+      "name": "sameSeqOtherLinkHash",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\nxfgGHB1H4LQcqivW_cLUGEACbZra7DR7qbasn6dRWd4\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEQCIBhuU9TK7m+D5TX5zuD0zXbsSc0g+5xCSP6DdhbuDAjIAiBB8SHh/y8G0UBGZTvP4BZnj15RB7QBPKFiFfrVzJ+3TA=="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEUCIQD2BTANUCyQc0PXU4a/Sh9bl1o4YU9BAi8L2F6drZdONAIgEkCMEGyg70ShLGrZBPTo82tZiiAYsW5Wi3GLUUuZXGM="
+      },
+      "expected": {
+        "status": 409,
+        "stored": "published"
+      }
+    },
+    {
+      "name": "sameSeqSameLinkHashFresher",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790010800000",
+          "signatureB64": "MEUCIQCU49CT4+UES+LnoqZWESo2fgAf2XnZU+MIcbSNr+5pPgIgB2jeoMXkymEK6lSGhgEihrQHgptZi572XF7neCXhcdw="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEUCIQCx/eHr5ERQ3f1B0EWxbN4QQ1RtnY4HCW43Xw3M4zE/7AIgJH3aeyzxDW8mn0IZfE8P3redhKjnQpvuwfLWxlYDGoM="
+      },
+      "expected": {
+        "status": 200,
+        "stored": "incoming"
+      }
+    },
+    {
+      "name": "sameSeqSameLinkHashOlder",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790005400000",
+          "signatureB64": "MEUCIQDrIEhuPtXaB/YkqZsXGwylA/CgsxDOGaEFWc4DmzXjUgIgNH0Hg1vlRyWfacC8pBisnrFEpyxIWw6ymGvdXuqCw3U="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEQCICaMl1hKWAq0dDeK89CsZYFWkHLxccdf/nuC28QFAEleAiATNq0ROzOjbuh59FJbZv1YJ9nnAiHOXK0KJBNP+cS+1A=="
+      },
+      "expected": {
+        "status": 200,
+        "stored": "published"
+      }
+    },
+    {
+      "name": "sameHeadAgain",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEUCIQC1zw3o5iMZI6YB8Kagk8HCh/akXnTbK4mtQZCt7MdZmgIgEMdG+EnRljLG1YxNgQ0TU9J/gsG6sICnCq8mayiEFeI="
+      },
+      "expected": {
+        "status": 200,
+        "stored": "published"
+      }
+    },
+    {
+      "name": "unknownKey",
+      "published": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA="
+      },
+      "incoming": {
+        "v": 1,
+        "keyId": "a0J0jjYrM-B9c-XQ57Fv2jYgAeBMPizM1FHXl36pwSw",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790010800000",
+          "signatureB64": "MEUCIQCU49CT4+UES+LnoqZWESo2fgAf2XnZU+MIcbSNr+5pPgIgB2jeoMXkymEK6lSGhgEihrQHgptZi572XF7neCXhcdw="
+        },
+        "seenAtMs": "1790010840000",
+        "signatureB64": "MEQCIHW6CPNmtgNioOVOujEvVOTYyYnRRGTz9LjMOpfY4kDsAiAbkclMmox40eNwmFJwyqA+fMT7NCeRXayg5A28FFU+zA=="
+      },
+      "expected": {
+        "status": 400,
+        "stored": "published"
+      }
+    },
+    {
+      "name": "wrongSignature",
+      "published": null,
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCU01cshHLSuNM6d6Txd1I+phBNP1Wz8DNN20sjbElipgIgP4Egj0UfDwbGrFcT0Blyx93zIXOHyFKg3mWRB0fkyI0="
+      },
+      "expected": {
+        "status": 400,
+        "stored": "none"
+      }
+    },
+    {
+      "name": "highS",
+      "published": null,
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEYCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIhAO/vaM59Mindzcwu1/4BBSU8zvaLqfAq2ZY2j7LtOFQR"
+      },
+      "expected": {
+        "status": 400,
+        "stored": "none"
+      }
+    },
+    {
+      "name": "extraKey",
+      "published": null,
+      "incoming": {
+        "v": 1,
+        "keyId": "e1-V4DwlH6RtOruxFg1OAGpC7NryMifK0Sg2wRzO61o",
+        "head": {
+          "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n5\n1nKONWv0Pfr0kssVTyx-Jf_RuVryPmDW2PQePoyWJbc\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790007200000",
+          "signatureB64": "MEUCIQC4Kox6kvGb2Xjs9OguOMDmVdyU3lLdbx/uJNh+5a0tkgIgUrpRshad6odbTxeSVBZ5swZJ8e7n2liJ2qcTCxB59lM="
+        },
+        "seenAtMs": "1790007240000",
+        "signatureB64": "MEUCIQCZXRK/O07xAVeIbjGl966quW49kqfrELIyPw1UG6cx1QIgEBCXMILN1iMyM9EoAf762oAYBCH9J3OrXYM7EA8q0UA=",
+        "extra": "1"
+      },
+      "expected": {
+        "status": 400,
+        "stored": "none"
+      }
+    },
+    {
+      "name": "notJson",
+      "published": null,
+      "incomingRaw": "{\"v\":1,",
+      "expected": {
+        "status": 400,
+        "stored": "none"
+      }
+    }
+  ]
+}

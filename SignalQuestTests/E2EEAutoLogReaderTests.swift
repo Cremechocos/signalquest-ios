@@ -893,3 +893,265 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         XCTAssertFalse(E2EEAutoLogReader.isAccountNotFound(.init(kind: .permanent, statusCode: 410, code: "E2EE_AUTO_ACCOUNT_NOT_FOUND", message: "x")))
     }
 }
+
+// MARK: - Sonde (§3.7, révision 21 §7.8 E) : vecteur `probe-head-v1`
+
+extension E2EEAutoLogReaderTests {
+    private struct Probe {
+        let vector: [String: Any]
+        let probeKeys: [String: String]
+        let logKeyB64: String
+        let links: [String]
+        let forkedLinks: [String]
+
+        func data(_ file: Any) throws -> Data {
+            try JSONSerialization.data(withJSONObject: file, options: [.fragmentsAllowed])
+        }
+
+        func cases(_ name: String) -> [[String: Any]] { vector[name] as? [[String: Any]] ?? [] }
+
+        func validFile(_ name: String) throws -> Data {
+            try data(XCTUnwrap(cases("valid").first { $0["name"] as? String == name }?["file"]))
+        }
+
+        /// Tête du journal signée, tirée des cas `compare` et `afterReread`.
+        func head(seq: Int64, linkHash: String? = nil) throws -> (text: String, signatureB64: String) {
+            let heads = (cases("compare").flatMap { [$0["appHead"], $0["probeHead"]] } + cases("afterReread").map { $0["probeHead"] })
+                .compactMap { $0 as? [String: String] }
+            let found = heads.first {
+                guard let parsed = $0["text"].flatMap(E2EEAutoLog.parseHead) else { return false }
+                return parsed.seq == seq && (linkHash == nil || parsed.linkHash == linkHash)
+            }
+            let head = try XCTUnwrap(found)
+            return (try XCTUnwrap(head["text"]), try XCTUnwrap(head["signatureB64"]))
+        }
+    }
+
+    private func probeVector() throws -> Probe {
+        let vector = try load("probe-head-v1")
+        let probeKey = try XCTUnwrap(vector["probeKey"] as? [String: String])
+        let logKey = try XCTUnwrap(vector["logKey"] as? [String: String])
+        let chain = try XCTUnwrap(vector["chain"] as? [String: [String]])
+        return Probe(
+            vector: vector,
+            probeKeys: [try XCTUnwrap(probeKey["keyId"]): try XCTUnwrap(probeKey["publicKeyB64"])],
+            logKeyB64: try XCTUnwrap(logKey["publicKeyB64"]),
+            links: try XCTUnwrap(chain["links"]), forkedLinks: try XCTUnwrap(chain["forkedLinks"])
+        )
+    }
+
+    func testProbeHeadVectors() throws {
+        let probe = try probeVector()
+        let vector = probe.vector
+        XCTAssertEqual(vector["maxAgeMs"] as? String, String(E2EEAutoProbeHead.maxAgeMs))
+        XCTAssertEqual(vector["clockToleranceMs"] as? String, String(E2EEAutoLog.clockToleranceMs))
+        for key in ["probeKey", "otherProbeKey"] {
+            let pair = try XCTUnwrap(vector[key] as? [String: String])
+            XCTAssertEqual(E2EEAutoProbeHead.keyId(try XCTUnwrap(pair["publicKeyB64"])), pair["keyId"], key)
+        }
+        let payload = try XCTUnwrap(vector["payload"] as? [String: String])
+        XCTAssertEqual(
+            E2EEAutoProbeHead.payload(
+                keyId: try XCTUnwrap(payload["keyId"]), headText: try XCTUnwrap(payload["headText"]), seenAtMs: try XCTUnwrap(payload["seenAtMs"])
+            ),
+            payload["text"]
+        )
+        let pinned = try XCTUnwrap(E2EEAutoProbeHead.pinnedKeys.first)
+        XCTAssertEqual(E2EEAutoProbeHead.keyId(pinned.value), pinned.key)
+
+        for valid in probe.cases("valid") {
+            let name = try XCTUnwrap(valid["name"] as? String)
+            let expected = try XCTUnwrap(valid["expected"] as? [String: Any])
+            let nowMs = try XCTUnwrap((valid["nowMs"] as? NSNumber)?.int64Value)
+            let check = E2EEAutoProbeHead.verify(try probe.data(try XCTUnwrap(valid["file"])), probeKeys: probe.probeKeys, logKeyB64: probe.logKeyB64, nowMs: nowMs)
+            let head: E2EEAutoLog.Head
+            switch (check, expected["status"] as? String) {
+            case (.ok(let verified), "ok"), (.stale(let verified), "stale"): head = verified
+            default: XCTFail("\(name) : \(check)"); continue
+            }
+            XCTAssertEqual(head.seq, (expected["seq"] as? NSNumber)?.int64Value, name)
+            XCTAssertEqual(head.linkHash, expected["linkHash"] as? String, name)
+            XCTAssertEqual(valid["appBehavior"] as? String, check == .ok(head) ? "COMPARE" : "IGNORE", name)
+        }
+
+        XCTAssertFalse(probe.cases("negative").isEmpty)
+        for negative in probe.cases("negative") {
+            let name = try XCTUnwrap(negative["name"] as? String)
+            let nowMs = try XCTUnwrap((negative["nowMs"] as? NSNumber)?.int64Value)
+            let check = E2EEAutoProbeHead.verify(try probe.data(try XCTUnwrap(negative["file"])), probeKeys: probe.probeKeys, logKeyB64: probe.logKeyB64, nowMs: nowMs)
+            XCTAssertEqual(check, .invalid(try XCTUnwrap(E2EEAutoProbeHead.Invalid(rawValue: try XCTUnwrap(negative["expected"] as? String)))), name)
+            XCTAssertEqual(negative["appBehavior"] as? String, "IGNORE", name)
+        }
+
+        // `v` booléen, décimal ou nul : jamais le nombre 1.
+        let basic = try XCTUnwrap(try JSONSerialization.jsonObject(with: probe.validFile("basic")) as? [String: Any])
+        for v: Any in [true, 1.5, NSNull()] {
+            var file = basic
+            file["v"] = v
+            XCTAssertEqual(E2EEAutoProbeHead.verify(try probe.data(file), probeKeys: probe.probeKeys, logKeyB64: probe.logKeyB64, nowMs: 1_790_010_840_000), .invalid(.format))
+        }
+        // La clé épinglée de production ne connaît pas la clé de test.
+        XCTAssertEqual(
+            E2EEAutoProbeHead.verify(try probe.validFile("basic"), logKeyB64: probe.logKeyB64, nowMs: 1_790_010_840_000),
+            .invalid(.keyUnknown)
+        )
+    }
+
+    /// Fichier de la sonde signé par une clé de test : pour les têtes que le vecteur ne publie pas.
+    private func signedProbeFile(head: (text: String, signatureB64: String), seenAtMs: Int64, key: P256.Signing.PrivateKey) throws -> Data {
+        let keyB64 = key.publicKey.x963Representation.base64EncodedString()
+        let keyId = E2EEAutoProbeHead.keyId(keyB64)
+        let payload = E2EEAutoProbeHead.payload(keyId: keyId, headText: head.text, seenAtMs: String(seenAtMs))
+        let signature = try E2EEV2LowS.sign(Data(payload.utf8), with: key)
+        return try JSONSerialization.data(withJSONObject: [
+            "v": 1, "keyId": keyId, "head": ["text": head.text, "signatureB64": head.signatureB64],
+            "seenAtMs": String(seenAtMs), "signatureB64": signature.base64EncodedString(),
+        ] as [String: Any])
+    }
+
+    private final class ProbeBox: @unchecked Sendable {
+        var data: Data?
+        private(set) var fetches = 0
+        init(_ data: Data?) { self.data = data }
+        func fetch() -> Data? { fetches += 1; return data }
+    }
+
+    private final class Clock: @unchecked Sendable {
+        var nowMs: Int64
+        init(_ nowMs: Int64) { self.nowMs = nowMs }
+    }
+
+    /// Lecteur sur la chaîne du vecteur (5 maillons, sans entrée `LOG_KEY`), dont le serveur sert les `served` premiers.
+    private func probeReader(
+        _ probe: Probe, served: Int, links: [String]? = nil, file: ProbeBox, clock: Clock, probeKeys: [String: String]? = nil,
+        store: E2EEAutoLogStore
+    ) throws -> (E2EEAutoLogReader, Server) {
+        let all = links ?? probe.links
+        let head = try probe.head(seq: Int64(served), linkHash: served == 0 ? nil : E2EEAutoLog.digest(all[served - 1]))
+        let reference = Reference(
+            pinnedLogKeyB64: probe.logKeyB64, nextLogKeysB64: [], links: Array(all.prefix(served)), logKeyEntries: [:],
+            headText: head.text, headSignatureB64: head.signatureB64, headNowMs: clock.nowMs, accounts: [:],
+            emptyHeadText: "", emptyHeadSignatureB64: "", emptyHeadNowMs: 0
+        )
+        let server = Server(reference)
+        let reader = E2EEAutoLogReader(
+            ownerScopeId: Self.owner, pinnedLogKeyB64: probe.logKeyB64, nextLogKeysB64: [], store: store,
+            fetchLinks: { after in (server.linksPage(after: after), nil) },
+            fetchAccount: { _, _, _ in nil },
+            fetchProbe: { file.fetch() },
+            probeKeys: probeKeys ?? probe.probeKeys,
+            now: { Date(timeIntervalSince1970: TimeInterval(clock.nowMs) / 1_000) }
+        )
+        return (reader, server)
+    }
+
+    func testProbeAgreesOncePerDayAndIgnoresWhatItCannotTrust() async throws {
+        let probe = try probeVector()
+        let clock = Clock(1_790_010_840_000)
+        let file = ProbeBox(try probe.validFile("basic"))
+        let store = makeStore()
+        let (reader, _) = try probeReader(probe, served: 5, file: file, clock: clock, store: store)
+
+        let unread = await reader.checkProbeIfDue()
+        XCTAssertEqual(unread, .skipped, "Rien avant la lecture des maillons")
+        XCTAssertEqual(file.fetches, 0)
+        _ = try await reader.refreshLinks()
+        let first = await reader.checkProbeIfDue()
+        let sameDay = await reader.checkProbeIfDue()
+        XCTAssertEqual(first, .agree)
+        XCTAssertEqual(sameDay, .skipped)
+        XCTAssertEqual(file.fetches, 1)
+
+        // La sonde n'a vu que la genèse : un préfixe de la chaîne d'ici.
+        clock.nowMs += E2EEAutoProbeHead.checkIntervalMs
+        file.data = try probe.validFile("emptyLog")
+        _ = try await reader.refreshLinks()
+        let empty = await reader.checkProbeIfDue()
+        XCTAssertEqual(empty, .agree)
+
+        // Absent, clé inconnue, signature fausse ou trop vieux : ignoré jusqu'au lendemain, sans alerte.
+        let unknown = try XCTUnwrap(probe.cases("negative").first { $0["name"] as? String == "unknownKey" }?["file"])
+        let wrong = try XCTUnwrap(probe.cases("negative").first { $0["name"] as? String == "wrongSignature" }?["file"])
+        let invalidFiles: [Data?] = [nil, Data("<html>".utf8), try probe.data(unknown), try probe.data(wrong)]
+        for data in invalidFiles {
+            clock.nowMs += E2EEAutoProbeHead.checkIntervalMs
+            file.data = data
+            _ = try await reader.refreshLinks()
+            let ignored = await reader.checkProbeIfDue()
+            let again = await reader.checkProbeIfDue()
+            XCTAssertEqual(ignored, .ignored)
+            XCTAssertEqual(again, .skipped)
+        }
+        // Vue il y a plus de 7 jours : ignorée, même juste.
+        clock.nowMs = 1_790_007_240_000 + E2EEAutoProbeHead.maxAgeMs + 1
+        file.data = try probe.validFile("basic")
+        _ = try await reader.refreshLinks()
+        let stale = await reader.checkProbeIfDue()
+        XCTAssertEqual(stale, .ignored)
+        let status = try await reader.refreshLinks()
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert)
+        if case .alert = status { XCTFail("Aucune alerte attendue") }
+    }
+
+    func testProbeAheadIsRereadThenJudged() async throws {
+        let probe = try probeVector()
+        // La sonde a vu le maillon 5 ; ici, la chaîne s'arrête à 4 puis le serveur le sert.
+        let clock = Clock(1_790_010_840_000)
+        let file = ProbeBox(try probe.validFile("basic"))
+        let (reader, server) = try probeReader(probe, served: 4, file: file, clock: clock, store: makeStore())
+        _ = try await reader.refreshLinks()
+        let fifth = try probe.head(seq: 5, linkHash: E2EEAutoLog.digest(probe.links[4]))
+        server.links = probe.links
+        server.headText = fifth.text
+        server.headSignatureB64 = fifth.signatureB64
+        let agree = await reader.checkProbeIfDue()
+        XCTAssertEqual(agree, .agree)
+        XCTAssertEqual(server.linkAfters, [0, 4])
+
+        // Relecture non concluante : jamais une fourche.
+        let store = makeStore()
+        let (stuck, stuckServer) = try probeReader(probe, served: 4, file: file, clock: clock, store: store)
+        _ = try await stuck.refreshLinks()
+        stuckServer.headText = "illisible"
+        let inconclusive = await stuck.checkProbeIfDue()
+        XCTAssertEqual(inconclusive, .ignored)
+        XCTAssertNil(try store.anchor(ownerScopeId: Self.owner)?.alert)
+
+        // Relecture concluante qui reste sous la sonde : le journal ne raccourcit pas.
+        let below = makeStore()
+        let (behind, _) = try probeReader(probe, served: 4, file: file, clock: clock, store: below)
+        _ = try await behind.refreshLinks()
+        let fork = await behind.checkProbeIfDue()
+        XCTAssertEqual(fork, .fork)
+        XCTAssertEqual(try below.anchor(ownerScopeId: Self.owner)?.alert, .init(error: "FORK", seq: 5))
+        let kept = try await behind.refreshLinks()
+        XCTAssertEqual(kept, .alert(.init(error: "FORK", seq: 5)))
+    }
+
+    func testProbeOnAnotherBranchRaisesTheForkAlert() async throws {
+        let probe = try probeVector()
+        let clock = Clock(1_790_010_840_000)
+        let key = P256.Signing.PrivateKey()
+        let keyB64 = key.publicKey.x963Representation.base64EncodedString()
+        let forked = try probe.head(seq: 5, linkHash: E2EEAutoLog.digest(probe.forkedLinks[4]))
+        XCTAssertNotEqual(probe.links[4], probe.forkedLinks[4])
+        let file = ProbeBox(try signedProbeFile(head: forked, seenAtMs: clock.nowMs - 60_000, key: key))
+        let store = makeStore()
+        let (reader, _) = try probeReader(
+            probe, served: 5, file: file, clock: clock, probeKeys: [E2EEAutoProbeHead.keyId(keyB64): keyB64], store: store
+        )
+        _ = try await reader.refreshLinks()
+        let fork = await reader.checkProbeIfDue()
+        XCTAssertEqual(fork, .fork)
+        let kept = try await reader.refreshLinks()
+        XCTAssertEqual(kept, .alert(.init(error: "FORK", seq: 5)))
+
+        // Même tête signée par une autre clé de sonde : inconnue, donc ignorée.
+        let other = makeStore()
+        let (unknown, _) = try probeReader(probe, served: 5, file: file, clock: clock, store: other)
+        _ = try await unknown.refreshLinks()
+        let ignored = await unknown.checkProbeIfDue()
+        XCTAssertEqual(ignored, .ignored)
+        XCTAssertNil(try other.anchor(ownerScopeId: Self.owner)?.alert)
+    }
+}
