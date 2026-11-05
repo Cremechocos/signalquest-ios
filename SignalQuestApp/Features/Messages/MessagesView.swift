@@ -579,7 +579,8 @@ struct MessagesView: View {
     private var listIsPolling: Bool { scenePhase == .active && (usesSplitLayout || routedConversationId == nil) }
 
     private func refreshV2Activation() {
-        guard services.e2eeV2Messaging.writesEnabled, let current = LocalAccountScope.sessionSnapshot() else {
+        guard E2EEV2ActivationPrompt.isGuided, services.e2eeV2Messaging.writesEnabled,
+              let current = LocalAccountScope.sessionSnapshot() else {
             needsV2Activation = false
             return
         }
@@ -2723,8 +2724,10 @@ private struct NewConversationSheet: View {
             if e2ee, services.e2eeV2Messaging.writesEnabled,
                let session = LocalAccountScope.sessionSnapshot(),
                services.e2eeV2Messaging.lacksV2Readiness(session) {
-                if afterActivation {
+                if afterActivation || !E2EEV2ActivationPrompt.isGuided {
                     errorMessage = String(localized: "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie.")
+                    // Inscription automatique pas encore aboutie : elle repart.
+                    if !E2EEV2ActivationPrompt.isGuided { Task { await services.enrollE2EEAutoDevice() } }
                 } else {
                     showV2Activation = true
                 }

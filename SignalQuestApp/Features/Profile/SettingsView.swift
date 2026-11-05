@@ -373,9 +373,14 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
 enum E2EEV2ActivationPrompt {
     static let snoozeSeconds: TimeInterval = 7 * 24 * 3600
 
+    /// E2EE-AUTO §4.1 : l'appareil s'inscrit seul au journal. L'activation
+    /// guidée (code e-mail, QR) ne se propose plus, même le temps que
+    /// l'inscription aboutisse sur un appareil neuf.
+    static var isGuided: Bool { !SQFeatures.e2eeAutoLogEnabled }
+
     @MainActor
     static func shouldPrompt(messaging: E2EEV2MessagingRuntime) -> Bool {
-        guard messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot() else { return false }
+        guard isGuided, messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot() else { return false }
         return messaging.lacksV2Readiness(session) && !isSnoozed(session)
     }
 

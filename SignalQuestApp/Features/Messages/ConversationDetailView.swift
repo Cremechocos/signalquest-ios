@@ -2634,7 +2634,8 @@ struct ConversationDetailView: View {
     }
 
     private func refreshOwnV2Activation() {
-        guard services.e2eeV2Messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot() else {
+        guard E2EEV2ActivationPrompt.isGuided, services.e2eeV2Messaging.writesEnabled,
+              let session = LocalAccountScope.sessionSnapshot() else {
             ownV2ActivationNeeded = false
             return
         }
