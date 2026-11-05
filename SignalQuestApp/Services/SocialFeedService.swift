@@ -670,7 +670,10 @@ final class SocialFeedService: SocialFeedServicing {
     }
 
     func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker] {
-        struct Response: Decodable { let speedtests: [AndroidSpeedtestMarker] }
+        struct Response: Decodable {
+            let speedtests: [AndroidSpeedtestMarker]
+            let timestampPrecision: String?
+        }
         let response: Response = try await api.request(
             APIEndpoint(path: "/api/social/nearby-speedtests", query: [
                 URLQueryItem(name: "lat", value: String(latitude)),
@@ -680,7 +683,9 @@ final class SocialFeedService: SocialFeedServicing {
             ]),
             as: Response.self
         )
-        return response.speedtests
+        // Règle A (public-map-tiles v1.1) : la précision est en tête de la réponse.
+        guard response.timestampPrecision == "hour" else { return response.speedtests }
+        return response.speedtests.map { var marker = $0; marker.hourPrecision = true; return marker }
     }
 
     // MARK: - Profils & follow

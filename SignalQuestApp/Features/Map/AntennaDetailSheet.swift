@@ -1655,7 +1655,7 @@ struct AntennaDetailSheet: View {
                                 .font(SQType.caption(.semibold))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
-                        Text(speedtestCaption(speed))
+                        Text(speedtestCaption(speed, hourPrecision: details.nearbySpeedtestsHourPrecision))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -1676,11 +1676,15 @@ struct AntennaDetailSheet: View {
     }
 
     /// « ↑ 41 Mb/s · 22 ms · hier » sous le débit descendant.
-    private func speedtestCaption(_ speed: NearbySpeedtest) -> String {
+    private func speedtestCaption(_ speed: NearbySpeedtest, hourPrecision: Bool) -> String {
         var parts: [String] = []
         if speed.uploadMbps != nil { parts.append("↑ " + SignalFormatters.speed(speed.uploadMbps)) }
         if speed.pingMs != nil { parts.append(SignalFormatters.ms(speed.pingMs)) }
-        if let date = SignalFormatters.date(speed.timestamp, includingTime: true, relative: true) { parts.append(date) }
+        if hourPrecision, let date = speed.timestamp.flatMap(SQDateParsing.parse) {
+            parts.append(SignalFormatters.approximateDate(date))
+        } else if let date = SignalFormatters.date(speed.timestamp, includingTime: true, relative: true) {
+            parts.append(date)
+        }
         return parts.joined(separator: " · ")
     }
 

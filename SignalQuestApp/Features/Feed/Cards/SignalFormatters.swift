@@ -96,6 +96,19 @@ enum SignalFormatters {
         String(localized: "\(dayFormatter.string(from: date)) vers \(hourFormatter.string(from: date))")
     }
 
+    /// Même heure tronquée, en relatif tant qu'elle est récente : « aujourd'hui vers 11 h »,
+    /// « hier vers 23 h », puis « il y a 3 jours » ; au-delà d'un mois, `dateAroundHour`.
+    /// Jamais « il y a 12 min » : la vraie heure peut être jusqu'à une heure plus tard.
+    static func approximateDate(_ date: Date) -> String {
+        let hour = hourFormatter.string(from: date)
+        if Calendar.current.isDateInToday(date) { return String(localized: "aujourd’hui vers \(hour)") }
+        if Calendar.current.isDateInYesterday(date) { return String(localized: "hier vers \(hour)") }
+        if abs(date.timeIntervalSinceNow) < 30 * 24 * 60 * 60 {
+            return relativeFormatter.localizedString(for: date, relativeTo: Date())
+        }
+        return dateAroundHour(date)
+    }
+
     nonisolated(unsafe) private static let hourFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("j")

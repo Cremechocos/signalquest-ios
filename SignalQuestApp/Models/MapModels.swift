@@ -929,6 +929,8 @@ struct AndroidSpeedtestMarker: Decodable, Identifiable, Equatable, Sendable {
     let frequency: String?
     let timestamp: Date?
     let `operator`: String?
+    /// Heure tronquée à l'heure par le serveur (lectures publiques, `timestampPrecision` "hour").
+    var hourPrecision = false
 
     enum CodingKeys: String, CodingKey {
         case id, lat, lng, downloadMbps, uploadMbps, pingMs, tech, band, frequency, timestamp

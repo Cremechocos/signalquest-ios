@@ -1288,7 +1288,7 @@ struct SignalQuestHomeView: View {
         var parts: [String] = []
         if let op = measure.`operator`, !op.isEmpty { parts.append(op) }
         if let date = measure.timestamp {
-            parts.append(date.formatted(.relative(presentation: .named)))
+            parts.append(measure.hourPrecision ? SignalFormatters.approximateDate(date) : date.formatted(.relative(presentation: .named)))
         }
         if let distance = distanceText(to: measure.lat, measure.lng) {
             parts.append(String(localized: "à \(distance)"))
@@ -1661,6 +1661,8 @@ struct SignalQuestHomeView: View {
         let center = CLLocation(latitude: latitude, longitude: longitude)
         return tiles
             .flatMap(\.markers)
+            // Tuiles publiques (#982) : heure toujours tronquée à l'heure.
+            .map { var marker = $0; marker.hourPrecision = true; return marker }
             .map { ($0, center.distance(from: CLLocation(latitude: $0.lat, longitude: $0.lng))) }
             .filter { $0.1 <= Double(Self.nearbyRadiusMeters) }
             .sorted { $0.1 < $1.1 }

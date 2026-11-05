@@ -39,4 +39,31 @@ final class SQDateTimeFormatTests: XCTestCase {
         XCTAssertFalse(text.contains(":"), text)
         XCTAssertTrue(text.hasPrefix("2 nov. 2026 vers "), text)
     }
+
+    /// Règle A : `timestampPrecision` est en tête de `/map/antenna/{id}`, à côté de `nearbySpeedtests`.
+    func testAntennaDetailsReadTheHourPrecisionOfNearbySpeedtests() throws {
+        func decode(_ precision: String) throws -> AntennaDetails {
+            try JSONDecoder.signalQuest.decode(AntennaDetails.self, from: Data("""
+            {"antenna":{"id":"1","supId":"1","lat":45.0,"lng":5.0,"operators":["ORANGE"],"technologies":["4G"],"azimuts":[]},\(precision)
+             "nearbySpeedtests":[{"id":"s1","downloadMbps":120.5,"timestamp":"2026-11-05T11:00:00.000Z"}]}
+            """.utf8))
+        }
+        XCTAssertTrue(try decode(#""timestampPrecision":"hour","#).nearbySpeedtestsHourPrecision)
+        XCTAssertFalse(try decode("").nearbySpeedtestsHourPrecision)
+    }
+
+    /// Règle A (public-map-tiles v1.1) : une heure tronquée reste approximative même en relatif.
+    func testTruncatedHourStaysApproximateWhenRelative() throws {
+        let calendar = Calendar.current
+        let thisHour = try XCTUnwrap(calendar.dateInterval(of: .hour, for: Date())?.start)
+        let today = SignalFormatters.approximateDate(thisHour)
+        XCTAssertTrue(today.hasPrefix("aujourd’hui vers "), today)
+        XCTAssertFalse(today.contains(":") || today.contains("min"), today)
+        let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: thisHour))
+        XCTAssertTrue(SignalFormatters.approximateDate(yesterday).hasPrefix("hier vers "))
+        let older = try XCTUnwrap(calendar.date(byAdding: .day, value: -3, to: thisHour))
+        XCTAssertEqual(SignalFormatters.approximateDate(older), "il y a 3 jours")
+        let old = try XCTUnwrap(calendar.date(byAdding: .day, value: -60, to: thisHour))
+        XCTAssertTrue(SignalFormatters.approximateDate(old).contains(" vers "))
+    }
 }

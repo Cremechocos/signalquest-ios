@@ -284,6 +284,8 @@ struct AntennaDetails: Decodable {
     let core: AntennaCoreDetails?
     let signalStats: AntennaSignalStats?
     let nearbySpeedtests: [NearbySpeedtest]
+    /// Règle A (public-map-tiles v1.1) : heures des speedtests voisins tronquées à l'heure.
+    let nearbySpeedtestsHourPrecision: Bool
     let photos: [AntennaPhotoSummary]
 
     init(from decoder: Decoder) throws {
@@ -319,6 +321,7 @@ struct AntennaDetails: Decodable {
             core = antenna
             signalStats = decodedSignalStats
             nearbySpeedtests = decodedSpeedtests
+            nearbySpeedtestsHourPrecision = (try? root.decodeIfPresent(String.self, forKey: .timestampPrecision)) == "hour"
             photos = decodedPhotos
             return
         }
@@ -351,6 +354,7 @@ struct AntennaDetails: Decodable {
         core = nil
         signalStats = nil
         nearbySpeedtests = []
+        nearbySpeedtestsHourPrecision = false
         photos = []
     }
 
@@ -360,7 +364,7 @@ struct AntennaDetails: Decodable {
     }
 
     enum WrapperKeys: String, CodingKey {
-        case details, antenna, signalStats, nearbySpeedtests, photos
+        case details, antenna, signalStats, nearbySpeedtests, photos, timestampPrecision
     }
 }
 

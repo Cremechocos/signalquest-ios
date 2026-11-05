@@ -110320,6 +110320,38 @@
           }
         }
       }
+    },
+    "aujourd’hui vers %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "today around %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aujourd’hui vers %@"
+          }
+        }
+      }
+    },
+    "hier vers %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yesterday around %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hier vers %@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
