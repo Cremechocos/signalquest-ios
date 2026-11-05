@@ -102318,34 +102318,6 @@
         }
       }
     },
-    "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device was added less than 24 hours ago. It can remove your other devices in %lld h; until then, remove them from an older device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans %lld h ; d’ici là, retire-les depuis un appareil plus ancien." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer vos autres appareils dans %lld h ; d’ici là, retirez-les depuis un appareil plus ancien."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Empreinte %@" : {
       "localizations" : {
         "en" : {
@@ -102713,34 +102685,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« Ce n’est pas moi » le retire tout de suite et ferme toutes vos autres sessions."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device was added less than 24 hours ago. If it isn’t you, remove the other one from an older device, or come back here in %lld h."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans %lld h." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas vous, retirez l’autre depuis un appareil plus ancien, ou revenez ici dans %lld h."
           }
         }
       },
@@ -109680,6 +109624,498 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’est plus sur votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce code n’est plus valable. Demande un nouveau code." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This code is no longer valid. Request a new code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code n’est plus valable. Demande un nouveau code."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce code n’est plus valable. Demande un nouveau code." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code n’est plus valable. Demandez un nouveau code."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton compte n’a pas d’adresse e-mail. Retire cet appareil depuis un appareil plus ancien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account has no email address. Remove this device from an older device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte n’a pas d’adresse e-mail. Retire cet appareil depuis un appareil plus ancien."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton compte n’a pas d’adresse e-mail. Retire cet appareil depuis un appareil plus ancien." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte n’a pas d’adresse e-mail. Retirez cet appareil depuis un appareil plus ancien."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Trois codes ont déjà été demandés en 24 h. Retire cet appareil depuis un appareil plus ancien, ou réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Three codes have already been requested in 24 hours. Remove this device from an older device, or try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trois codes ont déjà été demandés en 24 h. Retire cet appareil depuis un appareil plus ancien, ou réessaie plus tard."
+          }
+        }
+      }
+    },
+    "SQFormal|Trois codes ont déjà été demandés en 24 h. Retire cet appareil depuis un appareil plus ancien, ou réessaie plus tard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trois codes ont déjà été demandés en 24 h. Retirez cet appareil depuis un appareil plus ancien, ou réessayez plus tard."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible d’envoyer le code. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t send the code. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’envoyer le code. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible d’envoyer le code. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’envoyer le code. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Saisis les 6 chiffres reçus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the 6 digits you received."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisis les 6 chiffres reçus."
+          }
+        }
+      }
+    },
+    "SQFormal|Saisis les 6 chiffres reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez les 6 chiffres reçus."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Trop d’essais. Demande un nouveau code." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Request a new code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop d’essais. Demande un nouveau code."
+          }
+        }
+      }
+    },
+    "SQFormal|Trop d’essais. Demande un nouveau code." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop d’essais. Demandez un nouveau code."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Code incorrect. Essais restants : %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incorrect code. Attempts left: %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code incorrect. Essais restants : %lld."
+          }
+        }
+      }
+    },
+    "Code incorrect." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incorrect code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code incorrect."
+          }
+        }
+      }
+    },
+    "Saisis aussi le code de ton application d’authentification." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also enter the code from your authenticator app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisis aussi le code de ton application d’authentification."
+          }
+        }
+      }
+    },
+    "SQFormal|Saisis aussi le code de ton application d’authentification." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez aussi le code de votre application d’authentification."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce code a expiré ou a déjà servi. Demande un nouveau code." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This code has expired or was already used. Request a new code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code a expiré ou a déjà servi. Demande un nouveau code."
+          }
+        }
+      }
+    },
+    "SQFormal|Ce code a expiré ou a déjà servi. Demande un nouveau code." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code a expiré ou a déjà servi. Demandez un nouveau code."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible de vérifier le code. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t check the code. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de vérifier le code. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Impossible de vérifier le code. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de vérifier le code. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h : pour retirer un autre appareil, un code sera envoyé à ton adresse e-mail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago: to remove another device, a code will be sent to your email address."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : pour retirer un autre appareil, un code sera envoyé à ton adresse e-mail."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h : pour retirer un autre appareil, un code sera envoyé à ton adresse e-mail." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h : pour retirer un autre appareil, un code sera envoyé à votre adresse e-mail."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil a été ajouté il y a moins de 24 h. Pour retirer %@, saisis le code reçu par e-mail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago. To remove %@, enter the code you received by email."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Pour retirer %@, saisis le code reçu par e-mail."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil a été ajouté il y a moins de 24 h. Pour retirer %@, saisis le code reçu par e-mail." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été ajouté il y a moins de 24 h. Pour retirer %@, saisissez le code reçu par e-mail."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Envoi du code…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending the code…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi du code…"
+          }
+        }
+      }
+    },
+    "Envoyer un nouveau code" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send a new code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un nouveau code"
+          }
+        }
+      }
+    },
+    "Confirmer par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer par e-mail"
+          }
+        }
+      }
+    },
+    "Code envoyé à %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code sent to %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code envoyé à %@."
+          }
+        }
+      }
+    },
+    "Code de ton application d’authentification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code from your authenticator app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de ton application d’authentification"
+          }
+        }
+      }
+    },
+    "SQFormal|Code de ton application d’authentification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de votre application d’authentification"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Retirer l’appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer l’appareil"
+          }
+        }
+      }
+    },
+    "Un code ne retire qu’un appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One code removes one device only."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un code ne retire qu’un appareil."
+          }
+        }
+      }
+    },
+    "Cet appareil-ci a été ajouté il y a moins de 24 h : un code envoyé par e-mail confirmera le retrait, et toutes tes autres sessions seront fermées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was added less than 24 hours ago: a code sent by email will confirm the removal, and all your other sessions will be signed out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h : un code envoyé par e-mail confirmera le retrait, et toutes tes autres sessions seront fermées."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil-ci a été ajouté il y a moins de 24 h : un code envoyé par e-mail confirmera le retrait, et toutes tes autres sessions seront fermées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil-ci a été ajouté il y a moins de 24 h : un code envoyé par e-mail confirmera le retrait, et toutes vos autres sessions seront fermées."
           }
         }
       },

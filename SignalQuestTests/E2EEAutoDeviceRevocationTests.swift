@@ -290,7 +290,7 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         XCTAssertEqual(model.rows.first?.shortFingerprint.count, 4)
     }
 
-    /// Garde des 24 h (§4.4) : aucun bouton vers les autres, l'heure restante à la place.
+    /// Garde des 24 h (§4.4) : rien n'est révoqué sans le code e-mail (révision 21).
     @MainActor
     func testRecentDeviceExplainsInsteadOfRevoking() async {
         let now: Int64 = 100 * 24 * 3_600_000
@@ -340,6 +340,234 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         await apple.revoke(try XCTUnwrap(apple.rows.last), reason: .user)
         XCTAssertEqual(apple.confirmationMessage, String(localized: "Appareil retiré. Il ne reçoit plus tes messages.") + "\n\n" + advice)
         XCTAssertFalse(notMe.confirmationMessage?.contains(advice) ?? true, "pas pour un appareil Android")
+    }
+
+    // MARK: Confirmation par e-mail (révision 21)
+
+    private static let confirmationId = "rc_confirmation_0000000001"
+    private static let token = String(repeating: "Ab-_", count: 10) + "xyz"
+
+    func testRevokeConfirmationContract() throws {
+        XCTAssertEqual(E2EEAutoRevokeConfirmationContract.requestPath, "/api/e2ee/auto/revoke-confirmations")
+        XCTAssertEqual(
+            E2EEAutoRevokeConfirmationContract.verifyPath(confirmationId: Self.confirmationId),
+            "/api/e2ee/auto/revoke-confirmations/\(Self.confirmationId)/verify"
+        )
+        XCTAssertEqual(E2EEAutoRevokeConfirmationContract.requestBody, Data("{}".utf8))
+
+        func request(_ object: [String: Any]) -> E2EEAutoRevokeConfirmationContract.Request? {
+            E2EEAutoRevokeConfirmationContract.parseRequest(try! JSONSerialization.data(withJSONObject: object))
+        }
+        let valid: [String: Any] = ["confirmationId": Self.confirmationId, "expiresAtMs": "1762300000000", "totpRequired": false, "emailHint": "a•••@e•••.fr"]
+        XCTAssertEqual(request(valid), .init(confirmationId: Self.confirmationId, expiresAtMs: 1_762_300_000_000, totpRequired: false, emailHint: "a•••@e•••.fr"))
+        XCTAssertNil(request(valid.merging(["expiresAtMs": 1_762_300_000_000]) { $1 }), "chaîne décimale seulement")
+        XCTAssertNil(request(valid.merging(["confirmationId": "court"]) { $1 }))
+        XCTAssertNil(request(valid.merging(["emailHint": ""]) { $1 }))
+        XCTAssertNil(request(valid.filter { $0.key != "totpRequired" }))
+
+        XCTAssertTrue(E2EEAutoRevokeConfirmationContract.isCode("012345"))
+        for bad in ["12345", "1234567", "12 345", "١٢٣٤٥٦", "abcdef"] {
+            XCTAssertFalse(E2EEAutoRevokeConfirmationContract.isCode(bad), bad)
+        }
+        let body = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: nil))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["code": "012345"], "totpCode absent, jamais null")
+        let withTotp = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: "654321"))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: withTotp) as? [String: String], ["code": "012345", "totpCode": "654321"])
+        XCTAssertNil(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: "65432"))
+
+        func token(_ value: String) -> String? {
+            E2EEAutoRevokeConfirmationContract.parseToken(try! JSONSerialization.data(withJSONObject: ["confirmationToken": value, "expiresAtMs": "1"]))
+        }
+        XCTAssertEqual(Self.token.count, 43)
+        XCTAssertEqual(token(Self.token), Self.token)
+        XCTAssertNil(token(Self.token + "A"))
+        XCTAssertNil(token(String(Self.token.dropLast()) + "="), "base64url sans remplissage")
+    }
+
+    private func confirmations(_ fake: Fake) -> E2EEAutoDeviceRevocation {
+        E2EEAutoDeviceRevocation(fake.dependencies(device: ownDevice, signing: signing))
+    }
+
+    func testConfirmationRequestAndVerifyOutcomes() async throws {
+        let sent = Fake(reads: [.verified(account([ownState()]))])
+        sent.responses = [.success(value: try JSONSerialization.data(withJSONObject: [
+            "confirmationId": Self.confirmationId, "expiresAtMs": "1762300000000", "totpRequired": true, "emailHint": "a•••@e•••.fr",
+        ]), statusCode: 201, idempotentReplay: false)]
+        let request = await confirmations(sent).requestConfirmation()
+        XCTAssertEqual(request, .sent(.init(confirmationId: Self.confirmationId, expiresAtMs: 1_762_300_000_000, totpRequired: true, emailHint: "a•••@e•••.fr")))
+        XCTAssertEqual(sent.posts.first?.path, E2EEAutoRevokeConfirmationContract.requestPath)
+        XCTAssertEqual(sent.posts.first?.body.isEmpty, true)
+
+        func requested(_ response: E2EEV2TransportResult<Data>) async -> E2EEAutoDeviceRevocation.ConfirmationRequestOutcome {
+            let fake = Fake(reads: [.verified(account([ownState()]))])
+            fake.responses = [response]
+            return await confirmations(fake).requestConfirmation()
+        }
+        let notNeeded = await requested(Self.failure(409, "E2EE_REVOKE_CONFIRMATION_NOT_NEEDED"))
+        XCTAssertEqual(notNeeded, .notNeeded)
+        let noEmail = await requested(Self.failure(409, "E2EE_REVOKE_CONFIRMATION_EMAIL_UNAVAILABLE"))
+        XCTAssertEqual(noEmail, .emailUnavailable)
+        let limited = await requested(Self.failure(429, "E2EE_REVOKE_CONFIRMATION_RATE_LIMITED"))
+        XCTAssertEqual(limited, .rateLimited)
+        let pending = await requested(Self.failure(403, "E2EE_DEVICE_NOT_ACTIVE"))
+        XCTAssertEqual(pending, .notActive)
+        let smtp = await requested(Self.failure(503, "E2EE_EMAIL_UNAVAILABLE"))
+        XCTAssertEqual(smtp, .retryLater)
+        let forged = await requested(.success(value: Data("{}".utf8), statusCode: 201, idempotentReplay: false))
+        XCTAssertEqual(forged, .failed("invalid-e2ee-auto-revoke-confirmation"))
+
+        let verified = Fake(reads: [.verified(account([ownState()]))])
+        verified.responses = [.success(value: try JSONSerialization.data(withJSONObject: ["confirmationToken": Self.token, "expiresAtMs": "1"]), statusCode: 200, idempotentReplay: false)]
+        let token = await confirmations(verified).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", totpCode: "654321")
+        XCTAssertEqual(token, .token(Self.token))
+        XCTAssertEqual(verified.posts.first?.path, E2EEAutoRevokeConfirmationContract.verifyPath(confirmationId: Self.confirmationId))
+        XCTAssertEqual(verified.posts.first?.body as? [String: String], ["code": "012345", "totpCode": "654321"])
+
+        func checked(_ response: E2EEV2TransportResult<Data>) async -> E2EEAutoDeviceRevocation.ConfirmationVerifyOutcome {
+            let fake = Fake(reads: [.verified(account([ownState()]))])
+            fake.responses = [response]
+            return await confirmations(fake).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", totpCode: nil)
+        }
+        let wrong = await checked(Self.failure(403, "E2EE_REVOKE_CONFIRMATION_CODE_INVALID", details: ["attemptsLeft": .number(2)]))
+        XCTAssertEqual(wrong, .codeInvalid(attemptsLeft: 2))
+        let worn = await checked(Self.failure(403, "E2EE_REVOKE_CONFIRMATION_CODE_INVALID", details: ["attemptsLeft": .number(0)]))
+        XCTAssertEqual(worn, .codeInvalid(attemptsLeft: 0))
+        let totp = await checked(Self.failure(403, "E2EE_REVOKE_CONFIRMATION_TOTP_REQUIRED"))
+        XCTAssertEqual(totp, .totpRequired)
+        let expired = await checked(Self.failure(410, "E2EE_REVOKE_CONFIRMATION_EXPIRED"))
+        XCTAssertEqual(expired, .expired)
+        let unknown = await checked(Self.failure(404, "E2EE_REVOKE_CONFIRMATION_NOT_FOUND"))
+        XCTAssertEqual(unknown, .expired)
+
+        let local = Fake(reads: [.verified(account([ownState()]))])
+        let refused = await confirmations(local).verifyConfirmation(confirmationId: Self.confirmationId, code: "12345", totpCode: nil)
+        XCTAssertEqual(refused, .failed("e2ee-auto-revoke-confirmation-invalid"))
+        XCTAssertTrue(local.posts.isEmpty, "un code mal formé n’est jamais envoyé")
+    }
+
+    /// Le jeton suit la révocation, hors signature, et survit à une nouvelle signature après LOG_STALE.
+    func testConfirmedRevocationCarriesTheTokenAcrossAResign() async throws {
+        let first = E2EEAutoLog.digest("first"), second = E2EEAutoLog.digest("second")
+        let recent = ownState(addedAtMs: 999_000)
+        let fake = Fake(reads: [
+            .verified(account([recent, state(otherId)], last: first)),
+            .verified(account([recent, state(otherId)], last: second)),
+        ])
+        fake.responses = [
+            Self.failure(409, "E2EE_LOG_STALE"),
+            .success(value: try written(target: otherId, prev: second, reason: .notMe), statusCode: 200, idempotentReplay: false),
+        ]
+        let outcome = await confirmations(fake).revoke(deviceId: otherId, reason: .notMe, confirmationToken: Self.token)
+        XCTAssertEqual(outcome, .revoked(ownDevice: false))
+        XCTAssertEqual(fake.posts.map { $0.body["confirmationToken"] as? String }, [Self.token, Self.token])
+
+        let invalid = Fake(reads: [.verified(account([recent, state(otherId)]))])
+        invalid.responses = [Self.failure(403, "E2EE_REVOKE_CONFIRMATION_INVALID")]
+        let refused = await confirmations(invalid).revoke(deviceId: otherId, reason: .user, confirmationToken: Self.token)
+        XCTAssertEqual(refused, .confirmationInvalid)
+    }
+
+    @MainActor
+    private func emailModel(
+        now: Int64,
+        request: [E2EEAutoDeviceRevocation.ConfirmationRequestOutcome],
+        verify: [E2EEAutoDeviceRevocation.ConfirmationVerifyOutcome] = [],
+        confirmed: E2EEAutoDeviceRevocation.Outcome = .revoked(ownDevice: false),
+        revoke: E2EEAutoDeviceRevocation.Outcome = .revoked(ownDevice: false),
+        log: Log
+    ) -> E2EEAutoDevicesViewModel {
+        let ownId = ownId
+        let devices = account([ownState(addedAtMs: now - 5 * 3_600_000), state(otherId, platform: .android)])
+        var requests = request, verifications = verify
+        return E2EEAutoDevicesViewModel(dependencies: .init(
+            ownDeviceId: { ownId },
+            readOwnAccount: { .verified(devices) },
+            revoke: { id, _ in log.calls.append("revoke:\(id)"); return revoke },
+            requestConfirmation: { log.calls.append("request"); return requests.isEmpty ? .failed("x") : requests.removeFirst() },
+            verifyConfirmation: { id, code, totp in
+                log.calls.append("verify:\(id):\(code):\(totp ?? "-")")
+                return verifications.isEmpty ? .failed("x") : verifications.removeFirst()
+            },
+            revokeConfirmed: { id, reason, token in log.calls.append("confirmed:\(id):\(reason.rawValue):\(token)"); return confirmed },
+            nowMs: { now }
+        ))
+    }
+
+    private final class Log: @unchecked Sendable { var calls: [String] = [] }
+
+    /// Moins de 24 h : le code e-mail ouvre une révocation, avec son jeton.
+    @MainActor
+    func testRecentDeviceRevokesAnotherWithTheEmailCode() async throws {
+        let now: Int64 = 100 * 24 * 3_600_000
+        let log = Log()
+        let pending = E2EEAutoRevokeConfirmationContract.Request(confirmationId: Self.confirmationId, expiresAtMs: now + 600_000, totpRequired: false, emailHint: "a•••@e•••.fr")
+        let model = emailModel(now: now, request: [.sent(pending)], verify: [.codeInvalid(attemptsLeft: 4), .token(Self.token)], log: log)
+        await model.load()
+        XCTAssertTrue(model.revokesOthersByEmail)
+        let other = try XCTUnwrap(model.rows.last)
+        await model.revoke(other, reason: .notMe)
+        XCTAssertEqual(model.emailConfirmation?.request, pending)
+        XCTAssertEqual(log.calls, ["request"], "aucune révocation sans code")
+
+        await model.submitEmailCode("12", totpCode: nil)
+        XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Saisis les 6 chiffres reçus."))
+        await model.submitEmailCode("000000", totpCode: nil)
+        XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Code incorrect. Essais restants : \(4)."))
+        await model.submitEmailCode("012345", totpCode: nil)
+        XCTAssertNil(model.emailConfirmation)
+        XCTAssertEqual(log.calls, [
+            "request", "verify:\(Self.confirmationId):000000:-", "verify:\(Self.confirmationId):012345:-",
+            "confirmed:\(otherId):NOT_ME:\(Self.token)",
+        ])
+        XCTAssertEqual(model.confirmationMessage, String(localized: "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît."))
+    }
+
+    @MainActor
+    func testEmailConfirmationRefusalsAndRecovery() async throws {
+        let now: Int64 = 100 * 24 * 3_600_000
+        let pending = E2EEAutoRevokeConfirmationContract.Request(confirmationId: Self.confirmationId, expiresAtMs: now + 600_000, totpRequired: true, emailHint: "a•••@e•••.fr")
+
+        // Plus de code disponible : le message reste, la révocation n'est pas tentée.
+        let limitedLog = Log()
+        let limited = emailModel(now: now, request: [.rateLimited], log: limitedLog)
+        await limited.load()
+        await limited.revoke(try XCTUnwrap(limited.rows.last), reason: .user)
+        XCTAssertNil(limited.emailConfirmation?.request)
+        XCTAssertEqual(limited.emailConfirmation?.message, String(localized: "Trois codes ont déjà été demandés en 24 h. Retire cet appareil depuis un appareil plus ancien, ou réessaie plus tard."))
+        XCTAssertEqual(limitedLog.calls, ["request"])
+
+        // TOTP actif : les deux codes sont exigés ; essais épuisés, puis nouveau code.
+        let totpLog = Log()
+        let totp = emailModel(now: now, request: [.sent(pending), .sent(pending)], verify: [.codeInvalid(attemptsLeft: 0)], log: totpLog)
+        await totp.load()
+        await totp.revoke(try XCTUnwrap(totp.rows.last), reason: .user)
+        await totp.submitEmailCode("012345", totpCode: nil)
+        XCTAssertEqual(totpLog.calls, ["request"], "sans TOTP, rien n’est envoyé")
+        await totp.submitEmailCode("012345", totpCode: "654321")
+        XCTAssertNil(totp.emailConfirmation?.request)
+        XCTAssertEqual(totp.emailConfirmation?.message, String(localized: "Trop d’essais. Demande un nouveau code."))
+        await totp.requestEmailCode()
+        XCTAssertEqual(totp.emailConfirmation?.request, pending)
+        totp.cancelEmailConfirmation()
+        XCTAssertNil(totp.emailConfirmation)
+
+        // Le jeton refusé au REVOKE : nouveau code demandé, rien n'est retiré.
+        let staleLog = Log()
+        let stale = emailModel(now: now, request: [.sent(pending)], verify: [.token(Self.token)], confirmed: .confirmationInvalid, log: staleLog)
+        await stale.load()
+        await stale.revoke(try XCTUnwrap(stale.rows.last), reason: .user)
+        await stale.submitEmailCode("012345", totpCode: "654321")
+        XCTAssertNil(stale.emailConfirmation?.request)
+        XCTAssertEqual(stale.emailConfirmation?.message, String(localized: "Ce code n’est plus valable. Demande un nouveau code."))
+        XCTAssertNil(stale.confirmationMessage)
+
+        // Déjà inscrit depuis 24 h côté serveur : la révocation part sans code.
+        let notNeededLog = Log()
+        let notNeeded = emailModel(now: now, request: [.notNeeded], log: notNeededLog)
+        await notNeeded.load()
+        await notNeeded.revoke(try XCTUnwrap(notNeeded.rows.last), reason: .user)
+        XCTAssertEqual(notNeededLog.calls, ["request", "revoke:\(otherId)"])
+        XCTAssertNil(notNeeded.emailConfirmation)
     }
 
     // MARK: Alerte « Nouvel appareil » (6b)

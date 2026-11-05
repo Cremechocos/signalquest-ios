@@ -108,6 +108,9 @@ struct E2EEAutoNewDeviceAlertView: View {
             .sqReadableWidth()
         }
         .background(SQColor.bg.ignoresSafeArea())
+        .sheet(item: $model.emailConfirmation) { _ in
+            E2EEAutoEmailConfirmationSheet(model: model)
+        }
     }
 
     private func deviceCard(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
@@ -159,17 +162,24 @@ struct E2EEAutoNewDeviceAlertView: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-        } else {
-            Group {
-                if let hours = model.hoursBeforeRevokingOthers {
-                    Text("Cet appareil-ci a été ajouté il y a moins de 24 h. Si ce n’est pas toi, retire l’autre depuis un appareil plus ancien, ou reviens ici dans \(hours) h.")
-                } else {
-                    Text("Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils.")
-                }
+        } else if model.revokesOthersByEmail {
+            // Téléphone perdu (révision 21) : le code e-mail remplace l'attente des 24 h.
+            GradientButton(String(localized: "Ce n’est pas moi"), isBusy: model.isActing, style: .destructive) {
+                Task { await model.revoke(row, reason: .notMe) }
             }
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+            .disabled(model.isActing)
+            .accessibilityIdentifier("e2eeAuto.newDevice.notMe")
+            Text("Cet appareil-ci a été ajouté il y a moins de 24 h : un code envoyé par e-mail confirmera le retrait, et toutes tes autres sessions seront fermées.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose(false) }
+                .accessibilityIdentifier("e2eeAuto.newDevice.later")
+        } else {
+            Text("Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose(false) }
                 .accessibilityIdentifier("e2eeAuto.newDevice.later")
         }

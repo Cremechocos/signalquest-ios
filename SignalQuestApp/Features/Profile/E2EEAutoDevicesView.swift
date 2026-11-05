@@ -15,6 +15,12 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         var ownDeviceId: () -> String?
         var readOwnAccount: () async -> E2EEAutoEnrollment.OwnAccount
         var revoke: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason) async -> E2EEAutoDeviceRevocation.Outcome
+        /// Téléphone perdu (révision 21) : code e-mail, puis révocation avec son jeton.
+        var requestConfirmation: () async -> E2EEAutoDeviceRevocation.ConfirmationRequestOutcome = { .failed("e2ee-auto-unavailable") }
+        var verifyConfirmation: (_ confirmationId: String, _ code: String, _ totpCode: String?) async
+            -> E2EEAutoDeviceRevocation.ConfirmationVerifyOutcome = { _, _, _ in .failed("e2ee-auto-unavailable") }
+        var revokeConfirmed: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason, _ confirmationToken: String) async
+            -> E2EEAutoDeviceRevocation.Outcome = { _, _, _ in .failed("e2ee-auto-unavailable") }
         /// Libellés et activités (§4.2, révision 12) ; nil : inconnus, sans message.
         var readLabels: () async -> [String: E2EEAutoDeviceLabels.Display]? = { nil }
         /// Mode renforcé (§6) ; l'écran ne l'adopte qu'à la relecture du journal.
@@ -62,6 +68,16 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         var lastSeenAtMs: Int64?
     }
 
+    /// Confirmation par e-mail en cours (révision 21) : un code ouvre une seule révocation.
+    struct EmailConfirmation: Identifiable, Equatable {
+        let row: Row
+        let reason: E2EEAutoLog.RevokeReason
+        /// nil : demande du code en cours, ou à refaire.
+        var request: E2EEAutoRevokeConfirmationContract.Request?
+        var message: String?
+        var id: String { row.id }
+    }
+
     /// Retirés depuis moins de 30 jours : la trace d'une révocation reste visible un temps.
     static let revokedWindowMs: Int64 = 30 * 24 * 3_600_000
 
@@ -73,6 +89,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     @Published private(set) var othersRevocableAtMs: Int64?
     @Published var errorMessage: String?
     @Published var confirmationMessage: String?
+    @Published var emailConfirmation: EmailConfirmation?
     /// Mode du compte, lu au journal vérifié.
     @Published private(set) var mode: E2EEAutoLog.Mode = .normal
     @Published private(set) var passkeyOffer: E2EEAutoPasskeyContract.Offer = .none
@@ -94,6 +111,11 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     var canRevokeOthers: Bool {
         guard current?.status == .active else { return false }
         return othersRevocableAtMs.map { dependencies.nowMs() >= $0 } ?? true
+    }
+
+    /// Inscrit depuis moins de 24 h et actif : il retire un autre appareil avec un code e-mail.
+    var revokesOthersByEmail: Bool {
+        current?.status == .active && !canRevokeOthers
     }
 
     /// Heures entières restantes avant la fin de la garde des 24 h, au moins 1.
@@ -207,15 +229,31 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
     }
 
     func revoke(_ row: Row, reason: E2EEAutoLog.RevokeReason) async {
-        guard !isActing, row.isCurrent || canRevokeOthers else { return }
+        guard !isActing else { return }
+        // Moins de 24 h : le code e-mail d'abord, la révocation ensuite.
+        if !row.isCurrent, revokesOthersByEmail {
+            await startEmailConfirmation(row, reason: reason)
+            return
+        }
+        guard row.isCurrent || canRevokeOthers else { return }
         isActing = true
         errorMessage = nil
         defer { isActing = false }
         let outcome = await dependencies.revoke(row.id, reason)
+        // L'horloge locale s'est trompée : le serveur garde la main.
+        if outcome == .tooRecent, !row.isCurrent, current?.status == .active {
+            isActing = false
+            await startEmailConfirmation(row, reason: reason)
+            return
+        }
+        apply(outcome, row: row, reason: reason)
+        await load()
+    }
+
+    private func apply(_ outcome: E2EEAutoDeviceRevocation.Outcome, row: Row, reason: E2EEAutoLog.RevokeReason) {
         switch outcome {
         case .revoked(ownDevice: true):
             signedOut = true
-            return
         case .revoked:
             var message = reason == .notMe
                 ? String(localized: "Appareil retiré. Tes autres sessions ont été fermées : change ton mot de passe si quelqu’un d’autre le connaît.")
@@ -227,6 +265,8 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
             confirmationMessage = message
         case .tooRecent:
             errorMessage = String(localized: "Cet appareil a été ajouté il y a moins de 24 h : passe par un appareil plus ancien pour en retirer un autre.")
+        case .confirmationInvalid:
+            errorMessage = String(localized: "Ce code n’est plus valable. Demande un nouveau code.")
         case .notActive:
             errorMessage = String(localized: "Cet appareil attend encore son activation : il ne peut retirer aucun appareil.")
         case .notFound:
@@ -240,7 +280,102 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         case .retryLater, .failed:
             errorMessage = String(localized: "Impossible de retirer cet appareil. Réessaie dans un instant.")
         }
-        await load()
+    }
+
+    // MARK: Confirmation par e-mail (révision 21)
+
+    func startEmailConfirmation(_ row: Row, reason: E2EEAutoLog.RevokeReason) async {
+        errorMessage = nil
+        emailConfirmation = EmailConfirmation(row: row, reason: reason)
+        await requestEmailCode()
+    }
+
+    /// Demande (ou redemande) le code ; une nouvelle demande annule la précédente.
+    func requestEmailCode() async {
+        guard !isActing, var pending = emailConfirmation else { return }
+        isActing = true
+        pending.request = nil
+        pending.message = nil
+        emailConfirmation = pending
+        let outcome = await dependencies.requestConfirmation()
+        isActing = false
+        guard emailConfirmation?.id == pending.id else { return }
+        switch outcome {
+        case .sent(let request):
+            pending.request = request
+        case .notNeeded:
+            // Inscrit depuis 24 h entre-temps : il révoque sans code.
+            emailConfirmation = nil
+            othersRevocableAtMs = dependencies.nowMs()
+            await revoke(pending.row, reason: pending.reason)
+            return
+        case .emailUnavailable:
+            pending.message = String(localized: "Ton compte n’a pas d’adresse e-mail. Retire cet appareil depuis un appareil plus ancien.")
+        case .rateLimited:
+            pending.message = String(localized: "Trois codes ont déjà été demandés en 24 h. Retire cet appareil depuis un appareil plus ancien, ou réessaie plus tard.")
+        case .notActive:
+            pending.message = String(localized: "Cet appareil attend encore son activation : il ne peut retirer aucun appareil.")
+        case .thisDeviceRevoked, .reauthenticate:
+            pending.message = String(localized: "La session a changé. Reconnecte-toi avant de gérer les appareils.")
+        case .updateRequired:
+            pending.message = String(localized: "Mets à jour SignalQuest pour gérer tes appareils.")
+        case .retryLater, .failed:
+            pending.message = String(localized: "Impossible d’envoyer le code. Réessaie dans un instant.")
+        }
+        emailConfirmation = pending
+    }
+
+    /// Code e-mail (et TOTP si le compte l'exige), puis la révocation avec le jeton.
+    func submitEmailCode(_ code: String, totpCode: String?) async {
+        guard !isActing, var pending = emailConfirmation, let request = pending.request else { return }
+        let code = code.trimmingCharacters(in: .whitespaces)
+        let totp = request.totpRequired ? totpCode?.trimmingCharacters(in: .whitespaces) : nil
+        guard E2EEAutoRevokeConfirmationContract.isCode(code), !request.totpRequired || totp.map(E2EEAutoRevokeConfirmationContract.isCode) == true else {
+            pending.message = String(localized: "Saisis les 6 chiffres reçus.")
+            emailConfirmation = pending
+            return
+        }
+        isActing = true
+        pending.message = nil
+        emailConfirmation = pending
+        defer { isActing = false }
+        switch await dependencies.verifyConfirmation(request.confirmationId, code, totp) {
+        case .token(let token):
+            let outcome = await dependencies.revokeConfirmed(pending.row.id, pending.reason, token)
+            if case .confirmationInvalid = outcome {
+                pending.request = nil
+                pending.message = String(localized: "Ce code n’est plus valable. Demande un nouveau code.")
+                emailConfirmation = pending
+                return
+            }
+            emailConfirmation = nil
+            apply(outcome, row: pending.row, reason: pending.reason)
+            await load()
+            return
+        case .codeInvalid(let left?) where left == 0:
+            pending.request = nil
+            pending.message = String(localized: "Trop d’essais. Demande un nouveau code.")
+        case .codeInvalid(let left?):
+            pending.message = String(localized: "Code incorrect. Essais restants : \(left).")
+        case .codeInvalid:
+            pending.message = String(localized: "Code incorrect.")
+        case .totpRequired:
+            pending.message = String(localized: "Saisis aussi le code de ton application d’authentification.")
+        case .expired:
+            pending.request = nil
+            pending.message = String(localized: "Ce code a expiré ou a déjà servi. Demande un nouveau code.")
+        case .thisDeviceRevoked, .reauthenticate:
+            pending.message = String(localized: "La session a changé. Reconnecte-toi avant de gérer les appareils.")
+        case .updateRequired:
+            pending.message = String(localized: "Mets à jour SignalQuest pour gérer tes appareils.")
+        case .retryLater, .failed:
+            pending.message = String(localized: "Impossible de vérifier le code. Réessaie dans un instant.")
+        }
+        emailConfirmation = pending
+    }
+
+    func cancelEmailConfirmation() {
+        emailConfirmation = nil
     }
 }
 
@@ -261,6 +396,18 @@ extension E2EEAutoDevicesViewModel {
             revoke: { deviceId, reason in
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
                 return await revocation.revoke(deviceId: deviceId, reason: reason)
+            },
+            requestConfirmation: {
+                guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
+                return await revocation.requestConfirmation()
+            },
+            verifyConfirmation: { confirmationId, code, totpCode in
+                guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
+                return await revocation.verifyConfirmation(confirmationId: confirmationId, code: code, totpCode: totpCode)
+            },
+            revokeConfirmed: { deviceId, reason, token in
+                guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
+                return await revocation.revoke(deviceId: deviceId, reason: reason, confirmationToken: token)
             },
             readLabels: E2EEAutoDeviceLabels.live(session: session, api: api),
             setMode: { mode in
@@ -472,6 +619,9 @@ struct E2EEAutoDevicesView: View {
         .sheet(item: $detailRow) { row in
             detailSheet(row)
         }
+        .sheet(item: $model.emailConfirmation) { _ in
+            E2EEAutoEmailConfirmationSheet(model: model)
+        }
         .alert("Appareils", isPresented: Binding(
             get: { model.confirmationMessage != nil },
             set: { if !$0 { model.confirmationMessage = nil } }
@@ -561,8 +711,8 @@ struct E2EEAutoDevicesView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             } footer: {
                 Group {
-                    if let hours = model.hoursBeforeRevokingOthers {
-                        Text("Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans \(hours) h ; d’ici là, retire-les depuis un appareil plus ancien.")
+                    if model.revokesOthersByEmail {
+                        Text("Cet appareil a été ajouté il y a moins de 24 h : pour retirer un autre appareil, un code sera envoyé à ton adresse e-mail.")
                     } else {
                         Text("Touche un appareil pour voir son empreinte et vérifier que c’est bien lui.")
                     }
@@ -582,7 +732,7 @@ struct E2EEAutoDevicesView: View {
             Button { detailRow = row } label: { rowSummary(row) }
                 .buttonStyle(.plain)
                 .accessibilityHint(Text("Affiche l’empreinte de l’appareil"))
-            if !row.isCurrent, row.status != .revoked, model.canRevokeOthers {
+            if !row.isCurrent, row.status != .revoked, model.canRevokeOthers || model.revokesOthersByEmail {
                 Button(role: .destructive) {
                     rowToRevoke = row
                 } label: {
@@ -838,7 +988,13 @@ struct E2EEAutoDevicesQAScreen: View {
         return E2EEAutoDevicesViewModel(dependencies: .init(
             ownDeviceId: { ownId },
             readOwnAccount: { refused ? .refused : .verified(account) },
-            revoke: { _, _ in .revoked(ownDevice: false) },
+            revoke: { _, _ in recent ? .tooRecent : .revoked(ownDevice: false) },
+            requestConfirmation: {
+                .sent(.init(confirmationId: "qa_confirmation_00000001", expiresAtMs: now + 600_000,
+                            totpRequired: AppEnvironment.hasQAFlag("auto-devices-totp"), emailHint: "a•••@e•••.fr"))
+            },
+            verifyConfirmation: { _, code, _ in code == "000000" ? .codeInvalid(attemptsLeft: 4) : .token(String(repeating: "A", count: 43)) },
+            revokeConfirmed: { _, _, _ in .revoked(ownDevice: false) },
             readLabels: { unlabeled ? nil : labels },
             passkeyOffer: {
                 if AppEnvironment.hasQAFlag("auto-devices-passkey-update") { return .update(credentialIds: ["AQID"]) }
@@ -856,5 +1012,133 @@ struct E2EEAutoDevicesQAScreen: View {
         #else
         EmptyView()
         #endif
+    }
+}
+
+// MARK: - Confirmation par e-mail (révision 21)
+
+/// Appareil inscrit depuis moins de 24 h : le retrait d'un autre appareil passe
+/// par un code envoyé à l'adresse du compte (et le code TOTP s'il est actif).
+/// Un code ne retire qu'un appareil.
+struct E2EEAutoEmailConfirmationSheet: View {
+    @ObservedObject var model: E2EEAutoDevicesViewModel
+    @State private var code = ""
+    @State private var totpCode = ""
+    @FocusState private var focused: Field?
+
+    private enum Field { case code, totp }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    if let pending = model.emailConfirmation {
+                        Text("Cet appareil a été ajouté il y a moins de 24 h. Pour retirer \(E2EEAutoDevicesView.deviceName(pending.row)), saisis le code reçu par e-mail.")
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let request = pending.request {
+                            form(request, message: pending.message)
+                        } else if pending.message == nil {
+                            HStack(spacing: SQSpace.sm) {
+                                SQSpinner()
+                                Text("Envoi du code…")
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        if pending.request == nil, let message = pending.message {
+                            errorLabel(message)
+                            GradientButton(String(localized: "Envoyer un nouveau code"), isBusy: model.isActing) {
+                                Task { await model.requestEmailCode() }
+                            }
+                            .disabled(model.isActing)
+                            .accessibilityIdentifier("e2eeAuto.emailConfirmation.resend")
+                        }
+                    }
+                }
+                .padding(.horizontal, SQSpace.xl)
+                .padding(.vertical, SQSpace.lg)
+                .sqReadableWidth()
+            }
+            .background(SQColor.bg.ignoresSafeArea())
+            .navigationTitle("Confirmer par e-mail")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") { model.cancelEmailConfirmation() }
+                        .disabled(model.isActing)
+                }
+            }
+        }
+        .interactiveDismissDisabled(model.isActing)
+    }
+
+    @ViewBuilder
+    private func form(_ request: E2EEAutoRevokeConfirmationContract.Request, message: String?) -> some View {
+        Text("Code envoyé à \(request.emailHint).")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        codeField(String(localized: "Code reçu par e-mail"), text: $code, field: .code)
+            .textContentType(.oneTimeCode)
+            .accessibilityIdentifier("e2eeAuto.emailConfirmation.code")
+        if request.totpRequired {
+            codeField(String(localized: "Code de ton application d’authentification"), text: $totpCode, field: .totp)
+                .accessibilityIdentifier("e2eeAuto.emailConfirmation.totp")
+        }
+        if let message {
+            errorLabel(message)
+        }
+        GradientButton(String(localized: "Retirer l’appareil"), isBusy: model.isActing, style: .destructiveFill) {
+            focused = nil
+            Task { await model.submitEmailCode(code, totpCode: request.totpRequired ? totpCode : nil) }
+        }
+        .disabled(model.isActing || code.count != 6 || (request.totpRequired && totpCode.count != 6))
+        .accessibilityIdentifier("e2eeAuto.emailConfirmation.submit")
+        Button("Envoyer un nouveau code") {
+            code = ""
+            totpCode = ""
+            Task { await model.requestEmailCode() }
+        }
+        .font(SQType.body)
+        .foregroundStyle(SQColor.accentInk)
+        .frame(minHeight: 44)
+        .disabled(model.isActing)
+        Text("Un code ne retire qu’un appareil.")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func errorLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(SQType.body)
+            .foregroundStyle(SQColor.dangerInk)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func codeField(_ title: String, text: Binding<String>, field: Field) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(verbatim: title)
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+            TextField(title, text: text, prompt: SQFormPrompt.text("123 456"))
+                .keyboardType(.numberPad)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .font(SQFont.body(24, .semibold))
+                .multilineTextAlignment(.center)
+                .textFieldStyle(SQTextFieldStyle())
+                .focused($focused, equals: field)
+                .accessibilityLabel(Text(verbatim: title))
+                .disabled(model.isActing)
+                .privacySensitive()
+                .onChangeCompat(of: text.wrappedValue) { _, value in
+                    let filtered = String(value.unicodeScalars.filter { (48...57).contains($0.value) }.prefix(6).map(Character.init))
+                    if value != filtered { text.wrappedValue = filtered }
+                }
+        }
     }
 }

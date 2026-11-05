@@ -40,6 +40,55 @@ enum E2EEAutoRevocationContract {
     }
 }
 
+/// Téléphone perdu (révision 21, §4.4 et C) : l'appareil de moins de 24 h
+/// demande un code à l'e-mail du compte, le vérifie, et reçoit un jeton à usage
+/// unique qui ouvre **une** révocation. Les deux requêtes sont signées (A.2).
+enum E2EEAutoRevokeConfirmationContract {
+    static let requestPath = "/api/e2ee/auto/revoke-confirmations"
+    static func verifyPath(confirmationId: String) -> String { "\(requestPath)/\(confirmationId)/verify" }
+    /// Corps exact `{}`.
+    static let requestBody = Data("{}".utf8)
+
+    struct Request: Equatable, Sendable {
+        let confirmationId: String
+        let expiresAtMs: Int64
+        let totpRequired: Bool
+        /// Adresse masquée (`a•••@g•••.com`), affichée telle quelle.
+        let emailHint: String
+    }
+
+    static func parseRequest(_ data: Data) -> Request? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = object["confirmationId"] as? String, E2EEV2Canonical.isOpaque(id),
+              let expires = (object["expiresAtMs"] as? String).flatMap({ E2EEAutoLog.decimal($0, in: 1...E2EEV2Canonical.maxSafeInteger) }),
+              let totp = object["totpRequired"] as? Bool,
+              let hint = object["emailHint"] as? String, !hint.isEmpty, hint.count <= 320 else { return nil }
+        return Request(confirmationId: id, expiresAtMs: expires, totpRequired: totp, emailHint: hint)
+    }
+
+    /// 6 chiffres ASCII.
+    static func isCode(_ value: String) -> Bool {
+        value.utf8.count == 6 && value.utf8.allSatisfy { (48...57).contains($0) }
+    }
+
+    /// Corps exact `{ "code", "totpCode"? }` : `totpCode` absent quand il ne sert pas.
+    static func verifyBody(code: String, totpCode: String?) -> Data? {
+        guard isCode(code), totpCode.map(isCode) ?? true else { return nil }
+        var object = ["code": code]
+        object["totpCode"] = totpCode
+        return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// `200 { "confirmationToken", "expiresAtMs" }` : 32 octets en base64url, 43 caractères.
+    static func parseToken(_ data: Data) -> String? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = object["confirmationToken"] as? String, token.utf8.count == 43,
+              token.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 || $0 == 95 })
+        else { return nil }
+        return token
+    }
+}
+
 actor E2EEAutoDeviceRevocation {
     struct Dependencies: Sendable {
         var userId: String
@@ -55,8 +104,10 @@ actor E2EEAutoDeviceRevocation {
     enum Outcome: Equatable, Sendable {
         /// `REVOKE` écrit (ou déjà au journal) ; `ownDevice` : la session va être fermée.
         case revoked(ownDevice: Bool)
-        /// Garde des 24 h : cet appareil ne révoque encore que lui-même.
+        /// Garde des 24 h : cet appareil ne révoque encore que lui-même, sauf code e-mail.
         case tooRecent
+        /// Jeton de confirmation refusé (faux, échu ou déjà servi) : redemander un code.
+        case confirmationInvalid
         /// Cet appareil est en attente (mode renforcé) : il ne révoque rien.
         case notActive
         /// Cible absente du compte, ou `NOT_ME` sur soi-même.
@@ -77,7 +128,9 @@ actor E2EEAutoDeviceRevocation {
         self.dependencies = dependencies
     }
 
-    func revoke(deviceId: String, reason: E2EEAutoLog.RevokeReason) async -> Outcome {
+    /// `confirmationToken` : jeton du code e-mail, pour l'appareil de moins de 24 h.
+    /// Il n'est consommé qu'avec le `REVOKE` écrit : le nouvel essai re-signé le garde.
+    func revoke(deviceId: String, reason: E2EEAutoLog.RevokeReason, confirmationToken: String? = nil) async -> Outcome {
         guard reason.isSigned, E2EEV2Canonical.isOpaque(deviceId) else { return .failed("e2ee-auto-revocation-invalid") }
         let device: E2EEV2DeviceDescriptor
         do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
@@ -106,7 +159,9 @@ actor E2EEAutoDeviceRevocation {
             let body: Data
             do {
                 let signature = try dependencies.sign(Data(payload.utf8)).base64EncodedString()
-                body = try E2EEAutoRevocationContract.body(prevUserEntryHash: previous, reason: reason, signatureB64: signature)
+                body = try E2EEAutoRevocationContract.body(
+                    prevUserEntryHash: previous, reason: reason, signatureB64: signature, confirmationToken: confirmationToken
+                )
             } catch {
                 return .failed("e2ee-auto-revocation-signature")
             }
@@ -119,7 +174,8 @@ actor E2EEAutoDeviceRevocation {
                 return done(ownDevice: ownDevice)
             case .failure(let failure):
                 switch failure.code {
-                case "E2EE_DEVICE_TOO_RECENT", "E2EE_REVOKE_CONFIRMATION_INVALID": return .tooRecent
+                case "E2EE_DEVICE_TOO_RECENT": return .tooRecent
+                case "E2EE_REVOKE_CONFIRMATION_INVALID": return .confirmationInvalid
                 case "E2EE_DEVICE_NOT_ACTIVE": return .notActive
                 case "E2EE_DEVICE_NOT_FOUND": return .notFound
                 default: break
@@ -148,6 +204,99 @@ actor E2EEAutoDeviceRevocation {
         }
         if account.devices[deviceId]?.status == .revoked { return done(ownDevice: ownDevice) }
         return .retryLater
+    }
+
+    enum ConfirmationRequestOutcome: Equatable, Sendable {
+        /// Code envoyé à l'e-mail du compte.
+        case sent(E2EEAutoRevokeConfirmationContract.Request)
+        /// Inscrit depuis 24 h : il révoque sans code.
+        case notNeeded
+        /// Compte sans adresse e-mail.
+        case emailUnavailable
+        /// 3 demandes sur 24 h glissantes.
+        case rateLimited
+        case notActive
+        case thisDeviceRevoked
+        case updateRequired
+        case reauthenticate
+        case retryLater
+        case failed(String)
+    }
+
+    enum ConfirmationVerifyOutcome: Equatable, Sendable {
+        case token(String)
+        /// Code e-mail ou TOTP faux ; `0` : confirmation épuisée.
+        case codeInvalid(attemptsLeft: Int?)
+        case totpRequired
+        /// Échue, annulée, déjà vérifiée, épuisée ou inconnue : redemander un code.
+        case expired
+        case thisDeviceRevoked
+        case updateRequired
+        case reauthenticate
+        case retryLater
+        case failed(String)
+    }
+
+    /// Demande de code (`{}` signé) ; une nouvelle demande annule la précédente.
+    func requestConfirmation() async -> ConfirmationRequestOutcome {
+        let device: E2EEV2DeviceDescriptor
+        do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
+        switch await post(E2EEAutoRevokeConfirmationContract.requestPath, E2EEAutoRevokeConfirmationContract.requestBody) {
+        case .success(let data, _, _):
+            guard let request = E2EEAutoRevokeConfirmationContract.parseRequest(data) else {
+                return .failed("invalid-e2ee-auto-revoke-confirmation")
+            }
+            return .sent(request)
+        case .failure(let failure):
+            switch failure.code {
+            case "E2EE_REVOKE_CONFIRMATION_NOT_NEEDED": return .notNeeded
+            case "E2EE_REVOKE_CONFIRMATION_EMAIL_UNAVAILABLE": return .emailUnavailable
+            case "E2EE_REVOKE_CONFIRMATION_RATE_LIMITED": return .rateLimited
+            case "E2EE_DEVICE_NOT_ACTIVE": return .notActive
+            default: break
+            }
+            switch E2EEAutoEnrollmentPolicy.action(for: failure, keyVersion: device.keyVersion) {
+            case .revoked, .accountDeleted: return .thisDeviceRevoked
+            case .updateRequired: return .updateRequired
+            case .reauthenticate, .refreshSession: return .reauthenticate
+            case .retryLater, .logClosed, .signerNotFound, .rereadAndResign: return .retryLater
+            default: return .failed("e2ee-auto-revoke-confirmation-refused")
+            }
+        }
+    }
+
+    func verifyConfirmation(confirmationId: String, code: String, totpCode: String?) async -> ConfirmationVerifyOutcome {
+        guard E2EEV2Canonical.isOpaque(confirmationId),
+              let body = E2EEAutoRevokeConfirmationContract.verifyBody(code: code, totpCode: totpCode) else {
+            return .failed("e2ee-auto-revoke-confirmation-invalid")
+        }
+        let device: E2EEV2DeviceDescriptor
+        do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
+        switch await post(E2EEAutoRevokeConfirmationContract.verifyPath(confirmationId: confirmationId), body) {
+        case .success(let data, _, _):
+            guard let token = E2EEAutoRevokeConfirmationContract.parseToken(data) else {
+                return .failed("invalid-e2ee-auto-revoke-confirmation-token")
+            }
+            return .token(token)
+        case .failure(let failure):
+            switch failure.code {
+            case "E2EE_REVOKE_CONFIRMATION_CODE_INVALID":
+                if case .number(let left)? = failure.details?["attemptsLeft"], left >= 0, left <= 5 {
+                    return .codeInvalid(attemptsLeft: Int(left))
+                }
+                return .codeInvalid(attemptsLeft: nil)
+            case "E2EE_REVOKE_CONFIRMATION_TOTP_REQUIRED": return .totpRequired
+            case "E2EE_REVOKE_CONFIRMATION_EXPIRED", "E2EE_REVOKE_CONFIRMATION_NOT_FOUND": return .expired
+            default: break
+            }
+            switch E2EEAutoEnrollmentPolicy.action(for: failure, keyVersion: device.keyVersion) {
+            case .revoked, .accountDeleted: return .thisDeviceRevoked
+            case .updateRequired: return .updateRequired
+            case .reauthenticate, .refreshSession: return .reauthenticate
+            case .retryLater, .logClosed, .signerNotFound, .rereadAndResign: return .retryLater
+            default: return .failed("e2ee-auto-revoke-confirmation-refused")
+            }
+        }
     }
 
     /// Un refus d'horodatage donne l'heure du serveur : une seule nouvelle signature (révision 8).
