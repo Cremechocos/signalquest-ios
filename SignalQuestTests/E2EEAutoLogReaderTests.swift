@@ -657,7 +657,8 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         let vectors = try reference()
         let vectorKeys = Set([vectors.pinnedLogKeyB64] + vectors.nextLogKeysB64)
         XCTAssertTrue(vectorKeys.isDisjoint(with: [keys.current] + keys.next))
-        XCTAssertFalse(SQFeatures.e2eeAutoLogEnabled, "le journal reste fermé jusqu'à la bascule")
+        // Lot 9 (05/11) : ouvert dans la build, sans effet tant que le serveur ne bascule pas.
+        XCTAssertTrue(SQFeatures.e2eeAutoLogEnabled, "le journal est ouvert pour la build de la bascule")
     }
 
     // MARK: Pages

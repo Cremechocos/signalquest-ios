@@ -58,10 +58,11 @@ enum SQFeatures {
     static let e2eeReactionsEnabled = true
 
     /// Chiffrement automatique (contrat E2EE-AUTO) : les appareils des membres
-    /// viennent du journal vérifié au lieu des paquets de confiance v2. Fermé
-    /// jusqu'à la bascule ; il faut aussi la clé du journal épinglée
-    /// (`E2EEAutoLogReader.productionLogKeys`).
-    static let e2eeAutoLogEnabled = false
+    /// viennent du journal vérifié au lieu des paquets de confiance v2. Ouvert
+    /// au lot 9 (05/11) avec la clé du journal épinglée
+    /// (`E2EEAutoLogReader.productionLogKeys`) ; le mode suit ensuite la
+    /// bascule du serveur (`E2EEV2ServerGate.autoActive`).
+    static let e2eeAutoLogEnabled = true
 
     /// Envoi des tests d'expérience (`POST /api/experience-tests`, contrat
     /// `experience-tests-v1`). Ouvert le 03/11 (décision d'Alexandre) : les tests
