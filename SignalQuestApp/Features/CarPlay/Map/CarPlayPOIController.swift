@@ -30,8 +30,15 @@ final class CarPlayPOIController: NSObject, CPPointOfInterestTemplateDelegate {
         super.init()
     }
 
-    func pointOfInterestTemplate(_ pointOfInterestTemplate: CPPointOfInterestTemplate,
-                                 didChangeMapRegion region: MKCoordinateRegion) {
+    /// CarPlay l'appelle depuis sa file XPC, hors du fil principal (iOS 27.2) :
+    /// sous `@MainActor`, le contrôle d'isolation de Swift 6 faisait planter
+    /// l'app (EXC_BREAKPOINT, builds 178 à 181). On repasse sur le fil principal.
+    nonisolated func pointOfInterestTemplate(_ pointOfInterestTemplate: CPPointOfInterestTemplate,
+                                             didChangeMapRegion region: MKCoordinateRegion) {
+        Task { @MainActor [weak self] in self?.mapRegionDidChange(region) }
+    }
+
+    private func mapRegionDidChange(_ region: MKCoordinateRegion) {
         let center = region.center
         if let last = lastLoadedCenter {
             let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)

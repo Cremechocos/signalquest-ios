@@ -1,5 +1,6 @@
 import CarPlay
 import CoreLocation
+import MapKit
 import XCTest
 @testable import SignalQuest
 
@@ -161,5 +162,23 @@ final class CarPlayTabsAndPOITests: XCTestCase {
 
         XCTAssertLessThanOrEqual(items.count, Int(CPListTemplate.maximumItemCount))
         XCTAssertEqual(items.first?.text, "1. Op 0", "un classement se lit par rang")
+    }
+    /// CarPlay appelle le délégué depuis sa file XPC (crash des builds 178 à 181) :
+    /// l'appel hors du fil principal ne doit pas planter et recharge sur le fil principal.
+    func testMapRegionChangeFromABackgroundQueueReloadsOnTheMainThread() {
+        let reloaded = expectation(description: "rechargement")
+        let controller = CarPlayPOIController { _ in
+            XCTAssertTrue(Thread.isMainThread)
+            reloaded.fulfill()
+        }
+        let template = CPPointOfInterestTemplate(title: "Antennes", pointsOfInterest: [], selectedIndex: NSNotFound)
+        let region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 45.19, longitude: 5.72),
+                                        latitudinalMeters: 1_000, longitudinalMeters: 1_000)
+        nonisolated(unsafe) let unsafeController = controller
+        nonisolated(unsafe) let unsafeTemplate = template
+        DispatchQueue.global().async {
+            unsafeController.pointOfInterestTemplate(unsafeTemplate, didChangeMapRegion: region)
+        }
+        wait(for: [reloaded], timeout: 2)
     }
 }
