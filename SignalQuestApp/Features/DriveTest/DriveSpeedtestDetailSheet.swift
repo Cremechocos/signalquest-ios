@@ -60,7 +60,7 @@ struct DriveSpeedtestDetailSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Test du trajet · \(result.createdAt.formatted(date: .omitted, time: .shortened))")
+            Text("Test du trajet · \(result.createdAt.sqFormatted(date: .none))")
                 .font(SQFont.body(12, .bold, relativeTo: .caption))
                 .tracking(12 * 0.16)
                 .textCase(.uppercase)
@@ -204,7 +204,7 @@ struct DriveSpeedtestDetailSheet: View {
                 }
                 dotRow("Serveur de mesure", serverText)
                 dotRow("Durée", "\(result.durationSeconds.formatted(.number.precision(.fractionLength(0...1)))) s")
-                dotRow("Heure", result.createdAt.formatted(date: .abbreviated, time: .shortened))
+                dotRow("Heure", result.createdAt.sqFormatted(date: .medium))
                 if let place = placeText {
                     dotRow("Lieu", place)
                 }

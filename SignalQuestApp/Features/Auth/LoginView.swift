@@ -437,7 +437,7 @@ struct GuestSpeedtestReceiptsView: View {
                     ForEach(receipts) { receipt in
                         let local = localResults[receipt.clientSubmissionId].map { SpeedtestHistoryRow(result: $0) }
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            Text(local?.titleLine ?? receipt.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(local?.titleLine ?? receipt.createdAt.sqFormatted(date: .medium))
                                 .font(SQType.heading)
                                 .foregroundStyle(SQColor.label)
                             if let local {

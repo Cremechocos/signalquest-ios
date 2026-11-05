@@ -75,7 +75,7 @@ struct ExperienceHistoryDetailSheet: View {
                     .font(SQType.title)
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)
-                Text(verbatim: detail.result.measuredAt.formatted(date: .long, time: .shortened))
+                Text(verbatim: detail.result.measuredAt.sqFormatted(date: .long))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                 if let network = item.networkLine {

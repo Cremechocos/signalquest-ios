@@ -116,7 +116,7 @@ struct ThreadView: View {
             }
             HStack(spacing: SQSpace.xs) {
                 if let date = source.createdAt {
-                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                    Text(date.sqFormatted(date: .medium))
                 }
                 let replyTotal = max(replies.count, source.threadReplyCount ?? 0)
                 if replyTotal > 0 {
@@ -156,7 +156,7 @@ struct ThreadView: View {
                 .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
                 .sqShadowSoft()
                 if let date = reply.createdAt {
-                    Text(date.formatted(date: .omitted, time: .shortened))
+                    Text(date.sqFormatted(date: .none))
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
                 }

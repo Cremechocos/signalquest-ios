@@ -772,7 +772,7 @@ struct E2EEAutoDevicesView: View {
     }
 
     private static func date(_ ms: Int64) -> String {
-        Date(timeIntervalSince1970: TimeInterval(ms) / 1_000).formatted(date: .abbreviated, time: .shortened)
+        Date(timeIntervalSince1970: TimeInterval(ms) / 1_000).sqFormatted(date: .medium)
     }
 }
 

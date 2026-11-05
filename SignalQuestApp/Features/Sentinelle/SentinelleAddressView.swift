@@ -265,7 +265,7 @@ struct SentinelleAddressView: View {
                     .foregroundStyle(SQColor.label)
                 Text(selected == nil
                     ? String(localized: "dernière mesure")
-                    : (shown.map { $0.at.formatted(date: .abbreviated, time: .shortened) } ?? ""))
+                    : (shown.map { $0.at.sqFormatted(date: .medium) } ?? ""))
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.labelSecondary)
             }

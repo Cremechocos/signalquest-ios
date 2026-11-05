@@ -179,7 +179,7 @@ struct ConversationMediaView: View {
     private func photoLabel(_ entry: Entry) -> String {
         let author = entry.message.sender?.displayName ?? String(localized: "Membre")
         guard let date = entry.message.createdAt else { return String(localized: "Photo de \(author)") }
-        return String(localized: "Photo de \(author), \(date.formatted(date: .abbreviated, time: .shortened))")
+        return String(localized: "Photo de \(author), \(date.sqFormatted(date: .medium))")
     }
 
     /// Fichiers et notes vocales en lignes sur une seule carte.
@@ -210,7 +210,7 @@ struct ConversationMediaView: View {
     private func fileSubtitle(_ entry: Entry) -> String {
         let author = entry.message.sender?.displayName ?? String(localized: "Membre")
         guard let date = entry.message.createdAt else { return author }
-        return "\(author) · \(date.formatted(date: .abbreviated, time: .shortened))"
+        return "\(author) · \(date.sqFormatted(date: .medium))"
     }
 
     private func fileRow(_ entry: Entry) -> some View {

@@ -214,6 +214,7 @@ struct SharedPostCardBubble: View {
     /// Carte chiffrée sans URL (§7.7) : le lien se reconstruit depuis l'identifiant de la publication.
     var onOpenPost: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var externalURL: URL?
 
     private func open(_ url: URL) {
@@ -261,7 +262,8 @@ struct SharedPostCardBubble: View {
     }
 
     private var header: some View {
-        HStack(spacing: SQSpace.sm) {
+        // Aux tailles AX, nom et identifiant prennent plusieurs lignes : l'avatar reste en haut.
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: SQSpace.sm) {
             SQAvatar(url: card.author?.avatarUrl, name: card.author?.displayName ?? "SignalQuest", size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(card.author?.displayName ?? card.title)
@@ -341,7 +343,7 @@ struct SharedPostCardBubble: View {
                 Text(visibleChips.joined(separator: " · "))
                     .font(SQType.micro)
                     .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -382,7 +384,7 @@ struct LocationBubble: View {
 
     private var observedAtText: String? {
         guard let observedAt = location.observedAt else { return nil }
-        return "\(String(localized: "Mesurée à")) \(observedAt.formatted(date: .omitted, time: .shortened))"
+        return "\(String(localized: "Mesurée à")) \(observedAt.sqFormatted(date: .none))"
     }
 
     private var accuracyText: String? {

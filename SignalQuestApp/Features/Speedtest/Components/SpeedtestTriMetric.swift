@@ -282,7 +282,7 @@ struct SpeedtestResultSummary: View {
     private var kicker: String {
         let age = Date().timeIntervalSince(result.createdAt) < 60
             ? String(localized: "à l'instant")
-            : result.createdAt.formatted(date: .omitted, time: .shortened)
+            : result.createdAt.sqFormatted(date: .none)
         return String(localized: "Résultat · \(age)")
     }
 

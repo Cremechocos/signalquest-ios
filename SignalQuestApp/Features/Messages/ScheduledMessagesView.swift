@@ -92,7 +92,7 @@ struct ScheduledMessagesView: View {
             SQIconPastille(systemImage: "clock.fill", size: 36, font: .system(size: 14, weight: .medium))
             VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 if let date = item.sendAt {
-                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                    Text(date.sqFormatted(date: .medium))
                         .font(SQType.caption.weight(.semibold))
                         .foregroundStyle(SQColor.accentInk)
                 }
@@ -150,7 +150,7 @@ struct ScheduledMessagesView: View {
     /// « Annuler l'envoi du 18 oct. à 18:00 : Salut… » : N boutons identiques ne disent
     /// pas lequel (A01).
     private func cancelAccessibilityLabel(for item: ScheduledMessage) -> String {
-        let when = item.sendAt.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? ""
+        let when = item.sendAt.map { $0.sqFormatted(date: .medium) } ?? ""
         let text = String(content(for: item).prefix(40))
         return String(localized: "Annuler l’envoi du \(when) : \(text)")
     }

@@ -5528,7 +5528,7 @@ struct MapItemSheet: View {
 
     private func formatDate(_ date: Date?) -> String? {
         guard let date else { return nil }
-        return date.formatted(date: .abbreviated, time: .shortened)
+        return date.sqFormatted(date: .medium)
     }
 
     private func coordinatesText(lat: Double?, lon: Double?) -> String? {

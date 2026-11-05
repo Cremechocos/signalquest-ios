@@ -717,7 +717,7 @@ struct ComposerSheet: View {
                                 // C'est la dernière mesure enregistrée : sa date se voit
                                 // avant de publier, surtout si elle n'est pas récente.
                                 let isStale = Date().timeIntervalSince(date) > 6 * 3600
-                                Text("Speedtest du \(date.formatted(date: .abbreviated, time: .shortened))")
+                                Text("Speedtest du \(date.sqFormatted(date: .medium))")
                                     .font(SQType.caption(isStale ? .semibold : .regular))
                                     .foregroundStyle(isStale ? SQColor.accentInk : SQColor.labelSecondary)
                                     .accessibilityIdentifier("composer.speedtest.date")

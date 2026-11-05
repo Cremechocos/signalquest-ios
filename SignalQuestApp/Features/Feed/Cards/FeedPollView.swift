@@ -71,7 +71,7 @@ struct FeedPollView: View {
                     Text("Clos")
                 } else if let expiresAt = poll.expiresAt {
                     Text("·")
-                    Text("Clôture le \(expiresAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text("Clôture le \(expiresAt.sqFormatted(date: .medium))")
                 }
             }
             .font(SQType.micro)

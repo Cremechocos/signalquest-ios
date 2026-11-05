@@ -234,7 +234,7 @@ struct SendTimePicker: View {
     private var presets: [Preset] {
         let calendar = Calendar.current
         let now = Date()
-        func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+        func time(_ date: Date) -> String { date.sqFormatted(date: .none) }
         var list: [Preset] = []
         if inOneHour > now.addingTimeInterval(60) {
             list.append(Preset(title: String(localized: "Dans 1 h"), date: inOneHour))

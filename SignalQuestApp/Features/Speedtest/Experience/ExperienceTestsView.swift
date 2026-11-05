@@ -401,7 +401,7 @@ private struct ExperienceResultView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Test d’expérience · \(finished.endedAt.formatted(date: .omitted, time: .shortened))")
+            Text("Test d’expérience · \(finished.endedAt.sqFormatted(date: .none))")
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
                 .accessibilityAddTraits(.isHeader)

@@ -200,7 +200,7 @@ struct SentinelleLatencyChart: View {
                 Text(accessibilitySummary)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(Array(series.samples.suffix(50))) { sample in
-                    Text("\(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+                    Text("\(sample.at.sqFormatted(date: .medium)) : \(SentinelleWording.ms(sample.rttMs))")
                 }
             }
         }
@@ -332,7 +332,7 @@ struct SentinelleFamilyChart: View {
                     Text(summary(series))
                         .accessibilityAddTraits(.isHeader)
                     ForEach(accessibilitySamples(series)) { sample in
-                        Text("\(sample.family?.label ?? "Réseau"), \(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+                        Text("\(sample.family?.label ?? "Réseau"), \(sample.at.sqFormatted(date: .medium)) : \(SentinelleWording.ms(sample.rttMs))")
                     }
                 }
             }
@@ -364,7 +364,7 @@ struct SentinelleFamilyChart: View {
                     }
                 }
                 Spacer()
-                Text(readAt.formatted(date: .omitted, time: .shortened))
+                Text(readAt.sqFormatted(date: .none))
                     .font(SQFont.body(12, relativeTo: .caption2))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.labelSecondary)
@@ -587,7 +587,7 @@ struct SentinelleChartFullScreen: View {
     /// « 12:05 · 29 ms », posé au-dessus de la courbe.
     private func reading(_ sample: SentinelleLatencySample) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Text(sample.at.formatted(date: .omitted, time: .shortened))
+            Text(sample.at.sqFormatted(date: .none))
                 .foregroundStyle(SQColor.labelSecondary)
             Text(verbatim: SentinelleWording.ms(sample.rttMs))
                 .font(SQFont.body(15, .bold, relativeTo: .subheadline))

@@ -90,7 +90,7 @@ struct AntennaProfileView: View {
                     Text(originLabel)
                         .accessibilityIdentifier("antenna.profile.origin")
                     if let originTimestamp {
-                        Text(verbatim: " · \(originTimestamp.formatted(date: .omitted, time: .shortened))")
+                        Text(verbatim: " · \(originTimestamp.sqFormatted(date: .none))")
                     }
                 }
                 .font(SQType.subhead)

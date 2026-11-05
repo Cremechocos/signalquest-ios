@@ -1368,7 +1368,7 @@ struct ConversationDetailView: View {
                 .first(where: { $0.userId != currentUserId })?.presence?.lastSeenAt,
               date <= Date().addingTimeInterval(60)
         else { return nil }
-        let time = date.formatted(date: .omitted, time: .shortened)
+        let time = date.sqFormatted(date: .none)
         let calendar = Calendar.current
         if calendar.isDateInToday(date) { return String(localized: "vu à \(time)") }
         if calendar.isDateInYesterday(date) { return String(localized: "vu hier à \(time)") }
@@ -3532,7 +3532,7 @@ struct ConversationDetailView: View {
     private func callRow(_ event: CallThreadEvent) -> some View {
         let missed = event.isMissedForReader(currentUserId: currentUserId)
         let summary = event.summary(currentUserId: currentUserId)
-        let time = event.startedAt.formatted(date: .omitted, time: .shortened)
+        let time = event.startedAt.sqFormatted(date: .none)
         let canRecall = SQFeatures.callsEnabled && networkPath.isOnline
         return Button {
             Haptics.selection()
@@ -6185,7 +6185,7 @@ private struct MessageInfoSheet: View {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 MessageSheetHeader(
                     title: "Infos",
-                    subtitle: sentAt.map { String(localized: "Envoyé le \($0.formatted(date: .abbreviated, time: .shortened))") },
+                    subtitle: sentAt.map { String(localized: "Envoyé le \($0.sqFormatted(date: .medium))") },
                     closeIdentifier: "message.info.close"
                 ) { dismiss() }
                 group("Lu", members: info.read, systemImage: "checkmark.circle.fill", tint: SQColor.accentInk)

@@ -82,7 +82,7 @@ struct RemindersView: View {
             SQIconPastille(systemImage: "bell.fill", size: 36, font: .system(size: 14, weight: .medium))
             VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 if let date = item.remindAt {
-                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                    Text(date.sqFormatted(date: .medium))
                         .font(SQType.callout(.bold))
                         .foregroundStyle(SQColor.label)
                 }
@@ -121,7 +121,7 @@ struct RemindersView: View {
     /// « Supprimer le rappel du 12 oct. 14:40 » : la date distingue les boutons les uns des autres.
     private func deleteAccessibilityLabel(for item: MessageReminder) -> String {
         guard let date = item.remindAt else { return String(localized: "Supprimer le rappel") }
-        let when = date.formatted(date: .abbreviated, time: .shortened)
+        let when = date.sqFormatted(date: .medium)
         return String(localized: "Supprimer le rappel du \(when)")
     }
 

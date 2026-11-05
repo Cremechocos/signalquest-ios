@@ -1143,7 +1143,7 @@ struct E2EEV2TrustedDevicesView: View {
         guard let date = fractional.date(from: value) ?? regular.date(from: value) else {
             return String(localized: "à une date inconnue")
         }
-        return date.formatted(date: .omitted, time: .shortened)
+        return date.sqFormatted(date: .none)
     }
 
     private func statusLabel(_ status: E2EEV2RemoteDeviceStatus) -> String {
@@ -1747,7 +1747,7 @@ struct E2EEV2RecoveryResetView: View {
     }
 
     private static func resetDate(_ milliseconds: Int64) -> String {
-        Date(timeIntervalSince1970: Double(milliseconds) / 1_000).formatted(date: .long, time: .shortened)
+        Date(timeIntervalSince1970: Double(milliseconds) / 1_000).sqFormatted(date: .long)
     }
 
     private var statusSection: some View {

@@ -1440,7 +1440,7 @@ struct MessagesView: View {
                 .accessibilityHidden(true)
             Group {
                 if let endsAt = focus.endsAt {
-                    Text("Mode focus · jusqu’à \(endsAt.formatted(date: .omitted, time: .shortened))")
+                    Text("Mode focus · jusqu’à \(endsAt.sqFormatted(date: .none))")
                 } else {
                     Text("Mode focus")
                 }
@@ -1766,7 +1766,7 @@ struct MessagesView: View {
                         .lineLimit(1)
                     Spacer(minLength: SQSpace.sm)
                     if let date = message.createdAt {
-                        Text(date.formatted(date: .abbreviated, time: .shortened))
+                        Text(date.sqFormatted(date: .medium))
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                     }

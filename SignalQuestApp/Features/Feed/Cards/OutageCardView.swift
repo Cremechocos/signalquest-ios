@@ -269,7 +269,7 @@ struct OutageCardView: View {
     private var bannerDetail: String? {
         var parts: [String] = []
         if let started = string("outageStartedAt").flatMap(Self.parseDate) {
-            parts.append(String(localized: "depuis \(started.formatted(date: .abbreviated, time: .shortened))"))
+            parts.append(String(localized: "depuis \(started.sqFormatted(date: .medium))"))
         }
         if let count = int("outageConfirmCount"), count > 0 {
             parts.append(String(localized: "\(count) confirmations"))

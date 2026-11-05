@@ -91,6 +91,48 @@ enum SignalFormatters {
     }
 }
 
+/// Date et heure en toutes lettres : « 2 nov. 2026 à 00:36 », « 00:36 ».
+///
+/// Remplace `formatted(date:time: .shortened)`, qui donne « 0:36 » en
+/// français sur iOS 27 ; `DateFormatter` garde les deux chiffres de l'heure,
+/// comme la barre d'état.
+extension Date {
+    /// `locale` et `timeZone` ne servent qu'aux tests.
+    func sqFormatted(date dateStyle: DateFormatter.Style, locale: Locale? = nil, timeZone: TimeZone? = nil) -> String {
+        guard locale != nil || timeZone != nil else { return SQDateTimeFormatters.formatter(dateStyle).string(from: self) }
+        let formatter = SQDateTimeFormatters.make(dateStyle)
+        if let locale { formatter.locale = locale }
+        if let timeZone { formatter.timeZone = timeZone }
+        return formatter.string(from: self)
+    }
+}
+
+private enum SQDateTimeFormatters {
+    nonisolated(unsafe) private static let time = make(.none)
+    nonisolated(unsafe) private static let short = make(.short)
+    nonisolated(unsafe) private static let medium = make(.medium)
+    nonisolated(unsafe) private static let long = make(.long)
+    nonisolated(unsafe) private static let full = make(.full)
+
+    static func formatter(_ dateStyle: DateFormatter.Style) -> DateFormatter {
+        switch dateStyle {
+        case .none: return time
+        case .short: return short
+        case .medium: return medium
+        case .long: return long
+        case .full: return full
+        @unknown default: return medium
+        }
+    }
+
+    static func make(_ dateStyle: DateFormatter.Style) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = dateStyle
+        formatter.timeStyle = .short
+        return formatter
+    }
+}
+
 /// Date relative courte : « il y a 5 min », « il y a 3 j », puis « il y a 5 mois »
 /// en toutes lettres — l'abréviation « m. » se lit minutes autant que mois.
 struct SQRelativeDateFormatStyle: FormatStyle {

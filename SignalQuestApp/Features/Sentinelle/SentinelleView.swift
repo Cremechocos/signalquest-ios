@@ -853,7 +853,7 @@ struct SentinelleFreshness: View {
 
     var body: some View {
         if let date {
-            Text("Mesures relues à \(date.formatted(date: .omitted, time: .shortened))")
+            Text("Mesures relues à \(date.sqFormatted(date: .none))")
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
                 .frame(maxWidth: .infinity)

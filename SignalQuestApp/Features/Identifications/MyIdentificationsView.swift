@@ -1154,8 +1154,8 @@ private struct IdentificationDetailSheet: View {
             if let market = item.marketCode { SQFactRow(label: "Marché", value: market) }
             if let source = sourceLabel { SQFactRow(label: "Source", value: source) }
             SQFactRow(label: "Identifiant site", value: item.siteId)
-            if let created = item.createdAt { SQFactRow(label: "Créée le", value: created.formatted(date: .abbreviated, time: .shortened)) }
-            if let validated = item.lastValidated { SQFactRow(label: "Dernière validation", value: validated.formatted(date: .abbreviated, time: .shortened)) }
+            if let created = item.createdAt { SQFactRow(label: "Créée le", value: created.sqFormatted(date: .medium)) }
+            if let validated = item.lastValidated { SQFactRow(label: "Dernière validation", value: validated.sqFormatted(date: .medium)) }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.md)
