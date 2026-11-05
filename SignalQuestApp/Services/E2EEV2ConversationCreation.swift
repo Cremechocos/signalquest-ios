@@ -186,11 +186,16 @@ struct E2EEV2ConversationCreation: Sendable {
     }
 
     /// Migration d'une conversation v1 (§14.2) : la conversation existe déjà.
+    /// Genèse auto (E2EE-AUTO §8, révision 13) : même forme, avec `memberLogSeqs`.
     var migrationBody: Data {
-        E2EEV2CanonicalJSON.encode(.object([
+        var object: [String: E2EEV2JSON] = [
             "membership": .array(membership.map(E2EEV2MembershipChange.json)),
             "epoch": epoch.json,
-        ]))
+        ]
+        if let memberLogSeqs {
+            object["memberLogSeqs"] = .object(memberLogSeqs.mapValues { .string(String($0)) })
+        }
+        return E2EEV2CanonicalJSON.encode(.object(object))
     }
 
     /// Identifiant choisi par l'appareil : 128 bits aléatoires au format opaque.
@@ -441,7 +446,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         /// Corps de migration gardé, relu strictement.
         init?(migrationBody: String, conversationId: String, isGroup: Bool) {
             guard let root = try? E2EEV2CanonicalJSON.parseCanonical(migrationBody).objectValue,
-                  Set(root.keys) == ["membership", "epoch"],
+                  Set(root.keys).subtracting(["memberLogSeqs"]) == ["membership", "epoch"],
                   let items = root["membership"]?.arrayValue,
                   let epoch = root["epoch"]?.objectValue,
                   Set(epoch.keys) == ["epochNumber", "previousEpochNumber", "manifest", "envelopes"],
@@ -458,6 +463,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             self.envelopes = envelopes
             pendingUserIds = []
             body = Data(migrationBody.utf8)
+            logged = root["memberLogSeqs"] != nil
         }
     }
 
@@ -581,9 +587,15 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         }
         let prepared: Prepared
         do {
+            var restored: Prepared?
             if let pending = try stateStore.pendingGenesis(conversationId: conversation.id, ownerNamespace: context.ownerNamespace) {
-                guard let restored = Prepared(migrationBody: pending, conversationId: conversation.id, isGroup: conversation.isGroup)
+                guard let kept = Prepared(migrationBody: pending, conversationId: conversation.id, isGroup: conversation.isGroup)
                 else { return .failure(localError("e2ee-pending-genesis-invalid")) }
+                restored = kept
+            }
+            // Une genèse gardée d'un côté de la bascule n'est jamais renvoyée de
+            // l'autre : le serveur la refuserait à chaque essai (E2EE_AUTO_REQUIRED).
+            if let restored, restored.logged == E2EEV2ServerGate.autoActive {
                 prepared = restored
             } else {
                 let migration = try build(context) {

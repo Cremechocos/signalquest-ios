@@ -441,6 +441,75 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertTrue(try fixture.states.isV2(conversationId: direct.id, ownerNamespace: namespace))
     }
 
+    /// E2EE-AUTO révision 13 : après la bascule, la genèse porte `memberLogSeqs`
+    /// hors signature, sinon le serveur la refuse (400 E2EE_AUTO_REQUIRED).
+    func testAnAutoGenesisCarriesTheMembersLogSeqs() async throws {
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [brunoPhone.device])
+        devices.logSeqs = [fixture.user: 9, bruno: 31, carla: 4]
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        let direct = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")], encrypted: false)
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(conversationId: direct.id, recipientCount: envelopes.count))
+        }
+        guard case .created = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+        else { return XCTFail("Genèse auto refusée") }
+        let (request, body) = try XCTUnwrap(captured.first)
+        XCTAssertEqual(request.url?.path, "/api/e2ee/v2/conversations/\(direct.id)/genesis")
+        XCTAssertEqual(Set(body.keys), ["membership", "epoch", "memberLogSeqs"])
+        XCTAssertEqual(body["memberLogSeqs"] as? [String: String], [fixture.user: "9", bruno: "31"], "Les membres seulement, en décimal")
+    }
+
+    /// Une genèse gardée avant la bascule (sans `memberLogSeqs`) n'est pas
+    /// rejouée après : elle est recomposée avec les `lastSeq` des membres.
+    func testAGenesisKeptBeforeTheSwitchIsRebuiltAfterIt() async throws {
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [brunoPhone.device])
+        devices.logSeqs = [fixture.user: 9, bruno: 31]
+        let direct = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")])
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let bodies = LockedRequests()
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
+        MockURLProtocol.requestHandler = { request in
+            bodies.append(request, body: try E2EEV2AccountFixture.body(request))
+            return E2EEV2AccountFixture.response(request, Data(#"{"error":"Indisponible.","code":"UNAVAILABLE"}"#.utf8), status: 503)
+        }
+        guard case .failure = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+        else { return XCTFail("Un 503 n'est pas une migration") }
+        XCTAssertNotNil(try fixture.states.pendingGenesis(conversationId: direct.id, ownerNamespace: fixture.session.ownerNamespace))
+
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            let body = try E2EEV2AccountFixture.body(request)
+            bodies.append(request, body: body)
+            let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(conversationId: direct.id, recipientCount: envelopes.count))
+        }
+        guard case .created = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+        else { return XCTFail("Genèse recomposée refusée") }
+        let sent = bodies.all
+        XCTAssertEqual(sent.count, 2)
+        XCTAssertNil(sent[0].1["memberLogSeqs"])
+        XCTAssertEqual(sent[1].1["memberLogSeqs"] as? [String: String], [fixture.user: "9", bruno: "31"])
+    }
+
     /// v0.4.16 : une genèse refusée pour de bon n'est jamais renvoyée.
     func testAGenesisRefusedForGoodIsForgotten() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
