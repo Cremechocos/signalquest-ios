@@ -990,24 +990,24 @@ private struct ANFRMapContent: View {
                 mapStack
             }
         }
+        // La carte passe sous une barre transparente : le titre commun aux deux pays
+        // tient dans une pastille d'une ligne ; le registre publié est cité dans le
+        // panneau et la légende.
         .navigationTitle("Carte des modifications")
         .toolbarTitleInlineCompat()
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            // Titre commun aux deux pays ; le registre publié en sous-titre.
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 0) {
-                    Text("Carte des modifications")
-                        .font(SQType.callout(.semibold))
-                        .foregroundStyle(SQColor.label)
-                    Text("Source : \(model.market.source)")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .allowsTightening(true)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
+                Text("Carte des modifications")
+                    .font(SQType.callout(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .allowsTightening(true)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.xs + 2)
+                    .background(.regularMaterial, in: Capsule(style: .continuous))
+                    .accessibilityAddTraits(.isHeader)
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
@@ -1178,7 +1178,7 @@ private struct ANFRMapContent: View {
                 clusterSelection = ANFRClusterSelection(sites: sites)
             }
         )
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea(edges: [.top, .bottom])
     }
 
     // MARK: Controls overlay
@@ -1457,6 +1457,10 @@ private struct ANFRMapContent: View {
             } else {
                 dateStepper
             }
+            Text("Source : \(model.market.source)")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.top, showsHandle ? SQSpace.xs : SQSpace.md)
@@ -1930,6 +1934,10 @@ struct ANFRMapLegendSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+
+                Text("Source : \(model.market.source)")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
             .padding(SQSpace.lg)
         }
@@ -2785,14 +2793,14 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 51.2, longitude: -5.3))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 41.3, longitude: 9.7))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                // Petites marges : le dock est dans layoutMargins, rien ne flotte en haut.
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24, left: 12, bottom: 24, right: 12), animated: animated)
+                // Petites marges : le dock est dans layoutMargins ; en haut, la carte passe sous la barre.
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
             case .canada:
                 // La bande habitée, de Vancouver à Halifax : en portrait, la largeur décide du zoom.
                 let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 56, longitude: -128))
                 let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 42, longitude: -58))
                 let rect = MKMapRect(x: northWest.x, y: northWest.y, width: southEast.x - northWest.x, height: southEast.y - northWest.y)
-                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24, left: 12, bottom: 24, right: 12), animated: animated)
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 24 + map.safeAreaInsets.top, left: 12, bottom: 24, right: 12), animated: animated)
             case .region(let center, let radius):
                 map.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: radius * 2.6, longitudinalMeters: radius * 2.6), animated: animated)
             case .site(let coordinate, let aboveSheet):
