@@ -282,10 +282,13 @@ struct RadioLogsView: View {
                     Text(siteTally)
                         .foregroundStyle(SQColor.label)
                         .monospacedDigit()
-                    Text(tallySubtitle)
-                        .font(SQType.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.labelSecondary)
+                    // Recalculé chaque minute : la date relative ne vieillissait qu'au rendu.
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        Text(tallySubtitle)
+                            .font(SQType.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
                 Spacer(minLength: 0)
                 if !isWorking && model.totalCount > 0 {
