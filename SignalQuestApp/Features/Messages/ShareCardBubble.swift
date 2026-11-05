@@ -160,7 +160,7 @@ struct SignalCardBubble: View {
                         .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                     Text("dBm · RSRP")
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onInk.opacity(0.7) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                 } else {
                     Text("RSRP indisponible")
                         .font(SQType.caption)
@@ -337,7 +337,7 @@ struct SharedPostCardBubble: View {
                     .foregroundStyle(mine ? SQColor.onInk : tint)
                 Text(unit)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onInk.opacity(0.7) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
             }
             if !visibleChips.isEmpty {
                 Text(visibleChips.joined(separator: " · "))

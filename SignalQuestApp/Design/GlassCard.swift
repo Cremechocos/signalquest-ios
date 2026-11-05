@@ -175,6 +175,8 @@ struct GradientButton: View {
             .frame(minHeight: controlSize == .large ? SQSpace.primaryActionHeight + 8 : SQSpace.primaryActionHeight)
             .foregroundStyle(foreground)
             .background(background, in: Capsule(style: .continuous))
+            // Style `ghost` : son fond transparent ne capte pas le toucher ; toute la capsule doit réagir.
+            .contentShape(Capsule(style: .continuous))
             .overlay {
                 if let line = outline {
                     Capsule(style: .continuous).strokeBorder(line, lineWidth: 1)

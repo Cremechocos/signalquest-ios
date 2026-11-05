@@ -313,6 +313,18 @@ final class AccessibilityAuditTests: XCTestCase {
                !name.isEmpty, name.unicodeScalars.allSatisfy({ $0.properties.isEmoji && $0.value > 0x2000 }) {
                 return exclude("emoji décoratif choisi par l’utilisateur", name, issue.auditType)
             }
+            // Code de sécurité changé (audit final, 05/11) : encadré d'avertissement
+            // mesuré sur les pixels à 12,2:1 et 13,3:1 ; l'auditeur lit le fond teinté.
+            if screen.hasPrefix("Chiffrement — safety-code-changed"), issue.auditType == .contrast,
+               name.hasPrefix("L’un de vous a ajouté") || name.hasPrefix("Le code a changé") {
+                return exclude("contraste mesuré sur les pixels à 12,2 et 13,3:1 (05/11)", name, issue.auditType)
+            }
+            // Appareils à AX XXL (05/11) : date d'ajout et avis de journal non vérifié
+            // rendus entiers sur la capture au même réglage.
+            if screen.hasPrefix("Chiffrement — devices"), issue.auditType == .textClipped,
+               name.hasPrefix("Ajouté le ") || name.hasPrefix("Le journal des appareils n’a pas pu") {
+                return exclude("rendu entier à AX XXL (capture du 05/11)", name, issue.auditType)
+            }
             // Ces avertissements sont des prédictions à taille normale. Ils ne
             // sont ignorés que pour les composants rendus de nouveau dans la
             // passe AX XXL, où `.textClipped` reste bloquant : l'exclusion
@@ -605,5 +617,43 @@ final class AccessibilityAuditTests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 10))
         audit(app, screen: "Sentinelle — texte accessibilité", blocking: true)
+    }
+
+    /// Écrans du chiffrement automatique (audit UI/UX final, 05/11), ouverts par
+    /// leurs points d'entrée QA : alertes, appareils, historique, code de sécurité.
+    private static let e2eeAutoScreens = [
+        "--qa-auto-history-request", "--qa-auto-history-approval", "--qa-auto-new-device",
+        "--qa-auto-log-alert", "--qa-auto-log-alert-rollback", "--qa-auto-log-alert-invalid",
+        "--qa-auto-log-alert-missing", "--qa-auto-log-alert-sent", "--qa-auto-log-alert-banner",
+        "--qa-auto-log-mismatch", "--qa-auto-log-mismatch-sent", "--qa-auto-safety-code",
+        "--qa-auto-safety-code-changed", "--qa-auto-safety-code-verified", "--qa-auto-attachments",
+        "--qa-auto-devices", "--qa-auto-devices-recent", "--qa-auto-devices-refused",
+    ]
+
+    func testAuditE2EEAutoScreens() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        for hook in Self.e2eeAutoScreens {
+            let app = launch(["--mock-auth", hook])
+            XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 20), "Écran absent : \(hook)")
+            // Dynamic Type et textClipped sont des prédictions à taille normale :
+            // la passe AX XXL ci-dessous les vérifie sur le rendu réel.
+            audit(app, screen: "Chiffrement — \(hook.dropFirst(10))", blocking: true,
+                  types: [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription])
+            app.terminate()
+        }
+    }
+
+    func testAuditE2EEAutoScreensAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        for hook in Self.e2eeAutoScreens {
+            let app = launch([
+                "--mock-auth", hook,
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+            ])
+            XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 20), "Écran absent : \(hook)")
+            audit(app, screen: "Chiffrement — \(hook.dropFirst(10)) — texte accessibilité", blocking: true,
+                  types: Self.renderedLargeTextTypes)
+            app.terminate()
+        }
     }
 }

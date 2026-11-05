@@ -392,6 +392,7 @@ struct E2EEAutoDevicesView: View {
                         }
                     } header: {
                         Text("Retirés récemment")
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
                 if let current = model.current {
@@ -400,16 +401,20 @@ struct E2EEAutoDevicesView: View {
                             confirmsSignOut = true
                         } label: {
                             Label("Déconnecter cet appareil", systemImage: "rectangle.portrait.and.arrow.right")
+                                .foregroundStyle(SQColor.dangerInk)
                                 .frame(minHeight: 48)
                         }
                         .disabled(model.isActing)
                         .accessibilityIdentifier("e2eeAuto.devices.signOut")
                     } footer: {
-                        if current.status == .pending {
-                            Text("Ferme la session sur cet appareil.")
-                        } else {
-                            Text("Retire cet appareil du compte et ferme sa session. Il faudra te reconnecter pour l’ajouter de nouveau.")
+                        Group {
+                            if current.status == .pending {
+                                Text("Ferme la session sur cet appareil.")
+                            } else {
+                                Text("Retire cet appareil du compte et ferme sa session. Il faudra te reconnecter pour l’ajouter de nouveau.")
+                            }
                         }
+                        .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
             }
@@ -507,11 +512,14 @@ struct E2EEAutoDevicesView: View {
                         .disabled(model.isActing)
                 }
             } footer: {
-                if updating {
-                    Text("Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages.")
-                } else {
-                    Text("Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil.")
+                Group {
+                    if updating {
+                        Text("Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages.")
+                    } else {
+                        Text("Avec une passkey, ton historique chiffré s’ouvre aussi sur Android ou dans un navigateur, sans passer par un autre appareil.")
+                    }
                 }
+                .foregroundStyle(SQColor.labelSecondary)
             }
         }
     }
@@ -537,6 +545,7 @@ struct E2EEAutoDevicesView: View {
                     Text("Il faut au moins deux appareils actifs pour l’activer.")
                 }
             }
+            .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
@@ -549,12 +558,16 @@ struct E2EEAutoDevicesView: View {
                 }
             } header: {
                 Text("Appareils")
+                    .foregroundStyle(SQColor.labelSecondary)
             } footer: {
-                if let hours = model.hoursBeforeRevokingOthers {
-                    Text("Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans \(hours) h ; d’ici là, retire-les depuis un appareil plus ancien.")
-                } else {
-                    Text("Touche un appareil pour voir son empreinte et vérifier que c’est bien lui.")
+                Group {
+                    if let hours = model.hoursBeforeRevokingOthers {
+                        Text("Cet appareil a été ajouté il y a moins de 24 h. Il pourra retirer tes autres appareils dans \(hours) h ; d’ici là, retire-les depuis un appareil plus ancien.")
+                    } else {
+                        Text("Touche un appareil pour voir son empreinte et vérifier que c’est bien lui.")
+                    }
                 }
+                .foregroundStyle(SQColor.labelSecondary)
             }
         }
     }
@@ -575,10 +588,13 @@ struct E2EEAutoDevicesView: View {
                 } label: {
                     if dynamicTypeSize.isAccessibilitySize {
                         Label("Retirer cet appareil", systemImage: "trash")
+                            .foregroundStyle(SQColor.dangerInk)
                             .frame(minHeight: 44)
                     } else {
                         Image(systemName: "trash")
+                            .foregroundStyle(SQColor.dangerInk)
                             .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                 }
                 .accessibilityLabel(String(localized: "Retirer \(Self.deviceName(row))"))
@@ -642,12 +658,16 @@ struct E2EEAutoDevicesView: View {
                             .accessibilityLabel(String(localized: "Empreinte \(row.shortFingerprint.joined(separator: ", "))"))
                     } header: {
                         Text("Empreinte")
+                            .foregroundStyle(SQColor.labelSecondary)
                     } footer: {
-                        if row.isCurrent {
-                            Text("C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils.")
-                        } else {
-                            Text("Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui.")
+                        Group {
+                            if row.isCurrent {
+                                Text("C’est l’empreinte de cet appareil. Tes autres appareils affichent la même pour lui dans Réglages > Appareils.")
+                            } else {
+                                Text("Elle vient de la clé de l’appareil, inscrite au journal signé. Ouvre Réglages > Appareils sur l’appareil en question : s’il affiche la même empreinte pour « Cet appareil », c’est bien lui.")
+                            }
                         }
+                        .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
             }
