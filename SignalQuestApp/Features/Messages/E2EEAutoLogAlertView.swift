@@ -397,12 +397,12 @@ struct E2EEAutoLogAlertQAScreen: View {
     @StateObject private var model = Self.model()
 
     private static func model() -> E2EEAutoLogAlertViewModel {
-        let arguments = ProcessInfo.processInfo.arguments
+        let flag = AppEnvironment.hasQAFlag
         return E2EEAutoLogAlertViewModel(
             alert: .init(
-                error: arguments.contains("--qa-auto-log-alert-rollback") ? "ROLLBACK"
-                    : arguments.contains("--qa-auto-log-alert-invalid") ? "CHAIN_INVALID"
-                    : arguments.contains("--qa-auto-log-alert-missing") ? "ENTRY_MISSING" : "FORK",
+                error: flag("auto-log-alert-rollback") ? "ROLLBACK"
+                    : flag("auto-log-alert-invalid") ? "CHAIN_INVALID"
+                    : flag("auto-log-alert-missing") ? "ENTRY_MISSING" : "FORK",
                 seq: 1_284
             ),
             dependencies: .init(
@@ -411,7 +411,7 @@ struct E2EEAutoLogAlertQAScreen: View {
                     return "bug_qa"
                 },
                 reset: { try await Task.sleep(nanoseconds: 600_000_000) },
-                reportId: { arguments.contains("--qa-auto-log-alert-sent") ? "bug_qa" : nil },
+                reportId: { flag("auto-log-alert-sent") ? "bug_qa" : nil },
                 setReported: { _ in },
                 device: {
                     BugReportDevice(model: "iPhone 17", osVersion: "iOS 27.0", appVersion: "1.0 (180)", build: "180",
@@ -424,7 +424,7 @@ struct E2EEAutoLogAlertQAScreen: View {
 
     var body: some View {
         #if DEBUG && targetEnvironment(simulator)
-        if ProcessInfo.processInfo.arguments.contains("--qa-auto-log-alert-banner") {
+        if AppEnvironment.hasQAFlag("auto-log-alert-banner") {
             E2EEAutoLogAlertBannerContent()
                 .padding(.horizontal, SQSpace.xl)
                 .frame(maxHeight: .infinity, alignment: .top)

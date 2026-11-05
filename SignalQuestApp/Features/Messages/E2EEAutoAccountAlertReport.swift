@@ -168,7 +168,7 @@ struct E2EEAutoAccountAlertQAScreen: View {
             try await Task.sleep(nanoseconds: 600_000_000)
             return "bug_qa"
         },
-        reportId: { _ in ProcessInfo.processInfo.arguments.contains("--qa-auto-log-mismatch-sent") ? "bug_qa" : nil },
+        reportId: { _ in AppEnvironment.hasQAFlag("auto-log-mismatch-sent") ? "bug_qa" : nil },
         setReported: { _, _ in },
         device: {
             BugReportDevice(model: "iPhone 17", osVersion: "iOS 27.0", appVersion: "1.0 (180)", build: "180",

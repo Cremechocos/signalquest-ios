@@ -1785,7 +1785,7 @@ struct SpeedtestView: View {
         #if DEBUG
         guard AppEnvironment.showsSpeedtestSharePreviewQA else { return false }
         // Variante au-delà du gigabit : « 1,722 Gb/s » ne doit déborder nulle part.
-        let gigabit = ProcessInfo.processInfo.arguments.contains("--qa-speedtest-gigabit")
+        let gigabit = AppEnvironment.hasQAFlag("speedtest-gigabit")
         let fixture = SpeedtestRunResult(
             label: "QA partage Speedtest",
             downloadMbps: gigabit ? 1_722.4 : 734.8,
