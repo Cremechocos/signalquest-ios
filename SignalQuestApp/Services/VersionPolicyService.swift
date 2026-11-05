@@ -240,7 +240,13 @@ final class VersionPolicyService: ObservableObject {
     }
 
     /// Best-effort : ne lève jamais, ne bloque jamais sur erreur.
-    func refresh() async {
+    ///
+    /// Au lancement, cette lecture part pendant que la session se restaure : la
+    /// requête prise sous l'ancien contexte est annulée par `APIClient` avant
+    /// même d'être envoyée. Elle repart alors une fois sous la session courante ;
+    /// sans cela, l'interrupteur auto, les capacités et la version minimale
+    /// attendaient le prochain retour au premier plan, 15 min plus tard.
+    func refresh(retriesAfterSessionChange: Bool = true) async {
         // Marquée dès le départ : le retour au premier plan pendant la lecture
         // du lancement n'en relance pas une seconde.
         lastRefresh = Date()
@@ -275,7 +281,10 @@ final class VersionPolicyService: ObservableObject {
             }
             state = Self.evaluate(policy: policy, currentBuild: currentBuild)
         } catch {
-            guard !error.isCancellation else { return }
+            guard !error.isCancellation else {
+                if retriesAfterSessionChange, !Task.isCancelled { await refresh(retriesAfterSessionChange: false) }
+                return
+            }
             logger.warning("Récupération de la politique de version échouée : \(error.localizedDescription, privacy: .public)")
         }
     }

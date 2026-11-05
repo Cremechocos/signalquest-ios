@@ -264,3 +264,75 @@ final class VersionPolicyTests: XCTestCase {
         )
     }
 }
+
+/// Au lancement, la lecture de la politique part pendant que la session se
+/// restaure : la requête prise sous l'ancien contexte est annulée. Elle doit
+/// repartir aussitôt, pas 15 min plus tard au retour au premier plan.
+@MainActor
+final class VersionPolicyRefreshTests: XCTestCase {
+    override func tearDown() {
+        PolicyURLProtocol.reset()
+        super.tearDown()
+    }
+
+    func testRefreshRetriesOnceWhenTheSessionChangesDuringLaunch() async {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        PolicyURLProtocol.onFirstRequest = { try? credentials.setAccessToken("session-restauree") }
+        let service = makeService(credentials: credentials)
+
+        await service.refresh()
+
+        XCTAssertEqual(PolicyURLProtocol.requestCount, 2, "La requête annulée par le changement de session repart une fois")
+        XCTAssertEqual(service.state, .upToDate)
+    }
+
+    func testRefreshDoesNotLoopWhenTheSessionKeepsChanging() async {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        PolicyURLProtocol.onEveryRequest = { try? credentials.setAccessToken(UUID().uuidString) }
+        let service = makeService(credentials: credentials)
+
+        await service.refresh()
+
+        XCTAssertEqual(PolicyURLProtocol.requestCount, 2)
+        XCTAssertEqual(service.state, .unknown)
+    }
+
+    private func makeService(credentials: CredentialStore) -> VersionPolicyService {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [PolicyURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config))
+        return VersionPolicyService(api: api)
+    }
+}
+
+/// Répond une politique valide ; `onFirstRequest` et `onEveryRequest` changent
+/// la session pendant que la requête est en vol.
+private final class PolicyURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var requestCount = 0
+    nonisolated(unsafe) static var onFirstRequest: (() -> Void)?
+    nonisolated(unsafe) static var onEveryRequest: (() -> Void)?
+
+    static func reset() {
+        requestCount = 0
+        onFirstRequest = nil
+        onEveryRequest = nil
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.requestCount += 1
+        if Self.requestCount == 1 { Self.onFirstRequest?() }
+        Self.onEveryRequest?()
+        let body = Data(#"{"platform":"ios","minVersionCode":1,"recommendedVersionCode":1,"serverProtocolVersion":1,"minWriteProtocol":1,"legacyWriteDeadline":null,"e2eeAutoActive":false,"serverCapabilities":[],"warnMessage":null,"blockMessage":null,"storeUrl":null}"#.utf8)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                       headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
