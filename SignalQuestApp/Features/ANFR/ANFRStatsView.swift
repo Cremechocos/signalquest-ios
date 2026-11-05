@@ -285,6 +285,7 @@ struct ANFRStatsView: View {
     @State private var appeared = false
     /// Relevé lu au doigt sur la courbe de la carte.
     @State private var scrubDate: Date?
+    @State private var showFilters = false
     @Environment(\.locale) private var locale
     @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.controlSize) private var controlSize
@@ -304,23 +305,12 @@ struct ANFRStatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header
-                if model.offersOverseas {
-                    marketPicker
-                }
                 // Des chiffres sont affichés, mais l'actualisation a échoué : on ne laisse pas
                 // croire qu'ils sont à jour.
                 if model.stats != nil, model.errorMessage != nil {
                     SQInlineError(message: String(localized: "Actualisation impossible. Dernières données conservées."))
                 }
                 if let stats = model.stats, !stats.latest.isEmpty {
-                    VStack(spacing: SQSpace.sm) {
-                        // ISED ne connaît pas les sites en projet (contrat §11).
-                        if model.market != .ca {
-                            metricToggle
-                        }
-                        filterToggle
-                    }
-                    .sqFadeUp()
                     heroCard
                         .sqFadeUp()
                     bandsLink
@@ -381,6 +371,16 @@ struct ANFRStatsView: View {
         .signalQuestBackground()
         .refreshable { await model.refresh() }
         .task { await model.load() }
+        .sheet(isPresented: $showFilters) {
+            ANFRStatsFilterSheet(model: model, offersOverseas: model.offersOverseas, onSelectMarket: { market in
+                scrubDate = nil
+                Task { await model.select(market: market) }
+            }, onSelectProjected: setProjected, onSelectFilter: { type in
+                withAnimation(reduceMotion ? nil : SQMotion.standard) { model.selectedFilter = type }
+            })
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .onAppear {
             withAnimation(reduceMotion ? nil : SQMotion.slow.delay(0.1)) { appeared = true }
         }
@@ -408,7 +408,16 @@ struct ANFRStatsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.stats.back") { dismiss() }
+            HStack {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.stats.back") { dismiss() }
+                Spacer(minLength: SQSpace.md)
+                if model.stats != nil {
+                    MapChipIconButton(systemImage: "slider.horizontal.3", label: "Filtres", identifier: "anfr.stats.filters") {
+                        showFilters = true
+                    }
+                    .accessibilityValue(Text(verbatim: filtersSummary))
+                }
+            }
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Statistiques des antennes")
                     .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
@@ -436,54 +445,21 @@ struct ANFRStatsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: Marché
+    // MARK: Territoire et sites comptés
 
-    private var marketPicker: some View {
-        MapSegmented(
-            selection: Binding(get: { model.market }, set: { market in
-                scrubDate = nil
-                Task { await model.select(market: market) }
-            }),
-            options: ANFRStatsMarket.allCases.map { ($0, $0.label) },
-            identifier: "anfr.stats.market"
-        )
-    }
-
-    // MARK: Op/Proj toggle
-
-    private var metricToggle: some View {
-        MapSegmented(
-            selection: Binding(get: { model.showProjected }, set: { setProjected($0) }),
-            options: [(false, String(localized: "Opérationnel")), (true, String(localized: "Avec projeté"))],
-            identifier: "anfr.stats.metric"
-        )
+    /// Résumé du territoire et des sites comptés ; les choix sont dans une feuille.
+    private var filtersSummary: String {
+        // ISED ne connaît pas les sites en projet (contrat §11).
+        let metric = model.market == .ca ? String(localized: "Sites autorisés")
+            : model.showProjected ? String(localized: "Avec projeté") : String(localized: "Opérationnel")
+        let parts = (model.offersOverseas || model.market == .ca ? [model.market.label] : []) + [model.selectedFilter.label, metric]
+        return parts.joined(separator: " · ")
     }
 
     private func setProjected(_ value: Bool) {
         guard model.showProjected != value else { return }
         withAnimation(reduceMotion ? nil : SQMotion.standard) {
             model.showProjected = value
-        }
-    }
-
-    // MARK: Filter selector
-
-    /// Bandes en pastilles, la choisie en encre.
-    private var filterToggle: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(model.filters) { type in
-                    SQChip(
-                        label: type.label, isSelected: model.selectedFilter == type,
-                        selectedFill: SQColor.label, selectedInk: SQColor.onInk
-                    ) {
-                        withAnimation(reduceMotion ? nil : SQMotion.standard) {
-                            model.selectedFilter = type
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 2)
         }
     }
 
@@ -1592,5 +1568,158 @@ enum ANFRDateParser {
     /// et le 1ᵉʳ du mois tomberait sur le mois précédent. À enchaîner avec `.day().month()…`.
     static func style(locale: Locale = .autoupdatingCurrent) -> Date.FormatStyle {
         Date.FormatStyle(locale: locale, timeZone: TimeZone(identifier: "UTC") ?? .gmt)
+    }
+}
+
+
+// MARK: - Feuille : territoire et sites comptés
+
+/// Les choix qui changent toute la page, hors de la page : territoire et sites
+/// comptés. Chaque choix s'applique tout de suite, comme les filtres de la carte.
+private struct ANFRStatsFilterSheet: View {
+    @ObservedObject var model: ANFRStatsViewModel
+    let offersOverseas: Bool
+    let onSelectMarket: (ANFRStatsMarket) -> Void
+    let onSelectProjected: (Bool) -> Void
+    let onSelectFilter: (ANFRFilterType) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.md) {
+                    Text("Filtres")
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .sqHeader()
+                    Spacer(minLength: SQSpace.md)
+                    Button("Terminé") { dismiss() }
+                        .font(SQType.button)
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityIdentifier("anfr.stats.filters.done")
+                }
+
+                if offersOverseas {
+                    section("Territoire") {
+                        ForEach(ANFRStatsMarket.allCases) { market in
+                            option(
+                                title: market.label, detail: detail(of: market), systemImage: symbol(of: market),
+                                isSelected: model.market == market, identifier: "anfr.stats.market.\(market.rawValue)"
+                            ) {
+                                onSelectMarket(market)
+                            }
+                        }
+                    }
+                }
+
+                section("Technologie") {
+                    FlexibleChips(model.filters) { type in
+                        SQChip(
+                            label: type.label, isSelected: model.selectedFilter == type,
+                            selectedFill: SQColor.label, selectedInk: SQColor.onInk
+                        ) {
+                            guard model.selectedFilter != type else { return }
+                            Haptics.selection()
+                            onSelectFilter(type)
+                        }
+                    }
+                }
+
+                section("Sites comptés") {
+                    if model.market == .ca {
+                        Text("ISED ne publie que les sites autorisés : il n’y a pas de sites en projet au Canada.")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        option(
+                            title: String(localized: "Opérationnel"), detail: String(localized: "Les sites en service."),
+                            systemImage: "antenna.radiowaves.left.and.right", isSelected: !model.showProjected,
+                            identifier: "anfr.stats.metric.operational"
+                        ) { onSelectProjected(false) }
+                        option(
+                            title: String(localized: "Avec projeté"),
+                            detail: String(localized: "Ajoute les sites autorisés qui ne sont pas encore en service."),
+                            systemImage: "hammer", isSelected: model.showProjected,
+                            identifier: "anfr.stats.metric.projected"
+                        ) { onSelectProjected(true) }
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .signalQuestBackground()
+    }
+
+    private func detail(of market: ANFRStatsMarket) -> String {
+        switch market {
+        case .fr: return String(localized: "Observatoire ANFR, relevé chaque semaine.")
+        case .drom: return String(localized: "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte.")
+        case .ca: return String(localized: "Licences ISED, extrait chaque mois.")
+        }
+    }
+
+    private func symbol(of market: ANFRStatsMarket) -> String {
+        switch market {
+        case .fr: return "map"
+        case .drom: return "sun.horizon"
+        case .ca: return "leaf"
+        }
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title)
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .sqHeader()
+            content()
+        }
+    }
+
+    /// Une rangée à choix unique : pastille d'icône, titre, précision, coche.
+    private func option(
+        title: String, detail: String, systemImage: String, isSelected: Bool, identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            guard !isSelected else { return }
+            Haptics.selection()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.accentInk)
+                    .frame(width: 40, height: 40)
+                    .background(isSelected ? SQColor.brandRed : SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: title)
+                        .font(SQType.rowTitle)
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: detail)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isSelected ? SQColor.brandRed : SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.md)
+            .frame(minHeight: 64)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityIdentifier(identifier)
     }
 }

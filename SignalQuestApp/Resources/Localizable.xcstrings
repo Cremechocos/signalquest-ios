@@ -110352,6 +110352,166 @@
           }
         }
       }
+    },
+    "Sites autorisés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authorized sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites autorisés"
+          }
+        }
+      }
+    },
+    "Territoire et sites comptés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territory and counted sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territoire et sites comptés"
+          }
+        }
+      }
+    },
+    "Ouvre les choix" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the choices"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les choix"
+          }
+        }
+      }
+    },
+    "Sites comptés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Counted sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites comptés"
+          }
+        }
+      }
+    },
+    "ISED ne publie que les sites autorisés : il n’y a pas de sites en projet au Canada." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED only publishes authorized sites: there are no planned sites in Canada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED ne publie que les sites autorisés : il n’y a pas de sites en projet au Canada."
+          }
+        }
+      }
+    },
+    "Les sites en service." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites in service."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites en service."
+          }
+        }
+      }
+    },
+    "Ajoute les sites autorisés qui ne sont pas encore en service." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds authorized sites that are not in service yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute les sites autorisés qui ne sont pas encore en service."
+          }
+        }
+      }
+    },
+    "Observatoire ANFR, relevé chaque semaine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR observatory, updated every week."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observatoire ANFR, relevé chaque semaine."
+          }
+        }
+      }
+    },
+    "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guadeloupe, Martinique, French Guiana, Réunion and Mayotte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guadeloupe, Martinique, Guyane, La Réunion et Mayotte."
+          }
+        }
+      }
+    },
+    "Licences ISED, extrait chaque mois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED licences, extracted every month."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences ISED, extrait chaque mois."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
