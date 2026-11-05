@@ -2422,6 +2422,8 @@ final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
     /// amas (quelques centaines), alors qu'un relevé en crée jusqu'à plusieurs milliers.
     lazy var style = ANFRMarkerStyle(site: site)
     var coordinate: CLLocationCoordinate2D { site.coordinate }
+    /// Position projetée, calculée une fois : la grille des amas la relit à chaque déplacement.
+    let mapPoint: MKMapPoint
     var title: String? { site.displayName }
     /// Lu par VoiceOver : sans lui un repère ne disait que sa commune, pas ce qui a changé.
     var subtitle: String? {
@@ -2432,6 +2434,45 @@ final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
     }
     init(site: ANFRMapSite) {
         self.site = site
+        mapPoint = MKMapPoint(site.coordinate)
+    }
+}
+
+/// Une case de la grille et ses supports : le même amas est gardé tant qu'elle ne change pas.
+struct ANFRGridKey: Hashable {
+    let cell: Double
+    let index: SIMD2<Int>
+    let count: Int
+    let signature: Int
+
+    init(cell: Double, index: SIMD2<Int>, members: [ANFRSiteAnnotationMK]) {
+        self.cell = cell
+        self.index = index
+        count = members.count
+        signature = members.reduce(0) { $0 ^ $1.site.supId.hashValue }
+    }
+}
+
+/// Amas calculé par l'app aux zooms larges : les supports d'une case de la grille,
+/// posé à leur barycentre. MapKit ne regroupe plus lui-même des milliers de repères.
+final class ANFRGridClusterMK: NSObject, MKAnnotation {
+    let members: [ANFRSiteAnnotationMK]
+    let coordinate: CLLocationCoordinate2D
+
+    init(members: [ANFRSiteAnnotationMK]) {
+        self.members = members
+        let x = members.reduce(0) { $0 + $1.mapPoint.x } / Double(members.count)
+        let y = members.reduce(0) { $0 + $1.mapPoint.y } / Double(members.count)
+        coordinate = MKMapPoint(x: x, y: y).coordinate
+    }
+}
+
+private extension UIColor {
+    /// Composantes RVBA d'une couleur déjà résolue, pour indexer une image dessinée.
+    var cacheKey: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return "\(Int(r * 255)),\(Int(g * 255)),\(Int(b * 255)),\(Int(a * 255))"
     }
 }
 
@@ -2466,15 +2507,26 @@ final class ANFRSiteAnnotationView: MKAnnotationView {
         configure(tint: applied.tint, ink: applied.ink, glyph: applied.glyph)
     }
 
+    /// Images déjà dessinées, par couleur, symbole et thème : MapKit redemande une vue
+    /// pour chaque repère qui réapparaît au zoom ou au déplacement, des milliers de fois,
+    /// alors qu'il n'existe que quelques dizaines d'aspects différents.
+    private static let images = NSCache<NSString, UIImage>()
+
     func configure(tint rawTint: UIColor, ink rawInk: UIColor, glyph: String) {
         applied = (rawTint, rawInk, glyph)
         let tint = rawTint.resolvedColor(with: traitCollection)
         let ink = rawInk.resolvedColor(with: traitCollection)
         let ring = UIColor(SQColor.surface).resolvedColor(with: traitCollection)
+        let key = "\(tint.cacheKey)|\(ink.cacheKey)|\(ring.cacheKey)|\(glyph)|\(traitCollection.displayScale)" as NSString
+        centerOffset = CGPoint(x: 0, y: -1)
+        if let cached = Self.images.object(forKey: key) {
+            image = cached
+            return
+        }
         let side = Self.diameter
         // Marge pour l'ombre portée, dessinée dans l'image : MapKit ne l'ajoute pas.
         let size = CGSize(width: side + 6, height: side + 6)
-        image = UIGraphicsImageRenderer(size: size).image { context in
+        let drawn = UIGraphicsImageRenderer(size: size).image { context in
             let rect = CGRect(x: 3, y: 2, width: side, height: side)
             let cg = context.cgContext
             cg.saveGState()
@@ -2490,7 +2542,8 @@ final class ANFRSiteAnnotationView: MKAnnotationView {
                 symbol.draw(at: origin)
             }
         }
-        centerOffset = CGPoint(x: 0, y: -1)
+        Self.images.setObject(drawn, forKey: key)
+        image = drawn
     }
 
     override func setSelected(_ selected: Bool, animated: Bool) {
@@ -2525,6 +2578,8 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
     /// Dernier contenu appliqué, pour redessiner le disque quand le thème bascule
     /// carte ouverte : l'image est rendue une fois, ses couleurs seraient sinon figées.
     private var applied: (count: Int, segments: [Segment])?
+    /// Images déjà dessinées : voir `ANFRSiteAnnotationView.images`.
+    private static let images = NSCache<NSString, UIImage>()
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
@@ -2543,7 +2598,19 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
         let ringWidth: CGFloat = 5
         let size = CGSize(width: diameter + 6, height: diameter + 6)
         let resolved = segments.map { (color: $0.color.resolvedColor(with: traitCollection), count: $0.count) }
-        image = UIGraphicsImageRenderer(size: size).image { context in
+        centerOffset = .zero
+        accessibilityLabel = String(localized: "\(count) supports regroupés")
+        accessibilityHint = String(localized: "Zoome sur ce groupe")
+        // Parts arrondies au 1/120 de tour, invisible à l'œil : les amas de même nombre et
+        // de même répartition partagent leur image d'un zoom à l'autre.
+        let total = max(1, resolved.reduce(0) { $0 + $1.count })
+        let shares = resolved.map { "\($0.color.cacheKey):\($0.count * 120 / total)" }.joined(separator: ",")
+        let key = "\(text)|\(fill.cacheKey)|\(ink.cacheKey)|\(shares)|\(traitCollection.displayScale)" as NSString
+        if let cached = Self.images.object(forKey: key) {
+            image = cached
+            return
+        }
+        let drawn = UIGraphicsImageRenderer(size: size).image { context in
             let cg = context.cgContext
             let rect = CGRect(x: 3, y: 2, width: diameter, height: diameter)
             let center = CGPoint(x: rect.midX, y: rect.midY)
@@ -2554,7 +2621,6 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
             cg.restoreGState()
 
             // Anneau : un arc par opérateur, dans l'ordre reçu, depuis midi.
-            let total = max(1, resolved.reduce(0) { $0 + $1.count })
             let radius = diameter / 2 - ringWidth / 2 - 1
             let gap: CGFloat = resolved.count > 1 ? 0.06 : 0
             var start = -CGFloat.pi / 2
@@ -2578,9 +2644,8 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
             let textSize = label.size(withAttributes: attributes)
             label.draw(at: CGPoint(x: center.x - textSize.width / 2, y: center.y - textSize.height / 2), withAttributes: attributes)
         }
-        centerOffset = .zero
-        accessibilityLabel = String(localized: "\(count) supports regroupés")
-        accessibilityHint = String(localized: "Zoome sur ce groupe")
+        Self.images.setObject(drawn, forKey: key)
+        image = drawn
     }
 }
 
@@ -2660,17 +2725,16 @@ struct ANFRMapKitView: UIViewRepresentable {
         coordinator.applyHighlight(highlightedSupId, on: map)
     }
 
-    static func dismantleUIView(_ host: ANFRMapHostView, coordinator: Coordinator) {
-        coordinator.stop()
-    }
-
     @MainActor final class Coordinator: NSObject, MKMapViewDelegate {
         var onSelectSite: (ANFRMapSite) -> Void
         var onSelectCluster: ([ANFRMapSite]) -> Void
         var isCompactWidth = true
         var requestedCamera: ANFRCameraRequest?
-        /// Annotations posées sur la carte, par support.
+        /// Repères du relevé filtré, par support ; seuls ceux de `shownSites` sont sur la carte.
         private var annotations: [String: ANFRSiteAnnotationMK] = [:]
+        /// Repères et amas de grille posés sur la carte.
+        private var shownSites: [String: ANFRSiteAnnotationMK] = [:]
+        private var shownGrid: [ANFRGridKey: ANFRGridClusterMK] = [:]
         private var lastRevision = -1
         private var appliedBackdrop: MapBackdrop?
         private var tileOverlay: MKTileOverlay?
@@ -2678,10 +2742,6 @@ struct ANFRMapKitView: UIViewRepresentable {
         private var appliedHighlight: String?
         private var appliedZone: ANFRZone?
         private var zoneOverlay: MKCircle?
-        /// Repères restant à poser, par paquets : un relevé de plusieurs milliers de
-        /// supports posé d'un bloc figeait le fil principal.
-        private var pendingAdds: [ANFRSiteAnnotationMK] = []
-        private var drainTask: Task<Void, Never>?
         /// Couleur du repère et encre du symbole, par opérateur : leur résolution
         /// analyse le nom de l'opérateur, trop pour chaque repère affiché.
         private var paints: [String: (tint: UIColor, ink: UIColor)] = [:]
@@ -2689,12 +2749,6 @@ struct ANFRMapKitView: UIViewRepresentable {
         init(onSelectSite: @escaping (ANFRMapSite) -> Void, onSelectCluster: @escaping ([ANFRMapSite]) -> Void) {
             self.onSelectSite = onSelectSite
             self.onSelectCluster = onSelectCluster
-        }
-
-        func stop() {
-            drainTask?.cancel()
-            drainTask = nil
-            pendingAdds.removeAll()
         }
 
         func applyBackdrop(_ backdrop: MapBackdrop, on map: MKMapView) {
@@ -2766,6 +2820,8 @@ struct ANFRMapKitView: UIViewRepresentable {
         func applyHighlight(_ supId: String?, on map: MKMapView) {
             guard supId != appliedHighlight else { return }
             appliedHighlight = supId
+            // Aux zooms larges, le support ouvert est peut-être dans un amas de la grille.
+            refreshDisplayed(on: map)
             if let supId, let annotation = annotations[supId] {
                 if !map.selectedAnnotations.contains(where: { $0 === annotation }) {
                     map.selectAnnotation(annotation, animated: !UIAccessibility.isReduceMotionEnabled)
@@ -2777,53 +2833,87 @@ struct ANFRMapKitView: UIViewRepresentable {
 
         // MARK: Repères
 
-        /// Met la carte au niveau de `sites` en ne touchant QUE les repères qui
-        /// changent. Vider puis reposer tous les repères à chaque bascule de filtre
-        /// obligeait MapKit à reconstruire ses amas pour tout le relevé.
+        /// Met les repères au niveau de `sites` en ne recréant QUE ceux qui changent :
+        /// un repère recréé perd son image et son amas.
         func sync(_ sites: [ANFRMapSite], revision: Int, on map: MKMapView) {
             guard revision != lastRevision else { return }
             lastRevision = revision
             var next: [String: ANFRSiteAnnotationMK] = [:]
             next.reserveCapacity(sites.count)
-            var added: [ANFRSiteAnnotationMK] = []
             for site in sites where next[site.supId] == nil {
                 // Même contenu (antennes retenues, type de modif) : le repère reste tel quel.
                 if let existing = annotations[site.supId], Self.sameContent(existing.site, site) {
                     next[site.supId] = existing
                 } else {
-                    let annotation = ANFRSiteAnnotationMK(site: site)
-                    next[site.supId] = annotation
-                    added.append(annotation)
+                    next[site.supId] = ANFRSiteAnnotationMK(site: site)
                 }
             }
-            var removed: [ANFRSiteAnnotationMK] = []
-            for (supId, annotation) in annotations where next[supId] !== annotation { removed.append(annotation) }
             annotations = next
-            // Les repères en attente qui ne sont plus voulus ne seront jamais posés.
-            pendingAdds.removeAll { next[$0.site.supId] !== $0 }
-            if !removed.isEmpty { map.removeAnnotations(removed) }
-            pendingAdds.append(contentsOf: added)
-            drainPendingAdds(on: map)
+            refreshDisplayed(on: map)
         }
 
-        private func drainPendingAdds(on map: MKMapView) {
-            guard drainTask == nil, !pendingAdds.isEmpty else { return }
-            // Petit lot : posé tout de suite, sans repasser par une tâche.
-            if pendingAdds.count <= 600 {
-                map.addAnnotations(pendingAdds)
-                pendingAdds.removeAll()
-                return
+        /// Au-delà, MapKit met plus d'une seconde à regrouper les repères à chaque zoom
+        /// (mesuré : 5 100 supports, gels de 1,2 à 5 s) ; en deçà, il reste fluide.
+        private static let individualLimit = 600
+
+        /// Pose ce qui se voit : la zone visible et une demi-zone autour, pour qu'un
+        /// déplacement ne découvre pas de vide. Peu de supports : chacun son repère,
+        /// regroupés par MapKit. Beaucoup : une grille d'amas calculée ici.
+        func refreshDisplayed(on map: MKMapView) {
+            guard map.bounds.width > 0 else { return }
+            let visible = map.visibleMapRect
+            let area = visible.insetBy(dx: -visible.width / 2, dy: -visible.height / 2)
+            let highlighted = appliedHighlight.flatMap { annotations[$0] }
+            var inArea: [ANFRSiteAnnotationMK] = []
+            for annotation in annotations.values where annotation !== highlighted && area.contains(annotation.mapPoint) {
+                inArea.append(annotation)
             }
-            drainTask = Task { @MainActor [weak self, weak map] in
-                while let self, let map, !self.pendingAdds.isEmpty, !Task.isCancelled {
-                    let chunk = Array(self.pendingAdds.prefix(500))
-                    self.pendingAdds.removeFirst(chunk.count)
-                    map.addAnnotations(chunk)
-                    // Laisse MapKit et SwiftUI dessiner une image entre deux paquets.
-                    try? await Task.sleep(nanoseconds: 8_000_000)
+            var wantedSites: [ANFRSiteAnnotationMK] = highlighted.map { [$0] } ?? []
+            var wantedGrid: [ANFRGridKey: ANFRGridClusterMK] = [:]
+            if inArea.count <= Self.individualLimit {
+                wantedSites += inArea
+            } else {
+                // Cases d'environ 64 pt, calées sur une puissance de deux : elles ne bougent
+                // pas tant que le zoom ne change pas, et leurs amas non plus.
+                let cell = pow(2, ceil(log2(visible.width / Double(map.bounds.width) * 64)))
+                var buckets: [SIMD2<Int>: [ANFRSiteAnnotationMK]] = [:]
+                for annotation in inArea {
+                    let index = SIMD2(Int(annotation.mapPoint.x / cell), Int(annotation.mapPoint.y / cell))
+                    buckets[index, default: []].append(annotation)
                 }
-                self?.drainTask = nil
+                for (index, members) in buckets {
+                    if members.count == 1 {
+                        wantedSites.append(members[0])
+                        continue
+                    }
+                    let key = ANFRGridKey(cell: cell, index: index, members: members)
+                    wantedGrid[key] = shownGrid[key] ?? ANFRGridClusterMK(members: members)
+                }
             }
+
+            var nextShown: [String: ANFRSiteAnnotationMK] = [:]
+            nextShown.reserveCapacity(wantedSites.count)
+            var added: [MKAnnotation] = []
+            var removed: [MKAnnotation] = []
+            for annotation in wantedSites {
+                nextShown[annotation.site.supId] = annotation
+                if shownSites[annotation.site.supId] !== annotation { added.append(annotation) }
+            }
+            for (supId, annotation) in shownSites where nextShown[supId] !== annotation { removed.append(annotation) }
+            for (key, cluster) in shownGrid where wantedGrid[key] !== cluster { removed.append(cluster) }
+            for (key, cluster) in wantedGrid where shownGrid[key] !== cluster { added.append(cluster) }
+            shownSites = nextShown
+            shownGrid = wantedGrid
+            if !removed.isEmpty { map.removeAnnotations(removed) }
+            if !added.isEmpty { map.addAnnotations(added) }
+            // Le support ouvert, reposé (relevé changé), reste sélectionné.
+            if let highlighted, !map.selectedAnnotations.contains(where: { $0 === highlighted }) {
+                map.selectAnnotation(highlighted, animated: false)
+            }
+        }
+
+        func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
+            refreshDisplayed(on: map)
         }
 
         /// Ce qui détermine l'aspect d'un repère : position, commune et, par antenne,
@@ -2844,10 +2934,15 @@ struct ANFRMapKitView: UIViewRepresentable {
         }
 
         func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            let clusterMembers: [ANFRSiteAnnotationMK]?
             if let cluster = annotation as? MKClusterAnnotation {
-                let view = map.dequeueReusableAnnotationView(withIdentifier: "anfr-cluster", for: cluster) as? ANFRClusterAnnotationView
-                    ?? ANFRClusterAnnotationView(annotation: cluster, reuseIdentifier: "anfr-cluster")
-                let members = cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }
+                clusterMembers = cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }
+            } else {
+                clusterMembers = (annotation as? ANFRGridClusterMK)?.members
+            }
+            if let members = clusterMembers {
+                let view = map.dequeueReusableAnnotationView(withIdentifier: "anfr-cluster", for: annotation) as? ANFRClusterAnnotationView
+                    ?? ANFRClusterAnnotationView(annotation: annotation, reuseIdentifier: "anfr-cluster")
                 // Un segment par opérateur, le plus présent d'abord ; les non suivis en gris, à la fin.
                 var counts: [String: (op: ANFRStatsOperator?, count: Int)] = [:]
                 for member in members {
@@ -2871,7 +2966,10 @@ struct ANFRMapKitView: UIViewRepresentable {
 
         func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
             if let cluster = view.annotation as? MKClusterAnnotation {
-                selectCluster(cluster, on: map)
+                selectCluster(cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }, on: map)
+                map.deselectAnnotation(cluster, animated: false)
+            } else if let cluster = view.annotation as? ANFRGridClusterMK {
+                selectCluster(cluster.members, on: map)
                 map.deselectAnnotation(cluster, animated: false)
             } else if let annotation = view.annotation as? ANFRSiteAnnotationMK {
                 // Le repère le plus marquant reste devant, et sélectionné tant que la fiche est ouverte.
@@ -2890,8 +2988,7 @@ struct ANFRMapKitView: UIViewRepresentable {
 
         /// Un amas de supports au même point ne se découpe jamais en zoomant : il
         /// s'ouvre en liste. Les autres se cadrent sur leurs membres.
-        private func selectCluster(_ cluster: MKClusterAnnotation, on map: MKMapView) {
-            let members = cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }
+        private func selectCluster(_ members: [ANFRSiteAnnotationMK], on map: MKMapView) {
             guard let first = members.first else { return }
             let samePoint = members.allSatisfy {
                 abs($0.coordinate.latitude - first.coordinate.latitude) < 0.000_01
@@ -2901,7 +2998,10 @@ struct ANFRMapKitView: UIViewRepresentable {
             if samePoint || alreadyClose {
                 onSelectCluster(members.map(\.site))
             } else {
-                map.showAnnotations(members, animated: !UIAccessibility.isReduceMotionEnabled)
+                // Cadrage calculé : `showAnnotations` poserait sur la carte des repères de la grille.
+                let rect = members.reduce(MKMapRect.null) { $0.union(MKMapRect(origin: $1.mapPoint, size: MKMapSize(width: 0, height: 0))) }
+                map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 60, left: 60, bottom: 60, right: 60),
+                                      animated: !UIAccessibility.isReduceMotionEnabled)
             }
         }
 
@@ -2929,3 +3029,4 @@ struct ANFRMapKitView: UIViewRepresentable {
         }
     }
 }
+
