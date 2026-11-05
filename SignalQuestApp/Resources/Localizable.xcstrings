@@ -110136,6 +110136,158 @@
           }
         }
       }
+    },
+    "Choisis une heure entre 1 minute et 30 jours à partir de maintenant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a time between 1 minute and 30 days from now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis une heure entre 1 minute et 30 jours à partir de maintenant."
+          }
+        }
+      }
+    },
+    "SQFormal|Choisis une heure entre 1 minute et 30 jours à partir de maintenant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez une heure entre 1 minute et 30 jours à partir de maintenant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce message programmé ne peut plus être modifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This scheduled message can no longer be changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message programmé ne peut plus être modifié."
+          }
+        }
+      }
+    },
+    "Ce message chiffré n’a pas pu être programmé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This encrypted message couldn’t be scheduled."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message chiffré n’a pas pu être programmé."
+          }
+        }
+      }
+    },
+    "En attente de rechiffrement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting to be re-encrypted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de rechiffrement"
+          }
+        }
+      }
+    },
+    "Non envoyé : tu ne fais plus partie de la conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent: you’re no longer in this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non envoyé : tu ne fais plus partie de la conversation."
+          }
+        }
+      }
+    },
+    "SQFormal|Non envoyé : tu ne fais plus partie de la conversation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non envoyé : vous ne faites plus partie de la conversation."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Non envoyé : l’appareil qui l’a programmé a été retiré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent: the device that scheduled it was removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non envoyé : l’appareil qui l’a programmé a été retiré."
+          }
+        }
+      }
+    },
+    "Non envoyé : il n’a pas pu être rechiffré à temps." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent: it couldn’t be re-encrypted in time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non envoyé : il n’a pas pu être rechiffré à temps."
+          }
+        }
+      }
+    },
+    "Ce message programmé ne s’ouvre pas sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This scheduled message can’t be opened on this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message programmé ne s’ouvre pas sur cet appareil."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

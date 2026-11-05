@@ -233,8 +233,9 @@ struct E2EEV2SeededConversation {
 }
 
 extension E2EEV2AccountFixture {
-    func seedConversation(with peer: String, devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
-        try seed(participants: [peer], isGroup: false, devices: devices)
+    /// `marked` : époque marquée par le serveur (E2EE-AUTO §7.2).
+    func seedConversation(with peer: String, devices: E2EEV2CertifiedDeviceSet, marked: Bool = false) throws -> E2EEV2SeededConversation {
+        try seed(participants: [peer], isGroup: false, devices: devices, marked: marked)
     }
 
     /// Groupe créé par ce compte, qui en est l'administrateur.
@@ -242,7 +243,7 @@ extension E2EEV2AccountFixture {
         try seed(participants: peers, isGroup: true, devices: devices)
     }
 
-    private func seed(participants: [String], isGroup: Bool, devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
+    private func seed(participants: [String], isGroup: Bool, devices: E2EEV2CertifiedDeviceSet, marked: Bool = false) throws -> E2EEV2SeededConversation {
         let epochKey = Data((0..<32).map { UInt8($0) })
         let creation = try make(
             participants: participants, isGroup: isGroup, title: isGroup ? "Groupe" : nil, excludesWeb: false, devices: devices,
@@ -253,13 +254,14 @@ extension E2EEV2AccountFixture {
             recordInput: .init(conversationId: creation.conversationId, epochId: "epoch_seeded_000000000001", epochNumber: 1, keyCommitmentB64: creation.epoch.keyCommitmentB64),
             epochKey: epochKey, ownerNamespace: namespace, expectedSession: session
         ))
-        let current = E2EEV2ConversationStateStore.CurrentEpoch(
+        var current = E2EEV2ConversationStateStore.CurrentEpoch(
             conversationId: creation.conversationId, epochNumber: 1, membershipChangeNumber: creation.genesis.changeNumber,
             memberIds: creation.genesis.members.sorted(),
             recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients),
             excludesWeb: false, createdAtMs: creation.epoch.createdAtMs, acceptedAtMs: creation.epoch.createdAtMs,
             epochId: "epoch_seeded_000000000001", keyCommitmentB64: creation.epoch.keyCommitmentB64
         )
+        if marked { current.e2eeAuto = true }
         try states.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: namespace)
         try states.record(
             .init(

@@ -299,6 +299,72 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         return last
     }
 
+    // MARK: Programmés chiffrés (E2EE-AUTO §7.8 F)
+
+    /// Programme ou rechiffre un message ; une rotation ou une synchronisation
+    /// nécessaire passe d'abord, comme pour un envoi.
+    func schedule(
+        _ draft: E2EEV2MessageSenderV2.Draft,
+        clientRequestId: String,
+        sendAt: Date?,
+        scheduledId: String?,
+        conversationId: String,
+        isGroup: Bool,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String
+    ) async -> E2EEV2ScheduleResultV2 {
+        if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) {
+            let untrusted = devices.untrustedMembers(context.head.members)
+            guard untrusted.isEmpty else { return .membersNotTrusted(untrusted) }
+            let unread = devices.unread(context.head.members)
+            guard unread.isEmpty else { return .failure(E2EEV2DeviceListReread.failure(unread)) }
+        }
+        var last = E2EEV2ScheduleResultV2.needsEpoch
+        for _ in 0..<Self.maxSendRounds {
+            guard let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) else {
+                return .failure(localError("e2ee-send-state-unavailable"))
+            }
+            last = await sender.schedule(
+                draft, conversationId: conversationId, clientRequestId: clientRequestId, sendAt: sendAt,
+                scheduledId: scheduledId, membership: context.head, devices: devices,
+                expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+            )
+            switch last {
+            case .needsRotation:
+                switch await rotator.rotateIfNeeded(
+                    conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
+                    devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+                ) {
+                case .failure(let error): return .failure(error)
+                case .membersNotTrusted(let untrusted): return .membersNotTrusted(untrusted)
+                case .needsMembershipSync:
+                    if case .failure(let error) = await syncer.sync(
+                        conversationId: conversationId, isGroup: isGroup, devices: devices,
+                        expectedOwnerScopeId: expectedOwnerScopeId
+                    ) { return .failure(error) }
+                case .upToDate, .rotated, .adopted:
+                    continue
+                }
+            case .needsEpoch:
+                if case .failure(let error) = await syncer.sync(
+                    conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
+                ) { return .failure(error) }
+            default:
+                return last
+            }
+        }
+        return last
+    }
+
+    func openScheduled(
+        _ scheduled: E2EEAutoScheduledMessage,
+        conversationId: String,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String
+    ) -> E2EEV2ContentPayloadV2? {
+        sender.openScheduled(scheduled, conversationId: conversationId, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId)
+    }
+
     // MARK: Membres
 
     /// Un changement d'appartenance, puis aussitôt l'époque suivante après un

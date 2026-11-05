@@ -1697,10 +1697,13 @@ final class MessagesService: MessagesServicing {
     }
 
     func scheduledMessages(conversationId: String) async throws -> [ScheduledMessage] {
-        try await api.request(
-            APIEndpoint(path: "/api/messages/conversations/\(conversationId)/scheduled"),
-            as: ScheduledMessagesResponse.self
-        ).scheduledMessages
+        let data = try await api.requestData(APIEndpoint(path: "/api/messages/conversations/\(conversationId)/scheduled"))
+        var items = try JSONDecoder.signalQuest.decode(ScheduledMessagesResponse.self, from: data).scheduledMessages
+        // Programmés chiffrés (E2EE-AUTO §7.8 F, point 4) : enveloppe et appareil signataire.
+        let raw = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["scheduledMessages"] as? [[String: Any]] ?? []
+        let encrypted = Dictionary(raw.compactMap(E2EEAutoScheduledMessage.parse).map { ($0.scheduledId, $0) }) { first, _ in first }
+        for index in items.indices { items[index].v3 = encrypted[items[index].id] }
+        return items
     }
 
     func createScheduledMessage(

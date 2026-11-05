@@ -12,7 +12,10 @@ struct ScheduleMessageSheet: View {
     /// « À Léa Martin » sous le titre.
     let subtitle: String?
     let onScheduled: () -> Void
+    /// Conversation chiffrée automatiquement : enveloppe v3 programmée (E2EE-AUTO §7.8 F).
+    var usesV2 = false
 
+    @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -27,8 +30,10 @@ struct ScheduleMessageSheet: View {
         e2ee: E2EEServicing?,
         initialText: String,
         subtitle: String? = nil,
+        usesV2: Bool = false,
         onScheduled: @escaping () -> Void
     ) {
+        self.usesV2 = usesV2
         self.conversation = conversation
         self.service = service
         self.e2ee = e2ee
@@ -79,6 +84,22 @@ struct ScheduleMessageSheet: View {
         guard canSchedule else { return }
         isBusy = true
         defer { isBusy = false }
+        if usesV2 {
+            let result = await services.e2eeV2Messaging.schedule(
+                .init(body: .text(text.trimmingCharacters(in: .whitespacesAndNewlines)), replyToRef: nil, mentions: [], ttlSeconds: 0),
+                sendAt: sendAt, conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId)
+            )
+            if let failure = EncryptedConversationSurfaces.scheduleFailureMessage(result) {
+                errorMessage = failure
+                Haptics.error()
+                return
+            }
+            Haptics.success()
+            onScheduled()
+            dismiss()
+            return
+        }
         do {
             let senderId: String? = {
                 if case .authenticated(let user) = session.state { return user.id }

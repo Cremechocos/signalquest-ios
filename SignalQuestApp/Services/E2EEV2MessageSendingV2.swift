@@ -85,6 +85,96 @@ enum E2EEV2MessageSendResultV2: Sendable, Equatable {
     case failure(E2EEV2TransportFailure)
 }
 
+enum E2EEV2ScheduleResultV2: Sendable, Equatable {
+    case scheduled(E2EEAutoScheduledMessage.Ack)
+    /// Pas d'époque courante vérifiée, ou le serveur en connaît une plus récente.
+    case needsEpoch
+    /// L'époque courante doit tourner avant tout envoi (§3.3).
+    case needsRotation
+    case membersNotTrusted([String])
+    case failure(E2EEV2TransportFailure)
+}
+
+/// Programmé chiffré tel que `GET …/scheduled` le rend (E2EE-AUTO §7.8 F, point 4).
+struct E2EEAutoScheduledMessage: Equatable, Sendable {
+    enum Status: Equatable, Sendable {
+        case scheduled
+        /// Époque changée ou compromise : à rechiffrer par un appareil actif du compte.
+        case needsReencrypt
+        /// `MEMBER_LEFT`, `DEVICE_REVOKED`, `REENCRYPT_EXPIRED`, `INVALID`, ou une valeur inconnue.
+        case failed(reason: String?)
+
+        init?(_ raw: String?, failureReason: String?) {
+            switch raw {
+            case "SCHEDULED"?: self = .scheduled
+            case "NEEDS_REENCRYPT"?: self = .needsReencrypt
+            case "FAILED"?: self = .failed(reason: failureReason)
+            default: return nil
+            }
+        }
+    }
+
+    /// Réponse d'un dépôt : `201` du `POST` ou vue du `PUT`.
+    struct Ack: Equatable, Sendable {
+        let scheduledId: String
+        let status: Status
+        let sendAt: Date
+
+        static func parse(_ data: Data) -> Ack? {
+            guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let id = root["scheduledId"] as? String, isScheduledId(id),
+                  let status = Status(root["status"] as? String, failureReason: root["failureReason"] as? String),
+                  let sendAt = (root["sendAt"] as? String).flatMap(E2EEAutoScheduledMessage.date) else { return nil }
+            return Ack(scheduledId: id, status: status, sendAt: sendAt)
+        }
+    }
+
+    let scheduledId: String
+    let status: Status
+    let sendAt: Date
+    let signed: E2EEV2SignedMessageEnvelopeV2
+    /// L'appareil qui a signé le corps stocké, lié par l'AAD sans être dans l'enveloppe.
+    let senderDeviceId: String
+
+    var clientRequestId: String { signed.envelope.clientRequestId }
+
+    /// Un élément de la liste ; nil pour un programmé de l'ancien format ou illisible.
+    static func parse(_ object: [String: Any]) -> E2EEAutoScheduledMessage? {
+        guard let id = object["scheduledId"] as? String, isScheduledId(id),
+              let status = Status(object["status"] as? String, failureReason: object["failureReason"] as? String),
+              let sendAt = (object["sendAt"] as? String).flatMap(date),
+              let sender = object["senderDeviceId"] as? String, E2EEV2Canonical.isOpaque(sender),
+              let message = object["e2eeMessage"], JSONSerialization.isValidJSONObject(message),
+              let data = try? JSONSerialization.data(withJSONObject: message, options: [.withoutEscapingSlashes]),
+              let value = try? E2EEV2CanonicalJSON.parseStrict(data),
+              let signed = E2EEV2SignedMessageEnvelopeV2.parse(value),
+              signed.envelope.envelopeVersion == E2EEV2MessageCryptoV2.annotationEnvelopeVersion,
+              signed.envelope.delivery == .message else { return nil }
+        return E2EEAutoScheduledMessage(scheduledId: id, status: status, sendAt: sendAt, signed: signed, senderDeviceId: sender)
+    }
+
+    static func isScheduledId(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z"#, options: .regularExpression) != nil
+    }
+
+    /// Corps exact `{ "e2eeMessage", "sendAt"? }` (point 1 et 3), signé A.2 tel quel.
+    static func requestBody(_ signed: E2EEV2SignedMessageEnvelopeV2, sendAt: Date?) -> Data {
+        var fields: [String: E2EEV2JSON] = ["e2eeMessage": signed.json]
+        if let sendAt { fields["sendAt"] = .string(isoFormatter.string(from: sendAt)) }
+        return E2EEV2CanonicalJSON.encode(.object(fields))
+    }
+
+    static func date(_ value: String) -> Date? {
+        isoFormatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+}
+
 /// Envoi d'un message texte v2 (§4, E.3). Le compteur est réservé, la charge
 /// et `fk` gardés avant le premier envoi ; le même `clientRequestId` renvoie
 /// ensuite la même enveloppe, à l'octet, tant que son époque est la courante.
@@ -361,16 +451,10 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         notifyUserId: String,
         marked: Bool
     ) throws -> E2EEV2ConversationStateStore.PendingSend {
-        guard var epoch = try E2EEV2VerifiedEpochKeys.exact(
-            conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace,
-            keyStore: keyStore, stateStore: stateStore
-        ) else { throw E2EEV2MessageV2Error.invalidContext }
-        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
-        let signed = try E2EEV2MessageComposerV2.compose(
-            payload: payload, conversationId: conversationId, clientRequestId: clientRequestId, ttlSeconds: ttlSeconds,
-            epoch: epoch, device: device, fk: fk, nonce: E2EEV2MessageComposerV2.randomBytes(12),
-            notifyUserId: notifyUserId, marked: marked
-        ) { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) }
+        let signed = try signedEnvelope(
+            payload: payload, fk: fk, ttlSeconds: ttlSeconds, conversationId: conversationId, clientRequestId: clientRequestId,
+            epochNumber: epochNumber, device: device, ownerNamespace: ownerNamespace, notifyUserId: notifyUserId, marked: marked
+        )
         let pending = E2EEV2ConversationStateStore.PendingSend(
             conversationId: conversationId, clientRequestId: clientRequestId, deviceId: device.deviceId,
             counter: counter, ttlSeconds: ttlSeconds, payloadB64: payload.base64EncodedString(),
@@ -380,6 +464,180 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         )
         try stateStore.savePendingSend(pending, ownerNamespace: ownerNamespace)
         return pending
+    }
+
+    /// Enveloppe signée sous l'époque vérifiée désignée.
+    private func signedEnvelope(
+        payload: Data,
+        fk: Data,
+        ttlSeconds: Int,
+        conversationId: String,
+        clientRequestId: String,
+        epochNumber: Int,
+        device: E2EEV2DeviceDescriptor,
+        ownerNamespace: String,
+        notifyUserId: String,
+        marked: Bool
+    ) throws -> E2EEV2SignedMessageEnvelopeV2 {
+        guard var epoch = try E2EEV2VerifiedEpochKeys.exact(
+            conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace,
+            keyStore: keyStore, stateStore: stateStore
+        ) else { throw E2EEV2MessageV2Error.invalidContext }
+        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
+        return try E2EEV2MessageComposerV2.compose(
+            payload: payload, conversationId: conversationId, clientRequestId: clientRequestId, ttlSeconds: ttlSeconds,
+            epoch: epoch, device: device, fk: fk, nonce: E2EEV2MessageComposerV2.randomBytes(12),
+            notifyUserId: notifyUserId, marked: marked
+        ) { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) }
+    }
+
+    // MARK: Programmés chiffrés (E2EE-AUTO §7.8 F)
+
+    /// Programme `draft` sous l'époque marquée courante : composé comme un envoi,
+    /// avec un compteur neuf, puis déposé tel quel. Rien n'entre dans la file
+    /// d'envoi : seul l'ordonnanceur publie ce message. Avec `scheduledId`, le
+    /// programmé existant est rechiffré par `PUT`, sous son `clientRequestId`.
+    func schedule(
+        _ draft: Draft,
+        conversationId: String,
+        clientRequestId: String,
+        sendAt: Date?,
+        scheduledId: String?,
+        membership: E2EEV2MembershipState,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String,
+        messageCount: Int = 0
+    ) async -> E2EEV2ScheduleResultV2 {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:"),
+              E2EEV2Canonical.isOpaque(conversationId), E2EEV2MessageCryptoV2.isClientRequestId(clientRequestId),
+              scheduledId.map(E2EEAutoScheduledMessage.isScheduledId) ?? true,
+              (sendAt != nil) || (scheduledId != nil) else {
+            return .failure(localError("invalid-e2ee-schedule-scope"))
+        }
+        let ownerNamespace = session.ownerNamespace
+        let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
+        let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
+        let device: E2EEV2DeviceDescriptor
+        let current: E2EEV2ConversationStateStore.CurrentEpoch?
+        do {
+            guard let loaded = try identityStore.load(ownerNamespace: ownerNamespace),
+                  try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) != nil else {
+                return .failure(localError("e2ee-send-state-unavailable"))
+            }
+            device = loaded
+            current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        } catch {
+            return .failure(localError("e2ee-send-state-unavailable"))
+        }
+        guard let current, membership.changeNumber >= current.membershipChangeNumber else { return .needsEpoch }
+        // Seule une époque marquée porte des enveloppes v3 de nature `message`.
+        guard current.e2eeAuto == true else { return .failure(localError("e2ee-schedule-requires-auto")) }
+        guard membership.members.contains(ownUserId) else { return .failure(localError("e2ee-sender-not-member")) }
+        guard E2EEV2RotationPolicy.reasons(
+            current: current, membership: membership, devices: devices, nowMs: nowMs, messageCount: messageCount
+        ).isEmpty else { return .needsRotation }
+
+        let signed: E2EEV2SignedMessageEnvelopeV2
+        do {
+            signed = try Self.lock.withLock {
+                guard let probe = try? E2EEV2ContentPayloadV2(
+                    sentAtMs: nowMs, counter: Int64(E2EEV2Canonical.maxSequenceNumber), replyToRef: draft.replyToRef,
+                    mentions: draft.mentions, body: draft.body
+                ).encoded(), (try? E2EEV2ContentPayloadV2.parse(probe)) != nil else {
+                    throw SendFailure(reason: "e2ee-message-too-long")
+                }
+                let counter: Int
+                do {
+                    counter = try stateStore.reserveSendCounter(
+                        conversationId: conversationId, deviceId: device.deviceId, ownerNamespace: ownerNamespace
+                    )
+                } catch E2EEV2ConversationStateStore.Failure.counterExhausted {
+                    throw SendFailure(reason: "e2ee-send-counter-exhausted")
+                }
+                let payload = try E2EEV2ContentPayloadV2(
+                    sentAtMs: nowMs, counter: Int64(counter), replyToRef: draft.replyToRef, mentions: draft.mentions,
+                    body: draft.body
+                ).encoded()
+                var fk = try E2EEV2MessageComposerV2.randomBytes(32)
+                defer { fk.resetBytes(in: 0..<fk.count) }
+                return try signedEnvelope(
+                    payload: payload, fk: fk, ttlSeconds: draft.ttlSeconds, conversationId: conversationId,
+                    clientRequestId: clientRequestId, epochNumber: current.epochNumber, device: device,
+                    ownerNamespace: ownerNamespace, notifyUserId: "", marked: true
+                )
+            }
+        } catch let failure as SendFailure {
+            return .failure(localError(failure.reason))
+        } catch {
+            return .failure(localError("e2ee-send-preparation-failed"))
+        }
+
+        let body = E2EEAutoScheduledMessage.requestBody(signed, sendAt: sendAt)
+        let bound = transport.bound(to: session)
+        let result: E2EEV2TransportResult<Data>
+        if let scheduledId {
+            result = await bound.putJSON(
+                path: "/api/messages/conversations/\(conversationId)/scheduled/\(scheduledId)", body: body,
+                expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+            )
+        } else {
+            result = await bound.postJSON(
+                path: "/api/messages/conversations/\(conversationId)/scheduled", body: body,
+                expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+            )
+        }
+        switch result {
+        case .success(let data, _, _):
+            guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
+            guard let ack = E2EEAutoScheduledMessage.Ack.parse(data) else {
+                return .failure(localError("invalid-e2ee-schedule-receipt"))
+            }
+            return .scheduled(ack)
+        case .failure(let error) where error.statusCode == 409
+            && (error.code == "E2EE_EPOCH_STALE" || error.code == "E2EE_MEMBERSHIP_STALE"):
+            return .needsEpoch
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    /// La charge d'un programmé de son compte, signée par `scheduled.senderDeviceId`
+    /// (cet appareil ou un autre du compte), lue sous l'époque de son enveloppe, même
+    /// remplacée ou compromise (§7.8 F, point 4). nil : appareil inconnu, clé absente
+    /// ou enveloppe fausse.
+    func openScheduled(
+        _ scheduled: E2EEAutoScheduledMessage,
+        conversationId: String,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String
+    ) -> E2EEV2ContentPayloadV2? {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else { return nil }
+        let ownerNamespace = session.ownerNamespace
+        let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
+        let signingKey: P256.Signing.PublicKey?
+        if let own = try? identityStore.load(ownerNamespace: ownerNamespace), own.deviceId == scheduled.senderDeviceId {
+            signingKey = Data(base64Encoded: own.publicSigningKeyB64).flatMap { try? P256.Signing.PublicKey(x963Representation: $0) }
+        } else {
+            signingKey = devices.signingKey(userId: ownUserId, deviceId: scheduled.senderDeviceId)
+        }
+        guard let signingKey else { return nil }
+        let context = scheduled.signed.context(conversationId: conversationId, senderDeviceId: scheduled.senderDeviceId)
+        guard (try? E2EEV2MessageCryptoV2.verifySignature(
+            context: context, envelope: scheduled.signed.envelope, signatureDerB64: scheduled.signed.senderSignatureB64,
+            senderSigningKey: signingKey
+        )) != nil,
+              var epoch = try? keyStore.loadEpoch(
+                conversationId: conversationId, epochNumber: scheduled.signed.envelope.epochNumber,
+                ownerNamespace: ownerNamespace, includeRestored: false
+              ) else { return nil }
+        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
+        guard var opened = try? E2EEV2MessageCryptoV2.decrypt(
+            envelope: scheduled.signed.envelope, epochKey: epoch.epochKey, context: context
+        ) else { return nil }
+        opened.fk.resetBytes(in: 0..<opened.fk.count)
+        return opened.payload
     }
 
     /// Envoi abandonné : sa charge en clair quitte le trousseau.

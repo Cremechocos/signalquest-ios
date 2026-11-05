@@ -116,6 +116,30 @@ enum EncryptedConversationSurfaces {
         }
     }
 
+    /// Programmé chiffré (E2EE-AUTO §7.8 F) : les textes de l'envoi, sans file de reprise,
+    /// plus les refus propres aux programmés.
+    static func scheduleFailureMessage(_ result: E2EEV2ScheduleResultV2) -> String? {
+        switch result {
+        case .scheduled:
+            return nil
+        case .failure(let failure) where failure.code == "SCHEDULED_SEND_AT_INVALID":
+            return String(localized: "Choisis une heure entre 1 minute et 30 jours à partir de maintenant.")
+        case .failure(let failure) where failure.code == "SCHEDULED_NOT_EDITABLE" || failure.code == "SCHEDULED_NOT_FOUND":
+            return String(localized: "Ce message programmé ne peut plus être modifié.")
+        case .failure(let failure) where failure.kind != .retryable && !MessageRequestLimitError.isPending(failure)
+            && !MessageRequestLimitError.isLimit(failure):
+            return String(localized: "Ce message chiffré n’a pas pu être programmé.")
+        case .failure(let failure):
+            return v2SendFailureMessage(.failure(failure), keptForRetry: false)
+        case .needsEpoch:
+            return v2SendFailureMessage(.needsEpoch, keptForRetry: false)
+        case .needsRotation:
+            return v2SendFailureMessage(.needsRotation, keptForRetry: false)
+        case .membersNotTrusted(let members):
+            return v2SendFailureMessage(.membersNotTrusted(members), keptForRetry: false)
+        }
+    }
+
     /// L'aperçu du sélecteur d'apps est masqué tant qu'un écran montre le
     /// contenu déchiffré d'une conversation chiffrée.
     static func hidesSnapshot(of conversation: MessageConversation) -> Bool {

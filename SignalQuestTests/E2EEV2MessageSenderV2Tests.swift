@@ -675,6 +675,154 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         }
     }
 
+    // MARK: Programmés chiffrés (E2EE-AUTO §7.8 F)
+
+    func testSchedulesAV3EnvelopeThatNeverEntersTheSendQueue() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices, marked: true)
+        let requests = LockedRequests()
+        let bodies = Bodies()
+        MockURLProtocol.requestHandler = { request in
+            _ = bodies.append(E2EEV2AccountFixture.rawBody(request))
+            requests.append(request, body: [:])
+            return E2EEV2AccountFixture.response(request, Self.ack("scheduled_01J7ABCD00000001", sendAt: "2026-11-06T09:00:00.000Z"), status: 201)
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let sendAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-06T09:00:00Z"))
+        let result = await sender.schedule(
+            draft("À demain"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000101",
+            sendAt: sendAt, scheduledId: nil, membership: seeded.membership, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .scheduled(let ack) = result else { return XCTFail("Programmé refusé : \(result)") }
+        XCTAssertEqual(ack.scheduledId, "scheduled_01J7ABCD00000001")
+        XCTAssertEqual(ack.status, .scheduled)
+        XCTAssertEqual(requests.first?.0.url?.path, "/api/messages/conversations/\(seeded.conversationId)/scheduled")
+        XCTAssertEqual(requests.first?.0.httpMethod, "POST")
+
+        // Corps exact { "e2eeMessage", "sendAt" }, en JSON canonique ; enveloppe v3 de nature `message`.
+        let body = try XCTUnwrap(bodies.all.first)
+        let root = try XCTUnwrap(try E2EEV2CanonicalJSON.parseCanonical(body).objectValue)
+        XCTAssertEqual(Set(root.keys), ["e2eeMessage", "sendAt"])
+        XCTAssertEqual(root["sendAt"]?.stringValue, "2026-11-06T09:00:00.000Z")
+        let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(try XCTUnwrap(root["e2eeMessage"])))
+        XCTAssertEqual(signed.envelope.envelopeVersion, 3)
+        XCTAssertEqual(signed.envelope.delivery, .message)
+        XCTAssertEqual(signed.envelope.clientRequestId, "message_01J7ABCD00000101")
+        let context = signed.context(conversationId: seeded.conversationId, senderDeviceId: fixture.descriptor.deviceId)
+        let ownKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded: fixture.descriptor.publicSigningKeyB64)))
+        try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: signed.envelope, signatureDerB64: signed.senderSignatureB64, senderSigningKey: ownKey)
+        let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: signed.envelope, epochKey: seeded.epochKey, context: context)
+        XCTAssertEqual(opened.payload.body, .text("À demain"))
+        XCTAssertNil(try fixture.states.pendingSend(
+            conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000101", ownerNamespace: fixture.session.ownerNamespace
+        ), "Seul l'ordonnanceur publie un programmé : rien dans la file d'envoi")
+
+        // Rechiffrement (point 3) : même `clientRequestId`, compteur neuf, nouveau `frankTag`, par `PUT`.
+        let listed = try XCTUnwrap(E2EEAutoScheduledMessage.parse(Self.listed(
+            id: "scheduled_01J7ABCD00000001", status: "NEEDS_REENCRYPT", envelope: signed, senderDeviceId: fixture.descriptor.deviceId
+        )))
+        XCTAssertEqual(listed.status, .needsReencrypt)
+        let payload = try XCTUnwrap(sender.openScheduled(
+            listed, conversationId: seeded.conversationId, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ))
+        XCTAssertEqual(payload.body, .text("À demain"))
+        MockURLProtocol.requestHandler = { request in
+            _ = bodies.append(E2EEV2AccountFixture.rawBody(request))
+            requests.append(request, body: [:])
+            return E2EEV2AccountFixture.response(request, Self.ack("scheduled_01J7ABCD00000001", sendAt: "2026-11-06T09:00:00.000Z"))
+        }
+        let again = await sender.schedule(
+            .init(body: payload.body, replyToRef: payload.replyToRef, mentions: payload.mentions, ttlSeconds: 0),
+            conversationId: seeded.conversationId, clientRequestId: listed.clientRequestId, sendAt: nil,
+            scheduledId: listed.scheduledId, membership: seeded.membership, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .scheduled = again else { return XCTFail("Rechiffrement refusé : \(again)") }
+        XCTAssertEqual(requests.all.last?.0.url?.path, "/api/messages/conversations/\(seeded.conversationId)/scheduled/scheduled_01J7ABCD00000001")
+        XCTAssertEqual(requests.all.last?.0.httpMethod, "PUT")
+        let putRoot = try XCTUnwrap(try E2EEV2CanonicalJSON.parseCanonical(try XCTUnwrap(bodies.all.last)).objectValue)
+        XCTAssertEqual(Set(putRoot.keys), ["e2eeMessage"], "sendAt facultatif au rechiffrement")
+        let resigned = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(try XCTUnwrap(putRoot["e2eeMessage"])))
+        XCTAssertEqual(resigned.envelope.clientRequestId, signed.envelope.clientRequestId)
+        XCTAssertNotEqual(resigned.envelope.counter, signed.envelope.counter)
+        XCTAssertNotEqual(resigned.envelope.frankTagB64, signed.envelope.frankTagB64)
+
+        // Un signataire inconnu du compte ne s'ouvre pas.
+        let stranger = try XCTUnwrap(E2EEAutoScheduledMessage.parse(Self.listed(
+            id: "scheduled_01J7ABCD00000001", status: "SCHEDULED", envelope: signed, senderDeviceId: "device_unknown_01J7ABCD0000"
+        )))
+        XCTAssertNil(sender.openScheduled(
+            stranger, conversationId: seeded.conversationId, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ))
+    }
+
+    func testAnUnmarkedEpochSchedulesNothing() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let requests = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request, body: [:])
+            return E2EEV2AccountFixture.response(request, Data("{}".utf8))
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let result = await sender.schedule(
+            draft("Pas ici"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000102",
+            sendAt: Date().addingTimeInterval(3_600), scheduledId: nil, membership: seeded.membership, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure(let failure) = result else { return XCTFail("Une époque non marquée ne programme rien : \(result)") }
+        XCTAssertEqual(failure.message, "e2ee-schedule-requires-auto")
+        XCTAssertNil(requests.first)
+    }
+
+    func testScheduledViewsAreReadStrictly() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices, marked: true)
+        let epoch = try XCTUnwrap(E2EEV2VerifiedEpochKeys.exact(
+            conversationId: seeded.conversationId, epochNumber: 1, ownerNamespace: fixture.session.ownerNamespace,
+            keyStore: fixture.keys, stateStore: fixture.states
+        ))
+        func signed(marked: Bool) throws -> E2EEV2SignedMessageEnvelopeV2 {
+            let payload = try E2EEV2ContentPayloadV2(sentAtMs: 1, counter: 1, replyToRef: nil, mentions: [], body: .text("x")).encoded()
+            return try E2EEV2MessageComposerV2.compose(
+                payload: payload, conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000103",
+                ttlSeconds: 0, epoch: epoch, device: fixture.descriptor, fk: Data(count: 32), nonce: Data(count: 12), marked: marked
+            ) { try fixture.identity.sign(canonicalRequest: $0, ownerNamespace: fixture.session.ownerNamespace) }
+        }
+        let v3 = try signed(marked: true)
+        let failed = try XCTUnwrap(E2EEAutoScheduledMessage.parse(
+            Self.listed(id: "scheduled_01J7ABCD00000002", status: "FAILED", envelope: v3, senderDeviceId: fixture.descriptor.deviceId, failureReason: "DEVICE_REVOKED")
+        ))
+        XCTAssertEqual(failed.status, .failed(reason: "DEVICE_REVOKED"))
+        XCTAssertEqual(ScheduledMessagesView.failureLabel("DEVICE_REVOKED"), "Non envoyé : l’appareil qui l’a programmé a été retiré.")
+        XCTAssertEqual(ScheduledMessagesView.failureLabel("NOUVELLE_RAISON"), "Échec d’envoi", "Valeur inconnue : texte générique")
+        // Statut inconnu, enveloppe v2, ancien format, appareil manquant : rien n'est lu.
+        XCTAssertNil(E2EEAutoScheduledMessage.parse(Self.listed(id: "s1", status: "SENT", envelope: v3, senderDeviceId: fixture.descriptor.deviceId)))
+        XCTAssertNil(E2EEAutoScheduledMessage.parse(Self.listed(id: "s1", status: "SCHEDULED", envelope: try signed(marked: false), senderDeviceId: fixture.descriptor.deviceId)))
+        XCTAssertNil(E2EEAutoScheduledMessage.parse(["id": "legacy", "status": "scheduled", "content": "", "e2eeVersion": 2]))
+        var noDevice = Self.listed(id: "s1", status: "SCHEDULED", envelope: v3, senderDeviceId: fixture.descriptor.deviceId)
+        noDevice["senderDeviceId"] = NSNull()
+        XCTAssertNil(E2EEAutoScheduledMessage.parse(noDevice))
+        XCTAssertNil(E2EEAutoScheduledMessage.Ack.parse(Data(#"{"scheduledId":"s1","status":"SCHEDULED"}"#.utf8)))
+        XCTAssertEqual(
+            E2EEAutoScheduledMessage.Ack.parse(Self.ack("s1", sendAt: "2026-11-06T09:00:00Z"))?.sendAt,
+            ISO8601DateFormatter().date(from: "2026-11-06T09:00:00Z")
+        )
+    }
+
     // MARK: Aides
 
     private func draft(_ text: String) -> E2EEV2MessageSenderV2.Draft {
@@ -687,6 +835,22 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
             "serverTagB64": .string(Data(repeating: 9, count: 32).base64EncodedString()),
             "serverTimeMs": .string("1790000000250"), "keyId": .string(keyId),
         ]))
+    }
+
+    private static func ack(_ scheduledId: String, sendAt: String) -> Data {
+        Data(#"{"scheduledId":"\#(scheduledId)","status":"SCHEDULED","sendAt":"\#(sendAt)"}"#.utf8)
+    }
+
+    /// Un élément de `GET …/scheduled` sous la forme du contrat, l'enveloppe en objet JSON.
+    private static func listed(
+        id: String, status: String, envelope: E2EEV2SignedMessageEnvelopeV2, senderDeviceId: String, failureReason: String? = nil
+    ) -> [String: Any] {
+        var object: [String: Any] = [
+            "scheduledId": id, "status": status, "sendAt": "2026-11-06T09:00:00.000Z",
+            "e2eeMessage": (try? JSONSerialization.jsonObject(with: envelope.encoded)) as Any, "senderDeviceId": senderDeviceId,
+        ]
+        if let failureReason { object["failureReason"] = failureReason }
+        return object
     }
 
     private static func error(_ code: String) -> Data {

@@ -10,11 +10,16 @@ struct ScheduledMessagesView: View {
     let e2ee: E2EEServicing?
     /// Nom de la conversation, sous le titre.
     var subtitle: String? = nil
+    /// Conversation chiffrée automatiquement : programmés v3 (E2EE-AUTO §7.8 F).
+    var usesV2 = false
 
+    @EnvironmentObject private var services: AppServices
     @State private var items: [ScheduledMessage] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var decrypted: [String: String] = [:]
+    /// Programmés v3 dont le texte s'est ouvert ici : lui seul se modifie.
+    @State private var decryptedTexts: Set<String> = []
     /// Envoi programmé dont l'annulation attend confirmation (irréversible).
     @State private var deletionTarget: ScheduledMessage?
     /// Envoi programmé dont l'heure ou le texte se modifie.
@@ -77,7 +82,7 @@ struct ScheduledMessagesView: View {
         .sheet(item: $editTarget) { item in
             ScheduledMessageEditSheet(
                 item: item,
-                plainText: item.isEncrypted ? nil : (item.content ?? ""),
+                plainText: editableText(item),
                 subtitle: subtitle
             ) { sendAt, content in
                 try await update(item, sendAt: sendAt, content: content)
@@ -100,8 +105,8 @@ struct ScheduledMessagesView: View {
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.label)
                     .lineLimit(4)
-                if let status = item.status, status != "scheduled" {
-                    Text(statusLabel(status))
+                if let status = statusLabel(item) {
+                    Text(status)
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.warning)
                 }
@@ -142,9 +147,22 @@ struct ScheduledMessagesView: View {
         return value.isEmpty ? String(localized: "(vide)") : value
     }
 
-    /// Seuls les envois encore en attente se modifient.
+    /// Seuls les envois encore en attente se modifient ; un programmé chiffré,
+    /// seulement s'il s'ouvre ici (il est rechiffré à chaque modification).
     private func canEdit(_ item: ScheduledMessage) -> Bool {
-        item.status == nil || item.status == "scheduled"
+        if let v3 = item.v3 {
+            guard decrypted[item.id] != nil else { return false }
+            switch v3.status {
+            case .scheduled, .needsReencrypt: return true
+            case .failed: return false
+            }
+        }
+        return item.status == nil || item.status == "scheduled"
+    }
+
+    private func editableText(_ item: ScheduledMessage) -> String? {
+        if item.v3 != nil { return decryptedTexts.contains(item.id) ? decrypted[item.id] : nil }
+        return item.isEncrypted ? nil : (item.content ?? "")
     }
 
     /// « Annuler l'envoi du 18 oct. à 18:00 : Salut… » : N boutons identiques ne disent
@@ -153,6 +171,28 @@ struct ScheduledMessagesView: View {
         let when = item.sendAt.map { $0.sqFormatted(date: .medium) } ?? ""
         let text = String(content(for: item).prefix(40))
         return String(localized: "Annuler l’envoi du \(when) : \(text)")
+    }
+
+    private func statusLabel(_ item: ScheduledMessage) -> String? {
+        if let v3 = item.v3 {
+            switch v3.status {
+            case .scheduled: return nil
+            case .needsReencrypt: return String(localized: "En attente de rechiffrement")
+            case .failed(let reason): return Self.failureLabel(reason)
+            }
+        }
+        guard let status = item.status, status != "scheduled" else { return nil }
+        return statusLabel(status)
+    }
+
+    /// `failureReason` d'un programmé chiffré ; une valeur inconnue a un texte générique.
+    static func failureLabel(_ reason: String?) -> String {
+        switch reason {
+        case "MEMBER_LEFT": return String(localized: "Non envoyé : tu ne fais plus partie de la conversation.")
+        case "DEVICE_REVOKED": return String(localized: "Non envoyé : l’appareil qui l’a programmé a été retiré.")
+        case "REENCRYPT_EXPIRED": return String(localized: "Non envoyé : il n’a pas pu être rechiffré à temps.")
+        default: return String(localized: "Échec d’envoi")
+        }
     }
 
     private func statusLabel(_ status: String) -> String {
@@ -166,6 +206,20 @@ struct ScheduledMessagesView: View {
     }
 
     private func update(_ item: ScheduledMessage, sendAt: Date, content: String?) async throws {
+        if let v3 = item.v3 {
+            // Rechiffré sous l'époque courante, même message logique (point 3).
+            let result = await services.e2eeV2Messaging.reschedule(
+                v3, sendAt: sendAt, text: content, conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId)
+            )
+            if let message = result.map(EncryptedConversationSurfaces.scheduleFailureMessage)
+                ?? String(localized: "Ce message programmé ne s’ouvre pas sur cet appareil.") {
+                throw ScheduledMessageError(errorDescription: message)
+            }
+            await load()
+            Haptics.success()
+            return
+        }
         let saved = try await service.updateScheduledMessage(
             conversationId: conversation.id,
             scheduledId: item.id,
@@ -182,6 +236,9 @@ struct ScheduledMessagesView: View {
         do {
             items = try await service.scheduledMessages(conversationId: conversation.id)
             errorMessage = nil
+            if usesV2, await ScheduledReencryption.run(items, conversation: conversation, runtime: services.e2eeV2Messaging) {
+                items = try await service.scheduledMessages(conversationId: conversation.id)
+            }
             await decryptAll()
         } catch {
             errorMessage = error.userFacingMessage
@@ -189,7 +246,21 @@ struct ScheduledMessagesView: View {
     }
 
     private func decryptAll() async {
-        guard isE2EE, let e2ee else { return }
+        guard isE2EE else { return }
+        if usesV2 {
+            for item in items where decrypted[item.id] == nil {
+                guard let v3 = item.v3,
+                      let payload = await services.e2eeV2Messaging.openScheduled(v3, conversationId: conversation.id) else { continue }
+                if case .text(let text) = payload.body {
+                    decrypted[item.id] = text
+                    decryptedTexts.insert(item.id)
+                } else {
+                    decrypted[item.id] = String(localized: "Message chiffré")
+                }
+            }
+            return
+        }
+        guard let e2ee else { return }
         for item in items where item.isEncrypted && decrypted[item.id] == nil {
             // Reconstitue un MessageItem minimal pour réutiliser decryptText.
             let proxy = MessageItem(
@@ -226,6 +297,29 @@ struct ScheduledMessagesView: View {
             errorMessage = error.userFacingMessage
             Haptics.error()
         }
+    }
+}
+
+private struct ScheduledMessageError: LocalizedError {
+    let errorDescription: String?
+}
+
+/// Rechiffrement des programmés de son compte en `NEEDS_REENCRYPT`, à l'ouverture
+/// de la conversation (E2EE-AUTO §7.8 F, point 3). Un programmé qui ne s'ouvre pas
+/// ici reste en attente : un autre appareil du compte peut le sauver.
+enum ScheduledReencryption {
+    /// Vrai si au moins un programmé a été rechiffré.
+    @discardableResult
+    static func run(_ items: [ScheduledMessage], conversation: MessageConversation, runtime: E2EEV2MessagingRuntime) async -> Bool {
+        var changed = false
+        for item in items {
+            guard let v3 = item.v3, v3.status == .needsReencrypt else { continue }
+            if case .scheduled? = await runtime.reschedule(
+                v3, sendAt: nil, conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId)
+            ) { changed = true }
+        }
+        return changed
     }
 }
 

@@ -1335,18 +1335,21 @@ struct ScheduledMessage: Decodable, Identifiable, Equatable {
     let sendAt: Date?
     let status: String?
     let createdAt: Date?
+    /// Programmé chiffré (E2EE-AUTO §7.8 F), servi sous la forme du contrat ;
+    /// rattaché par `MessagesService.scheduledMessages`.
+    var v3: E2EEAutoScheduledMessage?
 
-    var isEncrypted: Bool { e2eeVersion != nil || e2eeCiphertextB64 != nil }
+    var isEncrypted: Bool { v3 != nil || e2eeVersion != nil || e2eeCiphertextB64 != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, conversationId, senderId, kind, content
+        case id, scheduledId, conversationId, senderId, kind, content
         case e2eeVersion, e2eeIvB64, e2eeCiphertextB64, e2eeAadB64
         case metadata, replyToId, sendAt, status, createdAt
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        id = (try? c.decode(String.self, forKey: .id)) ?? (try? c.decode(String.self, forKey: .scheduledId)) ?? UUID().uuidString
         conversationId = c.decodeFlexibleString(forKey: .conversationId)
         senderId = c.decodeFlexibleString(forKey: .senderId)
         kind = c.decodeFlexibleString(forKey: .kind) ?? "TEXT"

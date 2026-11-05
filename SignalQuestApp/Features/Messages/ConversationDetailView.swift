@@ -51,6 +51,7 @@ struct ConversationDetailView: View {
     /// Vrai dès que le premier chargement a répondu (succès ou échec) : tant qu'il
     /// ne l'est pas, une liste vide veut dire « pas encore là », pas « vide ».
     @State private var hasLoadedOnce = false
+    @State private var scheduledReencryptionChecked = false
     @State private var focusHandled = false
     @State private var olderCursor: String?
     /// Fil v2 : nombre de messages présentés (les plus récents) et existence de plus anciens.
@@ -695,7 +696,7 @@ struct ConversationDetailView: View {
             ConversationMediaView(conversation: conversation, service: service, subtitle: conversationTitle)
         }
         .navigationDestination(isPresented: $showScheduled) {
-            ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle)
+            ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle, usesV2: usesV2)
         }
         .navigationDestination(isPresented: $showReminders) {
             RemindersView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle)
@@ -755,7 +756,8 @@ struct ConversationDetailView: View {
                 service: service,
                 e2ee: e2ee,
                 initialText: scheduleSeedText,
-                subtitle: conversation.isGroup ? sheetSubtitle : String(localized: "À \(conversationTitle)")
+                subtitle: conversation.isGroup ? sheetSubtitle : String(localized: "À \(conversationTitle)"),
+                usesV2: usesV2
             ) {
                 Haptics.success()
                 // Le texte programmé restait dans le champ et le brouillon : un appui
@@ -3026,6 +3028,16 @@ struct ConversationDetailView: View {
             v2LoadAgain = false
             await loadV2Once()
         } while v2LoadAgain && !Task.isCancelled
+        await reencryptScheduledOnce()
+    }
+
+    /// Une fois par ouverture : ses programmés chiffrés en attente de rechiffrement
+    /// passent sous l'époque courante (E2EE-AUTO §7.8 F, point 3).
+    private func reencryptScheduledOnce() async {
+        guard !scheduledReencryptionChecked, conversation.firstAutoEpochNumber != nil, !AppEnvironment.usesDemoData else { return }
+        scheduledReencryptionChecked = true
+        guard let items = try? await service.scheduledMessages(conversationId: conversation.id) else { return }
+        await ScheduledReencryption.run(items, conversation: conversation, runtime: services.e2eeV2Messaging)
     }
 
     /// Anciens messages d'une conversation passée en auto, lus une fois par la

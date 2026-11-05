@@ -254,6 +254,68 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    // MARK: Programmés chiffrés (E2EE-AUTO §7.8 F)
+
+    /// Programme `draft` ; avec `existing`, le rechiffre sous l'époque courante
+    /// (même `clientRequestId`, `sendAt` facultatif).
+    func schedule(
+        _ draft: E2EEV2MessageSenderV2.Draft,
+        sendAt: Date?,
+        existing: E2EEAutoScheduledMessage? = nil,
+        conversationId: String,
+        isGroup: Bool,
+        participantIds: [String]
+    ) async -> E2EEV2ScheduleResultV2 {
+        guard writesEnabled else { return .failure(Self.closed) }
+        guard let parts = current() else { return .failure(Self.noSession) }
+        let clientRequestId = existing?.clientRequestId ?? UUID().uuidString
+        do {
+            return try await withDevices(conversationId: conversationId, participantIds: participantIds, parts: parts, staleUserIds: {
+                if case .failure(let failure) = $0 { return Self.stale(failure) }
+                return nil
+            }) { devices in
+                await parts.messaging.schedule(
+                    draft, clientRequestId: clientRequestId, sendAt: sendAt, scheduledId: existing?.scheduledId,
+                    conversationId: conversationId, isGroup: isGroup, devices: devices,
+                    expectedOwnerScopeId: parts.session.ownerScopeId
+                )
+            }
+        } catch {
+            return .failure(Self.directoryFailure(error))
+        }
+    }
+
+    /// La charge d'un programmé de son compte, lue sous l'époque de son enveloppe.
+    func openScheduled(_ scheduled: E2EEAutoScheduledMessage, conversationId: String) async -> E2EEV2ContentPayloadV2? {
+        guard readsEnabled, let parts = current() else { return nil }
+        let ownUserId = String(parts.session.ownerScopeId.dropFirst("user:".count))
+        guard let devices = try? await parts.directory.devices(for: [ownUserId]) else { return nil }
+        return parts.messaging.openScheduled(
+            scheduled, conversationId: conversationId, devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId
+        )
+    }
+
+    /// Rechiffre un programmé de son compte (point 3), avec un nouveau texte ou
+    /// une nouvelle heure s'ils sont donnés. nil : il ne s'ouvre pas ici.
+    func reschedule(
+        _ scheduled: E2EEAutoScheduledMessage,
+        sendAt: Date?,
+        text: String? = nil,
+        conversationId: String,
+        isGroup: Bool,
+        participantIds: [String]
+    ) async -> E2EEV2ScheduleResultV2? {
+        guard let payload = await openScheduled(scheduled, conversationId: conversationId) else { return nil }
+        var body = payload.body
+        if let text, case .text = body { body = .text(text) }
+        return await schedule(
+            .init(body: body, replyToRef: payload.replyToRef, mentions: payload.mentions,
+                  ttlSeconds: scheduled.signed.envelope.ttlSeconds),
+            sendAt: sendAt, existing: scheduled, conversationId: conversationId, isGroup: isGroup,
+            participantIds: participantIds
+        )
+    }
+
     func change(
         _ change: E2EEV2MembershipWriterV2.Change,
         conversationId: String,
