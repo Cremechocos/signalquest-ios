@@ -2832,6 +2832,8 @@ struct SQSettingsRowLabel: View {
                     .font(SQFont.body(16, .semibold, relativeTo: .body))
                     .foregroundStyle(tone == .danger ? SQColor.dangerInk : SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
+                    // Plafonné à AX3 : en AX5, un mot long dépasse la rangée et se coupe (DEV-01).
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility3)
                     .accessibilityIdentifier("settings.label.\(title)")
                 if let subtitle {
                     Text(verbatim: subtitle)
@@ -2839,10 +2841,17 @@ struct SQSettingsRowLabel: View {
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // En très grand texte, la valeur passe sous le titre.
+                if let value, dynamicTypeSize.isAccessibilitySize {
+                    Text(verbatim: value)
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let value {
+            if let value, !dynamicTypeSize.isAccessibilitySize {
                 Text(verbatim: value)
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)

@@ -234,7 +234,7 @@ struct MapAdvancedFilterSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack(spacing: SQSpace.sm2) {
+            MapFooterStack {
                 Button { resetDraft() } label: {
                     Text("Réinitialiser")
                         .font(SQType.button).foregroundStyle(SQColor.label)
@@ -748,6 +748,23 @@ struct MapTechTag: View {
             .padding(.horizontal, 7)
             .frame(minHeight: 22)
             .background(SQBrand.techColor(technology), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            // Pastille décorative (le libellé suit en clair) : plafonnée pour rester dans sa tuile.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+}
+
+/// Boutons d'un pied de feuille : côte à côte, empilés en très grand texte, où
+/// « Réinitialiser » et « Afficher les résultats » se coupaient en plein mot (DEV-01).
+struct MapFooterStack<Content: View>: View {
+    @ViewBuilder let content: Content
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: SQSpace.xs))
+            : AnyLayout(HStackLayout(spacing: SQSpace.sm2))
+        layout { content }
+            .dynamicTypeSize(...DynamicTypeSize.accessibility3)
     }
 }
 
@@ -760,7 +777,7 @@ struct MapSubpageFooter: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        HStack(spacing: SQSpace.sm2) {
+        MapFooterStack {
             Button(action: onClear) {
                 Text("Effacer")
                     .font(SQType.button).foregroundStyle(SQColor.label)

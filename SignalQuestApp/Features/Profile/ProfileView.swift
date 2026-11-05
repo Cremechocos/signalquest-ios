@@ -1038,6 +1038,8 @@ struct ProfileMenuRow: View {
                     .font(SQFont.body(16, .semibold, relativeTo: .body))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
+                    // Plafonné à AX3 : en AX5, « Identifications » est plus large que la rangée.
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility3)
                     .accessibilityIdentifier("profile.menu.title")
                 if let subtitle {
                     Text(verbatim: subtitle)
@@ -1046,25 +1048,16 @@ struct ProfileMenuRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("profile.menu.subtitle")
                 }
+                // En très grand texte, valeur et pastille passent sous le titre :
+                // à côté, elles coupaient « vérificatio / n » (DEV-01, tour AX du 12/10).
+                if dynamicTypeSize.isAccessibilitySize, value != nil || badge != nil {
+                    HStack(spacing: SQSpace.xs) { trailingDetails }
+                }
             }
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let value {
-                Text(verbatim: value)
-                    .font(SQType.callout)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("profile.menu.value")
-            }
-            if let badge {
-                Text(verbatim: badge)
-                    .font(SQType.caption(.heavy))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.onAccent)
-                    .padding(.horizontal, SQSpace.xs2)
-                    .frame(minWidth: 22, minHeight: 22)
-                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                    .accessibilityIdentifier("profile.menu.badge")
+            if !dynamicTypeSize.isAccessibilitySize {
+                trailingDetails
             }
             Image(systemName: "chevron.right")
                 .font(SQFont.body(13, .semibold, relativeTo: .footnote))
@@ -1075,6 +1068,27 @@ struct ProfileMenuRow: View {
         .padding(.vertical, SQSpace.sm2)
         .frame(minHeight: subtitle == nil ? 52 : 58)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var trailingDetails: some View {
+        if let value {
+            Text(verbatim: value)
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.labelSecondary)
+                .lineLimit(1)
+                .accessibilityIdentifier("profile.menu.value")
+        }
+        if let badge {
+            Text(verbatim: badge)
+                .font(SQType.caption(.heavy))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.onAccent)
+                .padding(.horizontal, SQSpace.xs2)
+                .frame(minWidth: 22, minHeight: 22)
+                .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                .accessibilityIdentifier("profile.menu.badge")
+        }
     }
 }
 

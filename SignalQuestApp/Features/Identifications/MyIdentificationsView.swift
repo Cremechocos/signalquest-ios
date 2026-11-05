@@ -687,6 +687,7 @@ struct SignalPill: View {
 }
 
 private struct IdentificationNodeRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let group: IdentifiedNodeGroup
     let isWithdrawing: Bool
 
@@ -714,7 +715,10 @@ private struct IdentificationNodeRow: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(2)
-                HStack(spacing: SQSpace.md) {
+                // Empilées en très grand texte : sur une ligne, elles finissaient tronquées (DEV-01).
+                (dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                    : AnyLayout(HStackLayout(spacing: SQSpace.md))) {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.seal.fill").accessibilityHidden(true)
                         Text("Validée \(group.validations) fois")

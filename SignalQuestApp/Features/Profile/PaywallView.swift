@@ -214,6 +214,8 @@ struct PaywallView: View {
             Text(SubscriptionPriceCopy.priceLine(product: product))
                 .font(SQFont.display(18, .bold))
                 .foregroundStyle(primaryText)
+                // Plafonné à AX3 : en AX5, « indisponible » se coupait en fin de mot (DEV-01).
+                .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         }
         // « L'essentiel + » promettait des fonctionnalités que Basic
         // n'ouvre pas : c'est un palier de soutien, et le nommer ainsi

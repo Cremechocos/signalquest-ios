@@ -96,5 +96,7 @@ extension Text {
             // Encre secondaire et non gris Halo : à 11 pt, le lissage des glyphes fait
             // tomber les 4,9:1 nominaux du gris sous le seuil une fois rendus.
             .foregroundStyle(SQColor.ink2)
+            // Capitales espacées : au-delà d'AX3, un mot coupait en « TECHNOLOGIE / S » (DEV-01).
+            .dynamicTypeSize(...DynamicTypeSize.accessibility3)
     }
 }
