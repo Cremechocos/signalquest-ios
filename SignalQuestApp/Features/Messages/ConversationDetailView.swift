@@ -72,7 +72,9 @@ struct ConversationDetailView: View {
     // après envoi) via ce couple seed/token, et REÇOIT le texte courant via closures.
     @State private var composerSeed = ""
     @State private var composerSeedToken = 0
-    @State private var scheduleSeedText = ""
+    /// Texte du composeur porté par la feuille elle-même : lu seulement dans la
+    /// closure d'une `.sheet(isPresented:)`, il arrivait vide à l'ouverture.
+    @State private var scheduleSeed: ScheduleSeed?
     /// Brouillon de la conversation, chiffré sur l'appareil (plan 3, vague 1).
     @State private var draftAutosaver: MessageDraftAutosaver?
     @State private var replyTarget: MessageItem?
@@ -219,7 +221,6 @@ struct ConversationDetailView: View {
     private var ephemeralTTL: Int { ephemeralEnabled ? ephemeralSeconds : 0 }
     @State private var isSharingLocation = false
     @State private var showLiveShare = false
-    @State private var showSchedulePicker = false
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
     /// Mon message dont on montre qui l'a lu ou reçu.
@@ -750,12 +751,12 @@ struct ConversationDetailView: View {
     /// Second étage : les feuilles du fil.
     private var conversationBase: some View {
         conversationDialogs
-        .sheet(isPresented: $showSchedulePicker) {
+        .sheet(item: $scheduleSeed) { seed in
             ScheduleMessageSheet(
                 conversation: conversation,
                 service: service,
                 e2ee: e2ee,
-                initialText: scheduleSeedText,
+                initialText: seed.text,
                 subtitle: conversation.isGroup ? sheetSubtitle : String(localized: "À \(conversationTitle)"),
                 usesV2: usesV2
             ) {
@@ -764,7 +765,6 @@ struct ConversationDetailView: View {
                 // sur Envoyer le doublait aussitôt (AF-MSG-12).
                 clearComposer()
                 draftAutosaver?.discard()
-                scheduleSeedText = ""
                 inAppNotifications.show(SQInAppNotificationItem(
                     body: String(localized: "Message programmé."),
                     variant: .success
@@ -1273,9 +1273,14 @@ struct ConversationDetailView: View {
                     Button { showMedia = true } label: {
                         Label("Médias et fichiers", systemImage: "photo.on.rectangle")
                     }
+                }
+                // Les programmés v2 ont leurs routes signées (E2EE-AUTO point F).
+                if EncryptedConversationSurfaces.allowsScheduling(isV2: conversationIsV2) {
                     Button { showScheduled = true } label: {
                         Label("Messages programmés", systemImage: "clock")
                     }
+                }
+                if !conversationIsV2 {
                     Button { showReminders = true } label: {
                         Label("Rappels", systemImage: "bell")
                     }
@@ -1448,8 +1453,7 @@ struct ConversationDetailView: View {
                 onSend: { text in Task { await send(text) } },
                 onPoll: { showNewPoll = true },
                 onSchedule: { text in
-                    scheduleSeedText = text
-                    showSchedulePicker = true
+                    scheduleSeed = ScheduleSeed(text: text)
                 },
                 // Coordonnées précises et adresse : un mauvais choix dans le menu
                 // suffisait à les envoyer (AF-MSG-09).
@@ -6175,6 +6179,11 @@ private final class OwnReadGate {
 }
 
 private struct SelectableText: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
+private struct ScheduleSeed: Identifiable {
     let id = UUID()
     let text: String
 }

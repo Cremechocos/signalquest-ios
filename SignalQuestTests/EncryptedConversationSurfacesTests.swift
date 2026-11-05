@@ -22,9 +22,10 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         XCTAssertFalse(EncryptedConversationSurfaces.isV2(conversation("conversation_plain_0001J7AB", encrypted: false), ownerNamespace: namespace, stateStore: broken))
     }
 
-    func testScheduledMessagesAreClosedInAV2Conversation() {
-        XCTAssertFalse(EncryptedConversationSurfaces.allowsScheduling(isV2: true))
-        XCTAssertTrue(EncryptedConversationSurfaces.allowsScheduling(isV2: false))
+    func testScheduledMessagesOpenInAV2ConversationOnlyOnceSwitchedOn() {
+        XCTAssertFalse(EncryptedConversationSurfaces.allowsScheduling(isV2: true, autoActive: false))
+        XCTAssertTrue(EncryptedConversationSurfaces.allowsScheduling(isV2: true, autoActive: true), "Point F")
+        XCTAssertTrue(EncryptedConversationSurfaces.allowsScheduling(isV2: false, autoActive: false))
         XCTAssertTrue(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: false, isV2: false), "En clair")
         XCTAssertTrue(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: true, isV2: true), "v2 : routes signées")
         XCTAssertFalse(EncryptedConversationSurfaces.allowsLiveShare(isE2EE: true, isV2: false), "v1 chiffrée")

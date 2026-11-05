@@ -51,11 +51,11 @@ enum EncryptedConversationSurfaces {
         !messageId.hasPrefix("local-") && !isV2
     }
 
-    /// Messages programmés désactivés dans une conversation v2 (décision du 30/09) :
-    /// le serveur enverrait plus tard un contenu que plus aucun appareil ne
-    /// rechiffre sous l'époque du moment.
-    static func allowsScheduling(isV2: Bool) -> Bool {
-        !isV2
+    /// Messages programmés dans une conversation v2 : seulement une fois la
+    /// bascule faite (E2EE-AUTO point F, décision du 03/11) : le message v3 est
+    /// signé à la création et l'app le rechiffre s'il passe en NEEDS_REENCRYPT.
+    static func allowsScheduling(isV2: Bool, autoActive: Bool = E2EEV2ServerGate.autoActive) -> Bool {
+        !isV2 || autoActive
     }
 
     /// Partage en direct (E2EE-AUTO §7.6) : en clair, ou dans une conversation v2
