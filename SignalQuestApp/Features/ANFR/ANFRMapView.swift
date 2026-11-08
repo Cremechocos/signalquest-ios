@@ -959,6 +959,9 @@ private struct ANFRMapContent: View {
     @State private var panelDetent: ANFRPanelDetent = .hidden
     /// Déplacement du doigt sur la poignée, positif vers le bas.
     @State private var panelDrag: CGFloat = 0
+    /// Cadre de la barre d'onglets quand elle est en colonne (iPhone Duo), en
+    /// coordonnées de la fenêtre ; nil quand elle est en bas.
+    @State private var verticalDockFrame: CGRect?
 
     /// Vrai quand l'écran a été ouvert depuis les statistiques : leur bouton revient en arrière.
     private let cameFromStats: Bool
@@ -1084,46 +1087,110 @@ private struct ANFRMapContent: View {
             mapLayer
             controlsLayer
             topBar
+            dockColumnButtons
+        }
+        .background {
+            ANFRSideDockReader { verticalDockFrame = $0 }
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
         }
     }
 
-    /// Retour, titre et statistiques flottent sur la carte, comme dans Plans.
-    private var topBar: some View {
-        VStack {
-            ZStack {
-                Text("Carte des modifications")
-                    .font(SQType.callout(.semibold))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .allowsTightening(true)
-                    .padding(.horizontal, SQSpace.md)
-                    .frame(minHeight: 36)
-                    .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-                    .sqShadowCard()
-                    .padding(.horizontal, 44 + SQSpace.sm)
-                    .accessibilityAddTraits(.isHeader)
-                HStack(spacing: SQSpace.sm) {
-                    MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.map.back") { dismiss() }
-                        .sqShadowCard()
+    /// Barre d'onglets en colonne (iPhone Duo) : les contrôles de carte se posent
+    /// juste au-dessus, dans sa colonne, plutôt qu'à côté sur la carte.
+    @ViewBuilder
+    private var dockColumnButtons: some View {
+        if let dock = verticalDockFrame, !showsFloatingPanel || panelDetent == .hidden {
+            GeometryReader { proxy in
+                let origin = proxy.frame(in: .global).origin
+                VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
-                    if isRegularWidth {
-                        MapChipIconButton(systemImage: "sidebar.right",
-                                          label: showsSidePanel ? "Masquer le panneau" : "Afficher le panneau",
-                                          identifier: "anfr.map.list") { showsSidePanel.toggle() }
-                            .sqShadowCard()
+                    mapButtons
+                }
+                .frame(width: dock.width, height: max(0, dock.minY - origin.y - SQSpace.sm))
+                .padding(.leading, dock.minX - origin.x)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    /// Boutons ronds flottant sur la carte, comme dans Plans : Retour à gauche, le
+    /// titre, puis Statistiques à droite ; les contrôles de carte sont en bas.
+    private var topBar: some View {
+        GeometryReader { proxy in
+            topBarContent(cornerInset: proxy.safeAreaInsets.top < 20)
+        }
+    }
+
+    /// `cornerInset` : aucune marge haute (l'iPhone Duo met l'heure sur le côté). Son
+    /// grand coin rognait Retour : la rangée s'écarte du bord et Retour passe sous
+    /// Statistiques, à droite. Le titre prend une seconde ligne s'il ne tient pas.
+    private func topBarContent(cornerInset: Bool) -> some View {
+        VStack {
+            ViewThatFits(in: .horizontal) {
+                VStack(alignment: .trailing, spacing: SQSpace.sm) {
+                    HStack(alignment: .top, spacing: SQSpace.sm) {
+                        if !cornerInset { backButton }
+                        titlePill.fixedSize()
+                        Spacer(minLength: 0)
+                        topBarTrailing
                     }
-                    MapChipIconButton(systemImage: "chart.bar.xaxis", label: "Statistiques des antennes",
-                                      identifier: "anfr.map.stats") {
-                        if cameFromStats { dismiss() } else { showsStats = true }
+                    if cornerInset { backButton }
+                }
+                VStack(spacing: SQSpace.sm) {
+                    HStack(spacing: SQSpace.sm) {
+                        if !cornerInset { backButton }
+                        Spacer(minLength: 0)
+                        topBarTrailing
                     }
-                    .sqShadowCard()
+                    HStack(spacing: SQSpace.sm) {
+                        titlePill
+                        Spacer(minLength: 0)
+                        if cornerInset { backButton }
+                    }
                 }
             }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.top, SQSpace.xs)
+            .padding(.horizontal, cornerInset ? SQSpace.xxl : SQSpace.lg)
+            .padding(.top, cornerInset ? SQSpace.xxl : SQSpace.sm)
             Spacer(minLength: 0)
+        }
+    }
+
+    private var backButton: some View {
+        MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "anfr.map.back") { dismiss() }
+            .sqShadowCard()
+    }
+
+    private var titlePill: some View {
+        Text("Carte des modifications")
+            .font(SQType.callout(.semibold))
+            .foregroundStyle(SQColor.label)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .allowsTightening(true)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 36)
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
+            .frame(minHeight: 44)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var topBarTrailing: some View {
+        HStack(spacing: SQSpace.sm) {
+            // Sur iPhone, les réglages sont dans le panneau du bas ; sur iPad, on masque la colonne.
+            if isRegularWidth {
+                MapChipIconButton(systemImage: "sidebar.right",
+                                  label: showsSidePanel ? "Masquer le panneau" : "Afficher le panneau",
+                                  identifier: "anfr.map.list") { showsSidePanel.toggle() }
+                    .sqShadowCard()
+            }
+            MapChipIconButton(systemImage: "chart.bar.xaxis", label: "Statistiques des antennes",
+                              identifier: "anfr.map.stats") {
+                if cameFromStats { dismiss() } else { showsStats = true }
+            }
+            .sqShadowCard()
         }
     }
 
@@ -1189,7 +1256,7 @@ private struct ANFRMapContent: View {
 
     // MARK: Controls overlay
 
-    /// La carte reste nue : des boutons ronds en bas à droite ; pays, filtres et relevé
+    /// La carte reste nue : les boutons ronds sont en haut ; pays, filtres et relevé
     /// vivent dans la feuille du bas, fermée par défaut.
     private var controlsLayer: some View {
         VStack(spacing: SQSpace.sm) {
@@ -1197,7 +1264,7 @@ private struct ANFRMapContent: View {
             // Les pastilles basses réservent la hauteur du dock : sur iOS 16 à 25 il
             // se superpose à la carte au lieu de décaler la zone sûre.
             statusPills
-            if !showsFloatingPanel || panelDetent == .hidden {
+            if verticalDockFrame == nil, !showsFloatingPanel || panelDetent == .hidden {
                 HStack {
                     Spacer(minLength: 0)
                     mapButtons
@@ -2665,6 +2732,73 @@ final class ANFRClusterAnnotationView: MKAnnotationView {
 
 /// Vue hôte : MapKit n'ayant pas de taille au moment de `makeUIView`, le cadrage
 /// initial attend la première mise en page.
+/// Lit le cadre de la barre d'onglets système quand elle est en colonne (plus haute
+/// que large), pour y poser les contrôles de carte.
+private struct ANFRSideDockReader: UIViewRepresentable {
+    let onChange: (CGRect?) -> Void
+
+    func makeUIView(context: Context) -> Probe {
+        let probe = Probe()
+        probe.onChange = onChange
+        return probe
+    }
+
+    func updateUIView(_ probe: Probe, context: Context) {
+        probe.onChange = onChange
+    }
+
+    final class Probe: UIView {
+        var onChange: ((CGRect?) -> Void)?
+        private var reported: CGRect??
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            setNeedsLayout()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            // La barre se place après nous : on relit au tour suivant.
+            DispatchQueue.main.async { [weak self] in self?.report() }
+        }
+
+        private func report() {
+            guard let window else { return }
+            var frame: CGRect?
+            // La colonne d'onglets vit dans la marge sûre de droite : ses boutons
+            // sont les contrôles de cette bande, sous le tiers haut (l'heure).
+            let band = window.safeAreaInsets.right
+            if band >= 44 {
+                let minX = window.bounds.width - band
+                let rect = Self.controlsFrame(in: window, minX: minX, minY: window.bounds.height / 3)
+                if !rect.isNull, rect.height > rect.width { frame = rect }
+            }
+            guard reported != .some(frame) else { return }
+            reported = .some(frame)
+            onChange?(frame)
+        }
+
+        private static func controlsFrame(in view: UIView, minX: CGFloat, minY: CGFloat) -> CGRect {
+            view.subviews.reduce(CGRect.null) { union, child in
+                guard !child.isHidden, child.alpha > 0 else { return union }
+                if child is UIControl {
+                    let rect = child.convert(child.bounds, to: nil)
+                    return rect.minX >= minX && rect.minY >= minY ? union.union(rect) : union
+                }
+                return union.union(controlsFrame(in: child, minX: minX, minY: minY))
+            }
+        }
+    }
+}
+
 final class ANFRMapHostView: UIView {
     let map = MKMapView(frame: .zero)
     var onLayout: (() -> Void)?
