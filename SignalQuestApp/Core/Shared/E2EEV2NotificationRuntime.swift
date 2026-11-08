@@ -38,15 +38,15 @@ enum E2EEV2NotificationPresentationPolicy {
             let text = (body?["text"] as? String)?
                 .split(whereSeparator: \.isWhitespace)
                 .joined(separator: " ") ?? ""
-            fullText = text.isEmpty ? String(localized: "Nouveau message chiffré") : String(text.prefix(240))
-        case "MEDIA": fullText = String(localized: "Pièce jointe chiffrée")
-        case "AUDIO": fullText = String(localized: "Message vocal chiffré")
-        case "LOCATION": fullText = String(localized: "Position chiffrée")
-        case "LIVE_LOCATION": fullText = String(localized: "Partage en direct chiffré")
-        case "CARD": fullText = String(localized: "Carte SignalQuest chiffrée")
-        case "REACTION": fullText = String(localized: "Nouvelle réaction chiffrée")
-        case "EDIT": fullText = String(localized: "Message chiffré modifié")
-        default: fullText = String(localized: "Nouveau message chiffré")
+            fullText = text.isEmpty ? String(localized: "Nouveau message") : String(text.prefix(240))
+        case "MEDIA": fullText = String(localized: "Pièce jointe")
+        case "AUDIO": fullText = String(localized: "Message vocal")
+        case "LOCATION": fullText = String(localized: "Position")
+        case "LIVE_LOCATION": fullText = String(localized: "Position en direct")
+        case "CARD": fullText = String(localized: "Carte SignalQuest")
+        case "REACTION": fullText = String(localized: "Nouvelle réaction")
+        case "EDIT": fullText = String(localized: "Message modifié")
+        default: fullText = String(localized: "Nouveau message")
         }
         return presentation(fullText: fullText, privacy: privacy, senderName: senderName)
     }
@@ -65,15 +65,15 @@ enum E2EEV2NotificationPresentationPolicy {
         let fullText: String
         switch payload.body {
         case .text where ephemeral:
-            fullText = String(localized: "Message éphémère chiffré")
+            fullText = String(localized: "Message éphémère")
         case .text(let text):
             let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            fullText = normalized.isEmpty ? String(localized: "Nouveau message chiffré") : String(normalized.prefix(240))
-        case .edit: fullText = String(localized: "Message chiffré modifié")
-        case .delete: fullText = String(localized: "Message chiffré supprimé")
-        case .reaction: fullText = String(localized: "Nouvelle réaction chiffrée")
+            fullText = normalized.isEmpty ? String(localized: "Nouveau message") : String(normalized.prefix(240))
+        case .edit: fullText = String(localized: "Message modifié")
+        case .delete: fullText = String(localized: "Message supprimé")
+        case .reaction: fullText = String(localized: "Nouvelle réaction")
         // Aucun push n'est envoyé pour un import (E2EE-AUTO §8) : jamais son contenu.
-        case .historyImport: fullText = String(localized: "Nouveau message chiffré")
+        case .historyImport: fullText = String(localized: "Nouveau message")
         case .r17(let body): fullText = r17Text(body, ephemeral: ephemeral)
         }
         var result = presentation(fullText: fullText, privacy: privacy, senderName: senderName)
@@ -95,20 +95,20 @@ enum E2EEV2NotificationPresentationPolicy {
                 if !normalized.isEmpty { return String(normalized.prefix(240)) }
             }
             let kinds = Set(attachments.map { E2EEAutoContentR17.presentation(mimeType: $0.file.mimeType) })
-            if attachments.count > 1 { return String(localized: "Pièces jointes chiffrées") }
-            if kinds == [.image] { return String(localized: "Photo chiffrée") }
-            if kinds == [.video] { return String(localized: "Vidéo chiffrée") }
-            return String(localized: "Fichier chiffré")
-        case .audio: return String(localized: "Message vocal chiffré")
-        case .poll: return String(localized: "Sondage chiffré")
-        case .card: return String(localized: "Publication partagée chiffrée")
-        case .pollVote, .pollClose: return String(localized: "Nouveau message chiffré")
+            if attachments.count > 1 { return String(localized: "Pièces jointes") }
+            if kinds == [.image] { return String(localized: "Photo") }
+            if kinds == [.video] { return String(localized: "Vidéo") }
+            return String(localized: "Fichier")
+        case .audio: return String(localized: "Message vocal")
+        case .poll: return String(localized: "Sondage")
+        case .card: return String(localized: "Publication partagée")
+        case .pollVote, .pollClose: return String(localized: "Nouveau message")
         }
     }
 
     /// Expéditeur authentifié, contenu jamais lu (mode « expéditeur seulement »).
     static func presentSender(privacy: E2EEV2NotificationPrivacy, senderName: String?) -> E2EEV2NotificationPresentation {
-        presentation(fullText: String(localized: "Nouveau message chiffré"), privacy: privacy, senderName: senderName)
+        presentation(fullText: String(localized: "Nouveau message"), privacy: privacy, senderName: senderName)
     }
 
     private static func presentation(
@@ -123,8 +123,8 @@ enum E2EEV2NotificationPresentationPolicy {
             return .init(title: senderTitle ?? String(localized: "Nouveau message"), body: fullText, privacy: privacy)
         case .senderOnly:
             return .init(
-                title: senderTitle ?? String(localized: "Nouveau message chiffré"),
-                body: String(localized: "Nouveau message chiffré"),
+                title: senderTitle ?? String(localized: "Nouveau message"),
+                body: String(localized: "Nouveau message"),
                 privacy: privacy
             )
         case .hidden:
@@ -133,7 +133,7 @@ enum E2EEV2NotificationPresentationPolicy {
     }
 
     static let placeholder = E2EEV2NotificationPresentation(
-        title: String(localized: "Nouveau message chiffré"),
+        title: String(localized: "Nouveau message"),
         body: String(localized: "Ouvre SignalQuest pour afficher le message."),
         privacy: .hidden
     )

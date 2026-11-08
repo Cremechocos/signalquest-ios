@@ -1844,9 +1844,11 @@ struct MessagesView: View {
     /// ils restaient en français dans l'app anglaise.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
         // Message v2 : le serveur n'en sert qu'un aperçu vide (lot A7) ; le texte
-        // vient du message déchiffré ici, le cadenas seulement s'il est illisible.
+        // vient du message déchiffré ici ; « Nouveau message » seulement quand cet
+        // appareil n'a pas encore l'enveloppe : il n'en connaît alors pas le type
+        // (décision d'Alexandre, 08/11, commune aux trois apps).
         if conversation.e2eeV2?.lastMessage != nil {
-            return model.decryptedPreviews[conversation.id].flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Message chiffré")
+            return model.decryptedPreviews[conversation.id].flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Nouveau message")
         }
         guard let last = conversation.lastMessage else {
             return String(localized: "Aucun message")

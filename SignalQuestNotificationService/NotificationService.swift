@@ -205,7 +205,12 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
         // Never copy the original title/body: only fixed copy or verified local decryption.
         let content = UNMutableNotificationContent()
         content.title = "SignalQuest"
-        content.body = String(localized: "Nouveau contenu privé")
+        // Message illisible ici (miroir absent ou périmé) : « Nouveau message »,
+        // sans le mot « chiffré » (choix d'Alexandre, 08/11), sauf en mode
+        // « aucun aperçu », qui ne dit même pas qu'il s'agit d'un message.
+        let privacy = (try? E2EEV2NotificationContextStore.configured()?.load())?.privacy
+        content.body = privacy == nil || privacy == .hidden
+            ? String(localized: "Nouveau contenu privé") : String(localized: "Nouveau message")
         content.sound = .default
         if let request = delivery.request {
             content.userInfo = [

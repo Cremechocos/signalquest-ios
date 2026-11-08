@@ -224,7 +224,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let result = await process(fixture, store: store) { _ in fixture.data }
         guard case .preview(let preview) = result else { return XCTFail("Expected sender-only preview") }
         XCTAssertEqual(preview.presentation.title, "Test Sender")
-        XCTAssertEqual(preview.presentation.body, String(localized: "Nouveau message chiffré"))
+        XCTAssertEqual(preview.presentation.body, String(localized: "Nouveau message"))
         XCTAssertFalse(preview.presentation.body.contains("Contenu privé"))
     }
 
@@ -374,9 +374,9 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             conversationId: conversationId, senderDeviceId: senderDeviceId, clientRequestId: "request_notification_target"
         )
         let cases: [(Int, E2EEV2ContentPayloadV2.Body, String)] = [
-            (60, .text("Contenu privé de test"), String(localized: "Message éphémère chiffré")),
-            (0, .edit(targetRef: target, text: "Texte privé modifié"), String(localized: "Message chiffré modifié")),
-            (0, .delete(targetRef: target), String(localized: "Message chiffré supprimé")),
+            (60, .text("Contenu privé de test"), String(localized: "Message éphémère")),
+            (0, .edit(targetRef: target, text: "Texte privé modifié"), String(localized: "Message modifié")),
+            (0, .delete(targetRef: target), String(localized: "Message supprimé")),
         ]
         for (ttl, body, expected) in cases {
             let fixture = try fixture(ttlSeconds: ttl, body: body), store = try store(fixture)
