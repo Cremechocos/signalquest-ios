@@ -11,6 +11,9 @@ final class MessagesViewModel: ObservableObject {
     @Published var actionError: String?
     /// Aperçus déchiffrés du dernier message, par id de conversation.
     @Published var decryptedPreviews: [String: String] = [:]
+    /// Aperçus v2 déjà relus en arrière-plan, par conversation et enveloppe : un nouveau dernier message relance la relève.
+    private var previewRefreshed: Set<String> = []
+    static let maxPreviewRefreshes = 8
     /// Limite d'épinglage du compte (P2-46), quand le serveur la sert.
     @Published var pinLimit: Int?
     /// D'autres conversations existent côté serveur au-delà de celles chargées (B01).
@@ -376,8 +379,28 @@ final class MessagesViewModel: ObservableObject {
         let readable = conversations + requestConversations
         // v2 : le dernier message vérifié et gardé ici, sans requête ni clé v1.
         if let v2 {
+            // Le serveur ne sert aucun texte v2 : l'aperçu vient du message
+            // déchiffré ici. S'il n'est pas encore relevé, la conversation se
+            // relit en arrière-plan (les premières de la liste, l'une après
+            // l'autre), comme à son ouverture (demande d'Alexandre, 08/11).
+            var behind: [MessageConversation] = []
             for conversation in readable where EncryptedConversationSurfaces.isV2(conversation) {
-                if let text = v2.latestText(conversationId: conversation.id) { decryptedPreviews[conversation.id] = text }
+                let preview = v2.latestPreview(conversationId: conversation.id)
+                if let preview { decryptedPreviews[conversation.id] = preview.text }
+                if let server = conversation.e2eeV2?.lastMessage, server.envelopeId != preview?.envelopeId {
+                    behind.append(conversation)
+                }
+            }
+            for conversation in behind.prefix(Self.maxPreviewRefreshes) {
+                let key = conversation.id + "|" + (conversation.e2eeV2?.lastMessage?.envelopeId ?? "")
+                guard previewRefreshed.insert(key).inserted else { continue }
+                _ = await v2.refresh(
+                    conversationId: conversation.id, isGroup: conversation.isGroup,
+                    participantIds: conversation.participants.map(\.userId)
+                )
+                if let preview = v2.latestPreview(conversationId: conversation.id) {
+                    decryptedPreviews[conversation.id] = preview.text
+                }
             }
         }
         guard let e2ee, await e2ee.isUnlocked() else { return }
@@ -1820,8 +1843,11 @@ struct MessagesView: View {
     /// Les replis passent par `String(localized:)` : rendus en `Text(String)`,
     /// ils restaient en français dans l'app anglaise.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
-        // Message v2 : le serveur n'en sert qu'un aperçu vide (lot A7).
-        if conversation.e2eeV2?.lastMessage != nil { return String(localized: "Message chiffré") }
+        // Message v2 : le serveur n'en sert qu'un aperçu vide (lot A7) ; le texte
+        // vient du message déchiffré ici, le cadenas seulement s'il est illisible.
+        if conversation.e2eeV2?.lastMessage != nil {
+            return model.decryptedPreviews[conversation.id].flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Message chiffré")
+        }
         guard let last = conversation.lastMessage else {
             return String(localized: "Aucun message")
         }

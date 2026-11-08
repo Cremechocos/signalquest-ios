@@ -143,4 +143,26 @@ extension E2EEV2MessagingRuntimeTests {
         XCTAssertEqual(try JSONDecoder.signalQuest.decode(MessageConversation.self, from: group).migrationMemberIds, [],
                        "Un groupe garde la règle « non archivé »")
     }
+
+    /// Aperçu de la liste (demande d'Alexandre, 08/11) : le vrai dernier
+    /// message en clair, jamais un import ; la nature d'un message sans texte.
+    func testTheListPreviewIsTheLastMessageInClear() {
+        func stored(_ id: String, _ kind: String, _ text: String?, deleted: Bool = false) -> E2EEV2MessageStoreV2.Stored {
+            E2EEV2MessageStoreV2.Stored(
+                messageRef: "ref_\(id)", envelopeId: id, sequence: 1, senderUserId: bruno, senderDeviceId: "d",
+                clientRequestId: "c", epochNumber: 1, serverTimeMs: 0, serverTagB64: "", keyId: "k", frankTagB64: "",
+                kind: kind, targetRef: nil, replyToRef: nil, sentAtMs: 0, expiresAtMs: nil, text: text, deleted: deleted
+            )
+        }
+        XCTAssertNil(E2EEV2MessagingRuntime.preview(of: []))
+        XCTAssertNil(E2EEV2MessagingRuntime.preview(of: [stored("i", E2EEV2MessageStoreV2.importKind, nil)]))
+        let text = E2EEV2MessagingRuntime.preview(of: [stored("a", "TEXT", "Salut"), stored("b", "TEXT", "On se voit\nà 8 h"), stored("i", E2EEV2MessageStoreV2.importKind, nil)])
+        XCTAssertEqual(text?.envelopeId, "b")
+        XCTAssertEqual(text?.text, "On se voit à 8 h")
+        XCTAssertEqual(E2EEV2MessagingRuntime.preview(of: [stored("a", "TEXT", "Salut"), stored("p", "POLL", nil)])?.envelopeId, "p")
+        XCTAssertEqual(E2EEV2MessagingRuntime.preview(of: [stored("m", "MEDIA", nil)])?.envelopeId, "m")
+        let deleted = E2EEV2MessagingRuntime.preview(of: [stored("d", "TEXT", "secret", deleted: true)])
+        XCTAssertEqual(deleted?.envelopeId, "d")
+        XCTAssertNotEqual(deleted?.text, "secret")
+    }
 }

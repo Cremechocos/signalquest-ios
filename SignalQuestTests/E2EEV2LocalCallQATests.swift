@@ -309,7 +309,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         _ = await session.messaging.callMembers(conversationId: conversationId, synchronizing: true)
         // Les messages v2 de l'appelant, relevés et déchiffrés sur l'appareil.
         _ = await session.messaging.refresh(conversationId: conversationId, isGroup: true, participantIds: [callee.userId, callerUserId])
-        print("[QA appel croisé] dernier message v2 lu : \(session.messaging.latestText(conversationId: conversationId) ?? "aucun")")
+        print("[QA appel croisé] dernier message v2 lu : \(session.messaging.latestPreview(conversationId: conversationId)?.text ?? "aucun")")
         var ringing: CallSession?
         for _ in 0..<20 where ringing == nil {
             ringing = try await session.service.pending().first { $0.id == callId }

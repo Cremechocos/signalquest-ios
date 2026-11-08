@@ -734,15 +734,31 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         )
     }
 
-    /// Dernier message lisible d'une conversation v2, déjà vérifié et gardé
-    /// sur cet appareil : l'aperçu de la liste, sans aucune requête.
-    func latestText(conversationId: String) -> String? {
+    /// Dernier message affichable gardé ici, pour l'aperçu de la liste : son
+    /// enveloppe (comparée à `e2eeV2.lastMessage` du serveur) et son texte en
+    /// clair, ou la nature d'un message sans texte. Un import n'est jamais un
+    /// dernier message.
+    func latestPreview(conversationId: String) -> (envelopeId: String, text: String)? {
         guard readsEnabled, let parts = current(),
               let snapshot = try? parts.messageStore.snapshot(
                   conversationId: conversationId, ownerScopeId: parts.session.ownerScopeId,
                   nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
               ) else { return nil }
-        return snapshot.messages.last { !$0.deleted && $0.text != nil }?.text
+        return Self.preview(of: snapshot.messages)
+    }
+
+    /// Choix de l'aperçu parmi les messages affichables, dans l'ordre du serveur.
+    static func preview(of messages: [E2EEV2MessageStoreV2.Stored]) -> (envelopeId: String, text: String)? {
+        guard let last = messages.last(where: { $0.kind != E2EEV2MessageStoreV2.importKind }) else { return nil }
+        if last.deleted { return (last.envelopeId, String(localized: "Message supprimé")) }
+        if let text = last.text?.split(whereSeparator: \.isNewline).joined(separator: " "), !text.isEmpty {
+            return (last.envelopeId, text)
+        }
+        switch last.kind {
+        case "POLL": return (last.envelopeId, String(localized: "Sondage"))
+        case "MEDIA", "AUDIO", "CARD": return (last.envelopeId, String(localized: "📎 Pièce jointe"))
+        default: return nil
+        }
     }
 
     /// Signalement en deux parties (§11, D.10) de messages gardés par cet
