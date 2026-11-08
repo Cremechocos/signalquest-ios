@@ -211,11 +211,14 @@ enum E2EEV2EpochVerifierV2 {
     ) -> Outcome {
         let fields = served.manifest.canonical.components(separatedBy: "\n")
         // Époque marquée : son créateur a pu être révoqué depuis, le journal garde
-        // sa clé de signature et le contrôle du §7.1 juge la date.
+        // sa clé de signature et le contrôle du §7.1 juge la date. Non marquée :
+        // un créateur absent du journal se lit dans ses certificats v2 (§12).
         guard genesis.conversationId == conversationId,
               fields.count == 13,
-              let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5])
-                ?? (served.accepted.e2eeAuto ? logSigningKey(devices, userId: fields[4], deviceId: fields[5]) : nil),
+              let creatorKey = served.accepted.e2eeAuto
+                ? devices.signingKey(userId: fields[4], deviceId: fields[5])
+                    ?? logSigningKey(devices, userId: fields[4], deviceId: fields[5])
+                : devices.priorSigningKey(userId: fields[4], deviceId: fields[5]),
               let manifest = try? E2EEV2EpochManifest.verify(
                   served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
               ),

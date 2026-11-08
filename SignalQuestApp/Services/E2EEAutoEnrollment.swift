@@ -476,7 +476,7 @@ extension E2EEAutoEnrollment {
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
         markerStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")
     ) async -> Outcome? {
-        guard SQFeatures.e2eeAutoLogEnabled, E2EEAutoLogReader.productionLogKeys != nil else { return nil }
+        guard SQFeatures.e2eeAutoLogEnabled, E2EEAutoLogReader.liveLogKeys != nil else { return nil }
         var outcome: Outcome?
         var (replaced, refreshed) = (false, false)
         for _ in 0..<3 {

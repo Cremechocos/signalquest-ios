@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import os
 
@@ -51,6 +52,9 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
     private let stateStore: E2EEV2ConversationStateStore
     private let expectedSession: LocalAccountSession?
     private let now: @Sendable () -> Date
+    /// Certificats v2 des comptes nommés (E2EE-AUTO §12, avant l'étape 5) :
+    /// lus seulement pour un signataire absent d'un journal vérifié.
+    private let legacySigners: (@Sendable ([String]) async -> E2EEV2CertifiedDeviceSet?)?
 
     init(
         api: APIClient,
@@ -58,14 +62,37 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
         stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         expectedSession: LocalAccountSession? = nil,
+        legacySigners: (@Sendable ([String]) async -> E2EEV2CertifiedDeviceSet?)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
+        self.legacySigners = legacySigners
         self.identityStore = identityStore
         self.keyStore = keyStore
         self.stateStore = stateStore
         self.expectedSession = expectedSession
         self.now = now
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
+    }
+
+    /// Auteurs (compte, appareil) des changements d'appartenance.
+    static func actors(_ changes: [E2EEV2SignedString]) -> [(String, String)] {
+        changes.compactMap {
+            guard let f = E2EEV2Canonical.split($0.canonical, tag: E2EEV2MembershipChange.tag, version: "1", fieldCount: 10)
+            else { return nil }
+            return (f[6], f[7])
+        }
+    }
+
+    /// Les certificats v2 des comptes dont un signataire manque au journal,
+    /// lus une fois par relève et joints à l'ensemble.
+    private func withLegacySigners(
+        _ signers: [(String, String)], devices: E2EEV2CertifiedDeviceSet
+    ) async -> E2EEV2CertifiedDeviceSet {
+        let users = Set(signers.filter { devices.needsLegacySigner(userId: $0.0, deviceId: $0.1) }.map(\.0))
+        guard let legacySigners, !users.isEmpty, let read = await legacySigners(users.sorted()) else { return devices }
+        var merged = devices
+        for user in users { merged.legacyDevicesByUser[user] = read.devicesByUser[user] ?? [] }
+        return merged
     }
 
     /// `devices` couvre chaque auteur de la chaîne, anciens membres compris : un
@@ -134,10 +161,16 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
         //    n'est écrit avant que toute la chaîne soit relue.
         let genesis: E2EEV2ConversationStateStore.Genesis
         let isNewGenesis: Bool
+        // Signataires absents du journal : leurs certificats v2, lus au besoin.
+        var signers = devices
+        func chainKey(_ userId: String, _ deviceId: String) -> P256.Signing.PublicKey? {
+            signers.priorSigningKey(userId: userId, deviceId: deviceId)
+        }
         do {
             if let recorded = try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) {
                 genesis = recorded
                 isNewGenesis = false
+                signers = await withLegacySigners(Self.actors(fresh), devices: signers)
             } else {
                 let data: Data
                 switch await bound.getJSON(
@@ -150,7 +183,9 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                     return .failure(localError("invalid-e2ee-genesis-manifest"))
                 }
                 let fields = served.manifest.canonical.components(separatedBy: "\n")
-                guard fields.count == 13, let creatorKey = signingKey(fields[4], fields[5]) else {
+                guard fields.count == 13 else { return .failure(localError("invalid-e2ee-genesis-manifest")) }
+                signers = await withLegacySigners([(fields[4], fields[5])] + Self.actors(all), devices: signers)
+                guard let creatorKey = chainKey(fields[4], fields[5]) else {
                     return .failure(localError("invalid-e2ee-genesis-manifest"))
                 }
                 let manifest = try E2EEV2EpochManifest.verify(
@@ -162,7 +197,7 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 }
                 _ = try E2EEV2EpochBinding.verifyGenesis(
                     manifest, recipients: served.recipients, chain: Array(all.prefix(manifest.membershipChangeNumber)),
-                    isGroup: isGroup, signingKey: signingKey
+                    isGroup: isGroup, signingKey: chainKey
                 )
                 genesis = .init(
                     conversationId: conversationId, creatorUserId: manifest.creatorUserId,
@@ -181,7 +216,7 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             // gardée l'a été vérifiée, sans dépendre de l'annuaire du jour.
             let head = try E2EEV2MembershipChain.apply(
                 all, conversationId: conversationId, isGroup: isGroup, genesisLength: genesis.membershipChangeNumber,
-                verifiedCount: known.count, signingKey: signingKey
+                verifiedCount: known.count, signingKey: chainKey
             )
             guard head.genesisActor == E2EEV2MembershipChain.Actor(userId: genesis.creatorUserId, deviceId: genesis.creatorDeviceId)
             else { return .failure(localError("invalid-e2ee-membership")) }
@@ -209,6 +244,12 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             }
             served = parsed
         }
+        // Créateur d'une époque non marquée absent du journal : ses certificats v2 (§12).
+        let creator = served.manifest.canonical.components(separatedBy: "\n")
+        if !served.accepted.e2eeAuto, creator.count == 13 {
+            signers = await withLegacySigners([(creator[4], creator[5])], devices: signers)
+        }
+        let epochSigners = signers
         let knownEpoch: E2EEV2ConversationStateStore.CurrentEpoch?
         do {
             knownEpoch = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
@@ -242,7 +283,7 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             switch E2EEV2EpochVerifierV2.open(
                 epoch, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
                 ownDeviceId: device.deviceId, genesis: genesis,
-                previousMembershipChangeNumber: previous?.membershipChangeNumber, devices: devices,
+                previousMembershipChangeNumber: previous?.membershipChangeNumber, devices: epochSigners,
                 membershipAt: membershipAt,
                 firstAutoEpochNumber: E2EEAutoConversationMarkers().guardNumber(
                     local: previous?.firstAutoEpochNumber, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId

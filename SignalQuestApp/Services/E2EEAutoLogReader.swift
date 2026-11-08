@@ -259,6 +259,21 @@ actor E2EEAutoLogReader {
         next: ["BF5ImQG7MrKenFAYOmzOSOrjRBAS6W14Lv/KlOQiv0ARjQtrP7HYUBfvLRug6WBvd0vJ32L07KU7+b87PvXXwm8="]
     )
 
+    /// Clés épinglées par le lecteur en service : celles de production, sauf
+    /// sur la pile QA locale, qui sert le journal des vecteurs du contrat
+    /// (`AppEnvironment.pinsAutoLogVectorKeysQA`, simulateur Debug seulement).
+    static var liveLogKeys: (current: String, next: [String])? {
+        #if DEBUG && targetEnvironment(simulator)
+        if AppEnvironment.pinsAutoLogVectorKeysQA {
+            return (
+                current: "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+                next: ["BAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc="]
+            )
+        }
+        #endif
+        return productionLogKeys
+    }
+
     typealias FetchLinks = @Sendable (_ after: Int64) async throws -> (data: Data, serverDate: Date?)
     /// Entrées de seq dans `]after, upTo]` ; nil : compte non servi (404).
     typealias FetchAccount = @Sendable (_ userId: String, _ after: Int64, _ upTo: Int64) async throws -> Data?
@@ -317,7 +332,7 @@ actor E2EEAutoLogReader {
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore()
     ) -> E2EEAutoLogReader? {
-        guard let keys = productionLogKeys, session.ownerScopeId.hasPrefix("user:") else { return nil }
+        guard let keys = liveLogKeys, session.ownerScopeId.hasPrefix("user:") else { return nil }
         let owner = session.ownerScopeId
         let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
         return E2EEAutoLogReader(

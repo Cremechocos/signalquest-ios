@@ -26,6 +26,8 @@ actor E2EEV2DeviceDirectoryCache {
     private let autoRead: (@Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet)?
     private let now: @Sendable () -> Date
     private var entries: [String: Entry] = [:]
+    /// Certificats v2 lus pour des signataires absents du journal, par compte.
+    private var legacyEntries: [String: (devices: [E2EEV2CertifiedDevice], readAt: Date)] = [:]
     /// Dernier écart d'horloge mesuré par le journal (§7.1).
     private var logClockOffsetMs: Int64?
     /// Invalidations par compte : une lecture commencée avant une invalidation
@@ -93,6 +95,27 @@ actor E2EEV2DeviceDirectoryCache {
             if !added.isEmpty { E2EEAutoDeviceEvents.post(ownerScopeId: reader.ownerScopeId, added: added) }
             return set
         }
+    }
+
+    /// Certificats v2 de comptes dont un signataire manque au journal : la
+    /// vérification v2 d'avant la bascule, gardée jusqu'à l'étape 5
+    /// (E2EE-AUTO §12). Sans source auto, `devices(for:)` les lit déjà.
+    /// Gardés 5 minutes, comme les appareils.
+    func legacySigners(for userIds: [String]) async -> E2EEV2CertifiedDeviceSet? {
+        guard autoRead != nil, !userIds.isEmpty else { return nil }
+        let current = now()
+        let stale = Set(userIds).filter { user in
+            guard let entry = legacyEntries[user] else { return true }
+            return current.timeIntervalSince(entry.readAt) >= Self.lifetime || current < entry.readAt
+        }.sorted()
+        if !stale.isEmpty {
+            guard let read = try? await directory.certifiedDevices(for: stale) else { return nil }
+            let readAt = now()
+            for user in stale { legacyEntries[user] = (read.devicesByUser[user] ?? [], readAt) }
+        }
+        var devices: [String: [E2EEV2CertifiedDevice]] = [:]
+        for user in userIds { devices[user] = legacyEntries[user]?.devices ?? [] }
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: [:])
     }
 
     /// Les comptes demandés, relus s'ils manquent ou ont plus de 5 minutes. Un

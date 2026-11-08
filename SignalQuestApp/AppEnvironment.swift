@@ -217,6 +217,17 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Pile QA locale (3201) : son journal est celui des vecteurs du contrat,
+    /// signé par leurs clés de test. `--qa-auto-log-vector-keys` les épingle,
+    /// face à un hôte local seulement ; jamais compilé hors simulateur Debug.
+    static var pinsAutoLogVectorKeysQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        let host = AppConfig.current.apiBaseURL.host?.lowercased()
+        return hasArgument("--qa-auto-log-vector-keys") && (host == "localhost" || host == "127.0.0.1")
+        #else
+        false
+        #endif
+    }
     /// Ligne « le journal de X ne correspond pas » ; `--qa-auto-log-mismatch-sent` après le signalement.
     static var showsAutoLogMismatchQA: Bool {
         #if DEBUG && targetEnvironment(simulator)

@@ -129,7 +129,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 session: session,
                 messaging: E2EEV2ConversationMessagingV2(
                     api: api, identityStore: identityStore, keyStore: keyStore, stateStore: stateStore,
-                    ledgerStore: stores.1, messageStore: stores.0, notificationMirror: mirror, expectedSession: session
+                    ledgerStore: stores.1, messageStore: stores.0, notificationMirror: mirror, expectedSession: session,
+                    legacySigners: { [directory] in await directory.legacySigners(for: $0) }
                 ),
                 creator: E2EEV2ConversationCreator(
                     api: api, identityStore: identityStore, keyStore: keyStore, stateStore: stateStore, expectedSession: session
@@ -371,8 +372,10 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         case .notV2 where E2EEV2ServerGate.autoActive:
             // Appareil neuf (E2EE-AUTO §7) : une conversation v2 jamais relue
             // ici se relit d'abord, avec les membres servis ; sa chaîne vérifiée
-            // fait foi ensuite.
-            guard let conversation = await conversationDetail(conversationId), conversation.e2eeV2 != nil
+            // fait foi ensuite. La route de détail ne sert pas `e2eeV2` (la
+            // liste seule le sert) : `e2eeProtocolVersion` 2 suffit.
+            guard let conversation = await conversationDetail(conversationId),
+                  conversation.e2eeV2 != nil || conversation.e2eeProtocolVersion == 2
             else { return .noAction }
             stored = (conversation.isGroup, conversation.migrationMemberIds)
         case .notV2: return .noAction
@@ -388,7 +391,14 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 if case .failure(let failure) = $0 { return Self.stale(failure) }
                 return nil
             }) { devices in
-                await parts.messaging.rotate(
+                // Créateur de l'époque courante, non marquée, absent du journal :
+                // ses certificats v2 (E2EE-AUTO §12, avant l'étape 5).
+                var devices = devices
+                let logged = stored.members.filter { devices.logAccounts[$0] != nil }.sorted()
+                if !logged.isEmpty, let legacy = await parts.directory.legacySigners(for: logged) {
+                    for user in logged { devices.legacyDevicesByUser[user] = legacy.devicesByUser[user] ?? [] }
+                }
+                return await parts.messaging.rotate(
                     conversationId: conversationId, isGroup: stored.isGroup, devices: devices,
                     expectedOwnerScopeId: parts.session.ownerScopeId
                 )

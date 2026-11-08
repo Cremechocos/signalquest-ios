@@ -63,6 +63,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         messageStore: E2EEV2MessageStoreV2,
         notificationMirror: E2EEV2NotificationMirrorWriter? = nil,
         expectedSession: LocalAccountSession? = nil,
+        legacySigners: (@Sendable ([String]) async -> E2EEV2CertifiedDeviceSet?)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.notificationMirror = notificationMirror
@@ -74,7 +75,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
         syncer = E2EEV2ConversationSyncV2(
             api: api, identityStore: identityStore, keyStore: keyStore, stateStore: stateStore,
-            expectedSession: expectedSession, now: now
+            expectedSession: expectedSession, legacySigners: legacySigners, now: now
         )
         rotator = E2EEV2EpochRotatorV2(
             api: api, identityStore: identityStore, keyStore: keyStore, stateStore: stateStore,

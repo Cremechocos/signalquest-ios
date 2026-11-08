@@ -28,6 +28,28 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     /// Comptes supprimés (410 `E2EE_ACCOUNT_DELETED`, D.4 v0.4.30) : membres
     /// sans appareil, ni refusés ni à relire ; un administrateur les retire.
     var deleted: Set<String> = []
+    /// Appareils v2 d'avant la bascule, absents du journal (E2EE-AUTO §12,
+    /// avant l'étape 5) : lus pour vérifier une genèse, sa chaîne ou une
+    /// époque non marquée, jamais comme destinataires.
+    var legacyDevicesByUser: [String: [E2EEV2CertifiedDevice]] = [:]
+
+    /// Signataire d'une genèse, de sa chaîne ou d'une époque non marquée : un
+    /// appareil actif ; sinon, s'il manque au journal vérifié de son compte
+    /// (appareil v2 jamais repris au journal, §3.6), ses certificats v2. Un
+    /// appareil que le journal connaît, révoqué compris, et un compte dont le
+    /// journal n'est pas vérifié ne passent jamais par le v2.
+    func priorSigningKey(userId: String, deviceId: String) -> P256.Signing.PublicKey? {
+        if let key = signingKey(userId: userId, deviceId: deviceId) { return key }
+        guard let account = logAccounts[userId], account.devices[deviceId] == nil else { return nil }
+        return legacyDevicesByUser[userId]?.first { $0.deviceId == deviceId }?.signingKey
+    }
+
+    /// Le signataire manque au journal vérifié et aux certificats v2 déjà lus.
+    func needsLegacySigner(userId: String, deviceId: String) -> Bool {
+        priorSigningKey(userId: userId, deviceId: deviceId) == nil
+            && logAccounts[userId].map { $0.devices[deviceId] == nil } == true
+            && legacyDevicesByUser[userId] == nil
+    }
 
     /// Membres qui n'ont pas été lus du tout, ni crus ni refusés : appris par
     /// une synchronisation après la lecture. Ils sont à lire avant toute
