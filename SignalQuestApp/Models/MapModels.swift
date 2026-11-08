@@ -770,6 +770,10 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     /// seulement qu'il y a de la 5G quelque part sur le pylône, pas à qui elle
     /// appartient. Vide sur un site mono-opérateur ou un backend antérieur.
     let operators5G: [String]
+    /// Systèmes de chaque opérateur d'un support partagé (TECH-BY-OP, servi le
+    /// 08/11). Clé absente = inconnu ; vide sur un support à un seul opérateur
+    /// ou un backend antérieur.
+    let technologiesByOperator: [String: [String]]
     let bands: [Int]
     let address: String?
     let isZTD: Bool
@@ -795,7 +799,7 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let radioSystems: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, azimutsByOperator, operators5G, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
+        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, azimutsByOperator, operators5G, technologiesByOperator, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
         // Le backend n'émet PAS de clé `address` : il envoie les composants ANFR
         // séparément. Sans eux, l'adresse d'un site venu des tuiles restait vide.
         case adrLbAdd1 = "adr_lb_add1"
@@ -854,6 +858,7 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
         azimutsByOperator = ((try? c.decodeIfPresent([String: [Double]].self, forKey: .azimutsByOperator)) ?? nil) ?? [:]
         operators5G = c.decodeLossyArray([String].self, forKey: .operators5G)
+        technologiesByOperator = ((try? c.decodeIfPresent([String: [String]].self, forKey: .technologiesByOperator)) ?? nil) ?? [:]
         bands = c.decodeLossyArray([Int].self, forKey: .bands)
         address = Self.composedAddress(from: c)
         isZTD = (try? c.decodeIfPresent(Bool.self, forKey: .isZTD)) ?? false

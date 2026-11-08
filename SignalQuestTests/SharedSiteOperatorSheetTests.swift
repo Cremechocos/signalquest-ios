@@ -86,6 +86,29 @@ final class SharedSiteOperatorSheetTests: XCTestCase {
         XCTAssertEqual(site.technologies(attributedTo: "ALL"), ["5G", "4G"])
     }
 
+    /// TECH-BY-OP servi le 08/11, mesuré par Backend sur Rosny (2991320) : SFR,
+    /// Bouygues et Orange ont les quatre systèmes, Free n'a que la 5G NR 3500.
+    /// Une clé absente (opérateur mutualisé sans ligne) reste « inconnu ».
+    func testSharedSiteReadsTheTechnologiesOfEachOperator() throws {
+        let json = Data("""
+        {"id":"2991320","supId":"2991320","lat":48.87,"lng":2.48,
+         "operators":["SFR","BOUYGUES","ORANGE","FREE"],
+         "technologies":["LTE 1800","LTE 2100","LTE 2600","5G NR 3500"],
+         "technologiesByOperator":{"SFR":["LTE 1800","LTE 2100","LTE 2600","5G NR 3500"],"ORANGE":["LTE 1800","LTE 2100","LTE 2600","5G NR 3500"],"FREE":["5G NR 3500"]}}
+        """.utf8)
+        let marker = try JSONDecoder().decode(AndroidAntennaMarker.self, from: json)
+        XCTAssertEqual(marker.technologiesByOperator["FREE"], ["5G NR 3500"])
+        var site = sharedSite(azimuths: [], byOperator: [:])
+        site.technologiesByOperator = marker.technologiesByOperator
+        XCTAssertEqual(site.technologies(attributedTo: "FREE"), ["5G"])
+        XCTAssertEqual(site.technologies(attributedTo: "orange"), ["5G", "4G"])
+        XCTAssertNil(site.technologies(attributedTo: "BOUYGUES"), "Clé absente : jamais la liste d'un voisin")
+        XCTAssertEqual(site.technologies(attributedTo: "ALL"), ["5G", "4G"])
+        // DROM : clé d'`operatorFacets` octet pour octet, libellé inconnu jamais jeté.
+        site.technologiesByOperator = ["Digicel": ["LTE 800", "WIMAX 3500"]]
+        XCTAssertEqual(site.technologies(attributedTo: "Digicel"), ["4G", "WIMAX 3500"])
+    }
+
     func testSingleOperatorSiteKeepsItsTechnologies() {
         let site = AntennaSite(
             id: "1288882", siteId: "1288882", latitude: 45.18, longitude: 5.73,

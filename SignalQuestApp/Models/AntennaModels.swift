@@ -37,6 +37,9 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     var azimuthsByOperator: [String: [Double]] = [:]
     /// Opérateurs du site qui émettent en 5G (support partagé uniquement).
     var operators5G: [String] = []
+    /// Systèmes de chaque opérateur sur un support partagé (TECH-BY-OP §3),
+    /// libellés bruts. Une clé absente veut dire « inconnu ».
+    var technologiesByOperator: [String: [String]] = [:]
 
     /// Empreinte du site quand la réponse la porte (`site_key` du registre ISED) :
     /// un résultat de la recherche rapide n'a sinon que son `sup_id`.
@@ -76,17 +79,22 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// Les technologies de la tuile, seulement quand elles appartiennent
     /// sûrement à cet opérateur : support à un seul opérateur, ou vue « Tous »
     /// (le support entier, sans attribution). Sur un support partagé,
-    /// `technologies` n'est pas celle de l'opérateur demandé : jusqu'au contrat
-    /// TECH-BY-OP, c'est celle du premier opérateur rencontré (SFR, Bouygues,
-    /// Orange, Free), ensuite l'union du support. La prêter à l'un d'eux
-    /// affichait la 3G ou la 4G d'un voisin, ou omettait les siennes. `nil` veut dire
-    /// « inconnu » : on n'affiche rien plutôt qu'une donnée fausse.
+    /// `technologies` est l'union du support (TECH-BY-OP, avant : celle du
+    /// premier opérateur rencontré) : la prêter à l'un d'eux affichait la 3G ou
+    /// la 4G d'un voisin. On lit alors `technologiesByOperator` (§5, point 2),
+    /// clé exacte d'abord (DROM : octet pour octet), puis sans casse. `nil` veut
+    /// dire « inconnu » (clé absente, ou tuile antérieure) : on n'affiche rien
+    /// plutôt qu'une donnée fausse, jamais la liste d'un autre opérateur.
     func technologies(attributedTo operatorKey: String) -> [String]? {
-        let key = operatorKey.trimmingCharacters(in: .whitespaces).uppercased()
+        let trimmed = operatorKey.trimmingCharacters(in: .whitespaces)
+        let key = trimmed.uppercased()
         if key == "ALL" { return technologies }
         let distinct = Set(operators.map { $0.trimmingCharacters(in: .whitespaces).uppercased() })
-        guard distinct.count <= 1, distinct.isEmpty || distinct.contains(key) else { return nil }
-        return technologies
+        if distinct.count <= 1, distinct.isEmpty || distinct.contains(key) { return technologies }
+        let scoped = technologiesByOperator[trimmed]
+            ?? technologiesByOperator.first(where: { $0.key.uppercased() == key })?.value
+        guard let scoped, !scoped.isEmpty else { return nil }
+        return Self.normalizedTechnologies(scoped)
     }
 
     func azimuths(for operatorKey: String) -> [Double] {

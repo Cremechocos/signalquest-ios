@@ -1578,6 +1578,7 @@ final class MapExplorerViewModel: ObservableObject {
             site.radioSystems = marker.radioSystems
             site.azimuthsByOperator = marker.azimutsByOperator
             site.operators5G = marker.operators5G
+            site.technologiesByOperator = marker.technologiesByOperator
             return site
         }
     }
