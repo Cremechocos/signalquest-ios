@@ -633,6 +633,33 @@ final class AppServices: ObservableObject {
         } while historyBackfillPending
     }
 
+    private var mirrorRefreshRunning = false
+    private var mirrorRefreshedAt: Date?
+    static let mirrorRefreshInterval: TimeInterval = 600
+    static let maxMirrorRefreshes = 30
+
+    /// Notifications chiffrées en clair (choix d'Alexandre, 08/11) : l'extension
+    /// ne lit que le miroir écrit par l'app après une relève, frais de moins de
+    /// 24 h et avec l'époque courante, sinon elle montre un texte générique. Au
+    /// premier plan, au plus toutes les 10 min, les conversations chiffrées les
+    /// plus récentes sont relues l'une après l'autre : la relève reprend les
+    /// nouvelles époques et réécrit leur entrée du miroir.
+    func refreshEncryptedNotificationMirrors() async {
+        guard e2eeV2Messaging.readsEnabled, !mirrorRefreshRunning, LocalAccountScope.sessionSnapshot() != nil,
+              mirrorRefreshedAt.map({ Date().timeIntervalSince($0) >= Self.mirrorRefreshInterval }) ?? true else { return }
+        mirrorRefreshRunning = true
+        defer { mirrorRefreshRunning = false }
+        guard let page = try? await messages.conversationPage(cursor: nil, take: Self.maxMirrorRefreshes) else { return }
+        mirrorRefreshedAt = Date()
+        for conversation in page.conversations where EncryptedConversationSurfaces.isV2(conversation) {
+            guard !Task.isCancelled, LocalAccountScope.sessionSnapshot() != nil else { return }
+            _ = await e2eeV2Messaging.refresh(
+                conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId)
+            )
+        }
+    }
+
     /// Push `e2ee_device_added` reçu, ou premier plan avec un `seq` encore attendu
     /// (révision 21) : son propre compte relu. L'appareil ajouté part de cette
     /// lecture (alerte « Nouvel appareil », rotations), jamais du push.

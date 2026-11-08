@@ -398,6 +398,7 @@ struct AppRootView: View {
                             await services.callManager.reconcilePendingIncomingCall()
                             await services.livePresence.refreshSharingSettings()
                             await services.push.refreshE2eeV2NotificationContext()
+                            await services.refreshEncryptedNotificationMirrors()
                         }
                     }
                     services.enterForeground()
