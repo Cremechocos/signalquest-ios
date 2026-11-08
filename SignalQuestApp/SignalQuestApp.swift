@@ -322,6 +322,11 @@ struct AppRootView: View {
                       let id = note.userInfo?["session"] as? String else { return }
                 services.epochRotations.resume(expected: .init(ownerScopeId: owner, sessionId: id))
             }
+            // Époque rangée ici : sauvegardée vers HK tout de suite (E2EE-AUTO §5.2).
+            .onReceive(NotificationCenter.default.publisher(for: E2EEV2EpochEvents.didAdvance).receive(on: RunLoop.main)) { note in
+                guard let advance = E2EEV2EpochEvents.advance(from: note) else { return }
+                services.scheduleHistoryEpochBackfill(ownerNamespace: advance.ownerNamespace)
+            }
             // Appareils ajoutés vus dans le journal (E2EE-AUTO §3.5, §7).
             .onReceive(NotificationCenter.default.publisher(for: E2EEAutoDeviceEvents.name).receive(on: RunLoop.main)) { note in
                 guard let account = LocalAccountScope.sessionSnapshot(),

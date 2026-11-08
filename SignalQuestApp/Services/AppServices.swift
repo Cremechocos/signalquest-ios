@@ -601,6 +601,38 @@ final class AppServices: ObservableObject {
         E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
     }
 
+    private var historyBackfillTask: Task<Void, Never>?
+    private var historyBackfillRunning = false
+    private var historyBackfillPending = false
+
+    /// Clé d'époque rangée ici (genèse, rotation, synchro) : sauvegardée vers HK
+    /// sans attendre le prochain premier plan (§5.2). Sans ce passage, une époque
+    /// créée en cours de session n'avait aucune enveloppe d'historique, et un
+    /// appareil arrivé ensuite ne la lisait jamais (constaté en prod le 08/11).
+    /// Regroupé sur 3 s : une rafale d'époques ne fait qu'un passage.
+    func scheduleHistoryEpochBackfill(ownerNamespace: String) {
+        guard SQFeatures.e2eeAutoLogEnabled, E2EEV2ServerGate.autoActive,
+              LocalAccountScope.sessionSnapshot()?.ownerNamespace == ownerNamespace else { return }
+        historyBackfillTask?.cancel()
+        historyBackfillTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.runHistoryEpochBackfill(ownerNamespace: ownerNamespace)
+        }
+    }
+
+    private func runHistoryEpochBackfill(ownerNamespace: String) async {
+        guard !historyBackfillRunning else { historyBackfillPending = true; return }
+        historyBackfillRunning = true
+        defer { historyBackfillRunning = false }
+        repeat {
+            historyBackfillPending = false
+            guard let session = LocalAccountScope.sessionSnapshot(), session.ownerNamespace == ownerNamespace,
+                  let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
+            E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
+        } while historyBackfillPending
+    }
+
     /// Push `e2ee_device_added` reçu, ou premier plan avec un `seq` encore attendu
     /// (révision 21) : son propre compte relu. L'appareil ajouté part de cette
     /// lecture (alerte « Nouvel appareil », rotations), jamais du push.
