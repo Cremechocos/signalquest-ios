@@ -320,6 +320,59 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         }
     }
 
+    /// L'acteur est réentrant : une relecture des maillons pendant la lecture
+    /// d'un compte (ici, la tête passe de 12 à 16) ne doit pas juger ce compte
+    /// sur des maillons au-delà des entrées demandées. Sinon : fausse alerte
+    /// « entrée du journal absente », gardée (pile QA 3201, 08/11, après la
+    /// publication de HK par l'appareil lui-même).
+    func testLinksReadDuringAnAccountReadDoNotRaiseAMissingEntry() async throws {
+        let reference = try reference(), server = Server(reference)
+        let boundary = try boundaryHead(seq: 12)
+        server.links = Array(reference.links.prefix(12))
+        (server.headText, server.headSignatureB64) = boundary
+        let store = makeStore()
+        final class Box: @unchecked Sendable { var reader: E2EEAutoLogReader?; var refreshed = false }
+        let box = Box()
+        let reader = E2EEAutoLogReader(
+            ownerScopeId: Self.owner, pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64,
+            store: store,
+            fetchLinks: { after in (server.linksPage(after: after), server.serverDate) },
+            fetchAccount: { userId, after, upTo in
+                let page = server.accountPage(userId: userId, after: after, upTo: upTo)
+                if !box.refreshed, let reader = box.reader {
+                    box.refreshed = true
+                    // Le journal avance pendant la lecture du compte.
+                    server.links = reference.links
+                    (server.headText, server.headSignatureB64) = (reference.headText, reference.headSignatureB64)
+                    _ = try? await reader.refreshLinks()
+                }
+                return page
+            },
+            now: { Date(timeIntervalSince1970: TimeInterval(reference.headNowMs) / 1_000) }
+        )
+        box.reader = reader
+        _ = try await reader.refreshLinks()
+
+        let chain12 = try E2EEAutoLog.extendChain(
+            .initial(pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64),
+            links: Array(reference.links.prefix(12)), logKeyEntries: [:]
+        ).get()
+        let bySeq12 = Dictionary(uniqueKeysWithValues: reference.links.prefix(12).enumerated().map { (Int64($0.offset + 1), $0.element) })
+        let (userId, account) = try XCTUnwrap(reference.accounts.first {
+            $0.value.entries.contains { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) > 12 }
+        })
+        let kept = account.entries.filter { (E2EEAutoLog.parseEntry($0)?.entry.seq ?? 0) <= 12 }
+        let expected = E2EEAutoLog.verifyAccount(userId: userId, accountSaltB64: account.salt, entries: kept, links: bySeq12, chain: chain12)
+        XCTAssertNotNil(try? expected.get())
+
+        let read = try await reader.account(userId)
+        XCTAssertTrue(box.refreshed, "la relecture a bien eu lieu pendant la lecture du compte")
+        XCTAssertEqual(read, expected)
+        let anchor = try store.anchor(ownerScopeId: Self.owner)
+        XCTAssertNil(anchor?.alert)
+        XCTAssertNil(anchor?.accountAlerts?[userId])
+    }
+
     /// Lecteur qui garde la tête 12 (avant la LOG_KEY du maillon 13), sur le même magasin.
     private func keepHead12(_ reference: Reference, store: E2EEAutoLogStore) async throws {
         let server = Server(reference), boundary = try boundaryHead(seq: 12)

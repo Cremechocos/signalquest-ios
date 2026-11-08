@@ -603,6 +603,13 @@ actor E2EEAutoLogReader {
     /// entrée, gardé jusqu'à ce que l'utilisateur oublie le journal (§3.5 point 5).
     func account(_ userId: String) async throws -> Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>? {
         guard let chain else { throw Failure.linksNotRead }
+        // Maillons figés avec la chaîne : l'acteur est réentrant, et une relecture
+        // des maillons pendant `fetchAccount` ajoutait un maillon au-delà des
+        // entrées demandées (`upTo` = cette chaîne). Le compte se jugeait alors sur
+        // un maillon sans son entrée : fausse alerte « entrée du journal absente »,
+        // gardée, et plus d'envoi chiffré (pile QA, 08/11, juste après la
+        // publication de HK par l'appareil lui-même).
+        let links = linksBySeq.filter { $0.key <= chain.seq }
         if let alert = try store.anchor(ownerScopeId: ownerScopeId)?.accountAlerts?[userId] {
             return .failure(.init(error: E2EEAutoLog.AccountError(rawValue: alert.error) ?? .entryMissing, seq: alert.seq))
         }
@@ -646,7 +653,7 @@ actor E2EEAutoLogReader {
             }
             let result: Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>
             if let salt {
-                result = E2EEAutoLog.verifyAccount(userId: userId, accountSaltB64: salt, entries: entries, links: linksBySeq, chain: chain)
+                result = E2EEAutoLog.verifyAccount(userId: userId, accountSaltB64: salt, entries: entries, links: links, chain: chain)
             } else if let link = chain.accounts[E2EEAutoLog.accountId(userId: userId)] {
                 // Le maillon `ACCOUNT` existe, le serveur tait le compte.
                 result = .failure(.init(error: .accountWithheld, seq: link.seq))
