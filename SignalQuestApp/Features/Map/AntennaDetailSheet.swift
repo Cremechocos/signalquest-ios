@@ -906,8 +906,13 @@ struct AntennaDetailSheet: View {
                 .font(SQType.callout(.bold))
                 .foregroundStyle(SQColor.label)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(technologies(for: op), id: \.self) { tech in
-                MapTechTag(technology: tech, label: tech)
+            if isActive, isLoadingScopedTechnologies {
+                SkeletonBlock(width: 64, height: 20, radius: SQRadius.sm)
+                    .accessibilityHidden(true)
+            } else {
+                ForEach(technologies(for: op), id: \.self) { tech in
+                    MapTechTag(technology: tech, label: tech)
+                }
             }
             if isActive, model.details != nil {
                 Text(identityLine ?? String(localized: "n° non publié"))
@@ -952,13 +957,17 @@ struct AntennaDetailSheet: View {
     }
 
     /// Technologies d'un opérateur du support : celles de la fiche pour
-    /// l'opérateur affiché, sinon la fusion du support, sans prêter la 5G d'un
-    /// voisin (`operators5G`).
+    /// l'opérateur affiché ; pour les autres, celles de la tuile seulement si
+    /// elles sont sûrement les siennes, sinon rien.
     private func technologies(for op: String) -> [String] {
         if op == selectedOperator { return displayedTechnologies }
-        guard !site.operators5G.isEmpty else { return site.technologies }
-        let has5G = site.operators5G.contains { $0.caseInsensitiveCompare(op) == .orderedSame }
-        return has5G ? site.technologies : site.technologies.filter { $0 != "5G" }
+        return site.technologies(attributedTo: op) ?? []
+    }
+
+    /// La fiche scopée de l'opérateur affiché charge encore, et la tuile ne
+    /// dit pas ses technologies à lui : un squelette plutôt que la liste du support.
+    private var isLoadingScopedTechnologies: Bool {
+        model.details == nil && model.error == nil && site.technologies(attributedTo: selectedOperator) == nil
     }
 
     /// Les signalements, en lignes au bas de l'onglet plutôt qu'en grande carte.
@@ -1328,17 +1337,19 @@ struct AntennaDetailSheet: View {
 
     /// Technologies de l'opérateur affiché.
     ///
-    /// `site.technologies` est la FUSION du support : sur un site partagé, la
+    /// Sur un site partagé, `site.technologies` n'est pas celle de l'opérateur
+    /// affiché (celle du premier opérateur du support, puis leur union) : la
     /// fiche de Bouygues (5G seule ici) affichait « 5G 4G » parce qu'un voisin a
     /// de la 4G sur le même pylône. Le détail, lui, est déjà scopé opérateur ;
-    /// tant qu'il n'a pas répondu, `operators5G` permet au moins de ne pas
-    /// prêter la 5G d'un opérateur à un autre.
+    /// tant qu'il n'a pas répondu, ou s'il échoue, la tuile ne sert que si elle
+    /// est sûrement à lui (`technologies(attributedTo:)`), sinon rien : une
+    /// fiche vide plutôt qu'une technologie prêtée, ici comme dans l'image de
+    /// partage et la visionneuse photo.
     private var displayedTechnologies: [String] {
         let core = model.details?.core?.technologies ?? []
         if !core.isEmpty { return core }
-        guard !site.operators5G.isEmpty else { return site.technologies }
-        let has5G = site.operators5G.contains { $0.caseInsensitiveCompare(selectedOperator) == .orderedSame }
-        return has5G ? site.technologies : site.technologies.filter { $0 != "5G" }
+        if let scoped = model.details?.technologies, !scoped.isEmpty { return scoped }
+        return site.technologies(attributedTo: selectedOperator) ?? []
     }
 
     // MARK: Secteurs & azimuts

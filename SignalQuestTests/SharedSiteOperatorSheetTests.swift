@@ -74,6 +74,28 @@ final class SharedSiteOperatorSheetTests: XCTestCase {
         XCTAssertEqual(site.azimuths(for: "ALL"), [30, 150, 270])
     }
 
+    // MARK: Technologies attribuées (cmw8ios0fuitetechno0001)
+
+    /// Sur un site partagé, la liste de la tuile n'est pas celle de l'opérateur
+    /// demandé (celle du premier opérateur, puis l'union du support). Rien,
+    /// plutôt qu'une 3G ou une 4G prêtée par un voisin, ou les siennes omises.
+    func testSharedSiteNeverLendsItsMergedTechnologies() {
+        let site = sharedSite(azimuths: [], byOperator: [:])
+        XCTAssertNil(site.technologies(attributedTo: "FREE"))
+        XCTAssertNil(site.technologies(attributedTo: "orange"))
+        XCTAssertEqual(site.technologies(attributedTo: "ALL"), ["5G", "4G"])
+    }
+
+    func testSingleOperatorSiteKeepsItsTechnologies() {
+        let site = AntennaSite(
+            id: "1288882", siteId: "1288882", latitude: 45.18, longitude: 5.73,
+            operators: ["FREE"], technologies: ["5G", "4G"], bands: [], azimuths: [],
+            sharingType: nil, crozonLeader: nil, address: nil, height: nil, owner: nil
+        )
+        XCTAssertEqual(site.technologies(attributedTo: "Free"), ["5G", "4G"])
+        XCTAssertNil(site.technologies(attributedTo: "SFR"))
+    }
+
     // MARK: Largeur de la grille des secteurs
 
     /// Largeur utile réelle de la grille dans la fiche : écran d'iPhone moins la

@@ -73,6 +73,22 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// partagé, et n'y met que les opérateurs dont il connaît les secteurs : une
     /// clé absente de ce dictionnaire non vide veut dire « pas d'azimut publié
     /// pour lui », pas « prends ceux du voisin ».
+    /// Les technologies de la tuile, seulement quand elles appartiennent
+    /// sûrement à cet opérateur : support à un seul opérateur, ou vue « Tous »
+    /// (le support entier, sans attribution). Sur un support partagé,
+    /// `technologies` n'est pas celle de l'opérateur demandé : jusqu'au contrat
+    /// TECH-BY-OP, c'est celle du premier opérateur rencontré (SFR, Bouygues,
+    /// Orange, Free), ensuite l'union du support. La prêter à l'un d'eux
+    /// affichait la 3G ou la 4G d'un voisin, ou omettait les siennes. `nil` veut dire
+    /// « inconnu » : on n'affiche rien plutôt qu'une donnée fausse.
+    func technologies(attributedTo operatorKey: String) -> [String]? {
+        let key = operatorKey.trimmingCharacters(in: .whitespaces).uppercased()
+        if key == "ALL" { return technologies }
+        let distinct = Set(operators.map { $0.trimmingCharacters(in: .whitespaces).uppercased() })
+        guard distinct.count <= 1, distinct.isEmpty || distinct.contains(key) else { return nil }
+        return technologies
+    }
+
     func azimuths(for operatorKey: String) -> [Double] {
         guard !azimuthsByOperator.isEmpty else { return azimuths }
         let key = operatorKey.trimmingCharacters(in: .whitespaces).uppercased()
