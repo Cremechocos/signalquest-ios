@@ -853,10 +853,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let dlGraphWarmupState = ProgressState()
         let omitMs = Double(omitSeconds) * 1_000
 
-        // Ping / jitter en charge pendant le DL — en ICMP seulement. Une connexion
-        // TCP sur un port VOISIN occupait un démon iPerf3 mono-place du même POP,
-        // c'est-à-dire le test d'un autre utilisateur ; sans écho ICMP (POP qui le
-        // filtre), pas de latence sous charge plutôt que cette gêne.
+        // Ping / jitter en charge pendant le DL, vers le serveur de test : ICMP s'il
+        // répond, sinon connexions TCP sur le HAUT de la plage, jamais sur le port
+        // actif (choix d'Alexandre du 09/11, méthode d'Android : `computeLoadedLatencyProbePort`).
+        // Avant, sans écho ICMP, il n'y avait aucune latence sous charge (15 tests iPerf3
+        // sur 21 en prod).
+        let dlActivePort = SpeedtestPortBox(port)
+        let loadedProbe = tcpProbe
+        let probeMin = iperfServer.portMin, probeMax = iperfServer.portMax
         let dlLoadedHost = iperfServer.hostname
         let dlLoadedOmit = omitSeconds
         let dlLoadedStart = speedtestMonotonicSeconds()
@@ -865,6 +869,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             let wait = Double(dlLoadedOmit) - (speedtestMonotonicSeconds() - dlLoadedStart)
             if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
             guard !Task.isCancelled else { return [Double]() }
+            if await IPerfEndpointCache.shared.isICMPSilent(dlLoadedHost) {
+                return await SpeedtestService.collectIPerfLoadedTcpPings(
+                    host: dlLoadedHost, deadline: dlLoadedDeadline, tcpProbe: loadedProbe,
+                    port: { iperfLoadedProbePort(active: dlActivePort.value, min: probeMin, max: probeMax) }
+                )
+            }
             return await SpeedtestService.collectIPerfLoadedIcmpPings(
                 host: dlLoadedHost,
                 deadline: dlLoadedDeadline
@@ -924,7 +934,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     stage: "warmup", usefulElapsedSeconds: 0
                 ))
             },
-            onPortAttempt: { @Sendable _, attempt in
+            onPortAttempt: { @Sendable activePort, attempt in
+                dlActivePort.value = activePort
                 dlSamplesBox.reset(); dlGraphBox.reset(); dlState.reset(); dlGraphWarmupState.reset()
                 dlLiveSampler.reset()
                 progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName, stage: attempt > 0 ? "reconnecting" : "preparation", usefulElapsedSeconds: 0))
@@ -1069,13 +1080,20 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 max: iperfServer.portMax
             )
         let ulStreamAttempts = SpeedtestEngineConfig.uploadStreamLadder(requested: parallelStreams)
-        // Latence sous charge en ICMP, comme pendant le DL.
+        // Latence sous charge comme pendant le DL : ICMP, sinon TCP sur le haut de la plage.
+        let ulActivePort = SpeedtestPortBox(ulPreferredPort)
         let ulLoadedHost = iperfServer.hostname
         let ulLoadedOmit = omitSeconds
         let ulLoadedDeadline = speedtestMonotonicSeconds() + (Double(omitSeconds + durationSeconds) + 3)
         let ulLoadedPingsTask = Task.detached(priority: .utility) {
             try? await Task.sleep(nanoseconds: UInt64(ulLoadedOmit) * 1_000_000_000)
             guard !Task.isCancelled else { return [Double]() }
+            if await IPerfEndpointCache.shared.isICMPSilent(ulLoadedHost) {
+                return await SpeedtestService.collectIPerfLoadedTcpPings(
+                    host: ulLoadedHost, deadline: ulLoadedDeadline, tcpProbe: loadedProbe,
+                    port: { iperfLoadedProbePort(active: ulActivePort.value, min: probeMin, max: probeMax) }
+                )
+            }
             return await SpeedtestService.collectIPerfLoadedIcmpPings(
                 host: ulLoadedHost,
                 deadline: ulLoadedDeadline
@@ -1135,7 +1153,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                                 stage: "warmup", usefulElapsedSeconds: 0
                             ))
                         },
-                        onPortAttempt: { @Sendable _, attempt in
+                        onPortAttempt: { @Sendable activePort, attempt in
+                            ulActivePort.value = activePort
                             ulSamplesBox.reset(); ulGraphBox.reset(); ulState.reset(); ulGraphWarmupState.reset()
                             ulLiveSampler.reset()
                             progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName, stage: attempt > 0 ? "reconnecting" : "preparation", usefulElapsedSeconds: 0))
@@ -3098,6 +3117,30 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         return samples.map(\.rttMs).filter { $0 > 0 && $0 < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 }
     }
 
+    /// RTT TCP sous charge vers un serveur iPerf3 qui ne répond pas à l'ICMP : le
+    /// port sondé est relu à chaque échantillon pour ne jamais viser le port actif
+    /// (le port-walk peut le déplacer). Sans port sûr, l'échantillon est sauté.
+    static func collectIPerfLoadedTcpPings(
+        host: String,
+        deadline: TimeInterval,
+        tcpProbe: SpeedtestTCPProbing,
+        port: @Sendable () -> UInt16?
+    ) async -> [Double] {
+        var values: [Double] = []
+        while speedtestMonotonicSeconds() < deadline && !Task.isCancelled {
+            if let target = port(),
+               let elapsed = try? await tcpProbe.connectLatencyMs(
+                   host: host, port: target, timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+               ),
+               !Task.isCancelled, elapsed > 0, elapsed < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 {
+                values.append(elapsed)
+            }
+            if Task.isCancelled || speedtestMonotonicSeconds() >= deadline { break }
+            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        }
+        return values
+    }
+
     /// RTT TCP sous charge (Cloudflare, LibreSpeed : serveurs HTTPS, pas iPerf3) :
     /// connect latency uniquement, pour peupler pingDl/Ul + jitterDl/Ul.
     private static func collectIPerfLoadedPings(
@@ -3461,6 +3504,28 @@ var activeIPerfServers: [IPerfPublicServer] {
 
 /// Publie un catalogue chargé à distance. `nil` revient à l'embarqué.
 /// Un catalogue vide est ignoré : mieux vaut l'embarqué que plus aucun serveur.
+/// Port de la latence sous charge sur un démon iPerf3 (miroir de
+/// `computeLoadedLatencyProbePort` d'Android) : le HAUT de la plage, qui ne gêne
+/// ni le download (parti du bas) ni l'upload (son voisin) ; un cran plus bas si le
+/// port actif y est arrivé ; `nil` pour une plage d'un seul port.
+func iperfLoadedProbePort(active: UInt16?, min: UInt16, max: UInt16) -> UInt16? {
+    let lo = Swift.min(min, max), hi = Swift.max(min, max)
+    guard hi > lo else { return nil }
+    if active != hi { return hi }
+    return hi - 1 >= lo ? hi - 1 : nil
+}
+
+/// Port actif d'une phase iPerf3, relu par la sonde de latence sous charge.
+final class SpeedtestPortBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: UInt16?
+    init(_ port: UInt16?) { storage = port }
+    var value: UInt16? {
+        get { lock.lock(); defer { lock.unlock() }; return storage }
+        set { lock.lock(); storage = newValue; lock.unlock() }
+    }
+}
+
 func setActiveIPerfServers(_ servers: [IPerfPublicServer]?) {
     activeIPerfCatalogLock.withLock { current in
         guard let servers else { current = nil; return }

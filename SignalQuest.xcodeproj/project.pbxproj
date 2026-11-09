@@ -27,6 +27,7 @@
 		04CFFD016F738A3D61416036 /* PrivacyZoneDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739902E9E40436CAC9CAFF28 /* PrivacyZoneDraft.swift */; };
 		0518F95E1550265272CBBCD4 /* VoiceNotePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01369D5FB0B0C64E298726B8 /* VoiceNotePlayer.swift */; };
 		05689A5F4B79762B10A54B29 /* E2EEAutoConversationMarkersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80E425FE1268C53612C0FF2 /* E2EEAutoConversationMarkersTests.swift */; };
+		059BE1CD01ACD97E2AEB0368 /* IPerfLoadedProbePortTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C67F2C2D7A5F1251B5FFDD /* IPerfLoadedProbePortTests.swift */; };
 		05B7E7D7DB5CC95AFF2328E5 /* BackgroundLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389D21260C9885B53E70B525 /* BackgroundLifecycleTests.swift */; };
 		05D9F891322900914BCB76AC /* CarPlayDashboardSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0378B1E1AE6C315F1C4C873E /* CarPlayDashboardSceneDelegate.swift */; };
 		05E6C68B1C9FAEFB75F3C92C /* PasswordResetPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7F8D58CD984CD0C83B72A68 /* PasswordResetPresentationTests.swift */; };
@@ -1322,6 +1323,7 @@
 		5246A20CABC3F1DA08D8BEEE /* E2EEV2AccountFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2AccountFixture.swift; sourceTree = "<group>"; };
 		527D687BC482DC4BA0BCE648 /* speedtest-v6-vectors.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "speedtest-v6-vectors.json"; sourceTree = "<group>"; };
 		529164AC3282F6AC5AA5AEAD /* E2EEV2MessageReceiverV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2MessageReceiverV2Tests.swift; sourceTree = "<group>"; };
+		52C67F2C2D7A5F1251B5FFDD /* IPerfLoadedProbePortTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPerfLoadedProbePortTests.swift; sourceTree = "<group>"; };
 		52E42B98FC629E7504CCF403 /* MapDisplayPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDisplayPreferencesTests.swift; sourceTree = "<group>"; };
 		53043E8410BD4D6EF71540B8 /* geotagged.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = geotagged.mov; sourceTree = "<group>"; };
 		53482F595BA7C9973BE76955 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -3226,6 +3228,7 @@
 				EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				80C917F21DE1EEDB7822C844 /* InternationalTests.swift */,
+				52C67F2C2D7A5F1251B5FFDD /* IPerfLoadedProbePortTests.swift */,
 				F29E5F20774A2755469467DA /* ISEDChangesMapTests.swift */,
 				16C9E5FDD182F8B718FA3F0A /* JSONDateParsingTests.swift */,
 				6C417B0E3A5B8BAEA89F18C7 /* LastSpeedtestResultIntentTests.swift */,
@@ -4639,6 +4642,7 @@
 				69FED86790884C42156C03F6 /* HiddenStoryAuthorsStoreTests.swift in Sources */,
 				4C052575B1B6C1C04E37F62D /* ICMPPingerLiveCallbackTests.swift in Sources */,
 				E7CE9DC50F6EB2A39D1FB723 /* ICMPPingerTests.swift in Sources */,
+				059BE1CD01ACD97E2AEB0368 /* IPerfLoadedProbePortTests.swift in Sources */,
 				9027786ED4AB1D5B0675AC3C /* ISEDChangesMapTests.swift in Sources */,
 				4148DB1B1B8F2896859A4B56 /* InternationalTests.swift in Sources */,
 				4E5AFE32AFF929E8AE4E94D7 /* JSONDateParsingTests.swift in Sources */,
