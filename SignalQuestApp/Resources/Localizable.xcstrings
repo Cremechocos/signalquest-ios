@@ -111176,6 +111176,38 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Retiré depuis un appareil du compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed from one of the account’s devices"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré depuis un appareil du compte"
+          }
+        }
+      }
+    },
+    "Retiré par une réinitialisation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed by an identity reset"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré par une réinitialisation"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

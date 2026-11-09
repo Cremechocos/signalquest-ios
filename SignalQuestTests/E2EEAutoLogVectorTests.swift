@@ -107,6 +107,18 @@ final class E2EEAutoLogVectorTests: XCTestCase {
         }
     }
 
+    /// E2EE-REVOKE-SYNC r1 : `V2_REVOKE` et `IDENTITY_RESET` sont des raisons
+    /// serveur (sans signature) ; une raison inconnue reste refusée.
+    func testServerRevokeReasonsOfTheV2Paths() {
+        XCTAssertEqual(E2EEAutoLog.parseDetail(.revoke, "V2_REVOKE"), .serverRevoke(reason: .v2Revoke))
+        XCTAssertEqual(E2EEAutoLog.parseDetail(.revoke, "IDENTITY_RESET"), .serverRevoke(reason: .identityReset))
+        XCTAssertFalse(E2EEAutoLog.RevokeReason.v2Revoke.isSigned)
+        XCTAssertFalse(E2EEAutoLog.RevokeReason.identityReset.isSigned)
+        let signature = Data(repeating: 1, count: 64).base64EncodedString()
+        XCTAssertNil(E2EEAutoLog.parseDetail(.revoke, "V2_REVOKE:device_a1:\(signature)"), "jamais signée")
+        XCTAssertNil(E2EEAutoLog.parseDetail(.revoke, "V2_REVOKED"))
+    }
+
     /// Le format admet une signature à S haut ; la vérification la refuse (§2.3).
     func testHighSRotateSignatureIsRefused() throws {
         let vectors = try load("log-entry-v2"), chain = try load("log-chain-v2")

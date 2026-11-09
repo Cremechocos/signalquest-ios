@@ -916,6 +916,8 @@ struct E2EEAutoDevicesView: View {
             case .notMe?, .emailNotMe?: return String(localized: "Retiré : « Ce n’est pas moi »")
             case .inactive?: return String(localized: "Retiré après 45 jours sans activité")
             case .admin?: return String(localized: "Retiré par l’équipe SignalQuest")
+            case .v2Revoke?: return String(localized: "Retiré depuis un appareil du compte")
+            case .identityReset?: return String(localized: "Retiré par une réinitialisation")
             default: return String(localized: "Retiré")
             }
         }

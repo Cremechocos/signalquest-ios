@@ -47,6 +47,11 @@ enum E2EEAutoLog {
         case inactive = "INACTIVE"
         case accountDeleted = "ACCOUNT_DELETED"
         case admin = "ADMIN"
+        /// E2EE-REVOKE-SYNC r1 : retrait par l'ancienne route v2
+        /// (`POST /api/e2ee/v2/devices/{id}/revoke`) ou par une réinitialisation
+        /// d'identité v2, inscrit par le serveur au journal.
+        case v2Revoke = "V2_REVOKE"
+        case identityReset = "IDENTITY_RESET"
 
         var isSigned: Bool { self == .user || self == .notMe }
     }
