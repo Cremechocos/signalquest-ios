@@ -117,8 +117,9 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         // Membre absent de l'époque courante alors qu'il en gardait une plus ancienne
         // (09/11 : une rotation d'un autre appareil avait omis tout le compte) : il ne
         // l'attend plus d'un autre, il tourne lui-même depuis l'époque témoin, qui
-        // l'inclut avec tous les appareils certifiés (E2EE-AUTO §7), puis relit.
-        if synced == .waitingForEpoch, E2EEV2ServerGate.autoActive,
+        // l'inclut avec tous les appareils certifiés (E2EE-AUTO §7), puis relit. En v2
+        // comme en auto : la conversation du 28/10 est une v2 (Backend, 09/11).
+        if synced == .waitingForEpoch,
            let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup),
            context.head.members.contains(ownUserId(expectedOwnerScopeId)),
            case .rotated = await rotator.rotateIfNeeded(

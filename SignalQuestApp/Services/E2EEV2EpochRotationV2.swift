@@ -503,7 +503,9 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         // Même chose pour un membre que l'époque courante a omis alors qu'il en garde
         // une plus ancienne (`excludedFromCurrent`) : la témoin, plus récente, sert de base.
         var base = stored
-        if base == nil || excludedFromCurrent, E2EEV2ServerGate.autoActive {
+        // La témoin ne dépend pas du mode : son manifeste est vérifié contre les
+        // appareils certifiés, en v2 comme en auto (la conversation du 28/10 est v2).
+        if excludedFromCurrent || (base == nil && E2EEV2ServerGate.autoActive) {
             base = await witnessedEpoch(
                 conversationId: conversationId, genesis: genesis, ownUserId: ownUserId, ownDeviceId: device.deviceId,
                 membershipAt: membershipAt, devices: devices, transport: transport.bound(to: session),
@@ -527,7 +529,11 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         ).isEmpty else { return .upToDate }
         // Jamais une époque qui laisse un membre sans aucun appareil : il ne lirait plus
         // rien (09/11, conversation rendue illisible par une rotation qui omettait un compte).
-        guard Set(expected.map(\.userId)).isSuperset(of: membership.members) else {
+        // Un membre sans aucun appareil certifié n'impose rien (on ne peut pas chiffrer pour lui).
+        let reachable = membership.members.filter { member in
+            (devices.devicesByUser[member] ?? []).contains { !(membership.excludesWeb && $0.platform == "web") }
+        }
+        guard Set(expected.map(\.userId)).isSuperset(of: reachable) else {
             return .failure(localError("e2ee-member-without-devices"))
         }
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),

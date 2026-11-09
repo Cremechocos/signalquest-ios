@@ -56,11 +56,12 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertEqual(state.admins, [fixture.user], "Le créateur administre le groupe")
         XCTAssertEqual(manifest.membershipChangeNumber, chain.count)
 
-        // Destinataires : appareils certifiés et à jour, navigateur compris ;
-        // un appareil sans capacités récentes et un membre sans appareil attendent.
+        // Destinataires : appareils certifiés et à jour, navigateur compris. Un membre
+        // dont TOUS les appareils ont des capacités anciennes n'est plus écarté : ils
+        // sont cités (E2EE-MEMBRE r1, 09/11). Seul un membre sans appareil attend.
         let recipientDevices = Set(wire.recipients.compactMap { E2EEV2EpochManifest.Recipient.parse($0)?.deviceId })
-        XCTAssertEqual(recipientDevices, [fixture.descriptor.deviceId, brunoPhone.device.deviceId, brunoWeb.device.deviceId])
-        XCTAssertEqual(creation.pendingUserIds, [carla, dora].sorted())
+        XCTAssertEqual(recipientDevices, [fixture.descriptor.deviceId, brunoPhone.device.deviceId, brunoWeb.device.deviceId, doraOld.device.deviceId])
+        XCTAssertEqual(creation.pendingUserIds, [carla])
 
         // Chaque destinataire retrouve la clé de l'époque dans son enveloppe.
         for remote in [brunoPhone, brunoWeb] {

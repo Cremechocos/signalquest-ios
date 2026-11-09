@@ -62,8 +62,15 @@ enum E2EEV2EpochProposals {
         excludesWeb: Bool,
         nowMs: Int64
     ) -> [E2EEV2CertifiedDevice] {
-        members.flatMap { devices.devicesByUser[$0] ?? [] }
-            .filter { !$0.isSidelined(nowMs: nowMs) && !(excludesWeb && $0.platform == "web") }
+        // Un appareil mis à l'écart (capacités trop anciennes) reste dehors, mais
+        // jamais un compte entier : si tous les appareils d'un membre le sont, ils
+        // sont tous cités (E2EE-MEMBRE r1 §2 ; le 28/10, une rotation qui écartait
+        // ainsi tout un compte a rendu une conversation illisible).
+        members.flatMap { member -> [E2EEV2CertifiedDevice] in
+            let eligible = (devices.devicesByUser[member] ?? []).filter { !(excludesWeb && $0.platform == "web") }
+            let fresh = eligible.filter { !$0.isSidelined(nowMs: nowMs) }
+            return fresh.isEmpty ? eligible : fresh
+        }
             .sorted { lhs, rhs in
                 lhs.userId == rhs.userId
                     ? Array(lhs.deviceId.utf8).lexicographicallyPrecedes(Array(rhs.deviceId.utf8))
