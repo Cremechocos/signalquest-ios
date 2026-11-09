@@ -47,6 +47,22 @@ final class SpeedtestAccountHistoryTests: XCTestCase {
         XCTAssertEqual(account("old", average: 1, at: t0).displayedDate, t0, "Sans heure de mesure : l'heure d'arrivée")
     }
 
+    /// MEASURED-AT-1 : on envoie la fin de mesure (début + durée), et un test
+    /// servi avec la fin comme avec le début (envois du 09/11) reste reconnu.
+    func testMeasuredAtIsTheEndOfTheMeasurement() {
+        let result = local(64.34, at: t0)
+        XCTAssertEqual(result.measurementEndedAt, t0.addingTimeInterval(10))
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: result, streams: 1, deviceModel: "iPhone").measuredAt,
+                       SpeedtestSubmission.measuredAtString(t0.addingTimeInterval(10)))
+        var end = account("end", average: 80, at: t0.addingTimeInterval(3 * 86_400))
+        end.measuredAt = t0.addingTimeInterval(10)
+        var start = account("start", average: 80, at: t0.addingTimeInterval(3 * 86_400))
+        start.measuredAt = t0
+        var between = account("between", average: 64.34, at: t0.addingTimeInterval(12))
+        between.measuredAt = t0.addingTimeInterval(5)
+        XCTAssertEqual(SpeedtestAccountHistory.accountOnly([end, start, between], local: [result]).map(\.id), ["between"])
+    }
+
     func testMeasuredAtIsSentInUTCWithMilliseconds() throws {
         let date = Date(timeIntervalSince1970: 1_794_227_696.7896)
         XCTAssertEqual(SpeedtestSubmission.measuredAtString(date), "2026-11-09T12:34:56.789Z")

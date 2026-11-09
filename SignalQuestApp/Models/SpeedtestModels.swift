@@ -1141,7 +1141,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         payload.uploadServerPort = result.uploadServerPort
         payload.measurementTrace = result.measurementTrace
         payload.methodologyVersion = result.methodologyVersion ?? 5
-        payload.measuredAt = Self.measuredAtString(result.createdAt)
+        payload.measuredAt = Self.measuredAtString(result.measurementEndedAt)
         return payload
     }
 
@@ -1492,4 +1492,11 @@ struct SpeedMetricCalculator {
         let index = Int((Double(sorted.count - 1) * clamped).rounded())
         return sorted[index]
     }
+}
+
+extension SpeedtestRunResult {
+    /// Fin de la mesure (MEASURED-AT-1 : « heure de fin de mesure du
+    /// téléphone ») : `createdAt` est posé au début du test, `durationSeconds`
+    /// en est la durée sur l'horloge monotone.
+    var measurementEndedAt: Date { createdAt.addingTimeInterval(max(0, durationSeconds)) }
 }
