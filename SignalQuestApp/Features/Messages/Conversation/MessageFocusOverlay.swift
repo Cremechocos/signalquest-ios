@@ -149,8 +149,8 @@ struct MessageFocusOverlay<Bubble: View>: View {
                     Haptics.light()
                     dismiss { onReact(emoji) }
                 } label: {
-                    Text(emoji)
-                        .font(.system(size: 26))
+                    // Chaque emoji joue son geste juste après son entrée.
+                    AnimatedReactionEmoji(emoji: emoji, size: 26, autoplayDelay: 0.18 + Double(index) * 0.06)
                         .frame(width: 42, height: 42)
                         .background(Circle().fill(picked ? SQColor.brandRed.opacity(0.18) : .clear))
                         .contentShape(Circle())

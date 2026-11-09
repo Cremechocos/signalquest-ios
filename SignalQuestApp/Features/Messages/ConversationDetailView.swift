@@ -237,6 +237,8 @@ struct ConversationDetailView: View {
     /// Bulle présentée par l'appui long (façon iMessage), et cadres des bulles visibles.
     @State private var focusedMessage: FocusedMessage?
     @State private var bubbleFrames = BubbleFrameRegistry()
+    /// Réactions posées à l'instant (message|emoji) : leur pastille joue son geste en apparaissant.
+    @State private var reactionBursts: [String: Date] = [:]
     /// Texte à transférer vers une autre conversation.
     @State private var forwardTarget: ForwardPayload?
     /// Photos, vidéos et fichiers en attente dans le compositeur (partage reçu,
@@ -2110,8 +2112,11 @@ struct ConversationDetailView: View {
                         Haptics.selection()
                         Task { await toggleReaction(message: message, emoji: reaction.emoji) }
                     } label: {
-                        Text(reaction.emoji)
-                            .font(.system(size: 15))
+                        AnimatedReactionEmoji(
+                            emoji: reaction.emoji, size: 15,
+                            burst: reactionBursts["\(message.id)|\(reaction.emoji)"],
+                            count: reaction.count
+                        )
                             .frame(width: 26, height: 26)
                             .background(Circle().fill(reaction.mine ? SQColor.brandRed.opacity(0.16) : .clear))
                             // Zone tactile de 44 pt sans grossir la bulle de réaction.
@@ -5091,6 +5096,8 @@ struct ConversationDetailView: View {
     private func toggleReaction(message: MessageItem, emoji: String) async {
         guard reactionsAllowed, !message.id.hasPrefix("local-") else { return }
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
+        // La pastille joue le geste de l'emoji qu'on vient de poser.
+        if !alreadyMine { reactionBursts["\(message.id)|\(emoji)"] = Date() }
         if usesV2 {
             await toggleV2Reaction(message: message, emoji: emoji, alreadyMine: alreadyMine)
             return

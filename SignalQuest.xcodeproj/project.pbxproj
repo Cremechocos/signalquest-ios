@@ -268,6 +268,7 @@
 		461DBB7E85D2CDE0FE30FF9F /* MessageLinkPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5AA77D0652DCF73487082D7 /* MessageLinkPreviewTests.swift */; };
 		465550028B0506CE315A9506 /* NotificationsHTTPQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06E026EA0B3667BF1129FCF /* NotificationsHTTPQATests.swift */; };
 		46DC084CD072F1758C22C9B8 /* SpeedtestLauncherWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83ECE37B4D4634BF8CA4B3A /* SpeedtestLauncherWidget.swift */; };
+		4756BDE07808C2258F02636E /* AnimatedReactionEmoji.swift in Sources */ = {isa = PBXBuildFile; fileRef = D53AA03923655B62102CCBB8 /* AnimatedReactionEmoji.swift */; };
 		479DAA09F0F70F020AB8CA4F /* ANFRSiteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */; };
 		47C71CEBC1B6AFC97D4BD42A /* E2EEV2LockedCallEpochTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC57340D93CE2F4DA3574894 /* E2EEV2LockedCallEpochTests.swift */; };
 		480E595E70AD0121DC5AFD80 /* CreateSiteFromCellsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */; };
@@ -1811,6 +1812,7 @@
 		D4D24F171008453522EDC74C /* ResumeLastTabQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeLastTabQATests.swift; sourceTree = "<group>"; };
 		D4DB45536846705516AB27E9 /* CarPlayDestinationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayDestinationStore.swift; sourceTree = "<group>"; };
 		D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSiteFromCellsView.swift; sourceTree = "<group>"; };
+		D53AA03923655B62102CCBB8 /* AnimatedReactionEmoji.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedReactionEmoji.swift; sourceTree = "<group>"; };
 		D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareQATests.swift; sourceTree = "<group>"; };
 		D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodeTests.swift; sourceTree = "<group>"; };
 		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2247,6 +2249,7 @@
 		2CF9814C78DFAFB55BBAA3EC /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
+				D53AA03923655B62102CCBB8 /* AnimatedReactionEmoji.swift */,
 				78F38B35680E7C99DE20288D /* ConversationModels.swift */,
 				6E9816756A77B99C80C56487 /* MessageComposerBar.swift */,
 				0D9D5F4EBC7EC486A10E1CB9 /* MessageFocusOverlay.swift */,
@@ -3877,6 +3880,7 @@
 				EB44A3D8FD41548A92D24D29 /* AccountSpeedtestRow.swift in Sources */,
 				2ACC1A07393B28E170732031 /* ActivityCardView.swift in Sources */,
 				E255A40A100134664CABBBAB /* AndroidDataPresence.swift in Sources */,
+				4756BDE07808C2258F02636E /* AnimatedReactionEmoji.swift in Sources */,
 				EDA2AC7EAF239065EC5A756C /* AntennaCoverageFocus.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,
 				34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */,
