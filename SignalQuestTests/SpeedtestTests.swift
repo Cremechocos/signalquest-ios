@@ -551,12 +551,13 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedtestGaugeScale.maxSpeed(for: wifi, upload: false), 1_000)
     }
 
-    func testShareTextIsTheCaptionWithoutFigures() {
+    /// Contrat presentation-v1 (#1010, c7da1be3) : la légende porte les chiffres de l'image
+    /// et se termine par « #SignalQuest », jamais par l'adresse du site.
+    func testShareTextIsTheCaptionSignedWithTheHashtag() {
         let result = makeSpeedtestResult(downloadSeries: [120, 480], uploadSeries: [40, 90])
         let text = SpeedtestShareImageRenderer.shareText(for: result)
-        XCTAssertFalse(text.contains(SQUnits.throughputUnit(mbps: 480)))
         XCTAssertFalse(text.contains("signalquest.fr"))
-        XCTAssertTrue(text.contains("SignalQuest"))
+        XCTAssertTrue(text.contains("#SignalQuest"))
     }
 
     func testShareImageLocationKeepsMeasuredCityAndDoesNotInventCountry() {
