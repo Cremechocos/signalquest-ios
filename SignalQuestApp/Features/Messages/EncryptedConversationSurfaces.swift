@@ -102,7 +102,7 @@ enum EncryptedConversationSurfaces {
                 : String(localized: "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Réessaie quand ce sera fait.")
         case .membersNotTrusted:
             return String(localized: "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer.")
-        case .needsEpoch, .needsRotation:
+        case .needsEpoch, .needsRotation, .compromisedEpoch:
             return String(localized: "La conversation chiffrée se met à jour. Réessaie dans un instant.")
         case .failure(let failure) where MessageRequestLimitError.isPending(failure):
             // DM-REQ-1 : le premier message est parti, la suite attend l'acceptation.
@@ -135,6 +135,8 @@ enum EncryptedConversationSurfaces {
             return v2SendFailureMessage(.needsEpoch, keptForRetry: false)
         case .needsRotation:
             return v2SendFailureMessage(.needsRotation, keptForRetry: false)
+        case .compromisedEpoch:
+            return v2SendFailureMessage(.compromisedEpoch, keptForRetry: false)
         case .membersNotTrusted(let members):
             return v2SendFailureMessage(.membersNotTrusted(members), keptForRetry: false)
         }

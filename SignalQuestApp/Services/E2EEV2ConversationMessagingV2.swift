@@ -308,10 +308,11 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                 devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
             )
             switch last {
-            case .needsRotation:
+            case .needsRotation, .compromisedEpoch:
                 switch await rotator.rotateIfNeeded(
                     conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
-                    devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+                    devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount,
+                    force: last == .compromisedEpoch
                 ) {
                 case .failure(let error): return .failure(error)
                 case .membersNotTrusted(let untrusted): return .membersNotTrusted(untrusted)
@@ -368,10 +369,11 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                 expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
             )
             switch last {
-            case .needsRotation:
+            case .needsRotation, .compromisedEpoch:
                 switch await rotator.rotateIfNeeded(
                     conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
-                    devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+                    devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount,
+                    force: last == .compromisedEpoch
                 ) {
                 case .failure(let error): return .failure(error)
                 case .membersNotTrusted(let untrusted): return .membersNotTrusted(untrusted)

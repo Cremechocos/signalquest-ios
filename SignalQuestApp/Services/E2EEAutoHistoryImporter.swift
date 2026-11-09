@@ -99,7 +99,7 @@ enum E2EEAutoHistoryImporter {
             return .exists
         case .failure(let failure) where failure.statusCode == 400 && failure.code == "E2EE_IMPORT_SOURCE_INVALID":
             return .refused
-        case .failure, .needsEpoch, .needsRotation, .membersNotTrusted, .capabilityMissing:
+        case .failure, .needsEpoch, .needsRotation, .compromisedEpoch, .membersNotTrusted, .capabilityMissing:
             return .retry
         }
     }

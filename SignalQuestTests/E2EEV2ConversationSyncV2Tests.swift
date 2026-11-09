@@ -277,7 +277,9 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
         }
         let keyTwo = Data(repeating: 0x22, count: 32), keyThree = Data(repeating: 0x33, count: 32)
         let two = try reshape(try epoch(2, key: keyTwo, fixture, creator: creator, devices: devices, chain: served.chain), status: "retired")
-        let three = try epoch(3, key: keyThree, fixture, creator: creator, devices: devices, chain: served.chain)
+        // Époque courante compromise (E2EE-COMPROMISED-1 §3.1) : lisible comme « retired ».
+        let three = try reshape(try epoch(3, key: keyThree, fixture, creator: creator, devices: devices, chain: served.chain),
+                                status: "compromised")
         MockURLProtocol.requestHandler = { request in
             let path = request.url?.path ?? ""
             if path.hasSuffix("/epochs/2") { return E2EEV2AccountFixture.response(request, two) }
@@ -285,7 +287,7 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
             return try Self.server(served)(request)
         }
         let caughtUp = await sync(fixture, devices: devices)
-        XCTAssertEqual(caughtUp, .received(epochNumber: 3), "Une époque « retired » se relit")
+        XCTAssertEqual(caughtUp, .received(epochNumber: 3), "Une époque « retired » se relit, une courante « compromised » aussi")
         XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 2,
                                                   ownerNamespace: fixture.session.ownerNamespace)?.epochKey, keyTwo)
 
@@ -553,5 +555,22 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
             ),
             signing: signing
         )
+    }
+
+    /// E2EE-COMPROMISED-1 : « compromised » se lit à la lecture d'une époque
+    /// servie, jamais dans un accusé de création (§3.5).
+    func testACompromisedEpochIsReadableButNeverAReceipt() {
+        let served: E2EEV2JSON = .object([
+            "id": .string("epoch_01J7ABCDEF"), "epochNumber": .string("3"),
+            "status": .string("compromised"), "createdAt": .string("2026-11-09T14:58:54.763Z"),
+        ])
+        XCTAssertNil(E2EEV2EpochContractV2.epoch(served))
+        XCTAssertEqual(E2EEV2EpochContractV2.epoch(served, allowsCompromised: true)?.compromised, true)
+        let receipt = Data(#"{"epoch":{"id":"epoch_01J7ABCDEF","epochNumber":"3","status":"compromised","createdAt":"2026-11-09T14:58:54.763Z"},"recipientCount":"2"}"#.utf8)
+        XCTAssertNil(E2EEV2EpochContractV2.parseReceipt(receipt, epochNumber: 3, recipientCount: 2))
+        XCTAssertEqual(E2EEV2EpochContractV2.parseReceipt(
+            Data(String(decoding: receipt, as: UTF8.self).replacingOccurrences(of: "compromised", with: "active").utf8),
+            epochNumber: 3, recipientCount: 2
+        )?.compromised, false)
     }
 }

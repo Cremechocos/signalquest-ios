@@ -75,6 +75,9 @@ enum E2EEV2EpochContractV2 {
         /// Époque créée avec `memberLogSeqs` (E2EE-AUTO §7.2) : seule une époque
         /// marquée passe le contrôle du journal. Servi seulement à `true`.
         var e2eeAuto = false
+        /// Époque adressée à un appareil révoqué depuis (E2EE-COMPROMISED-1) :
+        /// lisible comme une époque remplacée, jamais pour envoyer.
+        var compromised = false
     }
 
     /// Époque courante servie à un appareil : l'époque acceptée, son manifeste
@@ -100,7 +103,7 @@ enum E2EEV2EpochContractV2 {
     static func parseCurrent(_ data: Data, conversationId: String) -> Current? {
         guard let root = object(data), Set(root.keys) == ["conversationId", "epoch", "manifest", "envelope"],
               root["conversationId"]?.stringValue == conversationId,
-              let accepted = epoch(root["epoch"]),
+              let accepted = epoch(root["epoch"], allowsCompromised: true),
               let manifest = root["manifest"].flatMap(E2EEV2EpochManifest.signed(from:)),
               let served = root["envelope"] else {
             return nil
@@ -127,7 +130,9 @@ enum E2EEV2EpochContractV2 {
         return (try? E2EEV2CanonicalJSON.parseStrict(data, smallIntegerKeys: smallIntegerKeys))?.objectValue
     }
 
-    static func epoch(_ value: E2EEV2JSON?) -> Accepted? {
+    /// `allowsCompromised` : seulement à la lecture d'une époque servie
+    /// (E2EE-COMPROMISED-1 §3.1) ; un accusé de création la refuse toujours (§3.5).
+    static func epoch(_ value: E2EEV2JSON?, allowsCompromised: Bool = false) -> Accepted? {
         // Le marqueur `e2eeAuto` n'est servi qu'à `true` : `false` est refusé
         // comme toute autre clé, pour garder les réponses d'avant identiques.
         guard let epoch = value?.objectValue,
@@ -136,12 +141,15 @@ enum E2EEV2EpochContractV2 {
               let epochId = epoch["id"]?.stringValue, E2EEV2Canonical.isOpaque(epochId),
               let number = epoch["epochNumber"]?.stringValue.flatMap(E2EEV2Canonical.sequenceNumber),
               // « retired » : une époque remplacée depuis (relue après coup) ;
-              // le client n'en décide rien.
-              ["active", "retired"].contains(epoch["status"]?.stringValue ?? ""),
+              // le client n'en décide rien. « compromised » se lit comme elle.
+              (["active", "retired"] + (allowsCompromised ? ["compromised"] : [])).contains(epoch["status"]?.stringValue ?? ""),
               let createdAt = epoch["createdAt"]?.stringValue, !createdAt.isEmpty, createdAt.count <= 64 else {
             return nil
         }
-        return Accepted(epochId: epochId, epochNumber: number, createdAt: createdAt, e2eeAuto: epoch["e2eeAuto"] != nil)
+        return Accepted(
+            epochId: epochId, epochNumber: number, createdAt: createdAt, e2eeAuto: epoch["e2eeAuto"] != nil,
+            compromised: epoch["status"]?.stringValue == "compromised"
+        )
     }
 
     static func envelope(_ value: E2EEV2JSON?) -> E2EEV2SignedEpochEnvelope? {
@@ -474,7 +482,8 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String,
         messageCount: Int = 0,
-        excludedFromCurrent: Bool = false
+        excludedFromCurrent: Bool = false,
+        force: Bool = false
     ) async -> E2EEV2EpochRotationV2Result {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
@@ -524,7 +533,9 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         let lines = expected.map {
             E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint)
         }
-        guard !E2EEV2RotationPolicy.reasons(
+        // `force` : le serveur a refusé l'époque courante comme compromise (409
+        // E2EE_EPOCH_COMPROMISED), même si l'annuaire n'y voit encore aucun écart.
+        guard force || !E2EEV2RotationPolicy.reasons(
             current: current, membership: membership, expectedRecipients: lines, nowMs: nowMs, messageCount: messageCount
         ).isEmpty else { return .upToDate }
         // Jamais une époque qui laisse un membre sans aucun appareil : il ne lirait plus

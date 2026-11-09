@@ -75,6 +75,10 @@ enum E2EEV2MessageSendResultV2: Sendable, Equatable {
     case needsEpoch
     /// L'époque courante doit tourner avant tout envoi (§3.3).
     case needsRotation
+    /// `409 E2EE_EPOCH_COMPROMISED` : l'époque courante a été adressée à un
+    /// appareil révoqué depuis ; elle tourne même à destinataires inchangés,
+    /// puis l'envoi reprend (E2EE-COMPROMISED-1 §5).
+    case compromisedEpoch
     /// Des membres dont l'identité n'est pas crue : rien n'est envoyé tant que
     /// l'utilisateur n'a pas accepté leur nouveau numéro (§2.4).
     case membersNotTrusted([String])
@@ -91,6 +95,8 @@ enum E2EEV2ScheduleResultV2: Sendable, Equatable {
     case needsEpoch
     /// L'époque courante doit tourner avant tout envoi (§3.3).
     case needsRotation
+    /// Voir `E2EEV2MessageSendResultV2.compromisedEpoch`.
+    case compromisedEpoch
     case membersNotTrusted([String])
     case failure(E2EEV2TransportFailure)
 }
@@ -312,6 +318,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
                 missing = values.compactMap { if case .string(let value) = $0 { return value }; return nil }
             }
             return .capabilityMissing(missing.isEmpty ? ["intersection"] : missing.sorted())
+        case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_EPOCH_COMPROMISED":
+            return .compromisedEpoch
         case .failure(let error) where error.statusCode == 409
             && (error.code == "E2EE_EPOCH_STALE" || error.code == "E2EE_MEMBERSHIP_STALE"):
             // Le serveur connaît une époque ou un état plus récent : synchroniser,
@@ -594,6 +602,8 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
                 return .failure(localError("invalid-e2ee-schedule-receipt"))
             }
             return .scheduled(ack)
+        case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_EPOCH_COMPROMISED":
+            return .compromisedEpoch
         case .failure(let error) where error.statusCode == 409
             && (error.code == "E2EE_EPOCH_STALE" || error.code == "E2EE_MEMBERSHIP_STALE"):
             return .needsEpoch
