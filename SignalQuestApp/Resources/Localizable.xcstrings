@@ -110964,6 +110964,26 @@
           }
         }
       }
+    },
+    "Bandes non publiées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bands not published"
+          }
+        }
+      }
+    },
+    "Mêmes bandes déclarées par %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same bands declared by %@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

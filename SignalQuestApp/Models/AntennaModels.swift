@@ -97,6 +97,23 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         return Self.normalizedTechnologies(scoped)
     }
 
+    /// Systèmes bruts (« LTE 800 », « 5G NR 3500 ») de CET opérateur, mêmes
+    /// règles que `technologies(attributedTo:)` : ceux de la tuile sur un
+    /// support à un seul opérateur, sinon `technologiesByOperator`. `nil` =
+    /// inconnu, jamais la liste du support ni celle d'un voisin (BANDES-OP).
+    func systems(attributedTo operatorKey: String) -> [String]? {
+        let trimmed = operatorKey.trimmingCharacters(in: .whitespaces)
+        let key = trimmed.uppercased()
+        let distinct = Set(operators.map { $0.trimmingCharacters(in: .whitespaces).uppercased() })
+        if key == "ALL" || (distinct.count <= 1 && (distinct.isEmpty || distinct.contains(key))) {
+            return radioSystems.isEmpty ? nil : radioSystems
+        }
+        let scoped = technologiesByOperator[trimmed]
+            ?? technologiesByOperator.first(where: { $0.key.uppercased() == key })?.value
+        guard let scoped, !scoped.isEmpty else { return nil }
+        return scoped
+    }
+
     func azimuths(for operatorKey: String) -> [Double] {
         guard !azimuthsByOperator.isEmpty else { return azimuths }
         let key = operatorKey.trimmingCharacters(in: .whitespaces).uppercased()
@@ -880,5 +897,66 @@ struct AntennaPhotoSummary: Decodable, Equatable, Identifiable {
         socialPostId = c.decodeFlexibleString(forKey: .socialPostId)
         commentCount = try? c.decodeIfPresent(Int.self, forKey: .commentCount)
         repostsCount = try? c.decodeIfPresent(Int.self, forKey: .repostsCount)
+    }
+}
+
+/// Bandes d'un opérateur rangées par génération (BANDES-OP, forme B choisie le
+/// 09/11) : « 5G ··· 2100 · 3500 ». Chaque bande reste sous l'opérateur ET la
+/// génération qui la déclarent, si bien que « 2100 » ne peut plus vouloir dire
+/// à la fois la 4G d'Orange et la 5G de Bouygues.
+struct GenerationBands: Equatable, Identifiable {
+    let generation: String
+    /// Bandes en service, en MHz, croissantes.
+    let bands: [Int]
+    /// Bandes déclarées en projet pour cet opérateur, absentes de `bands`.
+    let plannedBands: [Int]
+    var id: String { generation }
+
+    static let order = ["5G", "4G", "3G", "2G"]
+
+    /// `systems` : libellés bruts de l'ANFR ; `planned` : « 5G 3500 », « 4G 700 ».
+    /// Un libellé sans génération connue ou sans fréquence est ignoré.
+    static func rows(systems: [String], planned: [String] = []) -> [GenerationBands] {
+        var active: [String: Set<Int>] = [:]
+        var projected: [String: Set<Int>] = [:]
+        for system in systems {
+            if let (gen, mhz) = parse(system) { active[gen, default: []].insert(mhz) }
+        }
+        for label in planned {
+            if let (gen, mhz) = parse(label), active[gen]?.contains(mhz) != true {
+                projected[gen, default: []].insert(mhz)
+            }
+        }
+        return order.compactMap { gen in
+            let on = (active[gen] ?? []).sorted()
+            let later = (projected[gen] ?? []).sorted()
+            guard !on.isEmpty || !later.isEmpty else { return nil }
+            return GenerationBands(generation: gen, bands: on, plannedBands: later)
+        }
+    }
+
+    /// Les opérateurs déclarent-ils exactement les mêmes bandes en service ?
+    /// Les projets n'entrent pas dans la comparaison : la fiche ne les connaît
+    /// que pour l'opérateur affiché.
+    static func sameDeclaredBands(_ lists: [[GenerationBands]]) -> Bool {
+        guard lists.count > 1 else { return false }
+        let keys = lists.map { rows in
+            rows.filter { !$0.bands.isEmpty }.map { "\($0.generation):\($0.bands)" }
+        }
+        guard let first = keys.first, !first.isEmpty else { return false }
+        return keys.allSatisfy { $0 == first }
+    }
+
+    private static func parse(_ label: String) -> (String, Int)? {
+        let upper = label.uppercased()
+        let gen: String
+        if upper.contains("5G") || upper.contains("NR") { gen = "5G" }
+        else if upper.contains("LTE") || upper.contains("4G") { gen = "4G" }
+        else if upper.contains("UMTS") || upper.contains("3G") { gen = "3G" }
+        else if upper.contains("GSM") || upper.contains("2G") { gen = "2G" }
+        else { return nil }
+        guard let range = label.range(of: #"\d{3,4}"#, options: .regularExpression),
+              let mhz = Int(label[range]) else { return nil }
+        return (gen, mhz)
     }
 }

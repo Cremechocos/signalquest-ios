@@ -886,6 +886,12 @@ struct AntennaDetailSheet: View {
             }
             .padding(.horizontal, SQSpace.md)
             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            if let sameBandsNote {
+                Text(sameBandsNote)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("antenna.detail.sameBands")
+            }
             if site.operators.count > 1 {
                 Text("Touche un opérateur pour voir sa fiche.")
                     .font(SQType.caption)
@@ -898,7 +904,7 @@ struct AntennaDetailSheet: View {
     private func operatorRow(_ op: String) -> some View {
         let isActive = op == selectedOperator
         let isSwitchable = site.operators.count > 1 && !isActive
-        let row = HStack(spacing: SQSpace.sm) {
+        let header = HStack(spacing: SQSpace.sm) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(registryColor(op))
                 .frame(width: 4, height: 22)
@@ -906,14 +912,6 @@ struct AntennaDetailSheet: View {
                 .font(SQType.callout(.bold))
                 .foregroundStyle(SQColor.label)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if isActive, isLoadingScopedTechnologies {
-                SkeletonBlock(width: 64, height: 20, radius: SQRadius.sm)
-                    .accessibilityHidden(true)
-            } else {
-                ForEach(technologies(for: op), id: \.self) { tech in
-                    MapTechTag(technology: tech, label: tech)
-                }
-            }
             if isActive, model.details != nil {
                 Text(identityLine ?? String(localized: "n° non publié"))
                     .font(SQType.caption(.semibold))
@@ -927,6 +925,29 @@ struct AntennaDetailSheet: View {
             }
         }
         .frame(minHeight: 46)
+        // Forme B (BANDES-OP) : sous chaque opérateur, une rangée par génération
+        // avec SES bandes. Plus de pastilles ni de liste réunissant le support.
+        let row = VStack(alignment: .leading, spacing: 0) {
+            header
+            Group {
+                if let rows = bandRows(for: op) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(rows) { generationRow($0) }
+                    }
+                } else if isActive, model.details == nil, model.error == nil {
+                    // La fiche scopée charge et la tuile ne lui attribue rien :
+                    // un squelette plutôt que les bandes du support.
+                    SkeletonBlock(width: 160, height: 14, radius: SQRadius.sm)
+                        .accessibilityHidden(true)
+                } else {
+                    Text("Bandes non publiées")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .padding(.leading, 4 + SQSpace.sm)
+            .padding(.bottom, SQSpace.sm2)
+        }
         .contentShape(Rectangle())
         if isSwitchable {
             Button {
@@ -956,18 +977,65 @@ struct AntennaDetailSheet: View {
         return nil
     }
 
-    /// Technologies d'un opérateur du support : celles de la fiche pour
-    /// l'opérateur affiché ; pour les autres, celles de la tuile seulement si
-    /// elles sont sûrement les siennes, sinon rien.
-    private func technologies(for op: String) -> [String] {
-        if op == selectedOperator { return displayedTechnologies }
-        return site.technologies(attributedTo: op) ?? []
+    /// Bandes d'un opérateur par génération : la fiche scopée pour l'opérateur
+    /// affiché (avec ses bandes en projet), la tuile pour les autres, et
+    /// seulement si elle les lui attribue. `nil` → « Bandes non publiées ».
+    private func bandRows(for op: String) -> [GenerationBands]? {
+        if op == selectedOperator, let details = model.details {
+            let core = details.core
+            var systems = core?.frequencyBands ?? []
+            if systems.isEmpty { systems = details.bands }
+            if systems.isEmpty { systems = Array(Set((core?.sectorSystems ?? []).flatMap(\.systems))) }
+            let rows = GenerationBands.rows(systems: systems, planned: core?.technologiesInProject ?? [])
+            if !rows.isEmpty { return rows }
+        }
+        guard let systems = site.systems(attributedTo: op) else { return nil }
+        let rows = GenerationBands.rows(systems: systems)
+        return rows.isEmpty ? nil : rows
     }
 
-    /// La fiche scopée de l'opérateur affiché charge encore, et la tuile ne
-    /// dit pas ses technologies à lui : un squelette plutôt que la liste du support.
-    private var isLoadingScopedTechnologies: Bool {
-        model.details == nil && model.error == nil && site.technologies(attributedTo: selectedOperator) == nil
+    /// « Mêmes bandes déclarées par Bouygues Telecom et Orange » quand tous les
+    /// opérateurs du support déclarent les mêmes bandes (choix d'Alexandre du
+    /// 09/11 : nommer les opérateurs plutôt que dire « équipement partagé »).
+    private var sameBandsNote: String? {
+        guard site.operators.count > 1 else { return nil }
+        let lists = site.operators.map { bandRows(for: $0) }
+        guard lists.allSatisfy({ $0 != nil }), GenerationBands.sameDeclaredBands(lists.compactMap { $0 }) else { return nil }
+        let names = site.operators.map(photoOperatorLabel)
+        return String(localized: "Mêmes bandes déclarées par \(names.formatted(.list(type: .and)))")
+    }
+
+    /// « 4G ··· 700 · 800 · 1800 », les projets en gris à la suite.
+    private func generationRow(_ row: GenerationBands) -> some View {
+        let active = row.bands.map(String.init).joined(separator: " · ")
+        let planned = row.plannedBands.map(String.init).joined(separator: " · ")
+        var value = Text(verbatim: active)
+        if !planned.isEmpty {
+            value = value + Text(verbatim: active.isEmpty ? "" : " · ")
+                + Text("\(planned) en projet").foregroundColor(SQColor.labelTertiary)
+        }
+        var spoken = Text(verbatim: "\(row.generation), \(row.bands.map(String.init).joined(separator: ", "))")
+        if !planned.isEmpty {
+            spoken = spoken + Text(verbatim: ", ") + Text("\(row.plannedBands.map(String.init).joined(separator: ", ")) en projet")
+        }
+        return HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+            Text(verbatim: row.generation)
+                .font(SQType.caption(.bold))
+                .foregroundStyle(SQColor.label)
+                .frame(minWidth: 24, alignment: .leading)
+            BandLeaderLine()
+                .stroke(SQColor.separator, style: StrokeStyle(lineWidth: 1, dash: [1, 3]))
+                .frame(height: 1)
+                .frame(minWidth: 8)
+            value
+                .font(SQType.caption)
+                .monospacedDigit()
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.trailing)
+                .layoutPriority(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
     }
 
     /// Les signalements, en lignes au bas de l'onglet plutôt qu'en grande carte.
@@ -1887,4 +1955,14 @@ struct AzimuthFanView: View {
 /// Les cinq onglets de la fiche antenne ; Discussion seulement sur une facette d'opérateur.
 private enum AntennaDetailTab: Hashable, CaseIterable {
     case essential, identifiers, measures, photos, discussion
+}
+
+/// Points de conduite entre la génération et ses bandes (BANDES-OP).
+private struct BandLeaderLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return path
+    }
 }
