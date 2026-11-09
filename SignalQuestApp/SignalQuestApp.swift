@@ -646,6 +646,8 @@ struct RootView: View {
             } else if isAuthenticated || isGuestApplicationAllowed {
                 MainTabView(user: authenticatedUser)
                     .id(addressStore.treeRevision)
+                    // Bandeau de l'historique dans Messages.
+                    .environmentObject(historyRequests)
                     .onAppear {
                         mainApplicationAppeared = true
                         acknowledgeGuestPresentation()

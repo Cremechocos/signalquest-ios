@@ -110904,6 +110904,66 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Anciens messages à déverrouiller" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older messages to unlock"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anciens messages à déverrouiller"
+          }
+        }
+      }
+    },
+    "Ouvre ton historique sur cet appareil, avec ta passkey ou un autre de tes appareils" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens your history on this device, with your passkey or another of your devices"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre ton historique sur cet appareil, avec ta passkey ou un autre de tes appareils"
+          }
+        }
+      }
+    },
+    "SQFormal|Ouvre ton historique sur cet appareil, avec ta passkey ou un autre de tes appareils" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre votre historique sur cet appareil, avec votre passkey ou un autre de vos appareils"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Masque ce rappel pendant une semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hides this reminder for a week"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masque ce rappel pendant une semaine"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

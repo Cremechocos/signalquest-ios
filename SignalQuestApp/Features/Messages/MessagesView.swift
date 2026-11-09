@@ -515,6 +515,7 @@ struct MessagesView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var networkPath: NetworkPathMonitor
+    @EnvironmentObject private var historyRequests: E2EEAutoHistoryRequestCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -721,6 +722,9 @@ struct MessagesView: View {
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
                 E2EEAutoLogAlertBanner()
+                if historyRequests.showsHistoryBanner, !showingShelved, !showingRequests {
+                    historyBanner
+                }
                 if offersE2EEUnlock, !showingShelved, !showingRequests {
                     e2eeUnlockBanner
                 }
@@ -1148,6 +1152,56 @@ struct MessagesView: View {
             $0.e2eeEnabled == true && $0.e2eeProtocolVersion != 2 && !EncryptedConversationSurfaces.isV2($0)
         }) else { offersE2EEUnlock = false; return }
         offersE2EEUnlock = !(await e2ee.isUnlocked())
+    }
+
+    /// Historique chiffré absent de cet appareil (E2EE-AUTO §5.3) : un bandeau
+    /// discret plutôt qu'un écran qui s'impose. Les nouveaux messages arrivent déjà.
+    private var historyBanner: some View {
+        HStack(spacing: 0) {
+            Button {
+                Haptics.light()
+                historyRequests.openRequester()
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityHidden(true)
+                    }
+                    Text("Anciens messages à déverrouiller")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Déverrouiller")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+                .padding(.leading, SQSpace.md)
+                .frame(minHeight: 44)
+                .padding(.vertical, SQSpace.xs)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint(Text("Ouvre ton historique sur cet appareil, avec ta passkey ou un autre de tes appareils"))
+            .accessibilityIdentifier("messages.history.banner")
+            Button {
+                Haptics.light()
+                historyRequests.snoozeBanner()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Plus tard"))
+            .accessibilityHint(Text("Masque ce rappel pendant une semaine"))
+            .accessibilityIdentifier("messages.history.later")
+        }
+        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     /// Bandeau des anciennes conversations chiffrées : la feuille s'ouvre au toucher.

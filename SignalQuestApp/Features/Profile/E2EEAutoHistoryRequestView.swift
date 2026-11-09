@@ -95,6 +95,20 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         }
         var sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
         var now: () -> Date = Date.init
+        /// « Plus tard » du bandeau de Messages, par compte.
+        var bannerSnoozedUntil: () -> Date? = {
+            UserDefaults.standard.object(forKey: E2EEAutoHistoryRequestCoordinator.snoozeKey()) as? Date
+        }
+        var snoozeBanner: (Date?) -> Void = {
+            UserDefaults.standard.set($0, forKey: E2EEAutoHistoryRequestCoordinator.snoozeKey())
+        }
+    }
+
+    /// Bandeau masqué une semaine après « Plus tard ».
+    nonisolated static let bannerSnooze: TimeInterval = 7 * 24 * 3_600
+
+    nonisolated static func snoozeKey() -> String {
+        "e2eeAuto.historyBanner.snoozedUntil." + (LocalAccountScope.sessionSnapshot()?.ownerNamespace ?? "none")
     }
 
     enum RequesterPhase: Equatable {
@@ -138,11 +152,24 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     @Published private(set) var requester: Requester?
-    /// « Continuer sans l'historique » : la demande reste ouverte, l'écran revient au prochain lancement.
+    /// Appareil en attente (mode renforcé) fermé par « Plus tard » : l'écran revient au prochain lancement.
     @Published private(set) var requesterHidden = false
+    /// Historique : l'écran ne s'impose plus, il s'ouvre depuis le bandeau de Messages.
+    @Published private(set) var requesterOpened = false
+    @Published private(set) var bannerSnoozed = false
     @Published private(set) var approval: Approval?
 
-    var presentsRequester: Bool { requester != nil && !requesterHidden }
+    var presentsRequester: Bool {
+        guard let requester else { return false }
+        // Sans activation, l'appareil lit et envoie déjà : rien ne s'impose.
+        return requester.activating ? !requesterHidden : requesterOpened
+    }
+
+    /// Bandeau « Anciens messages à débloquer » de la liste des conversations.
+    var showsHistoryBanner: Bool {
+        guard let requester, !requester.activating, requester.phase != .received, !requesterOpened else { return false }
+        return !bannerSnoozed
+    }
 
     private let dependencies: Dependencies
     private var requesterTask: Task<Void, Never>?
@@ -153,6 +180,25 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
 
     init(dependencies: Dependencies) {
         self.dependencies = dependencies
+        reloadBannerSnooze()
+    }
+
+    // MARK: Bandeau
+
+    /// « Débloquer » : l'écran de la demande (passkey ou « C'est moi »).
+    func openRequester() {
+        guard requester != nil else { return }
+        requesterOpened = true
+    }
+
+    /// « Plus tard » : le bandeau se tait une semaine ; la demande reste ouverte.
+    func snoozeBanner() {
+        dependencies.snoozeBanner(dependencies.now().addingTimeInterval(Self.bannerSnooze))
+        bannerSnoozed = true
+    }
+
+    func reloadBannerSnooze() {
+        if let until = dependencies.bannerSnoozedUntil() { bannerSnoozed = until > dependencies.now() } else { bannerSnoozed = false }
     }
 
     // MARK: Demandeur
@@ -161,6 +207,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     /// demande déjà ouverte n'attend pas.
     func historyKeyMissing(hkPubB64: String) {
         guard requesterTask == nil, requester == nil else { return }
+        reloadBannerSnooze()
         requesterTask = Task { [weak self] in
             await self?.runRequester(hkPubB64: hkPubB64)
             self?.requesterTask = nil
@@ -266,14 +313,15 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     func hideRequester() {
-        if requester?.phase == .received { requester = nil } else { requesterHidden = true }
+        requesterOpened = false
+        if requester?.phase == .received { requester = nil } else if requester?.activating == true { requesterHidden = true }
     }
 
     private func handle(_ outcome: E2EEAutoHistoryRequests.RequestOutcome, client: Client) async {
         switch outcome {
         case .present:
             // Écran affiché : il le dit ; sinon rien ne s'affiche.
-            if presentsRequester { requester?.phase = .received } else { requester = nil }
+            if presentsRequester { requester?.phase = .received } else { requester = nil; requesterOpened = false }
             await dependencies.continueWithHistoryKey()
         case .waiting(let open):
             if requester == nil {
@@ -291,10 +339,12 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             // Activé sans HK : la suite habituelle la publie ou la redemande (§5.3).
             requester = nil
             requesterHidden = false
+            requesterOpened = false
             await dependencies.continueWithHistoryKey()
         case .noHistoryKey, .notActive:
             // Pas de HK au compte : l'appareil la publie (§5.1) ; en attente : mode renforcé (§6).
             requester = nil
+            requesterOpened = false
         case .retryLater:
             if requester?.phase == .checking { requester?.phase = .paused }
         case .logRefused, .failed:
@@ -383,8 +433,10 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         listTask = nil
         requester = nil
         requesterHidden = false
+        requesterOpened = false
         approval = nil
         postponedApprovals = []
+        reloadBannerSnooze()
     }
 }
 

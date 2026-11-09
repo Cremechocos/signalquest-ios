@@ -29,6 +29,7 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         var hasPasskey = false
         var passkeyOutcomes: [Coordinator.PasskeyRecovery] = []
         var passkeyUses = 0
+        var snoozedUntil: Date?
 
         @MainActor
         func coordinator() -> Coordinator {
@@ -53,7 +54,9 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
                 continueWithHistoryKey: { self.continued += 1 },
                 removeDelivered: { self.removed.append($0) },
                 sleep: { duration in self.clock.addTimeInterval(TimeInterval(duration.components.seconds)) },
-                now: { self.clock }
+                now: { self.clock },
+                bannerSnoozedUntil: { self.snoozedUntil },
+                snoozeBanner: { self.snoozedUntil = $0 }
             ))
         }
     }
@@ -86,7 +89,12 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         XCTAssertEqual(world.keyChecks, 12)
         XCTAssertEqual(coordinator.requester?.phase, .waiting)
         XCTAssertEqual(coordinator.requester?.fingerprint, ["48213", "09177", "66402", "31958"])
+        // L'écran ne s'impose plus : le bandeau de Messages l'ouvre.
+        XCTAssertFalse(coordinator.presentsRequester)
+        XCTAssertTrue(coordinator.showsHistoryBanner)
+        coordinator.openRequester()
         XCTAssertTrue(coordinator.presentsRequester)
+        XCTAssertFalse(coordinator.showsHistoryBanner)
     }
 
     /// Une demande déjà ouverte n'attend pas la synchro.
@@ -124,6 +132,7 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         let coordinator = world.coordinator()
         coordinator.historyKeyMissing(hkPubB64: "hk")
         await settle(coordinator)
+        coordinator.openRequester()
         await coordinator.pollWhileVisible()
         XCTAssertEqual(world.checks, 2)
         XCTAssertEqual(world.continued, 1)
@@ -138,12 +147,40 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         let coordinator = world.coordinator()
         coordinator.historyKeyMissing(hkPubB64: "hk")
         await settle(coordinator)
+        coordinator.openRequester()
         coordinator.hideRequester()
         XCTAssertFalse(coordinator.presentsRequester)
+        XCTAssertTrue(coordinator.showsHistoryBanner)
         world.checkOutcomes = [.present(hkPubB64: "hk")]
         await coordinator.refresh()
         XCTAssertEqual(world.continued, 1)
         XCTAssertNil(coordinator.requester)
+    }
+
+    /// « Plus tard » sur le bandeau : une semaine de silence, puis il revient.
+    func testBannerLaterSnoozesForAWeek() async {
+        let world = World()
+        world.hasOpenRequest = true
+        let coordinator = world.coordinator()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        coordinator.snoozeBanner()
+        XCTAssertFalse(coordinator.showsHistoryBanner)
+        XCTAssertEqual(world.snoozedUntil, world.clock.addingTimeInterval(Coordinator.bannerSnooze))
+        world.clock.addTimeInterval(Coordinator.bannerSnooze + 1)
+        coordinator.reloadBannerSnooze()
+        XCTAssertTrue(coordinator.showsHistoryBanner)
+    }
+
+    /// Mode renforcé : l'appareil ne lit rien sans activation, l'écran s'impose encore.
+    func testActivationStillPresentsTheScreen() async {
+        let world = World()
+        world.startOutcomes = [.waiting(.init(requestId: "hreq_000000000000000001", expiresAtMs: .max, activate: true))]
+        let coordinator = world.coordinator()
+        coordinator.activationNeeded()
+        await settle(coordinator)
+        XCTAssertTrue(coordinator.presentsRequester)
+        XCTAssertFalse(coordinator.showsHistoryBanner)
     }
 
     /// « C'est moi » servi : la notification livrée se retire.
@@ -192,6 +229,8 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         await settle(coordinator)
         XCTAssertEqual(world.starts, 0)
         XCTAssertEqual(coordinator.requester?.phase, .passkey)
+        XCTAssertTrue(coordinator.showsHistoryBanner)
+        coordinator.openRequester()
 
         world.passkeyOutcomes = [.present(hkPubB64: "hk")]
         await coordinator.usePasskey()
