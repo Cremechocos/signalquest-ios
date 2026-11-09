@@ -228,9 +228,13 @@ struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
                     break
                 case .waiting(let error):
                     if isImmediateConnectRefusal(error) {
+                        // Le temps du refus est gardé : seule la sonde sous charge
+                        // iPerf3 s'en sert (`SpeedtestTCPRefusal`), les autres
+                        // appelants y voient un échec comme avant.
+                        let elapsed = (speedtestMonotonicSeconds() - start) * 1_000
                         gate.run {
                             connection.cancel()
-                            continuation.resume(throwing: error)
+                            continuation.resume(throwing: SpeedtestTCPRefusal(elapsedMs: elapsed))
                         }
                     }
                 default:
@@ -3127,10 +3131,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         port: @Sendable () -> UInt16?
     ) async -> [Double] {
         var values: [Double] = []
+        // Adresse résolue une fois : un nom ferait entrer la résolution DNS dans la
+        // fenêtre chronométrée (cf. `NetworkSpeedtestTCPProbe`).
+        let address = (try? ICMPPinger.resolve(host: host).addressText) ?? host
         while speedtestMonotonicSeconds() < deadline && !Task.isCancelled {
             if let target = port(),
-               let elapsed = try? await tcpProbe.connectLatencyMs(
-                   host: host, port: target, timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+               let elapsed = await iperfLoadedConnectRttMs(
+                   tcpProbe: tcpProbe, host: address, port: target
                ),
                !Task.isCancelled, elapsed > 0, elapsed < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 {
                 values.append(elapsed)
@@ -4090,6 +4097,29 @@ func iperfSiblingCandidatePorts(
 /// pourtant une réponse définitive — attendre le délai (5 s) ne faisait que retarder
 /// le passage au port suivant.
 /// Les autres attentes (pas de réseau, pas de route) gardent leur délai.
+/// Connexion refusée tout de suite (RST), avec le temps écoulé jusqu'au refus.
+struct SpeedtestTCPRefusal: Error {
+    let elapsedMs: Double
+}
+
+/// Aller-retour d'une sonde sous charge vers un serveur iPerf3 : une connexion
+/// acceptée OU refusée compte, seul le silence est perdu (choix d'Alexandre, 09/11).
+/// Le refus vient du noyau du serveur, à la même distance : à Lyon (Bouygues), 9240
+/// n'a pas de démon et refuse en 7,6 ms médians quand 9200 accepte en 7,4 ms
+/// (10 essais depuis le Mac, 09/11). Sans ça, ce POP ne donnait aucune latence
+/// sous charge. Un port refusé n'occupe en plus aucun démon.
+func iperfLoadedConnectRttMs(tcpProbe: SpeedtestTCPProbing, host: String, port: UInt16) async -> Double? {
+    do {
+        return try await tcpProbe.connectLatencyMs(
+            host: host, port: port, timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+        )
+    } catch let refusal as SpeedtestTCPRefusal {
+        return refusal.elapsedMs
+    } catch {
+        return nil
+    }
+}
+
 func isImmediateConnectRefusal(_ error: NWError) -> Bool {
     if case .posix(let code) = error, code == .ECONNREFUSED { return true }
     return false

@@ -18,4 +18,24 @@ final class IPerfLoadedProbePortTests: XCTestCase {
         XCTAssertEqual(iperfLoadedProbePort(active: 5202, min: 5201, max: 5202), 5201)
         XCTAssertEqual(iperfLoadedProbePort(active: 5201, min: 5201, max: 5202), 5202)
     }
+
+    /// Un refus immédiat compte comme un aller-retour ; un silence reste perdu.
+    func testRefusalCountsAsReplyButSilenceDoesNot() async {
+        struct Probe: SpeedtestTCPProbing {
+            let outcome: Result<Double, Error>
+            func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double {
+                try outcome.get()
+            }
+        }
+        let accepted = await iperfLoadedConnectRttMs(tcpProbe: Probe(outcome: .success(7.4)), host: "192.0.2.1", port: 9240)
+        let refused = await iperfLoadedConnectRttMs(
+            tcpProbe: Probe(outcome: .failure(SpeedtestTCPRefusal(elapsedMs: 7.6))), host: "192.0.2.1", port: 9240
+        )
+        let silent = await iperfLoadedConnectRttMs(
+            tcpProbe: Probe(outcome: .failure(URLError(.timedOut))), host: "192.0.2.1", port: 9240
+        )
+        XCTAssertEqual(accepted, 7.4)
+        XCTAssertEqual(refused, 7.6)
+        XCTAssertNil(silent)
+    }
 }
