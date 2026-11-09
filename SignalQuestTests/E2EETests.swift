@@ -1882,6 +1882,17 @@ final class E2EETests: XCTestCase {
         }
         XCTAssertEqual(try parse([requirement])?.first?.reason, "MEMBER_REMOVED")
         XCTAssertNil(try parse([requirement, requirement]), "Une conversation nommée deux fois")
+        // `isGroup`, champ additif servi depuis le 09/11 (8fe65a067) : lu, jamais exigé.
+        var withKind = requirement
+        withKind["isGroup"] = false
+        XCTAssertEqual(try parse([withKind])?.first?.reason, "MEMBER_REMOVED")
+        withKind["isGroup"] = "false"
+        XCTAssertNil(try parse([withKind]), "isGroup n'est qu'un booléen")
+        withKind["isGroup"] = 0
+        XCTAssertNil(try parse([withKind]), "isGroup n'est qu'un booléen")
+        withKind["isGroup"] = false
+        withKind["extra"] = true
+        XCTAssertNil(try parse([withKind]), "Tout autre champ reste refusé")
         var legacy = requirement
         legacy["conversationId"] = "conversation_v1_000000001"
         legacy["reason"] = "DEVICE_REVOKED"

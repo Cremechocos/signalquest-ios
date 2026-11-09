@@ -7750,17 +7750,22 @@ enum E2EEV2EpochRotationContract {
         var seen = Set<String>()
         var requirements: [E2EEV2EpochRotationRequirement] = []
         for value in values {
-            guard exactKeys(
-                value,
-                [
-                    "conversationId",
-                    "reason",
-                    "revision",
-                    "triggeredAt",
-                    "currentEpochNumber",
-                    "currentEpochStatus",
-                ]
-            ),
+            // `isGroup` est servi en champ additif depuis le 09/11 (8fe65a067) : lu
+            // s'il est là et booléen, jamais exigé. Sans lui, tout le relevé était
+            // refusé et aucune exigence ne faisait tourner.
+            var keys = Set(value.keys)
+            if let isGroup = value["isGroup"] {
+                guard let flag = isGroup as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() else { return nil }
+                keys.remove("isGroup")
+            }
+            guard keys == [
+                "conversationId",
+                "reason",
+                "revision",
+                "triggeredAt",
+                "currentEpochNumber",
+                "currentEpochStatus",
+            ],
             let conversationId = value["conversationId"] as? String,
             validOpaqueId(conversationId),
             seen.insert(conversationId).inserted,
