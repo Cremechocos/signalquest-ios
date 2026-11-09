@@ -203,6 +203,7 @@
 		32337AAB7EEC3FB80A6BECC5 /* CarPlayImageFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4AC30BD45A05B230CB8559 /* CarPlayImageFactory.swift */; };
 		323D3ADBAF7A05EE0C9EFA9B /* SpeedtestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */; };
 		325514A5F1B701CBEA8A7AC1 /* CallHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A46F0D8DF52ED42DAFFC731 /* CallHistoryView.swift */; };
+		32B6856695B41479BCA508D7 /* MessageFocusOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9D5F4EBC7EC486A10E1CB9 /* MessageFocusOverlay.swift */; };
 		3337873295077C2595B68B7A /* TwoFactorSetupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801D14AA0B49C799ABDE674B /* TwoFactorSetupViewModel.swift */; };
 		338A5BB02C6B88C3DE273189 /* E2EEV2TrustFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1184356FD3FE50AE1A1702E6 /* E2EEV2TrustFormats.swift */; };
 		33C988E6EFCB2A0AD84D7D26 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AEDFB065EC3512D77D7569B /* CredentialStore.swift */; };
@@ -1060,6 +1061,7 @@
 		0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQCompat.swift; sourceTree = "<group>"; };
 		0D78446620CE1CC63CF05EF7 /* ExperienceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceCardView.swift; sourceTree = "<group>"; };
 		0D91C94888BEA4E1D4CAB367 /* ExperienceMethodTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceMethodTests.swift; sourceTree = "<group>"; };
+		0D9D5F4EBC7EC486A10E1CB9 /* MessageFocusOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageFocusOverlay.swift; sourceTree = "<group>"; };
 		0DA0BEDA1A291F4FBD677EF4 /* CoordinateGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoordinateGridTests.swift; sourceTree = "<group>"; };
 		0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiSSIDProvider.swift; sourceTree = "<group>"; };
 		0E4882F72DD2907AAAE98D14 /* MessageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageModels.swift; sourceTree = "<group>"; };
@@ -2247,6 +2249,7 @@
 			children = (
 				78F38B35680E7C99DE20288D /* ConversationModels.swift */,
 				6E9816756A77B99C80C56487 /* MessageComposerBar.swift */,
+				0D9D5F4EBC7EC486A10E1CB9 /* MessageFocusOverlay.swift */,
 				375FEBD8DD79973A3821B193 /* MessageRenderCache.swift */,
 				5D3298EDB2E0523439799250 /* TypingDotsView.swift */,
 			);
@@ -4151,6 +4154,7 @@
 				81DFFE9AA337FF36E5549415 /* MentionAutocomplete.swift in Sources */,
 				D1212A2119E013814872AB77 /* MessageComposerBar.swift in Sources */,
 				34B3762FBE08DA44D5FE0185 /* MessageDraftStore.swift in Sources */,
+				32B6856695B41479BCA508D7 /* MessageFocusOverlay.swift in Sources */,
 				82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */,
 				21F9365C9A2B8E7A624BD5CE /* MessageLinkPreview.swift in Sources */,
 				9D8F7A82FABDCB187B9D4B98 /* MessageModels.swift in Sources */,

@@ -234,6 +234,9 @@ struct ConversationDetailView: View {
     @State private var selectableText: SelectableText?
     /// Message auquel on réagit avec un emoji hors de la palette rapide.
     @State private var emojiPickerTarget: MessageItem?
+    /// Bulle présentée par l'appui long (façon iMessage), et cadres des bulles visibles.
+    @State private var focusedMessage: FocusedMessage?
+    @State private var bubbleFrames = BubbleFrameRegistry()
     /// Texte à transférer vers une autre conversation.
     @State private var forwardTarget: ForwardPayload?
     /// Photos, vidéos et fichiers en attente dans le compositeur (partage reçu,
@@ -957,6 +960,7 @@ struct ConversationDetailView: View {
             onPendingShare: { await consumePendingShare() }
         ))
         .accessibilityHidden(showsProtectionVeil)
+        .overlay { AnyView(messageFocusLayer) }
         .overlay {
             if showsProtectionVeil { protectionVeil }
         }
@@ -1716,9 +1720,46 @@ struct ConversationDetailView: View {
     /// Corps de bulle : contenu classique (texte/carte/sondage/fichier), photo
     /// seule (la photo EST la bulle) ou publication partagée seule (la carte
     /// EST la bulle — pas de cadre brique/surface autour), avec les réactions
-    /// posées en capsules qui chevauchent légèrement le bas de la bulle.
-    @ViewBuilder
+    /// posées dans une capsule sur le coin haut de la bulle.
     private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
+        let isLocal = message.id.hasPrefix("local-")
+        return bubbleContent(for: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime, photoOnly: photoOnly)
+        // Double tap : ❤️, ou le retire s'il est déjà de moi. Simultané pour ne pas retarder
+        // les appuis simples des liens, photos et sondages ; en conversation chiffrée,
+        // seulement si les réactions y sont chiffrées (SOC-07, D.16).
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                Haptics.light()
+                Task { await toggleReaction(message: message, emoji: "❤️") }
+            },
+            including: reactionsAllowed && message.deletedAt == nil && !isLocal ? .all : .subviews
+        )
+        .overlay(alignment: mine ? .topLeading : .topTrailing) {
+            reactionChips(for: message, summaries: reactions)
+        }
+        // Appui long : présentation façon iMessage (bulle soulevée, réactions, actions)
+        // à la place du menu contextuel système (choix d'Alexandre, 09/11).
+        .modifier(MessageLongPress(isEnabled: true) {
+            openFocus(message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime, photoOnly: photoOnly)
+        })
+        // Cadre global de la bulle, lu seulement à l'appui long (registre non observé) ;
+        // mesuré hors de l'enfoncement pour garder la taille réelle.
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { [bubbleFrames] frame in
+            bubbleFrames.frames[message.id] = frame
+        }
+        // Pendant la présentation, la copie soulevée remplace la bulle.
+        .opacity(focusedMessage?.id == message.id ? 0 : 1)
+        .accessibilityActions {
+            ForEach(messageActions(for: message, mine: mine)) { action in
+                Button(action: action.perform) { action.title }
+            }
+        }
+        .padding(.top, reactions.isEmpty ? 0 : 16)
+    }
+
+    /// Contenu seul de la bulle : partagé par la liste et par la copie soulevée de l'appui long.
+    @ViewBuilder
+    private func bubbleContent(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool, photoOnly: Bool) -> some View {
         Group {
             // L'ombre reste sur la photo et la carte seules ; une bulle de texte n'en a plus
             // (un calque d'ombre par bulle coûtait cher au défilement).
@@ -1734,23 +1775,6 @@ struct ConversationDetailView: View {
         }
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
         .sqAnimation(SQMotion.fast, value: sendStatus[message.id])
-        // Double tap : ❤️, ou le retire s'il est déjà de moi. Simultané pour ne pas retarder
-        // les appuis simples des liens, photos et sondages ; en conversation chiffrée,
-        // seulement si les réactions y sont chiffrées (SOC-07, D.16).
-        .simultaneousGesture(
-            TapGesture(count: 2).onEnded {
-                Haptics.light()
-                Task { await toggleReaction(message: message, emoji: "❤️") }
-            },
-            including: reactionsAllowed && message.deletedAt == nil && !message.id.hasPrefix("local-") ? .all : .subviews
-        )
-        // Réactions DANS la vue du menu contextuel : sinon la bulle soulevée par le
-        // menu passait par-dessus en se refermant, puis elles sautaient devant (09/11).
-        .overlay(alignment: mine ? .topLeading : .topTrailing) {
-            reactionChips(for: message, summaries: reactions)
-        }
-        .contextMenu { contextMenu(for: message, mine: mine) }
-        .padding(.top, reactions.isEmpty ? 0 : 16)
     }
 
     /// Message qui n'est QU'un partage de publication (embed interactif) :
@@ -2292,45 +2316,30 @@ struct ConversationDetailView: View {
         )
     }
 
-    @ViewBuilder
-    private func contextMenu(for message: MessageItem, mine: Bool) -> some View {
-        // Rangée d'emojis compacte en tête du menu contextuel : palette
-        // horizontale native sur iOS 17+ (rendu type iMessage, dim léger, pas de
-        // fond plein écran), boutons classiques en repli iOS 16.
-        // Pas de réactions en conversation chiffrée tant qu'elles n'y sont pas
-        // chiffrées : la réaction s'affichait puis disparaissait avec une erreur
-        // (SOC-07). En v2, elles le sont quand tous les appareils les lisent (D.16).
-        if reactionsAllowed, !message.id.hasPrefix("local-") {
-            if #available(iOS 17.0, *) {
-                ControlGroup { reactionMenuButtons(for: message) }
-                    .controlGroupStyle(.palette)
-                    // Choisir un emoji ferme le menu : il restait ouvert sur la réaction posée.
-                    .menuActionDismissBehavior(.enabled)
-            } else {
-                reactionMenuButtons(for: message)
-            }
-            Divider()
-        }
-        // Bulle encore locale (envoi en cours ou en échec) : le serveur ne la
-        // connaît pas, ses boutons « Renvoyer » et « Supprimer » suffisent.
+    /// Actions de l'appui long (et de VoiceOver), groupées comme dans iMessage.
+    /// Bulle encore locale (envoi en cours ou en échec) : le serveur ne la connaît
+    /// pas, ses boutons « Renvoyer » et « Supprimer » suffisent.
+    private func messageActions(for message: MessageItem, mine: Bool) -> [MessageMenuAction] {
         let isLocal = message.id.hasPrefix("local-")
+        let alive = message.deletedAt == nil
         let serverActions = EncryptedConversationSurfaces.allowsServerActions(messageId: message.id, isV2: conversationIsV2)
+        var primary: [MessageMenuAction] = []
+        var secondary: [MessageMenuAction] = []
+        var destructive: [MessageMenuAction] = []
+        var moderation: [MessageMenuAction] = []
+
         if !isLocal {
-            Button {
+            primary.append(MessageMenuAction(id: "reply", title: Text("Répondre"), systemImage: "arrowshape.turn.up.left") {
                 beginReply(to: message)
-            } label: {
-                Label("Répondre", systemImage: "arrowshape.turn.up.left")
-            }
+            })
         }
-        if message.deletedAt == nil, serverActions {
-            Button {
+        if alive, serverActions {
+            primary.append(MessageMenuAction(id: "thread", title: Text("Répondre dans un fil"), systemImage: "bubble.left.and.bubble.right") {
                 threadTarget = message
-            } label: {
-                Label("Répondre dans un fil", systemImage: "bubble.left.and.bubble.right")
-            }
+            })
         }
-        if message.deletedAt == nil, !displayedContent(for: message).isEmpty {
-            Button {
+        if alive, !displayedContent(for: message).isEmpty {
+            primary.append(MessageMenuAction(id: "copy", title: Text("Copier"), systemImage: "doc.on.doc") {
                 let text = displayedContent(for: message)
                 if isE2EE {
                     // MSG-PASTEBOARD-02 : texte déchiffré d'un message E2EE → copie
@@ -2342,118 +2351,126 @@ struct ConversationDetailView: View {
                 } else {
                     UIPasteboard.general.string = text
                 }
-            } label: {
-                Label("Copier", systemImage: "doc.on.doc")
-            }
+            })
             // Pas en conversation chiffrée : la sélection système contournerait la copie bornée ci-dessus.
             if !isE2EE {
-                Button {
+                primary.append(MessageMenuAction(id: "select", title: Text("Sélectionner le texte"), systemImage: "text.cursor") {
                     selectableText = SelectableText(text: displayedContent(for: message))
-                } label: {
-                    Label("Sélectionner le texte", systemImage: "text.cursor")
-                }
+                })
             }
         }
         // Transférer : le texte seul, vers une conversation chiffrée si la source l'est (jamais l'inverse).
         if let forwardable = textOnlyContent(for: message) {
-            Button {
+            primary.append(MessageMenuAction(id: "forward", title: Text("Transférer"), systemImage: "arrowshape.turn.up.right") {
                 forwardTarget = ForwardPayload(text: forwardable, sourceIsEncrypted: isE2EE)
-            } label: {
-                Label("Transférer", systemImage: "arrowshape.turn.up.right")
-            }
+            })
         } else if let media = forwardableMedia(for: message) {
             // Pièces chiffrées : le transfert cite les mêmes blobs (§7.8 G), vers une conversation v2 seulement.
-            Button {
+            primary.append(MessageMenuAction(id: "forward", title: Text("Transférer"), systemImage: "arrowshape.turn.up.right") {
                 forwardTarget = ForwardPayload(text: displayedContent(for: message), sourceIsEncrypted: true, media: media)
-            } label: {
-                Label("Transférer", systemImage: "arrowshape.turn.up.right")
-            }
+            })
         }
-        if message.deletedAt == nil, serverActions {
-            Button {
+        if alive, serverActions {
+            secondary.append(MessageMenuAction(id: "remind", title: Text("Me le rappeler"), systemImage: "bell") {
                 reminderTarget = message
-            } label: {
-                Label("Me le rappeler", systemImage: "bell")
-            }
-            Button {
+            })
+            secondary.append(MessageMenuAction(id: "save", title: Text("Enregistrer"), systemImage: "bookmark") {
                 Task { await saveMessage(message) }
-            } label: {
-                Label("Enregistrer", systemImage: "bookmark")
-            }
+            })
             if canPin {
                 if isPinned(message) {
-                    Button {
+                    secondary.append(MessageMenuAction(id: "unpin", title: Text("Désépingler"), systemImage: "pin.slash") {
                         Task { await unpin(message: message) }
-                    } label: {
-                        Label("Désépingler", systemImage: "pin.slash")
-                    }
+                    })
                 } else {
-                    Button {
+                    secondary.append(MessageMenuAction(id: "pin", title: Text("Épingler"), systemImage: "pin") {
                         Task { await pin(message: message) }
-                    } label: {
-                        Label("Épingler", systemImage: "pin")
-                    }
+                    })
                 }
             }
             // Pas de transcription dans une conversation chiffrée : elle suppose
             // que le serveur écoute l'audio (spec E2EE §13, refusée côté serveur
             // aussi). Un vocal peut y arriver en clair depuis une ancienne app.
             if message.hasVoiceNote, !isE2EE, transcriptions[message.id] == nil {
-                Button {
+                secondary.append(MessageMenuAction(id: "transcribe", title: Text("Afficher la transcription"), systemImage: "waveform") {
                     Task { await requestTranscription(message: message) }
-                } label: {
-                    Label("Afficher la transcription", systemImage: "waveform")
-                }
+                })
             }
         }
-        // Qui l'a lu ou reçu : les accusés ne sont pas du contenu, aussi en conversation chiffrée.
-        if mine && message.deletedAt == nil && !isLocal {
-            Button {
+        if mine && alive && !isLocal {
+            // Qui l'a lu ou reçu : les accusés ne sont pas du contenu, aussi en conversation chiffrée.
+            secondary.append(MessageMenuAction(id: "info", title: Text("Infos"), systemImage: "info.circle") {
                 messageInfoTarget = message
                 Task { await refreshReceipts() }
-            } label: {
-                Label("Infos", systemImage: "info.circle")
-            }
-        }
-        if mine && message.deletedAt == nil && !isLocal {
-            Button {
+            })
+            secondary.append(MessageMenuAction(id: "edit", title: Text("Modifier"), systemImage: "pencil") {
                 replyTarget = nil
                 editTarget = message
                 seedComposer(displayedContent(for: message))
-            } label: {
-                Label("Modifier", systemImage: "pencil")
-            }
-            Button(role: .destructive) {
+            })
+            destructive.append(MessageMenuAction(id: "delete-all", title: Text("Supprimer pour tous"), systemImage: "trash", destructive: true) {
                 pendingDeletion = PendingMessageDeletion(message: message, forEveryone: true)
-            } label: {
-                Label("Supprimer pour tous", systemImage: "trash")
-            }
+            })
         }
         if !isLocal {
-            Button(role: .destructive) {
+            destructive.append(MessageMenuAction(id: "delete-me", title: Text("Supprimer pour moi"), systemImage: "trash.slash", destructive: true) {
                 pendingDeletion = PendingMessageDeletion(message: message, forEveryone: false)
-            } label: {
-                Label("Supprimer pour moi", systemImage: "trash.slash")
-            }
+            })
         }
         // Signaler un message, en 1:1 comme en groupe (Guideline 1.2, SOC-12).
-        if !mine, message.deletedAt == nil, !message.id.hasPrefix("local-") {
-            Divider()
-            Button(role: .destructive) {
+        if !mine, alive, !isLocal {
+            moderation.append(MessageMenuAction(id: "report", title: Text("Signaler le message"), systemImage: "flag", destructive: true) {
                 reportTarget = message
-            } label: {
-                Label("Signaler le message", systemImage: "flag")
-            }
+            })
         }
         // Blocage par expéditeur dans les groupes (Guideline 1.2) — en 1:1 le
         // blocage est déjà accessible depuis la barre d'outils.
         if !mine, conversation.isGroup, let senderId = message.senderId {
-            Divider()
-            Button(role: .destructive) {
+            moderation.append(MessageMenuAction(id: "block", title: Text("Bloquer l’expéditeur"), systemImage: "hand.raised", destructive: true) {
                 pendingBlockSenderId = senderId
-            } label: {
-                Label("Bloquer l’expéditeur", systemImage: "hand.raised")
-            }
+            })
+        }
+        var all: [MessageMenuAction] = []
+        for var group in [primary, secondary, destructive, moderation] where !group.isEmpty {
+            if !all.isEmpty { group[0].startsSection = true }
+            all += group
+        }
+        return all
+    }
+
+    /// Ouvre la présentation façon iMessage sur la bulle touchée longuement.
+    private func openFocus(_ message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool, photoOnly: Bool) {
+        guard focusedMessage == nil, let frame = bubbleFrames.frames[message.id], frame.width > 0 else { return }
+        // Le clavier se range, comme dans Messages : la présentation prend tout l'écran.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        focusedMessage = FocusedMessage(
+            message: message, mine: mine, frame: frame,
+            isGroupStart: isGroupStart, showsTime: showsTime, photoOnly: photoOnly
+        )
+    }
+
+    /// Couche de l'appui long, posée au-dessus de toute la conversation.
+    @ViewBuilder
+    private var messageFocusLayer: some View {
+        if let focus = focusedMessage {
+            let message = focus.message
+            let canReact = reactionsAllowed && !message.id.hasPrefix("local-") && message.deletedAt == nil
+            let reactions = reactionSummaries(for: message)
+            MessageFocusOverlay(
+                focus: focus,
+                bubble: bubbleContent(for: message, mine: focus.mine, isGroupStart: focus.isGroupStart, showsTime: focus.showsTime, photoOnly: focus.photoOnly)
+                    .overlay(alignment: focus.mine ? .topLeading : .topTrailing) {
+                        reactionChips(for: message, summaries: reactions)
+                    },
+                quickReactions: canReact ? ["❤️", "🔥", "👏", "🚀", "⚡", "📡"] : [],
+                myReactions: Set(reactions.filter(\.mine).map(\.emoji)),
+                actions: messageActions(for: message, mine: focus.mine),
+                chipsOverhang: reactions.isEmpty ? 0 : 18,
+                onReact: { emoji in Task { await toggleReaction(message: message, emoji: emoji) } },
+                onMoreReactions: { emojiPickerTarget = message },
+                onDismissed: { focusedMessage = nil }
+            )
+            .id(focus.id)
         }
     }
 
@@ -2466,25 +2483,6 @@ struct ConversationDetailView: View {
             restoreComposerAfterEdit()
         }
         replyTarget = message
-    }
-
-    /// Boutons de réaction du menu contextuel (toggle : re-taper retire MA réaction).
-    @ViewBuilder
-    private func reactionMenuButtons(for message: MessageItem) -> some View {
-        ForEach(["❤️", "🔥", "👏", "🚀", "⚡", "📡"], id: \.self) { emoji in
-            Button {
-                Haptics.light()
-                Task { await toggleReaction(message: message, emoji: emoji) }
-            } label: {
-                Text(emoji)
-            }
-            .accessibilityLabel("Réagir avec \(emoji)")
-        }
-        Button {
-            emojiPickerTarget = message
-        } label: {
-            Label("Plus d’emojis", systemImage: "plus")
-        }
     }
 
     @ViewBuilder
