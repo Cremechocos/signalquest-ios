@@ -44,7 +44,7 @@ enum E2EEV2NotificationPresentationPolicy {
         case "LOCATION": fullText = String(localized: "Position")
         case "LIVE_LOCATION": fullText = String(localized: "Position en direct")
         case "CARD": fullText = String(localized: "Carte SignalQuest")
-        case "REACTION": fullText = String(localized: "Nouvelle réaction")
+        case "REACTION": fullText = String(localized: "A réagi à un message")
         case "EDIT": fullText = String(localized: "Message modifié")
         default: fullText = String(localized: "Nouveau message")
         }
@@ -71,7 +71,8 @@ enum E2EEV2NotificationPresentationPolicy {
             fullText = normalized.isEmpty ? String(localized: "Nouveau message") : String(normalized.prefix(240))
         case .edit: fullText = String(localized: "Message modifié")
         case .delete: fullText = String(localized: "Message supprimé")
-        case .reaction: fullText = String(localized: "Nouvelle réaction")
+        // La cible reste inconnue ici : « un message », jamais « ton message » (choix du 09/11).
+        case .reaction: fullText = String(localized: "A réagi à un message")
         // Aucun push n'est envoyé pour un import (E2EE-AUTO §8) : jamais son contenu.
         case .historyImport: fullText = String(localized: "Nouveau message")
         case .r17(let body): fullText = r17Text(body, ephemeral: ephemeral)

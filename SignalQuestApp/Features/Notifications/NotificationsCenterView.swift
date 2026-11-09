@@ -558,7 +558,8 @@ struct NotificationsCenterView: View {
         switch kind?.lowercased() {
         case "message_new": return String(localized: "Nouveau message")
         case "message_request": return String(localized: "Demande de message")
-        case "message_reaction", "social_reaction": return String(localized: "Nouvelle réaction")
+        case "message_reaction": return String(localized: "Réaction à ton message")
+        case "social_reaction": return String(localized: "Réaction à ta publication")
         case "message_mention", "social_mention": return String(localized: "On t’a mentionné")
         case "social_comment": return String(localized: "Nouveau commentaire")
         case "social_repost": return String(localized: "Ta publication a été repartagée")

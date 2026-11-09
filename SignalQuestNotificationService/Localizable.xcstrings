@@ -103,6 +103,23 @@
         }
       }
     },
+    "A réagi à un message": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reacted to a message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A réagi à un message"
+          }
+        }
+      }
+    },
     "Nouvelle réaction": {
       "extractionState" : "manual",
       "localizations" : {
