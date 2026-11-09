@@ -4,7 +4,7 @@
   "rules": {
     "shareMaxChars": 60,
     "captionMaxChars": 127,
-    "speedtestCaption": "légende du partage d’un test de débit (09/11), `speedtestShareCaption` : tout ou rien (les deux débits et une latence, sinon `speedtest.share.caption` sans chiffre) ; latence de l’image = min, sinon médiane, sinon moyenne, arrondie à l’entier demi vers le haut ; opérateur = nom complet de l’image, absent en Wi-Fi ou contexte réseau décoché (clé sans `operator`) ; `ratePair` : unité écrite une seule fois, après le second débit, quand les deux la partagent (« ↓ 719 · ↑ 73 Mb/s »), sur chacun sinon (« ↓ 1,172 Gb/s · ↑ 95 Mb/s ») ; U+00A0 avant « ms » et avant l’unité. hashtag dans la phrase (« mesuré avec #SignalQuest »), jamais traduit, sans seconde ligne. `shareMaxChars` ne borne pas la légende : `captionMaxChars` est son pire cas mesuré (cas « pire cas de longueur » : débits sous 10 Gb/s d’unités différentes, latence sous 10 000 ms, plus long libellé d’opérateur du registre des marchés)",
+    "speedtestCaption": "légende du partage d’un test de débit (09/11), `speedtestShareCaption` : tout ou rien (les deux débits et une latence, sinon `speedtest.share.caption` sans chiffre) ; latence de l’image = la première > 0 de min, médiane, moyenne (0 = mesure ratée, sautée), arrondie à l’entier demi vers le haut ; opérateur = nom complet de l’image, absent en Wi-Fi ou contexte réseau décoché (clé sans `operator`) ; `ratePair` : unité écrite une seule fois, après le second débit, quand les deux la partagent (« ↓ 719 · ↑ 73 Mb/s »), sur chacun sinon (« ↓ 1,172 Gb/s · ↑ 95 Mb/s ») ; U+00A0 avant « ms » et avant l’unité. hashtag dans la phrase (« mesuré avec #SignalQuest »), jamais traduit, sans seconde ligne. `shareMaxChars` ne borne pas la légende : `captionMaxChars` est son pire cas mesuré (cas « pire cas de longueur » : débits sous 10 Gb/s d’unités différentes, latence sous 10 000 ms, plus long libellé d’opérateur du registre des marchés)",
     "adaptivePlannedS": 30,
     "spikeThreshold": "experience-v3 : médiane + 100 ; experience-v4 : médiane + min(max(30, médiane), 100) (29→59, 31→62, 99→198, 101→201) ; à-coup = mesure STRICTEMENT supérieure au seuil",
     "spaces": "U+00A0 entre un nombre et son unité et devant « : » en français ; U+202F comme séparateur de milliers en français, virgule en anglais",
@@ -569,6 +569,48 @@
         },
         "fr": "↓ 84 · ↑ 13 Mb/s · 40 ms de latence chez Orange, mesuré avec #SignalQuest",
         "en": "↓ 84 · ↑ 13 Mb/s · 40 ms latency on Orange, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "latence : min à 0 (mesure ratée) → sautée, médiane",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": 12500,
+        "latency": {
+          "minMs": 0,
+          "medianMs": 12
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 84000,
+          "up": 12500,
+          "ping": 12,
+          "operator": "Orange"
+        },
+        "fr": "↓ 84 · ↑ 13 Mb/s · 12 ms de latence chez Orange, mesuré avec #SignalQuest",
+        "en": "↓ 84 · ↑ 13 Mb/s · 12 ms latency on Orange, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "tout ou rien : latences toutes à 0 → légende sans chiffre",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": 12500,
+        "latency": {
+          "minMs": 0,
+          "medianMs": 0,
+          "meanMs": 0
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption",
+        "args": {},
+        "fr": "Débit et latence, mesurés avec #SignalQuest",
+        "en": "Speed and latency, measured with #SignalQuest"
       }
     },
     {

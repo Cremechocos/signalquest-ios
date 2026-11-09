@@ -3,7 +3,7 @@ import XCTest
 
 /// Présentation commune des tests d'expérience : le vecteur `presentation-v1`
 /// (copie à l'octet de contracts/experience-tests/presentation-v1.json, map-nextjs
-/// 6428dad08, servi le 02/11 ; légende chiffrée d'un speedtest 38d79bf97, #1010 du
+/// 6428dad08, servi le 02/11 ; légende chiffrée d'un speedtest 1743f35ce, #1010 et #1012 du
 /// 09/11) rejoué dans les deux langues.
 final class ExperiencePresentationTests: XCTestCase {
     private func vector() throws -> [String: Any] {
@@ -29,11 +29,11 @@ final class ExperiencePresentationTests: XCTestCase {
         XCTAssertEqual(rules["captionMaxChars"] as? Int, ExperiencePresentation.captionMaxChars)
     }
 
-    /// Légende chiffrée du partage d'un speedtest (#1010, 09/11) : les 11 cas, clé,
-    /// arguments et phrases à l'octet dans les deux langues, et le pire cas de longueur.
+    /// Légende chiffrée du partage d'un speedtest (#1010, 09/11) : les 13 cas, clé,
+    /// arguments et phrases à l'octet dans les deux langues (latence à 0 sautée, #1012), et le pire cas de longueur.
     func testSpeedtestCaptions() throws {
         let cases = try XCTUnwrap(try vector()["speedtestCaptions"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 11)
+        XCTAssertEqual(cases.count, 13)
         func double(_ value: Any?) -> Double? { (value as? NSNumber)?.doubleValue }
         var longest = 0
         for vector in cases {
