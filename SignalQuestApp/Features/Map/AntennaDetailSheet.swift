@@ -886,6 +886,12 @@ struct AntennaDetailSheet: View {
             }
             .padding(.horizontal, SQSpace.md)
             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            if let projectNote {
+                Text(projectNote)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("antenna.detail.projectBands")
+            }
             if let sameBandsNote {
                 Text(sameBandsNote)
                     .font(SQType.caption)
@@ -978,7 +984,7 @@ struct AntennaDetailSheet: View {
     }
 
     /// Bandes d'un opérateur par génération : la fiche scopée pour l'opérateur
-    /// affiché (avec ses bandes en projet), la tuile pour les autres, et
+    /// affiché, la tuile pour les autres, et
     /// seulement si elle les lui attribue. `nil` → « Bandes non publiées ».
     private func bandRows(for op: String) -> [GenerationBands]? {
         if op == selectedOperator, let details = model.details {
@@ -986,7 +992,9 @@ struct AntennaDetailSheet: View {
             var systems = core?.frequencyBands ?? []
             if systems.isEmpty { systems = details.bands }
             if systems.isEmpty { systems = Array(Set((core?.sectorSystems ?? []).flatMap(\.systems))) }
-            let rows = GenerationBands.rows(systems: systems, planned: core?.technologiesInProject ?? [])
+            // Les projets ne vont PAS ici : `technologiesInProject` est un champ du
+            // support, sans opérateur (Android, 09/11) ; ils restent en pied du bloc.
+            let rows = GenerationBands.rows(systems: systems)
             if !rows.isEmpty { return rows }
         }
         guard let systems = site.systems(attributedTo: op) else { return nil }
@@ -1005,6 +1013,14 @@ struct AntennaDetailSheet: View {
         let names = site.operators.map(photoOperatorLabel)
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         return String(localized: "Mêmes bandes déclarées par \(names.formatted(.list(type: .and)))")
+    }
+
+    /// Bandes en projet du support, une seule fois après les opérateurs : la
+    /// source ne dit pas quel opérateur les a déclarées.
+    private var projectNote: String? {
+        let planned = model.details?.core?.technologiesInProject ?? []
+        guard !planned.isEmpty else { return nil }
+        return String(localized: "\(planned.joined(separator: " · ")) en projet")
     }
 
     /// « 4G ··· 700 · 800 · 1800 », les projets en gris à la suite.
