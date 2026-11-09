@@ -47,8 +47,9 @@ enum SQFeatures {
     /// le décodeur tolérant et l'auteur facultatif : la v2 peut servir
     /// `author: null`, qui fait tomber la page entière dans les builds d'avant.
     /// Fermé, la v1 ne sert ni `replyCount` ni `canReply` : rien des réponses
-    /// ne s'affiche.
-    static let siteThreadV2 = false
+    /// ne s'affiche. Ouvert le 09/11 : la 184 (publiée) porte le décodeur
+    /// tolérant (88b0538e) et la lecture v2 (98a6cc33).
+    static let siteThreadV2 = true
 
     /// Réactions chiffrées (spec E2EE D.16) : l'appareil annonce l'enveloppe
     /// v3, `REACTION` et `reactions` quand ce verrou est ouvert ET que le
