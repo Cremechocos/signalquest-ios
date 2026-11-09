@@ -257,6 +257,43 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(kept.e2eeAuto, true)
     }
 
+    /// Membre omis par l'époque courante alors qu'il garde une époque plus ancienne
+    /// (09/11, conversation avec Julien illisible) : la témoin, plus récente, sert de
+    /// base, et la suivante l'inclut avec tous les appareils certifiés.
+    func testAMemberLeftOutOfTheCurrentEpochRotatesFromTheWitnessedOne() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        var devices = fixture.deviceSet(adding: [phone.device])
+        devices.logSeqs = [fixture.user: 9, bruno: 31]
+        let seeded = try seed(fixture, devices: devices, keepEpoch: true)
+        let withoutUs = E2EEV2CertifiedDeviceSet(devicesByUser: [bruno: [phone.device]], refusals: [:])
+        let served = try servedEpoch(
+            fixture, seeded: seeded, devices: withoutUs, creator: phone, epochKey: Data(repeating: 7, count: 32), withoutEnvelope: true
+        )
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            if request.httpMethod != "POST" { return E2EEV2AccountFixture.response(request, served) }
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
+                "epoch": ["id": "epoch_rotation_000000000003", "epochNumber": "3", "status": "active", "createdAt": "2026-10-26T20:00:00.000Z"],
+                "recipientCount": String((body["envelopes"] as? [Any])?.count ?? 0),
+            ]))
+        }
+        let result = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId, excludedFromCurrent: true
+        )
+        XCTAssertEqual(result, .rotated(epochNumber: 3))
+        let body = try XCTUnwrap(captured.first?.1)
+        XCTAssertEqual(body["previousEpochNumber"] as? String, "2", "Base : l'époque témoin, pas l'époque 1 gardée")
+        let recipients = (body["envelopes"] as? [[String: Any]])?.compactMap { $0["recipientDeviceId"] as? String }
+        XCTAssertEqual(Set(recipients ?? []), [fixture.descriptor.deviceId, phone.device.deviceId])
+    }
+
     /// Conflit : l'époque acceptée entre-temps est relue, vérifiée et adoptée.
     func testAConflictAdoptsTheAcceptedEpochAfterVerifyingIt() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }

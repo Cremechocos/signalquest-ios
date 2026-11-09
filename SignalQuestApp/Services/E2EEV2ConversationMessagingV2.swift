@@ -110,10 +110,27 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             return .failure(localError("invalid-e2ee-refresh-scope"))
         }
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
-        let synced = await syncer.sync(
+        var synced = await syncer.sync(
             conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
         )
         if case .failure(let error) = synced { return .failure(error) }
+        // Membre absent de l'époque courante alors qu'il en gardait une plus ancienne
+        // (09/11 : une rotation d'un autre appareil avait omis tout le compte) : il ne
+        // l'attend plus d'un autre, il tourne lui-même depuis l'époque témoin, qui
+        // l'inclut avec tous les appareils certifiés (E2EE-AUTO §7), puis relit.
+        if synced == .waitingForEpoch, E2EEV2ServerGate.autoActive,
+           let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup),
+           context.head.members.contains(ownUserId(expectedOwnerScopeId)),
+           case .rotated = await rotator.rotateIfNeeded(
+               conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
+               devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount,
+               excludedFromCurrent: true
+           ) {
+            synced = await syncer.sync(
+                conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
+            )
+            if case .failure(let error) = synced { return .failure(error) }
+        }
         // Un départ ou un retrait appris ici, pas encore suivi d'une époque :
         // le premier membre restant qui l'apprend la crée (§3.3).
         if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup),

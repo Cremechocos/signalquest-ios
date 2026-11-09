@@ -473,7 +473,8 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         membershipAt: (Int) -> E2EEV2MembershipState?,
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String,
-        messageCount: Int = 0
+        messageCount: Int = 0,
+        excludedFromCurrent: Bool = false
     ) async -> E2EEV2EpochRotationV2Result {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
@@ -499,8 +500,10 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         }
         // Appareil neuf, jamais destinataire ici (E2EE-AUTO §7) : l'époque
         // courante, vérifiée sans clé, sert de base ; il tourne pour s'y ajouter.
+        // Même chose pour un membre que l'époque courante a omis alors qu'il en garde
+        // une plus ancienne (`excludedFromCurrent`) : la témoin, plus récente, sert de base.
         var base = stored
-        if base == nil, E2EEV2ServerGate.autoActive {
+        if base == nil || excludedFromCurrent, E2EEV2ServerGate.autoActive {
             base = await witnessedEpoch(
                 conversationId: conversationId, genesis: genesis, ownUserId: ownUserId, ownDeviceId: device.deviceId,
                 membershipAt: membershipAt, devices: devices, transport: transport.bound(to: session),
@@ -522,6 +525,11 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         guard !E2EEV2RotationPolicy.reasons(
             current: current, membership: membership, expectedRecipients: lines, nowMs: nowMs, messageCount: messageCount
         ).isEmpty else { return .upToDate }
+        // Jamais une époque qui laisse un membre sans aucun appareil : il ne lirait plus
+        // rien (09/11, conversation rendue illisible par une rotation qui omettait un compte).
+        guard Set(expected.map(\.userId)).isSuperset(of: membership.members) else {
+            return .failure(localError("e2ee-member-without-devices"))
+        }
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),
               ownCertified.signingKeyB64 == device.publicSigningKeyB64,
               let signingKey = ownCertified.signingKey,
