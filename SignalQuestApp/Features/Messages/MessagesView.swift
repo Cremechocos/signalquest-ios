@@ -804,10 +804,15 @@ struct MessagesView: View {
                         .tint(SQColor.info)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        pendingLeave = conversation
-                    } label: {
-                        Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                    // « Quitter » n'existe que pour un groupe (09/11) : en tête-à-tête, il
+                    // signait un départ du chiffrement alors que la conversation revenait
+                    // dans la liste au message suivant, illisible. « Archiver » suffit.
+                    if conversation.isGroup {
+                        Button(role: .destructive) {
+                            pendingLeave = conversation
+                        } label: {
+                            Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     }
                     shelveButton(conversation)
                         .tint(SQColor.info)
@@ -827,10 +832,12 @@ struct MessagesView: View {
                             Label("Marquer comme non lu", systemImage: "message.badge")
                         }
                     }
-                    Button(role: .destructive) {
-                        pendingLeave = conversation
-                    } label: {
-                        Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                    if conversation.isGroup {
+                        Button(role: .destructive) {
+                            pendingLeave = conversation
+                        } label: {
+                            Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     }
                 }
             }
