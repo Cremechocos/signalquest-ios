@@ -293,6 +293,7 @@ struct ConversationDetailView: View {
     @State private var noLongerMember = false
     @State private var isRemovingFromList = false
     @State private var confirmsLocalErase = false
+    @State private var isStartingNewConversation = false
     /// Posé quand la conversation s'affiche à côté de la liste (iPad) : pas de retour.
     @Environment(\.sqMessagesCloseDetail) private var closeSplitDetail
     private var inSplitDetail: Bool { closeSplitDetail != nil }
@@ -319,6 +320,16 @@ struct ConversationDetailView: View {
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
+                if otherParticipantId != nil {
+                    GradientButton(
+                        String(localized: "Nouvelle conversation"), systemImage: "square.and.pencil",
+                        isBusy: isStartingNewConversation, style: .primary
+                    ) {
+                        Task { await startNewConversation() }
+                    }
+                    .accessibilityIdentifier("conversation.notMember.new")
+                    .padding(.top, SQSpace.sm)
+                }
                 GradientButton(
                     String(localized: "Retirer de ma liste"), systemImage: "archivebox",
                     isBusy: isRemovingFromList, style: .secondary
@@ -349,7 +360,9 @@ struct ConversationDetailView: View {
 
     /// Efface la copie locale (messages, clés, brouillon, notifications), puis
     /// retire la conversation de la liste et la ferme.
-    private func eraseLocalCopy() async {
+    /// `thenClose` : le geste manuel retire et ferme ; l'effacement automatique
+    /// laisse la carte, pour que « Nouvelle conversation » reste à portée.
+    private func eraseLocalCopy(thenClose: Bool = true) async {
         guard !isRemovingFromList else { return }
         guard services.e2eeV2Messaging.eraseLocalCopy(conversationId: conversation.id) else {
             showActionError(String(localized: "La conversation n’a pas pu être effacée de cet iPhone."))
@@ -359,7 +372,27 @@ struct ConversationDetailView: View {
             try? await MessageDraftStore.shared.save("", conversationId: conversation.id, ownerScopeId: scope)
         }
         messages = []
-        await removeFromList()
+        if thenClose { await removeFromList() }
+    }
+
+    /// Tête-à-tête seulement : en ouvre un neuf avec la même personne. Le serveur
+    /// ignore depuis la release 8b59d6a3c (#1031, 09/11) un tête-à-tête v2 dont
+    /// l'un des deux n'est plus membre : sinon il rendrait l'ancien, illisible.
+    private func startNewConversation() async {
+        guard let peer = otherParticipantId, !isStartingNewConversation else { return }
+        isStartingNewConversation = true
+        defer { isStartingNewConversation = false }
+        do {
+            let id = try await services.openDirectConversation(with: peer)
+            guard id != conversation.id else {
+                showActionError(String(localized: "La nouvelle conversation n’a pas pu être créée. Réessaie plus tard."))
+                return
+            }
+            closeConversation()
+            router.route(toConversation: id)
+        } catch {
+            if !error.isCancellation { showActionError(error.userFacingMessage) }
+        }
     }
 
     /// Archive pour soi, comme « Archiver » dans la liste, puis ferme le fil.
@@ -3396,7 +3429,7 @@ struct ConversationDetailView: View {
             if services.e2eeV2Messaging.storedChainProvesDeparture(
                 conversationId: conversation.id, isGroup: conversation.isGroup
             ) {
-                await eraseLocalCopy()
+                await eraseLocalCopy(thenClose: false)
             }
         case .failure(let failure):
             errorMessage = failure.kind == .retryable

@@ -111148,6 +111148,34 @@
           }
         }
       }
+    },
+    "La nouvelle conversation n’a pas pu être créée. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The new conversation couldn’t be created. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La nouvelle conversation n’a pas pu être créée. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "SQFormal|La nouvelle conversation n’a pas pu être créée. Réessaie plus tard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La nouvelle conversation n’a pas pu être créée. Réessayez plus tard."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"
