@@ -219,11 +219,19 @@ enum SQShareCardBuilder {
             // repli se lirait « Free » (#6B7280). Hors palette, son nom seul.
             let colors = SQBrand.operatorColors(operatorName)
             let isKnown = colors.name != SQBrand.defaultOperator.name
-            // Free (#834, comme le web) : « Free Mobile » sur le réseau mobile, « Free » sur
-            // sa box ; ici le type de lien est mesuré, pas déduit de l'ASN.
-            let name = colors.name == SQBrand.operatorName("free")
-                ? (result.connectionType == .cellular ? colors.name : colors.shortName)
-                : operatorName
+            // Nom long de la palette pour tout opérateur connu (« Bouygues Telecom »,
+            // ticket cmw8share0bouygues0001), comme les autres écrans. Free (#834,
+            // comme le web) : « Free Mobile » sur le réseau mobile, « Free » sur sa
+            // box ; ici le type de lien est mesuré, pas déduit de l'ASN. Hors
+            // palette : le nom reçu, tel quel.
+            let name: String
+            if !isKnown {
+                name = operatorName
+            } else if colors.name == SQBrand.operatorName("free"), result.connectionType != .cellular {
+                name = colors.shortName
+            } else {
+                name = colors.name
+            }
             return .init(name: name, detail: link, barColor: isKnown ? UIColor(colors.solid) : nil)
         }
         return link.map { .init(name: $0, detail: nil, barColor: nil) }

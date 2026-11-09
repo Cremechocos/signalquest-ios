@@ -262,6 +262,15 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(model(result(connection: .wifi, operatorName: "Orange")).network?.name, "Orange")
     }
 
+    /// cmw8share0bouygues0001 : le nom long de la palette pour tout opérateur
+    /// connu, quel que soit le nom reçu ; un nom hors palette reste tel quel.
+    func testKnownOperatorsUseTheirFullName() {
+        XCTAssertEqual(model(result(operatorName: "Bouygues")).network?.name, "Bouygues Telecom")
+        XCTAssertEqual(model(result(connection: .wifi, operatorName: "BOUYGUES TELECOM")).network?.name, "Bouygues Telecom")
+        XCTAssertEqual(model(result(operatorName: "sfr")).network?.name, "SFR")
+        XCTAssertEqual(model(result(connection: .wifi, operatorName: "Sosh Réseau Local")).network?.name, "Sosh Réseau Local")
+    }
+
     /// SA et NSA, comme l'image d'Android : iOS les distingue, l'image aussi.
     func testHeaderTellsNonStandaloneApart() {
         XCTAssertEqual(model(result(technology: .fiveGNSA)).network?.detail, "5G NSA")
