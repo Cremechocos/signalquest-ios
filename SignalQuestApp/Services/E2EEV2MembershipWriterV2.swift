@@ -78,6 +78,13 @@ final class E2EEV2MembershipWriterV2: @unchecked Sendable {
               E2EEV2Canonical.isOpaque(conversationId) else {
             return .failure(localError("invalid-e2ee-membership-scope"))
         }
+        // Jamais de départ signé dans un tête-à-tête (cmw9quitter0leave0a2deux1,
+        // choix d'Alexandre du 09/11) : un LEAVE y est définitif, l'autre membre ne
+        // peut pas réajouter. La garde est ICI et non seulement dans l'écran, pour
+        // qu'un appelant ajouté un jour ne puisse pas le signer. La règle de
+        // VÉRIFICATION (`applyRule`) reste celle du contrat : des chaînes réelles
+        // contiennent déjà un tel départ et doivent rester lisibles.
+        if change == .leave && !isGroup { return .notAllowed }
         let ownerNamespace = session.ownerNamespace
         let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
         let device: E2EEV2DeviceDescriptor

@@ -59,6 +59,9 @@ final class E2EEV2MembershipWriterV2Tests: XCTestCase {
         XCTAssertEqual(add, .notAllowed, "Pas d'ajout dans un tête-à-tête")
         let remove = await writer.submit(.remove(userId: bruno), conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
         XCTAssertEqual(remove, .notAllowed)
+        // cmw9quitter0leave0a2deux1 : un départ signé est définitif, jamais en tête-à-tête.
+        let leave = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        XCTAssertEqual(leave, .notAllowed, "Pas de départ dans un tête-à-tête")
         XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
     }
 
@@ -122,20 +125,20 @@ extension E2EEV2MembershipWriterV2Tests {
     func testAReplayedLeaveAnsweredNotFoundCountsAsDone() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
-        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let seeded = try fixture.seedGroup(with: [bruno], devices: fixture.deviceSet(adding: [phone.device]))
         let namespace = fixture.session.ownerNamespace
         let writer = E2EEV2MembershipWriterV2(api: fixture.api, identityStore: fixture.identity, stateStore: fixture.states, expectedSession: fixture.session)
         let owner = fixture.session.ownerScopeId
         let notFound = Data(#"{"error":"x","code":"E2EE_CONVERSATION_NOT_FOUND"}"#.utf8)
 
         MockURLProtocol.requestHandler = { request in E2EEV2AccountFixture.response(request, notFound, status: 404) }
-        guard case .failure = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        guard case .failure = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: owner)
         else { return XCTFail("Premier envoi : un 404 reste un échec") }
         XCTAssertEqual(try fixture.states.membershipChain(conversationId: seeded.conversationId, ownerNamespace: namespace).count,
                        seeded.membership.changeNumber, "Rien n'est ajouté à la chaîne")
 
         // Le même départ, gardé, repart : le serveur l'avait accepté.
-        let replayed = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        let replayed = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: owner)
         XCTAssertEqual(replayed, .applied(changeNumber: seeded.membership.changeNumber + 1))
         XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: namespace))
         let chain = try fixture.states.membershipChain(conversationId: seeded.conversationId, ownerNamespace: namespace)
@@ -152,7 +155,7 @@ extension E2EEV2MembershipWriterV2Tests {
     private func refusedChangeIsNotKept(code: String) async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
-        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let seeded = try fixture.seedGroup(with: [bruno], devices: fixture.deviceSet(adding: [phone.device]))
         let namespace = fixture.session.ownerNamespace
         let bodies = MembershipBodies()
         MockURLProtocol.requestHandler = { request in
@@ -166,12 +169,12 @@ extension E2EEV2MembershipWriterV2Tests {
         }
         let writer = E2EEV2MembershipWriterV2(api: fixture.api, identityStore: fixture.identity, stateStore: fixture.states, expectedSession: fixture.session)
         let owner = fixture.session.ownerScopeId
-        guard case .failure(let refused) = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        guard case .failure(let refused) = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: owner)
         else { return XCTFail("Départ refusé attendu") }
         XCTAssertEqual(refused.code, code)
         XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: namespace))
 
-        let next = await writer.submit(.excludeBrowsers(true), conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        let next = await writer.submit(.excludeBrowsers(true), conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: owner)
         XCTAssertEqual(next, .applied(changeNumber: seeded.membership.changeNumber + 1))
         XCTAssertTrue(String(decoding: try XCTUnwrap(bodies.all.last).1, as: UTF8.self).contains("EXCLUDE_WEB_ON"))
     }
