@@ -9,11 +9,20 @@ import SwiftUI
 /// résultat : couleurs de la DA codées en dur, car ces vues sont aussi rendues
 /// hors hiérarchie, où les jetons dynamiques ne se résolvent pas toujours.
 enum SpeedtestShareImageRenderer {
-    /// Texte joint à l'image : la légende commune `speedtest.share.caption` (presentation-v1,
-    /// décision du 01/11), sans lien, sans opérateur ni chiffre, dans la langue de l'app.
-    /// L'image porte déjà le résultat et respecte les options de confidentialité.
-    static func shareText(for result: SpeedtestRunResult, options: SpeedtestShareOptions = .init()) -> String {
-        ExperiencePresentation.label("speedtest.share.caption")
+    /// Texte joint à l'image : la légende chiffrée commune (`speedtestShareCaption`,
+    /// presentation-v1, #1010 du 09/11), dans la langue de l'app, sans lien ni seconde
+    /// ligne. Mêmes chiffres que l'image ; l'opérateur seulement sur le réseau mobile et
+    /// si le contexte réseau reste coché (en Wi-Fi, le FAI de l'image n'y figure pas).
+    static func shareText(for result: SpeedtestRunResult, options: SpeedtestShareOptions = .init(),
+                          language: ExperienceShareLanguage = .current) -> String {
+        func kbps(_ mbps: Double?) -> Int? { mbps.flatMap { $0.isFinite && $0 >= 0 ? Int(($0 * 1_000).rounded()) : nil } }
+        let operatorName = options.includeNetworkContext && result.connectionType == .cellular
+            ? SQShareCardBuilder.operatorDisplayName(for: result) : nil
+        return ExperiencePresentation.speedtestShareCaption(
+            downloadKbps: kbps(result.downloadAverageMbps), uploadKbps: kbps(result.uploadAverageMbps),
+            latencyMinMs: result.pingMinMs, latencyMedianMs: result.pingMedianMs, latencyMeanMs: result.pingMs,
+            operator: operatorName
+        ).rendered(language)
     }
 
     // Conservé pour la dérivation de localisation (tests).

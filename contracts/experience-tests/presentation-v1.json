@@ -3,6 +3,8 @@
   "description": "Présentation commune des tests d’expérience (docs/contracts/experience-tests-v3.md) : catalogue des phrases, règles de rendu, seuil d’à-coup, verdict « Appels et jeu » et plafond de sa note, cas résolus. Remplace experience-share-phrases-v1 (`replaces` donne la phrase d’avant). Généré par scripts/experience/write-presentation-v1.ts depuis packages/core/experience-presentation.ts.",
   "rules": {
     "shareMaxChars": 60,
+    "captionMaxChars": 127,
+    "speedtestCaption": "légende du partage d’un test de débit (09/11), `speedtestShareCaption` : tout ou rien (les deux débits et une latence, sinon `speedtest.share.caption` sans chiffre) ; latence de l’image = min, sinon médiane, sinon moyenne, arrondie à l’entier demi vers le haut ; opérateur = nom complet de l’image, absent en Wi-Fi ou contexte réseau décoché (clé sans `operator`) ; `ratePair` : unité écrite une seule fois, après le second débit, quand les deux la partagent (« ↓ 719 · ↑ 73 Mb/s »), sur chacun sinon (« ↓ 1,172 Gb/s · ↑ 95 Mb/s ») ; U+00A0 avant « ms » et avant l’unité. hashtag dans la phrase (« mesuré avec #SignalQuest »), jamais traduit, sans seconde ligne. `shareMaxChars` ne borne pas la légende : `captionMaxChars` est son pire cas mesuré (cas « pire cas de longueur » : débits sous 10 Gb/s d’unités différentes, latence sous 10 000 ms, plus long libellé d’opérateur du registre des marchés)",
     "adaptivePlannedS": 30,
     "spikeThreshold": "experience-v3 : médiane + 100 ; experience-v4 : médiane + min(max(30, médiane), 100) (29→59, 31→62, 99→198, 101→201) ; à-coup = mesure STRICTEMENT supérieure au seuil",
     "spaces": "U+00A0 entre un nombre et son unité et devant « : » en français ; U+202F comme séparateur de milliers en français, virgule en anglais",
@@ -285,8 +287,35 @@
     },
     "speedtest.share.caption": {
       "args": {},
-      "fr": "Débit et latence, mesurés avec SignalQuest",
-      "en": "Speed and latency, measured with SignalQuest"
+      "fr": "Débit et latence, mesurés avec #SignalQuest",
+      "en": "Speed and latency, measured with #SignalQuest"
+    },
+    "speedtest.share.caption_measured": {
+      "args": {
+        "down": "rate",
+        "up": "rate",
+        "ping": "ms"
+      },
+      "ratePair": [
+        "down",
+        "up"
+      ],
+      "fr": "↓ {down} · ↑ {up} · {ping} de latence, mesuré avec #SignalQuest",
+      "en": "↓ {down} · ↑ {up} · {ping} latency, measured with #SignalQuest"
+    },
+    "speedtest.share.caption_measured_operator": {
+      "args": {
+        "down": "rate",
+        "up": "rate",
+        "ping": "ms",
+        "operator": "text"
+      },
+      "ratePair": [
+        "down",
+        "up"
+      ],
+      "fr": "↓ {down} · ↑ {up} · {ping} de latence chez {operator}, mesuré avec #SignalQuest",
+      "en": "↓ {down} · ↑ {up} · {ping} latency on {operator}, measured with #SignalQuest"
     },
     "experience.local.failed_server_busy": {
       "args": {},
@@ -361,6 +390,240 @@
       "kbps": 1722500,
       "fr": "1,723 Gb/s",
       "en": "1.723 Gb/s"
+    }
+  ],
+  "speedtestCaptions": [
+    {
+      "name": "unité commune : écrite une fois, après le second débit",
+      "input": {
+        "downloadKbps": 719000,
+        "uploadKbps": 73000,
+        "latency": {
+          "minMs": 18,
+          "medianMs": 21,
+          "meanMs": 24
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 719000,
+          "up": 73000,
+          "ping": 18,
+          "operator": "Orange"
+        },
+        "fr": "↓ 719 · ↑ 73 Mb/s · 18 ms de latence chez Orange, mesuré avec #SignalQuest",
+        "en": "↓ 719 · ↑ 73 Mb/s · 18 ms latency on Orange, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "unités différentes : sur chaque débit",
+      "input": {
+        "downloadKbps": 1172000,
+        "uploadKbps": 95000,
+        "latency": {
+          "minMs": 12
+        },
+        "operator": "Free"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 1172000,
+          "up": 95000,
+          "ping": 12,
+          "operator": "Free"
+        },
+        "fr": "↓ 1,172 Gb/s · ↑ 95 Mb/s · 12 ms de latence chez Free, mesuré avec #SignalQuest",
+        "en": "↓ 1.172 Gb/s · ↑ 95 Mb/s · 12 ms latency on Free, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "deux débits en Gb/s : unité commune",
+      "input": {
+        "downloadKbps": 1172000,
+        "uploadKbps": 1035000,
+        "latency": {
+          "minMs": 999
+        },
+        "operator": "Bouygues Telecom"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 1172000,
+          "up": 1035000,
+          "ping": 999,
+          "operator": "Bouygues Telecom"
+        },
+        "fr": "↓ 1,172 · ↑ 1,035 Gb/s · 999 ms de latence chez Bouygues Telecom, mesuré avec #SignalQuest",
+        "en": "↓ 1.172 · ↑ 1.035 Gb/s · 999 ms latency on Bouygues Telecom, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "décimale sous 10 Mb/s, unité commune",
+      "input": {
+        "downloadKbps": 7500,
+        "uploadKbps": 950,
+        "latency": {
+          "minMs": 45
+        },
+        "operator": "SFR"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 7500,
+          "up": 950,
+          "ping": 45,
+          "operator": "SFR"
+        },
+        "fr": "↓ 7,5 · ↑ 1 Mb/s · 45 ms de latence chez SFR, mesuré avec #SignalQuest",
+        "en": "↓ 7.5 · ↑ 1 Mb/s · 45 ms latency on SFR, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "sans opérateur (Wi-Fi ou contexte décoché)",
+      "input": {
+        "downloadKbps": 512000,
+        "uploadKbps": 48000,
+        "latency": {
+          "minMs": 9
+        },
+        "operator": null
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured",
+        "args": {
+          "down": 512000,
+          "up": 48000,
+          "ping": 9
+        },
+        "fr": "↓ 512 · ↑ 48 Mb/s · 9 ms de latence, mesuré avec #SignalQuest",
+        "en": "↓ 512 · ↑ 48 Mb/s · 9 ms latency, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "opérateur vide après espaces : sans opérateur",
+      "input": {
+        "downloadKbps": 512000,
+        "uploadKbps": 48000,
+        "latency": {
+          "minMs": 9
+        },
+        "operator": "  "
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured",
+        "args": {
+          "down": 512000,
+          "up": 48000,
+          "ping": 9
+        },
+        "fr": "↓ 512 · ↑ 48 Mb/s · 9 ms de latence, mesuré avec #SignalQuest",
+        "en": "↓ 512 · ↑ 48 Mb/s · 9 ms latency, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "latence : min absent → médiane, arrondie (demi vers le haut)",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": 12500,
+        "latency": {
+          "minMs": null,
+          "medianMs": 31.5,
+          "meanMs": 40
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 84000,
+          "up": 12500,
+          "ping": 32,
+          "operator": "Orange"
+        },
+        "fr": "↓ 84 · ↑ 13 Mb/s · 32 ms de latence chez Orange, mesuré avec #SignalQuest",
+        "en": "↓ 84 · ↑ 13 Mb/s · 32 ms latency on Orange, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "latence : min et médiane absents → moyenne",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": 12500,
+        "latency": {
+          "meanMs": 40.4
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 84000,
+          "up": 12500,
+          "ping": 40,
+          "operator": "Orange"
+        },
+        "fr": "↓ 84 · ↑ 13 Mb/s · 40 ms de latence chez Orange, mesuré avec #SignalQuest",
+        "en": "↓ 84 · ↑ 13 Mb/s · 40 ms latency on Orange, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "tout ou rien : envoi manquant → légende sans chiffre",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": null,
+        "latency": {
+          "minMs": 20
+        },
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption",
+        "args": {},
+        "fr": "Débit et latence, mesurés avec #SignalQuest",
+        "en": "Speed and latency, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "tout ou rien : aucune latence → légende sans chiffre",
+      "input": {
+        "downloadKbps": 84000,
+        "uploadKbps": 12500,
+        "latency": {},
+        "operator": "Orange"
+      },
+      "expected": {
+        "key": "speedtest.share.caption",
+        "args": {},
+        "fr": "Débit et latence, mesurés avec #SignalQuest",
+        "en": "Speed and latency, measured with #SignalQuest"
+      }
+    },
+    {
+      "name": "pire cas de longueur (captionMaxChars)",
+      "input": {
+        "downloadKbps": 9999000,
+        "uploadKbps": 999000,
+        "latency": {
+          "minMs": 9999
+        },
+        "operator": "1O1O / One2Free / New World Mobility / SUNMobile"
+      },
+      "expected": {
+        "key": "speedtest.share.caption_measured_operator",
+        "args": {
+          "down": 9999000,
+          "up": 999000,
+          "ping": 9999,
+          "operator": "1O1O / One2Free / New World Mobility / SUNMobile"
+        },
+        "fr": "↓ 9,999 Gb/s · ↑ 999 Mb/s · 9 999 ms de latence chez 1O1O / One2Free / New World Mobility / SUNMobile, mesuré avec #SignalQuest",
+        "en": "↓ 9.999 Gb/s · ↑ 999 Mb/s · 9,999 ms latency on 1O1O / One2Free / New World Mobility / SUNMobile, measured with #SignalQuest"
+      }
     }
   ],
   "spikes": {

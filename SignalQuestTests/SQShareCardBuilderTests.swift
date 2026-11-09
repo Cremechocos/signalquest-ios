@@ -403,14 +403,30 @@ final class SQShareCardBuilderTests: XCTestCase {
         )
     }
 
-    /// Le texte joint est la légende commune : aucun chiffre, opérateur, lieu, serveur ni lien.
-    func testShareTextIsTheCommonCaption() {
-        let text = SpeedtestShareImageRenderer.shareText(for: result())
-        XCTAssertEqual(text, ExperiencePresentation.label("speedtest.share.caption"))
-        XCTAssertEqual(ExperiencePresentation.label("speedtest.share.caption", .fr), "Débit et latence, mesurés avec SignalQuest")
-        for leak in ["770", "Orange", "Lyon", "Paris BBR", "signalquest.fr"] {
-            XCTAssertFalse(text.contains(leak), leak)
+    /// Le texte joint est la légende chiffrée commune (#1010) : les chiffres de l'image,
+    /// l'opérateur seulement sur le réseau mobile et si le contexte réseau reste coché ;
+    /// jamais de lieu, de serveur ni de lien.
+    func testShareTextIsTheMeasuredCaption() {
+        let cellular = result(operatorName: "Bouygues")
+        XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, language: .fr),
+                       "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence chez Bouygues Telecom, mesuré avec #SignalQuest")
+        XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, language: .en),
+                       "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms latency on Bouygues Telecom, measured with #SignalQuest")
+        // Contexte réseau décoché, ou Wi-Fi (le FAI de l'image n'entre pas dans la légende).
+        let withoutOperator = "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence, mesuré avec #SignalQuest"
+        XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, options: .init(includeNetworkContext: false), language: .fr), withoutOperator)
+        XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: result(connection: .wifi, operatorName: "Free"), language: .fr), withoutOperator)
+        // Latence de l'image : la médiane quand le minimum manque.
+        XCTAssertTrue(SpeedtestShareImageRenderer.shareText(for: result(pingMin: nil), language: .fr).contains(" 18\u{00A0}ms "))
+        for language in ExperienceShareLanguage.allCases {
+            let text = SpeedtestShareImageRenderer.shareText(for: cellular, language: language)
+            for leak in ["Lyon", "paris.bbr", "signalquest.fr", "\n"] {
+                XCTAssertFalse(text.contains(leak), leak)
+            }
         }
+        // Tout ou rien : sans latence, la légende sans chiffre.
+        XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: result(pingMin: nil, pingMedian: nil, pingAverage: nil), language: .fr),
+                       "Débit et latence, mesurés avec #SignalQuest")
     }
 
     func testExportFilenameDoesNotExposeInternalResultIdentifier() throws {

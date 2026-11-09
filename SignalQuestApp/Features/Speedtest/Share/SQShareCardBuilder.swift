@@ -213,28 +213,30 @@ enum SQShareCardBuilder {
         case .wired: link = "Ethernet"
         case .cellular, .other: link = result.cellularTechnology.map(generation)
         }
-        let operatorName = result.connectionType == .other ? nil : result.networkOperatorName?.shareTrimmed
-        if let operatorName {
+        if let name = operatorDisplayName(for: result) {
             // Barre seulement pour un opérateur de la palette : le gris ardoise du
             // repli se lirait « Free » (#6B7280). Hors palette, son nom seul.
-            let colors = SQBrand.operatorColors(operatorName)
+            let colors = SQBrand.operatorColors(name)
             let isKnown = colors.name != SQBrand.defaultOperator.name
-            // Nom long de la palette pour tout opérateur connu (« Bouygues Telecom »,
-            // ticket cmw8share0bouygues0001), comme les autres écrans. Free (#834,
-            // comme le web) : « Free Mobile » sur le réseau mobile, « Free » sur sa
-            // box ; ici le type de lien est mesuré, pas déduit de l'ASN. Hors
-            // palette : le nom reçu, tel quel.
-            let name: String
-            if !isKnown {
-                name = operatorName
-            } else if colors.name == SQBrand.operatorName("free"), result.connectionType != .cellular {
-                name = colors.shortName
-            } else {
-                name = colors.name
-            }
             return .init(name: name, detail: link, barColor: isKnown ? UIColor(colors.solid) : nil)
         }
         return link.map { .init(name: $0, detail: nil, barColor: nil) }
+    }
+
+    /// Le nom d'opérateur écrit sur l'image, nil si inconnu ou lien `.other`.
+    /// Nom long de la palette pour tout opérateur connu (« Bouygues Telecom »,
+    /// ticket cmw8share0bouygues0001), comme les autres écrans. Free (#834,
+    /// comme le web) : « Free Mobile » sur le réseau mobile, « Free » sur sa
+    /// box ; ici le type de lien est mesuré, pas déduit de l'ASN. Hors
+    /// palette : le nom reçu, tel quel.
+    static func operatorDisplayName(for result: SpeedtestRunResult) -> String? {
+        guard result.connectionType != .other, let operatorName = result.networkOperatorName?.shareTrimmed else { return nil }
+        let colors = SQBrand.operatorColors(operatorName)
+        guard colors.name != SQBrand.defaultOperator.name else { return operatorName }
+        if colors.name == SQBrand.operatorName("free"), result.connectionType != .cellular {
+            return colors.shortName
+        }
+        return colors.name
     }
 
     /// « 5G SA » ou « 5G NSA » quand iOS les distingue, comme l'image d'Android

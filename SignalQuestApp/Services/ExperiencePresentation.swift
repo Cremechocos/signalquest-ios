@@ -57,6 +57,8 @@ enum ExperiencePresentation {
     /// Durée de lecture prévue du lecteur adaptatif, le `{m}` de « Interrompu à {n} s sur {m} ».
     static let adaptivePlannedS = 30
     static let shareMaxChars = 60
+    /// Pire cas mesuré de la légende chiffrée d'un speedtest (`rules.captionMaxChars`).
+    static let captionMaxChars = 127
 
     /// La présentation des quatre usages d'un test, telle que les trois apps la rendent.
     static func uses(tests: [String: Any], methodology: String) -> [Use: UsePresentation] {
@@ -277,7 +279,7 @@ enum ExperiencePresentation {
     // MARK: Rendu
 
     enum ArgType: String, Sendable {
-        case quality, duration, ms, integer, rate
+        case quality, duration, ms, integer, rate, text
     }
 
     struct Entry: Sendable {
@@ -285,6 +287,8 @@ enum ExperiencePresentation {
         let fr: String
         let en: String
         var local = false
+        /// Deux débits dont l'unité commune ne s'écrit qu'une fois, après le second.
+        var ratePair: [String]? = nil
     }
 
     /// Catalogue : la référence est contracts/experience-tests/presentation-v1.json (le test vérifie l'égalité).
@@ -333,7 +337,9 @@ enum ExperiencePresentation {
         "experience.detail.upload_speed": Entry(args: [:], fr: "Débit d’envoi", en: "Upload speed"),
         "experience.detail.how_calculated": Entry(args: [:], fr: "Comment c’est calculé", en: "How it's calculated"),
         "experience.share.caption": Entry(args: [:], fr: "Vidéo, web, jeu\u{00A0}: ma connexion testée avec SignalQuest", en: "Video, web, gaming: my connection tested with SignalQuest"),
-        "speedtest.share.caption": Entry(args: [:], fr: "Débit et latence, mesurés avec SignalQuest", en: "Speed and latency, measured with SignalQuest"),
+        "speedtest.share.caption": Entry(args: [:], fr: "Débit et latence, mesurés avec #SignalQuest", en: "Speed and latency, measured with #SignalQuest"),
+        "speedtest.share.caption_measured": Entry(args: ["down": .rate, "up": .rate, "ping": .ms], fr: "↓ {down} · ↑ {up} · {ping} de latence, mesuré avec #SignalQuest", en: "↓ {down} · ↑ {up} · {ping} latency, measured with #SignalQuest", ratePair: ["down", "up"]),
+        "speedtest.share.caption_measured_operator": Entry(args: ["down": .rate, "up": .rate, "ping": .ms, "operator": .text], fr: "↓ {down} · ↑ {up} · {ping} de latence chez {operator}, mesuré avec #SignalQuest", en: "↓ {down} · ↑ {up} · {ping} latency on {operator}, measured with #SignalQuest", ratePair: ["down", "up"]),
         // Textes LOCAUX, affichés juste après le test : la cause d'un échec ne quitte pas le téléphone.
         "experience.local.failed_server_busy": Entry(args: [:], fr: "Échec\u{00A0}: serveur de mesure occupé", en: "Failed: measurement server busy", local: true),
         "experience.local.failed_server_redirected": Entry(args: [:], fr: "Échec\u{00A0}: serveur de mesure redirigé", en: "Failed: measurement server redirected", local: true),
@@ -345,11 +351,42 @@ enum ExperiencePresentation {
             return ""
         }
         var output = language == .fr ? entry.fr : entry.en
-        for (name, type) in entry.args {
-            guard let value = text.args[name] else { continue }
-            output = output.replacingOccurrences(of: "{\(name)}", with: format(type, value, language))
+        var rendered = entry.args.reduce(into: [String: String]()) { result, arg in
+            if let value = text.args[arg.key] { result[arg.key] = format(arg.value, value, language) }
+        }
+        // `ratePair` : unité commune écrite une seule fois, après le second débit.
+        if let pair = entry.ratePair, pair.count == 2,
+           let first = rendered[pair[0]], let second = rendered[pair[1]],
+           let unit = first.range(of: "\u{00A0}", options: .backwards).map({ first[$0.lowerBound...] }),
+           second.hasSuffix(unit) {
+            rendered[pair[0]] = String(first[..<unit.startIndex])
+        }
+        for (name, value) in rendered {
+            output = output.replacingOccurrences(of: "{\(name)}", with: value)
         }
         return output
+    }
+
+    /// Légende jointe à l'image d'un speedtest (`speedtestShareCaption`, contrat du 09/11, #1010) :
+    /// tout ou rien, les deux débits et une latence, sinon la légende sans chiffre ; latence de
+    /// l'image (min, sinon médiane, sinon moyenne, positives comme sur l'image) arrondie demi vers le haut ; un opérateur vide
+    /// compte comme absent.
+    static func speedtestShareCaption(
+        downloadKbps: Int?, uploadKbps: Int?,
+        latencyMinMs: Double?, latencyMedianMs: Double?, latencyMeanMs: Double?,
+        operator operatorName: String?
+    ) -> Text {
+        let ping = [latencyMinMs, latencyMedianMs, latencyMeanMs].lazy.compactMap { $0 }.first { $0.isFinite && $0 > 0 }
+        guard let downloadKbps, let uploadKbps, let ping else { return Text(key: "speedtest.share.caption") }
+        var args: [String: Text.Arg] = [
+            "down": .int(downloadKbps), "up": .int(uploadKbps),
+            "ping": .int(Int(ping.rounded(.toNearestOrAwayFromZero))),
+        ]
+        guard let name = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return Text(key: "speedtest.share.caption_measured", args: args)
+        }
+        args["operator"] = .string(name)
+        return Text(key: "speedtest.share.caption_measured_operator", args: args)
     }
 
     /// Le texte seul d'une clé sans argument (titres du détail, légendes de partage).
@@ -363,7 +400,7 @@ enum ExperiencePresentation {
         let integer = { ExperienceSharePhrases.integer($0, language) }
         let comma = language == .fr ? "," : "."
         switch type {
-        case .quality: return "\(number)"
+        case .quality, .text: return "\(number)"
         case .integer: return integer(number)
         case .ms: return "\(integer(number))\u{00A0}ms"
         case .duration:

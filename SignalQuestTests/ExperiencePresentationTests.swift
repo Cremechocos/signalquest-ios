@@ -3,7 +3,8 @@ import XCTest
 
 /// Présentation commune des tests d'expérience : le vecteur `presentation-v1`
 /// (copie à l'octet de contracts/experience-tests/presentation-v1.json, map-nextjs
-/// 6428dad08, servi le 02/11) rejoué dans les deux langues.
+/// 6428dad08, servi le 02/11 ; légende chiffrée d'un speedtest 38d79bf97, #1010 du
+/// 09/11) rejoué dans les deux langues.
 final class ExperiencePresentationTests: XCTestCase {
     private func vector() throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -20,10 +21,44 @@ final class ExperiencePresentationTests: XCTestCase {
             XCTAssertEqual(served["en"] as? String, entry.en, key)
             XCTAssertEqual(served["args"] as? [String: String] ?? [:], entry.args.mapValues(\.rawValue), key)
             XCTAssertEqual(served["local"] as? Bool ?? false, entry.local, key)
+            XCTAssertEqual(served["ratePair"] as? [String], entry.ratePair, key)
         }
         let rules = try XCTUnwrap(try vector()["rules"] as? [String: Any])
         XCTAssertEqual(rules["shareMaxChars"] as? Int, ExperiencePresentation.shareMaxChars)
         XCTAssertEqual(rules["adaptivePlannedS"] as? Int, ExperiencePresentation.adaptivePlannedS)
+        XCTAssertEqual(rules["captionMaxChars"] as? Int, ExperiencePresentation.captionMaxChars)
+    }
+
+    /// Légende chiffrée du partage d'un speedtest (#1010, 09/11) : les 11 cas, clé,
+    /// arguments et phrases à l'octet dans les deux langues, et le pire cas de longueur.
+    func testSpeedtestCaptions() throws {
+        let cases = try XCTUnwrap(try vector()["speedtestCaptions"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 11)
+        func double(_ value: Any?) -> Double? { (value as? NSNumber)?.doubleValue }
+        var longest = 0
+        for vector in cases {
+            let name = vector["name"] as? String ?? "?"
+            let input = try XCTUnwrap(vector["input"] as? [String: Any], name)
+            let expected = try XCTUnwrap(vector["expected"] as? [String: Any], name)
+            let latency = input["latency"] as? [String: Any] ?? [:]
+            let text = ExperiencePresentation.speedtestShareCaption(
+                downloadKbps: input["downloadKbps"] as? Int, uploadKbps: input["uploadKbps"] as? Int,
+                latencyMinMs: double(latency["minMs"]), latencyMedianMs: double(latency["medianMs"]),
+                latencyMeanMs: double(latency["meanMs"]), operator: input["operator"] as? String
+            )
+            XCTAssertEqual(text.key, expected["key"] as? String, name)
+            let args = (expected["args"] as? [String: Any] ?? [:]).mapValues { value -> ExperiencePresentation.Text.Arg in
+                (value as? String).map { .string($0) } ?? .int((value as? Int) ?? -1)
+            }
+            XCTAssertEqual(text.args, args, name)
+            for language in ExperienceShareLanguage.allCases {
+                let rendered = text.rendered(language)
+                XCTAssertEqual(rendered, expected[language.rawValue] as? String, "\(name) \(language)")
+                XCTAssertFalse(rendered.contains("\n"), name)
+                longest = max(longest, rendered.utf16.count)
+            }
+        }
+        XCTAssertEqual(longest, ExperiencePresentation.captionMaxChars)
     }
 
     /// Les débits du catalogue et ceux du reste de l'app (`SQUnits`) suivent la même règle.
