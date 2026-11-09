@@ -2324,8 +2324,11 @@ struct MessageAttachmentOutboxRecord: Codable, Equatable, Sendable {
 }
 
 actor MessageAttachmentOutboxStore {
-    /// Taille maximale d'une pièce jointe : celle du serveur (10 Mio).
-    static let maximumSourceBytes = 10 * 1_024 * 1_024
+    /// Taille maximale d'une pièce jointe. Le serveur plafonne le FICHIER à 10 Mio, mais
+    /// son proxy coupe le CORPS à 10 Mio (413 PAYLOAD_TOO_LARGE, #1065) : l'enveloppe
+    /// multipart (boundary, champs, en-têtes, ~400 o) ferait refuser un fichier de
+    /// 10 Mio pile. 64 Kio de marge, en attendant la limite que retiendra le serveur.
+    static let maximumSourceBytes = 10 * 1_024 * 1_024 - 64 * 1_024
 
     /// Vrai si un fichier de cette taille peut partir.
     static func fits(_ byteCount: Int) -> Bool {

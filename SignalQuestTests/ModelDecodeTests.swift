@@ -658,7 +658,7 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: eleven)) {
             XCTAssertEqual($0 as? ShareInbox.Failure, .tooManyImages)
         }
-        // Vidéo ou fichier : 10 Mio exactement passe, un octet de plus non.
+        // Vidéo ou fichier : la limite exacte passe, un octet de plus non.
         XCTAssertNoThrow(try inbox.write(text: nil, url: nil, sources: [try makeSource(.file, name: "ok.pdf", bytes: tenMiB)]))
         XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: [try makeSource(.video, name: "gros.mp4", bytes: tenMiB + 1)])) {
             XCTAssertEqual($0 as? ShareInbox.Failure, .fileTooLarge("gros.mp4"))

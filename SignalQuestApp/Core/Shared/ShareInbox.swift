@@ -16,8 +16,10 @@ struct ShareInbox: Sendable {
     /// Images d'un partage.
     static let maxImages = 10
     /// Vidéo ou fichier : la limite d'une pièce jointe de messagerie
-    /// (`MessageAttachmentOutboxStore.maximumSourceBytes`, 10 Mio).
-    static let maxFileBytes = 10 * 1_024 * 1_024
+    /// (`MessageAttachmentOutboxStore.maximumSourceBytes`, 10 Mio moins 64 Kio de
+    /// marge pour l'enveloppe multipart). Recopiée : l'extension de partage ne
+    /// compile pas le service de messagerie.
+    static let maxFileBytes = 10 * 1_024 * 1_024 - 64 * 1_024
     /// Une image est ré-encodée avant l'envoi (message ou fil) : on accepte plus
     /// lourd qu'une pièce jointe, sans laisser entrer une image démesurée.
     static let maxImageBytes = 20 * 1_024 * 1_024

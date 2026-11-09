@@ -51,10 +51,15 @@ final class ConversationMentionsAndMediaTests: XCTestCase {
         XCTAssertEqual(query["limit"], "10")
     }
 
-    func testAttachmentSizeLimitIsTheServersTenMebibytes() {
+    /// Le proxy du serveur coupe le corps à 10 Mio (#1065) : fichier + enveloppe
+    /// multipart doivent tenir dessous, d'où 64 Kio de marge.
+    func testAttachmentSizeLimitLeavesRoomForTheMultipartEnvelope() {
+        let limit = 10 * 1_024 * 1_024 - 64 * 1_024
+        XCTAssertEqual(ShareInbox.maxFileBytes, MessageAttachmentOutboxStore.maximumSourceBytes)
         XCTAssertTrue(MessageAttachmentOutboxStore.fits(1))
-        XCTAssertTrue(MessageAttachmentOutboxStore.fits(10 * 1_024 * 1_024))
-        XCTAssertFalse(MessageAttachmentOutboxStore.fits(10 * 1_024 * 1_024 + 1))
+        XCTAssertTrue(MessageAttachmentOutboxStore.fits(limit))
+        XCTAssertFalse(MessageAttachmentOutboxStore.fits(limit + 1))
+        XCTAssertFalse(MessageAttachmentOutboxStore.fits(10 * 1_024 * 1_024), "10 Mio pile + enveloppe = 413")
         XCTAssertFalse(MessageAttachmentOutboxStore.fits(0), "Un fichier vide ne part pas")
     }
 
