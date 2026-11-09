@@ -230,6 +230,15 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertFalse(messaging.storedChainHeadExcludesMe(
             conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
         ), "Toujours membre : la copie ne s'efface pas au départ")
+        // Un changement accepté ne veut pas dire parti : seul l'état signé le dit.
+        let promoted = await messaging.change(
+            .promote(userId: bruno), conversationId: seeded.conversationId, isGroup: true, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .applied = promoted else { return XCTFail("Nomination : \(promoted)") }
+        XCTAssertFalse(messaging.storedChainHeadExcludesMe(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ), "Nomination acceptée, toujours membre : rien ne s'efface")
         let left = await messaging.change(
             .leave, conversationId: seeded.conversationId, isGroup: true, devices: devices,
             expectedOwnerScopeId: fixture.session.ownerScopeId
