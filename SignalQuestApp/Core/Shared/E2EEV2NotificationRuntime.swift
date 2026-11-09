@@ -66,6 +66,9 @@ enum E2EEV2NotificationPresentationPolicy {
         switch payload.body {
         case .text where ephemeral:
             fullText = String(localized: "Message éphémère")
+        case .text(let text) where ShareTextV1.preview(text) != nil:
+            // Partage v1 : son aperçu, jamais l'en-tête brut (share-text §5).
+            fullText = ShareTextV1.preview(text) ?? ""
         case .text(let text):
             let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
             fullText = normalized.isEmpty ? String(localized: "Nouveau message") : String(normalized.prefix(240))

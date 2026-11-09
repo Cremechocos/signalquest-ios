@@ -107,6 +107,103 @@ struct ShareCardBubble: View {
     }
 }
 
+// MARK: Speedtest partagé en share-text v1
+
+/// Speedtest partagé au format share-text v1 (« SQ speedtest 1 »), clair ou déchiffré.
+/// Débit descendant en grand, puis les lignes ; le lien ne s'ouvre que s'il passe la
+/// liste blanche (§4), sinon il reste lisible en texte.
+struct SpeedtestShareTextBubble: View {
+    let card: SpeedtestShareTextCard
+    let mine: Bool
+    @EnvironmentObject private var services: AppServices
+    @Environment(\.openURL) private var openURL
+    @State private var registry: MarketRegistryPayload?
+
+    private var rows: [ShareCardRow] {
+        var rows: [ShareCardRow] = []
+        if let up = card.uploadMbps {
+            rows.append(.init(label: String(localized: "Envoi"), value: SQUnits.throughputValue(mbps: up) + " " + SQUnits.throughputUnit(mbps: up)))
+        }
+        if let ping = card.pingMs { rows.append(.init(label: String(localized: "Latence"), value: "\(ping) ms")) }
+        if let peak = card.peakMbps {
+            rows.append(.init(label: String(localized: "Max réception"), value: SQUnits.throughputValue(mbps: peak) + " " + SQUnits.throughputUnit(mbps: peak)))
+        }
+        rows += card.operatorRows(registry: registry)
+        if let address = card.address { rows.append(.init(label: String(localized: "Lieu"), value: address)) }
+        return rows
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "speedometer")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
+                    .frame(width: 32, height: 32)
+                    .background(mine ? SQColor.onInk.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Speedtest")
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                    if let subtitle = card.subtitle {
+                        Text(verbatim: subtitle)
+                            .font(SQType.micro)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            if let down = card.downloadMbps {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(verbatim: SQUnits.throughputValue(mbps: down))
+                        .font(SQType.metricSmall)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                    Text(verbatim: SQUnits.throughputUnit(mbps: down))
+                        .font(SQType.micro)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                    Text("Réception")
+                        .font(SQType.micro)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if !rows.isEmpty {
+                VStack(spacing: SQSpace.xs + 1) {
+                    ForEach(rows) { row in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(row.label)
+                                .font(SQType.micro)
+                                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                            Spacer(minLength: SQSpace.sm)
+                            Text(verbatim: row.value)
+                                .font(SQType.caption.weight(.medium))
+                                .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .padding(.top, 1)
+            }
+            if let url = card.safeURL {
+                ShareCardOpenButton(mine: mine) { openURL(url) }
+            } else if let link = card.link {
+                // Hors liste blanche : lisible, jamais cliquable ni habillé (§4).
+                Text(verbatim: link)
+                    .font(SQType.micro)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                    .textSelection(.enabled)
+                    .lineLimit(3)
+            }
+        }
+        .frame(maxWidth: 280, alignment: .leading)
+        .task { registry = await services.markets.registry() }
+        .accessibilityIdentifier("messages.share.speedtestV1")
+    }
+}
+
 // MARK: Carte « Mesure de signal » dédiée
 
 struct SignalCardBubble: View {

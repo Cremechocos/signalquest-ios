@@ -796,6 +796,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     static func preview(of messages: [E2EEV2MessageStoreV2.Stored]) -> (envelopeId: String, text: String)? {
         guard let last = messages.last(where: { $0.kind != E2EEV2MessageStoreV2.importKind }) else { return nil }
         if last.deleted { return (last.envelopeId, String(localized: "Message supprimé")) }
+        // Un partage v1 (« SQ speedtest 1 »…) a son aperçu, jamais l'en-tête brut.
+        if let raw = last.text, let shared = ShareTextV1.preview(raw) { return (last.envelopeId, shared) }
         if let text = last.text?.split(whereSeparator: \.isNewline).joined(separator: " "), !text.isEmpty {
             return (last.envelopeId, text)
         }

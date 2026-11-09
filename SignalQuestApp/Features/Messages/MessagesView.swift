@@ -1844,7 +1844,8 @@ struct MessagesView: View {
         // appareil n'a pas encore l'enveloppe : il n'en connaît alors pas le type
         // (décision d'Alexandre, 08/11, commune aux trois apps).
         if conversation.e2eeV2?.lastMessage != nil {
-            return model.decryptedPreviews[conversation.id].flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Nouveau message")
+            return model.decryptedPreviews[conversation.id].flatMap { $0.isEmpty ? nil : ShareTextV1.preview($0) ?? $0 }
+                ?? String(localized: "Nouveau message")
         }
         guard let last = conversation.lastMessage else {
             return String(localized: "Aucun message")
@@ -1853,12 +1854,13 @@ struct MessagesView: View {
         let attachmentHint = last.attachments.isEmpty ? "" : "📎 "
         if last.isEncrypted {
             if let plain = model.decryptedPreviews[conversation.id], !plain.isEmpty {
-                return attachmentHint + plain
+                // Jamais l'en-tête brut d'un partage v1 (share-text §5).
+                return attachmentHint + (ShareTextV1.preview(plain) ?? plain)
             }
             return attachmentHint.isEmpty ? String(localized: "Message chiffré") : String(localized: "📎 Pièce jointe")
         }
         if let content = last.content, !content.isEmpty {
-            return attachmentHint + content
+            return attachmentHint + (ShareTextV1.preview(content) ?? content)
         }
         return last.attachments.isEmpty ? String(localized: "Aucun message") : String(localized: "📎 Pièce jointe")
     }

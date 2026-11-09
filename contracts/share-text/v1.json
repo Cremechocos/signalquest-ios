@@ -1,0 +1,663 @@
+{
+  "fixtureVersion": "1",
+  "valid": [
+    {
+      "case": "site France complet",
+      "type": "site",
+      "fields": {
+        "operator": "ORANGE",
+        "operator_name": "Orange",
+        "technologies": "2G,4G,5G",
+        "enb": "123456",
+        "pci": "301",
+        "support": "1234567",
+        "anfr": "0751234567",
+        "market": "FR",
+        "address": "1 rue Exemple, 00000 Ville",
+        "position": "48.85000,2.35000",
+        "link": "https://signalquest.fr/carte?lat=48.85000&lng=2.35000&siteId=1234567&market=FR&operator=ORANGE&open=antenna"
+      },
+      "text": "SQ site 1\noperator: ORANGE\noperator_name: Orange\ntechnologies: 2G,4G,5G\nenb: 123456\npci: 301\nsupport: 1234567\nanfr: 0751234567\nmarket: FR\naddress: 1 rue Exemple, 00000 Ville\nposition: 48.85000,2.35000\nlink: https://signalquest.fr/carte?lat=48.85000&lng=2.35000&siteId=1234567&market=FR&operator=ORANGE&open=antenna"
+    },
+    {
+      "case": "site Canada, opérateur régional, sans ANFR",
+      "type": "site",
+      "fields": {
+        "operator": "REGIONAL",
+        "operator_name": "SaskTel",
+        "technologies": "4G,5G",
+        "gnb": "4128",
+        "support": "ISED-5150123",
+        "market": "CA",
+        "position": "50.45000,-104.60000",
+        "link": "https://signalquest.fr/carte?lat=50.45000&lng=-104.60000&siteId=ISED-5150123&market=CA&operator=REGIONAL&open=antenna"
+      },
+      "text": "SQ site 1\noperator: REGIONAL\noperator_name: SaskTel\ntechnologies: 4G,5G\ngnb: 4128\nsupport: ISED-5150123\nmarket: CA\nposition: 50.45000,-104.60000\nlink: https://signalquest.fr/carte?lat=50.45000&lng=-104.60000&siteId=ISED-5150123&market=CA&operator=REGIONAL&open=antenna"
+    },
+    {
+      "case": "site communautaire, minimum",
+      "type": "site",
+      "fields": {
+        "operator": "UNMAPPED_MNO",
+        "market": "HR",
+        "position": "45.81000,15.98000",
+        "link": "https://signalquest.fr/carte?lat=45.81000&lng=15.98000&market=HR&open=antenna"
+      },
+      "text": "SQ site 1\noperator: UNMAPPED_MNO\nmarket: HR\nposition: 45.81000,15.98000\nlink: https://signalquest.fr/carte?lat=45.81000&lng=15.98000&market=HR&open=antenna"
+    },
+    {
+      "case": "speedtest complet",
+      "type": "speedtest",
+      "fields": {
+        "time": "2026-10-05T12:02:00.000Z",
+        "download_mbps": "412.0",
+        "download_peak_mbps": "498.3",
+        "upload_mbps": "48.0",
+        "ping_ms": "21",
+        "connection": "5G NSA",
+        "operator": "ORANGE",
+        "operator_name": "Orange",
+        "market": "FR",
+        "enb": "123456",
+        "address": "Ville",
+        "link": "https://signalquest.fr/speedtest/st_1"
+      },
+      "text": "SQ speedtest 1\ntime: 2026-10-05T12:02:00.000Z\ndownload_mbps: 412.0\ndownload_peak_mbps: 498.3\nupload_mbps: 48.0\nping_ms: 21\nconnection: 5G NSA\noperator: ORANGE\noperator_name: Orange\nmarket: FR\nenb: 123456\naddress: Ville\nlink: https://signalquest.fr/speedtest/st_1"
+    },
+    {
+      "case": "speedtest MVNO, marque et réseau (v1.2)",
+      "type": "speedtest",
+      "fields": {
+        "time": "2026-11-09T19:30:00.000Z",
+        "download_mbps": "85.4",
+        "upload_mbps": "12.1",
+        "ping_ms": "34",
+        "connection": "4G",
+        "operator": "BOUYGUES",
+        "operator_name": "Bouygues Telecom",
+        "brand": "La Poste Mobile",
+        "market": "FR",
+        "link": "https://signalquest.fr/speedtest/st_2"
+      },
+      "text": "SQ speedtest 1\ntime: 2026-11-09T19:30:00.000Z\ndownload_mbps: 85.4\nupload_mbps: 12.1\nping_ms: 34\nconnection: 4G\noperator: BOUYGUES\noperator_name: Bouygues Telecom\nbrand: La Poste Mobile\nmarket: FR\nlink: https://signalquest.fr/speedtest/st_2"
+    },
+    {
+      "case": "speedtest, brand égale au réseau à la casse près : non écrite (v1.2)",
+      "type": "speedtest",
+      "writerFields": {
+        "time": "2026-11-09T19:31:00.000Z",
+        "download_mbps": "120.0",
+        "connection": "5G",
+        "operator": "ORANGE",
+        "operator_name": "Orange",
+        "brand": "ORANGE ",
+        "market": "FR",
+        "link": "https://signalquest.fr/speedtest/st_3"
+      },
+      "fields": {
+        "time": "2026-11-09T19:31:00.000Z",
+        "download_mbps": "120.0",
+        "connection": "5G",
+        "operator": "ORANGE",
+        "operator_name": "Orange",
+        "market": "FR",
+        "link": "https://signalquest.fr/speedtest/st_3"
+      },
+      "text": "SQ speedtest 1\ntime: 2026-11-09T19:31:00.000Z\ndownload_mbps: 120.0\nconnection: 5G\noperator: ORANGE\noperator_name: Orange\nmarket: FR\nlink: https://signalquest.fr/speedtest/st_3"
+    },
+    {
+      "case": "speedtest, brand égale au réseau aux accents et à la ponctuation près : non écrite (v1.2)",
+      "type": "speedtest",
+      "writerFields": {
+        "time": "2026-11-09T19:32:00.000Z",
+        "download_mbps": "64.0",
+        "connection": "4G",
+        "operator": "BOUYGUES",
+        "operator_name": "Bouygues Telecom",
+        "brand": "Bouygues-Télécom",
+        "market": "FR",
+        "link": "https://signalquest.fr/speedtest/st_5"
+      },
+      "fields": {
+        "time": "2026-11-09T19:32:00.000Z",
+        "download_mbps": "64.0",
+        "connection": "4G",
+        "operator": "BOUYGUES",
+        "operator_name": "Bouygues Telecom",
+        "market": "FR",
+        "link": "https://signalquest.fr/speedtest/st_5"
+      },
+      "text": "SQ speedtest 1\ntime: 2026-11-09T19:32:00.000Z\ndownload_mbps: 64.0\nconnection: 4G\noperator: BOUYGUES\noperator_name: Bouygues Telecom\nmarket: FR\nlink: https://signalquest.fr/speedtest/st_5"
+    },
+    {
+      "case": "session de couverture",
+      "type": "session",
+      "fields": {
+        "time": "2026-10-05T12:02:00.000Z",
+        "points": "1520",
+        "distance_km": "12.4",
+        "duration_min": "38",
+        "technologies": "4G,5G",
+        "connection": "5G",
+        "link": "https://signalquest.fr/sessions/sess_42"
+      },
+      "text": "SQ session 1\ntime: 2026-10-05T12:02:00.000Z\npoints: 1520\ndistance_km: 12.4\nduration_min: 38\ntechnologies: 4G,5G\nconnection: 5G\nlink: https://signalquest.fr/sessions/sess_42"
+    },
+    {
+      "case": "publication du fil, texte coupé et aplati",
+      "type": "post",
+      "fields": {
+        "post_id": "post_01J7",
+        "author_handle": "exemple_sq",
+        "text": "Première ligne seconde ligne ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+        "link": "https://signalquest.fr/feed?post=post_01J7"
+      },
+      "text": "SQ post 1\npost_id: post_01J7\nauthor_handle: exemple_sq\ntext: Première ligne seconde ligne ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\nlink: https://signalquest.fr/feed?post=post_01J7"
+    },
+    {
+      "case": "mesure radio 5G NSA, avec position et partage en direct",
+      "type": "radio-info",
+      "fields": {
+        "time": "2026-10-27T09:14:05.250Z",
+        "connection": "5G NSA",
+        "technology": "4G",
+        "operator": "ORANGE",
+        "operator_name": "Orange F",
+        "plmn": "20801",
+        "market": "FR",
+        "roaming": "false",
+        "rsrp_dbm": "-97",
+        "rsrq_db": "-11",
+        "sinr_db": "14",
+        "band": "3",
+        "bandwidth_khz": "20000",
+        "earfcn": "1850",
+        "pci": "301",
+        "enb": "123456",
+        "cell_id": "31604737",
+        "tac": "28160",
+        "ca": "true",
+        "nr_rsrp_dbm": "-89",
+        "nr_rsrq_db": "-11",
+        "nr_sinr_db": "18",
+        "nr_band": "78",
+        "nr_nrarfcn": "643296",
+        "nr_pci": "512",
+        "position": "48.85000,2.35000",
+        "accuracy_m": "12",
+        "live_session": "ls_01J8",
+        "link": "https://signalquest.fr/messages?c=conv_01J8&liveShare=ls_01J8&fullscreen=1"
+      },
+      "text": "SQ radio-info 1\ntime: 2026-10-27T09:14:05.250Z\nconnection: 5G NSA\ntechnology: 4G\noperator: ORANGE\noperator_name: Orange F\nplmn: 20801\nmarket: FR\nroaming: false\nrsrp_dbm: -97\nrsrq_db: -11\nsinr_db: 14\nband: 3\nbandwidth_khz: 20000\nearfcn: 1850\npci: 301\nenb: 123456\ncell_id: 31604737\ntac: 28160\nca: true\nnr_rsrp_dbm: -89\nnr_rsrq_db: -11\nnr_sinr_db: 18\nnr_band: 78\nnr_nrarfcn: 643296\nnr_pci: 512\nposition: 48.85000,2.35000\naccuracy_m: 12\nlive_session: ls_01J8\nlink: https://signalquest.fr/messages?c=conv_01J8&liveShare=ls_01J8&fullscreen=1"
+    },
+    {
+      "case": "mesure radio 5G SA en itinérance, avec position, sans partage en direct",
+      "type": "radio-info",
+      "fields": {
+        "time": "2026-10-27T09:14:05.250Z",
+        "connection": "5G SA",
+        "technology": "5G",
+        "operator": "BELL",
+        "plmn": "302610",
+        "market": "CA",
+        "roaming": "true",
+        "rsrp_dbm": "-88",
+        "rsrq_db": "-10",
+        "sinr_db": "21",
+        "band": "78",
+        "bandwidth_khz": "100000",
+        "nrarfcn": "636666",
+        "pci": "1002",
+        "gnb": "4128",
+        "cell_id": "68719476735",
+        "tac": "16777215",
+        "ca": "false",
+        "position": "45.50170,-73.56730",
+        "accuracy_m": "35",
+        "link": "https://signalquest.fr/carte?lat=45.50170&lng=-73.56730"
+      },
+      "text": "SQ radio-info 1\ntime: 2026-10-27T09:14:05.250Z\nconnection: 5G SA\ntechnology: 5G\noperator: BELL\nplmn: 302610\nmarket: CA\nroaming: true\nrsrp_dbm: -88\nrsrq_db: -10\nsinr_db: 21\nband: 78\nbandwidth_khz: 100000\nnrarfcn: 636666\npci: 1002\ngnb: 4128\ncell_id: 68719476735\ntac: 16777215\nca: false\nposition: 45.50170,-73.56730\naccuracy_m: 35\nlink: https://signalquest.fr/carte?lat=45.50170&lng=-73.56730"
+    },
+    {
+      "case": "mesure radio 4G sans position ni lien (interrupteur éteint)",
+      "type": "radio-info",
+      "fields": {
+        "time": "2026-10-27T09:14:05.250Z",
+        "connection": "4G",
+        "technology": "4G",
+        "operator": "UNMAPPED_MNO",
+        "plmn": "21910",
+        "market": "HR",
+        "rsrp_dbm": "-104",
+        "band": "20",
+        "earfcn": "6300"
+      },
+      "text": "SQ radio-info 1\ntime: 2026-10-27T09:14:05.250Z\nconnection: 4G\ntechnology: 4G\noperator: UNMAPPED_MNO\nplmn: 21910\nmarket: HR\nrsrp_dbm: -104\nband: 20\nearfcn: 6300"
+    },
+    {
+      "case": "mesure radio 2G : réseau et RSSI seulement",
+      "type": "radio-info",
+      "fields": {
+        "time": "2026-10-27T09:14:05.250Z",
+        "connection": "2G",
+        "technology": "2G",
+        "operator": "ORANGE",
+        "plmn": "20801",
+        "market": "FR",
+        "roaming": "false",
+        "rssi_dbm": "-71"
+      },
+      "text": "SQ radio-info 1\ntime: 2026-10-27T09:14:05.250Z\nconnection: 2G\ntechnology: 2G\noperator: ORANGE\nplmn: 20801\nmarket: FR\nroaming: false\nrssi_dbm: -71"
+    }
+  ],
+  "read": [
+    {
+      "case": "ordre libre, \\r\\n, clé inconnue ignorée",
+      "note": "L’ordre est libre à la lecture.",
+      "text": "SQ speedtest 1\r\nlink: https://signalquest.fr/speedtest/st_9\r\nfuture_key: x\r\ndownload_mbps: 10.5\r\n",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "link": "https://signalquest.fr/speedtest/st_9",
+          "download_mbps": "10.5"
+        },
+        "safeLink": "https://signalquest.fr/speedtest/st_9"
+      }
+    },
+    {
+      "case": "clé en double : la première fait foi, même refusée",
+      "note": "operator est absent : sa première valeur est refusée.",
+      "text": "SQ site 1\noperator: orange\noperator: ORANGE\nlink: https://signalquest.fr/carte?market=FR",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr/carte?market=FR"
+        },
+        "safeLink": "https://signalquest.fr/carte?market=FR"
+      }
+    },
+    {
+      "case": "valeur hors format : ligne ignorée",
+      "note": "Ordre décroissant, zéro de tête, PCI hors plage, position sans 5 décimales.",
+      "text": "SQ site 1\ntechnologies: 5G,4G\nenb: 0123456\npci: 1008\nposition: 45.7,4.8\nlink: https://signalquest.fr/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr/carte"
+        },
+        "safeLink": "https://signalquest.fr/carte"
+      }
+    },
+    {
+      "case": "lien hors liste blanche : non cliquable",
+      "note": "Le champ est lu, safeLink est null : le lecteur l’affiche en texte.",
+      "text": "SQ site 1\noperator: ORANGE\nlink: https://phishing.example/carte?market=FR",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "operator": "ORANGE",
+          "link": "https://phishing.example/carte?market=FR"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : www accepté à la lecture",
+      "note": "Origine www : cliquable, jamais écrite.",
+      "text": "SQ site 1\nlink: https://www.signalquest.fr/carte?market=CA",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://www.signalquest.fr/carte?market=CA"
+        },
+        "safeLink": "https://www.signalquest.fr/carte?market=CA"
+      }
+    },
+    {
+      "case": "lien : hôte et schéma sans casse",
+      "note": "Schéma et hôte comparés sans casse.",
+      "text": "SQ site 1\nlink: HTTPS://SignalQuest.FR/carte?market=FR",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "HTTPS://SignalQuest.FR/carte?market=FR"
+        },
+        "safeLink": "HTTPS://SignalQuest.FR/carte?market=FR"
+      }
+    },
+    {
+      "case": "lien : port 443 accepté",
+      "note": "Le port par défaut est toléré.",
+      "text": "SQ site 1\nlink: https://signalquest.fr:443/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr:443/carte"
+        },
+        "safeLink": "https://signalquest.fr:443/carte"
+      }
+    },
+    {
+      "case": "lien : http refusé",
+      "note": "Schéma http.",
+      "text": "SQ site 1\nlink: http://signalquest.fr/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "http://signalquest.fr/carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : autre port refusé",
+      "note": "Port autre que 443.",
+      "text": "SQ site 1\nlink: https://signalquest.fr:8443/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr:8443/carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : identifiants refusés",
+      "note": "Identifiants dans l’URL.",
+      "text": "SQ site 1\nlink: https://user@signalquest.fr/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://user@signalquest.fr/carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : fragment refusé",
+      "note": "Fragment.",
+      "text": "SQ site 1\nlink: https://signalquest.fr/carte#x",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr/carte#x"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : hôte suffixé refusé",
+      "note": "Autre hôte.",
+      "text": "SQ site 1\nlink: https://signalquest.fr.evil.example/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr.evil.example/carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : point final refusé",
+      "note": "Hôte avec point final.",
+      "text": "SQ site 1\nlink: https://signalquest.fr./carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr./carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : segment .. refusé",
+      "note": "Chemin brut, jamais normalisé.",
+      "text": "SQ site 1\nlink: https://signalquest.fr/carte/../x",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr/carte/../x"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : segment vide refusé",
+      "note": "Aucun segment vide.",
+      "text": "SQ site 1\nlink: https://signalquest.fr//carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr//carte"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "brand hors speedtest : clé inconnue ignorée",
+      "note": "brand n’existe que pour speedtest (v1.2).",
+      "text": "SQ site 1\noperator: BOUYGUES\nbrand: La Poste Mobile\nlink: https://signalquest.fr/carte?siteId=1",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "operator": "BOUYGUES",
+          "link": "https://signalquest.fr/carte?siteId=1"
+        },
+        "safeLink": "https://signalquest.fr/carte?siteId=1"
+      }
+    },
+    {
+      "case": "speedtest : brand sans operator",
+      "note": "Affichage : « Opérateur : <brand> » seul, sans ligne Réseau (v1.2).",
+      "text": "SQ speedtest 1\nbrand: La Poste Mobile\nlink: https://signalquest.fr/speedtest/st_4",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "brand": "La Poste Mobile",
+          "link": "https://signalquest.fr/speedtest/st_4"
+        },
+        "safeLink": "https://signalquest.fr/speedtest/st_4"
+      }
+    },
+    {
+      "case": "speedtest : brand qui répète le réseau, ignorée à la lecture",
+      "note": "Un écrivain fautif : le lecteur applique la même comparaison et retire brand (v1.2).",
+      "text": "SQ speedtest 1\noperator: ORANGE\noperator_name: Orange\nbrand: Orange\nlink: https://signalquest.fr/speedtest/st_6",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "operator": "ORANGE",
+          "operator_name": "Orange",
+          "link": "https://signalquest.fr/speedtest/st_6"
+        },
+        "safeLink": "https://signalquest.fr/speedtest/st_6"
+      }
+    },
+    {
+      "case": "lien : %2F refusé",
+      "note": "Le chemin brut ne contient pas de %.",
+      "text": "SQ speedtest 1\nlink: https://signalquest.fr/speedtest/a%2Fb",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "link": "https://signalquest.fr/speedtest/a%2Fb"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : chemin d’un autre type refusé",
+      "note": "Un speedtest vers /carte.",
+      "text": "SQ speedtest 1\nlink: https://signalquest.fr/carte?siteId=1",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "link": "https://signalquest.fr/carte?siteId=1"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "lien : identifiant manquant refusé",
+      "note": "/speedtest/ sans identifiant.",
+      "text": "SQ speedtest 1\nlink: https://signalquest.fr/speedtest/",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "link": "https://signalquest.fr/speedtest/"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "clé avec espaces autour : lue",
+      "note": "La clé est la partie avant le premier « : », sans espaces de tête ni de fin.",
+      "text": "SQ site 1\n operator : ORANGE\nlink: https://signalquest.fr/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "operator": "ORANGE",
+          "link": "https://signalquest.fr/carte"
+        },
+        "safeLink": "https://signalquest.fr/carte"
+      }
+    },
+    {
+      "case": "clé en majuscules : ignorée",
+      "note": "Les clés sont en minuscules.",
+      "text": "SQ site 1\nOperator: ORANGE\nlink: https://signalquest.fr/carte",
+      "expected": {
+        "type": "site",
+        "fields": {
+          "link": "https://signalquest.fr/carte"
+        },
+        "safeLink": "https://signalquest.fr/carte"
+      }
+    },
+    {
+      "case": "BOM avant l’en-tête : pas un partage v1",
+      "note": "Égalité stricte de la première ligne.",
+      "text": "﻿SQ site 1\nlink: https://signalquest.fr/carte",
+      "expected": null
+    },
+    {
+      "case": "espace en fin d’en-tête : pas un partage v1",
+      "note": "Égalité stricte de la première ligne.",
+      "text": "SQ site 1 \nlink: https://signalquest.fr/carte",
+      "expected": null
+    },
+    {
+      "case": "heure sans millisecondes : ligne ignorée",
+      "note": "Millisecondes et Z obligatoires.",
+      "text": "SQ speedtest 1\ntime: 2026-10-05T12:02:00Z\nlink: https://signalquest.fr/speedtest/st_1",
+      "expected": {
+        "type": "speedtest",
+        "fields": {
+          "link": "https://signalquest.fr/speedtest/st_1"
+        },
+        "safeLink": "https://signalquest.fr/speedtest/st_1"
+      }
+    },
+    {
+      "case": "version 2 : pas un partage v1",
+      "note": "Rendu en texte brut.",
+      "text": "SQ site 2\noperator: ORANGE\nlink: https://signalquest.fr/carte",
+      "expected": null
+    },
+    {
+      "case": "type inconnu : pas un partage v1",
+      "note": "radio-position n’existe pas : radio-info porte une position facultative.",
+      "text": "SQ radio-position 1\nrsrp_dbm: -95\nlink: https://signalquest.fr/carte",
+      "expected": null
+    },
+    {
+      "case": "radio : valeurs hors format ignorées",
+      "note": "PLMN avec tiret, RSRP hors plage, -0, booléen autre que true/false, techno qui n’est pas une génération, NCI sur plus de 36 bits. Pas de lien : safeLink est null.",
+      "text": "SQ radio-info 1\nplmn: 208-01\nrsrp_dbm: -30\nrsrq_db: -0\nroaming: yes\ntechnology: 5G NSA\ncell_id: 68719476736\nsinr_db: 14\n",
+      "expected": {
+        "type": "radio-info",
+        "fields": {
+          "sinr_db": "14"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "radio : lien de partage en direct d’un autre hôte refusé",
+      "note": "Le lien n’est pas cliquable ; live_session reste lue, et l’app ne l’ouvre que si ce partage existe dans la conversation.",
+      "text": "SQ radio-info 1\nlive_session: ls_1\nlink: https://evil.example/messages?liveShare=ls_1",
+      "expected": {
+        "type": "radio-info",
+        "fields": {
+          "live_session": "ls_1",
+          "link": "https://evil.example/messages?liveShare=ls_1"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "radio : identifiants au-delà de leur génération ignorés",
+      "note": "En 4G, ECI sur 28 bits et TAC sur 16 bits ; nr_* seulement en 5G NSA. Seul pci reste.",
+      "text": "SQ radio-info 1\nconnection: 4G\ntechnology: 4G\ncell_id: 2147483647\ntac: 70000\npci: 301\nnr_rsrp_dbm: -90\n",
+      "expected": {
+        "type": "radio-info",
+        "fields": {
+          "connection": "4G",
+          "technology": "4G",
+          "pci": "301"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "radio : aucune cellule en 2G et 3G",
+      "note": "LAC et CID n’ont pas le sens de TAC et ECI : seules les clés réseau et rssi_dbm restent.",
+      "text": "SQ radio-info 1\nconnection: 3G\ntechnology: 3G\nrssi_dbm: -80\ncell_id: 12345\ntac: 401\nband: 1\nearfcn: 10700\n",
+      "expected": {
+        "type": "radio-info",
+        "fields": {
+          "connection": "3G",
+          "technology": "3G",
+          "rssi_dbm": "-80"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "radio : chemin d’un autre type refusé",
+      "note": "radio-info ne lie que /carte et /messages.",
+      "text": "SQ radio-info 1\nlink: https://signalquest.fr/speedtest/st_1",
+      "expected": {
+        "type": "radio-info",
+        "fields": {
+          "link": "https://signalquest.fr/speedtest/st_1"
+        },
+        "safeLink": null
+      }
+    },
+    {
+      "case": "en-tête qui contient seulement : pas un partage v1",
+      "note": "Égalité stricte de la première ligne.",
+      "text": "Partage SQ site 1\noperator: ORANGE",
+      "expected": null
+    },
+    {
+      "case": "ancien format français : pas un partage v1",
+      "note": "Lu par l’ancien lecteur de chaque app.",
+      "text": "Antenne Orange (eNB 123456)\nOpérateur: Orange\nLien: https://signalquest.fr/carte",
+      "expected": null
+    },
+    {
+      "case": "valeur de plus de 512 points de code : ligne ignorée",
+      "note": "Le lecteur ne coupe pas : il refuse la ligne.",
+      "text": "SQ post 1\ntext: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nlink: https://signalquest.fr/feed?post=p1",
+      "expected": {
+        "type": "post",
+        "fields": {
+          "link": "https://signalquest.fr/feed?post=p1"
+        },
+        "safeLink": "https://signalquest.fr/feed?post=p1"
+      }
+    }
+  ]
+}

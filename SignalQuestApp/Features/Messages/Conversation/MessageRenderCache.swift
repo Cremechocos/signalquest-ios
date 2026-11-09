@@ -69,6 +69,16 @@ final class MessageRenderCache {
         return value
     }
 
+    /// Partage share-text v1 (« SQ … 1 ») relu, mémoïsé par message comme les sites.
+    var shareTextsV1: [String: (text: String, value: ShareTextV1.Parsed?)] = [:]
+
+    func shareTextV1(_ text: String, id: String) -> ShareTextV1.Parsed? {
+        if let cached = shareTextsV1[id], cached.text == text { return cached.value }
+        let value = ShareTextV1.read(text)
+        shareTextsV1[id] = (text, value)
+        return value
+    }
+
     private static func makeLinkedText(_ text: String) -> AttributedString? {
         guard text.contains("http") || text.contains("www."),
               let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }

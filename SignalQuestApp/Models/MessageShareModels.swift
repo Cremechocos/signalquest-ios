@@ -597,3 +597,74 @@ struct SiteShareCard: Equatable {
         String(format: "%.5f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 }
+
+// MARK: - Speedtest partagé en share-text v1 (« SQ speedtest 1 »)
+
+/// Un speedtest partagé au format share-text v1 (contrat §3), relu pour la carte.
+/// Seules les valeurs lues et valides y sont ; rien n'est deviné.
+struct SpeedtestShareTextCard: Equatable {
+    let downloadMbps: Double?
+    let peakMbps: Double?
+    let uploadMbps: Double?
+    let pingMs: Int?
+    let connection: String?
+    let operatorKey: String?
+    let operatorName: String?
+    let brand: String?
+    let market: String?
+    let address: String?
+    let time: Date?
+    let link: String?
+    /// Lien cliquable seulement s'il passe la liste blanche (§4).
+    let safeURL: URL?
+
+    init?(_ parsed: ShareTextV1.Parsed) {
+        guard parsed.kind == .speedtest else { return nil }
+        let f = parsed.fields
+        downloadMbps = f["download_mbps"].flatMap(Double.init)
+        peakMbps = f["download_peak_mbps"].flatMap(Double.init)
+        uploadMbps = f["upload_mbps"].flatMap(Double.init)
+        pingMs = f["ping_ms"].flatMap(Int.init)
+        connection = f["connection"]
+        operatorKey = f["operator"]
+        operatorName = f["operator_name"]
+        brand = f["brand"]
+        market = f["market"]
+        address = f["address"]
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        time = f["time"].flatMap(formatter.date(from:))
+        link = f["link"]
+        safeURL = parsed.safeLink.flatMap(URL.init(string:))
+    }
+
+    /// Le réseau : le nom du registre pour la clé, sinon le nom porté par le texte
+    /// (« à n'afficher que si la clé est inconnue de l'app »), sinon la clé.
+    func networkLabel(registry: MarketRegistryPayload?) -> String? {
+        if let key = operatorKey {
+            let entry = registry?.market(forCode: market)
+            if let label = entry?.operatorEntry(forKey: key)?.label { return label }
+            if let label = registry?.markets.lazy.compactMap({ $0.operatorEntry(forKey: key)?.label }).first { return label }
+            if let label = SiteShareCard.metropolitanOperatorName(forKey: key), market == nil || market == "FR" { return label }
+        }
+        return operatorName ?? operatorKey
+    }
+
+    /// v1.2 : « Opérateur : <marque> » puis « Réseau : <réseau> » ; sans marque, l'opérateur
+    /// seul ; une marque sans réseau, seule.
+    func operatorRows(registry: MarketRegistryPayload?) -> [ShareCardRow] {
+        let network = networkLabel(registry: registry)
+        if let brand {
+            return [ShareCardRow(label: String(localized: "Opérateur"), value: brand)]
+                + (network.map { [ShareCardRow(label: String(localized: "Réseau"), value: $0)] } ?? [])
+        }
+        return network.map { [ShareCardRow(label: String(localized: "Opérateur"), value: $0)] } ?? []
+    }
+
+    /// « 4G · 9 nov. 20:30 » : la connexion mesurée et l'heure, quand elles sont là.
+    var subtitle: String? {
+        let connectionLabel = connection.map { $0 == "WIFI" ? String(localized: "Wi-Fi") : $0 }
+        let parts = [connectionLabel, time?.formatted(.dateTime.day().month(.abbreviated).hour().minute())].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}

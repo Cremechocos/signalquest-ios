@@ -198,6 +198,8 @@ targets:
       - path: SignalQuestApp/Core/Shared/OutageNotificationReceiptContract.swift
       # Catégorie « Répondre / Marquer comme lu » des notifications de message.
       - path: SignalQuestApp/Core/Shared/MessageNotificationCategory.swift
+      # Aperçu d'un partage share-text v1 (« Speedtest 412,0 Mbit/s »), jamais l'en-tête brut.
+      - path: SignalQuestApp/Core/Shared/ShareTextV1.swift
     configFiles:
       Debug: Config/Debug.xcconfig
       DebugBeta: Config/DebugBeta.xcconfig

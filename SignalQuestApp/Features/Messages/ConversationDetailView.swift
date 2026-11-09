@@ -1960,6 +1960,7 @@ struct ConversationDetailView: View {
     private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool) -> some View {
             let card = shareCard(for: message)
             let site = siteShare(for: message, hasCard: card != nil)
+            let speedtestV1 = site == nil ? speedtestShareV1(for: message, hasCard: card != nil) : nil
             // Contenu interactif dans la bulle (embed de publication, photo
             // tappable) : on garde les éléments d'accessibilité séparés
             // (.contain) pour que VoiceOver atteigne les boutons ; sinon la
@@ -2078,6 +2079,10 @@ struct ConversationDetailView: View {
                         onVote: { ids in Task { await vote(messageId: message.id, pollId: poll.pollId, optionIds: ids) } },
                         onClose: { Task { await closePoll(messageId: message.id, pollId: poll.pollId) } }
                     )
+                } else if let speedtestV1 {
+                    // Speedtest partagé en share-text v1 (« SQ speedtest 1 »), clair ou
+                    // déchiffré : le texte brut reste copiable par le menu contextuel.
+                    SpeedtestShareTextBubble(card: speedtestV1, mine: mine)
                 } else if let site {
                     // Site partagé en texte (P2-47), clair ou déchiffré : le texte brut
                     // reste copiable par le menu contextuel.
@@ -3208,6 +3213,16 @@ struct ConversationDetailView: View {
         let text = displayedContent(for: message)
         guard text.range(of: "antenne", options: .caseInsensitive) != nil else { return nil }
         return renderCache.siteShare(text, id: message.id)
+    }
+
+    /// Speedtest partagé en share-text v1 : l'en-tête « SQ speedtest 1 » exact, relu en carte ;
+    /// mémoïsé par message dans `renderCache`. Les autres types v1 restent en texte.
+    private func speedtestShareV1(for message: MessageItem, hasCard: Bool) -> SpeedtestShareTextCard? {
+        guard !hasCard, message.deletedAt == nil,
+              location(for: message) == nil, pollsByMessageId[message.id] == nil else { return nil }
+        let text = displayedContent(for: message)
+        guard text.hasPrefix("SQ speedtest 1") else { return nil }
+        return renderCache.shareTextV1(text, id: message.id).flatMap(SpeedtestShareTextCard.init)
     }
 
     /// Localisation partagée (kind LOCATION) portée par le metadata. PERF-MSG-03 —
