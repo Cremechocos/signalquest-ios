@@ -859,6 +859,11 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     func leave(_ conversation: MessageConversation, naming successor: String?) async throws {
         if let successor { try await apply(.promote(userId: successor), to: conversation) }
         try await apply(.leave, to: conversation)
+        // `.applied` peut viser un changement gardé d'avant (accusé perdu) et non
+        // ce départ : on n'efface que si la chaîne gardée montre le départ.
+        guard let parts = current(), parts.messaging.storedChainHeadExcludesMe(
+            conversationId: conversation.id, isGroup: conversation.isGroup, expectedOwnerScopeId: parts.session.ownerScopeId
+        ) else { return }
         await forgetLeftConversation(conversation.id)
     }
 

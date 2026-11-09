@@ -626,6 +626,16 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         return atGenesis.members.contains(me) && !context.head.members.contains(me)
     }
 
+    /// La tête de la chaîne signée gardée n'a plus ce compte parmi les membres.
+    /// `false` si la chaîne est illisible : dans le doute, rien ne s'efface.
+    func storedChainHeadExcludesMe(conversationId: String, isGroup: Bool, expectedOwnerScopeId: String) -> Bool {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId,
+              let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup)
+        else { return false }
+        return !context.head.members.contains(ownUserId(session.ownerScopeId))
+    }
+
     /// Efface de cet appareil les messages déchiffrés gardés d'une conversation
     /// et ce que l'extension de notification en a montré. Irréversible.
     func eraseStoredMessages(conversationId: String, expectedOwnerScopeId: String) throws {

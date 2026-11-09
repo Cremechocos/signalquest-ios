@@ -227,6 +227,9 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertFalse(messaging.storedChainProvesDeparture(
             conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
         ), "Toujours membre : aucune preuve de départ")
+        XCTAssertFalse(messaging.storedChainHeadExcludesMe(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ), "Toujours membre : la copie ne s'efface pas au départ")
         let left = await messaging.change(
             .leave, conversationId: seeded.conversationId, isGroup: true, devices: devices,
             expectedOwnerScopeId: fixture.session.ownerScopeId
@@ -235,6 +238,12 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertTrue(messaging.storedChainProvesDeparture(
             conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
         ), "Départ signé gardé : preuve")
+        XCTAssertTrue(messaging.storedChainHeadExcludesMe(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ), "Départ gardé en tête de chaîne")
+        XCTAssertFalse(messaging.storedChainHeadExcludesMe(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: "user:" + String(repeating: "f", count: 64)
+        ), "Jamais pour un autre compte")
         XCTAssertFalse(messaging.storedChainProvesDeparture(
             conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: "user:" + String(repeating: "f", count: 64)
         ), "Jamais pour un autre compte")
