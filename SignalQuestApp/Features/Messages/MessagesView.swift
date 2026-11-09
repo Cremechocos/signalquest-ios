@@ -527,10 +527,6 @@ struct MessagesView: View {
     @State private var showE2EEUnlock = false
     /// Conversations v1 encore verrouillées : bandeau en tête de liste.
     @State private var offersE2EEUnlock = false
-    /// Micro jamais demandé : carte d'explication avant la demande iOS.
-    @State private var offersMicrophoneAccess = false
-    /// « Plus tard » : la carte ne revient pas ; la demande viendra au premier appel ou vocal.
-    @AppStorage("messages_microphone_card_dismissed") private var microphoneCardDismissed = false
     @State private var routedConversationId: String?
     /// Quitter se confirme : le balayage suffisait à perdre la conversation (SOC-22).
     @State private var pendingLeave: MessageConversation?
@@ -728,14 +724,8 @@ struct MessagesView: View {
                 if offersE2EEUnlock, !showingShelved, !showingRequests {
                     e2eeUnlockBanner
                 }
-                if offersMicrophoneAccess, !microphoneCardDismissed, !showingShelved, !showingRequests {
-                    microphoneAccessCard
-                }
                 if needsV2Activation {
                     v2ActivationCard
-                }
-                if E2EEV2RuntimeReadGate.enabled {
-                    E2EEV2NotificationPreviewNotice()
                 }
                 if let focus = model.focus, !showingShelved, !showingRequests {
                     focusBanner(focus)
@@ -1072,7 +1062,9 @@ struct MessagesView: View {
         .task(id: PushOwnerScope.current) { refreshV2Activation() }
         // Les appels se décrochent souvent écran verrouillé, où iOS ne peut pas
         // demander l'accès au micro : une carte explique pourquoi avant de le demander.
-        .task { offersMicrophoneAccess = CallManager.microphoneAccessUndetermined }
+        // Plus de carte « Répondre aux appels écran verrouillé » (choix d'Alexandre,
+        // 09/11) : la demande système directement, une fois, à l'ouverture.
+        .task { await CallManager.requestMicrophoneAccessIfUndetermined() }
         .onAppear { refreshV2Activation() }
         .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
             refreshV2Activation()
@@ -1189,63 +1181,6 @@ struct MessagesView: View {
         .buttonStyle(SQPressButtonStyle())
         .accessibilityHint(Text("Ouvre le déverrouillage de tes conversations chiffrées avec l’ancien mot de passe"))
         .accessibilityIdentifier("messages.e2eeUnlock.banner")
-    }
-
-    /// Micro jamais demandé : la raison d'abord, puis la demande iOS au toucher.
-    private var microphoneAccessCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack(alignment: .top, spacing: SQSpace.sm) {
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .accessibilityHidden(true)
-                }
-                VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                    Text("Répondre aux appels écran verrouillé")
-                        .font(SQType.subhead(.semibold))
-                        .foregroundStyle(SQColor.label)
-                    Text("iOS ne peut pas demander le micro pendant un appel reçu écran verrouillé. Autorise-le maintenant pour être entendu.")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            HStack(spacing: SQSpace.md) {
-                Button {
-                    Haptics.light()
-                    Task {
-                        await CallManager.requestMicrophoneAccessIfUndetermined()
-                        offersMicrophoneAccess = CallManager.microphoneAccessUndetermined
-                    }
-                } label: {
-                    Text("Autoriser")
-                        .font(SQType.subhead(.semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("messages.microphone.allow")
-                Button {
-                    microphoneCardDismissed = true
-                } label: {
-                    Text("Plus tard")
-                        .font(SQType.subhead(.semibold))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("messages.microphone.later")
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.top, SQSpace.sm)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("messages.microphone.card")
     }
 
     /// Opens the conversation requested by a notification tap (via AppRouter),

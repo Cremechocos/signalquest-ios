@@ -139,6 +139,8 @@ struct ConversationDetailView: View {
     /// lecture de l'historique n'y ramène plus de force (SOC-20).
     @State private var isNearBottom = true
     @State private var hasUnseenMessages = false
+    /// Ouverture : la liste attend d'être placée avant d'apparaître.
+    @State private var isPlacingOpening = false
     /// Actions destructives confirmées avant exécution (SOC-22).
     @State private var pendingDeletion: PendingMessageDeletion?
     @State private var reportTarget: MessageItem?
@@ -548,6 +550,8 @@ struct ConversationDetailView: View {
                     .padding()
                     // iPad : bulles dans une colonne lisible (SOC-27).
                     .sqReadableWidth()
+                    // Placée hors de la vue, puis montrée d'un coup (retour du 09/11).
+                    .opacity(isPlacingOpening ? 0 : 1)
                 }
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
@@ -573,11 +577,17 @@ struct ConversationDetailView: View {
                             // repoussaient le dernier message hors de l'écran, et la
                             // conversation s'ouvrait au milieu (retour du 09/11).
                             // On se recale pendant ce premier chargement.
+                            // La liste reste cachée pendant les premiers recalages :
+                            // on ne voit plus le saut du milieu vers le bas.
                             if old == nil {
+                                isPlacingOpening = true
                                 Task { @MainActor in
-                                    for delay in [150, 400, 900] as [UInt64] {
+                                    for delay in [60, 120, 150, 570] as [UInt64] {
                                         try? await Task.sleep(nanoseconds: delay * 1_000_000)
                                         withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
+                                        if isPlacingOpening, delay == 150 {
+                                            withAnimation(SQMotion.resolve(.easeOut(duration: 0.15), reduceMotion)) { isPlacingOpening = false }
+                                        }
                                     }
                                 }
                             }

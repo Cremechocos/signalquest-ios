@@ -317,9 +317,10 @@ enum E2EEV2NotificationPrivacyStore {
         return true
     }
 
+    /// Plus d'avis à accepter (choix d'Alexandre, 09/11) : le contenu complet est
+    /// actif par défaut, et se change dans Réglages › Notifications.
     static func isNoticeAcknowledged(ownerScopeId: String? = PushOwnerScope.current) -> Bool {
-        guard let ownerScopeId else { return false }
-        return UserDefaults.standard.bool(forKey: "e2ee-v2-preview-notice-v1.\(ownerScopeId)")
+        ownerScopeId != nil
     }
 
     @discardableResult
