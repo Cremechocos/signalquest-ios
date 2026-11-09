@@ -110984,6 +110984,106 @@
           }
         }
       }
+    },
+    "Tu ne fais plus partie de cette conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re no longer part of this conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne fais plus partie de cette conversation"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu ne fais plus partie de cette conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous ne faites plus partie de cette conversation"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages sent since you left are no longer meant for you. Earlier ones stay on the devices that received them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus."
+          }
+        }
+      }
+    },
+    "SQFormal|Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages envoyés depuis votre départ ne vous sont plus destinés. Les anciens restent sur les appareils qui les ont reçus."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Retirer de ma liste" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from my list"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer de ma liste"
+          }
+        }
+      }
+    },
+    "La conversation n’a pas pu être retirée de ta liste." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation couldn’t be removed from your list."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être retirée de ta liste."
+          }
+        }
+      }
+    },
+    "SQFormal|La conversation n’a pas pu être retirée de ta liste." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être retirée de votre liste."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

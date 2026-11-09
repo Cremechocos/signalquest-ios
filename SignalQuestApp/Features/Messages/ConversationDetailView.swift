@@ -286,9 +286,66 @@ struct ConversationDetailView: View {
     @State private var policyFetchGaveUp = false
     @State private var ephemeralDefaultApplied = false
     @State private var showProtection = false
+    /// Ce compte n'est plus membre en tête de la chaîne signée (404
+    /// E2EE_CONVERSATION_NOT_FOUND en lecture) : aucun nouvel essai ne peut lire
+    /// ce fil, l'écran le dit au lieu de proposer « Réessayer »
+    /// (cmw9quitter0leave0a2deux1, choix d'Alexandre du 09/11).
+    @State private var noLongerMember = false
+    @State private var isRemovingFromList = false
     /// Posé quand la conversation s'affiche à côté de la liste (iPad) : pas de retour.
     @Environment(\.sqMessagesCloseDetail) private var closeSplitDetail
     private var inSplitDetail: Bool { closeSplitDetail != nil }
+
+    /// Carte affichée quand ce compte ne fait plus partie de la conversation :
+    /// ni « Réessayer » ni champ de saisie, seulement le retrait de la liste.
+    private var noLongerMemberCard: some View {
+        GlassCard {
+            VStack(spacing: SQSpace.sm) {
+                SQIconPastille(
+                    systemImage: "person.crop.circle.badge.xmark",
+                    size: 46,
+                    tint: SQColor.labelSecondary,
+                    fill: SQColor.chip,
+                    font: SQFont.body(22, .medium, relativeTo: .title3)
+                )
+                .padding(.bottom, SQSpace.xs)
+                Text("Tu ne fais plus partie de cette conversation")
+                    .font(SQType.stateTitle)
+                    .foregroundStyle(SQColor.label)
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                GradientButton(
+                    String(localized: "Retirer de ma liste"), systemImage: "archivebox",
+                    isBusy: isRemovingFromList, style: .secondary
+                ) {
+                    Task { await removeFromList() }
+                }
+                .accessibilityIdentifier("conversation.notMember.remove")
+                .padding(.top, SQSpace.sm)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityIdentifier("conversation.notMember")
+    }
+
+    /// Archive pour soi, comme « Archiver » dans la liste, puis ferme le fil.
+    private func removeFromList() async {
+        guard !isRemovingFromList else { return }
+        isRemovingFromList = true
+        defer { isRemovingFromList = false }
+        do {
+            try await service.setConversationShelved(true, conversationId: conversation.id)
+            closeConversation()
+        } catch {
+            if !error.isCancellation {
+                showActionError(String(localized: "La conversation n’a pas pu être retirée de ta liste."))
+            }
+        }
+    }
 
     /// Quitte la conversation : retour en arrière sur iPhone, sélection levée à côté de la liste (iPad).
     private func closeConversation() {
@@ -301,7 +358,8 @@ struct ConversationDetailView: View {
     /// appareils les lisent (D.16) ; jamais dans une conversation v1 (SOC-07).
     private var reactionsAllowed: Bool { !isE2EE || (usesV2 && v2ReactionsAvailable) }
     private var canSend: Bool {
-        EncryptedConversationSurfaces.canSend(isEncrypted: isE2EE, usesV2: usesV2, legacyUnlocked: isE2EEUnlocked)
+        !noLongerMember
+            && EncryptedConversationSurfaces.canSend(isEncrypted: isE2EE, usesV2: usesV2, legacyUnlocked: isE2EEUnlocked)
     }
     /// Les médias d'une conversation sont privés même si leur URL ressemble à
     /// une URL CDN ordinaire. La session est capturée avant chaque rendu afin
@@ -554,7 +612,10 @@ struct ConversationDetailView: View {
                             .id(Self.bottomRowId)
                             .onAppear { isNearBottom = true; hasUnseenMessages = false }
                             .onDisappear { isNearBottom = false }
-                        if let errorMessage {
+                        if noLongerMember {
+                            noLongerMemberCard
+                                .padding(.horizontal)
+                        } else if let errorMessage {
                             ErrorStateView(title: "Messages indisponibles", message: errorMessage) {
                                 Task { usesV2 ? await loadV2() : await load() }
                             }
@@ -3294,6 +3355,10 @@ struct ConversationDetailView: View {
             computeUnreadDividerIfNeeded()
             Task { await acknowledgeDelivery() }
             errorMessage = nil
+            noLongerMember = false
+        case .failure(let failure) where failure.statusCode == 404 && failure.code == "E2EE_CONVERSATION_NOT_FOUND":
+            errorMessage = nil
+            noLongerMember = true
         case .failure(let failure):
             errorMessage = failure.kind == .retryable
                 ? String(localized: "Connexion instable. La conversation chiffrée se mettra à jour dès que possible.")
