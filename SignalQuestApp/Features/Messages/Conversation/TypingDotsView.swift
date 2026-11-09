@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Trois points qui ondulent doucement (indicateur « en train d'écrire »).
+/// Trois points qui respirent tour à tour (indicateur « en train d'écrire »).
 /// Avec Reduce Motion, les points restent statiques.
 struct TypingDotsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,9 +21,11 @@ struct TypingDotsView: View {
                 let phase: Double = time.map { sin(($0 * 2 * .pi / 1.2) - Double(index) * 0.85) } ?? 0
                 Circle()
                     .fill(SQColor.labelSecondary)
-                    .frame(width: 6, height: 6)
-                    .offset(y: CGFloat(phase) * -2)
-                    .opacity(0.3 + 0.7 * max(0, phase))
+                    .frame(width: 7, height: 7)
+                    // Respiration à la iMessage : chaque point grossit et s'éclaire à son tour.
+                    .scaleEffect(0.75 + 0.25 * max(0, phase))
+                    .offset(y: CGFloat(max(0, phase)) * -1.5)
+                    .opacity(0.35 + 0.65 * max(0, phase))
             }
         }
     }

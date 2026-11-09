@@ -526,6 +526,9 @@ struct ConversationDetailView: View {
                             // d'auteur = 10 pt (l'horodatage de section gère le sien).
                             .padding(.top, stamp != nil ? SQSpace.xs : (previous == nil ? 0 : (previous?.senderId == message.senderId ? 3 : 10)))
                             .id(message.id)
+                            // Entrée d'une bulle (seulement quand l'ajout est animé : envoi,
+                            // réception en bas) : elle monte depuis le bas, côté de son auteur.
+                            .transition(rowTransition(mine: message.senderId == currentUserId || message.id.hasPrefix("local-")))
                             .background(
                                 RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
                                     .fill(SQColor.brandRed.opacity(highlightedMessageId == message.id ? 0.14 : 0))
@@ -603,7 +606,8 @@ struct ConversationDetailView: View {
                                 }
                             }
                         } else if !(openedFromStore && (unreadDivider?.count ?? 0) >= UnreadDivider.scrollsToDividerFrom) {
-                            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
+                            // Même ressort que l'entrée de la bulle : la liste et la bulle montent ensemble.
+                            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
                         }
                     } else {
                         hasUnseenMessages = true
@@ -1729,6 +1733,7 @@ struct ConversationDetailView: View {
             }
         }
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
+        .sqAnimation(SQMotion.fast, value: sendStatus[message.id])
         // Double tap : ❤️, ou le retire s'il est déjà de moi. Simultané pour ne pas retarder
         // les appuis simples des liens, photos et sondages ; en conversation chiffrée,
         // seulement si les réactions y sont chiffrées (SOC-07, D.16).
@@ -2101,7 +2106,10 @@ struct ConversationDetailView: View {
                         .padding(.vertical, -10)
                     }
                     .buttonStyle(.plain)
-                    .disabled(isE2EE)
+                    // Pas de `.disabled` : il grisait la pastille (pâle en conversation
+                    // chiffrée, 09/11) ; `toggleReaction` vérifie déjà `reactionsAllowed`.
+                    // Une réaction posée apparaît d'un petit rebond (ressort `bouncy`).
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.3).combined(with: .opacity))
                     .accessibilityLabel(reaction.mine
                         ? String(localized: "Réaction \(reaction.emoji) : \(reaction.count), dont la tienne")
                         : String(localized: "Réaction \(reaction.emoji) : \(reaction.count)"))
@@ -2110,6 +2118,40 @@ struct ConversationDetailView: View {
             }
             .offset(y: 12)
             .padding(.horizontal, SQSpace.sm2)
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.3, anchor: mineAnchor(message)).combined(with: .opacity))
+        }
+    }
+
+    private func mineAnchor(_ message: MessageItem) -> UnitPoint {
+        message.senderId == currentUserId ? .bottomTrailing : .bottomLeading
+    }
+
+    /// Entrée d'une bulle : elle monte un peu, grandit depuis son coin et apparaît
+    /// (Reduce Motion : simple fondu). Le retrait reste un fondu.
+    private func rowTransition(mine: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .offset(y: 18)
+                .combined(with: .scale(scale: 0.92, anchor: mine ? .bottomTrailing : .bottomLeading))
+                .combined(with: .opacity),
+            removal: .opacity
+        )
+    }
+
+    /// Des messages reçus ajoutés en bas, sans rien retirer ni ajouter en tête :
+    /// ils entrent animés. Tout autre changement (ouverture, bulle locale remplacée
+    /// par celle du serveur, page plus ancienne) reste immédiat, sans doublon visible.
+    private func setMessagesAnimatingArrivals(_ next: [MessageItem]) {
+        let previous = messages
+        let newIds = Set(next.map(\.id))
+        let arrivals = !previous.isEmpty && previous.first?.id == next.first?.id
+            && previous.last?.id != next.last?.id
+            && previous.allSatisfy { newIds.contains($0.id) }
+            && next.last.map { $0.senderId != currentUserId && !$0.id.hasPrefix("local-") } == true
+        if arrivals {
+            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { messages = next }
+        } else {
+            messages = next
         }
     }
 
@@ -2260,6 +2302,8 @@ struct ConversationDetailView: View {
             if #available(iOS 17.0, *) {
                 ControlGroup { reactionMenuButtons(for: message) }
                     .controlGroupStyle(.palette)
+                    // Choisir un emoji ferme le menu : il restait ouvert sur la réaction posée.
+                    .menuActionDismissBehavior(.enabled)
             } else {
                 reactionMenuButtons(for: message)
             }
@@ -2819,6 +2863,8 @@ struct ConversationDetailView: View {
             }
             .font(SQType.micro)
             .foregroundStyle(status == .read ? SQColor.accentInk : SQColor.labelSecondary)
+            // « Envoyé » → « Distribué » → « Lu » : la seconde coche et le mot changent en douceur.
+            .sqAnimation(SQMotion.snappy, value: status)
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.top, SQSpace.xs)
             .accessibilityElement(children: .ignore)
@@ -3228,7 +3274,7 @@ struct ConversationDetailView: View {
             // Le message envoyé peut arriver par le flux avant l'accusé : sa bulle locale s'efface alors.
             let confirmed = localIdsConfirmed(by: thread.filter { !knownIds.contains($0.id) })
             let next = confirmed.isEmpty ? merged : merged.filter { !confirmed.contains($0.id) }
-            if next != messages { messages = next }
+            if next != messages { setMessagesAnimatingArrivals(next) }
             v2Notices = presentation.notices
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
             if v2Media != presentation.media { v2Media = presentation.media }
@@ -3512,7 +3558,7 @@ struct ConversationDetailView: View {
                         let others = userIds.filter { $0 != currentUserId }
                         guard let typer = others.first else { return }
                         typingUserId = typer
-                        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { typingUntil = Date().addingTimeInterval(5) }
+                        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { typingUntil = Date().addingTimeInterval(5) }
                     }
                 case .viewingEvent:
                     await refreshViewers()
@@ -3616,7 +3662,7 @@ struct ConversationDetailView: View {
             guard !fresh.isEmpty else { return }
             MessageSyncLog.logger.debug("delta since=\(since.ISO8601Format(), privacy: .public) -> \(fresh.count) nouveau(x)")
             await MainActor.run {
-                messages = Self.normalized(messages + delta)
+                setMessagesAnimatingArrivals(Self.normalized(messages + delta))
                 advanceLastSync(with: delta)
             }
             await decryptLoadedMessages()
@@ -4172,7 +4218,9 @@ struct ConversationDetailView: View {
         let optimistic = makeOptimisticMessage(id: localId, text: text, replyToId: replyToId, ttlSeconds: ttl)
         pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
         sendStatus[localId] = .sending
-        messages = Self.normalized(messages + [optimistic])
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+            messages = Self.normalized(messages + [optimistic])
+        }
         draftAutosaver?.discard()
         clearComposer()
         replyTarget = nil
@@ -4204,9 +4252,10 @@ struct ConversationDetailView: View {
             await stageV2Send(pending)
             if await sendV2(.text(pending.text), replyToId: pending.replyToId, ttlSeconds: pending.ttlSeconds,
                             clientRequestId: pending.idempotencyKey) {
-                messages.removeAll { $0.id == localId }
-                sendStatus[localId] = nil
-                pendingSends[localId] = nil
+                // La bulle locale reste jusqu'à ce que la relève apporte celle du serveur
+                // (même clientRequestId) : `loadV2Once` les échange dans la même mise à
+                // jour. La retirer ici la faisait disparaître puis revenir (09/11).
+                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = nil }
                 await removeV2Send(clientRequestId: pending.idempotencyKey)
             } else {
                 withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
@@ -4901,7 +4950,9 @@ struct ConversationDetailView: View {
         let optimistic = makeOptimisticMessage(
             id: localId, text: attachment.caption, replyToId: attachment.replyToId, ttlSeconds: attachment.ttlSeconds
         )
-        messages = Self.normalized(messages + [optimistic])
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+            messages = Self.normalized(messages + [optimistic])
+        }
         Haptics.light()
         await performAttachmentSend(localId: localId)
     }
@@ -5053,7 +5104,9 @@ struct ConversationDetailView: View {
             } else {
                 updated.reactions.append(MessageReaction(emoji: emoji, userId: uid))
             }
-            messages = messages.map { $0.id == message.id ? updated : $0 }
+            withAnimation(SQMotion.resolve(SQMotion.bouncy, reduceMotion)) {
+                messages = messages.map { $0.id == message.id ? updated : $0 }
+            }
         }
         do {
             if alreadyMine {
@@ -5073,7 +5126,9 @@ struct ConversationDetailView: View {
         } catch {
             // Échec : on remet l'état d'avant plutôt que d'afficher une
             // réaction que le serveur n'a pas enregistrée.
-            messages = messages.map { $0.id == message.id ? message : $0 }
+            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+                messages = messages.map { $0.id == message.id ? message : $0 }
+            }
             showActionError(error.userFacingMessage)
         }
     }
@@ -5095,14 +5150,20 @@ struct ConversationDetailView: View {
         } else {
             updated.reactions.append(MessageReaction(emoji: emoji, userId: uid))
         }
-        messages = messages.map { $0.id == message.id ? updated : $0 }
+        withAnimation(SQMotion.resolve(SQMotion.bouncy, reduceMotion)) {
+            messages = messages.map { $0.id == message.id ? updated : $0 }
+        }
         let author = message.senderId ?? ""
         let sent = await sendV2(
             .reaction(targetRef: message.id, emoji: emoji, action: alreadyMine ? .remove : .add),
             replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString,
             notifyUserId: !alreadyMine && author != uid ? author : ""
         )
-        if !sent { messages = messages.map { $0.id == message.id ? message : $0 } }
+        if !sent {
+            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+                messages = messages.map { $0.id == message.id ? message : $0 }
+            }
+        }
     }
 
     /// Réactions, votes et accusés de lecture ne passent pas par le delta, qui ne
