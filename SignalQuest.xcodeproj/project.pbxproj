@@ -873,6 +873,7 @@
 		E7CE9DC50F6EB2A39D1FB723 /* ICMPPingerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */; };
 		E827390EFC16EED7902FC752 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 81FB8B7245C8C64D14F46655 /* Localizable.xcstrings */; };
 		E853423BB6F0620F8970399F /* E2EEV2NotificationRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504672277B07E3B4C9880FD1 /* E2EEV2NotificationRuntime.swift */; };
+		E8E6232E943ED0FD45124C28 /* E2EEMemberMissingVectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F4F01484E64BBA13E0E7CB /* E2EEMemberMissingVectorTests.swift */; };
 		E8E8907253FE60FDECEFFD51 /* SharedPostEmbed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA98E8543E1A0DA35A68E52 /* SharedPostEmbed.swift */; };
 		E92941996F6D38DEF635810C /* SpeedtestTrendWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */; };
 		E996989B13437E3678AA43BA /* SQEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3B3E33665A0D12EB2183E /* SQEffects.swift */; };
@@ -1440,6 +1441,7 @@
 		712A1F6D81E592E671270431 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		71E4D5592689833F8992519D /* FhAzimuthsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FhAzimuthsTests.swift; sourceTree = "<group>"; };
 		71F03A270597876371BF433F /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		71F4F01484E64BBA13E0E7CB /* E2EEMemberMissingVectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEMemberMissingVectorTests.swift; sourceTree = "<group>"; };
 		71FB2DC45176685D48C0378F /* E2EEAutoModeSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoModeSetting.swift; sourceTree = "<group>"; };
 		72569C0DE7D33420DBF9B994 /* TransportBackendInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportBackendInteropTests.swift; sourceTree = "<group>"; };
 		729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTriMetric.swift; sourceTree = "<group>"; };
@@ -3162,6 +3164,7 @@
 				5166AD912DB76FA6970E393D /* E2EEAutoSafetyCodeViewModelTests.swift */,
 				997AA9AFAD74ED7F29B4F2BF /* E2EEAutoStrictModeTests.swift */,
 				ADAF1A1E74BF431984A6A304 /* E2EEAutoSwitchTests.swift */,
+				71F4F01484E64BBA13E0E7CB /* E2EEMemberMissingVectorTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				5F1BBEC3068C79034419B5CE /* E2EEV2A1ContractTests.swift */,
 				214621A144EF0AF09A3DCD5D /* E2EEV2A1LifecycleTests.swift */,
@@ -4578,6 +4581,7 @@
 				4F5153A4474E685BE2B47F07 /* E2EEAutoSafetyCodeViewModelTests.swift in Sources */,
 				61217091EBC11FCD2C0A5C91 /* E2EEAutoStrictModeTests.swift in Sources */,
 				03F729FEA4C26B4411AEDEEC /* E2EEAutoSwitchTests.swift in Sources */,
+				E8E6232E943ED0FD45124C28 /* E2EEMemberMissingVectorTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				9DDECAE6CF3EAE2DFA8C39D9 /* E2EEV2A1ContractTests.swift in Sources */,
 				42BF8C537C0F1D8D59E744E1 /* E2EEV2A1LifecycleTests.swift in Sources */,

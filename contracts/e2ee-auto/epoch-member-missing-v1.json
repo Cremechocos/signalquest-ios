@@ -1,0 +1,659 @@
+{
+  "fixtureVersion": 1,
+  "nowMs": 1790100000000,
+  "note": "E2EE-MEMBRE r2 (09/11), §2, §3 et §6 du contrat. Normatifs : l’issue (ok, 422 MEMBER_MISSING et ses userIds triés par octets UTF-8, ou 409 E2EE_DEVICE_LIST_STALE et ses userIds) ; jamais un appareil dans les details. `state` : APPROVED = appareil v2 approuvé, non révoqué, non effacé, dans la liste courante certifiée ; ACTIVE = appareil ACTIVE du journal (auto) ; REVOKED = tout autre état. `capabilitiesIssuedAtMs` : date du document de capacités (v2), null s’il n’y en a pas. `devices[userId]` vide ou absent : compte sans identité lisible, effacé, ou sans compte de journal (seq « 0 ») : dispensé. `staleUserIds` non vide : le 409 DEVICE_LIST_STALE des refus existants passe avant le 422. Plancher : citer un appareil certifié mais non éligible est accepté.",
+  "freshnessMs": 7776000000,
+  "marginMs": 86400000,
+  "cases": [
+    {
+      "name": "epoch-member-missing-v2",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "status": 422,
+        "code": "E2EE_EPOCH_RECIPIENT_INVALID",
+        "reason": "MEMBER_MISSING",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "epoch-member-missing-auto",
+      "mode": "auto",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "status": 422,
+        "code": "E2EE_EPOCH_RECIPIENT_INVALID",
+        "reason": "MEMBER_MISSING",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "epoch-member-no-eligible-device",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "REVOKED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          },
+          {
+            "deviceId": "device_bob_b2",
+            "platform": "ios",
+            "state": "REVOKED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-partial-devices",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          },
+          {
+            "deviceId": "device_bob_b2",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1",
+        "user_bob_0000000000002\ndevice_bob_b1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-missing-after-stale",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [
+        "user_bob_0000000000002"
+      ],
+      "expect": {
+        "status": 409,
+        "code": "E2EE_DEVICE_LIST_STALE",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "epoch-member-missing-emitter-account",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          },
+          {
+            "deviceId": "device_alice_a2",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1",
+        "user_bob_0000000000002\ndevice_bob_b1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-stale-capabilities-90d",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1782324000000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-stale-capabilities-89d-minus-1h",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1782414000000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "status": 422,
+        "code": "E2EE_EPOCH_RECIPIENT_INVALID",
+        "reason": "MEMBER_MISSING",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "epoch-member-stale-capabilities-89d-boundary",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1782410400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-no-capabilities-document",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": null
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-future-capabilities-not-cited",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790100300000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-future-capabilities-cited",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790100300000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1",
+        "user_bob_0000000000002\ndevice_bob_b1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-web-only-exclude-web",
+      "mode": "v2",
+      "excludesWeb": true,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "web",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-web-only-without-exclude-web",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "web",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "status": 422,
+        "code": "E2EE_EPOCH_RECIPIENT_INVALID",
+        "reason": "MEMBER_MISSING",
+        "userIds": [
+          "user_bob_0000000000002"
+        ]
+      }
+    },
+    {
+      "name": "epoch-member-no-log-account-auto",
+      "mode": "auto",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          }
+        ],
+        "user_bob_0000000000002": []
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-partial-devices-auto",
+      "mode": "auto",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          },
+          {
+            "deviceId": "device_bob_b2",
+            "platform": "ios",
+            "state": "ACTIVE",
+            "capabilitiesIssuedAtMs": null
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1",
+        "user_bob_0000000000002\ndevice_bob_b1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "epoch-member-missing-userids-sorted-by-utf8-bytes",
+      "mode": "v2",
+      "excludesWeb": false,
+      "memberUserIds": [
+        "user_alice_00000000001",
+        "user_bob_0000000000002",
+        "user_Zed_0000000000006",
+        "user_zed_0000000000007"
+      ],
+      "devices": {
+        "user_alice_00000000001": [
+          {
+            "deviceId": "device_alice_a1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_bob_0000000000002": [
+          {
+            "deviceId": "device_bob_b1",
+            "platform": "android",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_Zed_0000000000006": [
+          {
+            "deviceId": "device_zed_z1",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ],
+        "user_zed_0000000000007": [
+          {
+            "deviceId": "device_zed_z2",
+            "platform": "ios",
+            "state": "APPROVED",
+            "capabilitiesIssuedAtMs": 1790096400000
+          }
+        ]
+      },
+      "recipients": [
+        "user_alice_00000000001\ndevice_alice_a1"
+      ],
+      "staleUserIds": [],
+      "expect": {
+        "status": 422,
+        "code": "E2EE_EPOCH_RECIPIENT_INVALID",
+        "reason": "MEMBER_MISSING",
+        "userIds": [
+          "user_Zed_0000000000006",
+          "user_bob_0000000000002",
+          "user_zed_0000000000007"
+        ]
+      }
+    }
+  ]
+}
