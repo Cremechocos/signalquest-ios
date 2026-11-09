@@ -134,6 +134,14 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// Départ prouvé par la chaîne signée gardée (cf. `storedChainProvesDeparture`).
+    func storedChainProvesDeparture(conversationId: String, isGroup: Bool) -> Bool {
+        guard let parts = current() else { return false }
+        return parts.messaging.storedChainProvesDeparture(
+            conversationId: conversationId, isGroup: isGroup, expectedOwnerScopeId: parts.session.ownerScopeId
+        )
+    }
+
     /// Les briques de la session courante, rebâties si elle a changé.
     func current() -> Parts? {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return nil }

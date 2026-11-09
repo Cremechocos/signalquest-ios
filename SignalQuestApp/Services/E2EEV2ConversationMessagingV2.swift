@@ -608,6 +608,22 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         )
     }
 
+    /// Preuve SIGNÉE, gardée sur l'appareil, que ce compte n'est plus membre : il
+    /// l'était à la genèse et la chaîne vérifiée se termine sans lui (LEAVE signé
+    /// ou REMOVE par un admin). Une réponse 404 seule n'est que la parole du
+    /// serveur : sans cette preuve, rien ne s'efface tout seul (choix d'Alexandre
+    /// du 09/11, cmw9cache0local0jamais0ef1).
+    func storedChainProvesDeparture(conversationId: String, isGroup: Bool, expectedOwnerScopeId: String) -> Bool {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId,
+              let genesis = try? stateStore.genesis(conversationId: conversationId, ownerNamespace: session.ownerNamespace),
+              let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup),
+              let atGenesis = context.membershipAt(genesis.membershipChangeNumber)
+        else { return false }
+        let me = ownUserId(session.ownerScopeId)
+        return atGenesis.members.contains(me) && !context.head.members.contains(me)
+    }
+
     /// Efface de cet appareil les messages déchiffrés gardés d'une conversation
     /// et ce que l'extension de notification en a montré. Irréversible.
     func eraseStoredMessages(conversationId: String, expectedOwnerScopeId: String) throws {

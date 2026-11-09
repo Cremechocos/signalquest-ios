@@ -223,11 +223,21 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         server.failsSend = false
         guard case .refreshed = await refresh() else { return XCTFail("Relève après l'échec") }
 
+        // Effacement automatique (cmw9cache0local0jamais0ef1) : seulement sur preuve signée gardée.
+        XCTAssertFalse(messaging.storedChainProvesDeparture(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ), "Toujours membre : aucune preuve de départ")
         let left = await messaging.change(
             .leave, conversationId: seeded.conversationId, isGroup: true, devices: devices,
             expectedOwnerScopeId: fixture.session.ownerScopeId
         )
         guard case .applied = left else { return XCTFail("Départ : \(left)") }
+        XCTAssertTrue(messaging.storedChainProvesDeparture(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ), "Départ signé gardé : preuve")
+        XCTAssertFalse(messaging.storedChainProvesDeparture(
+            conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: "user:" + String(repeating: "f", count: 64)
+        ), "Jamais pour un autre compte")
         XCTAssertNil(try contextStore.conversation(seeded.conversationId), "Conversation quittée : plus d'entrée")
     }
 

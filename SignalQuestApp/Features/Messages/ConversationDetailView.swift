@@ -3389,6 +3389,15 @@ struct ConversationDetailView: View {
         case .failure(let failure) where failure.statusCode == 404 && failure.code == "E2EE_CONVERSATION_NOT_FOUND":
             errorMessage = nil
             noLongerMember = true
+            // Effacement automatique SEULEMENT si la chaîne signée gardée prouve le
+            // départ : le 404 seul peut être une erreur du serveur, et un
+            // effacement ne se rattrape pas (choix d'Alexandre du 09/11). Sinon la
+            // carte garde « Effacer de cet iPhone ».
+            if services.e2eeV2Messaging.storedChainProvesDeparture(
+                conversationId: conversation.id, isGroup: conversation.isGroup
+            ) {
+                await eraseLocalCopy()
+            }
         case .failure(let failure):
             errorMessage = failure.kind == .retryable
                 ? String(localized: "Connexion instable. La conversation chiffrée se mettra à jour dès que possible.")
