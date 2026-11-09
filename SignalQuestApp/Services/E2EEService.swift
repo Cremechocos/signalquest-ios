@@ -7550,7 +7550,9 @@ struct E2EEV2RotationDrainDependencies: Sendable {
     let isCurrent: @Sendable () -> Bool
     let activationEnabled: @Sendable () -> Bool
     let pending: @Sendable () async -> Result<[E2EEV2EpochRotationRequirement], E2EEV2TransportFailure>
-    let rotate: @Sendable (String) async -> E2EEV2EpochRotationResult
+    /// Le second argument vaut vrai quand le relevé du serveur liste une exigence
+    /// ouverte pour cette conversation : elle suffit à tourner (E2EE-COMPROMISED-1 §6).
+    let rotate: @Sendable (String, Bool) async -> E2EEV2EpochRotationResult
     var now: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
 }
 
@@ -7571,16 +7573,20 @@ actor E2EEV2RotationDrain {
         try backlog.phase(.running, for: session)
         let discovered = await d.pending()
         guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
+        // Le serveur ne clôt une exigence que par une nouvelle époque (§6) : une
+        // conversation qu'il liste tourne même sans écart vu d'ici.
+        var required = Set<String>()
         switch discovered {
         case .failure(let failure): return try backlog.failed(session, kind: failure.kind)
         case .success(let values):
             try backlog.merge(session, conversations: values.map(\.conversationId), scannedRevision: initial.revision)
+            required = Set(values.map(\.conversationId))
         }
         let tickets = try backlog.snapshot(session).pending.sorted { $0.key < $1.key }.prefix(limit)
         var failure: E2EEV2TransportFailureKind?
         for (id, ticket) in tickets {
             guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
-            let result = await d.rotate(id)
+            let result = await d.rotate(id, required.contains(id))
             switch result {
             case .noAction:
                 guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
@@ -7698,7 +7704,7 @@ final class E2EEV2EpochRotationRuntime: ObservableObject {
                     let retry = try await drain.run(session: current, backlog: backlog, dependencies: .init(
                         isCurrent: { current.isCurrent }, activationEnabled: { messaging.writesEnabled },
                         pending: { await requirements.pending(expectedOwnerScopeId: current.ownerScopeId) },
-                        rotate: { await messaging.rotate(conversationId: $0) }
+                        rotate: { await messaging.rotate(conversationId: $0, required: $1) }
                     ))
                     let updated = try await drain.snapshot(session: current, backlog: backlog)
                     guard current.isCurrent, self.session == current, !Task.isCancelled else { return }

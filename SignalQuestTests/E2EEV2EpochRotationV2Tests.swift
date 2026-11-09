@@ -86,6 +86,31 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(result, .upToDate)
     }
 
+    /// E2EE-COMPROMISED-1 §6 : une exigence ouverte suffit, appareils inchangés.
+    func testAnOpenRequirementRotatesEvenWithUnchangedDevices() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try seed(fixture, devices: devices)
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            let envelopes = body["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
+                "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": "2", "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
+                "recipientCount": String(envelopes.count),
+            ]))
+        }
+        let result = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId, force: true
+        )
+        XCTAssertEqual(result, .rotated(epochNumber: 2))
+        XCTAssertEqual(captured.first?.0.url?.path, "/api/e2ee/v2/conversations/\(seeded.conversationId)/epochs")
+    }
+
     func testAMemberWhoseIdentityIsNotTrustedIsNeverDroppedSilently() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")

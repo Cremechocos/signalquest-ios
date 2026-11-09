@@ -2792,7 +2792,10 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(pushSource.contains("e2eeDeviceApprovalId: e2eeDeviceApprovalId"))
         XCTAssertTrue(routerSource.contains("openE2EEDeviceApprovalId"))
         XCTAssertTrue(routerSource.contains("case \"e2ee_v2_device_approval\""))
-        XCTAssertTrue(profileSource.contains("initialApprovalId: link.id"))
+        // E2EE-REVOKE-SYNC r1 (09/11) : le lien ouvre les appareils du journal,
+        // plus l'écran v2 qui révoquait sans écrire le journal.
+        XCTAssertTrue(profileSource.contains("deepLinkE2EEApproval = E2EEDeviceApprovalDeepLink(id: id)"))
+        XCTAssertFalse(profileSource.contains("initialApprovalId: link.id"))
         XCTAssertTrue(profileSource.contains("consumeE2EEApprovalDeepLink"))
     }
 }
@@ -4739,7 +4742,7 @@ extension E2EETests {
         let retry = try await drain.run(session: session, backlog: backlog, dependencies: .init(
             isCurrent: { session == current.value }, activationEnabled: { false },
             pending: { calls.value += 1; return .success([]) },
-            rotate: { _ in calls.value += 1; return .noAction }, now: { clock.value }
+            rotate: { _, _ in calls.value += 1; return .noAction }, now: { clock.value }
         ))
         XCTAssertFalse(retry)
         XCTAssertEqual(calls.value, 0)
@@ -4761,7 +4764,7 @@ extension E2EETests {
         let deps = E2EEV2RotationDrainDependencies(
             isCurrent: { current.value == session }, activationEnabled: { true },
             pending: { calls.value += 1; return .failure(.init(kind: .retryable, message: "synthetic-offline")) },
-            rotate: { _ in XCTFail("A failed discovery must not rotate"); return .noAction }, now: { clock.value }
+            rotate: { _, _ in XCTFail("A failed discovery must not rotate"); return .noAction }, now: { clock.value }
         )
         for attempt in 1...5 {
             let startedAt = clock.value
@@ -4799,7 +4802,7 @@ extension E2EETests {
             pending: {
                 try? backlog.request(session, conversations: [id])
                 return .success([])
-            }, rotate: { _ in
+            }, rotate: { _, _ in
                 try? backlog.request(session, conversations: [id])
                 return .noAction
             }, now: { clock.value }
@@ -4813,6 +4816,31 @@ extension E2EETests {
         XCTAssertEqual(try backlog.snapshot(session), state)
     }
 
+    /// E2EE-COMPROMISED-1 §6 : le serveur ne clôt une exigence que par une nouvelle
+    /// époque. Celle qu'il liste est passée « requise » ; une demande locale ne l'est pas.
+    func testV2RotationServedRequirementIsRequiredLocalRequestIsNot() async throws {
+        let session = LocalAccountSession(ownerScopeId: "user:rotation-required-fixture", sessionId: UUID().uuidString)
+        let current = LockedBox(session), clock = LockedBox(Int64(1_000)), seen = LockedBox([String: Bool]())
+        let backlog = rotationBacklog(store: InMemoryTokenStore(), session: current, clock: clock)
+        let served = "conversation_rotation_0001", local = "conversation_rotation_0002"
+        try backlog.request(session, conversations: [local])
+        let drain = E2EEV2RotationDrain()
+        let retry = try await drain.run(session: session, backlog: backlog, dependencies: .init(
+            isCurrent: { current.value == session }, activationEnabled: { true },
+            pending: { .success([.init(
+                conversationId: served, reason: "DEVICE_REVOKED", revision: 1, triggeredAt: "2026-11-09T15:58:00.000Z",
+                currentEpochNumber: 3, currentEpochStatus: "compromised"
+            )]) },
+            rotate: { id, required in
+                seen.value[id] = required
+                return required ? .rotated(followUpRequired: false) : .noAction
+            }, now: { clock.value }
+        ))
+        XCTAssertFalse(retry)
+        XCTAssertEqual(seen.value, [served: true, local: false])
+        XCTAssertFalse(try backlog.snapshot(session).hasWork)
+    }
+
     func testV2RotationBoundedPassAndFollowUpDoNotAnnouncePrematureCompletion() async throws {
         let session = LocalAccountSession(ownerScopeId: "user:rotation-budget-fixture", sessionId: UUID().uuidString)
         let current = LockedBox(session), clock = LockedBox(Int64(1_000)), calls = LockedBox(0)
@@ -4822,7 +4850,7 @@ extension E2EETests {
         let drain = E2EEV2RotationDrain()
         let deps = E2EEV2RotationDrainDependencies(
             isCurrent: { current.value == session }, activationEnabled: { true }, pending: { .success([]) },
-            rotate: { id in
+            rotate: { id, _ in
                 calls.value += 1
                 if calls.value == 1 { return .rotated(followUpRequired: true) }
                 return .noAction
@@ -4854,7 +4882,7 @@ extension E2EETests {
         let drain = E2EEV2RotationDrain()
         let deps = E2EEV2RotationDrainDependencies(
             isCurrent: { current.value == session }, activationEnabled: { true }, pending: { .success([]) },
-            rotate: { _ in
+            rotate: { _, _ in
                 calls.value += 1
                 current.value = .init(ownerScopeId: "user:other-owner-fixture", sessionId: UUID().uuidString)
                 return .noAction
@@ -5914,7 +5942,7 @@ extension E2EETests {
                     // Test-only localhost driver. The compiled production gate remains false.
                     activationEnabled: { true },
                     pending: { await requirements.pending(expectedOwnerScopeId: session.ownerScopeId) },
-                    rotate: { await messaging.rotate(conversationId: $0) },
+                    rotate: { await messaging.rotate(conversationId: $0, required: $1) },
                     now: { clock.value }
                 ))
                 let state = try backlog.snapshot(session)

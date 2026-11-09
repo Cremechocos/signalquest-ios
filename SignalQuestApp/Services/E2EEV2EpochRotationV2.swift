@@ -534,7 +534,8 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
             E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint)
         }
         // `force` : le serveur a refusé l'époque courante comme compromise (409
-        // E2EE_EPOCH_COMPROMISED), même si l'annuaire n'y voit encore aucun écart.
+        // E2EE_EPOCH_COMPROMISED), ou garde une exigence de rotation ouverte (§6),
+        // même si l'annuaire n'y voit encore aucun écart.
         guard force || !E2EEV2RotationPolicy.reasons(
             current: current, membership: membership, expectedRecipients: lines, nowMs: nowMs, messageCount: messageCount
         ).isEmpty else { return .upToDate }

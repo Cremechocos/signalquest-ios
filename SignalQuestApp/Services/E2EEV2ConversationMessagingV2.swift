@@ -514,13 +514,17 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         conversationId: String,
         isGroup: Bool,
         devices: E2EEV2CertifiedDeviceSet,
-        expectedOwnerScopeId: String
+        expectedOwnerScopeId: String,
+        force: Bool = false
     ) async -> E2EEV2EpochRotationV2Result {
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         if case .failure(let error) = await syncer.sync(
             conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
         ) { return .failure(error) }
         var result = E2EEV2EpochRotationV2Result.upToDate
+        // `force` ne vaut qu'une fois : après une époque adoptée (un autre appareil
+        // a tourné avant nous), l'exigence est close et on ne tourne pas deux fois.
+        var forced = force
         rounds: for _ in 0..<Self.maxSendRounds {
             guard let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) else {
                 return .failure(localError("e2ee-rotation-state-unavailable"))
@@ -529,10 +533,11 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             guard context.head.members.contains(ownUserId(expectedOwnerScopeId)) else { result = .upToDate; break }
             result = await rotator.rotateIfNeeded(
                 conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
-                devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+                devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount,
+                force: forced
             )
             switch result {
-            case .adopted: continue
+            case .adopted: forced = false; continue
             case .needsMembershipSync:
                 if case .failure(let error) = await syncer.sync(
                     conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId

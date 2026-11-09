@@ -390,7 +390,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     /// révoqué, exigence publiée par le serveur). Rien à faire pour une
     /// conversation qui n'est pas v2 ici ; sinon la décision de l'appareil,
     /// avec les appareils certifiés des membres de la chaîne gardée.
-    func rotate(conversationId: String) async -> E2EEV2EpochRotationResult {
+    /// `required` : le serveur garde une exigence de rotation ouverte (§6), qui
+    /// suffit à tourner même quand destinataires, âge et volume n'ont pas changé.
+    func rotate(conversationId: String, required: Bool = false) async -> E2EEV2EpochRotationResult {
         guard writesEnabled else { return .failure(Self.closed) }
         guard let parts = current() else { return .failure(Self.noSession) }
         let stored: (isGroup: Bool, members: [String])
@@ -426,7 +428,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 }
                 return await parts.messaging.rotate(
                     conversationId: conversationId, isGroup: stored.isGroup, devices: devices,
-                    expectedOwnerScopeId: parts.session.ownerScopeId
+                    expectedOwnerScopeId: parts.session.ownerScopeId, force: required
                 )
             }
         } catch {
