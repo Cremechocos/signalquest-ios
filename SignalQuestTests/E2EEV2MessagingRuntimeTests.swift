@@ -36,6 +36,41 @@ final class E2EEV2MessagingRuntimeTests: XCTestCase {
         )
     }
 
+    /// Départ accepté : clés d'époque, brouillon et envois en attente du fil quitté
+    /// s'effacent de l'appareil ; ceux d'un autre fil restent.
+    func testLeavingForgetsTheLocalCopyOfThatConversationOnly() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let open = try runtime(fixture, reads: Reads(), ignoresGates: true)
+        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: []))
+        let namespace = fixture.session.ownerNamespace
+        let scope = fixture.session.ownerScopeId
+        XCTAssertNotNil(try fixture.keys.load(conversationId: seeded.conversationId, ownerNamespace: namespace))
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("drafts-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let drafts = MessageDraftStore(rootURL: root, keyStore: InMemoryTokenStore())
+        let other = "conversation_runtime_other1"
+        for id in [seeded.conversationId, other] {
+            try await drafts.save("brouillon", conversationId: id, ownerScopeId: scope)
+            try await drafts.stageV2Send(.init(
+                clientRequestId: "req-\(id)", conversationId: id, isGroup: true, participantIds: [bruno],
+                text: "en attente", replyToRef: nil, ttlSeconds: 0, createdAtMs: 1
+            ), ownerScopeId: scope)
+        }
+
+        await open.forgetLeftConversation(seeded.conversationId, drafts: drafts)
+
+        XCTAssertNil(try fixture.keys.load(conversationId: seeded.conversationId, ownerNamespace: namespace))
+        let left = await drafts.text(conversationId: seeded.conversationId, ownerScopeId: scope)
+        XCTAssertNil(left)
+        let leftSends = await drafts.pendingV2Sends(ownerScopeId: scope, conversationId: seeded.conversationId)
+        XCTAssertTrue(leftSends.isEmpty)
+        let kept = await drafts.text(conversationId: other, ownerScopeId: scope)
+        XCTAssertEqual(kept, "brouillon")
+        let keptSends = await drafts.pendingV2Sends(ownerScopeId: scope, conversationId: other)
+        XCTAssertEqual(keptSends.map(\.clientRequestId), ["req-\(other)"])
+    }
+
     func testNothingRunsWhileTheGatesAreClosed() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let reads = Reads()

@@ -859,6 +859,22 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     func leave(_ conversation: MessageConversation, naming successor: String?) async throws {
         if let successor { try await apply(.promote(userId: successor), to: conversation) }
         try await apply(.leave, to: conversation)
+        await forgetLeftConversation(conversation.id)
+    }
+
+    /// Départ accepté : la chaîne signée le prouve, la copie de cet iPhone
+    /// s'efface aussitôt (messages déchiffrés, clés d'époque, miroir des
+    /// notifications, brouillon, envois en attente). Le fil quitté sort de la
+    /// liste et le serveur ne le rend plus (403) : l'effacement à la réouverture
+    /// ne venait donc jamais (essai sur la pile QA, choix d'Alexandre du 09/11).
+    /// Au mieux : un échec ne remet pas le départ en cause.
+    func forgetLeftConversation(_ conversationId: String, drafts: MessageDraftStore = .shared) async {
+        guard let scope = current()?.session.ownerScopeId else { return }
+        _ = eraseLocalCopy(conversationId: conversationId)
+        try? await drafts.save("", conversationId: conversationId, ownerScopeId: scope)
+        for send in await drafts.pendingV2Sends(ownerScopeId: scope, conversationId: conversationId) {
+            await drafts.removeV2Send(clientRequestId: send.clientRequestId, ownerScopeId: scope)
+        }
     }
 
     /// Avant une suppression de compte : dans chaque groupe v2 dont ce compte
