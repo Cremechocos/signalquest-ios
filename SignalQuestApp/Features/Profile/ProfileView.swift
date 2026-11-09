@@ -211,9 +211,12 @@ struct ProfileView: View {
                     }
             }
         }
-        .sheet(item: $deepLinkE2EEApproval) { link in
+        .sheet(item: $deepLinkE2EEApproval) { _ in
             NavigationStack {
-                E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
+                // E2EE-REVOKE-SYNC r1 (choix d'Alexandre, 09/11) : un ancien lien
+                // d'approbation v2 ouvre les appareils du journal ; plus aucun
+                // chemin n'appelle la révocation ni la réinitialisation v2.
+                E2EEAutoDevicesView(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {
@@ -223,9 +226,12 @@ struct ProfileView: View {
                     }
             }
         }
-        .sheet(item: $deepLinkE2EEApprovalQR) { link in
+        .sheet(item: $deepLinkE2EEApprovalQR) { _ in
             NavigationStack {
-                E2EEV2TrustedDevicesView(api: services.api, initialApprovalQR: link.id)
+                // E2EE-REVOKE-SYNC r1 (choix d'Alexandre, 09/11) : un ancien lien
+                // d'approbation v2 ouvre les appareils du journal ; plus aucun
+                // chemin n'appelle la révocation ni la réinitialisation v2.
+                E2EEAutoDevicesView(api: services.api)
                     // Ouverte par un lien : sans « Fermer », seul le glissement en
                     // sortait (AF-PROF-03).
                     .toolbar {

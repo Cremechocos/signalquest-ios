@@ -2199,12 +2199,10 @@ struct SettingsView: View {
         switch destination {
         case .password: ChangePasswordView(appleLinked: appleLinked)
         case .devices:
-            // E2EE-AUTO §4 : les appareils viennent du journal vérifié.
-            if SQFeatures.e2eeAutoLogEnabled {
-                E2EEAutoDevicesView(api: services.api)
-            } else {
-                E2EEV2TrustedDevicesView(api: services.api)
-            }
+            // E2EE-AUTO §4 : les appareils viennent du journal vérifié ; l'écran
+            // v2 (révocation et réinitialisation v2) n'est plus proposé
+            // (E2EE-REVOKE-SYNC r1, 09/11).
+            E2EEAutoDevicesView(api: services.api)
         case .privacy: PrivacySettingsView(service: services.privacy)
         case .notifications: NotificationSettingsView(userService: services.users)
         case .glossary: SQGlossaryView()
