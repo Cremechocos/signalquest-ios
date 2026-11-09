@@ -561,12 +561,24 @@ struct ConversationDetailView: View {
                         if old == nil || replacesLocal {
                             var transaction = Transaction(animation: nil)
                             transaction.disablesAnimations = true
-                            withTransaction(transaction) {
-                                // Beaucoup de nouveautés : l'ouverture se place sur le repère, pas en bas.
+                            // Beaucoup de nouveautés : l'ouverture se place sur le repère, pas en bas.
+                            let target: (id: String, anchor: UnitPoint) =
                                 if old == nil, let divider = unreadDivider, divider.count >= UnreadDivider.scrollsToDividerFrom {
-                                    proxy.scrollTo(divider.messageId, anchor: .top)
+                                    (divider.messageId, .top)
                                 } else {
-                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                    (last.id, .bottom)
+                                }
+                            withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
+                            // Lignes d'appel, images et cartes arrivent après : elles
+                            // repoussaient le dernier message hors de l'écran, et la
+                            // conversation s'ouvrait au milieu (retour du 09/11).
+                            // On se recale pendant ce premier chargement.
+                            if old == nil {
+                                Task { @MainActor in
+                                    for delay in [150, 400, 900] as [UInt64] {
+                                        try? await Task.sleep(nanoseconds: delay * 1_000_000)
+                                        withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
+                                    }
                                 }
                             }
                         } else {
