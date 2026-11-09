@@ -1744,11 +1744,13 @@ struct ConversationDetailView: View {
             },
             including: reactionsAllowed && message.deletedAt == nil && !message.id.hasPrefix("local-") ? .all : .subviews
         )
-        .contextMenu { contextMenu(for: message, mine: mine) }
-        .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
+        // Réactions DANS la vue du menu contextuel : sinon la bulle soulevée par le
+        // menu passait par-dessus en se refermant, puis elles sautaient devant (09/11).
+        .overlay(alignment: mine ? .topLeading : .topTrailing) {
             reactionChips(for: message, summaries: reactions)
         }
-        .padding(.bottom, reactions.isEmpty ? 0 : 13)
+        .contextMenu { contextMenu(for: message, mine: mine) }
+        .padding(.top, reactions.isEmpty ? 0 : 16)
     }
 
     /// Message qui n'est QU'un partage de publication (embed interactif) :
@@ -2069,61 +2071,61 @@ struct ConversationDetailView: View {
     /// Capsules de réactions posées, regroupées par emoji, chevauchant le bas de
     /// la bulle. Tap = toggle de MA réaction. Ma réaction = capsule teintée accent.
     @ViewBuilder
+    /// Réactions façon iMessage (choix d'Alexandre, 09/11) : une seule petite bulle
+    /// posée sur le coin HAUT de la bulle, côté opposé à l'auteur, découpée par un
+    /// liseré couleur du fond. Chaque emoji reste touchable (ajouter ou retirer) ;
+    /// le mien est posé sur un rond teinté, le total s'affiche si quelqu'un d'autre
+    /// a réagi pareil.
     private func reactionChips(for message: MessageItem, summaries: [MessageReactionSummary]) -> some View {
         if !summaries.isEmpty {
-            HStack(spacing: SQSpace.xs) {
+            let fromMe = message.senderId == currentUserId
+            let total = summaries.reduce(0) { $0 + $1.count }
+            HStack(spacing: 0) {
                 ForEach(summaries) { reaction in
                     Button {
                         Haptics.selection()
                         Task { await toggleReaction(message: message, emoji: reaction.emoji) }
                     } label: {
-                        HStack(spacing: 3) {
-                            Text(reaction.emoji)
-                                .font(.system(size: 13))
-                            if reaction.count > 1 {
-                                Text("\(reaction.count)")
-                                    .font(SQType.micro)
-                                    // 12 pt : l'encre carmin, pas la brique (contraste sous 13 pt).
-                                    .foregroundStyle(reaction.mine ? SQColor.accentInk : SQColor.labelSecondary)
-                            }
-                        }
-                        .padding(.horizontal, SQSpace.sm)
-                        .padding(.vertical, 4)
-                        .background {
-                            // Base opaque `surface` (la capsule chevauche la bulle) ;
-                            // ma réaction est cerclée de carmin.
-                            Capsule(style: .continuous)
-                                .fill(SQColor.surface)
-                                .overlay(
-                                    Capsule(style: .continuous)
-                                        .strokeBorder(reaction.mine ? SQColor.brandRed : SQColor.separator, lineWidth: 1)
-                                )
-                        }
-                        .sqShadowSoft()
-                        // Zone tactile de 44 pt sans changer la hauteur de la capsule.
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
-                        .padding(.vertical, -10)
+                        Text(reaction.emoji)
+                            .font(.system(size: 15))
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(reaction.mine ? SQColor.brandRed.opacity(0.16) : .clear))
+                            // Zone tactile de 44 pt sans grossir la bulle de réaction.
+                            .padding(9)
+                            .contentShape(Rectangle())
+                            .padding(-9)
                     }
                     .buttonStyle(.plain)
-                    // Pas de `.disabled` : il grisait la pastille (pâle en conversation
+                    // Pas de `.disabled` : il grisait la réaction (pâle en conversation
                     // chiffrée, 09/11) ; `toggleReaction` vérifie déjà `reactionsAllowed`.
-                    // Une réaction posée apparaît d'un petit rebond (ressort `bouncy`).
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.3).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.2).combined(with: .opacity))
                     .accessibilityLabel(reaction.mine
                         ? String(localized: "Réaction \(reaction.emoji) : \(reaction.count), dont la tienne")
                         : String(localized: "Réaction \(reaction.emoji) : \(reaction.count)"))
                     .accessibilityHint(reaction.mine ? "Toucher pour retirer ta réaction" : "Toucher pour réagir aussi")
                 }
+                if total > summaries.count {
+                    Text("\(total)")
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                        .padding(.horizontal, 3)
+                        .accessibilityHidden(true)
+                }
             }
-            .offset(y: 12)
-            .padding(.horizontal, SQSpace.sm2)
-            .transition(reduceMotion ? .opacity : .scale(scale: 0.3, anchor: mineAnchor(message)).combined(with: .opacity))
+            .padding(.horizontal, 3)
+            .padding(.vertical, 2)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(SQColor.surface)
+                    .overlay(Capsule(style: .continuous).strokeBorder(SQColor.bg, lineWidth: 2))
+            }
+            .sqShadowSoft()
+            // À cheval sur le coin haut, débordant vers l'extérieur.
+            .offset(x: fromMe ? -14 : 14, y: -18)
+            // Entrée d'un petit rebond depuis le coin (ressort `bouncy` de l'appel).
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.2, anchor: fromMe ? .topLeading : .topTrailing).combined(with: .opacity))
         }
-    }
-
-    private func mineAnchor(_ message: MessageItem) -> UnitPoint {
-        message.senderId == currentUserId ? .bottomTrailing : .bottomLeading
     }
 
     /// Entrée d'une bulle : elle monte un peu, grandit depuis son coin et apparaît
