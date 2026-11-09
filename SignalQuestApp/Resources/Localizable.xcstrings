@@ -111084,6 +111084,70 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Effacer de cet iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erase from this iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer de cet iPhone"
+          }
+        }
+      }
+    },
+    "Effacer cette conversation de cet iPhone ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erase this conversation from this iPhone?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer cette conversation de cet iPhone ?"
+          }
+        }
+      }
+    },
+    "Les messages gardés sur cet iPhone seront effacés pour de bon. Les autres membres gardent les leurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages kept on this iPhone will be erased for good. Other members keep theirs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages gardés sur cet iPhone seront effacés pour de bon. Les autres membres gardent les leurs."
+          }
+        }
+      }
+    },
+    "La conversation n’a pas pu être effacée de cet iPhone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation couldn’t be erased from this iPhone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être effacée de cet iPhone."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

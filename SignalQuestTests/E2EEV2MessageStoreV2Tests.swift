@@ -42,6 +42,19 @@ final class E2EEV2MessageStoreV2Tests: XCTestCase {
         XCTAssertEqual(rewound.messages.map(\.text), ["Salut"])
     }
 
+    /// « Effacer de cet iPhone » (cmw9quitter0leave0a2deux1) : une seule conversation.
+    func testRemovingAConversationErasesOnlyIt() throws {
+        let store = makeStore()
+        try store.apply([try message(1, from: bruno, .text("Salut"))], equivocal: [], cursor: 7, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        try store.remove(conversationId: "conversation_01J7OTHER23456789", ownerScopeId: owner)
+        XCTAssertEqual(try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs).messages.map(\.text), ["Salut"])
+        try store.remove(conversationId: conversationId, ownerScopeId: owner)
+        let after = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertTrue(after.messages.isEmpty)
+        XCTAssertEqual(after.cursor, 0)
+        XCTAssertTrue(try FileManager.default.subpathsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".sealed") }.isEmpty)
+    }
+
     func testOnlyTheAuthorEditsOrDeletesInAnyArrivalOrder() throws {
         let store = makeStore()
         let original = try message(1, from: bruno, .text("Rendez-vous à 8 h"))

@@ -608,6 +608,13 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         )
     }
 
+    /// Efface de cet appareil les messages déchiffrés gardés d'une conversation
+    /// et ce que l'extension de notification en a montré. Irréversible.
+    func eraseStoredMessages(conversationId: String, expectedOwnerScopeId: String) throws {
+        try messageStore.remove(conversationId: conversationId, ownerScopeId: expectedOwnerScopeId)
+        notificationMirror?.forget(conversationId)
+    }
+
     private func ownUserId(_ ownerScopeId: String) -> String {
         String(ownerScopeId.dropFirst("user:".count))
     }

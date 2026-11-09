@@ -436,6 +436,14 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         return try read(conversationId: conversationId, ownerScopeId: ownerScopeId).messages[ref]
     }
 
+    /// Efface le fichier scellé d'UNE conversation (« Effacer de cet iPhone »).
+    func remove(conversationId: String, ownerScopeId: String) throws {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        let url = fileURL(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        if fileManager.fileExists(atPath: url.path) { try fileManager.removeItem(at: url) }
+    }
+
     func purge(ownerScopeId: String) throws {
         Self.lock.lock()
         defer { Self.lock.unlock() }

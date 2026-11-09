@@ -292,6 +292,7 @@ struct ConversationDetailView: View {
     /// (cmw9quitter0leave0a2deux1, choix d'Alexandre du 09/11).
     @State private var noLongerMember = false
     @State private var isRemovingFromList = false
+    @State private var confirmsLocalErase = false
     /// Posé quand la conversation s'affiche à côté de la liste (iPad) : pas de retour.
     @Environment(\.sqMessagesCloseDetail) private var closeSplitDetail
     private var inSplitDetail: Bool { closeSplitDetail != nil }
@@ -326,10 +327,39 @@ struct ConversationDetailView: View {
                 }
                 .accessibilityIdentifier("conversation.notMember.remove")
                 .padding(.top, SQSpace.sm)
+                GradientButton(
+                    String(localized: "Effacer de cet iPhone"), systemImage: "trash",
+                    isBusy: isRemovingFromList, style: .destructive
+                ) {
+                    confirmsLocalErase = true
+                }
+                .accessibilityIdentifier("conversation.notMember.erase")
             }
             .frame(maxWidth: .infinity)
         }
         .accessibilityIdentifier("conversation.notMember")
+        // `.alert` et non une feuille d'actions : « Annuler » doit rester visible.
+        .alert("Effacer cette conversation de cet iPhone ?", isPresented: $confirmsLocalErase) {
+            Button("Effacer", role: .destructive) { Task { await eraseLocalCopy() } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Les messages gardés sur cet iPhone seront effacés pour de bon. Les autres membres gardent les leurs.")
+        }
+    }
+
+    /// Efface la copie locale (messages, clés, brouillon, notifications), puis
+    /// retire la conversation de la liste et la ferme.
+    private func eraseLocalCopy() async {
+        guard !isRemovingFromList else { return }
+        guard services.e2eeV2Messaging.eraseLocalCopy(conversationId: conversation.id) else {
+            showActionError(String(localized: "La conversation n’a pas pu être effacée de cet iPhone."))
+            return
+        }
+        if let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId {
+            try? await MessageDraftStore.shared.save("", conversationId: conversation.id, ownerScopeId: scope)
+        }
+        messages = []
+        await removeFromList()
     }
 
     /// Archive pour soi, comme « Archiver » dans la liste, puis ferme le fil.

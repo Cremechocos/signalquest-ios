@@ -116,6 +116,24 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// « Effacer de cet iPhone » (cmw9quitter0leave0a2deux1, choix d'Alexandre du
+    /// 09/11 : sur demande, avec confirmation) : messages déchiffrés, clés
+    /// d'époque et entrée du miroir des notifications d'UNE conversation. Sans
+    /// les clés, rien de ce que garde le serveur ne se relit ici. `false` si
+    /// l'effacement n'a pas abouti.
+    func eraseLocalCopy(conversationId: String) -> Bool {
+        guard let parts = current() else { return false }
+        do {
+            try parts.messaging.eraseStoredMessages(
+                conversationId: conversationId, expectedOwnerScopeId: parts.session.ownerScopeId
+            )
+            try keyStore.remove(conversationId: conversationId, ownerNamespace: parts.session.ownerNamespace)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Les briques de la session courante, rebâties si elle a changé.
     func current() -> Parts? {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return nil }

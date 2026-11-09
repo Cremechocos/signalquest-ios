@@ -62,6 +62,10 @@ final class E2EEV2MembershipWriterV2Tests: XCTestCase {
         // cmw9quitter0leave0a2deux1 : un départ signé est définitif, jamais en tête-à-tête.
         let leave = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
         XCTAssertEqual(leave, .notAllowed, "Pas de départ dans un tête-à-tête")
+        // Un drapeau « groupe » faux (servi par erreur) ne fait rien signer : la
+        // relecture de la genèse gardée, sans administrateur, le refuse.
+        guard case .failure = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: true, expectedOwnerScopeId: owner)
+        else { return XCTFail("Un tête-à-tête déclaré groupe ne doit rien signer") }
         XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
     }
 
