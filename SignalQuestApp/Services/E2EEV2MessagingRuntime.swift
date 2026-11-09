@@ -581,6 +581,23 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// Présentation tirée du seul magasin local, pour l'ouverture : aucun
+    /// réseau, réactions masquées jusqu'à la relève, qui la remplace ensuite.
+    func storedThread(
+        conversationId: String, isGroup: Bool, participants: [ConversationParticipant], limit: Int? = nil
+    ) -> E2EEV2ThreadPresentation? {
+        guard readsEnabled, let parts = current(),
+              let stored = parts.messaging.storedMessages(
+                  conversationId: conversationId, expectedOwnerScopeId: parts.session.ownerScopeId
+              ) else { return nil }
+        let members = Dictionary(participants.map { ($0.userId, $0.user) }, uniquingKeysWith: { first, _ in first })
+        return E2EEV2ThreadPresenter.present(
+            stored, conversationId: conversationId, members: members, deviceOwners: [:],
+            ownUserId: LocalAccountScope.currentUserId, limit: limit, isGroup: isGroup,
+            groupAdmins: { parts.messaging.storedGroupAdmins(conversationId: conversationId, epochNumber: $0) }
+        )
+    }
+
     /// Où en est une conversation chiffrée après une tentative de migration.
     enum MigrationOutcome: Equatable, Sendable {
         case v2

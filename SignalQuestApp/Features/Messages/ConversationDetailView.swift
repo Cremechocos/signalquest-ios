@@ -141,6 +141,9 @@ struct ConversationDetailView: View {
     @State private var hasUnseenMessages = false
     /// Ouverture : la liste attend d'être placée avant d'apparaître.
     @State private var isPlacingOpening = false
+    /// Ouverture affichée depuis le magasin local, avant la relève : le repère
+    /// « non lus » n'est connu qu'après elle, et s'y place alors une fois.
+    @State private var openedFromStore = false
     /// Actions destructives confirmées avant exécution (SOC-22).
     @State private var pendingDeletion: PendingMessageDeletion?
     @State private var reportTarget: MessageItem?
@@ -536,8 +539,11 @@ struct ConversationDetailView: View {
                         // au lieu de rétrécir la zone visible (parité Android).
                         typingIndicator
                             .id(Self.typingRowId)
+                        // Repère de fin : le bas de l'écran s'y cale, avec un peu d'air
+                        // sous le « Lu » et après les lignes d'appel (retour du 09/11).
                         Color.clear
-                            .frame(height: 1)
+                            .frame(height: SQSpace.md)
+                            .id(Self.bottomRowId)
                             .onAppear { isNearBottom = true; hasUnseenMessages = false }
                             .onDisappear { isNearBottom = false }
                         if let errorMessage {
@@ -553,6 +559,7 @@ struct ConversationDetailView: View {
                     // Placée hors de la vue, puis montrée d'un coup (retour du 09/11).
                     .opacity(isPlacingOpening ? 0 : 1)
                 }
+                .modifier(BottomAnchoredScroll())
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
                 .onChangeCompat(of: messages.last?.id) { old, _ in
@@ -570,7 +577,7 @@ struct ConversationDetailView: View {
                                 if old == nil, let divider = unreadDivider, divider.count >= UnreadDivider.scrollsToDividerFrom {
                                     (divider.messageId, .top)
                                 } else {
-                                    (last.id, .bottom)
+                                    (Self.bottomRowId, .bottom)
                                 }
                             withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
                             // Lignes d'appel, images et cartes arrivent après : elles
@@ -580,43 +587,64 @@ struct ConversationDetailView: View {
                             // La liste reste cachée pendant les premiers recalages :
                             // on ne voit plus le saut du milieu vers le bas.
                             if old == nil {
-                                isPlacingOpening = true
+                                // iOS 17+ : la liste s'ancre déjà en bas dès sa première mise
+                                // en page (`defaultScrollAnchor`), rien à cacher.
+                                if #available(iOS 17.0, *), target.id == Self.bottomRowId {} else {
+                                    isPlacingOpening = true
+                                }
                                 Task { @MainActor in
                                     for delay in [60, 120, 150, 570] as [UInt64] {
                                         try? await Task.sleep(nanoseconds: delay * 1_000_000)
                                         withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
-                                        if isPlacingOpening, delay == 150 {
+                                        if isPlacingOpening, delay == 120 {
                                             withAnimation(SQMotion.resolve(.easeOut(duration: 0.15), reduceMotion)) { isPlacingOpening = false }
                                         }
                                     }
                                 }
                             }
-                        } else {
-                            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                        } else if !(openedFromStore && (unreadDivider?.count ?? 0) >= UnreadDivider.scrollsToDividerFrom) {
+                            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
                         }
                     } else {
                         hasUnseenMessages = true
                     }
                 }
+                // Ouverture depuis le magasin : le repère « non lus » arrive avec la
+                // relève ; s'il y en a beaucoup, on s'y place une fois.
+                .onChangeCompat(of: unreadDivider?.messageId) { _, id in
+                    guard openedFromStore, let id, let divider = unreadDivider,
+                          divider.count >= UnreadDivider.scrollsToDividerFrom else { return }
+                    openedFromStore = false
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(id, anchor: .top) }
+                }
+                // Anciens messages (v1) ajoutés en tête après l'ouverture : on reste en bas
+                // si on y était ; le chargement d'une page plus ancienne, lui, part du haut.
+                .onChangeCompat(of: messages.first?.id) { old, _ in
+                    guard old != nil, isNearBottom, !isLoadingOlder else { return }
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
+                }
                 // Un appel qui se termine ajoute une ligne en bas : on y reste si on y était.
                 .onChangeCompat(of: callEvents.first?.callId) { _, _ in
                     guard isNearBottom, let last = messages.last, let newest = callEvents.first,
                           let lastDate = last.createdAt, newest.startedAt > lastDate else { return }
-                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.typingRowId, anchor: .bottom) }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
                 }
                 // La frappe ou le « Lu » ajoutent une ligne en bas : on y reste si on y était.
                 .onChangeCompat(of: typingUntil != nil) { _, visible in
                     guard visible, isNearBottom else { return }
-                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.typingRowId, anchor: .bottom) }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
                 }
                 .onChangeCompat(of: receiptFooterKey) { _, key in
-                    guard key != nil, isNearBottom, let last = messages.last else { return }
-                    proxy.scrollTo(last.id, anchor: .bottom)
+                    guard key != nil, isNearBottom, !messages.isEmpty else { return }
+                    proxy.scrollTo(Self.bottomRowId, anchor: .bottom)
                 }
-                // Le clavier réduit la zone visible : on reste collé au dernier message si on y était.
+                // Le clavier s'ouvre : le dernier message reste toujours visible,
+                // même lu plus haut (retour du 09/11).
                 .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                    guard isNearBottom, let last = messages.last else { return }
-                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    guard !messages.isEmpty else { return }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) }
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .overlay(alignment: .bottom) {
@@ -624,7 +652,7 @@ struct ConversationDetailView: View {
                         Button {
                             Haptics.selection()
                             hasUnseenMessages = false
-                            if let last = messages.last { withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                            if !messages.isEmpty { withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.bottomRowId, anchor: .bottom) } }
                         } label: {
                             Label("Nouveaux messages", systemImage: "arrow.down")
                                 .font(SQType.subhead(.semibold))
@@ -1036,6 +1064,7 @@ struct ConversationDetailView: View {
         }
         .task {
             conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
+            showStoredV2IfAny()
             // §14.2 : une conversation chiffrée v1 passe en v2 à son ouverture,
             // si tous ses membres lisent le v2 (règle commune, v0.4.17). Après la
             // bascule, une conversation v1 ou en clair y passe sans attendre (E2EE-AUTO §8).
@@ -2723,6 +2752,7 @@ struct ConversationDetailView: View {
     }
 
     private static let typingRowId = "typing-indicator"
+    private static let bottomRowId = "conversation-bottom"
 
     /// Statut de `message` (mon dernier message) : Envoyé, Distribué ou Lu. Tant que `/receipts`
     /// n'a pas répondu, seul le « Lu » existant s'affiche ; derrière une bulle locale encore en
@@ -3146,6 +3176,29 @@ struct ConversationDetailView: View {
         }
         v2ImportSettled.formUnion(report.outcomes.filter { $0.value != .retry }.keys)
         await loadV2()
+    }
+
+    /// Les messages déjà déchiffrés et gardés sur l'appareil, affichés tout de
+    /// suite (retour du 09/11 : un chargement à chaque ouverture) ; la relève
+    /// réseau complète ensuite. Ni accusé ni repère « non lus » ici.
+    private func showStoredV2IfAny() {
+        guard usesV2, messages.isEmpty, !AppEnvironment.usesDemoData,
+              let presentation = services.e2eeV2Messaging.storedThread(
+                  conversationId: conversation.id, isGroup: conversation.isGroup,
+                  participants: conversation.participants, limit: v2Limit
+              ) else { return }
+        let hidden = E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: conversation.id)
+        let thread = Self.normalized(presentation.messages.filter { !hidden.contains($0.id) })
+        guard !thread.isEmpty else { return }
+        openedFromStore = true
+        v2HasOlder = presentation.hasOlder
+        v2Imports = presentation.imports
+        v2Media = presentation.media
+        v2Cards = presentation.cards
+        pollsByMessageId.merge(presentation.polls) { _, new in new }
+        v2BlobEnvelopes = presentation.blobEnvelopes
+        v2LegacyCaptions = presentation.legacyCaptions
+        messages = thread
     }
 
     private func loadV2Once() async {
@@ -6880,5 +6933,17 @@ extension EnvironmentValues {
     var sqMessagesCloseDetail: (() -> Void)? {
         get { self[SQMessagesCloseDetailKey.self] }
         set { self[SQMessagesCloseDetailKey.self] = newValue }
+    }
+}
+
+/// Fil de messages ancré en bas dès sa première mise en page (iOS 17+) : la
+/// conversation s'ouvre sur le dernier message sans saut (retour du 09/11).
+private struct BottomAnchoredScroll: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.defaultScrollAnchor(.bottom)
+        } else {
+            content
+        }
     }
 }

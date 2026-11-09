@@ -240,6 +240,25 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         }
     }
 
+    /// Ce que le magasin local garde déjà, sans réseau ni synchronisation :
+    /// l'écran l'affiche dès l'ouverture, avant la relève (retour du 09/11).
+    func storedMessages(conversationId: String, expectedOwnerScopeId: String) -> E2EEV2MessagesV2? {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId,
+              let snapshot = try? messageStore.snapshot(
+                  conversationId: conversationId, ownerScopeId: expectedOwnerScopeId, nowMs: nowMs()
+              ), !snapshot.messages.isEmpty else { return nil }
+        return E2EEV2MessagesV2(
+            snapshot: snapshot, unsupported: [], missingByDevice: [:], waitingForEpoch: false,
+            securityAlerts: (try? stateStore.securityAlerts(
+                conversationId: conversationId, ownerNamespace: session.ownerNamespace
+            )) ?? [],
+            deviceChanges: (try? stateStore.deviceChanges(
+                conversationId: conversationId, ownerNamespace: session.ownerNamespace
+            )) ?? []
+        )
+    }
+
     // MARK: Envoi
 
     /// Envoie un texte, une édition ou une suppression. Une rotation ou une
