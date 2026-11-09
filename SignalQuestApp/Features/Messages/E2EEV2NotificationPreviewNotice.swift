@@ -9,6 +9,20 @@ struct E2EEV2NotificationPreviewNotice: View {
     @State private var needsNotice = false
     @State private var errorMessage: String?
 
+    init(showReminder: Bool = false, onChoiceChanged: @escaping (E2EEV2NotificationPrivacy) -> Void = { _ in }) {
+        self.showReminder = showReminder
+        self.onChoiceChanged = onChoiceChanged
+        // État calculé dès la création : un `Group` vide ne lance ni `.task` ni
+        // `.onReceive`, si bien qu'un avis parti caché ne s'affichait jamais, et
+        // sans avis accepté le contexte des notifications n'était jamais écrit
+        // (« Nouveau contenu privé » sur chaque notification, 09/11).
+        let owner = PushOwnerScope.current
+        let privacy = E2EEV2NotificationPrivacyStore.get(ownerScopeId: owner)
+        _ownerScopeId = State(initialValue: owner)
+        _selected = State(initialValue: privacy)
+        _needsNotice = State(initialValue: Self.needsNotice(ownerScopeId: owner, selected: privacy))
+    }
+
     var body: some View {
         Group {
             if needsNotice {
@@ -30,20 +44,22 @@ struct E2EEV2NotificationPreviewNotice: View {
     private func reload() {
         ownerScopeId = PushOwnerScope.current
         selected = E2EEV2NotificationPrivacyStore.get(ownerScopeId: ownerScopeId)
-        // Seulement une fois cet appareil entré en v2 : avant, aucun aperçu chiffré.
-        needsNotice = E2EEV2RuntimeReadGate.enabled && ownerScopeId != nil && selected != .hidden &&
-            Self.deviceIsInV2 &&
+        needsNotice = Self.needsNotice(ownerScopeId: ownerScopeId, selected: selected)
+    }
+
+    /// Seulement une fois cet appareil entré en v2 : avant, aucun aperçu chiffré.
+    private static func needsNotice(ownerScopeId: String?, selected: E2EEV2NotificationPrivacy) -> Bool {
+        E2EEV2RuntimeReadGate.enabled && ownerScopeId != nil && selected != .hidden && deviceIsInV2 &&
             !E2EEV2NotificationPrivacyStore.isNoticeAcknowledged(ownerScopeId: ownerScopeId)
     }
 
-    /// Identité d'appareil et clé de compte (reçue à l'approbation) présentes ici.
+    /// Identité d'appareil présente ici. Le chiffrement automatique (E2EE-AUTO)
+    /// n'a plus de clé de compte : l'exiger cachait l'avis, et sans avis accepté
+    /// le contexte des notifications n'était jamais écrit (« Nouveau contenu
+    /// privé » sur chaque notification, constaté sur iPhone le 09/11).
     private static var deviceIsInV2: Bool {
         guard let session = LocalAccountScope.sessionSnapshot() else { return false }
-        let namespace = session.ownerNamespace
-        let account = E2EEV2AccountIdentityStore()
-        return (try? E2EEV2DeviceIdentityStore().load(ownerNamespace: namespace)) != nil
-            && (try? account.load(ownerNamespace: namespace)) != nil
-            && (try? account.hasPendingBootstrap(ownerNamespace: namespace)) == false
+        return (try? E2EEV2DeviceIdentityStore().load(ownerNamespace: session.ownerNamespace)) != nil
     }
 
     private func choose(_ privacy: E2EEV2NotificationPrivacy) {

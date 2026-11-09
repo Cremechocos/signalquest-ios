@@ -370,12 +370,10 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
             return false
         }
         guard let deviceId = try? identityStore.signingDeviceId(ownerNamespace: session.ownerNamespace) else { return false }
-        // Appareil pas encore approuvé (sans la clé du compte) : le serveur
-        // refuse capacités et jetons (403 E2EE_DEVICE_NOT_APPROVED). Rien ne
-        // part ; l'approbation relance l'enregistrement (rafraîchissement « identity »).
-        let accounts = E2EEV2AccountIdentityStore()
-        guard (try? accounts.load(ownerNamespace: session.ownerNamespace)) != nil,
-              (try? accounts.hasPendingBootstrap(ownerNamespace: session.ownerNamespace)) == false else { return false }
+        // Le chiffrement automatique (E2EE-AUTO) n'a plus de clé de compte :
+        // l'exiger empêchait tout appareil inscrit seul d'enregistrer ses jetons
+        // (4 iPhone approuvés sans jeton en prod le 09/11). Un appareil encore en
+        // attente reçoit 403 E2EE_DEVICE_NOT_APPROVED, sans autre effet.
         // « Appels vérifiés » publié d'abord : l'intersection du serveur le lit
         // pour choisir les appareils qui sonnent.
         _ = await lifecycle.publishCapabilitiesIfNeeded()
