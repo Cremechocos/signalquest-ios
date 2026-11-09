@@ -1001,7 +1001,9 @@ struct AntennaDetailSheet: View {
         guard site.operators.count > 1 else { return nil }
         let lists = site.operators.map { bandRows(for: $0) }
         guard lists.allSatisfy({ $0 != nil }), GenerationBands.sameDeclaredBands(lists.compactMap { $0 }) else { return nil }
+        // Ordre alphabétique : la phrase ne dépend pas de l'ordre servi par la tuile.
         let names = site.operators.map(photoOperatorLabel)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         return String(localized: "Mêmes bandes déclarées par \(names.formatted(.list(type: .and)))")
     }
 
