@@ -7558,6 +7558,10 @@ struct E2EEV2RotationDrainDependencies: Sendable {
 
 actor E2EEV2RotationDrain {
     private var running = false
+    /// Exigence servie refusée de façon définitive (4xx : membre manquant, identité
+    /// refusée…) : la même révision n'est plus forcée, seule une révision plus grande
+    /// le sera (E2EE-COMPROMISED-1 §6). Gardée le temps du processus.
+    private var refusedRevisions: [String: Int] = [:]
 
     func run(session: LocalAccountSession, backlog: E2EEV2RotationBacklog,
              dependencies d: E2EEV2RotationDrainDependencies, limit: Int = 20) async throws -> Bool {
@@ -7575,18 +7579,29 @@ actor E2EEV2RotationDrain {
         guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
         // Le serveur ne clôt une exigence que par une nouvelle époque (§6) : une
         // conversation qu'il liste tourne même sans écart vu d'ici.
-        var required = Set<String>()
+        var required: [String: Int] = [:]
         switch discovered {
         case .failure(let failure): return try backlog.failed(session, kind: failure.kind)
         case .success(let values):
             try backlog.merge(session, conversations: values.map(\.conversationId), scannedRevision: initial.revision)
-            required = Set(values.map(\.conversationId))
+            required = Dictionary(values.map { ($0.conversationId, $0.revision) }, uniquingKeysWith: max)
         }
         let tickets = try backlog.snapshot(session).pending.sorted { $0.key < $1.key }.prefix(limit)
         var failure: E2EEV2TransportFailureKind?
         for (id, ticket) in tickets {
             guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
-            let result = await d.rotate(id, required.contains(id))
+            let revision = required[id]
+            var forced = false
+            if let revision { forced = refusedRevisions[id].map { revision > $0 } ?? true }
+            let result = await d.rotate(id, forced)
+            if forced, let revision {
+                switch result {
+                case .failure(let error) where error.kind == .permanent || error.kind == .localState:
+                    refusedRevisions[id] = revision
+                case .rotated: refusedRevisions[id] = nil
+                default: break
+                }
+            }
             switch result {
             case .noAction:
                 guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }

@@ -4852,6 +4852,42 @@ extension E2EETests {
         XCTAssertFalse(try backlog.snapshot(session).hasWork)
     }
 
+    /// Après un refus définitif, la même révision n'est plus forcée ; une révision
+    /// plus grande l'est de nouveau. Un échec passager ne retire pas le forçage.
+    func testV2RotationRefusedRequirementRevisionIsNotForcedAgain() async throws {
+        let session = LocalAccountSession(ownerScopeId: "user:rotation-refused-fixture", sessionId: UUID().uuidString)
+        let current = LockedBox(session), clock = LockedBox(Int64(1_000))
+        let forced = LockedBox([Bool]()), revision = LockedBox(1), outcome = LockedBox(E2EEV2TransportFailureKind.permanent)
+        let backlog = rotationBacklog(store: InMemoryTokenStore(), session: current, clock: clock)
+        let id = "conversation_rotation_0001"
+        let drain = E2EEV2RotationDrain()
+        let deps = E2EEV2RotationDrainDependencies(
+            isCurrent: { current.value == session }, activationEnabled: { true },
+            pending: { .success([.init(
+                conversationId: id, reason: "MEMBER_REMOVED", revision: revision.value,
+                triggeredAt: "2026-11-09T19:26:06.804Z", currentEpochNumber: 4, currentEpochStatus: "active"
+            )]) },
+            rotate: { _, required in
+                forced.value.append(required)
+                return required ? .failure(.init(kind: outcome.value, message: "refused")) : .noAction
+            }, now: { clock.value }
+        )
+        func pass() async throws {
+            try backlog.request(session, conversations: [], resetRetry: true)
+            clock.value = max(clock.value, try backlog.snapshot(session).notBeforeMs)
+            _ = try await drain.run(session: session, backlog: backlog, dependencies: deps)
+        }
+        outcome.value = .retryable
+        try await pass()
+        try await pass()
+        outcome.value = .permanent
+        try await pass()
+        try await pass()
+        revision.value = 2
+        try await pass()
+        XCTAssertEqual(forced.value, [true, true, true, false, true])
+    }
+
     func testV2RotationBoundedPassAndFollowUpDoNotAnnouncePrematureCompletion() async throws {
         let session = LocalAccountSession(ownerScopeId: "user:rotation-budget-fixture", sessionId: UUID().uuidString)
         let current = LockedBox(session), clock = LockedBox(Int64(1_000)), calls = LockedBox(0)
