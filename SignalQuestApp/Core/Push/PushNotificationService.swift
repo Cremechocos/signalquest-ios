@@ -653,6 +653,14 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     /// C'est ce token — et non le token APNs brut — que `firebase-admin` côté
     /// backend sait cibler pour livrer les notifications.
     func didRegister(fcmToken token: String) {
+        // Jeton APNs des notifications chiffrées (E.1) : relu chez Firebase, qui
+        // l'a forcément reçu avant de dériver le jeton FCM. Le swizzling de
+        // Firebase, derrière l'adaptateur SwiftUI, ne rappelle pas toujours
+        // `didRegisterForRemoteNotificationsWithDeviceToken` : aucun appareil v2
+        // iOS n'avait d'`apnsToken` en prod le 09/11 (10 sur 10, VoIP seul).
+        if AppDelegate.isFirebaseConfigured, let apns = Messaging.messaging().apnsToken, !apns.isEmpty {
+            E2EEV2CallPushTokens.apnsToken = E2EEV2CallPushTokens.hex(apns)
+        }
         lastToken.withLock { $0 = token }
         identity.saveFCMToken(token)
         Task {
