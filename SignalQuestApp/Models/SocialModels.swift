@@ -1076,13 +1076,18 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
     let networkType: String?
     let mobileOperator: String?
     let timestamp: Date?
+    /// Heure de mesure (MEASURED-AT-1 r1) ; `timestamp` reste l'heure d'arrivée,
+    /// qui ordonne et pagine la liste (décision A d'Alexandre, 09/11).
+    var measuredAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp
+        case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp, measuredAt
     }
 
     /// La réception à afficher : la moyenne quand le serveur la donne.
     var downloadAverageMbps: Double? { averageSpeed ?? downloadSpeed }
+    /// La date à AFFICHER, commune aux trois clients : `measuredAt ?? timestamp`.
+    var displayedDate: Date? { measuredAt ?? timestamp }
 
     init(
         id: String,
@@ -1116,6 +1121,11 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
             timestamp = SQDateParsing.parseParisWallClock(raw)
         } else {
             timestamp = try? c.decodeIfPresent(Date.self, forKey: .timestamp)
+        }
+        if let raw = try? c.decodeIfPresent(String.self, forKey: .measuredAt) {
+            measuredAt = SQDateParsing.parseParisWallClock(raw)
+        } else {
+            measuredAt = try? c.decodeIfPresent(Date.self, forKey: .measuredAt)
         }
     }
 }

@@ -47,7 +47,7 @@ struct AccountSpeedtestRow: View {
     /// « 10 juil. · 388 Mbit/s · 21 ms »
     var titleLine: String {
         var parts: [String] = []
-        if let date = test.timestamp {
+        if let date = test.displayedDate {
             parts.append(date.formatted(.dateTime.day().month(.abbreviated)))
         }
         if let download = test.downloadAverageMbps, download.isFinite, download > 0 {

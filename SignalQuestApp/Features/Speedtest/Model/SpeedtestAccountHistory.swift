@@ -15,6 +15,13 @@ enum SpeedtestAccountHistory {
     }
 
     static func isSameTest(_ test: SocialShareableSpeedtest, _ local: SpeedtestRunResult) -> Bool {
+        // Heure de mesure servie (MEASURED-AT-1) : c'est le `createdAt` local
+        // envoyé tel quel. 1 s de marge couvre une route qui servirait la
+        // seconde sans millisecondes ; la fenêtre de 24 h ne sert plus qu'aux
+        // tests d'avant le champ.
+        if let measured = test.measuredAt {
+            return abs(local.createdAt.timeIntervalSince(measured)) <= 1
+        }
         guard let date = test.timestamp else { return false }
         let gap = abs(local.createdAt.timeIntervalSince(date))
         if gap <= sameTestWindow { return true }
@@ -72,7 +79,7 @@ extension SpeedtestAccountHistory {
             serverName: detail.server,
             downloadServerName: detail.downloadServerName,
             downloadServerId: detail.downloadServerId,
-            createdAt: detail.timestamp ?? detail.createdAt ?? Date(),
+            createdAt: detail.measuredAt ?? detail.timestamp ?? detail.createdAt ?? Date(),
             uploadMeasurementSource: detail.uploadMeasurementSource,
             deviceModel: includesPrivateDetails ? detail.deviceModel : nil,
             measurementTrace: detail.measurementTrace,

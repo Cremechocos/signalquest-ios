@@ -994,6 +994,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
 
     var measurementTrace: SpeedtestMeasurementTrace? = nil
     var methodologyVersion: Int = 5
+    /// Heure de FIN de la mesure, horloge du téléphone (MEASURED-AT-1 r1, figé le
+    /// 09/11) : ISO UTC « Z » à 3 décimales. `timestamp` reste l'heure d'arrivée
+    /// posée par le serveur ; hors bornes, le serveur garde le test et ignore ce champ.
+    var measuredAt: String? = nil
     var pingServerHost: String? = nil
     var pingServerPort: Int? = nil
     var uploadServerHost: String? = nil
@@ -1024,7 +1028,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, runOrigin, automationId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, runOrigin, automationId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, measuredAt, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -1137,7 +1141,17 @@ struct SpeedtestSubmission: Encodable, Equatable {
         payload.uploadServerPort = result.uploadServerPort
         payload.measurementTrace = result.measurementTrace
         payload.methodologyVersion = result.methodologyVersion ?? 5
+        payload.measuredAt = Self.measuredAtString(result.createdAt)
         return payload
+    }
+
+    /// `2026-11-09T12:34:56.789Z` : UTC, millisecondes tronquées. Jamais de
+    /// décalage (`+01:00`), que le contrat traite comme illisible.
+    static func measuredAtString(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: Date(timeIntervalSince1970: (date.timeIntervalSince1970 * 1_000).rounded(.down) / 1_000))
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1203,6 +1217,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
         try c.encodeIfPresent(downloadServerHost, forKey: .downloadServerHost)
         try c.encode(methodologyVersion, forKey: .methodologyVersion)
+        try c.encodeIfPresent(measuredAt, forKey: .measuredAt)
         try c.encodeIfPresent(measurementTrace, forKey: .measurementTrace)
         try c.encodeIfPresent(pingServerHost, forKey: .pingServerHost)
         try c.encodeIfPresent(pingServerPort, forKey: .pingServerPort)
@@ -1267,6 +1282,9 @@ struct SpeedtestSaveResponse: Codable {
 struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let id: String
     let timestamp: Date?
+    /// Heure de mesure (MEASURED-AT-1) : `null` pour les tests d'avant le 09/11.
+    /// À afficher en `measuredAt ?? timestamp`.
+    var measuredAt: Date? = nil
     let createdAt: Date?
     let downloadSpeed: Double?
     let maxSpeed: Double?
@@ -1329,7 +1347,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
-        case id, timestamp, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
+        case id, timestamp, measuredAt, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
     }
 
@@ -1344,6 +1362,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         methodologyVersion = try c.decodeIfPresent(Int.self, forKey: .methodologyVersion)
         id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString
         timestamp = try? c.decodeIfPresent(Date.self, forKey: .timestamp)
+        measuredAt = try? c.decodeIfPresent(Date.self, forKey: .measuredAt)
         createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
         downloadSpeed = try? c.decodeIfPresent(Double.self, forKey: .downloadSpeed)
         maxSpeed = try? c.decodeIfPresent(Double.self, forKey: .maxSpeed)

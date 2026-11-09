@@ -33,6 +33,34 @@ final class SpeedtestAccountHistoryTests: XCTestCase {
         XCTAssertEqual(SpeedtestAccountHistory.accountOnly(server, local: phone).map(\.id), ["other"])
     }
 
+    /// MEASURED-AT-1 : l'heure de mesure servie reconnaît un envoi différé de plus
+    /// de 24 h, que la fenêtre d'avant laissait en double ; une autre heure de
+    /// mesure n'est jamais confondue, même à la même seconde d'arrivée.
+    func testServedMeasurementTimeMatchesADelayedUpload() {
+        let phone = [local(64.34, at: t0)]
+        var late = account("late", average: 80, at: t0.addingTimeInterval(3 * 86_400))
+        late.measuredAt = t0.addingTimeInterval(0.0004)
+        var other = account("other", average: 64.34, at: t0.addingTimeInterval(10))
+        other.measuredAt = t0.addingTimeInterval(-600)
+        XCTAssertEqual(SpeedtestAccountHistory.accountOnly([late, other], local: phone).map(\.id), ["other"])
+        XCTAssertEqual(late.displayedDate, late.measuredAt)
+        XCTAssertEqual(account("old", average: 1, at: t0).displayedDate, t0, "Sans heure de mesure : l'heure d'arrivée")
+    }
+
+    func testMeasuredAtIsSentInUTCWithMilliseconds() throws {
+        let date = Date(timeIntervalSince1970: 1_794_227_696.7896)
+        XCTAssertEqual(SpeedtestSubmission.measuredAtString(date), "2026-11-09T12:34:56.789Z")
+        let decoded = try JSONDecoder.signalQuest.decode(
+            SocialShareableSpeedtest.self,
+            from: Data(#"{"id":"x","timestamp":"2026-11-12T08:00:00.000Z","measuredAt":"2026-11-09T12:34:56.789Z"}"#.utf8)
+        )
+        XCTAssertEqual(try XCTUnwrap(decoded.measuredAt).timeIntervalSince1970, 1_794_227_696.789, accuracy: 0.001)
+        let legacy = try JSONDecoder.signalQuest.decode(
+            SocialShareableSpeedtest.self, from: Data(#"{"id":"y","timestamp":"2026-11-12T08:00:00.000Z","measuredAt":null}"#.utf8)
+        )
+        XCTAssertNil(legacy.measuredAt)
+    }
+
     func testEveryAccountTestShowsOnAFreshInstall() {
         let server = [account("a", average: 10, at: t0), account("b", average: 20, at: t0.addingTimeInterval(-60))]
         XCTAssertEqual(SpeedtestAccountHistory.accountOnly(server, local: []).count, 2)
