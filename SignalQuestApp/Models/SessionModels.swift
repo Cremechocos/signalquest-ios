@@ -42,6 +42,18 @@ struct SessionOperator: Decodable, Equatable, Identifiable {
 /// Clés réelles du backend (`app/api/coverage/sessions/route.ts`) : type via
 /// `source == "drive_test"`, `distance` en **km**, `operators` = tableau d'objets,
 /// RSRP moyen sous `avgSignalStrength`, dates `startTime`/`endTime`.
+/// `driveSummary` d'une session (contrat coverage-drive-summary v1). Le
+/// propriétaire reçoit aussi les octets et les réserves ; les autres, les tests
+/// et les débits seulement.
+struct CoverageDriveSummary: Decodable, Equatable, Sendable {
+    let testCount: Int?
+    let bytesUsed: Int?
+    let stoppedByDataCap: Bool?
+    let vpnActive: Bool?
+    let downloadAvgMbps: Double?
+    let downloadMaxMbps: Double?
+}
+
 struct CoverageSession: Decodable, Identifiable, Equatable {
     let id: String
     let name: String?
@@ -61,8 +73,14 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let operators: [SessionOperator]
     let technologies: [String]
     let showOnMap: Bool?
+    /// Récap d'un trajet Drive Test envoyé sans tracé (MES-14) ; nil pour les autres.
+    let driveSummary: CoverageDriveSummary?
+
+    /// Trajet connu par son récap seulement : pas de points à montrer.
+    var isSummaryOnly: Bool { driveSummary != nil && (totalPoints ?? 0) == 0 }
 
     enum CodingKeys: String, CodingKey {
+        case driveSummary
         case id, name, description, source, operatorKey, mvnoKey, mvnoName
         case startTime, startedAt, createdAt, endTime, endedAt, duration
         case totalPoints, pointCount, distance
@@ -97,6 +115,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
             return t.isEmpty ? c.decodeLossyArray([String].self, forKey: .technologiesDetected) : t
         }()
         showOnMap = (try? c.decodeIfPresent(Bool.self, forKey: .showOnMap)) ?? nil
+        driveSummary = (try? c.decodeIfPresent(CoverageDriveSummary.self, forKey: .driveSummary)) ?? nil
     }
 
     /// Décode `operators` comme tableau d'objets `{key,label,color,count}` ; repli

@@ -112022,6 +112022,38 @@
           }
         }
       }
+    },
+    "Débit moyen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit moyen"
+          }
+        }
+      }
+    },
+    "Débit max" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit max"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

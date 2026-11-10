@@ -144,6 +144,11 @@ final class DriveTestViewModel: ObservableObject {
     /// Un VPN a été vu à un moment de la session : le bilan ne doit pas dépendre
     /// de l'état au moment de l'arrêt.
     private var vpnSeenDuringSession = false
+    /// Trajet en cours pour « Mes trajets » (MES-14) : son id, les ids locaux de
+    /// ses speedtests et le réseau vu à chaque test (nil quand il n'était pas connu).
+    private var tripId: String?
+    private var tripSpeedtestIds: [UUID] = []
+    private var tripNetworks: [String?] = []
 
     /// Opérateurs du marché courant : alimente la palette de couleurs des marqueurs.
     @Published private(set) var availableOperators: [MarketRegistryOperator] = []
@@ -326,6 +331,9 @@ final class DriveTestViewModel: ObservableObject {
     func onAppear() {
         // Le dernier trajet reste lisible d'une visite à l'autre (MES-14).
         if !isRunning, lastSessionRecap == nil { lastSessionRecap = SessionRecap.load() }
+        // Un récap resté en file (hors ligne à l'arrêt) repart vers « Mes trajets ».
+        let summaries = services.driveTripSummaries
+        Task { await summaries.flush() }
         isVPNActive = VPNDetector.isActive()
         observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: isVPNActive)
         // Pré-remplit le sélecteur d'opérateur sans attendre une position.
@@ -433,6 +441,9 @@ final class DriveTestViewModel: ObservableObject {
         lastSessionRecap = nil
         lastSessionTrace = nil
         sessionStartedAt = Date()
+        tripId = DriveTripSummaryDraft.newTripId()
+        tripSpeedtestIds = []
+        tripNetworks = []
         distanceMeters = 0
         lastTestCoordinate = nil
         manualTestRequested = false
@@ -485,6 +496,7 @@ final class DriveTestViewModel: ObservableObject {
                 recap.save()
                 lastSessionRecap = recap
                 lastSessionTrace = makeShareTrace()
+                sendTripSummary(recap)
             } else {
                 // Trajet vide (arrêt aussitôt, pause Wi-Fi) : il n'efface pas le
                 // dernier vrai trajet, qui reste affiché.
@@ -1025,6 +1037,58 @@ final class DriveTestViewModel: ObservableObject {
                      operatorLabel: simOperatorLabel)
     }
 
+    /// Envoie le récap vers « Mes trajets » (MES-14), sans tracé. Il attend en
+    /// file sur l'appareil tant que l'envoi n'a pas abouti.
+    private func sendTripSummary(_ recap: SessionRecap) {
+        guard let tripId, let startedAt = recap.startedAt,
+              LocalAccountScope.currentOwnerScopeId != "guest" else { return }
+        #if DEBUG
+        if AppEnvironment.usesDemoData { return }
+        #endif
+        let network = Self.tripNetwork(tripNetworks)
+        let draft = DriveTripSummaryDraft(
+            clientTripId: tripId,
+            ownerScopeId: LocalAccountScope.currentOwnerScopeId,
+            startedAt: startedAt,
+            endedAt: max(recap.endedAt, startedAt.addingTimeInterval(1)),
+            distanceMeters: recap.distanceMeters,
+            testCount: recap.testCount,
+            bytesUsed: recap.bytes,
+            stoppedByDataCap: recap.stoppedByDataCap,
+            // Le récap affiché ne garde qu'une réserve ; le serveur doit savoir
+            // si un VPN a été vu, même quand le plafond a aussi été atteint.
+            vpnActive: vpnSeenDuringSession || VPNDetector.isActive(),
+            downloadAvgMbps: recap.averageDownloadMbps,
+            downloadMaxMbps: recap.maxDownloadMbps,
+            marketCode: network?.market,
+            operatorKey: network?.operatorKey,
+            speedtestClientIds: tripSpeedtestIds,
+            deviceModel: APIClient.hardwareModelIdentifier(),
+            osVersion: APIClient.osVersionLabel,
+            appVersion: APIClient.appVersionLabel(
+                shortVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+            )
+        )
+        self.tripId = nil
+        let summaries = services.driveTripSummaries
+        Task {
+            await summaries.enqueue(draft)
+            await summaries.flush()
+        }
+    }
+
+    /// Le réseau du trajet, seulement si chaque test l'a vu et que c'était le même :
+    /// le contrat préfère l'omettre (itinérance, frontière, réseau inconnu) plutôt
+    /// qu'en choisir un.
+    nonisolated static func tripNetwork(_ networks: [String?]) -> (market: String, operatorKey: String)? {
+        guard let first = networks.first, let key = first,
+              networks.allSatisfy({ $0 == key }) else { return nil }
+        let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        return (parts[0], parts[1])
+    }
+
     /// Tracé et mesures du trajet, pour la carte de partage.
     private func makeShareTrace() -> DriveShareTrace {
         DriveShareTrace(route: trace, measures: speedtestTrail.map { point in
@@ -1159,6 +1223,8 @@ final class DriveTestViewModel: ObservableObject {
             errorMessage = Self.uploadFailureMessage(error, subject: "speedtest")
             Self.log.error("drive speedtest save ÉCHEC (en file d'attente) : \(error.localizedDescription, privacy: .public)")
         }
+        tripSpeedtestIds.append(measured.id)
+        tripNetworks.append(resolvedSim.map { "\($0.market)|\($0.operatorKey)" })
         // Valeurs finales du test (restent affichées jusqu'au test suivant).
         livePhaseFinalize(measured)
         // Point speedtest géolocalisé (carte Drive Test, tappable → détails).

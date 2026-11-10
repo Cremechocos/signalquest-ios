@@ -552,7 +552,15 @@ private struct SessionRow: View {
     /// « 240 points · 18,4 km · 40 min · −91 dBm », ce qui est connu seulement.
     private var metrics: String {
         var parts: [String] = []
-        if let points = session.totalPoints { parts.append(String(localized: "\(points) points")) }
+        if session.isSummaryOnly, let summary = session.driveSummary {
+            // Trajet Drive Test sans tracé (MES-14) : ses tests, pas « 0 points ».
+            if let tests = summary.testCount { parts.append(String(localized: "\(tests) test")) }
+            if let average = summary.downloadAvgMbps {
+                parts.append(String(localized: "\(SQUnits.throughput(mbps: average)) en moyenne"))
+            }
+        } else if let points = session.totalPoints {
+            parts.append(String(localized: "\(points) points"))
+        }
         if let km = session.distanceKm, km > 0 { parts.append(SQUnits.distance(kilometers: km)) }
         if let duration = session.durationLabel { parts.append(duration) }
         if let rsrp = session.avgRsrpLabel { parts.append(rsrp) }

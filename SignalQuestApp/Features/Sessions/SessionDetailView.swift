@@ -510,11 +510,27 @@ struct SessionDetailView: View {
         let operators = s.operators.isEmpty ? model.session.operators : s.operators
         let technologies = s.technologies.isEmpty ? model.session.technologies : s.technologies
         return VStack(alignment: .leading, spacing: SQSpace.md) {
-            kpiRow([
-                (s.totalPoints.map { $0.formatted() } ?? "—", "Points"),
-                (s.distanceKm.map(Self.formatKm) ?? "—", "Distance"),
-                (s.durationLabel ?? "—", "Durée")
-            ])
+            if let summary = (s.driveSummary ?? model.session.driveSummary), s.isSummaryOnly || model.session.isSummaryOnly {
+                // Trajet Drive Test sans tracé (MES-14) : tests et débits du récap.
+                kpiRow([
+                    (summary.testCount.map { $0.formatted() } ?? "—", "Tests"),
+                    (s.distanceKm.map(Self.formatKm) ?? "—", "Distance"),
+                    (s.durationLabel ?? "—", "Durée")
+                ])
+                if summary.downloadAvgMbps != nil || summary.downloadMaxMbps != nil {
+                    Divider()
+                    kpiRow([
+                        (summary.downloadAvgMbps.map { SQUnits.throughput(mbps: $0) } ?? "—", "Débit moyen"),
+                        (summary.downloadMaxMbps.map { SQUnits.throughput(mbps: $0) } ?? "—", "Débit max")
+                    ])
+                }
+            } else {
+                kpiRow([
+                    (s.totalPoints.map { $0.formatted() } ?? "—", "Points"),
+                    (s.distanceKm.map(Self.formatKm) ?? "—", "Distance"),
+                    (s.durationLabel ?? "—", "Durée")
+                ])
+            }
             // iOS ne lit pas le RSRP : la ligne n'apparaît que si la session en porte un.
             if let average = s.avgRsrpLabel {
                 Divider()

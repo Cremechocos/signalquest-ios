@@ -410,7 +410,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return headers
     }
 
-    private static let osVersionLabel: String = {
+    static let osVersionLabel: String = {
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
         var label = "\(osVersion.majorVersion).\(osVersion.minorVersion)"
         if osVersion.patchVersion > 0 { label += ".\(osVersion.patchVersion)" }
@@ -449,7 +449,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     }()
 
     /// Identifiant matériel (ex. « iPhone15,3 »), via `uname` — sûr hors main actor.
-    private static func hardwareModelIdentifier() -> String? {
+    static func hardwareModelIdentifier() -> String? {
         var systemInfo = utsname()
         uname(&systemInfo)
         let identifier = Mirror(reflecting: systemInfo.machine).children.reduce(into: "") { result, element in

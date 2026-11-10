@@ -110,6 +110,8 @@ final class AppServices: ObservableObject {
     let liveShare: ConversationLiveShareCoordinator
     let leaderboards: LeaderboardServicing
     let sessions: SessionsServicing
+    /// Récaps des trajets Drive Test vers « Mes trajets » (MES-14).
+    let driveTripSummaries: DriveTripSummaryService
     let validations: ValidationsServicing
     let identify: IdentifyServicing
     /// Journal radio SYNCHRONISÉ du compte (capté sur Android, relu ici en
@@ -246,6 +248,9 @@ final class AppServices: ObservableObject {
             invalidatePublicMap: { await mapService.invalidateTiles() }
         )
         speedtest = speedtestService
+        driveTripSummaries = DriveTripSummaryService(
+            api: api, serverId: { await speedtestService.serverId(forClientId: $0) }
+        )
         accountDataEraser.install { await speedtestService.eraseLocalData(ownerScopeId: $0) }
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
