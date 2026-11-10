@@ -428,6 +428,9 @@ final class MapSnapshotService: MapSnapshotServicing {
         try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: nil)
     }
 
+    /// Fraîcheur maximale d'une tuile de grille gardée sur l'appareil.
+    static let coverageGridMaxAge: TimeInterval = 5 * 60
+
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
         // Le focus entre dans la CLÉ de cache : sans ça, la couverture isolée
@@ -445,7 +448,9 @@ final class MapSnapshotService: MapSnapshotServicing {
             zoom: zoom,
             detailBoost: boost,
             maxTiles: boost > 0 ? 40 : 24,
-            maxAge: maxAge,
+            // Grille du dézoom : 5 min de fraîcheur au plus (décision D-N2-GRILLE, 10/11),
+            // contre 60 min sur disque par défaut ; un rafraîchissement explicite reste à 0.
+            maxAge: zoom < Double(CoverageRenderPolicy.rawPointsFromZoom) ? min(maxAge ?? Self.coverageGridMaxAge, Self.coverageGridMaxAge) : maxAge,
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
