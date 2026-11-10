@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 /// Fiche détaillée d'un site prévisionnel : statut d'activation (croisé ANFR),
@@ -7,8 +8,15 @@ struct PlannedDetailSheet: View {
     let site: PlannedSiteLive
     let operatorLabel: String
     let operatorAccent: Color
+    /// Fiche ANFR du support apparié : c'est elle qui porte l'adresse postale,
+    /// le flux prévisionnel n'en a pas.
+    var antennas: AntennasServicing?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var anfr: AntennaCoreDetails?
+    @State private var isLoadingAddress = false
+    /// Repli sans support apparié : l'adresse approchée de la position du site.
+    @State private var geocodedAddress: String?
 
     private var status: PlannedActivationStatus { site.activation?.status ?? .planned }
 
@@ -17,6 +25,7 @@ struct PlannedDetailSheet: View {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
                 statusBanner
+                addressSection
                 if !plannedTechs.isEmpty { technologiesSection }
                 infoSection
             }
@@ -27,6 +36,80 @@ struct PlannedDetailSheet: View {
         .background(SQColor.bg.ignoresSafeArea())
         .presentationDetents([.height(460), .medium, .large])
         .sqSheet(background: SQColor.bg)
+        .task(id: site.id) { await loadAddress() }
+    }
+
+    // MARK: Adresse
+
+    private var supId: String? { site.activation?.supId.flatMap { $0.isEmpty ? nil : $0 } }
+    private var isProximityMatch: Bool { site.activation?.matchType == "proximity" }
+
+    @ViewBuilder
+    private var addressSection: some View {
+        let anfrAddress = anfr?.fullAddress
+        if anfrAddress != nil || geocodedAddress != nil || isLoadingAddress {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Adresse")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                if let address = anfrAddress ?? geocodedAddress {
+                    Text(verbatim: address)
+                        .font(SQFont.body(15, .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("planned.detail.address")
+                    Text(verbatim: addressSource(isANFR: anfrAddress != nil))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    HStack(spacing: SQSpace.sm) {
+                        SQSpinner()
+                        Text("Recherche de l'adresse…")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+            }
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqCardBackground()
+        }
+    }
+
+    /// D'où vient l'adresse : la même station ANFR, le support le plus proche (à
+    /// vérifier), ou la seule position du site.
+    private func addressSource(isANFR: Bool) -> String {
+        guard isANFR else { return String(localized: "Adresse approchée d'après la position du site.") }
+        if isProximityMatch, let distance = site.activation?.distanceM {
+            return String(localized: "Adresse du support ANFR le plus proche, à \(SQUnits.distance(meters: distance)) : à vérifier.")
+        }
+        return String(localized: "Adresse du support ANFR de cette station.")
+    }
+
+    private func loadAddress() async {
+        isLoadingAddress = true
+        defer { isLoadingAddress = false }
+        if let supId, let antennas, let operatorName = site.operator, !operatorName.isEmpty {
+            let details = try? await antennas.details(
+                id: supId,
+                market: site.market ?? "FR",
+                operatorName: operatorName,
+                anfrCode: site.activation?.anfrStationId
+            )
+            if let core = details?.core, core.fullAddress != nil {
+                anfr = core
+                return
+            }
+        }
+        guard let lat = site.lat, let lon = site.lon,
+              let placemark = try? await CLGeocoder().reverseGeocodeLocation(CLLocation(latitude: lat, longitude: lon)).first
+        else { return }
+        let street = [placemark.subThoroughfare, placemark.thoroughfare].compactMap { $0 }.joined(separator: " ")
+        let city = [placemark.postalCode, placemark.locality].compactMap { $0 }.joined(separator: " ")
+        let parts = [street, city].filter { !$0.isEmpty }
+        if !parts.isEmpty { geocodedAddress = parts.joined(separator: ", ") }
     }
 
     /// En-tête Halo, comme `ObservedCellSheet` : l'opérateur en petites capitales, le code du
@@ -126,15 +209,38 @@ struct PlannedDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             infoRow("Opérateur", operatorLabel)
             infoRow("Code site", site.codeSite)
-            infoRow("Station ANFR", site.activation?.matchType == "anfr" ? site.idStation : nil)
-            infoRow("Commune", site.commune?.capitalized)
-            infoRow("Département", site.departement)
-            infoRow("Activation 5G prévue", formattedDate(site.date5g))
+            infoRow("Station ANFR", site.activation?.anfrStationId ?? (site.activation?.matchType == "anfr" ? site.idStation : nil))
+            infoRow("Support ANFR", supId)
+            infoRow("Appariement ANFR", matchLabel)
             infoRow("Distance antenne", site.activation?.distanceM.map { SQUnits.distance(meters: $0) })
+            infoRow("Commune", (site.commune ?? anfr?.commune)?.capitalized)
+            infoRow("Code postal", anfr?.postalCode)
+            infoRow("Département", site.departement)
+            infoRow("Code INSEE", site.insee)
+            infoRow("Coordonnées", coordinatesLabel)
+            infoRow("Support", anfr?.siteInfo.supportType ?? anfr?.technical.supportType)
+            infoRow("Hauteur du support", (anfr?.siteInfo.supportHeightMeters ?? anfr?.siteInfo.pylonHeight).map { "\(Int($0.rounded())) m" })
+            infoRow("Propriétaire du support", anfr?.siteInfo.supportOwner)
+            infoRow("Activation 5G prévue", formattedDate(site.date5g))
             infoRow(String(localized: "Mise en service"), formattedDate(site.activation?.lastInServiceDate))
+            infoRow("Mise à jour de l'opérateur", formattedDate(site.sourceUpdatedAt))
         }
         .padding(.vertical, SQSpace.xs)
         .sqCardBackground()
+    }
+
+    private var matchLabel: String? {
+        switch site.activation?.matchType {
+        case "anfr": return String(localized: "Même station")
+        case "proximity": return String(localized: "Support le plus proche")
+        default: return nil
+        }
+    }
+
+    private var coordinatesLabel: String? {
+        guard let lat = site.lat, let lon = site.lon else { return nil }
+        let style = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(5))
+        return "\(lat.formatted(style)), \(lon.formatted(style))"
     }
 
     @ViewBuilder
@@ -149,6 +255,7 @@ struct PlannedDetailSheet: View {
                     .font(SQFont.body(14, .semibold))
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.trailing)
+                    .textSelection(.enabled)
             }
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 1)

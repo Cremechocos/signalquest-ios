@@ -1841,7 +1841,12 @@ struct MapExplorerView: View {
             )
         }
         .sheet(item: $selectedPlanned) { site in
-            PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
+            PlannedDetailSheet(
+                site: site,
+                operatorLabel: model.operatorLabel(site.operator ?? "ALL"),
+                operatorAccent: model.operatorAccent(site.operator ?? "ALL"),
+                antennas: services.antennas
+            )
         }
         .sheet(item: $selectedFriend) { friend in
             // L'ami vivant relu par son identifiant : la valeur du tap resterait figée

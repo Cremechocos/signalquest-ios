@@ -348,9 +348,14 @@ struct PlannedSiteActivation: Decodable, Equatable, Sendable {
     let distanceM: Double?
     /// Dernière mise en service connue de l'antenne appariée (date jour-seul).
     let lastInServiceDate: Date?
+    /// Support et station ANFR appariés (même station, ou le plus proche si
+    /// `matchType` vaut `proximity`) : ils donnent l'adresse postale du site.
+    let supId: String?
+    let anfrStationId: String?
 
     enum CodingKeys: String, CodingKey {
         case status, matchType, activeTechnologies, plannedTechnologies, confirmedTechnologies, pendingTechnologies, distanceM, lastInServiceDate
+        case supId, anfrStationId
     }
 
     init(from decoder: Decoder) throws {
@@ -363,6 +368,8 @@ struct PlannedSiteActivation: Decodable, Equatable, Sendable {
         pendingTechnologies = c.decodeLossyArray([String].self, forKey: .pendingTechnologies)
         distanceM = (try? c.decodeIfPresent(Double.self, forKey: .distanceM)) ?? nil
         lastInServiceDate = (try? c.decodeIfPresent(Date.self, forKey: .lastInServiceDate)) ?? nil
+        supId = c.decodeFlexibleString(forKey: .supId)
+        anfrStationId = c.decodeFlexibleString(forKey: .anfrStationId)
     }
 }
 
@@ -378,6 +385,8 @@ struct PlannedSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let referenceId: String?
     let departement: String?
     let commune: String?
+    let market: String?
+    let insee: String?
     let date5g: Date?
     let sourceUpdatedAt: Date?
     let technologies: [String]
@@ -387,7 +396,7 @@ struct PlannedSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case sourceId
         case `operator` = "operator"
-        case lat, lon, codeSite, idStation, plannedKey, referenceId, departement, commune, date5g, sourceUpdatedAt, technologies, activation
+        case lat, lon, codeSite, idStation, plannedKey, referenceId, departement, commune, market, insee, date5g, sourceUpdatedAt, technologies, activation
     }
 
     init(from decoder: Decoder) throws {
@@ -402,6 +411,8 @@ struct PlannedSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
         referenceId = c.decodeFlexibleString(forKey: .referenceId)
         departement = c.decodeFlexibleString(forKey: .departement)
         commune = try c.decodeIfPresent(String.self, forKey: .commune)
+        market = c.decodeFlexibleString(forKey: .market)
+        insee = c.decodeFlexibleString(forKey: .insee)
         // Décodage TOLÉRANT : un format de date inattendu ne doit jamais faire
         // échouer tout le tableau de sites prévisionnels (cf. bug couche vide).
         date5g = (try? c.decodeIfPresent(Date.self, forKey: .date5g)) ?? nil
