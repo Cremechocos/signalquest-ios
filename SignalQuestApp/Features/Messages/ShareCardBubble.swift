@@ -801,6 +801,9 @@ struct SiteShareCardBubble: View {
         if !card.technologies.isEmpty {
             parts.append("\(String(localized: "Technologies")) : \(card.technologies.joined(separator: ", "))")
         }
+        for line in card.operatorTechnologies {
+            parts.append("\(operatorLabel(line.operatorCode)) : \(line.generations.joined(separator: ", "))")
+        }
         if let enb = card.enb { parts.append("eNB \(enb)") }
         if let pci = card.pci { parts.append("PCI \(pci)") }
         if let support = card.supportId { parts.append(String(localized: "Support \(support)")) }
@@ -862,6 +865,7 @@ struct SiteShareCardBubble: View {
                     }
                 }
             }
+            operatorTechnologyRows
             identifiers
             if let address = card.address {
                 HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
@@ -879,6 +883,37 @@ struct SiteShareCardBubble: View {
         }
         .frame(maxWidth: 280, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    /// Nom affiché d'un code opérateur : celui de la métropole, sinon le code tel qu'écrit.
+    private func operatorLabel(_ code: String) -> String {
+        SiteShareCard.metropolitanOperatorName(forKey: code) ?? code
+    }
+
+    /// §5 bis : sur un support partagé vu en « Tous », une rangée par opérateur
+    /// (filet à sa couleur, nom, puis ses générations), comme la carte du web.
+    @ViewBuilder
+    private var operatorTechnologyRows: some View {
+        if !card.operatorTechnologies.isEmpty {
+            VStack(spacing: SQSpace.xs + 1) {
+                ForEach(card.operatorTechnologies, id: \.operatorCode) { line in
+                    let name = operatorLabel(line.operatorCode)
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(SQBrand.operatorColor(name))
+                            .frame(width: 3, height: 12)
+                        Text(verbatim: name)
+                            .font(SQType.caption.weight(.semibold))
+                            .foregroundStyle(primary)
+                        Spacer(minLength: SQSpace.sm)
+                        Text(verbatim: line.generations.joined(separator: "\u{00A0}· "))
+                            .font(SQType.caption.weight(.medium))
+                            .foregroundStyle(secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+            }
+        }
     }
 
     /// eNB, PCI, support et ANFR : une ligne « libellé · valeur » chacune, comme les

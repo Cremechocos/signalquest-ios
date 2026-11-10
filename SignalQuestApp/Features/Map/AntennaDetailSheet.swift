@@ -488,7 +488,8 @@ struct AntennaDetailSheet: View {
 
     /// Le site tel qu'on l'écrit dans une conversation (P2-47, format commun au web, à iOS
     /// et à Android) : une donnée inconnue omet sa ligne. L'opérateur est celui de la fiche
-    /// affichée ; sur un support partagé sans choix, la carte n'en nomme aucun.
+    /// affichée ; sur un support partagé sans choix, la carte n'en nomme aucun mais
+    /// détaille les technologies de chacun (§5 bis).
     private var siteShareText: String {
         let core = model.details?.core
         let operatorKey = selectedOperator.caseInsensitiveCompare("ALL") == .orderedSame
@@ -510,6 +511,11 @@ struct AntennaDetailSheet: View {
         let card = SiteShareCard(
             operatorName: operatorName,
             technologies: SiteShareCard.generations(in: displayedTechnologies),
+            // TECH-BY-OP §5 bis (choix A d'Alexandre, 10/11) : en « Tous » sur un support partagé,
+            // une ligne par opérateur sous l'union du support, comme le web (#1028).
+            operatorTechnologies: operatorName == nil
+                ? SiteShareCard.operatorTechnologies(site.technologiesByOperator, order: site.operators)
+                : [],
             enb: identifiers?.enb.first ?? customSite?.radio?.enb,
             pci: pcis.count == 1 ? pcis.first : nil,
             supportId: supportId,

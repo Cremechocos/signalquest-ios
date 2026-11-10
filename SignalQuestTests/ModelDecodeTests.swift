@@ -939,6 +939,59 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(SiteShareCard.parse(lines.joined(separator: "\n"))).hasSeveralOperators)
     }
 
+    /// TECH-BY-OP §5 bis : mêmes lignes que le test du web (#1028, 600d79922), ligne du
+    /// support d'abord ; un opérateur sans génération connue (FH) n'a pas de ligne.
+    func testSiteShareAllViewWritesOneTechnologiesLinePerOperatorAfterTheSupport() throws {
+        let byOperator = [
+            "SFR": ["UMTS 900", "LTE 800"],
+            "BOUYGUES": ["GSM 900", "LTE 700", "5G NR 3500"],
+            "ORANGE": ["5G NR 3500", "LTE 800", "UMTS 900"],
+            "FREE": ["FH"],
+        ]
+        var card = Self.gerland
+        card.operatorName = nil
+        card.operatorTechnologies = SiteShareCard.operatorTechnologies(byOperator, order: ["SFR", "BOUYGUES", "ORANGE", "FREE"])
+        let lines = card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n")
+        let at = try XCTUnwrap(lines.firstIndex(of: "Technologies: 4G, 5G"))
+        XCTAssertEqual(Array(lines[at..<(at + 4)]), [
+            "Technologies: 4G, 5G",
+            "Technologies · SFR: 3G, 4G",
+            "Technologies · BOUYGUES: 2G, 4G, 5G",
+            "Technologies · ORANGE: 3G, 4G, 5G",
+        ])
+        XCTAssertFalse(lines.contains { $0.hasPrefix("Technologies · FREE") })
+        XCTAssertEqual(lines[at + 4], "eNB: 812345")
+        let read = try XCTUnwrap(SiteShareCard.parse(lines.joined(separator: "\n")))
+        XCTAssertEqual(read.technologies, ["4G", "5G"], "la ligne du support reste l'union")
+        XCTAssertEqual(read.operatorTechnologies, card.operatorTechnologies)
+    }
+
+    func testSiteShareOperatorTechnologiesNeedTwoOperators() {
+        XCTAssertEqual(SiteShareCard.operatorTechnologies(["ORANGE": ["LTE 800"]], order: ["ORANGE"]), [])
+        XCTAssertEqual(SiteShareCard.operatorTechnologies([:], order: []), [])
+        // Ordre du support, puis les codes restants par ordre alphabétique.
+        let lines = SiteShareCard.operatorTechnologies(["FREE": ["LTE 700"], "ORANGE": ["NR 3500"], "SFR": ["LTE 800"]], order: ["SFR"])
+        XCTAssertEqual(lines.map(\.operatorCode), ["SFR", "FREE", "ORANGE"])
+        XCTAssertEqual(lines.last?.generations, ["5G"])
+    }
+
+    /// Lecteur : casse libre, code tel qu'écrit, première occurrence par code, ligne
+    /// sans génération ignorée ; sans ces lignes, la carte est inchangée.
+    func testSiteShareReaderReadsOperatorTechnologiesLines() throws {
+        let text = [
+            "Antenne", "Technologies: 4G, 5G",
+            "TECHNOLOGIES · FREE_CARAIBES: 4G", "technologies·SFR : 3G / 4G",
+            "Technologies · SFR: 5G", "Technologies · ORANGE: FH", "Support: 1234567",
+        ].joined(separator: "\n")
+        let card = try XCTUnwrap(SiteShareCard.parse(text))
+        XCTAssertEqual(card.operatorTechnologies, [
+            SiteShareOperatorTechnologies(operatorCode: "FREE_CARAIBES", generations: ["4G"]),
+            SiteShareOperatorTechnologies(operatorCode: "SFR", generations: ["3G", "4G"]),
+        ])
+        XCTAssertEqual(card.technologies, ["4G", "5G"])
+        XCTAssertEqual(try XCTUnwrap(SiteShareCard.parse(Self.gerlandLines.joined(separator: "\n"))).operatorTechnologies, [])
+    }
+
     func testSiteShareOperatorNamesAndLinkKeys() {
         XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "ORANGE"), "Orange")
         XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "bouygues"), "Bouygues Telecom")

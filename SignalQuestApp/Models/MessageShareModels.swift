@@ -343,10 +343,20 @@ struct SiteShareCoordinate: Equatable {
     }
 }
 
+/// Une ligne « Technologies · <CODE>: 3G, 4G » d'un partage en vue « Tous »
+/// (TECH-BY-OP §5 bis) : le code opérateur tel qu'écrit, ses générations.
+struct SiteShareOperatorTechnologies: Equatable {
+    let operatorCode: String
+    let generations: [String]
+}
+
 struct SiteShareCard: Equatable {
     var operatorName: String?
     /// Générations canoniques « 2G » à « 5G », de la plus ancienne à la plus récente.
     var technologies: [String] = []
+    /// TECH-BY-OP §5 bis : sur un support partagé vu en « Tous », les générations de
+    /// chaque opérateur, sous la ligne « Technologies » du support (qui reste l'union).
+    var operatorTechnologies: [SiteShareOperatorTechnologies] = []
     var enb: String?
     var pci: String?
     var supportId: String?
@@ -396,6 +406,16 @@ struct SiteShareCard: Equatable {
             let label = folded(String(line[..<colon]))
             let value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
             guard let content = meaningful(value) else { continue }
+            // « Technologies · BOUYGUES: 5G, 4G » : le code tel qu'écrit ; première
+            // occurrence par code ; sans génération connue, ligne ignorée (§5 bis).
+            if let code = operatorTechnologiesCode(String(line[..<colon])) {
+                let found = generations(in: content.split(whereSeparator: { ",·/".contains($0) }).map(String.init))
+                if !found.isEmpty, !card.operatorTechnologies.contains(where: { $0.operatorCode == code }) {
+                    card.operatorTechnologies.append(SiteShareOperatorTechnologies(operatorCode: code, generations: found))
+                    known += 1
+                }
+                continue
+            }
             switch label {
             case "operateur", "operator":
                 card.operatorName = clipped(content, 80)
@@ -428,6 +448,30 @@ struct SiteShareCard: Equatable {
     }
 
     private struct Header { let enb: String? }
+
+    /// Le code d'un libellé « Technologies · <CODE> » (casse libre), sinon `nil`.
+    private static func operatorTechnologiesCode(_ label: String) -> String? {
+        let trimmed = label.trimmingCharacters(in: .whitespaces)
+        guard let match = trimmed.range(of: #"^technologies\s*·\s*\S"#, options: [.regularExpression, .caseInsensitive]),
+              let dot = trimmed[..<match.upperBound].firstIndex(of: "·") else { return nil }
+        let code = trimmed[trimmed.index(after: dot)...].trimmingCharacters(in: .whitespaces)
+        return code.isEmpty ? nil : clipped(code, 40)
+    }
+
+    /// Les lignes §5 bis d'un support partagé : rien sous deux opérateurs connus ;
+    /// sinon une par opérateur ayant au moins une génération, dans l'ordre des
+    /// opérateurs du support (`order`), puis les autres codes par ordre alphabétique.
+    static func operatorTechnologies(_ byOperator: [String: [String]], order: [String]) -> [SiteShareOperatorTechnologies] {
+        guard byOperator.count >= 2 else { return [] }
+        var codes: [String] = []
+        for key in order where byOperator[key] != nil && !codes.contains(key) { codes.append(key) }
+        codes += byOperator.keys.filter { !codes.contains($0) }.sorted()
+        return codes.compactMap { code in
+            let found = generations(in: byOperator[code] ?? [])
+            let flat = code.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            return found.isEmpty || flat.isEmpty ? nil : SiteShareOperatorTechnologies(operatorCode: flat, generations: found)
+        }
+    }
 
     /// `nil` si la ligne n'est pas un en-tête « Antenne… ». Renvoie l'eNB que la
     /// parenthèse porte éventuellement. « Antennes de Lyon » n'en est pas un.
@@ -577,10 +621,17 @@ struct SiteShareCard: Equatable {
         }.joined(separator: "&")
         let base = baseURL.absoluteString.hasSuffix("/") ? String(baseURL.absoluteString.dropLast()) : baseURL.absoluteString
 
-        return [
+        // §5 bis : une ligne par opérateur APRÈS celle du support, qui reste la première
+        // « Technologies » (un ancien lecteur qui garde la première lit le support).
+        let operatorLines: [String?] = operatorTechnologies.map {
+            "Technologies · \($0.operatorCode): \(Self.generations(in: $0.generations).joined(separator: ", "))"
+        }
+        let head: [String?] = [
             header,
             line("Opérateur", name),
             generations.isEmpty ? nil : "Technologies: \(generations.joined(separator: ", "))",
+        ]
+        let tail: [String?] = [
             line("eNB", enbNumber),
             line("PCI", pci),
             line("Support", support),
@@ -589,7 +640,8 @@ struct SiteShareCard: Equatable {
             line("Adresse", address),
             coordinate.map { "Position: \(Self.coordinateText($0.latitude)), \(Self.coordinateText($0.longitude))" },
             "Lien: \(base)/carte?\(encoded)",
-        ].compactMap { $0 }.joined(separator: "\n")
+        ]
+        return (head + operatorLines + tail).compactMap { $0 }.joined(separator: "\n")
     }
 
     /// 5 décimales, point décimal, quelle que soit la langue de l'appareil.
