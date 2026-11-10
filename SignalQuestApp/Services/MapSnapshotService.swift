@@ -428,8 +428,11 @@ final class MapSnapshotService: MapSnapshotServicing {
         try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: nil)
     }
 
-    /// Fraîcheur maximale d'une tuile de grille gardée sur l'appareil.
+    /// Fraîcheur maximale d'une tuile de grille gardée sur l'appareil (D-N2-GRILLE).
     static let coverageGridMaxAge: TimeInterval = 5 * 60
+    /// Fraîcheur visée pour une tuile de points (D-N2-TUILES) : la carte l'affiche
+    /// d'abord depuis le cache, puis la revalide avec cet âge maximal.
+    static let coveragePointsMaxAge: TimeInterval = 60
 
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
@@ -448,9 +451,14 @@ final class MapSnapshotService: MapSnapshotServicing {
             zoom: zoom,
             detailBoost: boost,
             maxTiles: boost > 0 ? 40 : 24,
-            // Grille du dézoom : 5 min de fraîcheur au plus (décision D-N2-GRILLE, 10/11),
-            // contre 60 min sur disque par défaut ; un rafraîchissement explicite reste à 0.
-            maxAge: zoom < Double(CoverageRenderPolicy.rawPointsFromZoom) ? min(maxAge ?? Self.coverageGridMaxAge, Self.coverageGridMaxAge) : maxAge,
+            // Par tuile : la grille du dézoom garde sa propre fraîcheur, 5 min au plus
+            // (D-N2-GRILLE, 10/11, contre 60 min sur disque par défaut), que seul un
+            // rafraîchissement forcé (0) contourne ; une revalidation des points à 60 s
+            // ne la redemande donc pas. Les tuiles de points suivent l'appelant.
+            tileMaxAge: { tile in
+                guard tile.z < CoverageRenderPolicy.rawPointsFromZoom else { return maxAge }
+                return maxAge == 0 ? 0 : Self.coverageGridMaxAge
+            },
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
@@ -537,6 +545,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         detailBoost: Int = 0,
         maxTiles: Int = 24,
         maxAge: TimeInterval? = nil,
+        tileMaxAge: (@Sendable (AndroidMapTile) -> TimeInterval?)? = nil,
         cacheKey: @escaping @Sendable (AndroidMapTile) -> String,
         endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint,
         validate: @escaping @Sendable (T) throws -> Void = { _ in }
@@ -545,7 +554,7 @@ final class MapSnapshotService: MapSnapshotServicing {
                                              detailBoost: detailBoost, tileBudget: maxTiles).tiles
         let owner = api.credentials.snapshot()
         return try await Self.collectTiles(tiles, api: api, owner: owner) { [api, tileCache] tile in
-            let data = try await tileCache.data(for: cacheKey(tile), maxAge: maxAge, validate: {
+            let data = try await tileCache.data(for: cacheKey(tile), maxAge: tileMaxAge.map { $0(tile) } ?? maxAge, validate: {
                 let value = try MapTileAdmission.decode(T.self, from: $0, expectedTile: tile)
                 try validate(value)
             }) {

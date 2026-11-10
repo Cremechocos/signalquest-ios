@@ -187,6 +187,8 @@ final class MapExplorerViewModel: ObservableObject {
         case outage((value: MapFeedResult<OutageSiteLive>?, error: String?))
         case communityOutage((value: [CommunityOutage]?, error: String?, atLimit: Bool))
         case coverage((value: (tiles: MapTileLayerResult<AndroidCoverageTileResponse>, heat: [CoverageHeatPoint])?, error: String?))
+        /// Revalidation des tuiles de points à 60 s : seulement une réponse complète.
+        case coverageRevalidated([AndroidCoverageTileResponse]?)
         case photos((value: [MapPublicPhoto]?, error: String?))
     }
 
@@ -1180,11 +1182,32 @@ final class MapExplorerViewModel: ObservableObject {
                     }
                 case .coverage(let result):
                     coverage = result
+                    // D-N2-TUILES (« points à 60 s ») : la couche vient d'être affichée depuis
+                    // le cache ; une fois ce premier chargement réussi seulement, on redemande
+                    // les tuiles de points de plus de 60 s et on remplace la couche si elles ont
+                    // changé (la grille garde ses 5 min). Un échec de cette revalidation reste
+                    // silencieux : la couche affichée demeure.
+                    if wantsCoverage, !refresh, let tiles = result.value?.tiles, tiles.tiles != nil,
+                       tiles.failure == nil {
+                        group.addTask {
+                            let fresh = await MapTileLayerResult.load {
+                                try await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: MapSnapshotService.coveragePointsMaxAge, focus: focus)
+                            }
+                            return .coverageRevalidated(fresh.failure == nil ? fresh.tiles : nil)
+                        }
+                    }
                     if wantsCoverage, let value = result.value {
                         tileLoadIssues[.coverage] = value.tiles.issue(retaining: coverageTiles)
                         if let tiles = value.tiles.retaining(coverageTiles) { coverageTiles = tiles }
                         coverageHeat = value.heat
                         didPublish = true
+                    }
+                case .coverageRevalidated(let tiles):
+                    if wantsCoverage, let tiles {
+                        if tiles != coverageTiles {
+                            coverageTiles = tiles
+                            didPublish = true
+                        }
                     }
                 case .photos(let result):
                     photos = result

@@ -334,6 +334,47 @@ final class MapLoadConsistencyTests: XCTestCase {
         XCTAssertEqual(fixture.requests.count, 2)
     }
 
+    /// D-N2-TUILES : une tuile de points de moins de 60 s sert du cache sans requête ;
+    /// plus vieille, la couche s'affiche d'abord depuis le cache puis se revalide.
+    func testPointTilesAreRevalidatedAfterSixtySeconds() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                            session: URLSession(configuration: config))
+        let folder = "MapLoadHTTPTests-\(UUID())"
+        let disk = DiskCache(folderName: folder)
+        let clock = RevalidationClock()
+        let service = MapSnapshotService(api: api, cache: disk,
+                                          tileCache: TileCache(disk: disk, now: { clock.now }))
+        let model = MapExplorerViewModel(map: service, antennas: AntennasService(api: api),
+                                         markets: MarketRegistryService(api: api),
+                                         communityOutages: CommunityOutageService(api: api))
+        model.marketFilter = "FR"
+        model.operatorFilter = "SFR"
+        let fileURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(folder)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        let fixture = MapLoadHTTPFixture(snapshot: try JSONEncoder.signalQuest.encode(SocialMapSnapshot.empty))
+        MockURLProtocol.requestHandler = fixture.response
+        func coverageRequests() -> Int { fixture.requests.filter { $0.url?.path.contains("/tiles/coverage/") == true }.count }
+        await model.load(bounds: bounds, zoom: 14, filters: [.coverage])
+        XCTAssertEqual(Set(model.coverageTiles.flatMap(\.points).map(\.id)), ["live"])
+        let first = coverageRequests()
+        XCTAssertGreaterThan(first, 0)
+        fixture.setCoveragePhase(.empty)
+        clock.advance(30)
+        await model.load(bounds: bounds, zoom: 14, filters: [.coverage])
+        XCTAssertEqual(coverageRequests(), first, "Moins de 60 s : aucune requête")
+        XCTAssertEqual(Set(model.coverageTiles.flatMap(\.points).map(\.id)), ["live"])
+        clock.advance(31)
+        await model.load(bounds: bounds, zoom: 14, filters: [.coverage])
+        XCTAssertEqual(coverageRequests(), 2 * first, "Plus de 60 s : une revalidation par tuile, pas deux")
+        XCTAssertTrue(model.coverageTiles.flatMap(\.points).isEmpty, "La couche revalidée remplace le cache")
+    }
+
     func testFocused503ThroughRealServicesRetainsDataThenAcceptsTrueEmpty() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
@@ -558,4 +599,11 @@ private final class MapLoadHTTPFixture: @unchecked Sendable {
         }
         return (response, data)
     }
+}
+
+private final class RevalidationClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current = Date(timeIntervalSince1970: 1_800_000_000)
+    var now: Date { lock.lock(); defer { lock.unlock() }; return current }
+    func advance(_ seconds: TimeInterval) { lock.lock(); current += seconds; lock.unlock() }
 }
