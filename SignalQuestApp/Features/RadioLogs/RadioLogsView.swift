@@ -197,6 +197,7 @@ struct RadioLogsView: View {
         .sheet(item: $chainQueue) { queue in
             RadioLogIdentifyChainView(
                 sites: queue.sites,
+                siteNames: model.siteNames,
                 service: services.radioLogs,
                 identify: services.identify,
                 antennas: services.antennas,

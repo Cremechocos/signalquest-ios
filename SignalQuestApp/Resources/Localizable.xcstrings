@@ -61524,7 +61524,6 @@
       }
     },
     "Le plus proche" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -112051,6 +112050,144 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Débit max"
+          }
+        }
+      }
+    },
+    "Site %lld sur %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site %1$lld of %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Cercle pointillé : position médiane des %lld relevés, pas celle de l'antenne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dashed circle: location of %lld measurement, not the antenna’s."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dashed circle: median location of the %lld measurements, not the antenna’s."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Cercle pointillé : position médiane de %lld relevé, pas celle de l'antenne."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Cercle pointillé : position médiane des %lld relevés, pas celle de l'antenne."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@ sur le site %@ · envoi dans 2 s" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ on site %2$@ · sending in 2 s"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sur le site %2$@ · envoi dans 2 s"
+          }
+        }
+      }
+    },
+    "Confirmer le support %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm site %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer le support %@"
+          }
+        }
+      }
+    },
+    "Publique et attribuée à ton compte. Tu pourras la corriger depuis le journal." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public and credited to your account. You can correct it from the log."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publique et attribuée à ton compte. Tu pourras la corriger depuis le journal."
+          }
+        }
+      }
+    },
+    "SQFormal|Publique et attribuée à ton compte. Tu pourras la corriger depuis le journal." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publique et attribuée à votre compte. Vous pourrez la corriger depuis le journal."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucun de ceux-là ? Choisir sur la carte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of these? Pick on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun de ceux-là ? Choisir sur la carte"
           }
         }
       }

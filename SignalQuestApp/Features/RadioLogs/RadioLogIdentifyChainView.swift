@@ -17,17 +17,32 @@ struct RadioLogIdentifyChainView: View {
     @State private var identifiedCount = 0
     @State private var skippedIds: Set<String> = []
     @State private var showsMapPicker = false
-    @State private var showsConfirmation = false
+    /// Envoi différé de 2 s après « Confirmer » : « Annuler » pendant ce délai
+    /// n'écrit RIEN (on ne retire pas après coup une identification publique).
+    @State private var pending: PendingIdentification?
+    @State private var pendingTask: Task<Void, Never>?
     private let antennas: AntennasServicing
     private let customSites: CustomSitesServicing?
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 46.6, longitude: 2.5),
         span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
     )
+    /// Commune connue de chaque site (« Grenoble — … »), comme dans la liste.
+    private let siteNames: [String: String]
     let onIdentified: (RadioLogSite, String) -> Void
+
+    /// Délai entre « Confirmer » et l'envoi réel.
+    static let undoDelay: Duration = .seconds(2)
+
+    private struct PendingIdentification: Equatable {
+        let siteKey: String
+        let nodeLabel: String
+        let candidateSiteId: String
+    }
 
     init(
         sites: [RadioLogSite],
+        siteNames: [String: String] = [:],
         service: RadioLogsServicing,
         identify: IdentifyServicing,
         antennas: AntennasServicing,
@@ -35,6 +50,7 @@ struct RadioLogIdentifyChainView: View {
         onIdentified: @escaping (RadioLogSite, String) -> Void
     ) {
         self.sites = sites
+        self.siteNames = siteNames
         self.antennas = antennas
         self.customSites = customSites
         self.onIdentified = onIdentified
@@ -58,23 +74,23 @@ struct RadioLogIdentifyChainView: View {
                 }
             }
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(current == nil ? String(localized: "Terminé") : String(localized: "\(index + 1) sur \(sites.count)"))
+            .navigationTitle(current == nil ? String(localized: "Terminé") : String(localized: "Site \(index + 1) sur \(sites.count)"))
             .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Fermer") { dismiss() }
                 }
-                if identifiedCount > 0 {
+                if current != nil {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Text(String(localized: "\(identifiedCount) identifié"))
-                            .font(SQFont.body(12, .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(P.okInk)
-                            .accessibilityIdentifier("radioLogs.chain.identified")
+                        Button("Passer") { advance(skipped: true) }
+                            .disabled(picker.isSubmitting)
+                            .accessibilityIdentifier("radioLogs.chain.skip")
                     }
                 }
             }
         }
+        // Fermer pendant le délai : rien n'est parti, rien ne part.
+        .onDisappear { cancelPending() }
     }
 
     // MARK: La carte de file
@@ -82,9 +98,23 @@ struct RadioLogIdentifyChainView: View {
     private func card(for site: RadioLogSite) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.md) {
-                progressBar
+                HStack(spacing: SQSpace.sm) {
+                    progressBar
+                    if identifiedCount > 0 {
+                        Text(String(localized: "\(identifiedCount) identifié"))
+                            .font(SQFont.body(12, .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(P.okInk)
+                            .fixedSize()
+                            .accessibilityIdentifier("radioLogs.chain.identified")
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text(contextLine(for: site))
+                        .font(SQFont.body(M.siteMetaSize))
+                        .foregroundStyle(P.muted)
+                        .accessibilityIdentifier("radioLogs.chain.context")
                     HStack(spacing: SQSpace.sm) {
                         Text(site.nodeLabel)
                             .font(.sqTechnical(M.siteIdSize, .semibold))
@@ -93,13 +123,13 @@ struct RadioLogIdentifyChainView: View {
                         RadioLogTechBadge(label: site.techLabel)
                         Spacer(minLength: 0)
                     }
-                    Text(metaLine(for: site))
+                    Text([site.compositionLabel, String(localized: "\(site.logCount) relevé")].joined(separator: " · "))
                         .font(SQFont.body(M.siteMetaSize))
                         .monospacedDigit()
                         .foregroundStyle(P.muted)
 
                     let pciLabels = site.distinctPciLabels
-                    if !pciLabels.isEmpty {
+                    if !pciLabels.isEmpty || site.band != nil {
                         FlowLayoutCompat(spacing: M.pillsGap) {
                             ForEach(pciLabels.prefix(5), id: \.self) { label in
                                 RadioLogPill(label: label)
@@ -112,50 +142,24 @@ struct RadioLogIdentifyChainView: View {
                 }
 
                 if site.hasCoordinate {
-                    SQRegionMap(region: $region, items: pins(for: site)) { pin in
-                        MapAnnotation(coordinate: pin.coordinate) {
-                            Image(systemName: pin.isOrigin ? "dot.scope" : "antenna.radiowaves.left.and.right")
-                                .font(.system(size: pin.isOrigin ? 18 : 14, weight: .bold))
-                                .foregroundStyle(pin.isSelected ? P.onAccent : (pin.isOrigin ? P.ink : P.accentInk))
-                                .padding(6)
-                                .background(
-                                    pin.isSelected ? AnyShapeStyle(P.accent) : AnyShapeStyle(P.card),
-                                    in: Circle()
-                                )
-                                .sqShadowSoft()
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQRegionMap(region: $region, items: pins(for: site)) { pin in
+                            MapAnnotation(coordinate: pin.coordinate) {
+                                pinView(pin)
+                            }
                         }
+                        .frame(height: M.chainMapHeight)
+                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                        .accessibilityHidden(true)
+                        Text("Cercle pointillé : position médiane des \(site.logCount) relevés, pas celle de l'antenne.")
+                            .font(SQType.caption)
+                            .foregroundStyle(P.muted)
                     }
-                    .frame(height: M.chainMapHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                    .accessibilityHidden(true)
                 }
 
                 candidateSection(for: site)
 
-                HStack(spacing: M.ctaGap) {
-                    GradientButton(String(localized: "Passer"), style: .secondary) { advance(skipped: true) }
-                        .frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("radioLogs.chain.skip")
-                    GradientButton(
-                        picker.selectedCandidate?.needsVerification == true
-                            ? String(localized: "Vérifier ce site")
-                            : String(localized: "Identifier ici"),
-                        isBusy: picker.isSubmitting
-                    ) {
-                        // Sans choix, l'envoi dit lui-même qu'il manque une antenne.
-                        if picker.selectedCandidate == nil {
-                            Task { await identifyCurrent(site) }
-                        } else {
-                            showsConfirmation = true
-                        }
-                    }
-                    // Rien à identifier tant que les antennes de CE site arrivent, ni
-                    // sur un site bloqué : la bannière dit déjà pourquoi, « Passer » reste.
-                    .disabled(picker.isLoading || RadioLogIdentifyPicker.blockingReason(for: site) != nil)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("radioLogs.chain.identify")
-                }
-                .disabled(picker.isSubmitting)
+                confirmSection(for: site)
             }
             .padding(.horizontal, M.sheetPaddingH)
             .padding(.top, SQSpace.sm)
@@ -166,23 +170,71 @@ struct RadioLogIdentifyChainView: View {
             await picker.load(for: site)
             recenterOnSelection()
         }
-        .alert("Identifier ce site ?", isPresented: $showsConfirmation, presenting: picker.selectedCandidate) { _ in
-            Button("Annuler", role: .cancel) {}
-            Button("Identifier") { Task { await identifyCurrent(site) } }
-        } message: { candidate in
-            Text(RadioLogIdentifyPicker.confirmationMessage(
-                nodeLabel: site.nodeLabel,
-                siteId: candidate.siteId,
-                address: candidate.address,
-                needsVerification: candidate.needsVerification
-            ))
-        }
         .sheet(isPresented: $showsMapPicker) {
             RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
                 // Dans la file, on enchaîne : le site suivant est ce qu'on attend.
                 onIdentified(site, siteId)
                 identifiedCount += 1
                 advance(skipped: false)
+            }
+        }
+    }
+
+    /// « Confirmer le support X » et sa légende, ou, pendant les 2 s qui
+    /// précèdent l'envoi, le bandeau avec « Annuler ».
+    @ViewBuilder
+    private func confirmSection(for site: RadioLogSite) -> some View {
+        if let pending, pending.siteKey == site.id {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(P.okInk)
+                    .accessibilityHidden(true)
+                Text(String(localized: "\(pending.nodeLabel) sur le site \(pending.candidateSiteId) · envoi dans 2 s"))
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(P.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("Annuler") { cancelPending() }
+                    .font(SQFont.body(15, .bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("radioLogs.chain.undo")
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs)
+            .background(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("radioLogs.chain.pending")
+        } else if RadioLogIdentifyPicker.blockingReason(for: site) == nil {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                if let candidate = picker.selectedCandidate, candidate.needsVerification {
+                    noticeBanner(
+                        String(localized: "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer."),
+                        tint: OutageTint.degradedInk,
+                        soft: SQColor.warningSoft
+                    )
+                }
+                GradientButton(
+                    picker.selectedCandidate.map { String(localized: "Confirmer le support \($0.siteId)") }
+                        ?? String(localized: "Identifier ici"),
+                    isBusy: picker.isSubmitting
+                ) {
+                    // Sans choix, l'envoi dit lui-même qu'il manque une antenne.
+                    if picker.selectedCandidate == nil {
+                        Task { await identifyCurrent(site) }
+                    } else {
+                        schedule(site)
+                    }
+                }
+                // Rien à identifier tant que les antennes de CE site arrivent.
+                .disabled(picker.isLoading || picker.isSubmitting)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("radioLogs.chain.identify")
+                Text("Publique et attribuée à ton compte. Tu pourras la corriger depuis le journal.")
+                    .font(SQType.caption)
+                    .foregroundStyle(P.muted)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -255,10 +307,12 @@ struct RadioLogIdentifyChainView: View {
             RadioLogCandidateCard(
                 candidates: Array(picker.candidates.prefix(3)),
                 selectedId: picker.selectedId,
-                mapLabel: "Choisir sur la carte",
+                mapLabel: "Aucun de ceux-là ? Choisir sur la carte",
+                numbered: true,
                 hypothesisFailed: picker.hypothesisFailed,
                 onRetryHypothesis: { Task { await picker.load(for: site) } },
                 onSelect: { candidate in
+                    guard pending == nil else { return }
                     picker.selectedId = candidate.id
                     recenterOnSelection()
                 },
@@ -306,7 +360,27 @@ struct RadioLogIdentifyChainView: View {
         advance(skipped: false)
     }
 
+    private func schedule(_ site: RadioLogSite) {
+        guard pending == nil, let candidate = picker.selectedCandidate else { return }
+        pending = PendingIdentification(siteKey: site.id, nodeLabel: site.nodeLabel, candidateSiteId: candidate.siteId)
+        Haptics.selection()
+        pendingTask = Task { @MainActor in
+            try? await Task.sleep(for: Self.undoDelay)
+            guard !Task.isCancelled, pending?.siteKey == site.id else { return }
+            pending = nil
+            pendingTask = nil
+            await identifyCurrent(site)
+        }
+    }
+
+    private func cancelPending() {
+        pendingTask?.cancel()
+        pendingTask = nil
+        pending = nil
+    }
+
     private func advance(skipped: Bool) {
+        cancelPending()
         if skipped, let current { skippedIds.insert(current.id) }
         picker.selectedId = nil
         picker.errorMessage = nil
@@ -314,10 +388,15 @@ struct RadioLogIdentifyChainView: View {
         Haptics.selection()
     }
 
-    private func metaLine(for site: RadioLogSite) -> String {
-        [site.operatorName ?? String(localized: "Opérateur inconnu"),
-         site.compositionLabel,
-         String(localized: "\(site.logCount) relevé")]
+    /// « Orange · 4G · Grenoble · vu il y a 2 h » : opérateur, techno, commune
+    /// quand elle est connue, dernier relevé.
+    private func contextLine(for site: RadioLogSite) -> String {
+        let commune = siteNames[site.id]?.components(separatedBy: " — ").first.flatMap { $0.isEmpty ? nil : $0 }
+        return [site.operatorName ?? String(localized: "Opérateur inconnu"),
+                site.techLabel,
+                commune,
+                String(localized: "vu \(site.lastSeenAt.formatted(.relative(presentation: .named)))")]
+            .compactMap { $0 }
             .joined(separator: " · ")
     }
 
@@ -337,6 +416,32 @@ struct RadioLogIdentifyChainView: View {
         let coordinate: CLLocationCoordinate2D
         let isOrigin: Bool
         let isSelected: Bool
+        var number: Int?
+    }
+
+    /// Le centre des relevés en cercle pointillé (ce n'est pas une antenne), les
+    /// candidats par leur numéro, le même que dans la liste.
+    @ViewBuilder
+    private func pinView(_ pin: ChainPin) -> some View {
+        if pin.isOrigin {
+            ZStack {
+                Circle()
+                    .fill(P.accent.opacity(0.10))
+                Circle()
+                    .strokeBorder(P.accent, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                Circle().fill(P.accent).frame(width: 6, height: 6)
+            }
+            .frame(width: 44, height: 44)
+        } else {
+            Text(verbatim: pin.number.map { "\($0)" } ?? "")
+                .font(SQFont.body(13, .bold))
+                .monospacedDigit()
+                .foregroundStyle(pin.isSelected ? P.onAccent : P.ink)
+                .frame(width: 28, height: 28)
+                .background(pin.isSelected ? AnyShapeStyle(P.accent) : AnyShapeStyle(P.card), in: Circle())
+                .overlay(Circle().strokeBorder(pin.isSelected ? P.card : P.hairStrong, lineWidth: 2))
+                .sqShadowSoft()
+        }
     }
 
     private func pins(for site: RadioLogSite) -> [ChainPin] {
@@ -351,14 +456,15 @@ struct RadioLogIdentifyChainView: View {
                 )
             )
         }
-        for candidate in picker.candidates.prefix(3) {
+        for (position, candidate) in picker.candidates.prefix(3).enumerated() {
             guard let latitude = candidate.latitude, let longitude = candidate.longitude else { continue }
             pins.append(
                 ChainPin(
                     id: candidate.id,
                     coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
                     isOrigin: false,
-                    isSelected: candidate.id == picker.selectedId
+                    isSelected: candidate.id == picker.selectedId,
+                    number: position + 1
                 )
             )
         }

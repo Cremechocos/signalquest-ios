@@ -365,6 +365,9 @@ struct RadioLogCandidateCard: View {
     let candidates: [RadioLogCandidate]
     let selectedId: String?
     let mapLabel: LocalizedStringKey
+    /// File en chaîne : candidats numérotés comme leurs repères sur la carte, et
+    /// « Le plus proche » sur l'antenne la plus proche des relevés.
+    var numbered = false
     /// La piste du serveur n'a pas pu être demandée : on le dit, avec un nouvel essai.
     var hypothesisFailed = false
     var onRetryHypothesis: (() -> Void)?
@@ -393,8 +396,14 @@ struct RadioLogCandidateCard: View {
                 }
             }
             VStack(spacing: 0) {
-                ForEach(candidates) { candidate in
-                    RadioLogCandidateRow(candidate: candidate, isSelected: selectedId == candidate.id) {
+                let nearestId = numbered ? RadioLogCandidate.nearestId(in: candidates) : nil
+                ForEach(Array(candidates.enumerated()), id: \.element.id) { position, candidate in
+                    RadioLogCandidateRow(
+                        candidate: candidate,
+                        isSelected: selectedId == candidate.id,
+                        number: numbered ? position + 1 : nil,
+                        isNearest: candidate.id == nearestId
+                    ) {
                         onSelect(candidate)
                         Haptics.selection()
                     }
@@ -436,16 +445,27 @@ struct RadioLogCandidateCard: View {
 struct RadioLogCandidateRow: View {
     let candidate: RadioLogCandidate
     let isSelected: Bool
+    /// Numéro du repère sur la carte de la file ; nil dans la feuille unitaire.
+    var number: Int? = nil
+    var isNearest = false
     let onSelect: () -> Void
 
     var body: some View {
         Button(action: onSelect) {
             HStack(alignment: .top, spacing: SQSpace.md) {
                 ZStack {
-                    Circle()
-                        .strokeBorder(isSelected ? P.accent : P.hairStrong, lineWidth: 2)
-                    if isSelected {
-                        Circle().fill(P.accent).frame(width: 10, height: 10)
+                    if let number {
+                        Circle().fill(isSelected ? P.accent : P.chip)
+                        Text(verbatim: "\(number)")
+                            .font(SQFont.body(12, .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(isSelected ? P.onAccent : P.ink)
+                    } else {
+                        Circle()
+                            .strokeBorder(isSelected ? P.accent : P.hairStrong, lineWidth: 2)
+                        if isSelected {
+                            Circle().fill(P.accent).frame(width: 10, height: 10)
+                        }
                     }
                 }
                 .frame(width: 22, height: 22)
@@ -489,6 +509,17 @@ struct RadioLogCandidateRow: View {
                             .monospacedDigit()
                             .foregroundStyle(P.muted)
                             .sqSingleLine()
+                    }
+                    if isNearest {
+                        // Un indice réel (la distance aux relevés), pas un score inventé.
+                        Label("Le plus proche", systemImage: "location.fill")
+                            .font(SQFont.body(11, .semibold))
+                            .foregroundStyle(P.ink)
+                            .padding(.horizontal, M.techPaddingH)
+                            .padding(.vertical, M.techPaddingV)
+                            .background(P.chip, in: Capsule(style: .continuous))
+                            .padding(.top, 2)
+                            .accessibilityIdentifier("radioLogs.identify.nearest")
                     }
                 }
             }

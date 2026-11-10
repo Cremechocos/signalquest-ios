@@ -32,6 +32,16 @@ struct RadioLogCandidate: Identifiable, Equatable {
         guard let distanceMeters else { return nil }
         return SQUnits.distance(meters: Double(distanceMeters))
     }
+
+    /// Le candidat le plus proche des relevés, seulement quand la comparaison a
+    /// un sens : au moins deux distances connues, et pas d'égalité en tête.
+    static func nearestId(in candidates: [RadioLogCandidate]) -> String? {
+        let measured = candidates.compactMap { candidate in candidate.distanceMeters.map { (candidate.id, $0) } }
+        guard measured.count >= 2 else { return nil }
+        let sorted = measured.sorted { $0.1 < $1.1 }
+        guard sorted[0].1 < sorted[1].1 else { return nil }
+        return sorted[0].0
+    }
 }
 
 /// Charge et classe les candidats d'un site. Partagé par la feuille unitaire et

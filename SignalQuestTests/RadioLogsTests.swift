@@ -696,6 +696,17 @@ final class RadioLogsTests: XCTestCase {
     /// différents). Les pastilles décrivent le SITE : les répéter contredisait le
     /// « 3 PCI » affiché juste au-dessus — vu tel quel sur un site réel, qui
     /// alignait « PCI 261 » quatre fois.
+    func testNearestCandidateNeedsTwoDistancesAndNoTie() {
+        func candidate(_ id: String, _ distance: Int?) -> RadioLogCandidate {
+            RadioLogCandidate(id: id, siteId: id, latitude: nil, longitude: nil, operators: [], technologies: [],
+                              address: nil, distanceMeters: distance, confidenceScore: nil, isServerHypothesis: false)
+        }
+        XCTAssertEqual(RadioLogCandidate.nearestId(in: [candidate("a", 640), candidate("b", 240), candidate("c", nil)]), "b")
+        XCTAssertNil(RadioLogCandidate.nearestId(in: [candidate("a", 240)]), "Seul : rien à comparer")
+        XCTAssertNil(RadioLogCandidate.nearestId(in: [candidate("a", 240), candidate("b", nil)]))
+        XCTAssertNil(RadioLogCandidate.nearestId(in: [candidate("a", 240), candidate("b", 240)]), "Égalité : on ne tranche pas")
+    }
+
     func testPciPillsAreDistinct() throws {
         let entries = [
             try entry(id: "1", dedupeKey: "cap|1", enb: "95566", pci: 261, ci: 1),

@@ -61,4 +61,35 @@ final class RadioLogsRenderingTests: XCTestCase {
             try XCTUnwrap(image.pngData()).write(to: output.appendingPathComponent("\(name).png"))
         }
     }
+
+    /// Lot 2 de la refonte Logs : candidats numérotés de la file, « Proposé » et
+    /// « Le plus proche », rendus en français et en anglais.
+    func testChainCandidatesRenderNumberedWithTheirEvidence() throws {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let output = repository.appendingPathComponent("build/qa/radio-logs-chain")
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let candidates = [
+            RadioLogCandidate(id: "a", siteId: "0381522", latitude: 45.2, longitude: 5.7, operators: ["ORANGE"],
+                              technologies: ["4G"], address: "Chemin des Buissières, Le Fontanil", distanceMeters: 640,
+                              confidenceScore: nil, isServerHypothesis: true),
+            RadioLogCandidate(id: "b", siteId: "0381209", latitude: 45.21, longitude: 5.71, operators: ["ORANGE"],
+                              technologies: ["4G"], address: "Rue de la Gare, Saint-Égrève", distanceMeters: 240,
+                              confidenceScore: nil, isServerHypothesis: false),
+        ]
+        for (name, locale) in [("fr", Locale(identifier: "fr_FR")), ("en", Locale(identifier: "en_US"))] {
+            let content = RadioLogCandidateCard(
+                candidates: candidates, selectedId: "a", mapLabel: "Aucun de ceux-là ? Choisir sur la carte",
+                numbered: true, onSelect: { _ in }, onOpenMap: {}
+            )
+            .padding(16)
+            .frame(width: 390)
+            .background(SQColor.bg)
+            .environment(\.locale, locale)
+            let renderer = ImageRenderer(content: content)
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            XCTAssertGreaterThan(image.size.height, 150)
+            try XCTUnwrap(image.pngData()).write(to: output.appendingPathComponent("candidates-\(name).png"))
+        }
+    }
 }
