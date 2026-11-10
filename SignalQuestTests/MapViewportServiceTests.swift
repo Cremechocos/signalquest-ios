@@ -96,13 +96,14 @@ final class MapViewportServiceTests: XCTestCase {
         XCTAssertTrue(tiles.allSatisfy { $0.stats?.hasMore == false })
     }
 
-    func testCoverageOverviewFollowsTheChosenTileZoomRatherThanTheCameraZoom() async throws {
+    /// Au dézoom, la grille servie depuis le cache du serveur, plus overview (N2-3a).
+    func testCoverageGridFollowsTheChosenTileZoomRatherThanTheCameraZoom() async throws {
         let (service, fixture, _) = try makeService()
         let bounds = MapBounds(north: 85, south: -85, east: 180, west: -180)
         let tiles = try await service.coverageTiles(bounds: bounds, zoom: 14, market: "FR", operatorName: "SFR")
         XCTAssertEqual(tiles.count, 16)
         XCTAssertTrue(tiles.allSatisfy { $0.tile.z == 2 })
-        XCTAssertTrue(fixture.requests.allSatisfy { $0.query["detail"] == "overview" })
+        XCTAssertTrue(fixture.requests.allSatisfy { $0.query["detail"] == "grid" })
     }
 
     func testWrongTileIdentityIsRejectedAndCanRecoverWithoutRecreatingTheService() async throws {

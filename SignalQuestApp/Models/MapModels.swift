@@ -951,15 +951,84 @@ struct AndroidCoverageTileResponse: Decodable, Equatable, Sendable {
 }
 
 extension AndroidCoverageTileResponse {
-    enum CodingKeys: String, CodingKey { case tile, points, stats, clusters }
+    enum CodingKeys: String, CodingKey { case tile, points, stats, clusters, grid }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let tile = try c.decode(AndroidMapTile.self, forKey: .tile)
+        // `detail=grid` (N2-3a) sert `clusters: []` et la grille à côté : ses cellules
+        // deviennent les mêmes clusters qu'en overview, rendus à l'identique.
+        let grid = try c.decodeIfPresent(AndroidCoverageGrid.self, forKey: .grid)
+        let clusters = try grid.map { $0.clusters(in: tile) }
+            ?? c.decode([AndroidMapCluster].self, forKey: .clusters)
         self.init(tile: tile,
                   points: try c.decode([AndroidCoveragePoint].self, forKey: .points),
                   stats: try c.decodeIfPresent(AndroidCoverageStats.self, forKey: .stats),
-                  clusters: try c.decode([AndroidMapCluster].self, forKey: .clusters).map { $0.scoped(to: tile) })
+                  clusters: clusters.map { $0.scoped(to: tile) })
+    }
+}
+
+/// Grille de couverture v1 (`detail=grid`, servie depuis le cache du serveur) :
+/// la tuile découpée en `divisions` × `divisions` cellules web-mercator, chaque
+/// cellule portant un groupe par techno × source × identité observée.
+struct AndroidCoverageGrid: Decodable, Equatable, Sendable {
+    struct Group: Decodable, Equatable, Sendable {
+        /// Position moyenne des échantillons ; absente d'anciennes formes en cache.
+        let lat: Double?
+        let lng: Double?
+        let tech: String
+        let source: String
+        let count: Int
+        let measuredCount: Int?
+        let avgRsrp: Double?
+        let latestTimestamp: Date?
+    }
+    struct Cell: Decodable, Equatable, Sendable {
+        let id: String
+        let row: Int
+        let col: Int
+        let groups: [Group]
+    }
+    let version: Int
+    let projection: String
+    let divisions: Int
+    let cells: [Cell]
+
+    /// Un cluster par cellule × techno × source, comme overview : les identités
+    /// observées (PLMN) d'une même techno fusionnent, position pondérée par le
+    /// nombre d'échantillons, RSRP par le nombre de mesures (les groupes iOS n'en
+    /// ont pas). Sans position servie, le centre de la cellule.
+    func clusters(in tile: AndroidMapTile) -> [AndroidMapCluster] {
+        guard version == 1, projection == "web-mercator", divisions > 0 else { return [] }
+        let scale = pow(2.0, Double(tile.z))
+        return cells.flatMap { cell -> [AndroidMapCluster] in
+            let center = (
+                lat: atan(sinh(Double.pi * (1 - 2 * (Double(tile.y) + (Double(cell.row) + 0.5) / Double(divisions)) / scale))) * 180 / .pi,
+                lng: (Double(tile.x) + (Double(cell.col) + 0.5) / Double(divisions)) / scale * 360 - 180
+            )
+            let keys = cell.groups.reduce(into: [String]()) { keys, group in
+                let key = "\(group.tech)|\(group.source)"
+                if !keys.contains(key) { keys.append(key) }
+            }
+            return keys.compactMap { key -> AndroidMapCluster? in
+                let groups = cell.groups.filter { "\($0.tech)|\($0.source)" == key }
+                let count = groups.reduce(0) { $0 + max(0, $1.count) }
+                guard count > 0, let first = groups.first else { return nil }
+                let located = groups.filter { $0.lat != nil && $0.lng != nil && $0.count > 0 }
+                let weight = Double(located.reduce(0) { $0 + $1.count })
+                let lat = weight > 0 ? located.reduce(0) { $0 + $1.lat! * Double($1.count) } / weight : center.lat
+                let lng = weight > 0 ? located.reduce(0) { $0 + $1.lng! * Double($1.count) } / weight : center.lng
+                let measured = groups.filter { $0.avgRsrp != nil }
+                let measuredWeight = Double(measured.reduce(0) { $0 + max(1, $1.measuredCount ?? $1.count) })
+                let avgRsrp = measured.isEmpty ? nil
+                    : measured.reduce(0) { $0 + $1.avgRsrp! * Double(max(1, $1.measuredCount ?? $1.count)) } / measuredWeight
+                return AndroidMapCluster(
+                    id: "\(cell.id):\(key)", lat: lat, lng: lng, count: count, avgRsrp: avgRsrp,
+                    tech: first.tech, source: first.source,
+                    latestTimestamp: groups.compactMap(\.latestTimestamp).max()
+                )
+            }
+        }
     }
 }
 

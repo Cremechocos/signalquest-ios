@@ -438,7 +438,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         // = plus de points (trails continus, moins de « sauts »). On limite le boost au
         // dézoom où les tuiles de base sont peu nombreuses : le ×4 reste sous le plafond
         // (pas de troncature = pas de nouveaux trous) et le nombre de requêtes borné.
-        // Idem overview : grille plus fine = clusters plus denses.
+        // Le boost fixe aussi le passage aux points bruts (dès le zoom 10) : gardé avec la grille.
         let boost = zoom < 11 ? 1 : 0
         return try await fetchTiles(
             bounds: bounds,
@@ -449,7 +449,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
-                "coverage-bands-v2:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)\(focusKey)"
+                "coverage-bands-v3:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)\(focusKey)"
             },
             endpoint: { tile in
                 var query = [
@@ -460,10 +460,12 @@ final class MapSnapshotService: MapSnapshotServicing {
                 query.append(contentsOf: Self.bandQueryItems(bands))
                 // Couverture isolée : le backend croise eNB et gNB en OU.
                 if let focus { query.append(contentsOf: focus.queryItems) }
-                // Points bruts dès le « zoom ville » (z11) ; clusters (overview) en
-                // dessous. Seuil iOS uniquement — Android garde sa propre constante (z13).
+                // Points bruts dès le « zoom ville » (z11) ; grille en dessous, servie
+                // depuis le cache du serveur (~150 ms au p95, contre 2 s et plus pour
+                // overview, calculé à chaque appel : N2-3a, 10/11). Seuil iOS
+                // uniquement — Android garde sa propre constante (z13).
                 if tile.z < CoverageRenderPolicy.rawPointsFromZoom {
-                    query.append(URLQueryItem(name: "detail", value: "overview"))
+                    query.append(URLQueryItem(name: "detail", value: "grid"))
                 } else {
                     query.append(URLQueryItem(name: "limit", value: String(CoverageRenderPolicy.pointCapPerTile)))
                 }

@@ -14,6 +14,45 @@ final class CoverageRenderPolicyTests: XCTestCase {
         XCTAssertEqual(visibleIDs, ["8/130/87:lte-band7"], "A verified overview must not disappear when its band is selected")
     }
 
+    /// `detail=grid` (N2-3a) : `clusters: []` servi, les cellules deviennent les clusters
+    /// d'overview, un par techno × source ; les identités PLMN fusionnent (position pondérée
+    /// par les échantillons, RSRP par les mesures) ; sans position, le centre de la cellule.
+    func testGridCellsBecomeOverviewClusters() throws {
+        let bytes = Data(#"""
+        {"tile":{"z":8,"x":129,"y":88},"points":[],"clusters":[],"revision":"r1",
+         "grid":{"version":1,"projection":"web-mercator","divisions":4,"cells":[
+          {"id":"0:1","row":0,"col":1,"groups":[
+            {"lat":48.0,"lng":2.0,"tech":"4G","source":"android","observedPlmn":"20801","count":3,"measuredCount":3,"noServiceCount":0,"avgRsrp":-90,"latestTimestamp":"2026-11-09T10:00:00.000Z"},
+            {"lat":48.4,"lng":2.4,"tech":"4G","source":"android","observedPlmn":"20810","count":1,"measuredCount":1,"noServiceCount":0,"avgRsrp":-110,"latestTimestamp":"2026-11-09T11:00:00.000Z"},
+            {"lat":48.2,"lng":2.2,"tech":"5G","source":"ios","count":2,"measuredCount":0,"noServiceCount":0,"avgRsrp":null,"latestTimestamp":null}]},
+          {"id":"3:2","row":3,"col":2,"groups":[
+            {"tech":"3G","source":"android","count":5,"measuredCount":5,"noServiceCount":0,"avgRsrp":-100,"latestTimestamp":null}]}]},
+         "stats":{"avgRsrp":null,"sampleCount":11,"returnedCount":2,"hasMore":false,"truncated":false,"representation":"grid"}}
+        """#.utf8)
+        let tile = try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: bytes)
+        XCTAssertEqual(tile.clusters.map(\.id), ["8/129/88:0:1:4G|android", "8/129/88:0:1:5G|ios", "8/129/88:3:2:3G|android"])
+        let lte = tile.clusters[0]
+        XCTAssertEqual(lte.count, 4)
+        XCTAssertEqual(lte.lat, 48.1, accuracy: 1e-9)
+        XCTAssertEqual(lte.lng, 2.1, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(lte.avgRsrp), -95, accuracy: 1e-9)
+        XCTAssertEqual(lte.latestTimestamp, ISO8601DateFormatter().date(from: "2026-11-09T11:00:00Z"))
+        XCTAssertNil(tile.clusters[1].avgRsrp, "Un groupe iOS reste sans RSRP, comme en overview")
+        XCTAssertEqual(tile.clusters[1].source, "ios")
+        // Centre de la cellule (rangée 3, colonne 2 sur 4) de la tuile 8/129/88.
+        let center = tile.clusters[2]
+        XCTAssertEqual(center.lng, (129 + 2.5 / 4) / 256 * 360 - 180, accuracy: 1e-9)
+        let expectedLat = atan(sinh(Double.pi * (1 - 2 * (88 + 3.5 / 4) / 256))) * 180 / .pi
+        XCTAssertEqual(center.lat, expectedLat, accuracy: 1e-9)
+        XCTAssertTrue(CoverageRenderPolicy.mode(for: tile, selectedBands: []).useClusters)
+    }
+
+    /// Une grille d'une version ou d'une projection inconnue ne dessine rien plutôt qu'au mauvais endroit.
+    func testUnknownGridShapeDrawsNothing() throws {
+        let bytes = Data(#"{"tile":{"z":8,"x":129,"y":88},"points":[],"clusters":[],"grid":{"version":2,"projection":"web-mercator","divisions":4,"cells":[{"id":"0:0","row":0,"col":0,"groups":[{"tech":"4G","source":"android","count":1,"avgRsrp":-90}]}]}}"#.utf8)
+        XCTAssertTrue(try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: bytes).clusters.isEmpty)
+    }
+
     func testAggregatedPointKeepsItsSecondaryBandAndExcludesAnAbsentBand() throws {
         let bytes = Data(#"{"id":"aggregate","lat":48.8,"lng":2.3,"band":3,"bands":[3,7],"tech":"4G"}"#.utf8)
         let point = try JSONDecoder.signalQuest.decode(AndroidCoveragePoint.self, from: bytes)
