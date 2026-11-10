@@ -130,7 +130,9 @@ final class IdentificationCorrectionModel: ObservableObject {
         return (group.representative, group.cells.map(\.source))
     }
 
-    /// La cellule que le membre a sous les yeux : la première dont le PCI a été vu, sinon la première.
+    /// La cellule que le membre a sous les yeux : la première dont le PCI a été vu ;
+    /// sinon la cellule validée le plus récemment (règle commune avec le Web,
+    /// maquette « Corriger une identification », planche 2), sinon la première.
     nonisolated static func observedCell(
         in cells: [MyIdentification],
         observedPcis: [Int]
@@ -138,6 +140,8 @@ final class IdentificationCorrectionModel: ObservableObject {
         for pci in observedPcis {
             if let cell = cells.first(where: { $0.pci == pci || $0.pciValue == String(pci) }) { return cell }
         }
+        let dated = cells.compactMap { cell in (cell.lastValidated ?? cell.createdAt).map { (cell, $0) } }
+        if let newest = dated.max(by: { $0.1 < $1.1 }) { return newest.0 }
         return cells.first
     }
 
@@ -349,7 +353,24 @@ struct IdentificationCorrectionBlock: View {
             } else {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     ForEach(cells) { cell in
-                        cellRow(cell)
+                        // Toucher une rangée ouvre le schéma de SA cellule (règle commune avec le Web).
+                        Button {
+                            route = .sectors(cell: cell, cells: cells)
+                        } label: {
+                            HStack(spacing: SQSpace.sm) {
+                                cellRow(cell)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .accessibilityHidden(true)
+                            }
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.isBusy)
+                        .accessibilityHint(Text("Ouvre les secteurs de cette cellule"))
+                        .accessibilityIdentifier("identification.block.cell.\(cell.id)")
                     }
                 }
             }

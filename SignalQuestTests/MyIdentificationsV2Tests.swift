@@ -350,6 +350,18 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(IdentificationCorrectionModel.observedCell(in: cells, observedPcis: [])?.id, "11")
     }
 
+    /// Sans PCI vu, « Corriger » s'ouvre sur la cellule validée le plus récemment (règle du Web, #866).
+    func testCorrectionFallsBackToTheMostRecentlyValidatedCell() throws {
+        let cells = try [("11", "2026-10-01T08:00:00.000Z"), ("214", "2026-11-09T18:30:00.000Z"), ("216", "2026-10-20T12:00:00.000Z")]
+            .map { pci, validated in
+                try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+                {"id":"\(pci)","siteId":"799050","type":"pci","pci":\(pci),"pciValue":"\(pci)","enb":"81234","sectors":[1],"lastValidated":"\(validated)"}
+                """.utf8))
+            }
+        XCTAssertEqual(IdentificationCorrectionModel.observedCell(in: cells, observedPcis: [])?.id, "214")
+        XCTAssertEqual(IdentificationCorrectionModel.observedCell(in: cells, observedPcis: [216])?.id, "216", "Le PCI vu prime")
+    }
+
     /// Sur un écart, le secteur du PCI est la référence en pointillés ; le choix reste le
     /// secteur enregistré. Changer de cellule repart du secteur de la nouvelle cellule.
     func testSectorSheetShowsThePciReferenceAndSwitchesCells() async throws {

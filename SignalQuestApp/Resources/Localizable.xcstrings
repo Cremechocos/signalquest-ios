@@ -112374,6 +112374,23 @@
           }
         }
       }
+    },
+    "Ouvre les secteurs de cette cellule" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens this cell’s sectors"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les secteurs de cette cellule"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
