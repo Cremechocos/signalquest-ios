@@ -10,13 +10,14 @@ final class RadioLogsViewModel: ObservableObject {
     /// du serveur ? Pas de troisième catégorie — une hypothèse de voisinage n'est
     /// pas une identification, et n'a sa place que là où l'on regarde un site.
     enum Filter: String, CaseIterable, Identifiable {
-        case all, identified, unidentified
+        case all, unidentified, identified, uncheckable
         var id: String { rawValue }
         var label: String {
             switch self {
             case .all: return String(localized: "Tous")
             case .identified: return String(localized: "Identifiés")
             case .unidentified: return String(localized: "À identifier")
+            case .uncheckable: return String(localized: "Invérifiables")
             }
         }
     }
@@ -54,6 +55,11 @@ final class RadioLogsViewModel: ObservableObject {
 
     @Published private(set) var sites: [RadioLogSite] = []
     @Published private(set) var states: [String: RadioLogSiteState] = [:]
+    /// Support que le serveur propose pour un site non identifié, rendu par la
+    /// vérification du catalogue elle-même : il ne coûte aucun appel de plus.
+    @Published private(set) var proposals: [String: RadioLogSiteHypothesis] = [:]
+    /// Site dont la proposition est en cours d'envoi : sa ligne désactive « C'est lui ».
+    @Published private(set) var confirmingSiteId: String?
     /// Commune et adresse des sites identifiés, chargées à la demande.
     @Published private(set) var siteNames: [String: String] = [:]
     @Published private(set) var logCount = 0
@@ -83,7 +89,6 @@ final class RadioLogsViewModel: ObservableObject {
     /// Le choix « vérifier en données mobiles » survit à la fermeture de l'écran.
     nonisolated static let scanOnCellularKey = "radioLogs.scanOnCellular"
     @Published var searchText = "" { didSet { rebuild() } }
-    @Published var expandedSiteId: String?
 
     // MARK: Vues dérivées, CALCULÉES UNE FOIS
     //
@@ -102,6 +107,8 @@ final class RadioLogsViewModel: ObservableObject {
     @Published private(set) var uncheckableCount = 0
     /// Sites non identifiés du filtre courant — la matière de la file en chaîne.
     @Published private(set) var chainCandidates: [RadioLogSite] = []
+    /// Sites à identifier (catalogue entier) dont le serveur propose déjà un support.
+    @Published private(set) var proposedCount = 0
 
     // MARK: Dépendances
 
@@ -150,6 +157,7 @@ final class RadioLogsViewModel: ObservableObject {
         var unidentified = 0
         var checked = 0
         var uncheckable = 0
+        var proposed = 0
         var visible: [RadioLogSite] = []
         visible.reserveCapacity(sites.count)
 
@@ -160,12 +168,15 @@ final class RadioLogsViewModel: ObservableObject {
             if state.isIdentified { identified += 1 }
             if state.isUnidentified { unidentified += 1 }
             if state.isChecked { checked += 1 }
-            if !state.isChecked, !site.isCheckable { uncheckable += 1 }
+            let isUncheckable = !state.isChecked && !site.isCheckable
+            if isUncheckable { uncheckable += 1 }
+            if state.isUnidentified, proposals[site.id] != nil { proposed += 1 }
 
             switch filter {
             case .all: break
             case .identified: if !state.isIdentified { continue }
             case .unidentified: if !state.isUnidentified { continue }
+            case .uncheckable: if !isUncheckable { continue }
             }
             if !query.isEmpty, !matches(site, query: query) { continue }
             visible.append(site)
@@ -175,6 +186,7 @@ final class RadioLogsViewModel: ObservableObject {
         unidentifiedCount = unidentified
         checkedCount = checked
         uncheckableCount = uncheckable
+        proposedCount = proposed
 
         visible.sort(by: order)
         filteredCount = visible.count
@@ -247,8 +259,19 @@ final class RadioLogsViewModel: ObservableObject {
         case .all: return totalCount
         case .identified: return identifiedCount
         case .unidentified: return unidentifiedCount
+        case .uncheckable: return uncheckableCount
         }
     }
+
+    /// Le support proposé, pour un site encore à identifier seulement.
+    func proposal(for site: RadioLogSite) -> RadioLogSiteHypothesis? {
+        guard state(of: site).isUnidentified else { return nil }
+        return proposals[site.id]
+    }
+
+    /// Sites encore inconnus du serveur ET vérifiables : ce que la vérification
+    /// n'a pas encore atteint.
+    var pendingCount: Int { max(0, totalCount - checkedCount - uncheckableCount) }
 
     func state(of site: RadioLogSite) -> RadioLogSiteState {
         states[site.id] ?? .unchecked
@@ -301,14 +324,20 @@ final class RadioLogsViewModel: ObservableObject {
     /// (MES-17). Seules les affectations reviennent ici.
     private func loadFromCache() async {
         let service = self.service
-        let (snapshot, builtSites, cachedStates) = await Task.detached(priority: .userInitiated) {
+        let (snapshot, builtSites, cachedStates, cachedProposals) = await Task.detached(priority: .userInitiated) {
             let snapshot = service.cachedSnapshot()
-            return (snapshot, RadioLogSiteBuilder.build(from: snapshot.entries), service.cachedSiteStates())
+            return (
+                snapshot,
+                RadioLogSiteBuilder.build(from: snapshot.entries),
+                service.cachedSiteStates(),
+                service.cachedSiteProposals()
+            )
         }.value
         logCount = snapshot.entries.count
         lastSyncedAt = snapshot.lastSyncedAt
         sites = builtSites
         states = cachedStates
+        proposals = cachedProposals
         rebuild()
     }
 
@@ -388,7 +417,9 @@ final class RadioLogsViewModel: ObservableObject {
         scanTask = Task { [weak self] in
             for await resolved in stream {
                 guard let self, !Task.isCancelled else { break }
-                self.states.merge(resolved) { _, new in new }
+                self.states.merge(resolved.states) { _, new in new }
+                // La nouvelle réponse remplace l'ancienne proposition, y compris par « aucune ».
+                for key in resolved.states.keys { self.proposals[key] = resolved.proposals[key] }
                 self.rebuild()
             }
             // Un balayage annulé ou remplacé ne touche plus à l'état du suivant.
@@ -486,18 +517,6 @@ final class RadioLogsViewModel: ObservableObject {
         return parts.joined(separator: " — ")
     }
 
-    // MARK: Dépliement
-
-    func toggleExpansion(_ site: RadioLogSite) {
-        if expandedSiteId == site.id {
-            expandedSiteId = nil
-        } else {
-            expandedSiteId = site.id
-            loadSiteName(for: site)
-        }
-        Haptics.selection()
-    }
-
     // MARK: Identifications du membre
 
     /// Pages de 200 nœuds lues au plus : au-delà, les lignes les plus anciennes n'ont pas
@@ -547,6 +566,7 @@ final class RadioLogsViewModel: ObservableObject {
     /// prochain balayage. C'est un fait établi par le serveur, pas une supposition.
     func markIdentified(_ site: RadioLogSite, siteId: String) {
         states[site.id] = .identified(siteId: siteId)
+        proposals[site.id] = nil
         // Déplacé : l'ancienne clé ne vaut plus. Le nœud n'a qu'un support par membre.
         myNodeKeys = myNodeKeys.filter { !$0.hasPrefix("\(site.kind.rawValue)|\(site.node)|") }
         myNodeKeys.insert(Self.nodeKey(kind: site.kind, node: site.node, siteId: siteId))
@@ -569,6 +589,48 @@ final class RadioLogsViewModel: ObservableObject {
         rebuild()
     }
 
+    // MARK: « C'est lui »
+
+    /// Confirme d'un geste le support que le serveur propose, sans ouvrir la feuille.
+    /// Même requête que la feuille (`identify/direct`) : seule l'étape de choix est
+    /// sautée, et la confirmation reste demandée par la vue avant l'appel.
+    func confirmProposal(for site: RadioLogSite, identify: IdentifyServicing) async {
+        guard let proposal = proposal(for: site), confirmingSiteId == nil else { return }
+        if let reason = RadioLogIdentifyPicker.blockingReason(for: site) {
+            toast = reason
+            Haptics.error()
+            return
+        }
+        confirmingSiteId = site.id
+        defer { confirmingSiteId = nil }
+        let candidate = RadioLogCandidate(
+            id: proposal.siteId,
+            siteId: proposal.siteId,
+            latitude: proposal.latitude,
+            longitude: proposal.longitude,
+            operators: [site.operatorName].compactMap { $0 },
+            technologies: [site.techLabel],
+            address: proposal.placeLabel,
+            distanceMeters: proposal.distanceMeters,
+            confidenceScore: proposal.confidenceScore,
+            isServerHypothesis: true
+        )
+        do {
+            let result = try await identify.identify(RadioLogIdentifyPicker.request(for: site, candidate: candidate))
+            guard result.success else {
+                toast = result.message ?? String(localized: "Identification non confirmée par le serveur.")
+                Haptics.error()
+                return
+            }
+            markIdentified(site, siteId: result.siteId ?? proposal.siteId)
+            toast = String(localized: "Site identifié.")
+            Haptics.success()
+        } catch {
+            toast = error.userFacingMessage
+            Haptics.error()
+        }
+    }
+
     // MARK: Purge
 
     func purge() async {
@@ -576,6 +638,7 @@ final class RadioLogsViewModel: ObservableObject {
             try await service.purge()
             sites = []
             states = [:]
+            proposals = [:]
             siteNames = [:]
             logCount = 0
             lastSyncedAt = nil

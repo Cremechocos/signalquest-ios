@@ -208,95 +208,71 @@ struct RadioLogOperatorHeader: View {
 
 /// Une ligne par eNB/gNB — l'unité de la page, posée dans la carte de son opérateur.
 ///
-/// Le dépliement montre la COMPOSITION du site, en lecture seule : aucune
-/// pastille d'état ni bouton n'y figure, parce qu'aucune identification n'est
-/// calculée par cellule. Il s'ouvre par le bouton « 3 cellules », et non plus
-/// par toute la carte : un appui sur la ligne ne déclenche plus rien d'imprévu.
+/// La ligne répond à une seule question : « que reste-t-il à faire sur ce site ? ».
+/// Un site identifié se lit (sa commune, son support) et s'ouvre ; un site à
+/// identifier montre ce que le serveur propose, avec « C'est lui » pour le
+/// confirmer d'un geste. La composition détaillée (cellules, PCI, RSRP, carte des
+/// relevés) vit sur la fiche du site, ouverte d'un appui sur la ligne.
 struct RadioLogSiteCard: View {
     let site: RadioLogSite
     let state: RadioLogSiteState
     /// Commune et adresse, quand le site est identifié ET que la fiche a été
     /// chargée. Absente, la ligne ne prétend rien savoir.
     let siteName: String?
-    let isExpanded: Bool
+    /// Support proposé par le serveur pour un site à identifier.
+    var proposal: RadioLogSiteHypothesis? = nil
+    /// Identifié par le membre lui-même.
+    var isMine = false
+    /// La proposition de ce site part en ce moment.
+    var isConfirming = false
+    let onOpen: () -> Void
     let onIdentify: () -> Void
     let onOpenMap: () -> Void
-    var onToggleCells: () -> Void = {}
-    /// Identifié par le membre : « Corriger » ouvre sa correction.
-    var onCorrect: (() -> Void)? = nil
+    var onConfirmProposal: (() -> Void)? = nil
 
     /// Les actions s'alignent sous le texte, pas sous la pastille.
     private var actionInset: CGFloat { M.leadPill + M.cardInnerGap }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack(alignment: .top, spacing: M.cardInnerGap) {
-                leadPill
-                VStack(alignment: .leading, spacing: 3) {
-                    identifierLine
-                    if let siteName {
-                        Text(siteName)
-                            .font(SQFont.body(M.siteNameSize, .semibold))
-                            .foregroundStyle(P.ink)
-                            .lineLimit(2)
-                    }
-                    // À QUEL site ce nœud est rattaché. La commune ne suffit pas :
-                    // deux antennes d'une même commune se ressemblent, et c'est
-                    // l'identifiant qu'on retrouve dans « Mes identifications » ou
-                    // qu'on compare avec le terrain.
-                    if let identifiedSiteId = state.siteId, !identifiedSiteId.isEmpty {
-                        Text("Site \(identifiedSiteId)")
-                            .font(.sqTechnical(M.siteMetaSize, .semibold))
+            Button(action: onOpen) {
+                HStack(alignment: .top, spacing: M.cardInnerGap) {
+                    leadTile
+                    VStack(alignment: .leading, spacing: 3) {
+                        titleLine
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(.sqTechnical(M.siteMetaSize, .semibold))
+                                .foregroundStyle(P.muted)
+                                .sqSingleLine()
+                        }
+                        Text(metaLine)
+                            .font(SQFont.body(M.siteMetaSize))
+                            .monospacedDigit()
                             .foregroundStyle(P.muted)
-                            .sqSingleLine()
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text(metaLine)
-                        .font(SQFont.body(M.siteMetaSize))
-                        .monospacedDigit()
-                        .foregroundStyle(P.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
+            .accessibilityHint(Text("Ouvre la fiche du site"))
             .accessibilityIdentifier("radioLogs.site.\(site.node)")
 
             if state.isUnidentified {
-                RadioLogStatePill(state: state, checkable: site.isCheckable)
-                    .padding(.leading, actionInset)
-                // Une ligne tant qu'elle tient ; texte agrandi, les cellules passent
-                // dessous, puis chaque contrôle sur sa ligne, plutôt que de tronquer.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: M.ctaGap) {
-                        identifyActions
-                        Spacer(minLength: 0)
-                        cellsToggle(short: true)
-                    }
-                    VStack(alignment: .leading, spacing: M.ctaGap) {
-                        HStack(spacing: M.ctaGap) { identifyActions }
-                        cellsToggle(short: true)
-                    }
-                    VStack(alignment: .leading, spacing: M.ctaGap) {
-                        identifyActions
-                        cellsToggle(short: true)
+                Group {
+                    if let proposal, let onConfirmProposal {
+                        proposalBlock(proposal, confirm: onConfirmProposal)
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: M.ctaGap) { identifyActions }
+                            VStack(alignment: .leading, spacing: M.ctaGap) { identifyActions }
+                        }
                     }
                 }
                 .padding(.leading, actionInset)
-            } else {
-                HStack(spacing: M.ctaGap) {
-                    RadioLogStatePill(state: state, checkable: site.isCheckable)
-                    if let onCorrect {
-                        RadioLogActionButton(label: "Corriger", ghost: true, systemImage: "pencil", action: onCorrect)
-                            .accessibilityLabel(Text("Corriger \(site.nodeLabel)"))
-                            .accessibilityIdentifier("radioLogs.site.correct")
-                    }
-                    Spacer(minLength: 0)
-                    cellsToggle(short: false)
-                }
-                .padding(.leading, actionInset)
-            }
-
-            if isExpanded {
-                cellsPanel
             }
         }
         .padding(.vertical, SQSpace.xs)
@@ -304,6 +280,87 @@ struct RadioLogSiteCard: View {
     }
 
     // MARK: Sous-vues
+
+    /// Commune quand elle est connue, sinon l'identifiant du nœud.
+    private var title: String {
+        if let siteName, let commune = siteName.components(separatedBy: " — ").first, !commune.isEmpty {
+            return commune
+        }
+        return site.nodeLabel
+    }
+
+    private var titleIsNode: Bool { title == site.nodeLabel }
+
+    /// « eNB 812345 · site 0381234 » sous une commune, « site 0381234 » sous le nœud.
+    private var subtitle: String? {
+        let siteId = state.siteId.flatMap { $0.isEmpty ? nil : $0 }
+        let sitePart = siteId.map { String(localized: "site \($0)") }
+        if titleIsNode { return sitePart }
+        return [site.nodeLabel, sitePart].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var titleLine: some View {
+        HStack(spacing: SQSpace.sm) {
+            Text(title)
+                .font(titleIsNode ? .sqTechnical(M.siteIdSize, .semibold) : SQFont.body(M.siteIdSize, .bold))
+                .tracking(titleIsNode ? M.siteIdTracking : 0)
+                .foregroundStyle(P.ink)
+                .lineLimit(2)
+            RadioLogTechBadge(label: site.techLabel)
+            Spacer(minLength: 0)
+            trailing
+        }
+    }
+
+    @ViewBuilder
+    private var trailing: some View {
+        if state.isIdentified {
+            if isMine {
+                Text("Par toi")
+                    .font(SQFont.body(M.stateSize, .bold))
+                    .foregroundStyle(P.chipInk)
+                    .padding(.horizontal, M.statePaddingH)
+                    .padding(.vertical, M.statePaddingV)
+                    .background(P.chip, in: Capsule(style: .continuous))
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(P.muted)
+                .accessibilityHidden(true)
+        } else {
+            RadioLogStatePill(state: state, checkable: site.isCheckable)
+        }
+    }
+
+    /// `3 cellules · 2 PCI · 128 relevés · vu il y a 2 h`
+    private var metaLine: String {
+        [
+            site.compositionLabel,
+            String(localized: "\(site.logCount) relevé"),
+            String(localized: "vu \(site.lastSeenAt.formatted(.relative(presentation: .named)))")
+        ].joined(separator: " · ")
+    }
+
+    /// La couleur et le symbole disent l'état avant toute lecture : coche pour un
+    /// site identifié, antenne carmin pour un site à identifier.
+    private var leadTile: some View {
+        let style: (symbol: String, ink: Color, fill: Color) = {
+            switch state {
+            case .identified: return ("checkmark", P.okInk, P.okSoft)
+            case .unidentified: return ("antenna.radiowaves.left.and.right", P.accentInk, P.accentSoft)
+            case .unchecked:
+                return site.isCheckable
+                    ? ("ellipsis", P.muted, P.chip)
+                    : ("questionmark", P.muted, P.chip)
+            }
+        }()
+        return Image(systemName: style.symbol)
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(style.ink)
+            .frame(width: M.leadPill, height: M.leadPill)
+            .background(style.fill, in: RoundedRectangle(cornerRadius: M.leadPillRadius, style: .continuous))
+            .accessibilityHidden(true)
+    }
 
     @ViewBuilder
     private var identifyActions: some View {
@@ -318,122 +375,68 @@ struct RadioLogSiteCard: View {
         }
     }
 
-    /// Pastille d'accent quand le site est identifié, neutre sinon. C'est le seul
-    /// repère qui se lit au balayage vertical, avant même de lire.
-    private var leadPill: some View {
-        Image(systemName: site.kind == .gnb ? "antenna.radiowaves.left.and.right" : "cellularbars")
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(state.isIdentified ? P.accentInk : P.muted)
-            .frame(width: M.leadPill, height: M.leadPill)
-            .background(
-                state.isIdentified ? P.accentSoft : P.chip,
-                in: RoundedRectangle(cornerRadius: M.leadPillRadius, style: .continuous)
-            )
-            .accessibilityHidden(true)
-    }
-
-    private var identifierLine: some View {
-        HStack(spacing: SQSpace.sm) {
-            Text(site.nodeLabel)
-                .font(.sqTechnical(M.siteIdSize, .semibold))
-                .tracking(M.siteIdTracking)
-                .foregroundStyle(P.ink)
-                .sqSingleLine()
-            RadioLogTechBadge(label: site.techLabel)
-            Spacer(minLength: 0)
-        }
-    }
-
-    /// `3 cellules · 2 PCI · 128 relevés` — la composition, jamais une promesse.
-    private var metaLine: String {
-        var parts = [site.compositionLabel]
-        parts.append(String(localized: "\(site.logCount) relevé"))
-        return parts.joined(separator: " · ")
-    }
-
-    /// « 3 cellules ⌄ » : annonce ce que le dépliage montre. À côté des actions
-    /// d'un site à identifier, la place manque : « Cellules ⌄ » suffit, le compte
-    /// figure déjà dans la ligne du dessus.
-    private func cellsToggle(short: Bool) -> some View {
-        let count = String(localized: "\(site.cells.count) cellule")
-        return Button {
-            onToggleCells()
-            Haptics.selection()
-        } label: {
-            HStack(spacing: 3) {
-                Text(short ? String(localized: "Cellules") : count)
-                    .font(SQFont.body(12, .semibold))
-                    .monospacedDigit()
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+    /// Le support que propose le serveur, et de quoi le confirmer d'un geste. « Un
+    /// autre » ouvre la feuille complète, avec les voisins et la carte.
+    private func proposalBlock(_ proposal: RadioLogSiteHypothesis, confirm: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(P.okInk)
                     .accessibilityHidden(true)
-            }
-            .foregroundStyle(P.chipInk)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(count)
-        .accessibilityValue(isExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
-        .accessibilityIdentifier("radioLogs.site.cells")
-    }
-
-    /// La composition du site. DESCRIPTIVE : aucune pastille de statut, aucun
-    /// bouton. On ne calcule plus d'identification par cellule, donc il n'y a
-    /// plus rien à y valider.
-    private func cellIdentity(_ cell: RadioLogCell) -> some View {
-        Text(cell.identityLabel ?? "—")
-            .font(.sqTechnical(M.cellIdSize))
-            .foregroundStyle(P.ink)
-            .sqSingleLine()
-    }
-
-    private func cellBand(_ label: String) -> some View {
-        Text(label)
-            .font(SQFont.body(M.cellBandSize))
-            .monospacedDigit()
-            .foregroundStyle(P.muted)
-            .sqSingleLine()
-    }
-
-    private var cellsPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RadioLogDashedSeparator()
-            Text("Cellules captées")
-                .sqKicker()
-                .padding(.top, M.cellsTop)
-                .padding(.bottom, M.cellsHeaderBottom)
-
-            ForEach(Array(site.cells.enumerated()), id: \.element.id) { index, cell in
-                // Une ligne tant qu'elle tient ; texte agrandi, la bande passe
-                // dessous plutôt que de tronquer l'identité de la cellule.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: M.cellRowGap) {
-                        RadioLogCellPciTag(label: cell.pciLabel)
-                        cellIdentity(cell)
-                            .fixedSize()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if let bandLabel = cell.bandLabel { cellBand(bandLabel).fixedSize() }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Proposé : site \(proposal.siteId)")
+                        .font(SQFont.body(13, .bold))
+                        .foregroundStyle(P.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let detail = proposalDetail(proposal) {
+                        Text(detail)
+                            .font(SQType.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(P.muted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: M.cellRowGap) {
-                            RadioLogCellPciTag(label: cell.pciLabel)
-                            cellIdentity(cell).lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityElement(children: .combine)
+            HStack(spacing: M.ctaGap) {
+                Button(action: confirm) {
+                    HStack(spacing: SQSpace.xs) {
+                        if isConfirming {
+                            ProgressView().controlSize(.small).tint(SQColor.onInk)
                         }
-                        if let bandLabel = cell.bandLabel { cellBand(bandLabel) }
+                        Text("C’est lui")
                     }
+                    .font(SQFont.body(M.buttonSize, .bold))
+                    .foregroundStyle(SQColor.onInk)
+                    .padding(.horizontal, M.buttonPaddingH)
+                    .padding(.vertical, M.buttonPaddingV)
+                    .background(P.ink, in: RoundedRectangle(cornerRadius: M.buttonRadius, style: .continuous))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                .padding(.vertical, M.cellRowPaddingV)
-                .accessibilityElement(children: .combine)
-
-                if index < site.cells.count - 1 {
-                    Rectangle()
-                        .fill(P.hair)
-                        .frame(height: 1)
-                }
+                .buttonStyle(.plain)
+                .disabled(isConfirming)
+                .accessibilityLabel(Text("Confirmer le site \(proposal.siteId) pour \(site.nodeLabel)"))
+                .accessibilityIdentifier("radioLogs.site.confirmProposal")
+                RadioLogActionButton(label: "Un autre", ghost: true, action: onIdentify)
+                    .accessibilityLabel(Text("Choisir un autre site pour \(site.nodeLabel)"))
+                    .accessibilityIdentifier("radioLogs.site.identify")
+                Spacer(minLength: 0)
             }
         }
-        .accessibilityIdentifier("radioLogs.site.cellsPanel")
+        .padding(SQSpace.md)
+        .background(P.chip, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    /// « à 240 m · Le Fontanil — rue du Rocher », ce que le serveur a donné.
+    private func proposalDetail(_ proposal: RadioLogSiteHypothesis) -> String? {
+        var parts: [String] = []
+        if let distance = proposal.distanceMeters {
+            parts.append(String(localized: "à \(SQUnits.distance(meters: Double(distance)))"))
+        }
+        if let place = proposal.placeLabel { parts.append(place) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

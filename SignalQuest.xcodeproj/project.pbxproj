@@ -138,6 +138,7 @@
 		2249B0FFD84B669F701D887D /* E2EEV2IdentityVerificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C129F6AA51DA75F6A60A791 /* E2EEV2IdentityVerificationTests.swift */; };
 		22D7BF2F9602F098463D1900 /* CarPlayInterfaceControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7378AD6B4FED604F1D9328 /* CarPlayInterfaceControlling.swift */; };
 		22F3BB21D15AB09C5737DAB8 /* FavoriteAntennasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26324103A524AEF88109B0E1 /* FavoriteAntennasView.swift */; };
+		24295C2A43CC341E71F626B6 /* RadioLogSiteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EEF6483F14398DFFE9B74E /* RadioLogSiteDetailView.swift */; };
 		242EE2F3613CCD68522186C5 /* E2EEV2MembershipEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB7210CDA44B8EA73F6A869 /* E2EEV2MembershipEventsTests.swift */; };
 		244EC68604DEEC5E82995E8E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */; };
 		24D52A559727A045715483FF /* SentinelleComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB5E20693F10585EE50EAF49 /* SentinelleComponents.swift */; };
@@ -1051,6 +1052,7 @@
 		076CFD0CB1CB34BEB0F0E9C3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		08085CAF5AC02754C4042714 /* E2EEV2MessageSenderV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2MessageSenderV2Tests.swift; sourceTree = "<group>"; };
 		0830E8B030A7AC99A32FF917 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		08EEF6483F14398DFFE9B74E /* RadioLogSiteDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogSiteDetailView.swift; sourceTree = "<group>"; };
 		09CB65B2D1C9FAFB41970E34 /* MetricKitReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitReporter.swift; sourceTree = "<group>"; };
 		0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceUseRow.swift; sourceTree = "<group>"; };
 		0A64D296531342C5509ECF4C /* E2EEAutoPasskeyBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoPasskeyBackupTests.swift; sourceTree = "<group>"; };
@@ -2022,6 +2024,7 @@
 				43F86F356FE7B0E322F9B79A /* RadioLogIdentifyPicker.swift */,
 				DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */,
 				31424F4F8C76280C3D0AC98B /* RadioLogsFilterSheet.swift */,
+				08EEF6483F14398DFFE9B74E /* RadioLogSiteDetailView.swift */,
 				C0990B1A078A21371068E114 /* RadioLogSiteMapPicker.swift */,
 				8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */,
 				B0E1077E22C2EA2D3D667108 /* RadioLogsTokens.swift */,
@@ -4252,6 +4255,7 @@
 				0172A2931556007F32F840D0 /* RadioLogIdentifyPicker.swift in Sources */,
 				3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */,
 				4AFB0DC62CF13CCEA58DEC77 /* RadioLogModels.swift in Sources */,
+				24295C2A43CC341E71F626B6 /* RadioLogSiteDetailView.swift in Sources */,
 				D57FB42D1064CB2A6172E6A2 /* RadioLogSiteMapPicker.swift in Sources */,
 				4B210BA00F5D6D35E73E36AA /* RadioLogSiteModels.swift in Sources */,
 				F87A9373237B5F0AE131AA87 /* RadioLogStore.swift in Sources */,

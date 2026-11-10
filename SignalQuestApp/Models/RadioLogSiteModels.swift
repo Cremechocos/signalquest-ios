@@ -473,12 +473,15 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
 struct CachedRadioLogSiteState: Codable, Sendable {
     let state: RadioLogSiteState
     let updatedAtMs: Int
+    /// Support que le serveur propose pour un site non identifié, rendu par la même
+    /// réponse que le statut. Absent des anciens fichiers : décodé comme `nil`.
+    var proposal: RadioLogSiteHypothesis? = nil
 }
 
 /// Hypothèse de site proposée par le serveur pour un site NON identifié.
 /// Résolue à la demande (`identify/quick` avec position), jamais pendant le
 /// balayage : c'est une piste à confirmer, pas une identification.
-struct RadioLogSiteHypothesis: Sendable, Equatable {
+struct RadioLogSiteHypothesis: Codable, Sendable, Equatable {
     let siteId: String
     let latitude: Double?
     let longitude: Double?
@@ -487,6 +490,17 @@ struct RadioLogSiteHypothesis: Sendable, Equatable {
     let sector: Int?
     /// `proximity`, `exact_operator`… — dit d'où vient la piste.
     let resolutionMode: String?
+    /// Commune et adresse du support proposé, quand le serveur les donne.
+    var commune: String? = nil
+    var address: String? = nil
+
+    /// « Le Fontanil — rue du Rocher », ce qui est connu seulement.
+    var placeLabel: String? {
+        let parts = [commune, address]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " — ")
+    }
 
     /// `confiance 88 % · 2,9 km` — la ligne de méta de l'état « hypothèse ».
     var summaryLabel: String? {

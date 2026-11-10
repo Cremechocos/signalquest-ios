@@ -26,6 +26,13 @@ struct RadioLogsView: View {
     @State private var identifyTarget: RadioLogSite?
     @State private var chainQueue: RadioLogChainQueue?
     @State private var mapTarget: RadioLogSite?
+    /// Fiche ouverte d'un appui sur la ligne.
+    @State private var detailTarget: RadioLogSite?
+    /// Feuille d'identification demandée depuis la fiche : ouverte une fois la fiche
+    /// refermée, deux feuilles ne pouvant se présenter en même temps.
+    @State private var pendingIdentifyTarget: RadioLogSite?
+    /// « C'est lui » en attente de la confirmation.
+    @State private var confirmTarget: RadioLogSite?
     @State private var showsPurgeConfirmation = false
     @State private var showsPremiumPaywall = false
     @State private var tierBeforePaywall: SupporterTier = .free
@@ -67,10 +74,18 @@ struct RadioLogsView: View {
                         .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
                         .listRowBackground(Color.clear)
                 }
+                if !model.chainCandidates.isEmpty {
+                    chainCallToAction
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
                 if !model.sites.isEmpty {
                     SQSegmentedFilter(
                         selection: $model.filter,
-                        options: RadioLogsViewModel.Filter.allCases.map { option in
+                        // « Invérifiables » n'apparaît que s'il y en a, ou s'il est le filtre en cours.
+                        options: RadioLogsViewModel.Filter.allCases.filter { option in
+                            option != .uncheckable || model.uncheckableCount > 0 || model.filter == .uncheckable
+                        }.map { option in
                             (value: option, label: "\(option.label) · \(model.count(for: option).formatted())", icon: String?.none)
                         }
                     )
@@ -80,11 +95,6 @@ struct RadioLogsView: View {
                     .listRowBackground(Color.clear)
                     sortSummary
                         .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xs, bottom: 0, trailing: 0))
-                        .listRowBackground(Color.clear)
-                }
-                if !model.chainCandidates.isEmpty {
-                    chainCallToAction
-                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
                         .listRowBackground(Color.clear)
                 }
                 if model.sites.isEmpty || model.filteredCount == 0 {
@@ -102,11 +112,16 @@ struct RadioLogsView: View {
                             site: site,
                             state: model.state(of: site),
                             siteName: model.siteNames[site.id],
-                            isExpanded: model.expandedSiteId == site.id,
+                            proposal: model.proposal(for: site),
+                            isMine: model.isMine(site),
+                            isConfirming: model.confirmingSiteId == site.id,
+                            onOpen: {
+                                model.loadSiteName(for: site)
+                                detailTarget = site
+                            },
                             onIdentify: { identifyTarget = site },
                             onOpenMap: { mapTarget = site },
-                            onToggleCells: { model.toggleExpansion(site) },
-                            onCorrect: model.isMine(site) ? { identifyTarget = site } : nil
+                            onConfirmProposal: { confirmTarget = site }
                         )
                         .listRowBackground(SQColor.surface)
                         .listRowSeparatorTint(SQColor.separator)
@@ -193,6 +208,41 @@ struct RadioLogsView: View {
         .sheet(item: $mapTarget) { site in
             RadioLogSiteMapSheet(site: site)
         }
+        .sheet(item: $detailTarget, onDismiss: {
+            guard let pending = pendingIdentifyTarget else { return }
+            pendingIdentifyTarget = nil
+            identifyTarget = pending
+        }) { site in
+            RadioLogSiteDetailView(
+                site: site,
+                state: model.state(of: site),
+                siteName: model.siteNames[site.id],
+                proposal: model.proposal(for: site),
+                isMine: model.isMine(site),
+                service: services.radioLogs,
+                antennas: services.antennas,
+                onIdentify: { pendingIdentifyTarget = site },
+                onConfirmProposal: { Task { await model.confirmProposal(for: site, identify: services.identify) } }
+            )
+        }
+        .alert(
+            "Confirmer ce site ?",
+            isPresented: Binding(get: { confirmTarget != nil }, set: { if !$0 { confirmTarget = nil } }),
+            presenting: confirmTarget
+        ) { site in
+            Button("Annuler", role: .cancel) {}
+            Button("Confirmer") {
+                Task { await model.confirmProposal(for: site, identify: services.identify) }
+            }
+        } message: { site in
+            if let proposal = model.proposal(for: site) {
+                Text(RadioLogIdentifyPicker.confirmationMessage(
+                    nodeLabel: site.nodeLabel,
+                    siteId: proposal.siteId,
+                    address: proposal.placeLabel
+                ))
+            }
+        }
         .alert("Supprimer le journal radio ?", isPresented: $showsPurgeConfirmation) {
             Button("Annuler", role: .cancel) {}
             Button("Supprimer", role: .destructive) { Task { await model.purge() } }
@@ -200,7 +250,6 @@ struct RadioLogsView: View {
             Text("Les \(model.logCount) relevés synchronisés seront effacés du serveur et de cet appareil. Les identifications que tu as faites, elles, sont conservées.")
         }
         .overlay(alignment: .bottom) { toastOverlay }
-        .sqAnimation(SQMotion.standard, value: model.expandedSiteId)
     }
 
     // MARK: - En-tête
@@ -270,35 +319,47 @@ struct RadioLogsView: View {
 
     // MARK: - Synthèse
 
-    /// Sites, relevés, synchronisation et part vérifiée, en une carte. Pendant la
-    /// récupération ou la vérification, la carte porte aussi la tâche en cours et
-    /// de quoi la suspendre.
+    /// Le bilan du journal en une carte : combien de sites, ce qui est identifié,
+    /// ce qui reste, ce qui ne peut pas l'être. Une seule barre empilée dit les
+    /// quatre parts d'un coup ; pendant la récupération ou la vérification, la
+    /// carte porte aussi la tâche en cours et de quoi la suspendre.
     private var summaryCard: some View {
         // Une pause garde la carte : sans elle, « Reprendre » disparaissait avec le bloc.
         let isWorking = model.isScanning || model.isSyncing || model.isPaused
         return VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(alignment: .top, spacing: SQSpace.md) {
+            HStack(alignment: .bottom, spacing: SQSpace.md) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(siteTally)
                         .foregroundStyle(SQColor.label)
                         .monospacedDigit()
-                    // Recalculé chaque minute : la date relative ne vieillissait qu'au rendu.
-                    TimelineView(.periodic(from: .now, by: 60)) { _ in
-                        Text(tallySubtitle)
-                            .font(SQType.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+                    Text(String(localized: "\(model.logCount) relevé"))
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
-                if !isWorking && model.totalCount > 0 {
-                    verifiedPill
+                if model.totalCount > 0, model.checkedCount > 0 {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(verbatim: "\(identifiedPercent) %")
+                            .font(SQFont.display(22, .heavy, relativeTo: .title2))
+                            .monospacedDigit()
+                            .foregroundStyle(P.okInk)
+                        Text("identifiés")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("\(identifiedPercent) pour cent identifiés"))
                 }
+            }
+            if model.totalCount > 0 {
+                stackedBar
+                legend
             }
             if isWorking {
                 scanBlock
             } else if model.totalCount > 0 {
-                progressBar(value: model.completion, height: M.barHeight, tint: P.okInk)
+                verifiedFooter
             }
         }
         .padding(SQSpace.lg)
@@ -306,6 +367,122 @@ struct RadioLogsView: View {
         .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("radioLogs.summary")
+    }
+
+    private var identifiedPercent: Int {
+        guard model.totalCount > 0 else { return 0 }
+        return Int((Double(model.identifiedCount) / Double(model.totalCount) * 100).rounded())
+    }
+
+    /// Les parts du catalogue, dans l'ordre de la légende. La part « pas encore
+    /// vérifiés » est hachurée : ce n'est pas un résultat, c'est une attente.
+    private var barParts: [(count: Int, color: Color, label: String, hatched: Bool)] {
+        [
+            (model.identifiedCount, P.okInk, String(localized: "\(model.identifiedCount) identifié"), false),
+            (model.unidentifiedCount, P.accent, String(localized: "\(model.unidentifiedCount) à identifier"), false),
+            (model.uncheckableCount, P.hairStrong, String(localized: "\(model.uncheckableCount) invérifiable"), false),
+            (model.pendingCount, P.barTrack, String(localized: "\(model.pendingCount) pas encore vérifié"), true)
+        ].filter { $0.count > 0 }
+    }
+
+    private var stackedBar: some View {
+        let parts = barParts
+        let total = max(1, parts.reduce(0) { $0 + $1.count })
+        return GeometryReader { proxy in
+            let gaps = CGFloat(max(0, parts.count - 1)) * 2
+            HStack(spacing: 2) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    Rectangle()
+                        .fill(part.color)
+                        .overlay {
+                            if part.hatched { HatchPattern().stroke(P.hairStrong, lineWidth: 1).clipped() }
+                        }
+                        .frame(width: max(3, (proxy.size.width - gaps) * CGFloat(part.count) / CGFloat(total)))
+                }
+            }
+            .clipShape(Capsule(style: .continuous))
+        }
+        .frame(height: 10)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: parts.map(\.label).joined(separator: ", ")))
+        .accessibilityIdentifier("radioLogs.summary.bar")
+    }
+
+    private var legend: some View {
+        // Les étiquettes passent à la ligne plutôt que de se tronquer.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.md) { legendItems }
+            VStack(alignment: .leading, spacing: SQSpace.xs) { legendItems }
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var legendItems: some View {
+        ForEach(Array(barParts.enumerated()), id: \.offset) { _, part in
+            HStack(spacing: SQSpace.xs) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(part.color)
+                    .overlay {
+                        if part.hatched {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous).strokeBorder(P.hairStrong, lineWidth: 1)
+                        }
+                    }
+                    .frame(width: 9, height: 9)
+                Text(verbatim: part.label)
+                    .font(SQType.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize()
+            }
+        }
+    }
+
+    /// État de la vérification une fois terminée, et de quoi la relancer.
+    private var verifiedFooter: some View {
+        let percent = Int((model.completion * 100).rounded())
+        return HStack(spacing: SQSpace.sm) {
+            Image(systemName: percent >= 100 ? "checkmark" : "clock")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(percent >= 100 ? P.okInk : SQColor.labelSecondary)
+                .accessibilityHidden(true)
+            // Recalculé chaque minute : la date relative ne vieillissait qu'au rendu.
+            TimelineView(.periodic(from: .now, by: 60)) { _ in
+                Text(verbatim: verifiedFooterText(percent: percent))
+                    .font(SQType.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                model.rescanAll()
+                Haptics.selection()
+            } label: {
+                Text("Revérifier")
+                    .font(SQFont.body(12, .bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Demande au serveur le statut de tous les sites"))
+            .accessibilityIdentifier("radioLogs.rescan")
+        }
+        .padding(.top, SQSpace.xs)
+        .overlay(alignment: .top) { Rectangle().fill(P.hair).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("radioLogs.verified")
+    }
+
+    private func verifiedFooterText(percent: Int) -> String {
+        var parts = [percent >= 100
+            ? String(localized: "Catalogue vérifié")
+            : String(localized: "\(percent) % du catalogue vérifié")]
+        if let lastSyncedAt = model.lastSyncedAt {
+            parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// « 214 sites », le nombre en grand : la clé plurielle reste celle du reste
@@ -319,37 +496,6 @@ struct RadioLogsView: View {
             tally[tally.startIndex..<range].foregroundColor = SQColor.label
         }
         return tally
-    }
-
-    private var tallySubtitle: String {
-        // Traduit, avec les variantes de pluriel du catalogue (« 0 relevé » en
-        // français, « 0 measurements » en anglais).
-        var parts = [String(localized: "\(model.logCount) relevé")]
-        if let lastSyncedAt = model.lastSyncedAt {
-            parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    /// La complétude PERMANENTE. Elle reste après le balayage : elle dit l'état de
-    /// CONNAISSANCE du catalogue, pas une tâche en cours.
-    private var verifiedPill: some View {
-        let percent = Int((model.completion * 100).rounded())
-        return HStack(spacing: SQSpace.xs) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .bold))
-                .accessibilityHidden(true)
-            Text("\(percent) % vérifiés")
-                .font(SQFont.body(12, .bold))
-                .monospacedDigit()
-        }
-        .foregroundStyle(P.okInk)
-        .padding(.horizontal, SQSpace.sm)
-        .frame(minHeight: 26)
-        .background(P.okSoft, in: Capsule(style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Catalogue vérifié à \(percent) pour cent")
-        .accessibilityIdentifier("radioLogs.verified")
     }
 
     /// La vérification du catalogue, dans la carte de synthèse : elle se suspend
@@ -454,39 +600,52 @@ struct RadioLogsView: View {
         .accessibilityIdentifier("radioLogs.sortSummary")
     }
 
-    /// L'entrée de la file en chaîne. Elle n'ouvre pas douze fois le même écran :
-    /// elle ouvre UNE file, dont on sort à tout moment.
+    /// L'entrée de la file en chaîne, le geste principal de la page : c'est pour
+    /// identifier ce qui reste qu'on y revient. Elle ouvre UNE file, dont on sort à
+    /// tout moment, et dit combien de sites ont déjà un support proposé.
     private var chainCallToAction: some View {
         let candidates = model.chainCandidates
-        return Button {
-            chainQueue = RadioLogChainQueue(sites: Array(candidates.prefix(50)))
-            Haptics.selection()
-        } label: {
-            HStack(spacing: SQSpace.md) {
-                SQIconPastille(systemImage: "list.bullet.rectangle.portrait", size: 38, tint: SQColor.accentInk, fill: SQColor.surface)
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(P.onAccent)
+                    .frame(width: 44, height: 44)
+                    .background(P.onAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Identifier \(min(candidates.count, 50)) site à la suite")
-                        .font(SQFont.body(14, .bold))
-                        .foregroundStyle(SQColor.label)
-                    Text("Un site après l’autre, tu t’arrêtes quand tu veux.")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "\(candidates.count) site à identifier"))
+                        .font(SQFont.display(18, .heavy, relativeTo: .headline))
+                        .monospacedDigit()
+                        .foregroundStyle(P.onAccent)
+                        .sqHeader()
+                    Text(model.proposedCount > 0
+                         ? String(localized: "\(model.proposedCount) avec un support déjà proposé. Un geste suffit.")
+                         : String(localized: "Un site après l’autre, tu t’arrêtes quand tu veux."))
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(P.onAccent.opacity(0.92))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .accessibilityHidden(true)
             }
-            .padding(SQSpace.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(P.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            .contentShape(Rectangle())
+            Button {
+                chainQueue = RadioLogChainQueue(sites: Array(candidates.prefix(50)))
+                Haptics.selection()
+            } label: {
+                Text("Identifier à la suite")
+                    .font(SQFont.body(15, .bold))
+                    .foregroundStyle(P.accent)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(P.onAccent, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Ouvre les sites à identifier un par un"))
+            .accessibilityIdentifier("radioLogs.chain")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("radioLogs.chain")
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(P.accent, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - États
@@ -661,6 +820,20 @@ private struct IndeterminateSlide: ViewModifier {
         withAnimation(animation) {
             offset = width * 0.7
         }
+    }
+}
+
+/// Hachures de la part « pas encore vérifiés » : une attente, pas un résultat.
+private struct HatchPattern: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x = rect.minX - rect.height
+        while x < rect.maxX {
+            path.move(to: CGPoint(x: x, y: rect.maxY))
+            path.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+            x += 5
+        }
+        return path
     }
 }
 

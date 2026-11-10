@@ -32,12 +32,21 @@ final class RadioLogsRenderingTests: XCTestCase {
             ("fr", Locale(identifier: "fr_FR"), .large, true),
             ("en", Locale(identifier: "en_US"), .large, true),
             ("fr-xxl", Locale(identifier: "fr_FR"), .xxxLarge, true),
-            ("fr-repliee", Locale(identifier: "fr_FR"), .large, false),
+            // Site à identifier avec un support proposé : bloc « C’est lui ».
+            ("fr-proposition", Locale(identifier: "fr_FR"), .large, false),
+            ("en-proposition", Locale(identifier: "en_US"), .large, false),
         ]
-        for (name, locale, size, expanded) in cases {
+        let proposal = RadioLogSiteHypothesis(
+            siteId: "0381522", latitude: 45.24, longitude: 5.68, confidenceScore: nil,
+            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+        )
+        for (name, locale, size, identified) in cases {
             let content = RadioLogSiteCard(
-                site: site, state: .identified(siteId: "0381234"), siteName: "Grenoble · 12 rue Félix Poulat",
-                isExpanded: expanded, onIdentify: {}, onOpenMap: {}
+                site: site,
+                state: identified ? .identified(siteId: "0381234") : .unidentified,
+                siteName: identified ? "Grenoble · 12 rue Félix Poulat" : nil,
+                proposal: identified ? nil : proposal,
+                onOpen: {}, onIdentify: {}, onOpenMap: {}, onConfirmProposal: {}
             )
             .padding(16)
             .frame(width: 390)
@@ -48,7 +57,7 @@ final class RadioLogsRenderingTests: XCTestCase {
             renderer.scale = 2
             let image = try XCTUnwrap(renderer.uiImage)
             XCTAssertEqual(image.size.width, 390, accuracy: 0.1)
-            XCTAssertGreaterThan(image.size.height, 100)
+            XCTAssertGreaterThan(image.size.height, 60, "Rangée écrasée")
             try XCTUnwrap(image.pngData()).write(to: output.appendingPathComponent("\(name).png"))
         }
     }

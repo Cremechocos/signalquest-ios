@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import SignalQuest
 
@@ -560,7 +561,7 @@ final class RadioLogsTests: XCTestCase {
         }
         defer { MockURLProtocol.requestHandler = nil }
         let service = RadioLogsService(api: APIClient(config: .test, session: URLSession(configuration: configuration)))
-        for await states in service.scanStream(sites: [site]) { XCTAssertTrue(states.isEmpty) }
+        for await update in service.scanStream(sites: [site]) { XCTAssertTrue(update.states.isEmpty) }
     }
 
     func testDecodesServingNetworkIdentityWithoutLosingMncZeroes() throws {
@@ -1133,11 +1134,27 @@ private struct StubIdentifyService: IdentifyServicing {
     func editSectors(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> EditSectorsResult { throw APIError.cancelled }
 }
 
+/// Service qui ne sert qu'un journal en cache, pour la carte de la fiche.
+private struct SnapshotRadioLogsService: RadioLogsServicing {
+    let entries: [RadioLogEntry]
+    func cachedSnapshot() -> RadioLogSnapshot { RadioLogSnapshot(entries: entries) }
+    func syncStream() -> AsyncStream<RadioLogSyncProgress> { AsyncStream { $0.finish() } }
+    func cachedSiteStates() -> [String: RadioLogSiteState] { [:] }
+    func cachedSiteProposals() -> [String: RadioLogSiteHypothesis] { [:] }
+    func scanStream(sites: [RadioLogSite]) -> AsyncStream<RadioLogScanUpdate> { AsyncStream { $0.finish() } }
+    func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? { nil }
+    func markIdentified(siteKey: String, siteId: String) {}
+    func markWithdrawn(siteKey: String) {}
+    func purge() async throws {}
+    func clearLocalCache() {}
+}
+
 private struct StubRadioLogsService: RadioLogsServicing {
     func cachedSnapshot() -> RadioLogSnapshot { RadioLogSnapshot() }
     func syncStream() -> AsyncStream<RadioLogSyncProgress> { AsyncStream { $0.finish() } }
     func cachedSiteStates() -> [String: RadioLogSiteState] { [:] }
-    func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]> { AsyncStream { $0.finish() } }
+    func cachedSiteProposals() -> [String: RadioLogSiteHypothesis] { [:] }
+    func scanStream(sites: [RadioLogSite]) -> AsyncStream<RadioLogScanUpdate> { AsyncStream { $0.finish() } }
     func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? { nil }
     func markIdentified(siteKey: String, siteId: String) {}
     func markWithdrawn(siteKey: String) {}
@@ -1548,6 +1565,149 @@ extension RadioLogsTests {
             nowMs: 1_786_000_060_000
         )
         XCTAssertEqual(states["enb:626821"], .identified(siteId: "sup-42"))
+    }
+
+    /// « C'est lui » lit la proposition que la vérification a DÉJÀ reçue : le lot
+    /// `identify/quick/batch` rend la même charge que l'appel unitaire, hypothèse
+    /// comprise. La proposition garde la commune et l'adresse pour la ligne.
+    func testProposalComesFromTheResolutionWithItsPlace() throws {
+        let proximity = try JSONDecoder.signalQuest.decode(QuickIdentifyResolution.self, from: Data(#"""
+        {"found":true,"siteId":"0381522","resolutionMode":"proximity","requiresUserConfirmation":true,
+         "distanceMeters":240,
+         "hypothesis":{"siteId":"0381522","latitude":45.24,"longitude":5.68,"commune":"Le Fontanil",
+                        "address":"rue du Rocher","distanceMeters":240,"confidenceScore":71}}
+        """#.utf8))
+        let proposal = try XCTUnwrap(RadioLogsService.proposal(from: proximity))
+        XCTAssertEqual(proposal.siteId, "0381522")
+        XCTAssertEqual(proposal.distanceMeters, 240)
+        XCTAssertEqual(proposal.placeLabel, "Le Fontanil — rue du Rocher")
+
+        let ambiguous = try JSONDecoder.signalQuest.decode(QuickIdentifyResolution.self, from: Data(#"""
+        {"found":true,"ambiguous":true,"hypothesis":{"siteId":"x","distanceMeters":10}}
+        """#.utf8))
+        XCTAssertNil(RadioLogsService.proposal(from: ambiguous), "Une réponse ambiguë ne propose rien")
+
+        let tooFar = try JSONDecoder.signalQuest.decode(QuickIdentifyResolution.self, from: Data(#"""
+        {"found":true,"hypothesis":{"siteId":"y","distanceMeters":400000}}
+        """#.utf8))
+        XCTAssertNil(RadioLogsService.proposal(from: tooFar), "Un support à 400 km n'est pas une piste")
+    }
+
+    /// La proposition survit au retour sur l'écran avec le statut, disparaît quand le
+    /// site devient identifié, et un ancien fichier sans proposition se relit.
+    /// La carte de la fiche ne garde que les relevés de CE nœud, géolocalisés,
+    /// du plus récent au plus ancien, et au plus 200.
+    func testDetailMapReadingsKeepOnlyThisNodeNewestFirst() throws {
+        var entries: [RadioLogEntry] = []
+        for index in 0..<230 {
+            entries.append(try detailEntry(id: "e\(index)", enb: "812777", minute: index, rsrp: -80 - index % 40))
+        }
+        entries.append(try detailEntry(id: "other", enb: "999", minute: 500, rsrp: -70))
+        entries.append(try detailEntry(id: "nogps", enb: "812777", minute: 600, rsrp: -70, located: false))
+
+        let readings = RadioLogSiteDetailView.readings(from: entries, kind: .enb, node: "812777")
+        XCTAssertEqual(readings.count, RadioLogSiteDetailView.maxMapReadings)
+        XCTAssertEqual(readings.first?.id, "e229", "Le plus récent d'abord")
+        XCTAssertFalse(readings.contains { $0.id == "other" || $0.id == "nogps" })
+        XCTAssertTrue(RadioLogSiteDetailView.readings(from: entries, kind: .gnb, node: "812777").isEmpty)
+    }
+
+    /// Captures de la fiche d'un site pour relecture (clair, sombre, FR) :
+    /// `TEST_RUNNER_SQ_LOGS_SHOTS=<dossier>`. Le mode démo n'a pas de journal,
+    /// c'est la seule vue de la fiche hors compte réel.
+    @MainActor
+    func testCaptureSiteDetailForReview() async throws {
+        guard let output = ProcessInfo.processInfo.environment["SQ_LOGS_SHOTS"] else {
+            throw XCTSkip("SQ_LOGS_SHOTS absent")
+        }
+        try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
+        var entries: [RadioLogEntry] = []
+        for index in 0..<40 {
+            let angle = Double(index) / 40 * 2 * .pi
+            entries.append(try detailEntry(
+                id: "d\(index)", enb: "812777", minute: index, rsrp: -78 - (index * 7) % 50,
+                latitude: 45.252 + 0.006 * cos(angle) + Double(index % 5) * 0.0004,
+                longitude: 5.672 + 0.009 * sin(angle)
+            ))
+        }
+        let site = RadioLogSite(
+            id: "orange|208|01|eNB|812777", kind: .enb, node: "812777", operatorName: "Orange", rawOperatorName: "Orange F",
+            operatorKey: "orange", marketCode: "FR", countryCode: "FR", isRoaming: false, mcc: "208", mnc: "01",
+            cells: [
+                RadioLogCell(id: "c1", pci: 35, ci: 207_960_321, eciCellId: nil, identityKind: "ECI",
+                             networkIdentitySource: "SERVING_CELL", band: 3, earfcn: 1_501, bestRsrp: -84, logCount: 28),
+                RadioLogCell(id: "c2", pci: 36, ci: 207_960_322, eciCellId: nil, identityKind: "ECI",
+                             networkIdentitySource: "SERVING_CELL", band: 20, earfcn: 6_300, bestRsrp: -109, logCount: 12),
+            ],
+            logCount: 40, firstSeenAt: Date(timeIntervalSince1970: 1_790_000_000),
+            lastSeenAt: Date(timeIntervalSince1970: 1_790_050_000), latitude: 45.252, longitude: 5.672, band: 3, earfcn: 1_501
+        )
+        let proposal = RadioLogSiteHypothesis(
+            siteId: "0381522", latitude: 45.255, longitude: 5.668, confidenceScore: nil,
+            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+        )
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.makeKeyAndVisible()
+        for scheme in [ColorScheme.light, .dark] {
+            let view = RadioLogSiteDetailView(
+                site: site, state: .unidentified, siteName: nil, proposal: proposal, isMine: false,
+                service: SnapshotRadioLogsService(entries: entries), antennas: StubAntennasService(),
+                onIdentify: {}, onConfirmProposal: {}
+            )
+            .environment(\.colorScheme, scheme)
+            let host = UIHostingController(rootView: view)
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: 6_000_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(
+                to: URL(fileURLWithPath: output).appendingPathComponent("fiche-\(scheme == .dark ? "sombre" : "clair").png")
+            )
+        }
+    }
+
+    private func detailEntry(
+        id: String, enb: String, minute: Int, rsrp: Int,
+        latitude: Double = 45.25, longitude: Double = 5.67, located: Bool = true
+    ) throws -> RadioLogEntry {
+        let observed = String(format: "2026-07-01T%02d:%02d:00.000Z", 8 + minute / 60, minute % 60)
+        var json = #"{"id":"\#(id)","dedupeKey":"\#(id)","scope":"cap","technology":"LTE","operator":"Orange","mccMnc":"208-01","enb":"\#(enb)","rsrp":\#(rsrp),"observedAt":"\#(observed)","updatedAt":"\#(observed)""#
+        if located { json += #","latitude":\#(latitude),"longitude":\#(longitude)"# }
+        json += "}"
+        return try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: Data(json.utf8))
+    }
+
+    func testProposalIsStoredWithTheStatusAndClearedOnIdentification() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("radiolog-status-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let proposal = RadioLogSiteHypothesis(
+            siteId: "0381522", latitude: 45.24, longitude: 5.68, confidenceScore: nil,
+            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+        )
+        let now = 1_786_000_000_000
+        let store = RadioLogSiteStatusStore(fileURL: url)
+        store.merge(["enb:812777": .unidentified], proposals: ["enb:812777": proposal], nowMs: now)
+        XCTAssertEqual(
+            RadioLogSiteStatusStore(fileURL: url).freshProposals(unidentifiedTtlMs: 3_600_000, nowMs: now + 60_000),
+            ["enb:812777": proposal]
+        )
+        XCTAssertTrue(store.freshProposals(unidentifiedTtlMs: 3_600_000, nowMs: now + 7_200_000).isEmpty,
+                      "Une proposition périmée n'est plus servie")
+
+        store.merge(["enb:812777": .identified(siteId: "0381522")], nowMs: now + 120_000)
+        XCTAssertTrue(store.freshProposals(unidentifiedTtlMs: 3_600_000, nowMs: now + 180_000).isEmpty)
+
+        // Fichier écrit par la version précédente : pas de champ `proposal`.
+        let legacy = #"{"states":{"enb:1":{"state":{"kind":"unidentified"},"updatedAtMs":\#(now)}}}"#
+        try Data(legacy.utf8).write(to: url)
+        let reloaded = RadioLogSiteStatusStore(fileURL: url)
+        XCTAssertEqual(reloaded.fresh(identifiedTtlMs: 1, unidentifiedTtlMs: 3_600_000, nowMs: now)["enb:1"], .unidentified)
+        XCTAssertTrue(reloaded.freshProposals(unidentifiedTtlMs: 3_600_000, nowMs: now).isEmpty)
     }
 }
 

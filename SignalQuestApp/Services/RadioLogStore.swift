@@ -165,8 +165,18 @@ protocol RadioLogSiteStatusStoring: Sendable {
     /// Statuts encore frais. La durée de vie dépend du VERDICT, pas de l'entrée :
     /// voir `RadioLogsService` pour le raisonnement.
     func fresh(identifiedTtlMs: Int, unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteState]
-    func merge(_ states: [String: RadioLogSiteState], nowMs: Int)
+    /// Supports proposés encore frais, pour les sites non identifiés seulement.
+    func freshProposals(unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteHypothesis]
+    /// Écrit les statuts. Un site sans proposition dans `proposals` perd la sienne :
+    /// la nouvelle réponse remplace l'ancienne, elle ne s'y ajoute pas.
+    func merge(_ states: [String: RadioLogSiteState], proposals: [String: RadioLogSiteHypothesis], nowMs: Int)
     func clear()
+}
+
+extension RadioLogSiteStatusStoring {
+    func merge(_ states: [String: RadioLogSiteState], nowMs: Int) {
+        merge(states, proposals: [:], nowMs: nowMs)
+    }
 }
 
 private struct RadioLogSiteStatusFile: Codable {
@@ -210,12 +220,27 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
         return out
     }
 
-    func merge(_ states: [String: RadioLogSiteState], nowMs: Int) {
+    func freshProposals(unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteHypothesis] {
+        lock.lock(); defer { lock.unlock() }
+        let file = (try? readUnlocked()) ?? RadioLogSiteStatusFile()
+        var out: [String: RadioLogSiteHypothesis] = [:]
+        for (key, cached) in file.states where cached.state.isUnidentified {
+            guard let proposal = cached.proposal, nowMs - cached.updatedAtMs <= unidentifiedTtlMs else { continue }
+            out[key] = proposal
+        }
+        return out
+    }
+
+    func merge(_ states: [String: RadioLogSiteState], proposals: [String: RadioLogSiteHypothesis], nowMs: Int) {
         guard !states.isEmpty else { return }
         lock.lock(); defer { lock.unlock() }
         var file = (try? readUnlocked()) ?? RadioLogSiteStatusFile()
         for (key, state) in states {
-            file.states[key] = CachedRadioLogSiteState(state: state, updatedAtMs: nowMs)
+            file.states[key] = CachedRadioLogSiteState(
+                state: state,
+                updatedAtMs: nowMs,
+                proposal: state.isUnidentified ? proposals[key] : nil
+            )
         }
         if file.states.count > maxEntries {
             let kept = file.states.sorted { $0.value.updatedAtMs > $1.value.updatedAtMs }.prefix(maxEntries)

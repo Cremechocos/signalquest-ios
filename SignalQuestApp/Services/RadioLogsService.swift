@@ -15,13 +15,15 @@ protocol RadioLogsServicing: Sendable {
     func syncStream() -> AsyncStream<RadioLogSyncProgress>
     /// Statuts d'identification encore FRAIS, sans réseau.
     func cachedSiteStates() -> [String: RadioLogSiteState]
+    /// Supports proposés par la dernière vérification, encore frais, sans réseau.
+    func cachedSiteProposals() -> [String: RadioLogSiteHypothesis]
     /// Persiste une identification faite par l'utilisateur, pour qu'elle survive au retour sur
     /// l'écran — le balayage n'en sait rien tant qu'il n'a pas retourné ce site.
     func markIdentified(siteKey: String, siteId: String)
     /// L'identification vient d'être retirée ou supprimée : le site est de nouveau à identifier.
     func markWithdrawn(siteKey: String)
     /// Balaie le catalogue par fenêtres, en émettant chaque fenêtre résolue.
-    func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]>
+    func scanStream(sites: [RadioLogSite]) -> AsyncStream<RadioLogScanUpdate>
     /// Hypothèse de site pour UN site non identifié — charge complète, position
     /// comprise. Coûteuse : réservée à l'écran où l'on regarde un site à la fois.
     /// `nil` = le serveur n'a pas de piste ; une erreur = la piste n'a pas pu être demandée.
@@ -31,6 +33,14 @@ protocol RadioLogsServicing: Sendable {
     func purge() async throws
     /// Efface le cache local (journal + statuts).
     func clearLocalCache()
+}
+
+/// Une fenêtre de balayage résolue : le statut de chaque site, et pour les sites non
+/// identifiés le support que le serveur propose, quand il en propose un. La
+/// proposition vient de la MÊME réponse que le statut : aucun appel de plus.
+struct RadioLogScanUpdate: Sendable, Equatable {
+    var states: [String: RadioLogSiteState] = [:]
+    var proposals: [String: RadioLogSiteHypothesis] = [:]
 }
 
 /// Avancement d'un rattrapage.
@@ -278,6 +288,10 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         )
     }
 
+    func cachedSiteProposals() -> [String: RadioLogSiteHypothesis] {
+        statusStore.freshProposals(unidentifiedTtlMs: unidentifiedTtlMs, nowMs: nowMs())
+    }
+
     /// Inscrit une identification que L'UTILISATEUR vient de faire.
     ///
     /// Sans cela, le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le
@@ -300,12 +314,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// Le lot reste borné, mais chaque item transporte la preuve disponible :
     /// PLMN exact, position médiane et cellule représentative. Un gNB logique
     /// seul ne peut pas désigner un site physique.
-    func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]> {
+    func scanStream(sites: [RadioLogSite]) -> AsyncStream<RadioLogScanUpdate> {
         AsyncStream { continuation in
             let task = Task { [weak self] in
                 guard let self else { continuation.finish(); return }
                 let windows = sites.chunked(into: self.scanWindow)
-                await withTaskGroup(of: [String: RadioLogSiteState].self) { group in
+                await withTaskGroup(of: RadioLogScanUpdate.self) { group in
                     var iterator = windows.makeIterator()
                     var inFlight = 0
                     for _ in 0..<self.scanWindowsInFlight {
@@ -316,8 +330,8 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
                     while inFlight > 0, let resolved = await group.next() {
                         inFlight -= 1
                         if Task.isCancelled { break }
-                        if !resolved.isEmpty {
-                            self.statusStore.merge(resolved, nowMs: self.nowMs())
+                        if !resolved.states.isEmpty {
+                            self.statusStore.merge(resolved.states, proposals: resolved.proposals, nowMs: self.nowMs())
                             continuation.yield(resolved)
                         }
                         if let window = iterator.next() {
@@ -333,12 +347,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         }
     }
 
-    private func scanWindow(_ window: [RadioLogSite]) async -> [String: RadioLogSiteState] {
+    private func scanWindow(_ window: [RadioLogSite]) async -> RadioLogScanUpdate {
         // Un nœud sans PLMN exact n'est pas une recherche mondiale : l'API
         // historique pourrait appliquer son marché par défaut. Il reste lisible,
         // mais aucune réponse ne doit lui fabriquer un rattachement.
         let eligible = window.filter(\.isCheckable)
-        guard !eligible.isEmpty else { return [:] }
+        guard !eligible.isEmpty else { return RadioLogScanUpdate() }
         let items = eligible.map(Self.batchItem)
         do {
             let response: QuickIdentifyBatchResponse = try await api.requestJSON(
@@ -356,8 +370,13 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             // Un statut pour CHAQUE site demandé, non trouvés compris. Ne rien
             // rendre pour un site le laisserait « jamais vérifié » et le ferait
             // revenir à la passe suivante, indéfiniment.
-            return eligible.reduce(into: [:]) { states, site in
-                states[site.id] = Self.state(from: byId[site.id]?.result, site: site)
+            return eligible.reduce(into: RadioLogScanUpdate()) { update, site in
+                let resolution = byId[site.id]?.result
+                let state = Self.state(from: resolution, site: site)
+                update.states[site.id] = state
+                if state.isUnidentified, let resolution, let proposal = Self.proposal(from: resolution) {
+                    update.proposals[site.id] = proposal
+                }
             }
         } catch {
             // Fenêtre en échec : on n'écrit RIEN plutôt qu'un « non identifié »
@@ -365,7 +384,7 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             if !error.isCancellation {
                 logger.error("fenêtre de balayage échouée: \(error.localizedDescription, privacy: .public)")
             }
-            return [:]
+            return RadioLogScanUpdate()
         }
     }
 
@@ -474,7 +493,13 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             "/api/android/map/identify/quick",
             body: fields
         )
+        return Self.proposal(from: resolution)
+    }
 
+    /// La piste que porte une réponse `identify/quick`, unitaire ou en lot (le lot rend
+    /// le même contenu, item par item). Une réponse ambiguë, sans support désigné ou
+    /// à une distance absurde ne propose rien.
+    static func proposal(from resolution: QuickIdentifyResolution) -> RadioLogSiteHypothesis? {
         guard resolution.found == true,
               !resolution.isAmbiguousOrUnresolved,
               let payload = resolution.hypothesis,
@@ -492,7 +517,9 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             confidenceScore: payload.confidenceScore,
             distanceMeters: effectiveDistance.map { Int($0.rounded()) },
             sector: payload.sector,
-            resolutionMode: resolution.resolutionMode ?? resolution.source
+            resolutionMode: resolution.resolutionMode ?? resolution.source,
+            commune: payload.commune,
+            address: payload.address
         )
     }
 }
