@@ -106,9 +106,15 @@ extension SpeedtestAccountHistory {
                   !network.isEmpty else { return nil }
             return network
         }
-        guard let raw = detail.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty, SQBrand.operatorName(raw) != nil else { return nil }
-        return raw
+        return knownOperatorName(detail.mobileOperator)
+    }
+
+    /// Un nom d'opérateur brut, gardé seulement s'il désigne un opérateur connu de la
+    /// palette (France, outre-mer, Canada) : ailleurs, aucun nom plutôt qu'un faux.
+    static func knownOperatorName(_ raw: String?) -> String? {
+        guard let name = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty, SQBrand.operatorName(name) != nil else { return nil }
+        return name
     }
 
     /// « 5G NSA », « LTE », « 4G »… tel que les trois apps l'envoient.

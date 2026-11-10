@@ -87,6 +87,15 @@ final class SpeedtestAccountHistoryTests: XCTestCase {
         XCTAssertEqual(test.downloadAverageMbps, 50, "downloadSpeed may carry the peak for non-iOS sources")
         XCTAssertEqual(AccountSpeedtestRow(test: test).subtitleLine, "4G · Orange")
     }
+
+    /// cmw9share0nonoperateur01 : un nom qui n'est pas un opérateur n'est pas affiché.
+    func testAnUnknownOperatorNameIsNotShownInTheRow() {
+        let test = SocialShareableSpeedtest(id: "x", downloadSpeed: 60, uploadSpeed: nil, ping: 20,
+                                            networkType: "LTE", mobileOperator: "Cloudflare, Inc.", timestamp: t0)
+        XCTAssertEqual(AccountSpeedtestRow(test: test).subtitleLine, "4G")
+        XCTAssertNil(SpeedtestAccountHistory.knownOperatorName("Cloudflare, Inc."))
+        XCTAssertEqual(SpeedtestAccountHistory.knownOperatorName(" Rogers "), "Rogers")
+    }
 }
 
 /// Ticket du 26/10 : un test fait ailleurs s'ouvre avec la même fiche qu'un

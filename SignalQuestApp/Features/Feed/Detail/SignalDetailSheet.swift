@@ -519,7 +519,7 @@ struct SignalDetailSheet: View {
                     ? SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg) : ""),
                 // Opérateur, techno et latence du bloc de mesure ne s'y répètent pas (F-16) :
                 // le détail serveur ne les donne que quand le résumé ne les a pas.
-                ("Opérateur", (signal.servingOperator ?? signal.operator) == nil ? detail?.mobileOperator ?? "" : ""),
+                ("Opérateur", (signal.servingOperator ?? signal.operator) == nil ? detail.flatMap(SpeedtestAccountHistory.operatorName(of:)) ?? "" : ""),
                 ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
                 ("Technologie", signal.technology == nil ? detail?.networkType ?? "" : ""),
                 ("Latence min", latencyMinText(detail: detail, blockPing: signal.pingMs)),

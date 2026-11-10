@@ -822,7 +822,7 @@ struct SignalQuestHomeView: View {
             guard let download = test.downloadAverageMbps else { return nil }
             return DisplayedMeasurement(date: test.timestamp, downloadMbps: download, latencyMs: test.ping,
                                         technology: TechAccent.shortLabel(for: test.networkType),
-                                        operatorName: test.mobileOperator)
+                                        operatorName: SpeedtestAccountHistory.knownOperatorName(test.mobileOperator))
         }
         guard let account else { return local }
         guard let local, let localDate = local.date else { return account }

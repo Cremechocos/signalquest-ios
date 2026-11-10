@@ -5307,6 +5307,13 @@ struct MapItemSheet: View {
 
     /// Le débit de réception fait le titre ; envoi, latence et gigue en
     /// tuiles ; maximums et latence minimale dans les détails.
+    /// L'opérateur du test : celui du détail une fois chargé (même vide), sinon celui du
+    /// point de carte ; jamais un nom inconnu (« Cloudflare, Inc. »).
+    private func operatorKicker(detail: SpeedtestDetail?, local: String?) -> String? {
+        if let detail { return SpeedtestAccountHistory.operatorName(of: detail) }
+        return SpeedtestAccountHistory.knownOperatorName(local)
+    }
+
     private var speedtestContent: some View {
         let detail = speedtestDetail
         let local = item.details
@@ -5320,7 +5327,7 @@ struct MapItemSheet: View {
         let network = [detail?.connectionType, detail?.networkType].compactMap { $0 }.joined(separator: " / ")
         return VStack(alignment: .leading, spacing: SQSpace.lg) {
             header(
-                kicker: [String(localized: "Speedtest"), detail?.mobileOperator ?? local?.operatorName, tech],
+                kicker: [String(localized: "Speedtest"), operatorKicker(detail: detail, local: local?.operatorName), tech],
                 value: downloadAverage.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
                 unit: downloadAverage.map { String(localized: "\(SQUnits.throughputUnit(mbps: $0)) en réception") },
                 caption: [formatDate(detail?.timestamp) ?? local?.timestamp.map(SignalFormatters.dateAroundHour), distanceText]
