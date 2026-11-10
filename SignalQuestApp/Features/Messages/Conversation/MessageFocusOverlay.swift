@@ -32,10 +32,15 @@ struct FocusedMessage: Identifiable {
 
 /// Appui long sur une bulle : léger enfoncement pendant l'appui, puis ouverture.
 /// L'état d'appui vit ici pour ne pas redessiner toute la conversation.
+/// Simultané : sinon un bouton de la bulle (publication partagée, photo, carte,
+/// sondage) prend l'appui et la bulle ne se soulève jamais. La bulle soulevée est
+/// désactivée (`bubbleBody`), pour que le relâcher n'actionne pas aussi ce bouton.
+/// La priorité haute, elle, coupait le toucher simple d'un bouton sous le double
+/// toucher ❤️ (essais au simulateur du 10/11).
 struct MessageLongPress: ViewModifier {
     let isEnabled: Bool
     let onOpen: () -> Void
-    @State private var pressing = false
+    @GestureState private var pressing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
@@ -43,12 +48,11 @@ struct MessageLongPress: ViewModifier {
             content
                 .scaleEffect(pressing && !reduceMotion ? 0.96 : 1)
                 .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: pressing)
-                .onLongPressGesture(minimumDuration: 0.32, maximumDistance: 12) {
-                    pressing = false
-                    onOpen()
-                } onPressingChanged: { isPressing in
-                    pressing = isPressing
-                }
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.32, maximumDistance: 12)
+                        .updating($pressing) { value, state, _ in state = value }
+                        .onEnded { _ in onOpen() }
+                )
         } else {
             content
         }

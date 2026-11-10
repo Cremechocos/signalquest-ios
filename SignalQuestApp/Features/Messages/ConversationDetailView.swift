@@ -1873,8 +1873,10 @@ struct ConversationDetailView: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { [bubbleFrames] frame in
             bubbleFrames.frames[message.id] = frame
         }
-        // Pendant la présentation, la copie soulevée remplace la bulle.
+        // Pendant la présentation, la copie soulevée remplace la bulle ; désactivée,
+        // la bulle n'actionne pas au relâcher le bouton sous le doigt (publication, photo).
         .opacity(focusedMessage?.id == message.id ? 0 : 1)
+        .disabled(focusedMessage?.id == message.id)
         .accessibilityActions {
             ForEach(messageActions(for: message, mine: mine)) { action in
                 Button(action: action.perform) { action.title }
