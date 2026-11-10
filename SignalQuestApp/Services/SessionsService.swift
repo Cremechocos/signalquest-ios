@@ -422,6 +422,8 @@ protocol SessionsServicing: Sendable {
     /// la carte principale le montre quand un post du fil l'ouvre (contrat #958).
     /// Accessible au propriétaire, ou si la session est visible ou partagée.
     func sessionTrack(id: String) async throws -> [CoverageSessionPoint]
+    /// Analyse figée d'un trajet (DRIVE-ANALYSIS-1), mêmes droits que le détail.
+    func sessionAnalysis(id: String) async throws -> SessionAnalysis?
     // L'enregistrement de couverture est retiré d'iOS : les anciennes files
     // restent sur l'appareil, en lecture seule (`LocalCoverageArchiveReader`).
     // Ses méthodes d'écriture, qui ne faisaient plus que refuser, n'avaient
@@ -446,6 +448,8 @@ extension SessionsServicing {
     func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
         try await sessionDetail(id: id).points
     }
+
+    func sessionAnalysis(id: String) async throws -> SessionAnalysis? { nil }
 }
 
 final class SessionsService: SessionsServicing, @unchecked Sendable {
@@ -498,6 +502,16 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
             ),
             as: CoverageSessionDetail.self
         ).points
+    }
+
+    func sessionAnalysis(id: String) async throws -> SessionAnalysis? {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/coverage/sessions/analysis",
+                query: [URLQueryItem(name: "sessionId", value: id)]
+            ),
+            as: SessionAnalysisResponse.self
+        ).analysis
     }
 
     func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail {

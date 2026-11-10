@@ -15,6 +15,8 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var isLoadingMorePoints = false
     /// Change à chaque lot de points reçu : la carte ne se redessine que là.
     @Published var renderVersion = UUID()
+    /// Analyse figée par le serveur (DRIVE-ANALYSIS-1) ; nil tant qu'elle n'est pas prête.
+    @Published var analysis: SessionAnalysis?
     /// Tous les points sont là : revenir sur l'écran ne recharge rien.
     private var hasAllPoints = false {
         didSet { if hasAllPoints, !oldValue, let detail { onComplete?(detail) } }
@@ -170,6 +172,15 @@ final class SessionDetailViewModel: ObservableObject {
             if best == nil || d < best!.distance { best = (index, d) }
         }
         return best.map { k.km[$0.index] }
+    }
+
+    /// Seulement pour un trajet Drive Test à points : un trajet iOS (récap seul)
+    /// répondrait « no_points ». Un échec cache le bloc, sans message : le reste
+    /// du détail suffit.
+    func loadAnalysis(service: SessionsServicing) async {
+        guard session.isDriveTest, !session.isSummaryOnly, analysis == nil else { return }
+        guard let loaded = try? await service.sessionAnalysis(id: session.id), loaded.isDisplayable else { return }
+        analysis = loaded
     }
 
     func load(service: SessionsServicing) async {
@@ -393,6 +404,9 @@ struct SessionDetailView: View {
                 header
                 traceSection
                 summaryCard
+                if let analysis = model.analysis {
+                    SessionAnalysisCard(analysis: analysis)
+                }
                 generationSection
                 signalSection
                 speedtestsSection
@@ -427,6 +441,7 @@ struct SessionDetailView: View {
             if model.isLoading && model.detail == nil { SQSpinner().tint(SQColor.brandRed) }
         }
         .task { await model.load(service: services.sessions) }
+        .task { await model.loadAnalysis(service: services.sessions) }
         .task { marketRegistry = await services.markets.registry() }
         .sheet(item: $validationTarget) { target in
             ValidationsSheet(siteId: target.siteId, operatorName: target.operatorName, service: services.validations)
