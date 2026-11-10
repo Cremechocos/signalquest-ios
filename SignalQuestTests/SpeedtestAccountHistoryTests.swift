@@ -115,6 +115,24 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertEqual(result.durationSeconds, 15)
     }
 
+    /// cmw9share0nonoperateur01 : un nom qui n'est pas un opérateur n'atteint ni la fiche,
+    /// ni l'image, ni la légende de partage.
+    func testANameThatIsNotAnOperatorIsDropped() throws {
+        let base = #""id":"x","timestamp":"2026-03-11T10:00:00.000Z","averageSpeed":80,"connectionType":"CELLULAR","networkType":"LTE""#
+        // Serveur antérieur à MVNO-1 r3 : seul un nom de la palette est gardé.
+        let legacy = SpeedtestAccountHistory.runResult(from: try detail("{\(base),\"mobileOperator\":\"Cloudflare, Inc.\"}"))
+        XCTAssertNil(legacy.networkOperatorName)
+        XCTAssertNil(SpeedtestShareImageRenderer.shareText(for: legacy).range(of: "Cloudflare"))
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: try detail("{\(base),\"mobileOperator\":\"Orange\"}")).networkOperatorName, "Orange")
+        // MVNO-1 r3 : le serveur dit s'il a reconnu le réseau.
+        let unknown = try detail("{\(base),\"mobileOperator\":\"Cloudflare, Inc.\",\"operatorDisplay\":{\"brand\":null,\"brandSource\":null,\"network\":\"Cloudflare, Inc.\",\"networkKey\":null}}")
+        XCTAssertNil(SpeedtestAccountHistory.runResult(from: unknown).networkOperatorName)
+        let known = try detail("{\(base),\"mobileOperator\":\"Bouygues\",\"operatorDisplay\":{\"brand\":null,\"brandSource\":null,\"network\":\"Bouygues Telecom\",\"networkKey\":\"BOUYGUES\"}}")
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: known).networkOperatorName, "Bouygues Telecom")
+        // Une forme inattendue ne fait pas échouer le détail.
+        XCTAssertNil(try detail("{\(base),\"operatorDisplay\":\"x\"}").operatorDisplay)
+    }
+
     func testNetworkKindIsReadWithoutGuessing() {
         XCTAssertEqual(SpeedtestAccountHistory.cellularTechnology("LTE"), .fourG)
         XCTAssertNil(SpeedtestAccountHistory.cellularTechnology("5G"), "5G alone is neither NSA nor SA")

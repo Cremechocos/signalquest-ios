@@ -1279,6 +1279,16 @@ struct SpeedtestSaveResponse: Codable {
     var resolvedMvnoName: String? { responseString("mvnoName") }
 }
 
+/// MVNO-1 r3 : l'opérateur d'un speedtest servi en PARTIES par l'API (jamais une phrase).
+/// `networkKey` nul veut dire que le serveur n'a reconnu aucun réseau : `network` porte
+/// alors le nom brut reçu à l'envoi (un nom d'AS comme « Cloudflare, Inc. »), qui n'est
+/// pas un opérateur.
+struct SpeedtestServedOperatorDisplay: Decodable, Equatable {
+    let brand: String?
+    let network: String?
+    let networkKey: String?
+}
+
 struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let id: String
     let timestamp: Date?
@@ -1321,6 +1331,8 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let connectionKind: String?
     let networkType: String?
     let mobileOperator: String?
+    /// MVNO-1 r3, absent d'un serveur antérieur.
+    let operatorDisplay: SpeedtestServedOperatorDisplay?
     let mcc: Int?
     let mnc: Int?
     let latitude: Double?
@@ -1347,7 +1359,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
-        case id, timestamp, measuredAt, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
+        case id, timestamp, measuredAt, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, operatorDisplay, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
     }
 
@@ -1398,6 +1410,8 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         connectionKind = c.decodeFlexibleString(forKey: .connectionKind)
         networkType = c.decodeFlexibleString(forKey: .networkType)
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
+        // Tolérant : une forme inattendue ne fait pas échouer tout le détail.
+        operatorDisplay = (try? c.decodeIfPresent(SpeedtestServedOperatorDisplay.self, forKey: .operatorDisplay)) ?? nil
         mcc = try? c.decodeIfPresent(Int.self, forKey: .mcc)
         mnc = try? c.decodeIfPresent(Int.self, forKey: .mnc)
         latitude = try? c.decodeIfPresent(Double.self, forKey: .latitude)

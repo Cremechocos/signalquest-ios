@@ -73,7 +73,7 @@ extension SpeedtestAccountHistory {
             connectionType: connectionKind(served: detail.connectionKind)
                 ?? connectionKind(detail.connectionType, technology: technology),
             cellularTechnology: technology,
-            networkOperatorName: detail.mobileOperator,
+            networkOperatorName: operatorName(of: detail),
             networkOperatorMcc: detail.mcc,
             networkOperatorMnc: detail.mnc,
             address: includesPrivateDetails ? detail.address : nil,
@@ -91,6 +91,24 @@ extension SpeedtestAccountHistory {
             uploadServerHost: detail.uploadServerHost,
             uploadServerPort: detail.uploadServerPort
         )
+    }
+
+    /// Le réseau d'un test relu, seulement s'il désigne un opérateur reconnu
+    /// (cmw9share0nonoperateur01) : la ligne enregistrée peut porter un nom qui n'en est
+    /// pas un (« Cloudflare, Inc. », nom d'AS d'une ancienne version), que l'image et la
+    /// légende de partage annonceraient comme opérateur. Avec MVNO-1 r3, le serveur dit
+    /// lui-même s'il a reconnu le réseau (`networkKey`) ; sans, seul un nom de la palette
+    /// des opérateurs est gardé. Mieux vaut aucun nom qu'un faux.
+    static func operatorName(of detail: SpeedtestDetail) -> String? {
+        if let served = detail.operatorDisplay {
+            guard served.networkKey?.trimmingCharacters(in: .whitespaces).isEmpty == false,
+                  let network = served.network?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !network.isEmpty else { return nil }
+            return network
+        }
+        guard let raw = detail.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty, SQBrand.operatorName(raw) != nil else { return nil }
+        return raw
     }
 
     /// « 5G NSA », « LTE », « 4G »… tel que les trois apps l'envoient.
