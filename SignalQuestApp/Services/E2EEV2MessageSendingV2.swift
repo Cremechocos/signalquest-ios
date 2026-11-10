@@ -505,11 +505,17 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
     /// avec un compteur neuf, puis déposé tel quel. Rien n'entre dans la file
     /// d'envoi : seul l'ordonnanceur publie ce message. Avec `scheduledId`, le
     /// programmé existant est rechiffré par `PUT`, sous son `clientRequestId`.
+    ///
+    /// `sentAtMs` de la charge = l'échéance en vigueur (§7.8 F.6), jamais l'heure
+    /// de rédaction : `sendAt` demandé, sinon `currentSendAt`, celle que rend
+    /// `GET …/scheduled`. Les lecteurs comptent l'expiration d'un éphémère et
+    /// trient depuis `sentAtMs`. Chaque appel recompose sous un compteur neuf.
     func schedule(
         _ draft: Draft,
         conversationId: String,
         clientRequestId: String,
         sendAt: Date?,
+        currentSendAt: Date? = nil,
         scheduledId: String?,
         membership: E2EEV2MembershipState,
         devices: E2EEV2CertifiedDeviceSet,
@@ -520,9 +526,11 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:"),
               E2EEV2Canonical.isOpaque(conversationId), E2EEV2MessageCryptoV2.isClientRequestId(clientRequestId),
               scheduledId.map(E2EEAutoScheduledMessage.isScheduledId) ?? true,
-              (sendAt != nil) || (scheduledId != nil) else {
+              (sendAt != nil) || (scheduledId != nil),
+              let dueAt = sendAt ?? currentSendAt else {
             return .failure(localError("invalid-e2ee-schedule-scope"))
         }
+        let dueAtMs = Int64((dueAt.timeIntervalSince1970 * 1_000).rounded(.down))
         let ownerNamespace = session.ownerNamespace
         let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
         let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
@@ -550,7 +558,7 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         do {
             signed = try Self.lock.withLock {
                 guard let probe = try? E2EEV2ContentPayloadV2(
-                    sentAtMs: nowMs, counter: Int64(E2EEV2Canonical.maxSequenceNumber), replyToRef: draft.replyToRef,
+                    sentAtMs: dueAtMs, counter: Int64(E2EEV2Canonical.maxSequenceNumber), replyToRef: draft.replyToRef,
                     mentions: draft.mentions, body: draft.body
                 ).encoded(), (try? E2EEV2ContentPayloadV2.parse(probe)) != nil else {
                     throw SendFailure(reason: "e2ee-message-too-long")
@@ -564,7 +572,7 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
                     throw SendFailure(reason: "e2ee-send-counter-exhausted")
                 }
                 let payload = try E2EEV2ContentPayloadV2(
-                    sentAtMs: nowMs, counter: Int64(counter), replyToRef: draft.replyToRef, mentions: draft.mentions,
+                    sentAtMs: dueAtMs, counter: Int64(counter), replyToRef: draft.replyToRef, mentions: draft.mentions,
                     body: draft.body
                 ).encoded()
                 var fk = try E2EEV2MessageComposerV2.randomBytes(32)

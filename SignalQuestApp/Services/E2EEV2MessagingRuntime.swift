@@ -302,7 +302,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 return nil
             }) { devices in
                 await parts.messaging.schedule(
-                    draft, clientRequestId: clientRequestId, sendAt: sendAt, scheduledId: existing?.scheduledId,
+                    draft, clientRequestId: clientRequestId, sendAt: sendAt, currentSendAt: existing?.sendAt,
+                    scheduledId: existing?.scheduledId,
                     conversationId: conversationId, isGroup: isGroup, devices: devices,
                     expectedOwnerScopeId: parts.session.ownerScopeId
                 )

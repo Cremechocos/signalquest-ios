@@ -719,6 +719,7 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         try E2EEV2MessageCryptoV2.verifySignature(context: context, envelope: signed.envelope, signatureDerB64: signed.senderSignatureB64, senderSigningKey: ownKey)
         let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: signed.envelope, epochKey: seeded.epochKey, context: context)
         XCTAssertEqual(opened.payload.body, .text("À demain"))
+        XCTAssertEqual(opened.payload.sentAtMs, 1_793_955_600_000, "§7.8 F.6 : sentAtMs = sendAt, pas l'heure de rédaction")
         XCTAssertNil(try fixture.states.pendingSend(
             conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000101", ownerNamespace: fixture.session.ownerNamespace
         ), "Seul l'ordonnanceur publie un programmé : rien dans la file d'envoi")
@@ -740,7 +741,7 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         let again = await sender.schedule(
             .init(body: payload.body, replyToRef: payload.replyToRef, mentions: payload.mentions, ttlSeconds: 0),
             conversationId: seeded.conversationId, clientRequestId: listed.clientRequestId, sendAt: nil,
-            scheduledId: listed.scheduledId, membership: seeded.membership, devices: devices,
+            currentSendAt: listed.sendAt, scheduledId: listed.scheduledId, membership: seeded.membership, devices: devices,
             expectedOwnerScopeId: fixture.session.ownerScopeId
         )
         guard case .scheduled = again else { return XCTFail("Rechiffrement refusé : \(again)") }
@@ -752,6 +753,22 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         XCTAssertEqual(resigned.envelope.clientRequestId, signed.envelope.clientRequestId)
         XCTAssertNotEqual(resigned.envelope.counter, signed.envelope.counter)
         XCTAssertNotEqual(resigned.envelope.frankTagB64, signed.envelope.frankTagB64)
+        let reopened = try E2EEV2MessageCryptoV2.decrypt(envelope: resigned.envelope, epochKey: seeded.epochKey, context: resigned.context(
+            conversationId: seeded.conversationId, senderDeviceId: fixture.descriptor.deviceId
+        ))
+        XCTAssertEqual(reopened.payload.sentAtMs, Int64(listed.sendAt.timeIntervalSince1970 * 1_000), "PUT sans sendAt : l'échéance en vigueur")
+
+        // Sans échéance connue, rien n'est recomposé : jamais l'heure de rédaction.
+        let sentBefore = requests.all.count
+        let undated = await sender.schedule(
+            .init(body: payload.body, replyToRef: payload.replyToRef, mentions: payload.mentions, ttlSeconds: 0),
+            conversationId: seeded.conversationId, clientRequestId: listed.clientRequestId, sendAt: nil,
+            scheduledId: listed.scheduledId, membership: seeded.membership, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure(let undatedFailure) = undated else { return XCTFail("Sans échéance : \(undated)") }
+        XCTAssertEqual(undatedFailure.message, "invalid-e2ee-schedule-scope")
+        XCTAssertEqual(requests.all.count, sentBefore)
 
         // Un signataire inconnu du compte ne s'ouvre pas.
         let stranger = try XCTUnwrap(E2EEAutoScheduledMessage.parse(Self.listed(

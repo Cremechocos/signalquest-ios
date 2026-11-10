@@ -346,6 +346,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         _ draft: E2EEV2MessageSenderV2.Draft,
         clientRequestId: String,
         sendAt: Date?,
+        currentSendAt: Date? = nil,
         scheduledId: String?,
         conversationId: String,
         isGroup: Bool,
@@ -365,7 +366,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             }
             last = await sender.schedule(
                 draft, conversationId: conversationId, clientRequestId: clientRequestId, sendAt: sendAt,
-                scheduledId: scheduledId, membership: context.head, devices: devices,
+                currentSendAt: currentSendAt, scheduledId: scheduledId, membership: context.head, devices: devices,
                 expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
             )
             switch last {
