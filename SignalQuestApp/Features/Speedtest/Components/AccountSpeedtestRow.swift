@@ -64,8 +64,11 @@ struct AccountSpeedtestRow: View {
     /// « 5G · Orange » : le nom complet de l'opérateur, pas la clé « ORANGE » du serveur.
     var subtitleLine: String {
         let raw = test.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Un nom inconnu (« Cloudflare, Inc. ») n'est pas affiché comme opérateur.
-        let operatorName = raw.flatMap { SQBrand.operatorName($0) }
+        // MVNO-1 r3 servi : « <marque> · réseau <réseau> » ou le réseau reconnu ; sinon un
+        // nom inconnu (« Cloudflare, Inc. ») n'est pas affiché comme opérateur.
+        let operatorName = test.operatorDisplay != nil
+            ? SpeedtestAccountHistory.operatorLabel(display: test.operatorDisplay, raw: raw)
+            : raw.flatMap { SQBrand.operatorName($0) }
         return [TechAccent.shortLabel(for: test.networkType), operatorName]
             .compactMap { $0?.isEmpty == false ? $0 : nil }
             .joined(separator: " · ")

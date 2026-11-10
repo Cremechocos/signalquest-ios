@@ -880,7 +880,7 @@ struct FeedMeasureBlock: View {
         download = speedtest.averageSpeed ?? speedtest.downloadSpeed
         upload = speedtest.uploadSpeed
         ping = speedtest.ping
-        let parts = [SpeedtestAccountHistory.knownOperatorName(speedtest.mobileOperator), speedtest.networkType].compactMap { $0 }
+        let parts = [SpeedtestAccountHistory.operatorLabel(display: speedtest.operatorDisplay, raw: speedtest.mobileOperator), speedtest.networkType].compactMap { $0 }
         operatorAndTech = parts.isEmpty ? nil : parts.joined(separator: " ")
         roamingSim = nil
     }

@@ -89,7 +89,8 @@ extension SpeedtestAccountHistory {
             pingServerHost: detail.pingServerHost,
             pingServerPort: detail.pingServerPort,
             uploadServerHost: detail.uploadServerHost,
-            uploadServerPort: detail.uploadServerPort
+            uploadServerPort: detail.uploadServerPort,
+            servedBrand: detail.operatorDisplay?.brand?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 
@@ -107,6 +108,23 @@ extension SpeedtestAccountHistory {
             return network
         }
         return knownOperatorName(detail.mobileOperator)
+    }
+
+    /// L'opérateur à afficher sur une ligne (MVNO-1 r3) : « <marque> · réseau <réseau> »
+    /// quand l'API sert une marque, sinon le réseau reconnu seul ; sans `operatorDisplay`
+    /// (serveur antérieur), le nom brut s'il désigne un opérateur connu.
+    static func operatorLabel(display: SpeedtestServedOperatorDisplay?, raw: String?) -> String? {
+        guard let display else { return knownOperatorName(raw) }
+        let network: String? = {
+            guard display.networkKey?.trimmingCharacters(in: .whitespaces).isEmpty == false,
+                  let name = display.network?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty else { return nil }
+            return name
+        }()
+        guard let brand = display.brand?.trimmingCharacters(in: .whitespacesAndNewlines), !brand.isEmpty else {
+            return network
+        }
+        return network.map { String(localized: "\(brand) · réseau \($0)") } ?? brand
     }
 
     /// Un nom d'opérateur brut, gardé seulement s'il désigne un opérateur connu de la

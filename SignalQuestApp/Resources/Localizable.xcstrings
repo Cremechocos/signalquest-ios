@@ -111259,6 +111259,22 @@
           }
         }
       }
+    },
+    "%@ · réseau %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · réseau %2$@"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

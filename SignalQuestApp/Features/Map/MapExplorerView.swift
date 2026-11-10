@@ -5310,7 +5310,7 @@ struct MapItemSheet: View {
     /// L'opérateur du test : celui du détail une fois chargé (même vide), sinon celui du
     /// point de carte ; jamais un nom inconnu (« Cloudflare, Inc. »).
     private func operatorKicker(detail: SpeedtestDetail?, local: String?) -> String? {
-        if let detail { return SpeedtestAccountHistory.operatorName(of: detail) }
+        if let detail { return SpeedtestAccountHistory.operatorLabel(display: detail.operatorDisplay, raw: detail.mobileOperator) }
         return SpeedtestAccountHistory.knownOperatorName(local)
     }
 

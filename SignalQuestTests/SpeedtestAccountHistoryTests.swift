@@ -142,6 +142,28 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertNil(try detail("{\(base),\"operatorDisplay\":\"x\"}").operatorDisplay)
     }
 
+    /// MVNO-1 r3 (servi le 10/11) : « <marque> · réseau <réseau> » quand l'API sert une
+    /// marque (vrai MVNO, test Android), sinon le réseau reconnu seul.
+    func testServedBrandReadsBrandThenNetwork() throws {
+        let display = SpeedtestServedOperatorDisplay(brand: "La Poste Mobile", network: "Bouygues Telecom", networkKey: "BOUYGUES")
+        XCTAssertEqual(SpeedtestAccountHistory.operatorLabel(display: display, raw: "La Poste Mobile"), "La Poste Mobile · réseau Bouygues Telecom")
+        XCTAssertEqual(SpeedtestAccountHistory.operatorLabel(display: .init(brand: nil, network: "Orange", networkKey: "ORANGE"), raw: "Sosh"), "Orange")
+        XCTAssertEqual(SpeedtestAccountHistory.operatorLabel(display: .init(brand: "La Poste Mobile", network: "Cloudflare, Inc.", networkKey: nil), raw: nil), "La Poste Mobile")
+        XCTAssertNil(SpeedtestAccountHistory.operatorLabel(display: .init(brand: nil, network: "Cloudflare, Inc.", networkKey: nil), raw: "Cloudflare, Inc."))
+        XCTAssertEqual(SpeedtestAccountHistory.operatorLabel(display: nil, raw: "Orange"), "Orange")
+
+        let base = #""id":"x","timestamp":"2026-11-10T10:00:00.000Z","averageSpeed":80,"connectionType":"CELLULAR","networkType":"LTE""#
+        let result = SpeedtestAccountHistory.runResult(from: try detail("{\(base),\"mobileOperator\":\"Bouygues Telecom\",\"operatorDisplay\":{\"brand\":\"La Poste Mobile\",\"brandSource\":\"sim-column\",\"network\":\"Bouygues Telecom\",\"networkKey\":\"BOUYGUES\"}}"))
+        XCTAssertEqual(result.networkOperatorName, "Bouygues Telecom", "le partage nomme le réseau")
+        XCTAssertEqual(result.networkShareDisplayName, "La Poste Mobile · réseau Bouygues Telecom 4G")
+
+        let listed = try JSONDecoder.signalQuest.decode(SocialShareableSpeedtest.self, from: Data("""
+        {"id":"y","averageSpeed":50,"networkType":"LTE","mobileOperator":"Bouygues Telecom",
+         "operatorDisplay":{"brand":"La Poste Mobile","brandSource":"sim-column","network":"Bouygues Telecom","networkKey":"BOUYGUES"}}
+        """.utf8))
+        XCTAssertEqual(AccountSpeedtestRow(test: listed).subtitleLine, "4G · La Poste Mobile · réseau Bouygues Telecom")
+    }
+
     func testNetworkKindIsReadWithoutGuessing() {
         XCTAssertEqual(SpeedtestAccountHistory.cellularTechnology("LTE"), .fourG)
         XCTAssertNil(SpeedtestAccountHistory.cellularTechnology("5G"), "5G alone is neither NSA nor SA")

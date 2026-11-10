@@ -1079,9 +1079,11 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
     /// Heure de mesure (MEASURED-AT-1 r1) ; `timestamp` reste l'heure d'arrivée,
     /// qui ordonne et pagine la liste (décision A d'Alexandre, 09/11).
     var measuredAt: Date? = nil
+    /// MVNO-1 r3 (servi depuis le 10/11) : l'opérateur en parties ; absent d'un serveur antérieur.
+    var operatorDisplay: SpeedtestServedOperatorDisplay? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp, measuredAt
+        case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp, measuredAt, operatorDisplay
     }
 
     /// La réception à afficher : la moyenne quand le serveur la donne.
@@ -1116,6 +1118,7 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
         ping = try? c.decodeIfPresent(Double.self, forKey: .ping)
         networkType = c.decodeFlexibleString(forKey: .networkType)
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
+        operatorDisplay = (try? c.decodeIfPresent(SpeedtestServedOperatorDisplay.self, forKey: .operatorDisplay)) ?? nil
         // Heure de Paris sans fuseau : voir `SQDateParsing.parseParisWallClock`.
         if let raw = try? c.decodeIfPresent(String.self, forKey: .timestamp) {
             timestamp = SQDateParsing.parseParisWallClock(raw)

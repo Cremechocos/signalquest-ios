@@ -579,6 +579,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let carrierName: String?
     let mvnoKey: String?
     let mvnoName: String?
+    /// MVNO-1 r3 : marque servie par l'API pour un test relu (`operatorDisplay.brand`,
+    /// vrai MVNO d'un test Android seulement). Jamais remplie par une mesure de l'iPhone.
+    let servedBrand: String?
     let wifiSSID: String?
     let city: String?
     /// Adresse (rue + commune) reverse-géocodée du point de mesure. Envoyée au
@@ -697,7 +700,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         pingServerHost: String? = nil,
         pingServerPort: Int? = nil,
         uploadServerHost: String? = nil,
-        uploadServerPort: Int? = nil
+        uploadServerPort: Int? = nil,
+        servedBrand: String? = nil
     ) {
         self.id = id
         self.label = label
@@ -737,6 +741,7 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.carrierName = carrierName
         self.mvnoKey = mvnoKey
         self.mvnoName = mvnoName
+        self.servedBrand = servedBrand
         self.wifiSSID = wifiSSID
         self.city = city
         self.address = address
@@ -791,6 +796,12 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
             return "Wi‑Fi"
         case .cellular:
             let technology = cellularTechnology?.displayName
+            // MVNO-1 r3 : « <marque> · réseau <réseau> » quand l'API sert une marque.
+            if let brand = servedBrand?.trimmingCharacters(in: .whitespacesAndNewlines), !brand.isEmpty {
+                let network = networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let label = network.flatMap { $0.isEmpty ? nil : String(localized: "\(brand) · réseau \($0)") } ?? brand
+                return technology.map { "\(label) \($0)" } ?? label
+            }
             let simName = mvnoName ?? carrierName
             let operatorDisplay = [networkOperatorName, simName]
                 .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1283,7 +1294,7 @@ struct SpeedtestSaveResponse: Codable {
 /// `networkKey` nul veut dire que le serveur n'a reconnu aucun réseau : `network` porte
 /// alors le nom brut reçu à l'envoi (un nom d'AS comme « Cloudflare, Inc. »), qui n'est
 /// pas un opérateur.
-struct SpeedtestServedOperatorDisplay: Decodable, Equatable {
+struct SpeedtestServedOperatorDisplay: Codable, Equatable {
     let brand: String?
     let network: String?
     let networkKey: String?
