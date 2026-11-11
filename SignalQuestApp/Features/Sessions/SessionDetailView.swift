@@ -1798,6 +1798,12 @@ private struct SessionTraceFullScreen: View {
         if let band = point.primaryBand { radio.append(SQUnits.band(band, isNR: point.primaryBandIsNR)) }
         if let ta = point.timingAdvance, let meters = point.taDistanceMeters {
             radio.append(String(localized: "TA \(ta) ≈ \(SQUnits.distance(meters: meters))"))
+            if let doubt = SessionTADoubt.reasons(in: model.detail?.points ?? [])[point.id] {
+                radio.append(doubt.label)
+            }
+        }
+        if let accuracy = point.accuracy {
+            radio.append(String(localized: "GPS ± \(SQUnits.distance(meters: accuracy))"))
         }
         var cell: [String] = []
         if let pci = point.pci, !pci.isEmpty { cell.append("PCI \(pci)") }
@@ -1875,7 +1881,8 @@ private struct SessionTraceFullScreen: View {
                             .fill(SQBrand.operatorColor(antenna.operatorName ?? ""))
                             .frame(width: 10, height: 10)
                             .accessibilityHidden(true)
-                        Text(verbatim: Self.servedByText(antenna, site: group.coordinate, point: point))
+                        Text(verbatim: Self.servedByText(antenna, site: group.coordinate, point: point,
+                                                         doubt: SessionTADoubt.reasons(in: model.detail?.points ?? [])[point.id]))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.label)
                             .multilineTextAlignment(.leading)
@@ -1911,7 +1918,8 @@ private struct SessionTraceFullScreen: View {
     /// pour la précision du GPS et l'arrondi du TA lui-même.
     static let taToleranceMeters: Double = 3 * ServingAntenna.metersPerTimingAdvance
 
-    static func servedByText(_ antenna: ServingAntenna, site: CLLocationCoordinate2D, point: CoverageSessionPoint) -> String {
+    static func servedByText(_ antenna: ServingAntenna, site: CLLocationCoordinate2D, point: CoverageSessionPoint,
+                             doubt: SessionTADoubt? = nil) -> String {
         var parts: [String] = []
         let name = antenna.operatorDisplayName ?? String(localized: "Antenne")
         parts.append(String(localized: "Servi par \(name)"))
@@ -1923,7 +1931,9 @@ private struct SessionTraceFullScreen: View {
         let meters = CLLocation(latitude: site.latitude, longitude: site.longitude)
             .distance(from: CLLocation(latitude: point.lat, longitude: point.lng))
         parts.append(String(localized: "à \(SQUnits.distance(meters: meters)) du point"))
-        if let ta = point.taDistanceMeters {
+        if doubt != nil {
+            parts.append(String(localized: "TA écarté"))
+        } else if let ta = point.taDistanceMeters {
             parts.append(abs(meters - ta) <= taToleranceMeters
                          ? String(localized: "TA cohérent")
                          : String(localized: "TA incohérent"))
@@ -1939,6 +1949,8 @@ private struct SessionTraceFullScreen: View {
         let keys = group.nodeKeys
         let served = points.filter { $0.nodeKey.map(keys.contains) == true }
         let withTA = served.filter { $0.taDistanceMeters != nil }.count
+        let doubts = SessionTADoubt.reasons(in: points)
+        let discardedTA = served.filter { doubts[$0.id] != nil }.count
         // Le site servant lui-même face aux anneaux de ses points : la liste des
         // autres sites l'exclut, sans quoi « compatibles : 0 » ne disait rien de lui.
         let ownFit = SessionTraceHighlight.ringFit(
@@ -2019,10 +2031,14 @@ private struct SessionTraceFullScreen: View {
                 }
                 Text(verbatim: ([String(localized: "Points servis : \(served.count)"),
                                  String(localized: "avec TA : \(withTA)")]
+                                + (discardedTA > 0 ? [String(localized: "TA écartés : \(discardedTA)")] : [])
                                 + (ownFit.total > 0
                                    ? [String(localized: "anneaux TA compatibles : \(ownFit.matching) sur \(ownFit.total)")]
                                    : [])).joined(separator: " · "))
                     .monospacedDigit()
+                if discardedTA > 0 {
+                    Text("Les TA au GPS imprécis (plus de \(SQUnits.distance(meters: SessionTADoubt.maxAccuracyMeters))) ou figés pendant le trajet ne tracent pas d’anneau.")
+                }
                 if let estimate { Text(verbatim: estimate) }
                 if let conflict, let line = SessionConflictSites.line(conflict) {
                     Text(verbatim: line)

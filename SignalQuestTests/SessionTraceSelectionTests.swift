@@ -224,6 +224,40 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertNotNil(merged[1].conflict)
     }
 
+    /// TA écartés (choix d'Alexandre du 11/11) : GPS à plus de 30 m, ou TA figé
+    /// sur le même nœud alors que le point a roulé plus de 400 m.
+    func testDoubtfulTimingAdvancesDrawNoRing() throws {
+        // 0,001° de latitude ≈ 111 m. `timestamp` en secondes (décodeur par défaut).
+        let json = """
+        {"session":{"id":"s2","name":"Trajet","source":"android","points":[
+          {"id":"p1","latitude":45.1700,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":8,"timestamp":0},
+          {"id":"p2","latitude":45.1720,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":12,"timestamp":5},
+          {"id":"p3","latitude":45.1750,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":9,"timestamp":10},
+          {"id":"p4","latitude":45.1760,"longitude":5.7,"enb":"1","timingAdvance":11,"timestamp":15},
+          {"id":"p5","latitude":45.1770,"longitude":5.7,"enb":"1","timingAdvance":11,"accuracy":45,"timestamp":20},
+          {"id":"p6","latitude":45.1800,"longitude":5.7,"enb":"1","timingAdvance":11,"accuracy":"x","timestamp":400},
+          {"id":"p7","latitude":45.1820,"longitude":5.7,"enb":"2","timingAdvance":3,"accuracy":-1,"timestamp":405}
+        ]},"servingAntennas":[]}
+        """
+        let points = try JSONDecoder().decode(CoverageSessionDetail.self, from: Data(json.utf8)).points
+        XCTAssertEqual(points.first?.accuracy, 8)
+        XCTAssertNil(points.first { $0.id == "p6" }?.accuracy, "une précision illisible est ignorée")
+        XCTAssertNil(points.first { $0.id == "p7" }?.accuracy, "une précision négative est ignorée")
+
+        let doubts = SessionTADoubt.reasons(in: points)
+        XCTAssertNil(doubts["p2"], "222 m au même TA : encore plausible")
+        XCTAssertEqual(doubts["p3"], .frozen, "555 m au même TA sur le même nœud")
+        XCTAssertNil(doubts["p4"], "un nouveau TA ouvre une nouvelle suite")
+        XCTAssertEqual(doubts["p5"], .imprecise)
+        XCTAssertNil(doubts["p6"], "plus de 120 s après le dernier point du nœud : nouvelle suite")
+        XCTAssertNil(doubts["p7"])
+        XCTAssertEqual(doubts.count, 2)
+
+        let rings = SessionTraceHighlight.taRings(nodeKeys: ["1"], in: points, emphasizing: "p3")
+        XCTAssertEqual(rings.count, 4, "p1, p2, p4 et p6 : ni p3 ni p5, même touché")
+        XCTAssertFalse(rings.contains(where: \.emphasized), "le point touché au TA figé ne trace rien")
+    }
+
     func testConeOpensAroundTheAzimuth() {
         let origin = CLLocationCoordinate2D(latitude: 45, longitude: 5)
         let cone = SessionTraceHighlight.cone(at: origin, azimuthDeg: 90, radiusMeters: 1_000)

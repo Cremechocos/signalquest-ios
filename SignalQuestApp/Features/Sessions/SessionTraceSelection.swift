@@ -126,13 +126,17 @@ struct SessionTraceHighlight {
 
     /// Anneaux TA des points de ces nœuds. Un seul anneau par valeur de TA et par
     /// case d'environ 100 m : des points voisins au même TA tracent le même cercle.
+    /// Les TA douteux (`SessionTADoubt`) ne tracent rien, pas même celui du point
+    /// touché : sa fiche dit pourquoi.
     static func taRings(nodeKeys: Set<String>, in points: [CoverageSessionPoint],
                         emphasizing emphasizedId: String?) -> [Ring] {
         var seen = Set<String>()
         var candidates: [CoverageSessionPoint] = []
         var emphasized: CoverageSessionPoint?
+        let doubts = SessionTADoubt.reasons(in: points)
         for point in points where point.hasValidCoordinate {
-            guard let key = point.nodeKey, nodeKeys.contains(key), point.taDistanceMeters != nil else { continue }
+            guard let key = point.nodeKey, nodeKeys.contains(key), point.taDistanceMeters != nil,
+                  doubts[point.id] == nil else { continue }
             if point.id == emphasizedId { emphasized = point; continue }
             let cell = "\(point.timingAdvance ?? -1)|\(Int((point.lat * 1_000).rounded()))|\(Int((point.lng * 1_000).rounded()))"
             if seen.insert(cell).inserted { candidates.append(point) }
@@ -339,5 +343,60 @@ enum SessionConflictSites {
             facts.append(String(localized: "à \(SQUnits.distance(meters: meters)) du support retenu"))
         }
         return facts
+    }
+}
+
+/// TA d'un point qu'on écarte des anneaux et de leur accord (choix d'Alexandre du
+/// 11/11 : « retirer les TA avec des GPS faux ou presque »).
+enum SessionTADoubt: Equatable {
+    /// Le GPS du point se trompe de plus de `maxAccuracyMeters` : le centre de
+    /// l'anneau n'est pas sûr.
+    case imprecise
+    /// Même nœud, même TA, alors que le point s'est éloigné de plus de
+    /// `frozenTravelMeters` du premier point de cette valeur. Hors connexion active,
+    /// le modem Android rend souvent le dernier TA connu : la distance ne suit plus.
+    case frozen
+
+    static let maxAccuracyMeters: Double = 30
+    static let frozenTravelMeters: Double = 400
+    /// Au-delà, deux points du même nœud ne forment plus la même suite.
+    static let runGap: TimeInterval = 120
+
+    /// Les points dont le TA est écarté, par identifiant. Les suites se suivent par
+    /// nœud, dans l'ordre du trajet ; un point au GPS imprécis ne les fait ni
+    /// commencer ni avancer.
+    static func reasons(in points: [CoverageSessionPoint]) -> [String: SessionTADoubt] {
+        struct Run { let ta: Int; let anchor: CLLocation; var last: Date? }
+        var runs: [String: Run] = [:]
+        var result: [String: SessionTADoubt] = [:]
+        for point in points where point.hasValidCoordinate {
+            guard point.taDistanceMeters != nil, let ta = point.timingAdvance, let key = point.nodeKey else { continue }
+            if let accuracy = point.accuracy, accuracy > maxAccuracyMeters {
+                result[point.id] = .imprecise
+                continue
+            }
+            let location = CLLocation(latitude: point.lat, longitude: point.lng)
+            if var run = runs[key], run.ta == ta, !gapBreaks(run.last, point.timestamp) {
+                if location.distance(from: run.anchor) > frozenTravelMeters { result[point.id] = .frozen }
+                run.last = point.timestamp ?? run.last
+                runs[key] = run
+            } else {
+                runs[key] = Run(ta: ta, anchor: location, last: point.timestamp)
+            }
+        }
+        return result
+    }
+
+    private static func gapBreaks(_ last: Date?, _ next: Date?) -> Bool {
+        guard let last, let next else { return false }
+        return abs(next.timeIntervalSince(last)) > runGap
+    }
+
+    /// « écarté, GPS imprécis » : ce que la fiche du point ajoute à son TA.
+    var label: String {
+        switch self {
+        case .imprecise: String(localized: "écarté, GPS imprécis")
+        case .frozen: String(localized: "écarté, TA figé")
+        }
     }
 }

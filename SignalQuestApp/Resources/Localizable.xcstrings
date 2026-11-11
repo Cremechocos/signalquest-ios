@@ -113623,6 +113623,102 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "écarté, GPS imprécis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "discarded, imprecise GPS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "écarté, GPS imprécis"
+          }
+        }
+      }
+    },
+    "écarté, TA figé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "discarded, frozen TA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "écarté, TA figé"
+          }
+        }
+      }
+    },
+    "GPS ± %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS ± %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS ± %@"
+          }
+        }
+      }
+    },
+    "TA écarté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA discarded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA écarté"
+          }
+        }
+      }
+    },
+    "TA écartés : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA discarded: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA écartés : %lld"
+          }
+        }
+      }
+    },
+    "Les TA au GPS imprécis (plus de %@) ou figés pendant le trajet ne tracent pas d’anneau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA values with imprecise GPS (over %@) or frozen during the trip draw no ring."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les TA au GPS imprécis (plus de %@) ou figés pendant le trajet ne tracent pas d’anneau."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

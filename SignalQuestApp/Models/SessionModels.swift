@@ -210,6 +210,9 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     /// Timing Advance LTE brut, tel qu'Android le lit (0…1282) : un pas vaut
     /// ≈ 78 m de distance à l'antenne. Absent sur les trajets iOS.
     let timingAdvance: Int?
+    /// Précision horizontale du GPS du point, en mètres (rayon à 68 %), telle que
+    /// le client l'a envoyée. Absente sur les anciens points.
+    let accuracy: Double?
     /// Bande 3GPP de la cellule primaire (`cellMeasurements`), et si elle est NR.
     let primaryBand: Int?
     let primaryBandIsNR: Bool
@@ -217,7 +220,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
-        case rsrq, snr, timingAdvance, cellMeasurements
+        case rsrq, snr, timingAdvance, accuracy, cellMeasurements
         case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
         case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
         case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
@@ -257,6 +260,8 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         rsrq = (try? c.decodeIfPresent(Double.self, forKey: .rsrq)) ?? nil
         snr = (try? c.decodeIfPresent(Double.self, forKey: .snr)) ?? nil
         timingAdvance = (try? c.decodeIfPresent(Int.self, forKey: .timingAdvance)) ?? nil
+        accuracy = ((try? c.decodeIfPresent(Double.self, forKey: .accuracy)) ?? nil)
+            .flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         let cells = c.decodeLossyArray([PrimaryCellProbe].self, forKey: .cellMeasurements)
         let primary = cells.first { $0.isPrimary == true } ?? cells.first
         primaryBand = primary?.band.flatMap { $0 > 0 ? $0 : nil }
