@@ -129,6 +129,15 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         }
     }
 
+    /// Nom de la ligne dans une liste de cellules : la ligne du nœud qui porte un PCI ou
+    /// une cellule s'y nomme par eux, sinon elle répète le titre « eNB 608665 » du bloc.
+    var cellLabel: String {
+        guard kind == .enb || kind == .gnb else { return nodeLabel }
+        if let pci = pciValue?.nilIfBlank { return "PCI \(pci)" }
+        if let cellId = cellId?.nilIfBlank { return String(localized: "Cellule \(cellId)") }
+        return nodeLabel
+    }
+
     /// « Orange » plutôt que la clé serveur « ORANGE » ; hors France, le nom reçu.
     var operatorDisplayName: String? {
         guard let operatorName, !operatorName.isEmpty else { return nil }

@@ -403,7 +403,7 @@ struct IdentificationCorrectionBlock: View {
     private func cellRow(_ cell: MyIdentification) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: SQSpace.sm) {
-                Text(cell.nodeLabel)
+                Text(cell.cellLabel)
                     .font(SQType.caption.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)

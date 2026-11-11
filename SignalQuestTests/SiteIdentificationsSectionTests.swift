@@ -22,4 +22,16 @@ final class SiteIdentificationsSectionTests: XCTestCase {
         XCTAssertTrue(targets.allSatisfy { $0.siteId == "2877566" })
         XCTAssertTrue(SiteIdentificationsModel.targets(siteId: "2877566", in: []).isEmpty)
     }
+
+    /// La ligne du nœud qui porte un PCI se nomme par lui parmi les cellules, sans
+    /// répéter « eNB 608665 » sous le titre du bloc (retour d'Alexandre du 11/11).
+    func testNodeRowWithPciIsNamedByItsPciAmongCells() throws {
+        let node = try item(#"{"id":"n","siteId":"1316142","type":"enb","value":"608665","enb":"608665","gnb":null,"pci":"181","operator":"BOUYGUES","sectors":[1]}"#)
+        XCTAssertEqual(node.nodeLabel, "eNB 608665")
+        XCTAssertEqual(node.cellLabel, "PCI 181")
+        let bare = try item(#"{"id":"m","siteId":"1316142","type":"enb","value":"608665","enb":"608665","gnb":null,"operator":"BOUYGUES","sectors":[]}"#)
+        XCTAssertEqual(bare.cellLabel, "eNB 608665")
+        let cell = try item(#"{"id":"c","siteId":"1316142","type":"cell","value":"608665-10","enb":"608665","gnb":null,"cellId":"10","pci":"181","operator":"BOUYGUES","sectors":[2]}"#)
+        XCTAssertEqual(cell.cellLabel, cell.nodeLabel)
+    }
 }

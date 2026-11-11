@@ -220,7 +220,7 @@ struct SectorEditSheet: View {
             VStack(spacing: SQSpace.lg) {
                 MapSheetHeader(
                     title: "Corriger le secteur",
-                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.item.nodeLabel)."),
+                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.item.cellLabel)."),
                     closeIdentifier: "sector.cancel"
                 ) { dismiss() }
 
@@ -346,7 +346,7 @@ struct SectorEditSheet: View {
                         Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                             .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
                             .accessibilityHidden(true)
-                        Text(cell.nodeLabel)
+                        Text(cell.cellLabel)
                             .font(SQFont.body(14, .semibold))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
