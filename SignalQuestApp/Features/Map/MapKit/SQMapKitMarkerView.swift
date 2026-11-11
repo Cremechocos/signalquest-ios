@@ -212,9 +212,10 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             // APRÈS `resize`, obligatoirement : celui-ci remet `centerOffset` à zéro
             // — ce qui est aussi ce qui purge le décalage d'une vue RECYCLÉE, toutes
             // ces pastilles partageant un unique `reuseID`.
+            // Sans la couche Antennes, il n'y a rien à dégager : la panne reste sur sa position.
             switch payload.kind {
-            case .communityOutage: centerOffset = Self.communityOutageOffset
-            case .outage: centerOffset = Self.operatorIncidentOffset
+            case .communityOutage where payload.besideAntenna: centerOffset = Self.communityOutageOffset
+            case .outage where payload.besideAntenna: centerOffset = Self.operatorIncidentOffset
             default: centerOffset = .zero
             }
             // Panne seulement signalée : pastille ÉVIDÉE à liseré coloré. Le

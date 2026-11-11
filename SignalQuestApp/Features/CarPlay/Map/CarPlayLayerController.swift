@@ -92,7 +92,8 @@ final class CarPlayLayerController {
         layers.speedtests = Self.speedtestFeatures(from: speedtestResult ?? [])
         let loadedOutages = outageResult ?? []
         let loadedPlanned = plannedResult ?? []
-        layers.outages = Self.outagePayloads(from: loadedOutages, within: bounds)
+        layers.outages = Self.outagePayloads(from: loadedOutages, within: bounds,
+                                             besideAntenna: filters.contains(.antenna))
         layers.planned = Self.plannedPayloads(from: loadedPlanned, within: bounds)
         layers.outageSources = Dictionary(loadedOutages.map { ("outage-\($0.id)", $0) },
                                           uniquingKeysWith: { first, _ in first })
@@ -217,7 +218,8 @@ final class CarPlayLayerController {
     /// Pannes et évolutions arrivent par territoire, pas par tuile : on les borne
     /// nous-mêmes à la zone visible, sinon on épinglerait des incidents situés à
     /// des centaines de kilomètres.
-    static func outagePayloads(from sites: [OutageSiteLive], within bounds: MapBounds) -> [MapAnnotationPayload] {
+    static func outagePayloads(from sites: [OutageSiteLive], within bounds: MapBounds,
+                               besideAntenna: Bool = false) -> [MapAnnotationPayload] {
         sites.compactMap { site in
             guard let lat = site.lat, let lon = site.lon, bounds.contains(lat: lat, lon: lon) else { return nil }
             return MapAnnotationPayload(
@@ -233,7 +235,9 @@ final class CarPlayLayerController {
                 clusterCount: nil,
                 azimuths: [],
                 showsAzimuths: false,
-                tint: SQColor.danger
+                tint: SQColor.danger,
+                // Écartée du point d'antenne seulement quand la couche Antennes est là.
+                besideAntenna: besideAntenna
             )
         }
     }

@@ -4017,7 +4017,8 @@ struct MapExplorerView: View {
                 communityOutage: CommunityOutageMark(
                     severity: outage.severity,
                     confirmed: outage.state == .confirmed
-                )
+                ),
+                besideAntenna: filters.contains(.antenna)
             )
         }
         return clusteredPayloads(
@@ -4103,7 +4104,8 @@ struct MapExplorerView: View {
                 azimuths: [],
                 showsAzimuths: false,
                 tint: Self.outageColor(for: kindKey),
-                glyphOverride: Self.outageGlyph(for: kindKey)
+                glyphOverride: Self.outageGlyph(for: kindKey),
+                besideAntenna: filters.contains(.antenna)
             )
         }
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })

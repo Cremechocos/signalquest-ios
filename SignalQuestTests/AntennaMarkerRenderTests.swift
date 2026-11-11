@@ -250,15 +250,33 @@ final class AntennaMarkerRenderTests: XCTestCase {
 
     private func outagePayload(
         severity: OutageSeverity,
-        confirmed: Bool
+        confirmed: Bool,
+        besideAntenna: Bool = true
     ) -> MapAnnotationPayload {
         MapAnnotationPayload(
             id: "community-outage-1", kind: .communityOutage, title: "Site 3079254", subtitle: "SFR",
             coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72),
             metric: nil, backendId: "abc", details: nil, antennaId: nil, clusterCount: nil,
             azimuths: [], showsAzimuths: false,
-            communityOutage: CommunityOutageMark(severity: severity, confirmed: confirmed)
+            communityOutage: CommunityOutageMark(severity: severity, confirmed: confirmed),
+            besideAntenna: besideAntenna
         )
+    }
+
+    /// Couche Pannes seule : aucune antenne à dégager, la panne reste sur sa coordonnée.
+    /// Un décalage fixe de 22 pt valait plusieurs km au zoom large et la faisait glisser
+    /// d'un zoom à l'autre (vidéo d'Alexandre du 11/11).
+    func testOutageMarkersStayOnTheirCoordinateWithoutTheAntennaLayer() {
+        XCTAssertEqual(markerView(outagePayload(severity: .down, confirmed: true, besideAntenna: false)).centerOffset, .zero)
+        let incident = MapAnnotationPayload(
+            id: "outage-1", kind: .outage, title: "Panne", subtitle: "SFR",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72), metric: nil,
+            backendId: nil, details: nil, antennaId: nil, clusterCount: nil, azimuths: [], showsAzimuths: false
+        )
+        XCTAssertEqual(markerView(incident).centerOffset, .zero)
+        var beside = incident
+        beside.besideAntenna = true
+        XCTAssertNotEqual(markerView(beside).centerOffset, .zero)
     }
 
     /// Le défaut trouvé sur Android : le glyphe était peint en crème quelle que
