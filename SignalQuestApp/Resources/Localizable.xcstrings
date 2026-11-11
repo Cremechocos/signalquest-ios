@@ -113208,18 +113208,18 @@
         }
       }
     },
-    "Sites de l’opérateur autour : %lld" : {
+    "Autres sites de l’opérateur autour : %lld" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Operator sites nearby: %lld"
+            "value" : "Other operator sites nearby: %lld"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sites de l’opérateur autour : %lld"
+            "value" : "Autres sites de l’opérateur autour : %lld"
           }
         }
       }

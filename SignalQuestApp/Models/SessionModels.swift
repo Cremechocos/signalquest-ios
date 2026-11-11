@@ -443,8 +443,25 @@ struct ServingAntenna: Identifiable, Equatable {
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+    /// « Bouygues Telecom + SFR » : noms d'affichage, chacun une seule fois.
     var operatorDisplayName: String? {
-        operatorNames.isEmpty ? operatorName : operatorNames.joined(separator: " + ")
+        guard !operatorNames.isEmpty else { return operatorName.map { SQBrand.operatorName($0) ?? $0 } }
+        var seen = Set<String>()
+        return operatorNames
+            .map { SQBrand.operatorName($0) ?? $0 }
+            .filter { seen.insert($0.uppercased()).inserted }
+            .joined(separator: " + ")
+    }
+
+    /// Le serveur mêle des clés seules (`BOUYGUES`) et des libellés de partage
+    /// (`SFR / BOUYGUES`) : on éclate ces derniers et on garde chaque clé une fois,
+    /// sinon un site mutualisé s'affichait « BOUYGUES + SFR + SFR / BOUYGUES ».
+    static func distinctOperatorKeys(_ raws: [String]) -> [String] {
+        var seen = Set<String>()
+        return raws
+            .flatMap { $0.components(separatedBy: CharacterSet(charactersIn: "/+,")) }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0.uppercased()).inserted }
     }
 
     /// Confiance traduite (« confiance haute / moyenne / faible »).
@@ -480,10 +497,10 @@ struct ServingAntenna: Identifiable, Equatable {
             ?? r.hypothesis?.operatorName
             ?? r.matchedOperators?.first
             ?? a?.operators?.first
-        self.operatorName = resolvedOperatorName
-        var seenOperators = Set<String>()
-        self.operatorNames = ((r.matchedOperators ?? []) + (a?.operators ?? []) + [resolvedOperatorName].compactMap { $0 })
-            .filter { !$0.isEmpty && seenOperators.insert($0).inserted }
+        // Une action (identifier, ouvrir la fiche) veut une seule clé, jamais « SFR / BOUYGUES ».
+        self.operatorName = resolvedOperatorName.flatMap { Self.distinctOperatorKeys([$0]).first }
+        self.operatorNames = Self.distinctOperatorKeys(
+            (r.matchedOperators ?? []) + (a?.operators ?? []) + [resolvedOperatorName].compactMap { $0 })
         self.status = ServingAntenna.resolveStatus(r)
         self.confidenceLabel = r.confidence ?? r.hypothesis?.confidence
         self.distanceKm = r.distance ?? r.hypothesis?.distanceMeters.map { $0 / 1000 }

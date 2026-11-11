@@ -149,6 +149,21 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertEqual(SessionDetailViewModel.sample(for: antenna, in: [point])?.id, "a")
     }
 
+    /// Site mutualisé : `matchedOperators` [BOUYGUES, SFR] et `operators`
+    /// ["SFR / BOUYGUES"] ne donnent qu'un nom par opérateur (retour du 11/11).
+    func testSharedSiteOperatorsAreListedOnce() throws {
+        let json = """
+        {"id":"608665","ok":true,"result":{"identificationStatus":"uncertain","matchedOperators":["BOUYGUES","SFR"],
+          "antenna":{"latitude":45.6,"longitude":5.3,"operator":"SFR / BOUYGUES","operators":["SFR / BOUYGUES"],"sup_id":"1316142"}}}
+        """
+        let wrapper = try JSONDecoder().decode(ServingAntennaWrapper.self, from: Data(json.utf8))
+        let antenna = try XCTUnwrap(ServingAntenna(wrapper: wrapper))
+        XCTAssertEqual(antenna.operatorNames, ["BOUYGUES", "SFR"])
+        XCTAssertEqual(antenna.operatorName, "SFR")
+        XCTAssertEqual(antenna.operatorDisplayName, "Bouygues Telecom + SFR")
+        XCTAssertEqual(ServingAntenna.distinctOperatorKeys(["Free", "FREE", " Orange+SFR "]), ["Free", "Orange", "SFR"])
+    }
+
     func testConeOpensAroundTheAzimuth() {
         let origin = CLLocationCoordinate2D(latitude: 45, longitude: 5)
         let cone = SessionTraceHighlight.cone(at: origin, azimuthDeg: 90, radiusMeters: 1_000)

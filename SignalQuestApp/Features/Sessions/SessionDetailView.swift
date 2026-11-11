@@ -1910,6 +1910,10 @@ private struct SessionTraceFullScreen: View {
         let keys = group.nodeKeys
         let served = points.filter { $0.nodeKey.map(keys.contains) == true }
         let withTA = served.filter { $0.taDistanceMeters != nil }.count
+        // Le site servant lui-même face aux anneaux de ses points : la liste des
+        // autres sites l'exclut, sans quoi « compatibles : 0 » ne disait rien de lui.
+        let ownFit = SessionTraceHighlight.ringFit(
+            of: group.coordinate, rings: SessionTraceHighlight.taRings(nodeKeys: keys, in: points, emphasizing: nil))
         let canValidate = antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil)
         let subtitle = SessionDetailView.antennaSubtitle(antenna)
         let nodes = group.antennas.compactMap { member -> String? in
@@ -1976,8 +1980,11 @@ private struct SessionTraceFullScreen: View {
                     Text(verbatim: nodes.joined(separator: " · "))
                         .font(.system(.caption, design: .monospaced))
                 }
-                Text(verbatim: [String(localized: "Points servis : \(served.count)"),
-                                String(localized: "avec TA : \(withTA)")].joined(separator: " · "))
+                Text(verbatim: ([String(localized: "Points servis : \(served.count)"),
+                                 String(localized: "avec TA : \(withTA)")]
+                                + (ownFit.total > 0
+                                   ? [String(localized: "anneaux TA compatibles : \(ownFit.matching) sur \(ownFit.total)")]
+                                   : [])).joined(separator: " · "))
                     .monospacedDigit()
                 if let estimate { Text(verbatim: estimate) }
                 if antenna.status == .hypothesis, !antenna.evidenceLabels.isEmpty {
@@ -2141,7 +2148,7 @@ private struct SessionTraceFullScreen: View {
         return points.first { $0.nodeKey.map(keys.contains) == true }
     }
 
-    /// « Sites de l'opérateur autour : 14 · compatibles avec les anneaux TA : 2 ».
+    /// « Autres sites de l'opérateur autour : 14 · compatibles avec les anneaux TA : 2 ».
     @ViewBuilder
     private func candidatesLine(_ sites: [SessionCandidateSite], searching: Bool) -> some View {
         if searching, showsAntennas {
@@ -2152,7 +2159,7 @@ private struct SessionTraceFullScreen: View {
                     Text("Sites de l’opérateur indisponibles pour le moment.")
                 } else {
                     let likely = sites.filter(\.isLikely).count
-                    Text(verbatim: [String(localized: "Sites de l’opérateur autour : \(sites.count)"),
+                    Text(verbatim: [String(localized: "Autres sites de l’opérateur autour : \(sites.count)"),
                                     String(localized: "compatibles avec les anneaux TA : \(likely)")].joined(separator: " · "))
                 }
             }
