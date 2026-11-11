@@ -326,6 +326,19 @@ final class PhotosViewModel: ObservableObject {
 struct PhotosView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
+
+    private var isSignedIn: Bool {
+        if case .authenticated = session.state { return true }
+        return false
+    }
+
+    /// Vrai si le filtre personnel a été remis sur « Toutes ».
+    @discardableResult
+    private func resetPersonalFilterIfSignedOut() -> Bool {
+        guard !isSignedIn, model.filter != .approved else { return false }
+        model.filter = .approved
+        return true
+    }
     @StateObject private var model: PhotosViewModel
     @State private var showingUpload = false
     @Environment(\.dismiss) private var dismiss
@@ -376,7 +389,15 @@ struct PhotosView: View {
         .sqKeepsSwipeBack()
         .signalQuestBackground()
         .refreshable { await model.load() }
-        .task { if model.photos.isEmpty { await model.load() } }
+        .task {
+            if resetPersonalFilterIfSignedOut() || model.photos.isEmpty { await model.load() }
+        }
+        // « Mes photos » et « En vérification » exigent une session (401 sans elle) :
+        // sans compte, on revient à la galerie publique au lieu d'afficher une erreur.
+        .onChangeCompat(of: isSignedIn) { _, _ in
+            guard resetPersonalFilterIfSignedOut() else { return }
+            Task { await model.load() }
+        }
         .sheet(item: $model.selectedPhoto, onDismiss: { model.actionError = nil }) { _ in
             if let selected = model.selectedPhoto {
                 PhotoDetailView(
