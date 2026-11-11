@@ -135,6 +135,11 @@ struct AntennaDetailSheet: View {
     }
     @State private var showPhotoOperatorPicker = false
     @State private var tab: AntennaDetailTab = .essential
+    /// Bandes des AUTRES opérateurs d'un support partagé, lues dans leur propre fiche :
+    /// la tuile de la carte ne les attribue pas toujours (« Bandes non publiées » alors
+    /// que la fiche de l'opérateur les a, retour d'Alexandre du 11/11).
+    @State private var otherOperatorSystems: [String: [String]] = [:]
+    @State private var loadingOtherOperators: Set<String> = []
     /// Message notifié, montré une fois chargé dans l'onglet Discussion.
     private let focusCommentId: String?
     @State private var showReportSheet = false
@@ -262,6 +267,7 @@ struct AntennaDetailSheet: View {
                 // service refuse d'écrire avant d'avoir lu la liste des suivis.
                 await services.favoriteAntennas.load()
             }
+            .task(id: site.id) { await loadOtherOperatorBands() }
         }
         .presentationDetents([.medium, .large])
         .sqSheet(background: SQColor.bg)
@@ -848,6 +854,9 @@ struct AntennaDetailSheet: View {
                 SQNotice(message: outageError, tone: .warning)
             }
             radioBlock
+            // Les cellules que le membre a placées ici, à corriger sans passer par les logs.
+            SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify)
+                .id(site.siteId ?? site.id)
             sightCard
             if let details = model.details {
                 if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
@@ -946,7 +955,7 @@ struct AntennaDetailSheet: View {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(rows) { generationRow($0) }
                     }
-                } else if isActive, model.details == nil, model.error == nil {
+                } else if (isActive && model.details == nil && model.error == nil) || (!isActive && loadingOtherOperators.contains(op)) {
                     // La fiche scopée charge et la tuile ne lui attribue rien :
                     // un squelette plutôt que les bandes du support.
                     SkeletonBlock(width: 160, height: 14, radius: SQRadius.sm)
@@ -993,19 +1002,53 @@ struct AntennaDetailSheet: View {
     /// affiché, la tuile pour les autres, et
     /// seulement si elle les lui attribue. `nil` → « Bandes non publiées ».
     private func bandRows(for op: String) -> [GenerationBands]? {
+        // Les projets ne vont PAS ici : `technologiesInProject` est un champ du
+        // support, sans opérateur (Android, 09/11) ; ils restent en pied du bloc.
         if op == selectedOperator, let details = model.details {
-            let core = details.core
-            var systems = core?.frequencyBands ?? []
-            if systems.isEmpty { systems = details.bands }
-            if systems.isEmpty { systems = Array(Set((core?.sectorSystems ?? []).flatMap(\.systems))) }
-            // Les projets ne vont PAS ici : `technologiesInProject` est un champ du
-            // support, sans opérateur (Android, 09/11) ; ils restent en pied du bloc.
+            let rows = GenerationBands.rows(systems: Self.scopedSystems(of: details))
+            if !rows.isEmpty { return rows }
+        }
+        if op != selectedOperator, let systems = otherOperatorSystems[op] {
             let rows = GenerationBands.rows(systems: systems)
             if !rows.isEmpty { return rows }
         }
         guard let systems = site.systems(attributedTo: op) else { return nil }
         let rows = GenerationBands.rows(systems: systems)
         return rows.isEmpty ? nil : rows
+    }
+
+    /// Bandes d'une fiche scopée à un opérateur : ses bandes de fréquence, sinon
+    /// les bandes servies, sinon les systèmes de ses secteurs.
+    nonisolated static func scopedSystems(of details: AntennaDetails) -> [String] {
+        let core = details.core
+        var systems = core?.frequencyBands ?? []
+        if systems.isEmpty { systems = details.bands }
+        if systems.isEmpty { systems = Array(Set((core?.sectorSystems ?? []).flatMap(\.systems))) }
+        return systems
+    }
+
+    /// Lit une fois par support la fiche de chaque autre opérateur, en parallèle.
+    /// Un échec garde la tuile (ou « Bandes non publiées »), sans message.
+    private func loadOtherOperatorBands() async {
+        let others = site.operators.filter { $0 != selectedOperator && $0.caseInsensitiveCompare("ALL") != .orderedSame && otherOperatorSystems[$0] == nil }
+        guard site.operators.count > 1, !others.isEmpty else { return }
+        loadingOtherOperators.formUnion(others)
+        let service = services.antennas
+        let id = site.siteId ?? site.id
+        let anfrCode = site.anfrCode
+        let market = market
+        await withTaskGroup(of: (String, [String]?).self) { group in
+            for op in others {
+                group.addTask {
+                    let details = try? await service.details(id: id, market: market, operatorName: op, anfrCode: anfrCode)
+                    return (op, details.map(Self.scopedSystems(of:)))
+                }
+            }
+            for await (op, systems) in group {
+                loadingOtherOperators.remove(op)
+                if let systems, !systems.isEmpty { otherOperatorSystems[op] = systems }
+            }
+        }
     }
 
     /// « Mêmes bandes déclarées par Bouygues Telecom et Orange » quand tous les
