@@ -113347,6 +113347,222 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "nœud aussi validé ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "node also validated here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nœud aussi validé ici"
+          }
+        }
+      }
+    },
+    "Ce nœud est aussi validé sur un autre support : compare les anneaux TA." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also validated on another site: compare the TA rings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi validé sur un autre support : compare les anneaux TA."
+          }
+        }
+      }
+    },
+    "Ce nœud est aussi validé sur %lld autres supports : compare les anneaux TA." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also validated on %lld other sites: compare the TA rings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi validé sur %lld autres supports : compare les anneaux TA."
+          }
+        }
+      }
+    },
+    "Une cellule de ce nœud porte un autre PCI sur un autre support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cell of this node has a different PCI on another site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une cellule de ce nœud porte un autre PCI sur un autre support."
+          }
+        }
+      }
+    },
+    "Le même numéro est validé chez un autre opérateur, sur un autre réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The same number is validated for another operator, on another network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le même numéro est validé chez un autre opérateur, sur un autre réseau."
+          }
+        }
+      }
+    },
+    "Supports sans position : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites without a position: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports sans position : %@"
+          }
+        }
+      }
+    },
+    "La cellule de ce point n’est pas encore validée sur ce support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This point’s cell is not validated on this site yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cellule de ce point n’est pas encore validée sur ce support."
+          }
+        }
+      }
+    },
+    "Valider la cellule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validate the cell"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider la cellule"
+          }
+        }
+      }
+    },
+    "Ce nœud est aussi validé sur ce support. Le bon est celui qui recoupe les anneaux TA." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is also validated on this site. The right one is the site that matches the TA rings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi validé sur ce support. Le bon est celui qui recoupe les anneaux TA."
+          }
+        }
+      }
+    },
+    "validations : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validations: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validations : %lld"
+          }
+        }
+      }
+    },
+    "validé le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validated on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "validé le %@"
+          }
+        }
+      }
+    },
+    "à %@ du support retenu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from the chosen site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à %@ du support retenu"
+          }
+        }
+      }
+    },
+    "SQFormal|Ce nœud est aussi validé sur un autre support : compare les anneaux TA." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi validé sur un autre support : comparez les anneaux TA."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Ce nœud est aussi validé sur %lld autres supports : compare les anneaux TA." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est aussi validé sur %lld autres supports : comparez les anneaux TA."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

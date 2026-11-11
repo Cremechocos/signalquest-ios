@@ -430,6 +430,10 @@ struct ServingAntenna: Identifiable, Equatable {
     let sectorAzimuthDeg: Double?
     /// Position estimée par recoupement communautaire, si le serveur en a une.
     let estimatedSite: EstimatedSite?
+    /// LOOKUP-CONFLICT r1 : le même nœud est validé sur d'autres supports. Absent sans conflit.
+    let identificationConflict: IdentificationConflict?
+    /// Support confirmé, mais la cellule du point n'est pas validée : invitation à la valider.
+    let cellValidationSuggested: Bool
 
     struct EstimatedSite: Equatable {
         let latitude: Double
@@ -515,6 +519,8 @@ struct ServingAntenna: Identifiable, Equatable {
         self.confidenceScore = r.hypothesis?.confidenceScore ?? r.confidenceScore
         self.sectorAzimuthDeg = r.hypothesis?.sectorAzimuthDeg
         self.estimatedSite = r.estimatedSite
+        self.identificationConflict = r.identificationConflict
+        self.cellValidationSuggested = r.cellValidationSuggested == true
         self.id = wrapper.id ?? resolvedSiteId ?? "\(lat),\(lng)"
     }
 
@@ -542,6 +548,8 @@ struct ServingAntenna: Identifiable, Equatable {
         self.confidenceScore = nil
         self.sectorAzimuthDeg = nil
         self.estimatedSite = nil
+        self.identificationConflict = nil
+        self.cellValidationSuggested = false
     }
 
     /// Même règle que le serveur : empreinte hexadécimale de 40 caractères
@@ -602,11 +610,13 @@ struct ServingAntennaResult: Decodable {
     let hypothesis: ServingAntennaHypothesis?
     let confidenceScore: Int?
     let estimatedSite: ServingAntenna.EstimatedSite?
+    let identificationConflict: IdentificationConflict?
+    let cellValidationSuggested: Bool?
 
     enum CodingKeys: String, CodingKey {
         case found, identified, identificationStatus, source, confidence, confidenceReason
         case distance, canonicalSiteId, matchedOperators, antenna, hypothesis
-        case confidenceScore, estimatedSite
+        case confidenceScore, estimatedSite, identificationConflict, cellValidationSuggested
     }
 
     private enum EstimatedSiteKeys: String, CodingKey { case latitude, longitude, uncertaintyMeters }
@@ -616,7 +626,8 @@ struct ServingAntennaResult: Decodable {
             found = nil; identified = nil; identificationStatus = nil; source = nil
             confidence = nil; confidenceReason = nil; distance = nil; canonicalSiteId = nil
             matchedOperators = nil
-            antenna = nil; hypothesis = nil; confidenceScore = nil; estimatedSite = nil; return
+            antenna = nil; hypothesis = nil; confidenceScore = nil; estimatedSite = nil
+            identificationConflict = nil; cellValidationSuggested = nil; return
         }
         found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
         identified = (try? c.decodeIfPresent(Bool.self, forKey: .identified)) ?? nil
@@ -639,7 +650,92 @@ struct ServingAntennaResult: Decodable {
         } else {
             estimatedSite = nil
         }
+        // Un `kind` inconnu fait échouer le bloc seul : le statut reste affiché.
+        identificationConflict = (try? c.decodeIfPresent(IdentificationConflict.self, forKey: .identificationConflict)) ?? nil
+        cellValidationSuggested = (try? c.decodeIfPresent(Bool.self, forKey: .cellValidationSuggested)) ?? nil
     }
+}
+
+/// LOOKUP-CONFLICT r1 (11/11) : le nœud du support retenu est aussi validé ailleurs.
+/// Un conflit ne déclasse jamais le statut ; il montre les autres supports, à départager
+/// par les anneaux TA du trajet (calculés ici, jamais par le serveur).
+struct IdentificationConflict: Decodable, Equatable {
+    /// Enum fermée : toute nouvelle valeur demande une révision du contrat.
+    enum Kind: String, Equatable {
+        /// Même nœud validé sur un autre support du même opérateur.
+        case multiSite = "multi_site"
+        /// Même numéro chez un opérateur d'un autre PLMN : informatif.
+        case multiOperator = "multi_operator"
+        /// Une même cellule porte des PCI différents d'un support à l'autre.
+        case pciMismatch = "pci_mismatch"
+    }
+
+    struct Candidate: Decodable, Equatable, Identifiable {
+        /// Identifiant d'écriture du support (siteKey au Canada).
+        let siteId: String
+        let market: String?
+        let operatorName: String?
+        let nodeType: String?
+        let nodeId: String?
+        let tech: String?
+        let source: String?
+        let validatedAt: Date?
+        let validationCount: Int
+        let pci: [Int]
+        let latitude: Double?
+        let longitude: Double?
+        /// Distance au support retenu, arrondie à 10 m par le serveur.
+        let distanceMeters: Double?
+
+        var id: String { "\(siteId)|\(operatorName ?? "")" }
+        var coordinate: CLLocationCoordinate2D? {
+            guard let latitude, let longitude, latitude != 0 || longitude != 0 else { return nil }
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case siteId, market, nodeType, nodeId, tech, source, validatedAt, validationCount, pci
+            case latitude, longitude, distanceMeters
+            case operatorName = "operator"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            guard let siteId = c.decodeFlexibleString(forKey: .siteId), !siteId.isEmpty else {
+                throw DecodingError.dataCorruptedError(forKey: .siteId, in: c, debugDescription: "siteId absent")
+            }
+            self.siteId = siteId
+            market = c.decodeFlexibleString(forKey: .market)
+            operatorName = c.decodeFlexibleString(forKey: .operatorName)
+            nodeType = c.decodeFlexibleString(forKey: .nodeType)
+            nodeId = c.decodeFlexibleString(forKey: .nodeId)
+            tech = c.decodeFlexibleString(forKey: .tech)
+            source = c.decodeFlexibleString(forKey: .source)
+            validatedAt = c.decodeFlexibleString(forKey: .validatedAt).flatMap(SQDateParsing.parse)
+            validationCount = (try? c.decodeIfPresent(Int.self, forKey: .validationCount)) ?? 0
+            pci = c.decodeLossyArray([Int].self, forKey: .pci)
+            latitude = (try? c.decodeIfPresent(Double.self, forKey: .latitude)) ?? nil
+            longitude = (try? c.decodeIfPresent(Double.self, forKey: .longitude)) ?? nil
+            distanceMeters = (try? c.decodeIfPresent(Double.self, forKey: .distanceMeters)) ?? nil
+        }
+    }
+
+    let kind: Kind
+    let candidates: [Candidate]
+
+    enum CodingKeys: String, CodingKey { case kind, candidates }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let raw = c.decodeFlexibleString(forKey: .kind), let kind = Kind(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "kind inconnu")
+        }
+        self.kind = kind
+        candidates = c.decodeLossyArray([Candidate].self, forKey: .candidates)
+    }
+
+    /// Le conflit demande d'arbitrer : un autre support, ou des PCI qui divergent.
+    var isActionable: Bool { kind != .multiOperator && !candidates.isEmpty }
 }
 
 struct ServingAntennaCore: Decodable {

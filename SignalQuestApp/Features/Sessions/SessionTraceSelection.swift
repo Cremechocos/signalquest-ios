@@ -257,3 +257,87 @@ extension ServingAntenna {
         return evidence.compactMap(Self.evidenceLabel).filter { seen.insert($0).inserted }
     }
 }
+
+/// LOOKUP-CONFLICT r1 (11/11) : les autres supports où le nœud sélectionné est validé, posés
+/// sur la carte du trajet comme candidats, à départager par les anneaux TA calculés ici.
+enum SessionConflictSites {
+    /// Antennes de la sélection : celles du nœud du point touché, ou toutes celles du site touché.
+    static func selectionAntennas(point: CoverageSessionPoint?, group: ServingSiteGroup?,
+                                  groups: [ServingSiteGroup]) -> [ServingAntenna] {
+        if let point {
+            guard let key = point.nodeKey else { return [] }
+            return groups.flatMap(\.antennas).filter { $0.lookupKey == key }
+        }
+        return group?.antennas ?? []
+    }
+
+    /// LOOKUP-CONFLICT : les supports placés où le nœud est aussi validé, avec leur accord aux
+    /// anneaux TA. Un support déjà dessiné comme antenne desservante n'est pas redessiné.
+    static func sites(_ antennas: [ServingAntenna], rings: [SessionTraceHighlight.Ring],
+                              groups: [ServingSiteGroup]) -> [SessionCandidateSite] {
+        let serving = Set(groups.flatMap { $0.antennas.compactMap(\.siteId) })
+        var seen = Set<String>()
+        return antennas.compactMap(\.identificationConflict).filter(\.isActionable).flatMap(\.candidates).compactMap { item in
+            guard let coordinate = item.coordinate, !serving.contains(item.siteId), seen.insert(item.id).inserted else { return nil }
+            let site = AntennaSite(
+                id: item.siteId, siteId: item.siteId,
+                latitude: coordinate.latitude, longitude: coordinate.longitude,
+                operators: [item.operatorName].compactMap { $0 },
+                technologies: [item.tech].compactMap { $0 }, bands: [], azimuths: [],
+                sharingType: nil, crozonLeader: nil,
+                address: nil, height: nil, owner: nil
+            )
+            let fit = SessionTraceHighlight.ringFit(of: coordinate, rings: rings)
+            return SessionCandidateSite(site: site, operatorName: item.operatorName,
+                                        fitMatching: fit.matching, fitTotal: fit.total, conflict: item)
+        }
+    }
+
+    /// Un support en conflit déjà trouvé autour garde sa fiche (adresse) et prend le conflit ;
+    /// les autres passent en tête de liste.
+    static func merging(_ conflicts: [SessionCandidateSite], into sites: [SessionCandidateSite]) -> [SessionCandidateSite] {
+        var pending = Dictionary(conflicts.map { ($0.site.writeSiteId, $0) }, uniquingKeysWith: { first, _ in first })
+        let merged = sites.map { site -> SessionCandidateSite in
+            guard let match = pending.removeValue(forKey: site.site.writeSiteId) else { return site }
+            var copy = site
+            copy.conflict = match.conflict
+            return copy
+        }
+        return conflicts.filter { pending[$0.site.writeSiteId] != nil } + merged
+    }
+
+    /// Ligne de la fiche du site : ce que dit le conflit, et les supports qu'on ne peut placer.
+    static func line(_ conflict: IdentificationConflict) -> String? {
+        var parts: [String] = []
+        switch conflict.kind {
+        case .multiSite:
+            guard !conflict.candidates.isEmpty else { return nil }
+            parts.append(conflict.candidates.count == 1
+                ? String(localized: "Ce nœud est aussi validé sur un autre support : compare les anneaux TA.")
+                : String(localized: "Ce nœud est aussi validé sur \(conflict.candidates.count) autres supports : compare les anneaux TA."))
+        case .pciMismatch:
+            parts.append(String(localized: "Une cellule de ce nœud porte un autre PCI sur un autre support."))
+        case .multiOperator:
+            parts.append(String(localized: "Le même numéro est validé chez un autre opérateur, sur un autre réseau."))
+        }
+        let unplaced = conflict.candidates.filter { $0.coordinate == nil }.map(\.siteId)
+        if conflict.isActionable, !unplaced.isEmpty {
+            parts.append(String(localized: "Supports sans position : \(unplaced.joined(separator: ", "))"))
+        }
+        return parts.joined(separator: " ")
+    }
+
+    /// « validations : 2 · validé le 23 août 2026 · PCI 112 · à 8,8 km du support retenu ».
+    static func facts(_ item: IdentificationConflict.Candidate) -> [String] {
+        var facts = [String(localized: "nœud aussi validé ici")]
+        if item.validationCount > 0 { facts.append(String(localized: "validations : \(item.validationCount)")) }
+        if let date = item.validatedAt {
+            facts.append(String(localized: "validé le \(date.formatted(date: .abbreviated, time: .omitted))"))
+        }
+        if !item.pci.isEmpty { facts.append("PCI " + item.pci.map(String.init).joined(separator: ", ")) }
+        if let meters = item.distanceMeters, meters > 0 {
+            facts.append(String(localized: "à \(SQUnits.distance(meters: meters)) du support retenu"))
+        }
+        return facts
+    }
+}

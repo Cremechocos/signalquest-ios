@@ -146,7 +146,7 @@ struct SessionTraceMapView: UIViewRepresentable {
 
         /// Ne retouche les repères que si la liste (ou leur mise en avant) change.
         func syncCandidates(_ sites: [SessionCandidateSite], on map: MKMapView) {
-            let signature = sites.map { "\($0.id)|\($0.isLikely)" }
+            let signature = sites.map { "\($0.id)|\($0.isLikely)|\($0.conflict != nil)" }
             guard signature != candidateSignature else { return }
             candidateSignature = signature
             map.removeAnnotations(candidateAnnotations)
@@ -303,7 +303,7 @@ struct SessionTraceMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.image = candidate.markerImage(traits: mapView.traitCollection)
                 // Sous les antennes desservantes, au-dessus des points.
-                view.displayPriority = candidate.site.isLikely ? .required : .defaultHigh
+                view.displayPriority = candidate.site.isLikely || candidate.site.conflict != nil ? .required : .defaultHigh
                 view.zPriority = .min
                 view.canShowCallout = false
                 view.accessibilityLabel = candidate.accessibilityText
@@ -601,6 +601,8 @@ struct SessionCandidateSite: Identifiable, Equatable {
     /// Anneaux TA satisfaits par la position du site, sur le total dessiné.
     let fitMatching: Int
     let fitTotal: Int
+    /// LOOKUP-CONFLICT r1 : le même nœud est aussi validé sur ce support.
+    var conflict: IdentificationConflict.Candidate? = nil
 
     var id: String { site.id }
     var coordinate: CLLocationCoordinate2D {
@@ -617,9 +619,12 @@ final class SessionCandidateSiteAnnotation: NSObject, MKAnnotation {
     var coordinate: CLLocationCoordinate2D { site.coordinate }
 
     var accessibilityText: String {
-        let name = site.site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne")
-        guard site.fitTotal > 0 else { return name }
-        return [name, String(localized: "anneaux TA compatibles : \(site.fitMatching) sur \(site.fitTotal)")].joined(separator: ", ")
+        var parts = [site.site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne")]
+        if site.conflict != nil { parts.append(String(localized: "nœud aussi validé ici")) }
+        if site.fitTotal > 0 {
+            parts.append(String(localized: "anneaux TA compatibles : \(site.fitMatching) sur \(site.fitTotal)"))
+        }
+        return parts.joined(separator: ", ")
     }
 
     @MainActor private static var imageCache: [String: UIImage] = [:]
@@ -628,15 +633,19 @@ final class SessionCandidateSiteAnnotation: NSObject, MKAnnotation {
     func markerImage(traits: UITraitCollection) -> UIImage {
         let fill = UIColor(SQBrand.operatorColor(site.operatorName ?? "")).resolvedColor(with: traits)
         let accent = UIColor(SQColor.accentInk).resolvedColor(with: traits)
-        let key = "\(fill.description)|\(site.isLikely)|\(traits.userInterfaceStyle.rawValue)"
+        // Un support où le nœud est aussi validé n'est jamais estompé : son anneau ambre le distingue.
+        let conflict = UIColor(OutageTint.degradedInk).resolvedColor(with: traits)
+        let isConflict = site.conflict != nil
+        let key = "\(fill.description)|\(site.isLikely)|\(isConflict)|\(traits.userInterfaceStyle.rawValue)"
         if let hit = Self.imageCache[key] { return hit }
-        let dot: CGFloat = site.isLikely ? 18 : 14, ring: CGFloat = site.isLikely ? 3 : 2, margin: CGFloat = 8
+        let strong = site.isLikely || isConflict
+        let dot: CGFloat = strong ? 18 : 14, ring: CGFloat = strong ? 3 : 2, margin: CGFloat = 8
         let side = dot + margin * 2
         let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { ctx in
             let cg = ctx.cgContext
             let rect = CGRect(x: margin, y: margin, width: dot, height: dot)
-            cg.setAlpha(site.isLikely ? 1 : 0.55)
-            (site.isLikely ? accent : UIColor(red: 0xFB / 255, green: 0xF7 / 255, blue: 0xEF / 255, alpha: 1)).setFill()
+            cg.setAlpha(strong ? 1 : 0.55)
+            (isConflict ? conflict : site.isLikely ? accent : UIColor(red: 0xFB / 255, green: 0xF7 / 255, blue: 0xEF / 255, alpha: 1)).setFill()
             cg.fillEllipse(in: rect)
             fill.setFill()
             cg.fillEllipse(in: rect.insetBy(dx: ring, dy: ring))

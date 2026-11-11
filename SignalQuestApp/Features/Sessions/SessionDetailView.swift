@@ -1600,10 +1600,16 @@ private struct SessionTraceFullScreen: View {
         }()
         let request = Self.candidateRequest(point: selected, group: selectedGroup, groups: groups,
                                             points: points, highlight: highlight)
-        let candidateSites = showsAntennas && request != nil && candidatesKey == request?.key
+        let operatorSites = showsAntennas && request != nil && candidatesKey == request?.key
             ? Self.candidateSites(candidates, rings: highlight?.rings ?? [], groups: groups,
                                   operatorName: request?.operatorName)
             : []
+        // LOOKUP-CONFLICT : les autres supports où le nœud est validé, sans attendre la recherche.
+        let conflictSites = showsAntennas
+            ? SessionConflictSites.sites(SessionConflictSites.selectionAntennas(point: selected, group: selectedGroup, groups: groups),
+                                 rings: highlight?.rings ?? [], groups: groups)
+            : []
+        let candidateSites = SessionConflictSites.merging(conflictSites, into: operatorSites)
         let selectedCandidate = selectedCandidateID.flatMap { id in candidateSites.first { $0.id == id } }
         SessionTraceMapView(points: points,
                             antennas: showsAntennas ? (detail?.servingAntennas ?? []) : [],
@@ -1915,6 +1921,10 @@ private struct SessionTraceFullScreen: View {
         let ownFit = SessionTraceHighlight.ringFit(
             of: group.coordinate, rings: SessionTraceHighlight.taRings(nodeKeys: keys, in: points, emphasizing: nil))
         let canValidate = antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil)
+        let conflict = group.antennas.lazy.compactMap(\.identificationConflict).first
+        // LOOKUP-CONFLICT (a) : support confirmé, cellule du point pas encore validée.
+        let suggestsCell = !canValidate && antenna.status == .identified && antenna.cellValidationSuggested
+            && antenna.siteId != nil
         let subtitle = SessionDetailView.antennaSubtitle(antenna)
         let nodes = group.antennas.compactMap { member -> String? in
             var parts: [String] = []
@@ -1952,6 +1962,10 @@ private struct SessionTraceFullScreen: View {
                     }
                     HStack(spacing: SQSpace.sm) {
                         Self.statusPill(antenna.status)
+                        if conflict?.isActionable == true {
+                            SignalPill(text: "En conflit")
+                                .accessibilityIdentifier("sessionDetail.fullMap.site.conflict")
+                        }
                         if !status.isEmpty {
                             Text(verbatim: status.joined(separator: " · "))
                                 .font(SQFont.body(12, relativeTo: .caption2))
@@ -1987,6 +2001,13 @@ private struct SessionTraceFullScreen: View {
                                    : [])).joined(separator: " · "))
                     .monospacedDigit()
                 if let estimate { Text(verbatim: estimate) }
+                if let conflict, let line = SessionConflictSites.line(conflict) {
+                    Text(verbatim: line)
+                        .foregroundStyle(conflict.isActionable ? OutageTint.degradedInk : SQColor.labelSecondary)
+                }
+                if suggestsCell {
+                    Text("La cellule de ce point n’est pas encore validée sur ce support.")
+                }
                 if antenna.status == .hypothesis, !antenna.evidenceLabels.isEmpty {
                     Text(verbatim: antenna.evidenceLabels.joined(separator: " · "))
                 }
@@ -1999,8 +2020,19 @@ private struct SessionTraceFullScreen: View {
                     .font(SQType.caption)
                     .foregroundStyle(model.identifySucceeded ? SQColor.success : SQColor.dangerInk)
             }
-            if canValidate || antenna.siteId != nil {
+            if canValidate || suggestsCell || antenna.siteId != nil {
                 HStack(spacing: SQSpace.sm) {
+                    if suggestsCell {
+                        if model.identifyingId == antenna.id {
+                            SQSpinner().tint(SQColor.brandRed).frame(minWidth: 44, minHeight: 44)
+                        } else {
+                            RadioLogActionButton(label: "Valider la cellule", systemImage: "checkmark") {
+                                pendingIdentify = antenna
+                            }
+                            .disabled(model.identifyingId != nil)
+                            .accessibilityIdentifier("sessionDetail.fullMap.site.validateCell")
+                        }
+                    }
                     if canValidate {
                         if model.identifyingId == antenna.id {
                             SQSpinner().tint(SQColor.brandRed).frame(minWidth: 44, minHeight: 44)
@@ -2177,6 +2209,9 @@ private struct SessionTraceFullScreen: View {
         let site = candidate.site
         let title = site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne")
         var facts: [String] = []
+        if let conflict = candidate.conflict {
+            facts += SessionConflictSites.facts(conflict)
+        }
         if candidate.fitTotal > 0 {
             facts.append(String(localized: "anneaux TA compatibles : \(candidate.fitMatching) sur \(candidate.fitTotal)"))
         }
@@ -2223,7 +2258,12 @@ private struct SessionTraceFullScreen: View {
                 .accessibilityLabel(Text("Fermer la fiche du site"))
                 .accessibilityIdentifier("sessionDetail.fullMap.candidate.close")
             }
-            if let node {
+            if candidate.conflict != nil {
+                Text("Ce nœud est aussi validé sur ce support. Le bon est celui qui recoupe les anneaux TA.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let node {
                 Text("Ce site n’est pas rattaché à \(Self.nodeLabel(node)). « C’est elle » l’y rattache avec les identifiants de ce point.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

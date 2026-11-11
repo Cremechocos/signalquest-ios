@@ -164,6 +164,66 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertEqual(ServingAntenna.distinctOperatorKeys(["Free", "FREE", " Orange+SFR "]), ["Free", "Orange", "SFR"])
     }
 
+    /// LOOKUP-CONFLICT r1 : le conflit est lu à part du statut ; un `kind` inconnu fait ignorer
+    /// le bloc sans toucher au statut ; un candidat sans position reste listé, pas dessiné.
+    @MainActor
+    func testIdentificationConflictIsReadAndItsSitesAreDrawn() throws {
+        func antenna(_ conflict: String, suggests: Bool = false) throws -> ServingAntenna {
+            let json = """
+            {"id":"608665","ok":true,"result":{"identificationStatus":"confirmed","confidenceScore":100,
+              "cellValidationSuggested":\(suggests),"identificationConflict":\(conflict),
+              "antenna":{"latitude":45.60,"longitude":5.30,"operator":"BOUYGUES","sup_id":"1316142","enb":"608665"}}}
+            """
+            let wrapper = try JSONDecoder().decode(ServingAntennaWrapper.self, from: Data(json.utf8))
+            return try XCTUnwrap(ServingAntenna(wrapper: wrapper))
+        }
+        let served = try antenna("""
+        {"kind":"multi_site","candidates":[
+          {"siteId":"1452969","market":"FR","operator":"BOUYGUES","nodeType":"enb","nodeId":"608665","tech":"4G",
+           "source":"manual","validatedAt":"2026-08-23T14:05:00.000Z","validationCount":2,"pci":[112],
+           "latitude":45.64,"longitude":5.24,"distanceMeters":8760},
+          {"siteId":"1316142","operator":"BOUYGUES","validationCount":1,"pci":[]},
+          {"siteId":"999","operator":"BOUYGUES","validationCount":1},
+          {"operator":"BOUYGUES"}]}
+        """, suggests: true)
+        XCTAssertEqual(served.status, .identified, "un conflit ne déclasse jamais le statut")
+        XCTAssertTrue(served.cellValidationSuggested)
+        let conflict = try XCTUnwrap(served.identificationConflict)
+        XCTAssertEqual(conflict.kind, .multiSite)
+        XCTAssertEqual(conflict.candidates.map(\.siteId), ["1452969", "1316142", "999"], "sans siteId : écarté")
+        XCTAssertEqual(conflict.candidates[0].pci, [112])
+        XCTAssertEqual(conflict.candidates[0].validatedAt, ISO8601DateFormatter().date(from: "2026-08-23T14:05:00Z"))
+        XCTAssertNil(conflict.candidates[2].coordinate)
+        XCTAssertTrue(conflict.isActionable)
+        XCTAssertEqual(SessionConflictSites.line(conflict)?.contains("1316142, 999"), true,
+                       "les supports sans position sont nommés")
+
+        let unknown = try antenna(#"{"kind":"same_pci","candidates":[{"siteId":"1"}]}"#)
+        XCTAssertNil(unknown.identificationConflict)
+        XCTAssertEqual(unknown.status, .identified)
+        XCTAssertFalse(try antenna(#"{"kind":"multi_operator","candidates":[{"siteId":"1"}]}"#)
+            .identificationConflict!.isActionable, "autre PLMN : informatif seulement")
+
+        // Sur la carte : seul le candidat placé, hors support desservant ; fusion avec la recherche.
+        let groups = ServingSiteGroup.groups([served])
+        let sites = SessionConflictSites.sites([served], rings: [], groups: groups)
+        XCTAssertEqual(sites.map(\.site.writeSiteId), ["1452969"])
+        XCTAssertEqual(sites.first?.conflict?.validationCount, 2)
+        let around = AntennaSite(id: "1452969", siteId: "1452969", latitude: 45.64, longitude: 5.24,
+                                 operators: ["BOUYGUES"], technologies: [], bands: [], azimuths: [],
+                                 sharingType: nil, crozonLeader: nil, address: "Lieu-dit Les Combes", height: nil, owner: nil)
+        let other = AntennaSite(id: "77", siteId: "77", latitude: 45.7, longitude: 5.2,
+                                operators: ["BOUYGUES"], technologies: [], bands: [], azimuths: [],
+                                sharingType: nil, crozonLeader: nil, address: nil, height: nil, owner: nil)
+        let merged = SessionConflictSites.merging(sites, into: [
+            SessionCandidateSite(site: other, operatorName: "BOUYGUES", fitMatching: 0, fitTotal: 0),
+            SessionCandidateSite(site: around, operatorName: "BOUYGUES", fitMatching: 0, fitTotal: 0),
+        ])
+        XCTAssertEqual(merged.map(\.site.writeSiteId), ["77", "1452969"], "pas de doublon")
+        XCTAssertEqual(merged[1].site.address, "Lieu-dit Les Combes", "la fiche trouvée autour est gardée")
+        XCTAssertNotNil(merged[1].conflict)
+    }
+
     func testConeOpensAroundTheAzimuth() {
         let origin = CLLocationCoordinate2D(latitude: 45, longitude: 5)
         let cone = SessionTraceHighlight.cone(at: origin, azimuthDeg: 90, radiusMeters: 1_000)
