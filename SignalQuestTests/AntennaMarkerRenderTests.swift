@@ -263,6 +263,28 @@ final class AntennaMarkerRenderTests: XCTestCase {
         )
     }
 
+    /// Une panne et un incident à 120 m ou moins, sans antenne : écart horizontal symétrique,
+    /// communauté à droite, opérateur à gauche (OUTAGE-MERGE §3). Au-delà, rien ne bouge.
+    func testNearbyOutageAndIncidentStepApartHorizontally() {
+        let pairs = MapExplorerView.outagePairs(
+            community: [("c1", 45.1800, 5.7200), ("c2", 45.3000, 5.9000)],
+            incidents: [("i1", 45.1808, 5.7200), ("i2", 45.1900, 5.7200)]
+        )
+        XCTAssertEqual(pairs.community, ["c1"], "c1 est à ~90 m de i1 ; c2 est loin de tout")
+        XCTAssertEqual(pairs.incidents, ["i1"], "i2 est à ~1,1 km")
+
+        var community = outagePayload(severity: .down, confirmed: true, stepsAside: false)
+        community.pairNudge = SQMapKitMarkerView.outagePairNudge
+        XCTAssertEqual(markerView(community).centerOffset, CGPoint(x: 18, y: 0))
+        var incident = MapAnnotationPayload(
+            id: "outage-1", kind: .outage, title: "Panne", subtitle: "SFR",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72), metric: nil,
+            backendId: nil, details: nil, antennaId: nil, clusterCount: nil, azimuths: [], showsAzimuths: false
+        )
+        incident.pairNudge = -SQMapKitMarkerView.outagePairNudge
+        XCTAssertEqual(markerView(incident).centerOffset, CGPoint(x: -18, y: 0))
+    }
+
     /// Vue « Tous » : une pastille à la couleur de l'opérateur dit à qui est la panne, sans
     /// toucher à la couleur de gravité ; absente avec un opérateur choisi (choix du 11/11).
     func testOutageMarkerCarriesTheOperatorDotOnlyWhenGiven() {

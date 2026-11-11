@@ -113,6 +113,11 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// distinctes et un site peut très bien porter les deux à la fois (le CSV opérateur confirme
     /// un signalement, il ne le remplace pas). Superposées, elles se seraient à nouveau masquées
     /// l'une l'autre — cette fois entre elles.
+    /// Écart de chaque côté pour une panne et un incident proches : la moitié de la pastille
+    /// de panne (36 pt), pour que les deux disques se touchent sans se recouvrir. Le contrat
+    /// prend la plus grande valeur des apps (Web 17, Android 13).
+    static let outagePairNudge: CGFloat = otherDotSize / 2
+
     static let operatorIncidentZPriority = MKAnnotationViewZPriority(
         rawValue: MKAnnotationViewZPriority.defaultUnselected.rawValue + 1)
 
@@ -228,9 +233,11 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             // — ce qui est aussi ce qui purge le décalage d'une vue RECYCLÉE, toutes
             // ces pastilles partageant un unique `reuseID`.
             // Sans la couche Antennes, il n'y a rien à dégager : la panne reste sur sa position.
+            // Une panne et un incident proches, sans antenne : écart horizontal symétrique.
             switch payload.kind {
             case .communityOutage where payload.stepsAside: centerOffset = Self.communityOutageOffset
             case .outage where payload.stepsAside: centerOffset = Self.operatorIncidentOffset
+            case .communityOutage, .outage: centerOffset = CGPoint(x: payload.pairNudge, y: 0)
             default: centerOffset = .zero
             }
             // Panne seulement signalée : pastille ÉVIDÉE à liseré coloré. Le

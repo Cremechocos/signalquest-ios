@@ -138,12 +138,17 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// d'antenne : seulement quand la couche Antennes est affichée. Sans antenne, ce décalage
     /// fixe à l'écran déplaçait la panne de plusieurs km au zoom large et la faisait glisser à
     /// chaque zoom (retour d'Alexandre du 11/11). Sur un même site, l'incident opérateur passe
-    /// alors au-dessus de la panne signalée (cf. `SQMapKitMarkerView.operatorIncidentZPriority`).
+    /// au-dessus de la panne signalée (cf. `SQMapKitMarkerView.operatorIncidentZPriority`), et deux
+    /// pannes proches sans antenne s'écartent à l'horizontale (cf. `pairNudge`).
     var stepsAside: Bool = false
     /// Couleur de l'opérateur d'une panne, en petite pastille sur son marqueur : seulement
     /// en vue « Tous », où rien d'autre ne dit l'opérateur (choix d'Alexandre du 11/11).
     /// La couleur du marqueur reste celle de la gravité.
     var operatorDot: Color? = nil
+    /// Écart horizontal, en points (+ à droite, − à gauche), d'une panne communautaire et d'un
+    /// incident opérateur à 120 m ou moins l'un de l'autre, sans couche Antennes : les deux
+    /// restent touchables (OUTAGE-MERGE §3, décision d'Alexandre du 11/11). 0 ailleurs.
+    var pairNudge: CGFloat = 0
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -190,7 +195,8 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.operatorIncident == rhs.operatorIncident &&
         lhs.isSearchPin == rhs.isSearchPin &&
         lhs.stepsAside == rhs.stepsAside &&
-        lhs.operatorDot == rhs.operatorDot
+        lhs.operatorDot == rhs.operatorDot &&
+        lhs.pairNudge == rhs.pairNudge
     }
 }
 

@@ -3989,6 +3989,7 @@ struct MapExplorerView: View {
     /// de panne — une cible, deux destinations.
     private var communityOutagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
+        let pairs = outagePairs
         let individual = model.communityOutages.compactMap { outage -> MapAnnotationPayload? in
             guard outage.state.isVisible else { return nil }
             // Le serveur résout la position depuis son référentiel ; une panne dont
@@ -4019,7 +4020,8 @@ struct MapExplorerView: View {
                     confirmed: outage.state == .confirmed
                 ),
                 stepsAside: filters.contains(.antenna),
-                operatorDot: outageOperatorDot(outage.operatorKey)
+                operatorDot: outageOperatorDot(outage.operatorKey),
+                pairNudge: pairs.community.contains(outage.id) ? SQMapKitMarkerView.outagePairNudge : 0
             )
         }
         return clusteredPayloads(
@@ -4084,6 +4086,7 @@ struct MapExplorerView: View {
     /// une maintenance) et glyphe de la source (`OperatorIncidentCard.glyph`).
     private var outagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
+        let pairs = outagePairs
         let individual = model.outages.compactMap { site -> MapAnnotationPayload? in
             guard matchesSelectedOutageBands(site) else { return nil }
             guard let lat = site.lat, let lon = site.lon else { return nil }
@@ -4107,10 +4110,62 @@ struct MapExplorerView: View {
                 tint: Self.outageColor(for: kindKey),
                 glyphOverride: Self.outageGlyph(for: kindKey),
                 stepsAside: filters.contains(.antenna),
-                operatorDot: site.operator.flatMap(outageOperatorDot)
+                operatorDot: site.operator.flatMap(outageOperatorDot),
+                pairNudge: pairs.incidents.contains(site.id) ? -SQMapKitMarkerView.outagePairNudge : 0
             )
         }
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })
+    }
+
+    /// Pannes communautaires et incidents opérateur « au même point » (120 m ou moins, quel que
+    /// soit l'opérateur), sans couche Antennes : ils s'écartent à l'horizontale pour rester tous
+    /// deux touchables (OUTAGE-MERGE §3). Avant le servi du rattachement, toute paire compte
+    /// comme non fusionnée. Avec les antennes, les décalages diagonaux suffisent.
+    private var outagePairs: (community: Set<String>, incidents: Set<String>) {
+        guard !filters.contains(.antenna) else { return ([], []) }
+        let community = model.communityOutages.filter {
+            $0.state.isVisible && ($0.latitude != 0 || $0.longitude != 0)
+        }
+        let incidents = model.outages.compactMap { site -> (id: String, lat: Double, lon: Double)? in
+            guard matchesSelectedOutageBands(site), let lat = site.lat, let lon = site.lon else { return nil }
+            return (site.id, lat, lon)
+        }
+        return Self.outagePairs(
+            community: community.map { ($0.id, $0.latitude, $0.longitude) },
+            incidents: incidents
+        )
+    }
+
+    static let outagePairRadiusMeters: Double = 120
+
+    static func outagePairs(
+        community: [(id: String, lat: Double, lon: Double)],
+        incidents: [(id: String, lat: Double, lon: Double)]
+    ) -> (community: Set<String>, incidents: Set<String>) {
+        guard !community.isEmpty, !incidents.isEmpty else { return ([], []) }
+        // 120 m ≈ 0,0011° de latitude : on écarte d'abord ce qui est loin en latitude.
+        let latWindow = outagePairRadiusMeters / 111_000
+        let sorted = incidents.sorted { $0.lat < $1.lat }
+        var pairedCommunity = Set<String>()
+        var pairedIncidents = Set<String>()
+        for outage in community {
+            let here = CLLocation(latitude: outage.lat, longitude: outage.lon)
+            var low = 0, high = sorted.count
+            while low < high {
+                let mid = (low + high) / 2
+                if sorted[mid].lat < outage.lat - latWindow { low = mid + 1 } else { high = mid }
+            }
+            var index = low
+            while index < sorted.count, sorted[index].lat <= outage.lat + latWindow {
+                let incident = sorted[index]
+                if here.distance(from: CLLocation(latitude: incident.lat, longitude: incident.lon)) <= outagePairRadiusMeters {
+                    pairedCommunity.insert(outage.id)
+                    pairedIncidents.insert(incident.id)
+                }
+                index += 1
+            }
+        }
+        return (pairedCommunity, pairedIncidents)
     }
 
     /// Pastille de l'opérateur sur un marqueur de panne, en vue « Tous » seulement : un
