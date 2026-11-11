@@ -110,6 +110,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// distinctes et un site peut très bien porter les deux à la fois (le CSV opérateur confirme
     /// un signalement, il ne le remplace pas). Superposées, elles se seraient à nouveau masquées
     /// l'une l'autre — cette fois entre elles.
+    static let operatorIncidentZPriority = MKAnnotationViewZPriority(
+        rawValue: MKAnnotationViewZPriority.defaultUnselected.rawValue + 1)
+
     private static let operatorIncidentOffset = CGPoint(
         x: -communityOutageOffset.x,
         y: communityOutageOffset.y
@@ -172,6 +175,11 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
 
     func apply(_ payload: MapAnnotationPayload) {
         appliedPayload = payload
+        // Règle d'Alexandre (11/11) : posés au même point, l'incident déclaré par l'opérateur
+        // passe au-dessus de la panne signalée et reçoit le toucher. Réglé à chaque `apply`
+        // pour purger une vue recyclée (un seul `reuseID` pour toutes ces pastilles).
+        zPriority = payload.kind == .outage && payload.clusterCount == nil
+            ? Self.operatorIncidentZPriority : .defaultUnselected
         applyAccessibility(for: payload)
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {

@@ -134,11 +134,11 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// antenne, ni une donnée métier : il vit uniquement dans l'état de scène de
     /// la carte et reste donc indépendant des couches et des filtres radio.
     var isSearchPin: Bool = false
-    /// Marqueur de panne écarté de sa coordonnée (22 pt en diagonale) : seulement quand la
-    /// couche Antennes est affichée, pour dégager le point d'antenne, ou quand le site porte
-    /// aussi l'autre source de panne, pour que l'une ne masque pas l'autre. Partout ailleurs,
-    /// ce décalage fixe à l'écran déplaçait la panne de plusieurs km au zoom large et la
-    /// faisait glisser à chaque zoom (retour d'Alexandre du 11/11).
+    /// Marqueur de panne écarté de sa coordonnée (22 pt en diagonale) pour dégager le point
+    /// d'antenne : seulement quand la couche Antennes est affichée. Sans antenne, ce décalage
+    /// fixe à l'écran déplaçait la panne de plusieurs km au zoom large et la faisait glisser à
+    /// chaque zoom (retour d'Alexandre du 11/11). Sur un même site, l'incident opérateur passe
+    /// alors au-dessus de la panne signalée (cf. `SQMapKitMarkerView.operatorIncidentZPriority`).
     var stepsAside: Bool = false
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/

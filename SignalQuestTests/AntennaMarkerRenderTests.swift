@@ -277,9 +277,14 @@ final class AntennaMarkerRenderTests: XCTestCase {
         var beside = incident
         beside.stepsAside = true
         XCTAssertNotEqual(markerView(beside).centerOffset, .zero)
-        // Une panne signalée et un incident opérateur sur le même support restent écartés.
-        XCTAssertEqual(MapExplorerView.outageSiteKey(45.180001, 5.72), MapExplorerView.outageSiteKey(45.18, 5.720003))
-        XCTAssertNotEqual(MapExplorerView.outageSiteKey(45.18, 5.72), MapExplorerView.outageSiteKey(45.1801, 5.72))
+        // Au même point, l'incident opérateur passe au-dessus de la panne signalée (règle
+        // d'Alexandre du 11/11), et une vue recyclée retrouve la priorité par défaut.
+        let incidentView = markerView(incident)
+        XCTAssertEqual(incidentView.zPriority, SQMapKitMarkerView.operatorIncidentZPriority)
+        XCTAssertGreaterThan(incidentView.zPriority.rawValue,
+                             markerView(outagePayload(severity: .down, confirmed: true, stepsAside: false)).zPriority.rawValue)
+        incidentView.apply(outagePayload(severity: .down, confirmed: true, stepsAside: false))
+        XCTAssertEqual(incidentView.zPriority, .defaultUnselected)
     }
 
     /// Le défaut trouvé sur Android : le glyphe était peint en crème quelle que
