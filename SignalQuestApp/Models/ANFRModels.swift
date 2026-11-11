@@ -1082,6 +1082,41 @@ struct ISEDSiteRecord: Decodable, Sendable {
         let bandwidthMhz: Double?
         let technology: String?
         let bandLabel: String?
+        /// Contrat ISED r1 (étape b) : bornes du canal réel, duplex et bande lisible.
+        let rangeMhz: [Double]?
+        let duplex: String?
+        let bandId: String?
+        /// `bandId` servi (même nul) : la bande se lit alors sur lui seul. Nul (HSPA,
+        /// GSM) veut dire « aucune bande », pas « repli sur `bandLabel` ».
+        let servesBandId: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            case centerFrequencyMhz, bandwidthMhz, technology, bandLabel, rangeMhz, duplex, bandId
+        }
+
+        init(centerFrequencyMhz: Double?, bandwidthMhz: Double?, technology: String?, bandLabel: String?,
+             rangeMhz: [Double]? = nil, duplex: String? = nil, bandId: String? = nil, servesBandId: Bool = false) {
+            self.centerFrequencyMhz = centerFrequencyMhz
+            self.bandwidthMhz = bandwidthMhz
+            self.technology = technology
+            self.bandLabel = bandLabel
+            self.rangeMhz = rangeMhz
+            self.duplex = duplex
+            self.bandId = bandId
+            self.servesBandId = servesBandId
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            centerFrequencyMhz = c.optional(Double.self, .centerFrequencyMhz)
+            bandwidthMhz = c.optional(Double.self, .bandwidthMhz)
+            technology = c.optional(String.self, .technology)
+            bandLabel = c.optional(String.self, .bandLabel)
+            rangeMhz = c.optional([Double].self, .rangeMhz).flatMap { $0.count == 2 ? $0 : nil }
+            duplex = c.optional(String.self, .duplex)
+            bandId = c.optional(String.self, .bandId)
+            servesBandId = c.contains(.bandId)
+        }
     }
 
     let recordId: String
@@ -1090,10 +1125,12 @@ struct ISEDSiteRecord: Decodable, Sendable {
     let frequencies: [Frequency]
     let antennaStructureHeightM: Double?
     let transmitPowerDbm: Double?
+    /// La même puissance en watts (contrat ISED r1, étape b).
+    let transmitPowerW: Double?
 
     private enum RootKeys: String, CodingKey { case site }
     private enum SiteKeys: String, CodingKey {
-        case recordId, licenceeName, authorisationNumber, frequencyAssignments, antennaStructureHeightM, transmitPowerDbm
+        case recordId, licenceeName, authorisationNumber, frequencyAssignments, antennaStructureHeightM, transmitPowerDbm, transmitPowerW
     }
 
     init(from decoder: Decoder) throws {
@@ -1105,6 +1142,7 @@ struct ISEDSiteRecord: Decodable, Sendable {
         frequencies = c.value([Frequency].self, .frequencyAssignments, [])
         antennaStructureHeightM = c.optional(Double.self, .antennaStructureHeightM)
         transmitPowerDbm = c.optional(Double.self, .transmitPowerDbm)
+        transmitPowerW = c.optional(Double.self, .transmitPowerW)
     }
 }
 

@@ -447,6 +447,10 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let technical: AntennaTechnicalInfo
     let frequencyBands: [String]
     let radioCarriers: [AntennaRadioCarrier]
+    /// Canada (contrat ISED r1) : date de l'extrait du registre (`YYYY-MM-DD`).
+    let datasetPublishedAt: String?
+    /// Canada : nombre d'antennes omni du site, dont l'azimut n'entre plus dans `azimuts`.
+    let omniAntennaCount: Int?
     let cellIdentifiers: AntennaCellIdentifiers
     let siteInfo: AntennaSiteInfo
     /// Statut ANFR brut (« En service », « Projet approuvé »…). Champ additif :
@@ -566,6 +570,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, mutualiseOperators, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
+        case datasetPublishedAt, omniAntennaCount
         case isCustomSite, validationStatus, source, displayName, description
     }
 
@@ -619,6 +624,8 @@ struct AntennaCoreDetails: Decodable, Equatable {
         technical = (try? c.decode(AntennaTechnicalInfo.self, forKey: .technical)) ?? AntennaTechnicalInfo()
         frequencyBands = c.decodeLossyArray([String].self, forKey: .frequencyBands)
         radioCarriers = c.decodeLossyArray([AntennaRadioCarrier].self, forKey: .radioCarriers)
+        datasetPublishedAt = c.decodeFlexibleString(forKey: .datasetPublishedAt)
+        omniAntennaCount = (try? c.decodeIfPresent(Int.self, forKey: .omniAntennaCount)) ?? nil
         cellIdentifiers = (try? c.decode(AntennaCellIdentifiers.self, forKey: .cellIdentifiers)) ?? AntennaCellIdentifiers()
         siteInfo = (try? c.decode(AntennaSiteInfo.self, forKey: .siteInfo)) ?? AntennaSiteInfo()
         status = c.decodeFlexibleString(forKey: .status)
@@ -694,6 +701,30 @@ struct AntennaRadioCarrier: Decodable, Equatable, Identifiable {
     let cellIds: [String]
     let physicalIds: [String]
     let dateLastChanged: String?
+
+    // Contrat ISED r1, étape b : un canal réel par porteuse, valeurs typées.
+    // `band` et `technology` gardent leur type : les nouvelles valeurs vont dans
+    // `bandId` (« B66 », « n78 ») et `technologyDetail` (« LTE », « 5GNR », « 5GDSS »).
+    let bandId: String?
+    let technologyDetail: String?
+    /// À ne lire que si `bandId` n'est pas nil (règle client du contrat).
+    let bandInferred: Bool?
+    /// « FDD », « TDD » ou « SDL ».
+    let duplex: String?
+    let txRangeMhz: [Double]?
+    let rxRangeMhz: [Double]?
+    let txPowerW: Double?
+    /// « W » : la puissance a été déclarée en watts par le titulaire, puis convertie.
+    let txPowerUnitInferred: String?
+    // Étape c : une antenne omni n'a pas d'azimut (`sectorAzimuthDeg` nil).
+    let omni: Bool?
+    // Étape g1 : profil de l'antenne TX, chaque champ absent quand ISED ne le publie pas.
+    let gainDbi: Double?
+    let tiltDeg: Double?
+    let antennaHeightM: Double?
+    let antennaCount: Double?
+    let antennaModel: String?
+    let antennaManufacturer: String?
 }
 
 struct AntennaTechnicalInfo: Decodable, Equatable {

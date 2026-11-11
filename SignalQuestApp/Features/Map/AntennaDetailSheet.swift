@@ -1554,7 +1554,18 @@ struct AntennaDetailSheet: View {
 
     /// Les porteuses intéressent peu de monde et allongeaient la fiche : elles
     /// ont leur propre page.
+    @ViewBuilder
     private func carriersPage(_ core: AntennaCoreDetails) -> some View {
+        if core.market?.uppercased() == "CA" {
+            // Contrat ISED r1 : une carte par secteur, comme la fiche Web.
+            ISEDCarriersPage(sheet: .make(carriers: core.radioCarriers, azimuths: core.azimuts,
+                                          datasetPublishedAt: core.datasetPublishedAt))
+        } else {
+            genericCarriersPage(core)
+        }
+    }
+
+    private func genericCarriersPage(_ core: AntennaCoreDetails) -> some View {
         ScrollView {
             factCard { carriersContent(core) }
                 .padding(SQSpace.lg)
@@ -1687,7 +1698,8 @@ struct AntennaDetailSheet: View {
                     detailRow("En projet", core.technologiesInProject.joined(separator: " · "))
                 }
                 detailRow("Bandes", core.frequencyBands.joined(separator: " / "), term: .band)
-                detailRow("Azimuts", core.azimuts.prefix(12).map { "\(Int($0.rounded()))°" }.joined(separator: " · "), term: .azimuth)
+                // Liste entière : une coupure muette faisait croire à moins de secteurs.
+                detailRow("Azimuts", core.azimuts.map { "\(Int($0.rounded()))°" }.joined(separator: " · "), term: .azimuth)
                 detailRow("Support", core.siteInfo.supportType ?? core.technical.supportType)
                 // `supportHeight` est une chaîne brute du registre (« 29,5 », « 4 ») :
                 // l'afficher telle quelle donnait une hauteur sans unité.
@@ -1696,7 +1708,7 @@ struct AntennaDetailSheet: View {
                     (core.siteInfo.supportHeightMeters ?? core.siteInfo.pylonHeight)
                         .map { "\(Int($0.rounded())) m" }
                 )
-                detailRow("Types d'antennes", core.siteInfo.antennaTypes.prefix(6).joined(separator: " · "))
+                detailRow("Types d'antennes", core.siteInfo.antennaTypes.joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init), term: .sector)
                 // « Oui » ne disait rien : ni combien, ni où. Quand le registre
@@ -1713,10 +1725,13 @@ struct AntennaDetailSheet: View {
                     detailRow(label, value)
                 }
                 detailRow("Dernière mise à jour", SignalFormatters.date(core.siteInfo.lastUpdated, relative: true))
-                // Belgique, Suisse, Canada : le régulateur publie la position et
+                // Belgique, Suisse : le régulateur publie la position et
                 // l'opérateur, mais ni hauteur, ni secteurs, ni azimuts. Le dire
                 // évite que la fiche passe pour un chargement raté.
-                if !core.hasStructuralData {
+                // Le registre canadien publie hauteurs, secteurs et azimuts (porteuses) :
+                // la note ne vaut plus pour lui, sauf sur un site relevé par un membre.
+                if !core.hasStructuralData,
+                   core.market?.uppercased() != "CA" || core.isCustomSite || customSite != nil {
                     Text(registryCoverageNote(for: core))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -1740,7 +1755,6 @@ struct AntennaDetailSheet: View {
         switch core.market?.uppercased() {
         case "BE": registry = String(localized: "Le registre belge (BIPT)")
         case "CH": registry = String(localized: "Le registre suisse (OFCOM)")
-        case "CA": registry = String(localized: "Le registre canadien (ISED)")
         default: registry = String(localized: "Le registre de ce pays")
         }
         return String(localized: "\(registry) publie la position et l'exploitant, mais ni hauteur, ni secteurs, ni azimuts : ces lignes resteront vides tant que la source ne les donnera pas.")

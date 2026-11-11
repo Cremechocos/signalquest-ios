@@ -305,13 +305,27 @@ struct ISEDLicenceView: View {
         }
     }
 
-    /// « 3 505 MHz · 10 MHz · LTE B42 » : centre, largeur, technologie et bande publiées.
-    static func frequencyText(_ frequency: ISEDSiteRecord.Frequency) -> String {
-        let mhz = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...1))
+    /// « 3 510–3 560 MHz · 50 MHz de large · n78 · TDD » : canal réel (ou son centre),
+    /// largeur, bande et duplex publiés (contrat ISED r1).
+    static func frequencyText(_ frequency: ISEDSiteRecord.Frequency, locale: Locale = .current) -> String {
+        let nbsp = "\u{00A0}"
+        func mhz(_ value: Double, _ digits: Int = 1) -> String {
+            value.formatted(.number.precision(.fractionLength(0...digits)).locale(locale))
+        }
         var parts: [String] = []
-        if let center = frequency.centerFrequencyMhz { parts.append("\(center.formatted(mhz)) MHz") }
-        if let width = frequency.bandwidthMhz { parts.append(String(localized: "\(width.formatted(mhz)) MHz de large")) }
-        if let label = frequency.bandLabel ?? frequency.technology, !label.isEmpty { parts.append(label) }
+        if let range = frequency.rangeMhz, range.count == 2 {
+            parts.append("\(mhz(range[0]))–\(mhz(range[1]))\(nbsp)MHz")
+        } else if let center = frequency.centerFrequencyMhz {
+            parts.append("\(mhz(center))\(nbsp)MHz")
+        }
+        if let width = frequency.bandwidthMhz {
+            let text = "\(mhz(width, 2))\(nbsp)MHz"
+            parts.append(String(localized: "\(text) de large"))
+        }
+        // `bandId` servi : il fait foi, et nul veut dire « pas de bande » (HSPA, GSM).
+        let band = frequency.servesBandId ? frequency.bandId : (frequency.bandLabel ?? frequency.technology)
+        if let band, !band.isEmpty { parts.append(band) }
+        if let duplex = frequency.duplex, !duplex.isEmpty { parts.append(duplex) }
         return parts.joined(separator: " · ")
     }
 
@@ -319,10 +333,14 @@ struct ISEDLicenceView: View {
         var facts: [(String, String)] = []
         let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...1))
         if let power = record.transmitPowerDbm {
-            facts.append((String(localized: "Puissance d’émission"), "\(power.formatted(oneDecimal)) dBm"))
+            let dbm = "\(power.formatted(oneDecimal))\u{00A0}dBm"
+            let watts = record.transmitPowerW.map { w in
+                "\(w.formatted(.number.precision(.fractionLength(0...(w >= 10 ? 0 : w >= 1 ? 1 : 2)))))\u{00A0}W"
+            }
+            facts.append((String(localized: "Puissance d’émission"), watts.map { "\(dbm) (≈\u{00A0}\($0))" } ?? dbm))
         }
         if let height = record.antennaStructureHeightM {
-            facts.append((String(localized: "Hauteur de la structure"), "\(height.formatted(oneDecimal)) m"))
+            facts.append((String(localized: "Hauteur de la structure"), "\(height.formatted(oneDecimal))\u{00A0}m"))
         }
         return facts
     }
