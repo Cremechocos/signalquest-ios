@@ -1434,7 +1434,7 @@ final class MapExplorerViewModel: ObservableObject {
         let antennas = await antennasResult
         let places = await placesResult
         guard !Task.isCancelled, searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == q else { return }
-        let merged = Self.mergeSearchResults(places: places, antennas: antennas ?? [])
+        let merged = Self.mergeSearchResults(places: places, antennas: antennas ?? [], query: q)
         searchResults = merged
         // « Indisponible » seulement si la recherche a échoué : une requête
         // sans résultat n'est pas une panne (AF-CARTE-02).
@@ -1445,8 +1445,21 @@ final class MapExplorerViewModel: ObservableObject {
     /// Fusionne lieux (ville/adresse) et antennes : **lieux d'abord** (l'intention
     /// « ville/adresse » prime), jusqu'à 4, puis les antennes ; plafonné à 8. Pur et
     /// testable.
-    static func mergeSearchResults(places: [PlaceResult], antennas: [AntennaSite]) -> [MapSearchResult] {
-        Array((places.prefix(4).map { MapSearchResult.place($0) }
+    ///
+    /// Un code de site tapé tel quel (« LM110-01 ») ne cherche pas une adresse : quand un
+    /// site porte exactement ce code, les lieux, qu'Apple trouve quand même en devinant
+    /// une adresse lointaine, sont retirés. Cinq chiffres pile restent ambigus avec un
+    /// code postal : les lieux y sont gardés.
+    static func mergeSearchResults(places: [PlaceResult], antennas: [AntennaSite], query: String = "") -> [MapSearchResult] {
+        let code = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let mayBePostalCode = code.count == 5 && code.allSatisfy(\.isASCII) && code.allSatisfy(\.isNumber)
+        let namesASite = !code.isEmpty && !mayBePostalCode && antennas.contains { site in
+            [site.id, site.siteId, site.anfrCode, site.siteKey].contains {
+                $0?.caseInsensitiveCompare(code) == .orderedSame
+            }
+        }
+        let shownPlaces = namesASite ? [] : places
+        return Array((shownPlaces.prefix(4).map { MapSearchResult.place($0) }
             + antennas.map { MapSearchResult.antenna($0) }).prefix(8))
     }
 

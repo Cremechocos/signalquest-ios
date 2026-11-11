@@ -41,6 +41,30 @@ final class MapSearchTests: XCTestCase {
         XCTAssertTrue(merged.allSatisfy { if case .antenna = $0 { return true } else { return false } })
     }
 
+    /// « LM110-01 » (11/11) : Apple devinait une adresse en Côte-d'Or pour un code de site.
+    func testExactSiteCodeHidesPlaces() {
+        let site = AntennaSite(
+            id: "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567", siteId: "LM110-01", anfrCode: "LM110-01",
+            latitude: 45.49, longitude: -73.56, operators: ["VIDEOTRON_FREEDOM"], technologies: [],
+            bands: [], azimuths: [], sharingType: nil, crozonLeader: nil, isZTD: false,
+            address: nil, height: nil, owner: nil
+        )
+        let exact = MapExplorerViewModel.mergeSearchResults(places: [place(0)], antennas: [site], query: " lm110-01 ")
+        XCTAssertEqual(exact.map(\.id), ["antenna-\(site.id)"])
+        let partial = MapExplorerViewModel.mergeSearchResults(places: [place(0)], antennas: [site], query: "LM110")
+        XCTAssertEqual(partial.map(\.id), ["p0", "antenna-\(site.id)"], "Texte partiel : les lieux restent")
+    }
+
+    func testFiveDigitsKeepPlacesAsAPostalCode() {
+        let site = AntennaSite(
+            id: "a1", siteId: "38510", anfrCode: nil, latitude: 45, longitude: 5,
+            operators: [], technologies: [], bands: [], azimuths: [],
+            sharingType: nil, crozonLeader: nil, isZTD: false, address: nil, height: nil, owner: nil
+        )
+        let merged = MapExplorerViewModel.mergeSearchResults(places: [place(0)], antennas: [site], query: "38510")
+        XCTAssertEqual(merged.map(\.id), ["p0", "antenna-a1"])
+    }
+
     func testQuickSearchSendsExactWorldwideMarket() throws {
         let items = try AntennasService.quickSearchQueryItems(
             query: "Bamako",
