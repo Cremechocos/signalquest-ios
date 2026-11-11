@@ -353,12 +353,17 @@ enum SessionTADoubt: Equatable {
     /// l'anneau n'est pas sûr.
     case imprecise
     /// Même nœud, même TA, alors que le point s'est éloigné de plus de
-    /// `frozenTravelMeters` du premier point de cette valeur. Hors connexion active,
+    /// `frozenTravelMeters` (2 pas) du premier point de cette valeur. Hors connexion active,
     /// le modem Android rend souvent le dernier TA connu : la distance ne suit plus.
     case frozen
 
+    /// Agrégats du Backend (11/11, 255 301 points LTE, 30 jours) : 97 % des points
+    /// ont un GPS à 20 m ou mieux, et l'écart anneau/site n'en dépend presque pas.
+    /// En revanche, 90 % des points successifs d'un nœud gardent le même TA à
+    /// 12,7 m/s, alors qu'un TA qui vient de changer suit la distance à 11–90 m près.
+    /// On ne garde donc un TA que sur 2 pas (≈ 160 m) après son dernier changement.
     static let maxAccuracyMeters: Double = 30
-    static let frozenTravelMeters: Double = 400
+    static let frozenTravelMeters: Double = 2 * ServingAntenna.metersPerTimingAdvance
     /// Au-delà, deux points du même nœud ne forment plus la même suite.
     static let runGap: TimeInterval = 120
 

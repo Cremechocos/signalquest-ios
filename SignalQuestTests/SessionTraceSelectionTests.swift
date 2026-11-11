@@ -225,13 +225,13 @@ final class SessionTraceSelectionTests: XCTestCase {
     }
 
     /// TA écartés (choix d'Alexandre du 11/11) : GPS à plus de 30 m, ou TA figé
-    /// sur le même nœud alors que le point a roulé plus de 400 m.
+    /// sur le même nœud alors que le point a roulé plus de 2 pas (≈ 156 m).
     func testDoubtfulTimingAdvancesDrawNoRing() throws {
         // 0,001° de latitude ≈ 111 m. `timestamp` en secondes (décodeur par défaut).
         let json = """
         {"session":{"id":"s2","name":"Trajet","source":"android","points":[
           {"id":"p1","latitude":45.1700,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":8,"timestamp":0},
-          {"id":"p2","latitude":45.1720,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":12,"timestamp":5},
+          {"id":"p2","latitude":45.1710,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":12,"timestamp":5},
           {"id":"p3","latitude":45.1750,"longitude":5.7,"enb":"1","timingAdvance":10,"accuracy":9,"timestamp":10},
           {"id":"p4","latitude":45.1760,"longitude":5.7,"enb":"1","timingAdvance":11,"timestamp":15},
           {"id":"p5","latitude":45.1770,"longitude":5.7,"enb":"1","timingAdvance":11,"accuracy":45,"timestamp":20},
@@ -245,7 +245,7 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertNil(points.first { $0.id == "p7" }?.accuracy, "une précision négative est ignorée")
 
         let doubts = SessionTADoubt.reasons(in: points)
-        XCTAssertNil(doubts["p2"], "222 m au même TA : encore plausible")
+        XCTAssertNil(doubts["p2"], "111 m au même TA : encore plausible")
         XCTAssertEqual(doubts["p3"], .frozen, "555 m au même TA sur le même nœud")
         XCTAssertNil(doubts["p4"], "un nouveau TA ouvre une nouvelle suite")
         XCTAssertEqual(doubts["p5"], .imprecise)
