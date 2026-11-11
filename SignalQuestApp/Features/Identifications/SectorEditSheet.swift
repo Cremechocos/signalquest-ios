@@ -282,13 +282,21 @@ struct SectorEditSheet: View {
                     }
                 }
 
-                saveButton
-
                 if let onMove, !model.savedAwaitingClose {
                     moveLink(onMove)
                 }
             }
             .padding(SQSpace.lg)
+        }
+        // Bouton épinglé au bas : dans une feuille empilée sur la fiche, le bas du
+        // défilement passait sous le bord de l'écran et « Enregistrer » restait hors d'atteinte.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            saveButton
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.sm)
+                .padding(.bottom, SQSpace.md)
+                .frame(maxWidth: .infinity)
+                .background(SQColor.bg.ignoresSafeArea(edges: .bottom))
         }
         .background(SQColor.bg.ignoresSafeArea())
         .task { await model.load() }

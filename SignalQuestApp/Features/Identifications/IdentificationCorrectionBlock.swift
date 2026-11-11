@@ -238,7 +238,7 @@ struct IdentificationCorrectionBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Text("Tes identifications ici")
-                .font(SQType.subhead(.bold))
+                .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
                 .accessibilityAddTraits(.isHeader)
             content
@@ -332,39 +332,38 @@ struct IdentificationCorrectionBlock: View {
 
     private func found(node: MyIdentification, cells: [MyIdentification]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(spacing: SQSpace.sm) {
-                Text(node.nodeLabel)
-                    .font(.sqTechnical(15, .semibold))
-                    .foregroundStyle(SQColor.label)
-                if node.conflict {
-                    SignalPill(text: "En conflit")
-                }
-            }
+            nodeHeader(node, cellCount: cells.count)
             if node.conflict {
                 Text(conflictLine(node))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if cells.isEmpty {
-                Text("Aucune cellule")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-            } else {
-                VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    ForEach(cells) { cell in
+            if !cells.isEmpty {
+                // Tuile interne crème, une rangée par cellule séparée d'un filet (DESIGN.md).
+                VStack(spacing: 0) {
+                    ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
+                        if index > 0 {
+                            Rectangle()
+                                .fill(SQColor.separator)
+                                .frame(height: 1 / UIScreen.main.scale)
+                                .padding(.leading, SQSpace.md + 32 + SQSpace.sm2)
+                                .accessibilityHidden(true)
+                        }
                         // Toucher une rangée ouvre le schéma de SA cellule (règle commune avec le Web).
                         Button {
                             route = .sectors(cell: cell, cells: cells)
                         } label: {
-                            HStack(spacing: SQSpace.sm) {
+                            HStack(spacing: SQSpace.sm2) {
                                 cellRow(cell)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .foregroundStyle(SQColor.labelTertiary)
                                     .accessibilityHidden(true)
                             }
-                            .frame(minHeight: 44)
+                            .padding(.horizontal, SQSpace.md)
+                            .padding(.vertical, SQSpace.sm)
+                            .frame(minHeight: 52)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -373,6 +372,7 @@ struct IdentificationCorrectionBlock: View {
                         .accessibilityIdentifier("identification.block.cell.\(cell.id)")
                     }
                 }
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             if let error = model.actionError {
                 SQNotice(message: error, tone: .danger)
@@ -391,7 +391,7 @@ struct IdentificationCorrectionBlock: View {
                 .accessibilityIdentifier("radioLogs.identify.correct")
                 Button("Retirer") { withdrawReason = ""; confirmingWithdraw = true }
                     .font(SQType.subhead(.semibold))
-                    .foregroundStyle(SQColor.ink2)
+                    .foregroundStyle(SQColor.dangerInk)
                     .frame(minWidth: 88, minHeight: 44)
                     .disabled(model.isBusy)
                     .accessibilityIdentifier("identification.block.withdraw")
@@ -399,43 +399,82 @@ struct IdentificationCorrectionBlock: View {
         }
     }
 
-    /// « PCI 214 ····· secteur 2 », puis la référence du PCI quand elle est connue.
-    private func cellRow(_ cell: MyIdentification) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: SQSpace.sm) {
-                Text(cell.cellLabel)
-                    .font(SQType.caption.weight(.semibold))
-                    .monospacedDigit()
+    /// En-tête du nœud : pastille, « eNB 608665 », puis « Bouygues Telecom · 6 cellules ».
+    private func nodeHeader(_ node: MyIdentification, cellCount: Int) -> some View {
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(
+                systemImage: node.conflict ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
+                size: 36,
+                tint: node.conflict ? OutageTint.degradedInk : SQColor.success,
+                fill: node.conflict ? SQColor.warningSoft : SQColor.successSoft
+            )
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(node.nodeLabel)
+                    .font(.sqTechnical(15, .semibold))
                     .foregroundStyle(SQColor.label)
-                Spacer(minLength: SQSpace.sm)
-                if let sectors = sectorText(cell) {
-                    Text(sectors)
-                        .font(SQType.caption.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.label)
-                }
+                Text(verbatim: [node.operatorDisplayName,
+                                cellCount == 0 ? String(localized: "Aucune cellule") : String(localized: "\(cellCount) cellules")]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .monospacedDigit()
             }
-            if model.checks.sectorCheck == .ok, let derived = cell.derivedSector {
-                // `derivedSector` dit le secteur prouvé, même sans secteur enregistré.
-                if cell.sectors == [derived] {
-                    reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
-                } else {
-                    reference(String(localized: "Le PCI indique le secteur \(derived)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
-                }
-            } else if model.checks.sectorCheck == .ok, let check = cell.sectorCheck {
-                switch check.status {
-                case .mismatch:
-                    if let expected = check.expected {
-                        reference(String(localized: "Le PCI indique le secteur \(expected)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
-                    }
-                case .match:
-                    reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
-                case .notApplicable, .unknown:
-                    EmptyView()
-                }
+            Spacer(minLength: 0)
+            if node.conflict {
+                SignalPill(text: "En conflit")
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// Pastille du secteur, nom de la cellule, puis la référence du PCI quand elle est connue.
+    private func cellRow(_ cell: MyIdentification) -> some View {
+        HStack(spacing: SQSpace.sm2) {
+            sectorBadge(cell)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cell.cellLabel)
+                    .font(SQType.rowTitle)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                if model.checks.sectorCheck == .ok, let derived = cell.derivedSector {
+                    // `derivedSector` dit le secteur prouvé, même sans secteur enregistré.
+                    if cell.sectors == [derived] {
+                        reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
+                    } else {
+                        reference(String(localized: "Le PCI indique le secteur \(derived)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
+                    }
+                } else if model.checks.sectorCheck == .ok, let check = cell.sectorCheck {
+                    switch check.status {
+                    case .mismatch:
+                        if let expected = check.expected {
+                            reference(String(localized: "Le PCI indique le secteur \(expected)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
+                        }
+                    case .match:
+                        reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
+                    case .notApplicable, .unknown:
+                        EmptyView()
+                    }
+                }
+            }
+            Spacer(minLength: SQSpace.sm)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Numéro du secteur dans un disque, « – » quand aucun n'est enregistré.
+    private func sectorBadge(_ cell: MyIdentification) -> some View {
+        Text(verbatim: cell.sectors.isEmpty ? "–" : cell.sectors.map(String.init).joined(separator: ","))
+            .font(SQFont.display(13, .bold, relativeTo: .subheadline))
+            .monospacedDigit()
+            .foregroundStyle(cell.sectors.isEmpty ? SQColor.labelSecondary : SQColor.label)
+            .minimumScaleFactor(0.7)
+            .lineLimit(1)
+            .frame(width: 32, height: 32)
+            .background(SQColor.surface, in: Circle())
+            // Lu après le nom de la cellule : « Cellule 10, secteur 2, Conforme au PCI ».
+            .accessibilityLabel(sectorText(cell).map { Text(verbatim: $0) } ?? Text("Aucun secteur"))
+            .accessibilitySortPriority(-1)
     }
 
     private func reference(_ text: String, systemImage: String, tint: Color) -> some View {
