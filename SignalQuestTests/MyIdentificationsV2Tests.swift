@@ -490,6 +490,10 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertNil(rows[2].pci)
         XCTAssertFalse(rows[2].usesPciScope, "sans PCI : correction cellule par cellule")
         XCTAssertEqual(rows[2].reference, .none)
+        // Le sous-titre du nœud compte 4 cellules, pas 5 : la ligne pci 181 a ses cellules.
+        let group = try XCTUnwrap(IdentifiedNodeGroup.group(lines).first)
+        XCTAssertEqual(group.cells.count, 5)
+        XCTAssertEqual(group.cellCount, 4)
     }
 
     /// La correction d'un PCI part en une requête, sans cellId ni CI ; un serveur qui ne

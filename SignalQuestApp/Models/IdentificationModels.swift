@@ -280,8 +280,17 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
     var title: String {
         kind == .unassigned ? String(localized: "Cellules sans nœud") : "\(kind.rawValue) \(nodeValue)"
     }
+    /// Cellules du nœud, comptées comme dans « Tes identifications ici » : une ligne
+    /// `pci` ne compte que si aucune cellule de son PCI n'existe (SECTOR-PCI r1, comme
+    /// Android 223beb38c). Sans nœud, deux lignes de même PCI peuvent venir de deux sites :
+    /// chacune compte.
+    var cellCount: Int {
+        kind == .unassigned ? cells.count
+            : SectorRow.rows(cells.map(\.source)).reduce(0) { $0 + max($1.cells.count, 1) }
+    }
+
     var subtitle: String {
-        let count = cells.count
+        let count = cellCount
         let cellPart = count == 0 ? String(localized: "aucune cellule") : String(localized: "\(count) cellules")
         return "\(representative.operatorDisplayName ?? String(localized: "Opérateur inconnu")) · \(representative.techLabel) · \(cellPart)"
     }
