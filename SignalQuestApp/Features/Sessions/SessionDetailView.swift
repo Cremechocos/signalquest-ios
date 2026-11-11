@@ -1584,6 +1584,7 @@ private struct SessionTraceFullScreen: View {
     @State private var candidatesLoading = false
     @State private var candidatesFailed = false
     @State private var selectedCandidateID: String?
+    @State private var mapFocus: SessionMapFocus?
     /// Renouvelé à chaque réglage : la carte ne se redessine que là.
     @State private var renderID = UUID()
 
@@ -1632,7 +1633,8 @@ private struct SessionTraceFullScreen: View {
                             },
                             highlight: highlight,
                             candidateSites: candidateSites,
-                            onCandidateTap: { selectedCandidateID = $0 })
+                            onCandidateTap: { selectedCandidateID = $0 },
+                            focus: mapFocus)
             .ignoresSafeArea()
             .accessibilityIdentifier("sessionDetail.fullMap")
             .safeAreaInset(edge: .top, spacing: 0) { topBar }
@@ -1724,7 +1726,7 @@ private struct SessionTraceFullScreen: View {
                 candidatesLine(candidateSites, searching: searchesCandidates)
                 Divider()
             } else if let group = selectedGroup {
-                siteCard(group, points: points)
+                siteCard(group, points: points, conflicts: candidateSites.filter { $0.conflict != nil })
                 candidatesLine(candidateSites, searching: searchesCandidates)
                 Divider()
             }
@@ -1911,7 +1913,8 @@ private struct SessionTraceFullScreen: View {
 
     /// Fiche d'une antenne touchée : état et score, nœuds, points servis, indices,
     /// puis « C'est elle » et la fiche du site.
-    private func siteCard(_ group: ServingSiteGroup, points: [CoverageSessionPoint]) -> some View {
+    private func siteCard(_ group: ServingSiteGroup, points: [CoverageSessionPoint],
+                          conflicts: [SessionCandidateSite]) -> some View {
         let antenna = group.primary
         let keys = group.nodeKeys
         let served = points.filter { $0.nodeKey.map(keys.contains) == true }
@@ -2006,7 +2009,11 @@ private struct SessionTraceFullScreen: View {
                         .foregroundStyle(conflict.isActionable ? OutageTint.degradedInk : SQColor.labelSecondary)
                 }
                 if suggestsCell {
-                    Text("La cellule de ce point n’est pas encore validée sur ce support.")
+                    if let pci = antenna.pci, !pci.isEmpty {
+                        Text("Le PCI \(pci) n’est pas encore validé sur ce support.")
+                    } else {
+                        Text("Une cellule de ce nœud n’est pas encore validée sur ce support.")
+                    }
                 }
                 if antenna.status == .hypothesis, !antenna.evidenceLabels.isEmpty {
                     Text(verbatim: antenna.evidenceLabels.joined(separator: " · "))
@@ -2015,6 +2022,9 @@ private struct SessionTraceFullScreen: View {
             .font(SQType.caption)
             .foregroundStyle(SQColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
+            if !conflicts.isEmpty {
+                conflictRows(conflicts, from: group.coordinate)
+            }
             if let result = model.identifyResult {
                 Label(result, systemImage: model.identifySucceeded ? "checkmark.seal" : "exclamationmark.triangle")
                     .font(SQType.caption)
@@ -2063,6 +2073,60 @@ private struct SessionTraceFullScreen: View {
             }
         }
         .accessibilityIdentifier("sessionDetail.fullMap.site")
+    }
+
+    /// Les autres supports du nœud, souvent hors de la vue : toucher l'un d'eux ouvre sa fiche
+    /// et cadre la carte sur lui et sur le site retenu.
+    private func conflictRows(_ sites: [SessionCandidateSite], from origin: CLLocationCoordinate2D) -> some View {
+        VStack(spacing: 0) {
+            ForEach(sites) { site in
+                Button {
+                    selectedCandidateID = site.id
+                    mapFocus = SessionMapFocus(coordinates: [origin, site.coordinate])
+                } label: {
+                    HStack(spacing: SQSpace.sm2) {
+                        Circle()
+                            .strokeBorder(OutageTint.degradedInk, lineWidth: 3)
+                            .background(Circle().fill(SQBrand.operatorColor(site.operatorName ?? "")))
+                            .frame(width: 16, height: 16)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(verbatim: site.site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne"))
+                                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                                .foregroundStyle(SQColor.label)
+                                .monospacedDigit()
+                            Text(verbatim: Self.conflictRowFacts(site, from: origin))
+                                .font(SQType.caption)
+                                .foregroundStyle(site.isLikely ? SQColor.accentInk : SQColor.labelSecondary)
+                                .monospacedDigit()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "scope")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(Text("Affiche ce support sur la carte"))
+                .accessibilityIdentifier("sessionDetail.fullMap.site.conflictSite")
+            }
+        }
+    }
+
+    /// « à 8,8 km · anneaux TA compatibles : 0 sur 60 ».
+    static func conflictRowFacts(_ site: SessionCandidateSite, from origin: CLLocationCoordinate2D) -> String {
+        let meters = site.conflict?.distanceMeters ?? CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+            .distance(from: CLLocation(latitude: site.coordinate.latitude, longitude: site.coordinate.longitude))
+        var facts = [String(localized: "à \(SQUnits.distance(meters: meters))")]
+        if site.fitTotal > 0 {
+            facts.append(String(localized: "anneaux TA compatibles : \(site.fitMatching) sur \(site.fitTotal)"))
+        }
+        return facts.joined(separator: " · ")
     }
 
     /// Même étiquette d'état que la liste des antennes du détail.

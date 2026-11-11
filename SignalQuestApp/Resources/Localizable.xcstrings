@@ -113444,22 +113444,6 @@
         }
       }
     },
-    "La cellule de ce point n’est pas encore validée sur ce support." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This point’s cell is not validated on this site yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La cellule de ce point n’est pas encore validée sur ce support."
-          }
-        }
-      }
-    },
     "Valider la cellule" : {
       "localizations" : {
         "en" : {
@@ -113563,6 +113547,54 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Le PCI %@ n’est pas encore validé sur ce support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PCI %@ is not validated on this site yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le PCI %@ n’est pas encore validé sur ce support."
+          }
+        }
+      }
+    },
+    "Une cellule de ce nœud n’est pas encore validée sur ce support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cell of this node is not validated on this site yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une cellule de ce nœud n’est pas encore validée sur ce support."
+          }
+        }
+      }
+    },
+    "Affiche ce support sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows this site on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche ce support sur la carte"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

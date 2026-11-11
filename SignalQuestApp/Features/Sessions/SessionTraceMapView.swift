@@ -34,6 +34,8 @@ struct SessionTraceMapView: UIViewRepresentable {
     var candidateSites: [SessionCandidateSite] = []
     /// Toucher un site candidat (son `id`).
     var onCandidateTap: ((String) -> Void)? = nil
+    /// Recadrage demandé (un support en conflit hors de la vue) : appliqué une fois par `id`.
+    var focus: SessionMapFocus? = nil
     /// Carte d'une session (contrat session-signal-trace v1) : tracé ou points,
     /// teintes de l'échelle commune par techno et signal, sans coupure. `nil`
     /// garde l'ancien rendu (« Mes mesures »).
@@ -73,6 +75,7 @@ struct SessionTraceMapView: UIViewRepresentable {
         context.coordinator.syncSelection(selectedPoint, on: map)
         context.coordinator.syncHighlight(highlight, on: map)
         context.coordinator.syncCandidates(candidateSites, on: map)
+        context.coordinator.syncFocus(focus, on: map)
     }
 
     private func render(on map: MKMapView, context: Context) {
@@ -138,6 +141,20 @@ struct SessionTraceMapView: UIViewRepresentable {
         var onCandidateTap: ((String) -> Void)?
         private var candidateSignature: [String] = []
         private var candidateAnnotations: [SessionCandidateSiteAnnotation] = []
+
+        private var focusID: UUID?
+
+        /// Cadre les positions demandées au-dessus de la fiche, qui couvre le bas de la carte.
+        func syncFocus(_ focus: SessionMapFocus?, on map: MKMapView) {
+            guard let focus, focus.id != focusID, !focus.coordinates.isEmpty else { return }
+            focusID = focus.id
+            var rect = MKMapRect.null
+            for coordinate in focus.coordinates {
+                rect = rect.union(MKMapRect(origin: MKMapPoint(coordinate), size: MKMapSize(width: 1, height: 1)))
+            }
+            let bottom = max(map.bounds.height * 0.5, 120)
+            map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 160, left: 56, bottom: bottom, right: 56), animated: true)
+        }
 
         func resetCandidates() {
             candidateSignature = []
@@ -595,6 +612,14 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
 }
 
 /// Site de l'opérateur proposé autour des anneaux TA, avec son accord aux anneaux.
+/// Positions à cadrer sur la carte du trajet ; un nouvel `id` relance le cadrage.
+struct SessionMapFocus: Equatable {
+    let id = UUID()
+    let coordinates: [CLLocationCoordinate2D]
+
+    static func == (lhs: SessionMapFocus, rhs: SessionMapFocus) -> Bool { lhs.id == rhs.id }
+}
+
 struct SessionCandidateSite: Identifiable, Equatable {
     let site: AntennaSite
     let operatorName: String?
