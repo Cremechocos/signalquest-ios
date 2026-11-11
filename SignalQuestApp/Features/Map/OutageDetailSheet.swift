@@ -169,7 +169,9 @@ struct OutageDetailSheet: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.dangerInk)
                 }
-                if service != nil {
+                // Rattachement incertain : « Voir la panne signalée » ouvre déjà la même
+                // fiche, discussion comprise (parité Android 62cdc5e81).
+                if service != nil, primaryConfidence?.isSure == true {
                     linkButton(
                         String(localized: "Discussion · \(Self.commentsText(community.commentCount))"),
                         id: community.primaryOutageId
