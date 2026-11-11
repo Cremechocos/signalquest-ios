@@ -547,9 +547,10 @@ struct SignalDetailSheet: View {
                 ("Signal moy.", SignalFormatters.dbm(signal.averageSignalDbm)),
                 ("Min / Max", rangeText(signal: signal)),
                 ("Techs", signal.detectedTechs.prefix(3).joined(separator: " / ")),
-                // Une mesure isolée : Cell et PCI quittent la carte pour le détail (lot F).
-                ("PCI", signal.pci.map(String.init) ?? "")
-            ] + radioPairs(for: signal)
+                // Un trajet traverse plusieurs cellules : PCI, Cell, RSRP, RSRQ, SINR et Bande
+                // ne décriraient qu'un seul de ses points (le signal est déjà en moyenne et min / max).
+                ("Opérateur", signal.operator ?? "")
+            ]
         default:
             return radioPairs(for: signal)
         }
