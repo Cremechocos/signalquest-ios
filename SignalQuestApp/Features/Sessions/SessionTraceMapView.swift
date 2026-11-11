@@ -346,19 +346,15 @@ final class SessionPointsRenderer: MKOverlayRenderer {
         flush()
     }
 
-    /// Perles : un disque coloré cerclé du liseré, à taille écran constante.
+    /// Perles : un disque coloré plein, sans liseré (choix d'Alexandre du 11/11, en
+    /// signal comme en génération), à taille écran constante.
     private func drawPearls(_ overlay: SessionPointsOverlay, screen: Double, cull: MKMapRect, in context: CGContext) {
         let radius = 4 * screen
-        let ring = 1.5 * screen
         for dot in overlay.dots {
             guard cull.contains(dot.point) else { continue }
             let p = point(for: dot.point)
-            let outer = CGRect(x: p.x - radius - ring, y: p.y - radius - ring,
-                               width: (radius + ring) * 2, height: (radius + ring) * 2)
-            context.setFillColor(overlay.casing)
-            context.fillEllipse(in: outer)
             context.setFillColor(dot.color)
-            context.fillEllipse(in: outer.insetBy(dx: ring, dy: ring))
+            context.fillEllipse(in: CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2))
         }
     }
 }

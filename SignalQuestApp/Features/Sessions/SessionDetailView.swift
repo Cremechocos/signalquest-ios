@@ -1237,8 +1237,12 @@ private struct SessionSignalChart: View {
 
     private var xDomain: ClosedRange<Double> { domain ?? fullDomain }
 
+    /// Le domaine est lu UNE fois : dans le filtre, `xDomain` relisait `fullDomain`
+    /// (un passage sur tous les échantillons) pour chaque échantillon, soit ~800 × 800
+    /// par appel, plusieurs fois par rendu (gels de 0,7 à 7 s mesurés sur iPhone, 11/11).
     private var visible: [SessionDetailViewModel.SignalSample] {
-        samples.filter { xDomain.contains(x($0)) }
+        let domain = xDomain
+        return samples.filter { domain.contains(x($0)) }
     }
 
     /// Bornes à 5 dB près, avec une marge, sans dépasser la plage RSRP.
@@ -1287,7 +1291,10 @@ private struct SessionSignalChart: View {
     }
 
     var body: some View {
-        Chart {
+        // Calculés une fois par rendu : l'axe Y les relisait pour chaque graduation.
+        let xDomain = xDomain
+        let yDomain = yDomain
+        return Chart {
             ForEach(buckets) { bucket in
                 AreaMark(x: .value("Position", bucket.x),
                          yStart: .value("Minimum", bucket.low),
