@@ -3989,6 +3989,7 @@ struct MapExplorerView: View {
     /// de panne — une cible, deux destinations.
     private var communityOutagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
+        let shared = outageSitesWithBothSources
         let individual = model.communityOutages.compactMap { outage -> MapAnnotationPayload? in
             guard outage.state.isVisible else { return nil }
             // Le serveur résout la position depuis son référentiel ; une panne dont
@@ -4018,7 +4019,7 @@ struct MapExplorerView: View {
                     severity: outage.severity,
                     confirmed: outage.state == .confirmed
                 ),
-                besideAntenna: filters.contains(.antenna)
+                stepsAside: filters.contains(.antenna) || shared.contains(Self.outageSiteKey(outage.latitude, outage.longitude))
             )
         }
         return clusteredPayloads(
@@ -4083,6 +4084,7 @@ struct MapExplorerView: View {
     /// une maintenance) et glyphe de la source (`OperatorIncidentCard.glyph`).
     private var outagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
+        let shared = outageSitesWithBothSources
         let individual = model.outages.compactMap { site -> MapAnnotationPayload? in
             guard matchesSelectedOutageBands(site) else { return nil }
             guard let lat = site.lat, let lon = site.lon else { return nil }
@@ -4105,10 +4107,32 @@ struct MapExplorerView: View {
                 showsAzimuths: false,
                 tint: Self.outageColor(for: kindKey),
                 glyphOverride: Self.outageGlyph(for: kindKey),
-                besideAntenna: filters.contains(.antenna)
+                stepsAside: filters.contains(.antenna) || shared.contains(Self.outageSiteKey(lat, lon))
             )
         }
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })
+    }
+
+    /// Sites qui portent À LA FOIS une panne signalée et un incident opérateur. Sans couche
+    /// Antennes, les deux marqueurs restent écartés (droite et gauche) sur ces sites-là :
+    /// posés au même point, l'un masquerait l'autre. Partout ailleurs, la panne est posée
+    /// exactement sur sa coordonnée.
+    private var outageSitesWithBothSources: Set<String> {
+        let community = Set(model.communityOutages.compactMap { outage -> String? in
+            guard outage.state.isVisible, outage.latitude != 0 || outage.longitude != 0 else { return nil }
+            return Self.outageSiteKey(outage.latitude, outage.longitude)
+        })
+        guard !community.isEmpty else { return [] }
+        let incidents = Set(model.outages.compactMap { site -> String? in
+            guard let lat = site.lat, let lon = site.lon else { return nil }
+            return Self.outageSiteKey(lat, lon)
+        })
+        return community.intersection(incidents)
+    }
+
+    /// Même support à ~1 m près : les deux sources tirent la position du même référentiel.
+    static func outageSiteKey(_ lat: Double, _ lon: Double) -> String {
+        "\((lat * 100_000).rounded()),\((lon * 100_000).rounded())"
     }
 
     /// La gravité d'un incident opérateur, résolue à UN seul endroit.

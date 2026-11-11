@@ -214,8 +214,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             // ces pastilles partageant un unique `reuseID`.
             // Sans la couche Antennes, il n'y a rien à dégager : la panne reste sur sa position.
             switch payload.kind {
-            case .communityOutage where payload.besideAntenna: centerOffset = Self.communityOutageOffset
-            case .outage where payload.besideAntenna: centerOffset = Self.operatorIncidentOffset
+            case .communityOutage where payload.stepsAside: centerOffset = Self.communityOutageOffset
+            case .outage where payload.stepsAside: centerOffset = Self.operatorIncidentOffset
             default: centerOffset = .zero
             }
             // Panne seulement signalée : pastille ÉVIDÉE à liseré coloré. Le

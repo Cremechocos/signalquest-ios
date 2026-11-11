@@ -251,7 +251,7 @@ final class AntennaMarkerRenderTests: XCTestCase {
     private func outagePayload(
         severity: OutageSeverity,
         confirmed: Bool,
-        besideAntenna: Bool = true
+        stepsAside: Bool = true
     ) -> MapAnnotationPayload {
         MapAnnotationPayload(
             id: "community-outage-1", kind: .communityOutage, title: "Site 3079254", subtitle: "SFR",
@@ -259,7 +259,7 @@ final class AntennaMarkerRenderTests: XCTestCase {
             metric: nil, backendId: "abc", details: nil, antennaId: nil, clusterCount: nil,
             azimuths: [], showsAzimuths: false,
             communityOutage: CommunityOutageMark(severity: severity, confirmed: confirmed),
-            besideAntenna: besideAntenna
+            stepsAside: stepsAside
         )
     }
 
@@ -267,7 +267,7 @@ final class AntennaMarkerRenderTests: XCTestCase {
     /// Un décalage fixe de 22 pt valait plusieurs km au zoom large et la faisait glisser
     /// d'un zoom à l'autre (vidéo d'Alexandre du 11/11).
     func testOutageMarkersStayOnTheirCoordinateWithoutTheAntennaLayer() {
-        XCTAssertEqual(markerView(outagePayload(severity: .down, confirmed: true, besideAntenna: false)).centerOffset, .zero)
+        XCTAssertEqual(markerView(outagePayload(severity: .down, confirmed: true, stepsAside: false)).centerOffset, .zero)
         let incident = MapAnnotationPayload(
             id: "outage-1", kind: .outage, title: "Panne", subtitle: "SFR",
             coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72), metric: nil,
@@ -275,8 +275,11 @@ final class AntennaMarkerRenderTests: XCTestCase {
         )
         XCTAssertEqual(markerView(incident).centerOffset, .zero)
         var beside = incident
-        beside.besideAntenna = true
+        beside.stepsAside = true
         XCTAssertNotEqual(markerView(beside).centerOffset, .zero)
+        // Une panne signalée et un incident opérateur sur le même support restent écartés.
+        XCTAssertEqual(MapExplorerView.outageSiteKey(45.180001, 5.72), MapExplorerView.outageSiteKey(45.18, 5.720003))
+        XCTAssertNotEqual(MapExplorerView.outageSiteKey(45.18, 5.72), MapExplorerView.outageSiteKey(45.1801, 5.72))
     }
 
     /// Le défaut trouvé sur Android : le glyphe était peint en crème quelle que

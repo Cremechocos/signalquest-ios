@@ -93,7 +93,7 @@ final class CarPlayLayerController {
         let loadedOutages = outageResult ?? []
         let loadedPlanned = plannedResult ?? []
         layers.outages = Self.outagePayloads(from: loadedOutages, within: bounds,
-                                             besideAntenna: filters.contains(.antenna))
+                                             stepsAside: filters.contains(.antenna))
         layers.planned = Self.plannedPayloads(from: loadedPlanned, within: bounds)
         layers.outageSources = Dictionary(loadedOutages.map { ("outage-\($0.id)", $0) },
                                           uniquingKeysWith: { first, _ in first })
@@ -219,7 +219,7 @@ final class CarPlayLayerController {
     /// nous-mêmes à la zone visible, sinon on épinglerait des incidents situés à
     /// des centaines de kilomètres.
     static func outagePayloads(from sites: [OutageSiteLive], within bounds: MapBounds,
-                               besideAntenna: Bool = false) -> [MapAnnotationPayload] {
+                               stepsAside: Bool = false) -> [MapAnnotationPayload] {
         sites.compactMap { site in
             guard let lat = site.lat, let lon = site.lon, bounds.contains(lat: lat, lon: lon) else { return nil }
             return MapAnnotationPayload(
@@ -237,7 +237,7 @@ final class CarPlayLayerController {
                 showsAzimuths: false,
                 tint: SQColor.danger,
                 // Écartée du point d'antenne seulement quand la couche Antennes est là.
-                besideAntenna: besideAntenna
+                stepsAside: stepsAside
             )
         }
     }

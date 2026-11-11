@@ -134,11 +134,12 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// antenne, ni une donnée métier : il vit uniquement dans l'état de scène de
     /// la carte et reste donc indépendant des couches et des filtres radio.
     var isSearchPin: Bool = false
-    /// Marqueur de panne posé À CÔTÉ du point d'antenne qu'il concerne : vrai seulement
-    /// quand la couche Antennes est affichée. Sans antenne à dégager, le décalage fixe
-    /// à l'écran (22 pt) déplaçait la panne de plusieurs km au zoom large et la faisait
-    /// glisser à chaque zoom (retour d'Alexandre du 11/11).
-    var besideAntenna: Bool = false
+    /// Marqueur de panne écarté de sa coordonnée (22 pt en diagonale) : seulement quand la
+    /// couche Antennes est affichée, pour dégager le point d'antenne, ou quand le site porte
+    /// aussi l'autre source de panne, pour que l'une ne masque pas l'autre. Partout ailleurs,
+    /// ce décalage fixe à l'écran déplaçait la panne de plusieurs km au zoom large et la
+    /// faisait glisser à chaque zoom (retour d'Alexandre du 11/11).
+    var stepsAside: Bool = false
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -184,7 +185,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.communityOutage == rhs.communityOutage &&
         lhs.operatorIncident == rhs.operatorIncident &&
         lhs.isSearchPin == rhs.isSearchPin &&
-        lhs.besideAntenna == rhs.besideAntenna
+        lhs.stepsAside == rhs.stepsAside
     }
 }
 
