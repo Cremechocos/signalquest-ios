@@ -113595,6 +113595,34 @@
           }
         }
       }
+    },
+    "Carte réduite aux supports où ce nœud est validé. Ferme la fiche pour tout revoir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Map limited to the sites where this node is validated. Close the card to see everything again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte réduite aux supports où ce nœud est validé. Ferme la fiche pour tout revoir."
+          }
+        }
+      }
+    },
+    "SQFormal|Carte réduite aux supports où ce nœud est validé. Ferme la fiche pour tout revoir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte réduite aux supports où ce nœud est validé. Fermez la fiche pour tout revoir."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

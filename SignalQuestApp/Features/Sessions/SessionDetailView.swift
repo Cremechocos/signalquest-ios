@@ -1611,9 +1611,15 @@ private struct SessionTraceFullScreen: View {
                                  rings: highlight?.rings ?? [], groups: groups)
             : []
         let candidateSites = SessionConflictSites.merging(conflictSites, into: operatorSites)
+        // Antenne touchée en conflit (choix d'Alexandre, 11/11 16:15) : la carte ne garde que le
+        // site retenu et les supports où le nœud est aussi validé, pour choisir le bon.
+        let comparedGroup = selectedGroup.flatMap { conflictSites.isEmpty ? nil : $0 }
+        let mapAntennas = !showsAntennas ? [] : comparedGroup?.antennas ?? (detail?.servingAntennas ?? [])
+        let mapCandidates = comparedGroup == nil ? candidateSites : candidateSites.filter { $0.conflict != nil }
+        let comparedCoordinates = comparedGroup.map { [$0.coordinate] + conflictSites.map(\.coordinate) } ?? []
         let selectedCandidate = selectedCandidateID.flatMap { id in candidateSites.first { $0.id == id } }
         SessionTraceMapView(points: points,
-                            antennas: showsAntennas ? (detail?.servingAntennas ?? []) : [],
+                            antennas: mapAntennas,
                             speedtests: showsSpeedtests ? (detail?.speedtests ?? []) : [],
                             drawPath: model.session.isDriveTest,
                             coloring: coloring,
@@ -1632,7 +1638,7 @@ private struct SessionTraceFullScreen: View {
                                 selectedCandidateID = nil
                             },
                             highlight: highlight,
-                            candidateSites: candidateSites,
+                            candidateSites: mapCandidates,
                             onCandidateTap: { selectedCandidateID = $0 },
                             focus: mapFocus)
             .ignoresSafeArea()
@@ -1641,7 +1647,7 @@ private struct SessionTraceFullScreen: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 bottomCard(points: points, groups: groups, selectedGroup: selectedGroup,
                            candidate: selectedCandidate, candidateSites: candidateSites,
-                           searchesCandidates: request != nil)
+                           searchesCandidates: request != nil, comparesConflict: comparedGroup != nil)
             }
             .task(id: request?.key) { await loadCandidates(request) }
             .alert(
@@ -1673,6 +1679,11 @@ private struct SessionTraceFullScreen: View {
             .onChange(of: coloring) { _ in renderID = UUID() }
             .onChange(of: showsAntennas) { _ in renderID = UUID() }
             .onChange(of: showsSpeedtests) { _ in renderID = UUID() }
+            .onChange(of: comparedGroup?.id) { id in
+                // Les antennes ne se redessinent qu'au rendu complet ; puis cadrage sur les supports liés.
+                renderID = UUID()
+                if id != nil { mapFocus = SessionMapFocus(coordinates: comparedCoordinates) }
+            }
     }
 
     private var topBar: some View {
@@ -1715,7 +1726,8 @@ private struct SessionTraceFullScreen: View {
 
     private func bottomCard(points: [CoverageSessionPoint], groups: [ServingSiteGroup],
                             selectedGroup: ServingSiteGroup?, candidate: SessionCandidateSite?,
-                            candidateSites: [SessionCandidateSite], searchesCandidates: Bool) -> some View {
+                            candidateSites: [SessionCandidateSite], searchesCandidates: Bool,
+                            comparesConflict: Bool) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
             if let candidate {
                 candidateCard(candidate, node: Self.representativePoint(point: selected, group: selectedGroup, in: points))
@@ -1727,7 +1739,15 @@ private struct SessionTraceFullScreen: View {
                 Divider()
             } else if let group = selectedGroup {
                 siteCard(group, points: points, conflicts: candidateSites.filter { $0.conflict != nil })
-                candidatesLine(candidateSites, searching: searchesCandidates)
+                if comparesConflict {
+                    Text("Carte réduite aux supports où ce nœud est validé. Ferme la fiche pour tout revoir.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("sessionDetail.fullMap.compareNote")
+                } else {
+                    candidatesLine(candidateSites, searching: searchesCandidates)
+                }
                 Divider()
             }
             if coloring == .generation {
