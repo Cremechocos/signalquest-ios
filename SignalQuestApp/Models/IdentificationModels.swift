@@ -138,6 +138,17 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         return nodeLabel
     }
 
+    /// Secteur que la règle de l'opérateur prouve à partir du numéro de cellule : `derivedSector`,
+    /// sinon le `sectorCheck` d'un serveur plus ancien. Jamais deviné ici.
+    var referenceSector: Int? {
+        if let derivedSector { return derivedSector }
+        switch sectorCheck?.status {
+        case .mismatch: return sectorCheck?.expected
+        case .match: return sectors.count == 1 ? sectors.first : nil
+        default: return nil
+        }
+    }
+
     /// « Orange » plutôt que la clé serveur « ORANGE » ; hors France, le nom reçu.
     var operatorDisplayName: String? {
         guard let operatorName, !operatorName.isEmpty else { return nil }
@@ -152,6 +163,81 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case .enb: return "4G"
         default: return "—"
         }
+    }
+}
+
+/// SECTOR-PCI r1 (11/11) : une rangée de « Corriger le secteur ». Le secteur se définit par le PCI :
+/// la ligne pci, les cellules et la ligne du nœud qui portent le même PCI ne font qu'une rangée,
+/// corrigée d'un seul envoi. Une ligne sans PCI garde sa propre rangée et se corrige seule.
+struct SectorRow: Identifiable, Equatable {
+    /// nil : ligne sans PCI (groupe « Sans PCI »).
+    let pci: Int?
+    /// Lignes de la rangée, jamais vide : la ligne pci d'abord, puis les cellules, puis le nœud.
+    let members: [MyIdentification]
+
+    enum Reference: Equatable {
+        case none
+        case sector(Int)
+        /// Les cellules du PCI ne donnent pas le même secteur : aucune valeur n'est montrée.
+        case disagreement
+    }
+
+    var id: String { pci.map { "pci:\($0)" } ?? "line:\(primary.id)" }
+    var primary: MyIdentification { members[0] }
+    var label: String { pci.map { "PCI \($0)" } ?? primary.cellLabel }
+
+    /// Les cellules de la rangée (cellId ou CI), montrées en sous-lignes.
+    var cells: [MyIdentification] {
+        members.filter { $0.cellId?.nilIfBlank != nil || $0.ci?.nilIfBlank != nil }
+    }
+
+    var enb: String? { members.lazy.compactMap { $0.enb?.nilIfBlank }.first }
+    var gnb: String? { members.lazy.compactMap { $0.gnb?.nilIfBlank }.first }
+
+    /// `edit-sectors` en portée PCI : un nœud et un PCI, sans cellId ni CI.
+    var usesPciScope: Bool { pci != nil && (enb != nil || gnb != nil) }
+
+    private var storedSets: Set<[Int]> {
+        Set(members.map { $0.sectors.sorted() }.filter { !$0.isEmpty })
+    }
+
+    /// Les lignes du PCI ont des secteurs enregistrés différents : la correction les réalignera.
+    var isMisaligned: Bool { storedSets.count > 1 }
+    /// Tous les secteurs enregistrés, sans doublon.
+    var storedSectors: [Int] { Array(Set(members.flatMap(\.sectors))).sorted() }
+    /// Le secteur enregistré commun, vide en désaccord ou sans secteur.
+    var commonSectors: [Int] { isMisaligned ? [] : storedSets.first ?? [] }
+
+    /// La référence de la rangée, seulement si toutes les lignes qui en ont une s'accordent.
+    var reference: Reference {
+        let values = Set(members.compactMap(\.referenceSector))
+        switch values.count {
+        case 0: return .none
+        case 1: return .sector(values.first!)
+        default: return .disagreement
+        }
+    }
+
+    /// Les rangées d'un nœud : PCI croissant, puis les lignes sans PCI.
+    static func rows(_ lines: [MyIdentification]) -> [SectorRow] {
+        var byPci: [Int: [MyIdentification]] = [:]
+        var loose: [MyIdentification] = []
+        for line in lines {
+            if let pci = line.pci { byPci[pci, default: []].append(line) } else { loose.append(line) }
+        }
+        func rank(_ line: MyIdentification) -> Int {
+            switch line.kind {
+            case .pci: return 0
+            case .cellid: return 1
+            default: return 2
+            }
+        }
+        let pciRows = byPci.keys.sorted().map { pci in
+            SectorRow(pci: pci, members: byPci[pci, default: []].sorted {
+                (rank($0), $0.cellId ?? $0.ci ?? "") < (rank($1), $1.cellId ?? $1.ci ?? "")
+            })
+        }
+        return pciRows + loose.sorted { $0.cellLabel < $1.cellLabel }.map { SectorRow(pci: nil, members: [$0]) }
     }
 }
 
@@ -254,11 +340,12 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             acc.cellsTruncated = acc.cellsTruncated || item.cellsTruncated
             if kind == .unassigned || item.kind == .pci || item.kind == .cellid || item.pciValue != nil || item.ci != nil || item.cellId != nil {
                 // Sans nœud commun, deux cellules de même PCI peuvent venir de sites
-                // différents : la ligne elle-même les distingue.
+                // différents : la ligne elle-même les distingue. Une cellule (cellId) passe
+                // avant son PCI : plusieurs cellules portent le même PCI (SECTOR-PCI r1).
                 let cellId = kind == .unassigned ? item.id
                     : item.ci.map { "ci:\($0)" }
-                    ?? item.pciValue.map { "pci:\($0)" }
                     ?? item.cellId.map { "cell:\($0)" }
+                    ?? item.pciValue.map { "pci:\($0)" }
                     ?? item.id
                 let cell = IdentifiedCell(
                     id: "\(key):\(cellId)",
@@ -515,8 +602,11 @@ struct EditSectorsResult: Decodable, Equatable {
     let derived: [Int]
     let reason: String?
     let message: String?
+    /// SECTOR-PCI r1 : « pci » ou « cell ». Une requête en portée PCI qui revient sans `scope`
+    /// a touché un serveur plus ancien : seule la ligne pci a changé, on renvoie par cellule.
+    let scope: String?
 
-    enum CodingKeys: String, CodingKey { case applied, updated, sectors, derived, reason, message }
+    enum CodingKeys: String, CodingKey { case applied, updated, sectors, derived, reason, message, scope }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -526,6 +616,18 @@ struct EditSectorsResult: Decodable, Equatable {
         derived = c.decodeLossyArray([Int].self, forKey: .derived)
         reason = c.decodeFlexibleString(forKey: .reason)
         message = c.decodeFlexibleString(forKey: .message)
+        scope = c.decodeFlexibleString(forKey: .scope)
+    }
+
+    init(applied: Bool, updated: Int, sectors: [Int], derived: [Int], reason: String? = nil,
+         message: String? = nil, scope: String? = nil) {
+        self.applied = applied
+        self.updated = updated
+        self.sectors = sectors
+        self.derived = derived
+        self.reason = reason
+        self.message = message
+        self.scope = scope
     }
 
     /// `applied` avec `updated: 0` : aucune ligne n'a changé.

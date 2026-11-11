@@ -332,7 +332,8 @@ struct IdentificationCorrectionBlock: View {
 
     private func found(node: MyIdentification, cells: [MyIdentification]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            nodeHeader(node, cellCount: cells.count)
+            // Une cellule par cellId ou CI ; une ligne pci sans cellule compte pour une.
+            nodeHeader(node, cellCount: SectorRow.rows(cells).reduce(0) { $0 + max($1.cells.count, 1) })
             if node.conflict {
                 Text(conflictLine(node))
                     .font(SQType.caption)
@@ -340,22 +341,33 @@ struct IdentificationCorrectionBlock: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !cells.isEmpty {
-                // Tuile interne crème, une rangée par cellule séparée d'un filet (DESIGN.md).
+                // Tuile interne crème, une rangée par PCI séparée d'un filet (DESIGN.md, SECTOR-PCI r1).
+                let rows = SectorRow.rows(cells)
                 VStack(spacing: 0) {
-                    ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
-                        if index > 0 {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        if row.pci == nil, index == 0 || rows[index - 1].pci != nil {
+                            Text("Sans PCI")
+                                .font(SQType.micro.weight(.semibold))
+                                .tracking(1.2)
+                                .textCase(.uppercase)
+                                .foregroundStyle(SQColor.labelTertiary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, SQSpace.md)
+                                .padding(.top, SQSpace.sm)
+                                .accessibilityAddTraits(.isHeader)
+                        } else if index > 0 {
                             Rectangle()
                                 .fill(SQColor.separator)
                                 .frame(height: 1 / UIScreen.main.scale)
                                 .padding(.leading, SQSpace.md + 32 + SQSpace.sm2)
                                 .accessibilityHidden(true)
                         }
-                        // Toucher une rangée ouvre le schéma de SA cellule (règle commune avec le Web).
+                        // Toucher une rangée ouvre le schéma de SON PCI (règle commune avec le Web).
                         Button {
-                            route = .sectors(cell: cell, cells: cells)
+                            route = .sectors(cell: row.primary, cells: cells)
                         } label: {
                             HStack(spacing: SQSpace.sm2) {
-                                cellRow(cell)
+                                sectorRowView(row)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(SQColor.labelTertiary)
@@ -369,7 +381,7 @@ struct IdentificationCorrectionBlock: View {
                         .buttonStyle(.plain)
                         .disabled(model.isBusy)
                         .accessibilityHint(Text("Ouvre les secteurs de cette cellule"))
-                        .accessibilityIdentifier("identification.block.cell.\(cell.id)")
+                        .accessibilityIdentifier("identification.block.cell.\(row.primary.id)")
                     }
                 }
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -428,32 +440,39 @@ struct IdentificationCorrectionBlock: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Pastille du secteur, nom de la cellule, puis la référence du PCI quand elle est connue.
-    private func cellRow(_ cell: MyIdentification) -> some View {
+    /// Pastille du secteur, nom du PCI, sa référence, puis ses cellules en sous-lignes.
+    private func sectorRowView(_ row: SectorRow) -> some View {
         HStack(spacing: SQSpace.sm2) {
-            sectorBadge(cell)
+            sectorBadge(row)
             VStack(alignment: .leading, spacing: 2) {
-                Text(cell.cellLabel)
+                Text(verbatim: row.label)
                     .font(SQType.rowTitle)
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
-                if model.checks.sectorCheck == .ok, let derived = cell.derivedSector {
-                    // `derivedSector` dit le secteur prouvé, même sans secteur enregistré.
-                    if cell.sectors == [derived] {
-                        reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
-                    } else {
-                        reference(String(localized: "Le PCI indique le secteur \(derived)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
-                    }
-                } else if model.checks.sectorCheck == .ok, let check = cell.sectorCheck {
-                    switch check.status {
-                    case .mismatch:
-                        if let expected = check.expected {
-                            reference(String(localized: "Le PCI indique le secteur \(expected)"), systemImage: "diamond.fill", tint: OutageTint.degradedInk)
-                        }
-                    case .match:
-                        reference(String(localized: "Conforme au PCI"), systemImage: "checkmark", tint: SQColor.success)
-                    case .notApplicable, .unknown:
+                if row.isMisaligned {
+                    reference(SectorRowText.misaligned(row.storedSectors), systemImage: "exclamationmark.triangle.fill",
+                              tint: OutageTint.degradedInk)
+                } else if model.checks.sectorCheck == .ok {
+                    // La référence vient du numéro de cellule, même sans secteur enregistré.
+                    switch row.reference {
+                    case let .sector(derived) where row.commonSectors == [derived]:
+                        reference(String(localized: "Conforme au numéro de cellule"), systemImage: "checkmark", tint: SQColor.success)
+                    case let .sector(derived):
+                        reference(String(localized: "Le numéro de cellule indique le secteur \(derived)"),
+                                  systemImage: "diamond.fill", tint: OutageTint.degradedInk)
+                    case .disagreement:
+                        reference(String(localized: "Désaccord entre cellules"), systemImage: "questionmark.diamond",
+                                  tint: SQColor.labelSecondary)
+                    case .none:
                         EmptyView()
+                    }
+                }
+                if row.pci != nil {
+                    ForEach(row.cells) { cell in
+                        Text(verbatim: cellLine(cell, showsSector: row.reference == .disagreement))
+                            .font(SQType.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
             }
@@ -462,19 +481,30 @@ struct IdentificationCorrectionBlock: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Numéro du secteur dans un disque, « – » quand aucun n'est enregistré.
-    private func sectorBadge(_ cell: MyIdentification) -> some View {
-        Text(verbatim: cell.sectors.isEmpty ? "–" : cell.sectors.map(String.init).joined(separator: ","))
+    /// « Cellule 154834434 · B20 », avec le secteur de son numéro quand les cellules divergent.
+    private func cellLine(_ cell: MyIdentification, showsSector: Bool) -> String {
+        var parts = [cell.cellId.flatMap { $0.isEmpty ? nil : String(localized: "Cellule \($0)") } ?? cell.ci.map { "CI \($0)" } ?? ""]
+        if let band = cell.band { parts.append(cell.techLabel == "5G" ? "n\(band)" : "B\(band)") }
+        if showsSector, let derived = cell.referenceSector { parts.append(String(localized: "secteur \(derived)")) }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// Numéro du secteur dans un disque, « – » quand aucun n'est enregistré, « ! » en désaccord.
+    private func sectorBadge(_ row: SectorRow) -> some View {
+        let sectors = row.commonSectors
+        return Text(verbatim: row.isMisaligned ? "!" : sectors.isEmpty ? "–" : sectors.map(String.init).joined(separator: ","))
             .font(SQFont.display(13, .bold, relativeTo: .subheadline))
             .monospacedDigit()
-            .foregroundStyle(cell.sectors.isEmpty ? SQColor.labelSecondary : SQColor.label)
+            .foregroundStyle(row.isMisaligned ? OutageTint.degradedInk : sectors.isEmpty ? SQColor.labelSecondary : SQColor.label)
             .minimumScaleFactor(0.7)
             .lineLimit(1)
             .frame(width: 32, height: 32)
             .background(SQColor.surface, in: Circle())
-            // Lu après le nom de la cellule : « Cellule 10, secteur 2, Conforme au PCI ».
-            .accessibilityLabel(sectorText(cell).map { Text(verbatim: $0) } ?? Text("Aucun secteur"))
+            // Lu après le nom du PCI : « PCI 181, secteur 2, Conforme au numéro de cellule ».
+            .accessibilityLabel(sectorText(row).map { Text(verbatim: $0) } ?? Text("Aucun secteur"))
             .accessibilitySortPriority(-1)
+            // En désaccord, la ligne « secteurs 1 et 2 · à réaligner » le dit déjà.
+            .accessibilityHidden(row.isMisaligned)
     }
 
     private func reference(_ text: String, systemImage: String, tint: Color) -> some View {
@@ -487,11 +517,12 @@ struct IdentificationCorrectionBlock: View {
         .foregroundStyle(SQColor.labelSecondary)
     }
 
-    private func sectorText(_ cell: MyIdentification) -> String? {
-        switch cell.sectors.count {
+    private func sectorText(_ row: SectorRow) -> String? {
+        let sectors = row.commonSectors
+        switch sectors.count {
         case 0: return nil
-        case 1: return String(localized: "secteur \(cell.sectors[0])")
-        default: return String(localized: "secteurs \(cell.sectors.map(String.init).joined(separator: ", "))")
+        case 1: return String(localized: "secteur \(sectors[0])")
+        default: return String(localized: "secteurs \(sectors.map(String.init).joined(separator: ", "))")
         }
     }
 

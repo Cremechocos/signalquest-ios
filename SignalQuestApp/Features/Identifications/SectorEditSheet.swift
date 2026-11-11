@@ -15,10 +15,13 @@ final class SectorEditViewModel: ObservableObject {
     /// Secteur enregistré mais feuille gardée ouverte, le temps de lire la référence du serveur.
     @Published private(set) var savedAwaitingClose = false
 
-    /// Cellule dont on corrige le secteur : celle observée à l'ouverture, puis celle choisie.
-    @Published private(set) var item: MyIdentification
-    /// Les cellules du nœud, quand il en a plusieurs : on change de cellule sans quitter la feuille.
-    let cells: [MyIdentification]
+    /// SECTOR-PCI r1 : la rangée dont on corrige le secteur (un PCI du nœud, ou une ligne sans PCI),
+    /// celle de la cellule observée à l'ouverture, puis celle choisie.
+    @Published private(set) var row: SectorRow
+    /// Les rangées du nœud, quand il en a plusieurs : on change de PCI sans quitter la feuille.
+    let rows: [SectorRow]
+    /// La ligne qui porte l'opérateur, le marché et le support de la rangée.
+    var item: MyIdentification { row.primary }
     /// Secteur proposé par la règle de l'opérateur (`sectorCheck.expected`), dans la
     /// numérotation stockée ; présélectionné à la place du secteur enregistré.
     let prefilledSector: Int?
@@ -29,26 +32,26 @@ final class SectorEditViewModel: ObservableObject {
 
     init(item: MyIdentification, cells: [MyIdentification] = [], antennas: AntennasServicing, identify: IdentifyServicing,
          prefilledSector: Int? = nil, trustsSectorCheck: Bool = true) {
-        self.item = item
-        self.cells = cells.count > 1 ? cells : []
+        let all = SectorRow.rows(cells.isEmpty ? [item] : cells)
+        self.row = all.first { $0.members.contains { $0.id == item.id } }
+            ?? SectorRow.rows([item]).first ?? SectorRow(pci: nil, members: [item])
+        self.rows = all.count > 1 ? all : []
         self.prefilledSector = prefilledSector
         self.trustsSectorCheck = trustsSectorCheck
         self.antennas = antennas
         self.identify = identify
     }
 
-    /// Secteur que la règle de l'opérateur prouve à partir du PCI : `derivedSector`, montré
-    /// avant le choix. Un serveur plus ancien ne le sert pas : on se rabat sur `sectorCheck`.
-    /// Absent, il n'est jamais remplacé par une valeur à nous.
+    /// Secteur que la règle de l'opérateur prouve à partir du numéro de cellule, montré avant
+    /// le choix : seulement quand toutes les lignes de la rangée s'accordent. Absent, il n'est
+    /// jamais remplacé par une valeur à nous.
     private var derivedValue: Int? {
-        guard trustsSectorCheck else { return nil }
-        if let derived = item.derivedSector { return derived }
-        switch item.sectorCheck?.status {
-        case .mismatch: return item.sectorCheck?.expected
-        case .match: return item.sectors.count == 1 ? item.sectors.first : nil
-        default: return nil
-        }
+        guard trustsSectorCheck, case let .sector(value) = row.reference else { return nil }
+        return value
     }
+
+    /// Les cellules du PCI ne donnent pas le même secteur : « désaccord entre cellules ».
+    var referenceDisagrees: Bool { trustsSectorCheck && row.reference == .disagreement }
 
     private var derivedIndex: Int? { derivedValue.flatMap(storedIndex) }
 
@@ -93,13 +96,19 @@ final class SectorEditViewModel: ObservableObject {
         }
     }
 
-    func select(cell: MyIdentification) {
-        guard cell.id != item.id else { return }
-        item = cell
+    func select(row next: SectorRow) {
+        guard next.id != row.id else { return }
+        row = next
         errorMessage = nil
         infoMessage = nil
-        if usesList { ensureListCovers(cell.sectors + [cell.derivedSector, cell.sectorCheck?.expected].compactMap { $0 }) }
-        selectedIndex = cell.sectors.first.flatMap(storedIndex)
+        if usesList { ensureListCovers(next.storedSectors + next.members.compactMap(\.referenceSector)) }
+        selectedIndex = Self.initialSector(of: next).flatMap(storedIndex)
+    }
+
+    /// Secteur présélectionné : le secteur enregistré commun, aucun quand les lignes du PCI
+    /// ne s'accordent pas (le choix les réalignera).
+    private static func initialSector(of row: SectorRow) -> Int? {
+        row.commonSectors.first
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
@@ -134,13 +143,13 @@ final class SectorEditViewModel: ObservableObject {
         // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0).
         if unique.count <= 1 {
             listCount = Self.defaultListCount
-            ensureListCovers(item.sectors + [prefilledSector, item.derivedSector, item.sectorCheck?.expected].compactMap { $0 })
+            ensureListCovers(row.storedSectors + [prefilledSector].compactMap { $0 } + row.members.compactMap(\.referenceSector))
         } else {
             azimuths = unique
         }
         // Pré-sélection sur le secteur proposé par la règle, sinon sur celui enregistré, selon la convention de
         // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
-        if let first = prefilledSector ?? item.sectors.first {
+        if let first = prefilledSector ?? Self.initialSector(of: row) {
             selectedIndex = storedIndex(first)
         }
     }
@@ -158,24 +167,15 @@ final class SectorEditViewModel: ObservableObject {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            let result = try await identify.editSectors(
-                siteId: item.siteId,
-                enb: item.enb, gnb: item.gnb,
-                pci: item.pciValue,
-                cellId: item.cellId, ci: item.ci,
-                tech: item.tech,
-                operatorName: item.operatorName ?? "",
-                marketCode: item.marketCode,
-                sectors: [sectorNumber]
-            )
+            let result = try await send(sectors: [sectorNumber])
             if result.changed {
                 Haptics.success()
                 // Le serveur renvoie le secteur déduit du PCI comme référence : s'il diffère
                 // du choix enregistré, on le montre avant de fermer. Jamais une seconde fois
                 // quand `derivedSector` l'avait déjà mis sur le radar.
-                if derivedIndex == nil, !result.derived.isEmpty, result.derived != [sectorNumber] {
+                if derivedIndex == nil, !referenceDisagrees, !result.derived.isEmpty, result.derived != [sectorNumber] {
                     let derived = result.derived.map(String.init).joined(separator: ", ")
-                    infoMessage = String(localized: "Secteur déduit du PCI : \(derived)")
+                    infoMessage = String(localized: "Secteur déduit du numéro de cellule : \(derived)")
                     savedAwaitingClose = true
                 } else {
                     done = true
@@ -192,6 +192,65 @@ final class SectorEditViewModel: ObservableObject {
     }
 
     func finish() { done = true }
+
+    /// Une rangée de PCI part en portée PCI : le nœud et le PCI, sans cellId ni CI, et le serveur
+    /// réaligne toutes ses lignes. Sans `scope` dans la réponse, le serveur ne connaît pas cette
+    /// portée et n'a touché que la ligne pci : chaque cellule est alors renvoyée seule.
+    /// Une ligne sans PCI, ou sans nœud, reste en portée cellule.
+    private func send(sectors: [Int]) async throws -> EditSectorsResult {
+        let line = item
+        guard let pci = row.pci, row.usesPciScope else {
+            return try await edit(line, enb: line.enb, gnb: line.gnb, pci: line.pciValue,
+                                  cellId: line.cellId, ci: line.ci, sectors: sectors)
+        }
+        let first = try await edit(line, enb: row.enb, gnb: row.gnb, pci: String(pci),
+                                   cellId: nil, ci: nil, sectors: sectors)
+        guard first.scope == nil, !row.cells.isEmpty else { return first }
+        var updated = first.applied ? first.updated : 0
+        var applied = first.applied
+        var derived = first.derived
+        var refusal = first.applied ? nil : first.message
+        for cell in row.cells {
+            let next = try await edit(cell, enb: cell.enb ?? row.enb, gnb: cell.gnb ?? row.gnb, pci: cell.pciValue,
+                                      cellId: cell.cellId, ci: cell.ci, sectors: sectors)
+            if next.applied {
+                applied = true
+                updated += next.updated
+                if derived.isEmpty { derived = next.derived }
+            } else {
+                refusal = refusal ?? next.message
+            }
+        }
+        return EditSectorsResult(applied: applied, updated: updated, sectors: sectors, derived: derived,
+                                 message: refusal, scope: "cell")
+    }
+
+    private func edit(_ line: MyIdentification, enb: String?, gnb: String?, pci: String?,
+                      cellId: String?, ci: String?, sectors: [Int]) async throws -> EditSectorsResult {
+        try await identify.editSectors(
+            siteId: line.siteId,
+            enb: enb, gnb: gnb,
+            pci: pci,
+            cellId: cellId, ci: ci,
+            tech: line.tech,
+            operatorName: line.operatorName ?? "",
+            marketCode: line.marketCode,
+            sectors: sectors
+        )
+    }
+}
+
+/// Libellés communs de SECTOR-PCI r1, partagés par la feuille et le bloc « Tes identifications ici ».
+enum SectorRowText {
+    /// « secteurs 1 et 2 · à réaligner ».
+    static func misaligned(_ sectors: [Int]) -> String {
+        let list = ListFormatter.localizedString(byJoining: sectors.map(String.init))
+        return String(localized: "secteurs \(list) · à réaligner")
+    }
+
+    static var realignNote: String {
+        String(localized: "Ses cellules ont des secteurs différents : ton choix les réaligne.")
+    }
 }
 
 /// Corriger le secteur d'une cellule (PCI/CellID) : l'utilisateur tape le bon
@@ -220,12 +279,12 @@ struct SectorEditSheet: View {
             VStack(spacing: SQSpace.lg) {
                 MapSheetHeader(
                     title: "Corriger le secteur",
-                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.item.cellLabel)."),
+                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.row.label)."),
                     closeIdentifier: "sector.cancel"
                 ) { dismiss() }
 
-                if !model.cells.isEmpty {
-                    cellPicker
+                if !model.rows.isEmpty {
+                    rowPicker
                 }
 
                 if model.isLoading {
@@ -233,6 +292,7 @@ struct SectorEditSheet: View {
                 } else if model.usesList {
                     sectorList
                     pciReference
+                    scopeNote
                 } else if model.azimuths.isEmpty {
                     EmptyStateView(
                         title: "Aucun secteur",
@@ -252,6 +312,7 @@ struct SectorEditSheet: View {
 
                     selectionPill
                     pciReference
+                    scopeNote
                 }
 
                 if let info = model.infoMessage {
@@ -335,31 +396,54 @@ struct SectorEditSheet: View {
         }
     }
 
-    /// Les cellules du nœud, la cellule observée cochée : une ligne par cellule.
-    private var cellPicker: some View {
+    /// Les rangées du nœud, celle de la cellule observée cochée : une par PCI, puis « Sans PCI ».
+    private var rowPicker: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Ta cellule")
+            Text("À corriger")
                 .font(SQType.micro.weight(.semibold))
                 .tracking(1.2)
                 .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.bottom, SQSpace.xs)
-            ForEach(model.cells) { cell in
-                let isSelected = cell.id == model.item.id
+            ForEach(Array(model.rows.enumerated()), id: \.element.id) { index, row in
+                if row.pci == nil, index == 0 || model.rows[index - 1].pci != nil {
+                    Text("Sans PCI")
+                        .font(SQType.micro.weight(.semibold))
+                        .tracking(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .padding(.top, SQSpace.sm)
+                        .padding(.bottom, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                let isSelected = row.id == model.row.id
                 Button {
-                    model.select(cell: cell)
+                    model.select(row: row)
                     Haptics.selection()
                 } label: {
                     HStack(spacing: SQSpace.sm2) {
                         Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
                             .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
                             .accessibilityHidden(true)
-                        Text(cell.cellLabel)
-                            .font(SQFont.body(14, .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.label)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: row.label)
+                                .font(SQFont.body(14, .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(SQColor.label)
+                            if row.pci != nil, row.cells.count > 1 {
+                                Text("\(row.cells.count) cellules")
+                                    .font(SQType.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                        }
                         Spacer(minLength: 0)
-                        if let sector = cell.sectors.first {
+                        if row.isMisaligned {
+                            Text(SectorRowText.misaligned(row.storedSectors))
+                                .font(SQType.caption)
+                                .foregroundStyle(OutageTint.degradedInk)
+                                .multilineTextAlignment(.trailing)
+                        } else if let sector = row.commonSectors.first {
                             Text("secteur \(sector) aujourd’hui")
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
@@ -369,6 +453,7 @@ struct SectorEditSheet: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .accessibilityIdentifier("sector.cell")
                 Divider()
@@ -401,7 +486,7 @@ struct SectorEditSheet: View {
                         Spacer(minLength: 0)
                         if index == model.referenceIndex {
                             Label {
-                                Text("indiqué par le PCI")
+                                Text("indiqué par le numéro de cellule")
                             } icon: {
                                 Image(systemName: "diamond.fill").imageScale(.small).foregroundStyle(OutageTint.degradedInk)
                             }
@@ -442,10 +527,10 @@ struct SectorEditSheet: View {
             VStack(spacing: SQSpace.xs) {
                 Label {
                     if reference < model.azimuths.count {
-                        Text("Le PCI indique le secteur \(model.sectorLabel(forIndex: reference)) · \(Int(model.azimuths[reference].rounded()))°")
+                        Text("Le numéro de cellule indique le secteur \(model.sectorLabel(forIndex: reference)) · \(Int(model.azimuths[reference].rounded()))°")
                             .monospacedDigit()
                     } else {
-                        Text("Le PCI indique le secteur \(model.sectorLabel(forIndex: reference))")
+                        Text("Le numéro de cellule indique le secteur \(model.sectorLabel(forIndex: reference))")
                             .monospacedDigit()
                     }
                 } icon: {
@@ -453,7 +538,7 @@ struct SectorEditSheet: View {
                 }
                 .font(SQType.subhead(.semibold))
                 .foregroundStyle(SQColor.label)
-                Text("Garde ton choix si tu as vu l’antenne : le PCI n’est qu’un indice.")
+                Text("Garde ton choix si tu as vu l’antenne : le numéro de cellule n’est qu’un indice.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
@@ -464,13 +549,38 @@ struct SectorEditSheet: View {
             .accessibilityIdentifier("sector.pciReference")
         } else if model.selectionMatchesPci {
             Label {
-                Text("Conforme au PCI")
+                Text("Conforme au numéro de cellule")
             } icon: {
                 Image(systemName: "checkmark").foregroundStyle(SQColor.success)
             }
             .font(SQType.subhead(.semibold))
             .foregroundStyle(SQColor.label)
                 .accessibilityIdentifier("sector.pciMatch")
+        } else if model.referenceDisagrees {
+            Label {
+                Text("Désaccord entre cellules")
+            } icon: {
+                Image(systemName: "questionmark.diamond").imageScale(.small).foregroundStyle(SQColor.labelSecondary)
+            }
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.label)
+            .accessibilityIdentifier("sector.referenceDisagrees")
+        }
+    }
+
+    /// Portée de la correction : tout le PCI, et ses lignes réalignées quand elles divergent.
+    @ViewBuilder
+    private var scopeNote: some View {
+        if model.row.usesPciScope, model.row.isMisaligned || model.row.cells.count > 1 {
+            Text(model.row.isMisaligned
+                 ? SectorRowText.realignNote
+                 : String(localized: "Tout le PCI est corrigé : ses \(model.row.cells.count) cellules prennent ce secteur."))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("sector.scopeNote")
         }
     }
 
@@ -580,7 +690,7 @@ struct SelectableSectorRadar: View {
                         // sélectionnable (le radar tactile est sinon invisible à VoiceOver).
                         .accessibilityElement()
                         .accessibilityLabel(index == referenceIndex
-                            ? Text("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés, indiqué par le PCI")
+                            ? Text("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés, indiqué par le numéro de cellule")
                             : Text("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés"))
                         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                         .accessibilityAction {

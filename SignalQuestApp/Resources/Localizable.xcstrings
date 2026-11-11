@@ -22344,18 +22344,18 @@
         }
       }
     },
-    "Secteur déduit du PCI : %@" : {
+    "Secteur déduit du numéro de cellule : %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sector derived from the PCI: %@"
+            "value" : "Sector derived from the cell number: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Secteur déduit du PCI : %@"
+            "value" : "Secteur déduit du numéro de cellule : %@"
           }
         }
       }
@@ -56930,18 +56930,18 @@
         }
       }
     },
-    "Conforme au PCI" : {
+    "Conforme au numéro de cellule" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matches the PCI"
+            "value" : "Matches the cell number"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conforme au PCI"
+            "value" : "Conforme au numéro de cellule"
           }
         }
       }
@@ -56962,34 +56962,34 @@
         }
       }
     },
-    "Le PCI indique le secteur %lld · %lld°" : {
+    "Le numéro de cellule indique le secteur %lld · %lld°" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The PCI points to sector %1$lld · %2$lld°"
+            "value" : "The cell number points to sector %1$lld · %2$lld°"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le PCI indique le secteur %1$lld · %2$lld°"
+            "value" : "Le numéro de cellule indique le secteur %1$lld · %2$lld°"
           }
         }
       }
     },
-    "Le PCI indique le secteur %lld" : {
+    "Le numéro de cellule indique le secteur %lld" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The PCI points to sector %lld"
+            "value" : "The cell number points to sector %lld"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le PCI indique le secteur %lld"
+            "value" : "Le numéro de cellule indique le secteur %lld"
           }
         }
       }
@@ -79817,29 +79817,29 @@
         }
       }
     },
-    "Garde ton choix si tu as vu l’antenne : le PCI n’est qu’un indice." : {
+    "Garde ton choix si tu as vu l’antenne : le numéro de cellule n’est qu’un indice." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keep your choice if you saw the antenna: the PCI is only a hint."
+            "value" : "Keep your choice if you saw the antenna: the cell number is only a hint."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Garde ton choix si tu as vu l’antenne : le PCI n’est qu’un indice."
+            "value" : "Garde ton choix si tu as vu l’antenne : le numéro de cellule n’est qu’un indice."
           }
         }
       }
     },
-    "SQFormal|Garde ton choix si tu as vu l’antenne : le PCI n’est qu’un indice." : {
+    "SQFormal|Garde ton choix si tu as vu l’antenne : le numéro de cellule n’est qu’un indice." : {
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gardez votre choix si vous avez vu l’antenne : le PCI n’est qu’un indice."
+            "value" : "Gardez votre choix si vous avez vu l’antenne : le numéro de cellule n’est qu’un indice."
           }
         }
       },
@@ -79861,18 +79861,18 @@
         }
       }
     },
-    "indiqué par le PCI" : {
+    "indiqué par le numéro de cellule" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "suggested by the PCI"
+            "value" : "suggested by the cell number"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "indiqué par le PCI"
+            "value" : "indiqué par le numéro de cellule"
           }
         }
       }
@@ -79905,18 +79905,18 @@
       },
       "shouldTranslate" : false
     },
-    "Ta cellule" : {
+    "À corriger" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your cell"
+            "value" : "To correct"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ta cellule"
+            "value" : "À corriger"
           }
         }
       }
@@ -79949,18 +79949,18 @@
         }
       }
     },
-    "Secteur %lld, azimut %lld degrés, indiqué par le PCI" : {
+    "Secteur %lld, azimut %lld degrés, indiqué par le numéro de cellule" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sector %1$lld, azimuth %2$lld degrees, suggested by the PCI"
+            "value" : "Sector %1$lld, azimuth %2$lld degrees, suggested by the cell number"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Secteur %1$lld, azimut %2$lld degrés, indiqué par le PCI"
+            "value" : "Secteur %1$lld, azimut %2$lld degrés, indiqué par le numéro de cellule"
           }
         }
       }
@@ -113255,6 +113255,98 @@
           }
         }
       }
+    },
+    "Sans PCI" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No PCI"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans PCI"
+          }
+        }
+      }
+    },
+    "Désaccord entre cellules" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cells disagree"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désaccord entre cellules"
+          }
+        }
+      }
+    },
+    "secteurs %@ · à réaligner" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sectors %@ · to realign"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "secteurs %@ · à réaligner"
+          }
+        }
+      }
+    },
+    "Ses cellules ont des secteurs différents : ton choix les réaligne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its cells have different sectors: your choice realigns them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses cellules ont des secteurs différents : ton choix les réaligne."
+          }
+        }
+      }
+    },
+    "Tout le PCI est corrigé : ses %lld cellules prennent ce secteur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The whole PCI is corrected: its %lld cells take this sector."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout le PCI est corrigé : ses %lld cellules prennent ce secteur."
+          }
+        }
+      }
+    },
+    "SQFormal|Ses cellules ont des secteurs différents : ton choix les réaligne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses cellules ont des secteurs différents : votre choix les réaligne."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

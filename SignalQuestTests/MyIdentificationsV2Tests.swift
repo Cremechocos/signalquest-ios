@@ -380,7 +380,7 @@ final class MyIdentificationsV2Tests: XCTestCase {
         XCTAssertEqual(model.referenceIndex, 1, "secteur 2 d'Orange = deuxième azimut")
         XCTAssertFalse(model.selectionMatchesPci)
 
-        model.select(cell: match)
+        model.select(row: try XCTUnwrap(model.rows.first { $0.members.contains(match) }))
         XCTAssertEqual(model.selectedIndex, 1)
         XCTAssertNil(model.referenceIndex)
         XCTAssertTrue(model.selectionMatchesPci)
@@ -389,7 +389,7 @@ final class MyIdentificationsV2Tests: XCTestCase {
                                             identify: PagedIdentifyService(), trustsSectorCheck: false)
         await untrusted.load()
         XCTAssertNil(untrusted.referenceIndex, "contrôle indisponible : aucune référence montrée")
-        XCTAssertTrue(untrusted.cells.isEmpty)
+        XCTAssertTrue(untrusted.rows.isEmpty)
     }
 
     /// Support sans schéma (au plus un azimut) : une liste de trois secteurs, extensible, dans
@@ -457,6 +457,80 @@ final class MyIdentificationsV2Tests: XCTestCase {
         none.selectedIndex = 0
         XCTAssertNil(none.referenceIndex)
         XCTAssertFalse(none.selectionMatchesPci)
+    }
+
+    // MARK: SECTOR-PCI r1 (11/11)
+
+    private func line(_ json: String) throws -> MyIdentification {
+        try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data(json.utf8))
+    }
+
+    /// Une rangée par PCI : la ligne pci, les cellules et la ligne du nœud du même PCI n'en font
+    /// qu'une ; PCI croissant, puis « Sans PCI ». Désaccord des secteurs stockés et des références.
+    func testSectorRowsGroupTheLinesOfAPci() throws {
+        let base = #""siteId":"799050","enb":"608665","operator":"BOUYGUES","marketCode":"FR""#
+        let lines = try [
+            line(#"{"id":"c2",\#(base),"type":"cellid","cellId":"155812098","pci":181,"band":20,"sectors":[2],"derivedSector":2}"#),
+            line(#"{"id":"p",\#(base),"type":"pci","pci":181,"sectors":[1]}"#),
+            line(#"{"id":"c1",\#(base),"type":"cellid","cellId":"155812097","pci":181,"band":3,"sectors":[2],"derivedSector":1}"#),
+            line(#"{"id":"n",\#(base),"type":"enb","pci":12,"sectors":[3],"derivedSector":3}"#),
+            line(#"{"id":"x",\#(base),"type":"cellid","cellId":"155812099","sectors":[]}"#),
+        ]
+        let rows = SectorRow.rows(lines)
+        XCTAssertEqual(rows.map(\.label), ["PCI 12", "PCI 181", "Cellule 155812099"])
+        XCTAssertEqual(rows[1].members.map(\.id), ["p", "c1", "c2"], "ligne pci d'abord, puis les cellules")
+        XCTAssertEqual(rows[1].cells.map(\.id), ["c1", "c2"])
+        XCTAssertTrue(rows[1].isMisaligned)
+        XCTAssertEqual(rows[1].storedSectors, [1, 2])
+        XCTAssertEqual(rows[1].commonSectors, [])
+        XCTAssertEqual(rows[1].reference, .disagreement, "références 1 et 2 : aucune valeur")
+        XCTAssertTrue(rows[1].usesPciScope)
+        XCTAssertEqual(rows[0].reference, .sector(3))
+        XCTAssertEqual(rows[0].commonSectors, [3])
+        XCTAssertNil(rows[2].pci)
+        XCTAssertFalse(rows[2].usesPciScope, "sans PCI : correction cellule par cellule")
+        XCTAssertEqual(rows[2].reference, .none)
+    }
+
+    /// La correction d'un PCI part en une requête, sans cellId ni CI ; un serveur qui ne
+    /// répond pas `scope` reçoit ensuite une requête par cellule. Sans PCI : portée cellule.
+    func testSectorEditSendsThePciScopeAndFallsBackPerCell() async throws {
+        let base = #""siteId":"799050","enb":"608665","operator":"ORANGE","operatorMcc":208,"operatorMnc":1,"marketCode":"FR""#
+        let cells = try [
+            line(#"{"id":"p",\#(base),"type":"pci","pci":181,"sectors":[1]}"#),
+            line(#"{"id":"c1",\#(base),"type":"cellid","cellId":"11","pci":181,"sectors":[1]}"#),
+            line(#"{"id":"c2",\#(base),"type":"cellid","cellId":"12","pci":181,"sectors":[2]}"#),
+            line(#"{"id":"x",\#(base),"type":"cellid","cellId":"13","sectors":[1]}"#),
+        ]
+        let service = PagedIdentifyService()
+        let model = SectorEditViewModel(item: cells[1], cells: cells, antennas: AzimuthAntennasService(), identify: service)
+        await model.load()
+        XCTAssertEqual(model.row.pci, 181)
+        XCTAssertEqual(model.rows.count, 2)
+        XCTAssertNil(model.selectedIndex, "secteurs en désaccord : aucun choix présélectionné")
+        model.selectedIndex = 1
+        await model.submit()
+        XCTAssertEqual(service.sectorEdits, [.init(enb: "608665", pci: "181", cellId: nil, ci: nil)])
+        XCTAssertTrue(model.done)
+
+        let old = PagedIdentifyService()
+        old.pciScopeAnswer = #"{"success":true,"applied":true,"updated":1}"#
+        let fallback = SectorEditViewModel(item: cells[0], cells: cells, antennas: AzimuthAntennasService(), identify: old)
+        await fallback.load()
+        fallback.selectedIndex = 1
+        await fallback.submit()
+        XCTAssertEqual(old.sectorEdits, [
+            .init(enb: "608665", pci: "181", cellId: nil, ci: nil),
+            .init(enb: "608665", pci: "181", cellId: "11", ci: nil),
+            .init(enb: "608665", pci: "181", cellId: "12", ci: nil),
+        ])
+
+        let loose = PagedIdentifyService()
+        let single = SectorEditViewModel(item: cells[3], cells: cells, antennas: AzimuthAntennasService(), identify: loose)
+        await single.load()
+        XCTAssertEqual(single.selectedIndex, 0)
+        await single.submit()
+        XCTAssertEqual(loose.sectorEdits, [.init(enb: "608665", pci: nil, cellId: "13", ci: nil)])
     }
 
     /// Déplacer (planche 4) : la cible du conflit est présélectionnée une fois, la vue
@@ -601,9 +675,16 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
     }
     func editSite(fromSiteId: String, toSiteId: String, enb: String?, gnb: String?, reason: String?) async throws -> EditSiteResult { throw APIError.cancelled }
     var sentSectors: [[Int]] = []
+    struct SectorEdit: Equatable { let enb: String?; let pci: String?; let cellId: String?; let ci: String? }
+    var sectorEdits: [SectorEdit] = []
+    /// Réponse d'une requête en portée PCI : `scope` absent = serveur d'avant SECTOR-PCI r1.
+    var pciScopeAnswer = #"{"success":true,"applied":true,"updated":3,"scope":"pci"}"#
     func editSectors(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?, tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> EditSectorsResult {
         sentSectors.append(sectors)
-        return try JSONDecoder().decode(EditSectorsResult.self, from: Data(#"{"success":true,"applied":true,"updated":1}"#.utf8))
+        sectorEdits.append(SectorEdit(enb: enb, pci: pci, cellId: cellId, ci: ci))
+        let isPciScope = pci != nil && (enb != nil || gnb != nil) && cellId == nil && ci == nil
+        let answer = isPciScope ? pciScopeAnswer : #"{"success":true,"applied":true,"updated":1}"#
+        return try JSONDecoder().decode(EditSectorsResult.self, from: Data(answer.utf8))
     }
 }
 
