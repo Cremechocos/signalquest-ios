@@ -262,6 +262,23 @@ final class ServingAntennaSiteIdTests: XCTestCase {
         XCTAssertEqual(french.writeSiteId, "1002637")
     }
 
+    /// LM110-01 (11/11) : la recherche rend l'enregistrement ISED brut, titulaire dans
+    /// `marketOperator` et sans `operators`. Sans repli, la fiche demandait le site à Bell.
+    func testSearchResultTakesItsOperatorFromMarketOperator() throws {
+        let canadian = try JSONDecoder().decode(AntennaSite.self, from: Data("""
+        { "sup_id": "LM110-01", "marketOperator": "VIDEOTRON_FREEDOM", "latitude": 45.49, "longitude": -73.56 }
+        """.utf8))
+        XCTAssertEqual(canadian.operators, ["VIDEOTRON_FREEDOM"])
+        let listed = try JSONDecoder().decode(AntennaSite.self, from: Data("""
+        { "sup_id": "37199", "operators": ["SFR", "BOUYGUES"], "marketOperator": "SFR" }
+        """.utf8))
+        XCTAssertEqual(listed.operators, ["SFR", "BOUYGUES"], "La liste servie prime")
+        let unknown = try JSONDecoder().decode(AntennaSite.self, from: Data("""
+        { "sup_id": "X1", "marketOperator": "UNKNOWN" }
+        """.utf8))
+        XCTAssertEqual(unknown.operators, [])
+    }
+
     func testOfficialSourceOutageTellsToRetryShortly() {
         XCTAssertEqual(
             APIError.userFacingMessage(status: 503, code: "OFFICIAL_ANTENNA_SOURCE_UNAVAILABLE", serverMessage: ""),

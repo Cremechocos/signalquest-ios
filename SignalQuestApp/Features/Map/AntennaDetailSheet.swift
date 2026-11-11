@@ -180,6 +180,13 @@ struct AntennaDetailSheet: View {
     /// dans les 44 marchés sans référentiel public, c'est la SEULE antenne qui existe.
     private var outageTargetKind: String { isCustomSite ? "custom" : "anfr" }
 
+    /// Identifiant demandé à `/map/antenna/{id}`. Au Canada, le sup_id n'est pas unique
+    /// entre titulaires : la site_key hex-40, que la route accepte aussi, désigne le bon
+    /// site. En France, le sup_id reste commun aux opérateurs d'un support partagé.
+    private var detailsSiteId: String {
+        market.uppercased() == "CA" ? site.writeSiteId : site.siteId ?? site.id
+    }
+
     init(
         site: AntennaSite,
         market: String = "FR",
@@ -260,7 +267,7 @@ struct AntennaDetailSheet: View {
                 operatorIncidents = []
                 // En parallèle de la fiche : les pannes n'ont pas à attendre `details`.
                 async let outagesLoad: Void = loadOutages()
-                await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 await loadMarketEntry()
                 await outagesLoad
                 // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
@@ -818,7 +825,7 @@ struct AntennaDetailSheet: View {
             ErrorStateView(title: "Détails indisponibles", message: error) {
                 Task {
                     model.error = nil
-                    await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                    await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 }
             }
         } else {
@@ -870,7 +877,7 @@ struct AntennaDetailSheet: View {
                 ErrorStateView(title: "Détails indisponibles", message: error) {
                     Task {
                         model.error = nil
-                        await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                        await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                     }
                 }
             } else {

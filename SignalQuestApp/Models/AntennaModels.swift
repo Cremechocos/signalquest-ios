@@ -134,7 +134,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         case id, siteId, sup_id, anfrCode
         case latitude, lat
         case longitude, lng, lon
-        case operators, operatorList
+        case operators, operatorList, marketOperator
         case technologies, techs, emr_lb_systeme, generation
         case bands, bandes, azimuts, azimuths
         case sharingType, crozonLeader, isZTD
@@ -195,8 +195,15 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         let lonFallback1: Double? = (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? nil
         let lonFallback2: Double? = (try? c.decodeIfPresent(Double.self, forKey: .lon)) ?? nil
         longitude = lonPrimary ?? lonFallback1 ?? lonFallback2
-        operators = c.decodeLossyArray([String].self, forKey: .operators)
+        let listedOperators = c.decodeLossyArray([String].self, forKey: .operators)
             + c.decodeLossyArray([String].self, forKey: .operatorList)
+        // Hors France, la recherche rapide rend l'enregistrement brut du registre : son
+        // titulaire est dans `marketOperator`, sans liste `operators`. Sans ce repli, la
+        // fiche prenait l'opérateur du filtre de la carte (Bell au Canada) et le serveur,
+        // qui cherche le site dans le jeu de cet opérateur, répondait « Antenna not found ».
+        let marketOperator = c.decodeFlexibleString(forKey: .marketOperator)
+            .flatMap { $0.uppercased() == "UNKNOWN" ? nil : $0 }
+        operators = listedOperators.isEmpty ? [marketOperator].compactMap { $0 } : listedOperators
         let decodedTechnologies = c.decodeLossyArray([String].self, forKey: .technologies)
             + c.decodeLossyArray([String].self, forKey: .techs)
             + c.decodeLossyArray([String].self, forKey: .emr_lb_systeme)
