@@ -25,6 +25,11 @@ struct SessionTraceMapView: UIViewRepresentable {
     var onPointTap: ((CoverageSessionPoint?) -> Void)? = nil
     /// Point entouré sur la carte (celui qu'on lit).
     var selectedPoint: CoverageSessionPoint? = nil
+    /// Plein écran : un toucher sur une antenne ouvre sa fiche (id du groupe de
+    /// site) au lieu de la bulle MapKit.
+    var onAntennaTap: ((String) -> Void)? = nil
+    /// Traits, anneaux TA et secteur de la sélection ; rien sans sélection.
+    var highlight: SessionTraceHighlight? = nil
     /// Carte d'une session (contrat session-signal-trace v1) : tracé ou points,
     /// teintes de l'échelle commune par techno et signal, sans coupure. `nil`
     /// garde l'ancien rendu (« Mes mesures »).
@@ -56,10 +61,12 @@ struct SessionTraceMapView: UIViewRepresentable {
                 operatorLabels: operatorLabels)
         }
         context.coordinator.onPointTap = onPointTap
+        context.coordinator.onAntennaTap = onAntennaTap
         if context.coordinator.shouldRender(signature) {
             render(on: map, context: context)
         }
         context.coordinator.syncSelection(selectedPoint, on: map)
+        context.coordinator.syncHighlight(highlight, on: map)
     }
 
     private func render(on map: MKMapView, context: Context) {
@@ -69,6 +76,7 @@ struct SessionTraceMapView: UIViewRepresentable {
         let validPoints = points.filter(\.hasValidCoordinate)
         let coords = validPoints.map(\.coordinate)
         context.coordinator.selection = nil
+        context.coordinator.resetHighlight()
         if onPointTap != nil { context.coordinator.points = validPoints }
 
         // Drive Test : un ruban coloré point par point ; sinon un nuage de perles.
@@ -81,9 +89,10 @@ struct SessionTraceMapView: UIViewRepresentable {
                                                 casing: (isDark ? UIColor(white: 0.1, alpha: 0.9) : UIColor.white).cgColor),
                            level: .aboveLabels)
         }
-        // Antennes desservantes géolocalisées.
-        let locatedAntennas = antennas.filter(\.hasValidCoordinate)
-        map.addAnnotations(locatedAntennas.map(ServingAntennaAnnotation.init))
+        // Antennes desservantes géolocalisées, une pastille par site et opérateur.
+        let siteGroups = ServingSiteGroup.groups(antennas)
+        let locatedAntennas = siteGroups.map(\.primary)
+        map.addAnnotations(siteGroups.map(ServingAntennaAnnotation.init(group:)))
 
         // Speedtests géolocalisés (marqueur « débit » tappable).
         let locatedSpeedtests = speedtests.compactMap { st -> SessionSpeedtestAnnotation? in
@@ -114,8 +123,55 @@ struct SessionTraceMapView: UIViewRepresentable {
         /// Un geste avant le premier cadrage ne doit pas figer la vue du monde entier.
         var didFit = false
         var onPointTap: ((CoverageSessionPoint?) -> Void)?
+        var onAntennaTap: ((String) -> Void)?
         var points: [CoverageSessionPoint] = []
         var selection: SessionSelectedPointAnnotation?
+        private var highlightID: String?
+        private var highlightOverlays: [MKOverlay] = []
+
+        /// Les overlays viennent d'être tous retirés : la sélection sera redessinée.
+        func resetHighlight() {
+            highlightID = nil
+            highlightOverlays = []
+        }
+
+        func syncHighlight(_ highlight: SessionTraceHighlight?, on map: MKMapView) {
+            guard highlight?.id != highlightID else { return }
+            map.removeOverlays(highlightOverlays)
+            highlightOverlays = []
+            highlightID = highlight?.id
+            guard let highlight else { return }
+            var overlays: [MKOverlay] = []
+            for cone in highlight.cones {
+                let polygon = MKPolygon(coordinates: cone, count: cone.count)
+                polygon.title = HighlightKind.cone.rawValue
+                overlays.append(polygon)
+            }
+            for estimate in highlight.estimates {
+                let circle = MKCircle(center: estimate.coordinate, radius: max(estimate.uncertaintyMeters, 40))
+                circle.title = HighlightKind.estimate.rawValue
+                overlays.append(circle)
+            }
+            for ring in highlight.rings {
+                let circle = MKCircle(center: ring.center, radius: ring.radiusMeters)
+                circle.title = (ring.emphasized ? HighlightKind.strongRing : .ring).rawValue
+                overlays.append(circle)
+            }
+            for link in highlight.links {
+                var pair = [link.0, link.1]
+                let line = MKPolyline(coordinates: &pair, count: 2)
+                line.title = HighlightKind.link.rawValue
+                overlays.append(line)
+            }
+            map.addOverlays(overlays, level: .aboveLabels)
+            highlightOverlays = overlays
+        }
+
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard let onAntennaTap, let antenna = view.annotation as? ServingAntennaAnnotation else { return }
+            mapView.deselectAnnotation(antenna, animated: false)
+            onAntennaTap(antenna.groupID)
+        }
 
         /// Point le plus proche du doigt, à 28 pt au plus ; un toucher sur un
         /// repère (antenne, speedtest) garde sa bulle.
@@ -161,7 +217,39 @@ struct SessionTraceMapView: UIViewRepresentable {
             if let points = overlay as? SessionPointsOverlay {
                 return SessionPointsRenderer(overlay: points)
             }
-            return MKOverlayRenderer(overlay: overlay)
+            let traits = mapView.traitCollection
+            let accent = UIColor(SQColor.accentInk).resolvedColor(with: traits)
+            let warning = UIColor(SQColor.warning).resolvedColor(with: traits)
+            switch (overlay as? MKShape)?.title.flatMap(HighlightKind.init(rawValue:)) {
+            case .ring?, .strongRing?:
+                let renderer = MKCircleRenderer(overlay: overlay)
+                let strong = (overlay as? MKShape)?.title == HighlightKind.strongRing.rawValue
+                // Fins et translucides : là où les anneaux se croisent, le trait se renforce.
+                renderer.strokeColor = accent.withAlphaComponent(strong ? 0.95 : 0.4)
+                renderer.lineWidth = strong ? 2.5 : 1.2
+                return renderer
+            case .estimate?:
+                let renderer = MKCircleRenderer(overlay: overlay)
+                renderer.strokeColor = warning
+                renderer.fillColor = warning.withAlphaComponent(0.14)
+                renderer.lineWidth = 1.5
+                renderer.lineDashPattern = [5, 4]
+                return renderer
+            case .cone?:
+                let renderer = MKPolygonRenderer(overlay: overlay)
+                renderer.fillColor = warning.withAlphaComponent(0.16)
+                renderer.strokeColor = warning.withAlphaComponent(0.6)
+                renderer.lineWidth = 1
+                return renderer
+            case .link?:
+                let renderer = MKPolylineRenderer(overlay: overlay)
+                renderer.strokeColor = UIColor.label.resolvedColor(with: traits).withAlphaComponent(0.55)
+                renderer.lineWidth = 1.2
+                renderer.lineDashPattern = [4, 3]
+                return renderer
+            case nil:
+                return MKOverlayRenderer(overlay: overlay)
+            }
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -172,8 +260,10 @@ struct SessionTraceMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.image = serving.markerImage(traits: mapView.traitCollection)
                 view.displayPriority = .required
-                view.canShowCallout = true
+                // En plein écran, le toucher ouvre la fiche du bas plutôt qu'une bulle.
+                view.canShowCallout = onAntennaTap == nil
                 view.accessibilityLabel = [serving.title, serving.subtitle].compactMap { $0 }.joined(separator: ", ")
+                view.accessibilityTraits = onAntennaTap == nil ? .none : .button
                 return view
             }
             if annotation is SessionSelectedPointAnnotation {
@@ -381,10 +471,23 @@ enum SessionGenerationColor {
     static func cg(_ tech: String?) -> CGColor { ui(tech).cgColor }
 }
 
-/// Annotation MapKit d'une antenne desservante.
+/// Tracés de la sélection, reconnus par le titre de leur forme.
+enum HighlightKind: String {
+    case ring = "sq.ta"
+    case strongRing = "sq.ta.strong"
+    case estimate = "sq.estimate"
+    case cone = "sq.cone"
+    case link = "sq.link"
+}
+
+/// Annotation MapKit d'une antenne desservante (la principale de son site).
 final class ServingAntennaAnnotation: NSObject, MKAnnotation {
     let antenna: ServingAntenna
-    init(_ antenna: ServingAntenna) { self.antenna = antenna }
+    let groupID: String
+    init(group: ServingSiteGroup) {
+        self.antenna = group.primary
+        self.groupID = group.id
+    }
 
     var coordinate: CLLocationCoordinate2D { antenna.coordinate }
     var title: String? { antenna.operatorDisplayName ?? antenna.displayName ?? String(localized: "Antenne") }

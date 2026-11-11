@@ -454,6 +454,7 @@ struct SessionDetailView: View {
                 operatorLabels: speedtestOperatorLabels,
                 onClose: { showsFullMap = false }
             )
+            .environmentObject(services)
         }
         .confirmationDialog(
             "Confirmer cette antenne ?",
@@ -1099,8 +1100,8 @@ struct SessionDetailView: View {
                         }
                     }
                     .padding(.top, 2)
-                    if antenna.status == .hypothesis, !antenna.evidence.isEmpty {
-                        Text(verbatim: antenna.evidence.joined(separator: " · "))
+                    if antenna.status == .hypothesis, !antenna.evidenceLabels.isEmpty {
+                        Text(verbatim: antenna.evidenceLabels.joined(separator: " · "))
                             .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(2)
@@ -1567,15 +1568,29 @@ private struct SessionTraceFullScreen: View {
     @Binding var coloring: SessionPointColoring
     let operatorLabels: [String: String]
     let onClose: () -> Void
+    @EnvironmentObject private var services: AppServices
     @State private var showsAntennas = true
     @State private var showsSpeedtests = true
     @State private var selected: CoverageSessionPoint?
+    /// Site touché (id de `ServingSiteGroup`), exclusif avec `selected`.
+    @State private var selectedSiteID: String?
+    @State private var pendingIdentify: ServingAntenna?
+    @State private var openedSite: AntennaSite?
     /// Renouvelé à chaque réglage : la carte ne se redessine que là.
     @State private var renderID = UUID()
 
     var body: some View {
         let detail = model.detail
-        SessionTraceMapView(points: detail?.points ?? [],
+        let points = detail?.points ?? []
+        let groups = ServingSiteGroup.groups(detail?.servingAntennas ?? [])
+        let selectedGroup = selectedSiteID.flatMap { id in groups.first { $0.id == id } }
+        // Calculé une fois par rendu : il parcourt tous les points du trajet.
+        let highlight: SessionTraceHighlight? = {
+            if let selected { return SessionTraceHighlight.forPoint(selected, in: points, groups: groups) }
+            if let selectedGroup { return SessionTraceHighlight.forGroup(selectedGroup, in: points) }
+            return nil
+        }()
+        SessionTraceMapView(points: points,
                             antennas: showsAntennas ? (detail?.servingAntennas ?? []) : [],
                             speedtests: showsSpeedtests ? (detail?.speedtests ?? []) : [],
                             drawPath: model.session.isDriveTest,
@@ -1583,12 +1598,47 @@ private struct SessionTraceFullScreen: View {
                             renderID: renderID,
                             keepsUserViewport: true,
                             operatorLabels: operatorLabels,
-                            onPointTap: { selected = $0 },
-                            selectedPoint: selected)
+                            onPointTap: { point in
+                                selected = point
+                                selectedSiteID = nil
+                            },
+                            selectedPoint: selected,
+                            onAntennaTap: { id in
+                                selectedSiteID = id
+                                selected = nil
+                            },
+                            highlight: highlight)
             .ignoresSafeArea()
             .accessibilityIdentifier("sessionDetail.fullMap")
             .safeAreaInset(edge: .top, spacing: 0) { topBar }
-            .safeAreaInset(edge: .bottom, spacing: 0) { bottomCard }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomCard(points: points, groups: groups, selectedGroup: selectedGroup)
+            }
+            .alert(
+                "Confirmer cette antenne ?",
+                isPresented: Binding(get: { pendingIdentify != nil }, set: { if !$0 { pendingIdentify = nil } }),
+                presenting: pendingIdentify
+            ) { antenna in
+                Button("Valider l’antenne") {
+                    Task {
+                        await model.identify(antenna, service: services.identify, location: services.location)
+                        pendingIdentify = nil
+                        await model.refreshServingAntennas(service: services.sessions)
+                    }
+                }
+                Button("Annuler", role: .cancel) { pendingIdentify = nil }
+            } message: { antenna in
+                let place = [SessionDetailView.antennaTitle(antenna), SessionDetailView.antennaSubtitle(antenna)]
+                    .filter { !$0.isEmpty }.joined(separator: " · ")
+                Text("\(place). Confirme uniquement si tu l’as captée sur ce trajet : ton identification est publique et tu peux la retirer dans « Mes identifications ».")
+            }
+            .sheet(item: $openedSite) { site in
+                AntennaDetailSheet(site: site,
+                                   market: Self.market(of: site, in: points),
+                                   operatorName: selectedGroup?.primary.operatorName ?? "ALL",
+                                   service: services.antennas)
+                    .environmentObject(services)
+            }
             .onChange(of: model.renderVersion) { _ in renderID = UUID() }
             .onChange(of: coloring) { _ in renderID = UUID() }
             .onChange(of: showsAntennas) { _ in renderID = UUID() }
@@ -1633,10 +1683,15 @@ private struct SessionTraceFullScreen: View {
         .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
-    private var bottomCard: some View {
+    private func bottomCard(points: [CoverageSessionPoint], groups: [ServingSiteGroup],
+                            selectedGroup: ServingSiteGroup?) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
             if let point = selected {
                 pointReading(point)
+                servedBy(point, groups: groups)
+                Divider()
+            } else if let group = selectedGroup {
+                siteCard(group, points: points)
                 Divider()
             }
             if coloring == .generation {
@@ -1644,11 +1699,21 @@ private struct SessionTraceFullScreen: View {
             } else {
                 SessionDetailView.rsrpLegend
             }
-            if selected == nil {
-                Text("Touche un point pour lire sa mesure.")
+            if selected == nil, selectedGroup == nil {
+                Text("Touche un point pour lire sa mesure, ou une antenne pour voir ce qu’elle sert.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                if showsAntennas, let summary = antennaSummary(points: points, groups: groups) {
+                    Text(verbatim: summary)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("sessionDetail.fullMap.antennaSummary")
+                }
             }
         }
         .padding(SQSpace.lg)
@@ -1667,6 +1732,16 @@ private struct SessionTraceFullScreen: View {
         if let t = point.timestamp { facts.append(t.formatted(.dateTime.hour().minute())) }
         if model.session.isDriveTest, let km = model.kilometer(at: point) {
             facts.append(SQUnits.routeMarker(kilometers: km))
+        }
+        // RSRQ, SINR, bande et TA, quand le trajet les a (Android) : ce qu'il faut
+        // pour juger une identification.
+        var radio: [String] = []
+        let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...1))
+        if let rsrq = point.rsrq { radio.append("RSRQ \(rsrq.formatted(oneDecimal)) dB") }
+        if let snr = point.snr { radio.append("SINR \(snr.formatted(oneDecimal)) dB") }
+        if let band = point.primaryBand { radio.append(SQUnits.band(band, isNR: point.primaryBandIsNR)) }
+        if let ta = point.timingAdvance, let meters = point.taDistanceMeters {
+            radio.append(String(localized: "TA \(ta) ≈ \(SQUnits.distance(meters: meters))"))
         }
         var cell: [String] = []
         if let pci = point.pci, !pci.isEmpty { cell.append("PCI \(pci)") }
@@ -1716,9 +1791,248 @@ private struct SessionTraceFullScreen: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .monospacedDigit()
             }
+            if !radio.isEmpty {
+                Text(verbatim: radio.joined(separator: " · "))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("sessionDetail.fullMap.point")
+    }
+
+    /// « Servi par Orange · Hypothèse 72 % · à 450 m du point · TA cohérent »,
+    /// qui ouvre la fiche de l'antenne. Un nœud sans site trouvé le dit.
+    @ViewBuilder
+    private func servedBy(_ point: CoverageSessionPoint, groups: [ServingSiteGroup]) -> some View {
+        if let key = point.nodeKey {
+            if let group = groups.first(where: { $0.nodeKeys.contains(key) }) {
+                let antenna = group.antennas.first { $0.lookupKey == key } ?? group.primary
+                Button {
+                    selected = nil
+                    selectedSiteID = group.id
+                } label: {
+                    HStack(spacing: SQSpace.sm) {
+                        Circle()
+                            .fill(SQBrand.operatorColor(antenna.operatorName ?? ""))
+                            .frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
+                        Text(verbatim: Self.servedByText(antenna, site: group.coordinate, point: point))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.label)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("Ouvre la fiche de l’antenne"))
+                .accessibilityIdentifier("sessionDetail.fullMap.point.servedBy")
+            } else {
+                Label(String(localized: "\(Self.nodeLabel(point)) : aucun site trouvé pour ce nœud"),
+                      systemImage: "questionmark.circle")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("sessionDetail.fullMap.point.unresolved")
+            }
+        }
+    }
+
+    static func nodeLabel(_ point: CoverageSessionPoint) -> String {
+        if let enb = point.enb, !enb.isEmpty { return "eNB \(enb)" }
+        return "gNB \(point.gnb ?? "")"
+    }
+
+    /// Écart toléré entre la distance au site et l'anneau TA : trois pas de TA,
+    /// pour la précision du GPS et l'arrondi du TA lui-même.
+    static let taToleranceMeters: Double = 3 * ServingAntenna.metersPerTimingAdvance
+
+    static func servedByText(_ antenna: ServingAntenna, site: CLLocationCoordinate2D, point: CoverageSessionPoint) -> String {
+        var parts: [String] = []
+        let name = antenna.operatorDisplayName ?? String(localized: "Antenne")
+        parts.append(String(localized: "Servi par \(name)"))
+        if antenna.status == .hypothesis, let score = antenna.confidenceScore {
+            parts.append(String(localized: "Hypothèse \(score) %"))
+        } else {
+            parts.append(antenna.status.label)
+        }
+        let meters = CLLocation(latitude: site.latitude, longitude: site.longitude)
+            .distance(from: CLLocation(latitude: point.lat, longitude: point.lng))
+        parts.append(String(localized: "à \(SQUnits.distance(meters: meters)) du point"))
+        if let ta = point.taDistanceMeters {
+            parts.append(abs(meters - ta) <= taToleranceMeters
+                         ? String(localized: "TA cohérent")
+                         : String(localized: "TA incohérent"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Fiche d'une antenne touchée : état et score, nœuds, points servis, indices,
+    /// puis « C'est elle » et la fiche du site.
+    private func siteCard(_ group: ServingSiteGroup, points: [CoverageSessionPoint]) -> some View {
+        let antenna = group.primary
+        let keys = group.nodeKeys
+        let served = points.filter { $0.nodeKey.map(keys.contains) == true }
+        let withTA = served.filter { $0.taDistanceMeters != nil }.count
+        let canValidate = antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil)
+        let subtitle = SessionDetailView.antennaSubtitle(antenna)
+        let nodes = group.antennas.compactMap { member -> String? in
+            var parts: [String] = []
+            if let enb = member.enb, !enb.isEmpty { parts.append("eNB \(enb)") }
+            if let gnb = member.gnb, !gnb.isEmpty { parts.append("gNB \(gnb)") }
+            if parts.isEmpty, let key = member.lookupKey { parts.append(key) }
+            if let pci = member.pci, !pci.isEmpty { parts.append("PCI \(pci)") }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+        var status = [String]()
+        if antenna.status == .hypothesis, let score = antenna.confidenceScore {
+            status.append(String(localized: "score \(score) %"))
+        }
+        if let d = antenna.distanceKm, d > 0 { status.append(String(localized: "à \(SQUnits.distance(kilometers: d)) du trajet")) }
+        let estimate: String? = antenna.estimatedSite.map { site in
+            let meters = CLLocation(latitude: site.latitude, longitude: site.longitude)
+                .distance(from: CLLocation(latitude: antenna.lat, longitude: antenna.lng))
+            return String(localized: "Position estimée par recoupement : à \(SQUnits.distance(meters: meters)) de ce site (± \(SQUnits.distance(meters: site.uncertaintyMeters)))")
+        }
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 34,
+                               tint: SQBrand.operatorColor(antenna.operatorName ?? ""))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: SessionDetailView.antennaTitle(antenna))
+                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                        .sqSingleLine()
+                    if !subtitle.isEmpty {
+                        Text(verbatim: subtitle)
+                            .font(SQFont.body(13, relativeTo: .footnote))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    HStack(spacing: SQSpace.sm) {
+                        Self.statusPill(antenna.status)
+                        if !status.isEmpty {
+                            Text(verbatim: status.joined(separator: " · "))
+                                .font(SQFont.body(12, relativeTo: .caption2))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .monospacedDigit()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+                Spacer(minLength: 0)
+                Button { selectedSiteID = nil } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, -SQSpace.sm)
+                .accessibilityLabel(Text("Fermer la fiche de l’antenne"))
+                .accessibilityIdentifier("sessionDetail.fullMap.site.close")
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                if !nodes.isEmpty {
+                    Text(verbatim: nodes.joined(separator: " · "))
+                        .font(.system(.caption, design: .monospaced))
+                }
+                Text(verbatim: [String(localized: "Points servis : \(served.count)"),
+                                String(localized: "avec TA : \(withTA)")].joined(separator: " · "))
+                    .monospacedDigit()
+                if let estimate { Text(verbatim: estimate) }
+                if antenna.status == .hypothesis, !antenna.evidenceLabels.isEmpty {
+                    Text(verbatim: antenna.evidenceLabels.joined(separator: " · "))
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            if let result = model.identifyResult {
+                Label(result, systemImage: model.identifySucceeded ? "checkmark.seal" : "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(model.identifySucceeded ? SQColor.success : SQColor.dangerInk)
+            }
+            if canValidate || antenna.siteId != nil {
+                HStack(spacing: SQSpace.sm) {
+                    if canValidate {
+                        if model.identifyingId == antenna.id {
+                            SQSpinner().tint(SQColor.brandRed).frame(minWidth: 44, minHeight: 44)
+                        } else {
+                            RadioLogActionButton(label: "C’est elle", systemImage: "checkmark") {
+                                pendingIdentify = antenna
+                            }
+                            .disabled(model.identifyingId != nil)
+                            .accessibilityLabel(Text("Valider l’antenne \(SessionDetailView.antennaTitle(antenna))"))
+                            .accessibilityIdentifier("sessionDetail.fullMap.site.validate")
+                        }
+                    }
+                    if let siteId = antenna.siteId {
+                        RadioLogActionButton(label: "Fiche du site", ghost: true) {
+                            openedSite = AntennaSite(
+                                id: siteId, siteId: siteId,
+                                latitude: antenna.lat, longitude: antenna.lng,
+                                operators: antenna.operatorNames,
+                                technologies: [], bands: [], azimuths: [],
+                                sharingType: nil, crozonLeader: nil,
+                                address: nil, height: nil, owner: nil
+                            )
+                        }
+                        .accessibilityIdentifier("sessionDetail.fullMap.site.open")
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("sessionDetail.fullMap.site")
+    }
+
+    /// Même étiquette d'état que la liste des antennes du détail.
+    static func statusPill(_ status: ServingStatus) -> some View {
+        let ink: Color
+        let container: Color
+        switch status {
+        case .identified: ink = SQColor.success; container = SQColor.successSoft
+        case .hypothesis: ink = OutageTint.degradedInk; container = SQColor.warningSoft
+        case .proximity, .unknown: ink = SQColor.labelSecondary; container = SQColor.chip
+        }
+        return HStack(spacing: 5) {
+            Circle().fill(ink).frame(width: 6, height: 6)
+            Text(status.label)
+                .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                .foregroundStyle(ink)
+                .sqSingleLine()
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
+        .background(container, in: Capsule(style: .continuous))
+    }
+
+    /// « 12 antennes sur la carte · 3 nœuds sans site trouvé » : la carte ne
+    /// passe plus pour complète quand une partie des nœuds n'est pas placée.
+    private func antennaSummary(points: [CoverageSessionPoint], groups: [ServingSiteGroup]) -> String? {
+        let unresolved = ServingSiteGroup.unresolvedNodeKeys(points: points, antennas: model.detail?.servingAntennas ?? [])
+        guard !groups.isEmpty || !unresolved.isEmpty else { return nil }
+        var parts = [String(localized: "Antennes sur la carte : \(groups.count)")]
+        if !unresolved.isEmpty {
+            parts.append(String(localized: "nœuds sans site trouvé : \(unresolved.count)"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Marché de la fiche : celui des points mesurés, la France sinon.
+    static func market(of site: AntennaSite, in points: [CoverageSessionPoint]) -> String {
+        points.lazy.compactMap { ($0.marketCode ?? $0.countryCode)?.uppercased() }.first { !$0.isEmpty } ?? "FR"
     }
 }
 

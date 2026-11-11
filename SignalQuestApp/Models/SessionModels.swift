@@ -204,10 +204,20 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     /// l'utiliser là où un `operatorKey` est attendu (filtrage, scope, couleur).
     let simOperator: String?
     let timestamp: Date?
+    /// RSRQ et SINR (dB), quand le client les a envoyés (trajets Android).
+    let rsrq: Double?
+    let snr: Double?
+    /// Timing Advance LTE brut, tel qu'Android le lit (0…1282) : un pas vaut
+    /// ≈ 78 m de distance à l'antenne. Absent sur les trajets iOS.
+    let timingAdvance: Int?
+    /// Bande 3GPP de la cellule primaire (`cellMeasurements`), et si elle est NR.
+    let primaryBand: Int?
+    let primaryBandIsNR: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
+        case rsrq, snr, timingAdvance, cellMeasurements
         case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
         case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
         case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
@@ -244,10 +254,50 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
         mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
+        rsrq = (try? c.decodeIfPresent(Double.self, forKey: .rsrq)) ?? nil
+        snr = (try? c.decodeIfPresent(Double.self, forKey: .snr)) ?? nil
+        timingAdvance = (try? c.decodeIfPresent(Int.self, forKey: .timingAdvance)) ?? nil
+        let cells = c.decodeLossyArray([PrimaryCellProbe].self, forKey: .cellMeasurements)
+        let primary = cells.first { $0.isPrimary == true } ?? cells.first
+        primaryBand = primary?.band.flatMap { $0 > 0 ? $0 : nil }
+        primaryBandIsNR = primary?.cellType?.uppercased().contains("NR") == true
+    }
+
+    /// Ce qu'on lit de `cellMeasurements` : la bande de la cellule primaire.
+    private struct PrimaryCellProbe: Decodable {
+        let isPrimary: Bool?
+        let band: Int?
+        let cellType: String?
+
+        enum CodingKeys: String, CodingKey { case isPrimary, band, cellType }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            isPrimary = (try? c.decodeIfPresent(Bool.self, forKey: .isPrimary)) ?? nil
+            band = (try? c.decodeIfPresent(Int.self, forKey: .band)) ?? nil
+            cellType = c.decodeFlexibleString(forKey: .cellType)
+        }
     }
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+
+    /// Nœud radio du point, avec la clé du serveur pour les antennes desservantes
+    /// (`enb ?? gnb`) : c'est l'`id` de chaque résultat de `servingAntennas`.
+    var nodeKey: String? {
+        if let enb, !enb.isEmpty { return enb }
+        if let gnb, !gnb.isEmpty { return gnb }
+        return nil
+    }
+
+    /// Distance à l'antenne déduite du TA, en mètres. Seulement pour un point LTE
+    /// (eNB connu) : le TA d'Android est celui de la cellule LTE servante, et un
+    /// TA de 0 dit seulement « à moins de 78 m ».
+    var taDistanceMeters: Double? {
+        guard let timingAdvance, (0...1282).contains(timingAdvance),
+              let enb, !enb.isEmpty else { return nil }
+        return max(Double(timingAdvance), 0.5) * ServingAntenna.metersPerTimingAdvance
+    }
 
     var plmnEvidence: RadioLogPlmnEvidence {
         if [networkIdentitySource, networkIdentityConfidence].contains(where: {
@@ -371,6 +421,25 @@ struct ServingAntenna: Identifiable, Equatable {
     let gnb: String?
     let pci: String?
     let cellId: String?
+    /// Clé du nœud résolu (`enb ?? gnb` du point), l'`id` du résultat serveur :
+    /// elle relie l'antenne aux points qu'elle sert.
+    let lookupKey: String?
+    /// Score 0–100 du moteur d'identification, quand il est servi.
+    let confidenceScore: Int?
+    /// Azimut du secteur servant supposé (hypothèse), en degrés.
+    let sectorAzimuthDeg: Double?
+    /// Position estimée par recoupement communautaire, si le serveur en a une.
+    let estimatedSite: EstimatedSite?
+
+    struct EstimatedSite: Equatable {
+        let latitude: Double
+        let longitude: Double
+        let uncertaintyMeters: Double
+        var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+    }
+
+    /// Un pas de TA LTE ≈ 78 m (aller-retour divisé par deux), comme le serveur.
+    static let metersPerTimingAdvance: Double = 78
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
@@ -425,6 +494,10 @@ struct ServingAntenna: Identifiable, Equatable {
         self.gnb = a?.gnb
         self.pci = a?.pci
         self.cellId = a?.cellId
+        self.lookupKey = wrapper.id
+        self.confidenceScore = r.hypothesis?.confidenceScore ?? r.confidenceScore
+        self.sectorAzimuthDeg = r.hypothesis?.sectorAzimuthDeg
+        self.estimatedSite = r.estimatedSite
         self.id = wrapper.id ?? resolvedSiteId ?? "\(lat),\(lng)"
     }
 
@@ -484,18 +557,23 @@ struct ServingAntennaResult: Decodable {
     let matchedOperators: [String]?
     let antenna: ServingAntennaCore?
     let hypothesis: ServingAntennaHypothesis?
+    let confidenceScore: Int?
+    let estimatedSite: ServingAntenna.EstimatedSite?
 
     enum CodingKeys: String, CodingKey {
         case found, identified, identificationStatus, source, confidence, confidenceReason
         case distance, canonicalSiteId, matchedOperators, antenna, hypothesis
+        case confidenceScore, estimatedSite
     }
+
+    private enum EstimatedSiteKeys: String, CodingKey { case latitude, longitude, uncertaintyMeters }
 
     init(from decoder: Decoder) throws {
         guard let c = try? decoder.container(keyedBy: CodingKeys.self) else {
             found = nil; identified = nil; identificationStatus = nil; source = nil
             confidence = nil; confidenceReason = nil; distance = nil; canonicalSiteId = nil
             matchedOperators = nil
-            antenna = nil; hypothesis = nil; return
+            antenna = nil; hypothesis = nil; confidenceScore = nil; estimatedSite = nil; return
         }
         found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
         identified = (try? c.decodeIfPresent(Bool.self, forKey: .identified)) ?? nil
@@ -508,6 +586,16 @@ struct ServingAntennaResult: Decodable {
         matchedOperators = try? c.decodeIfPresent([String].self, forKey: .matchedOperators) ?? nil
         antenna = try? c.decodeIfPresent(ServingAntennaCore.self, forKey: .antenna) ?? nil
         hypothesis = try? c.decodeIfPresent(ServingAntennaHypothesis.self, forKey: .hypothesis) ?? nil
+        confidenceScore = ((try? c.decodeIfPresent(Double.self, forKey: .confidenceScore)) ?? nil).map { Int($0.rounded()) }
+        if let e = try? c.nestedContainer(keyedBy: EstimatedSiteKeys.self, forKey: .estimatedSite),
+           let lat = (try? e.decodeIfPresent(Double.self, forKey: .latitude)) ?? nil,
+           let lng = (try? e.decodeIfPresent(Double.self, forKey: .longitude)) ?? nil,
+           lat != 0 || lng != 0 {
+            let uncertainty = (try? e.decodeIfPresent(Double.self, forKey: .uncertaintyMeters)) ?? nil
+            estimatedSite = ServingAntenna.EstimatedSite(latitude: lat, longitude: lng, uncertaintyMeters: max(uncertainty ?? 0, 0))
+        } else {
+            estimatedSite = nil
+        }
     }
 }
 
@@ -560,16 +648,18 @@ struct ServingAntennaHypothesis: Decodable {
     let distanceMeters: Double?
     let evidence: [String]
     let enb: String?
+    let confidenceScore: Int?
+    let sectorAzimuthDeg: Double?
 
     enum CodingKeys: String, CodingKey {
-        case siteId, confidence, distanceMeters, evidence, enb
+        case siteId, confidence, distanceMeters, evidence, enb, confidenceScore, sectorAzimuthDeg
         case operatorName = "operator"
     }
 
     init(from decoder: Decoder) throws {
         guard let c = try? decoder.container(keyedBy: CodingKeys.self) else {
             siteId = nil; operatorName = nil; confidence = nil
-            distanceMeters = nil; evidence = []; enb = nil; return
+            distanceMeters = nil; evidence = []; enb = nil; confidenceScore = nil; sectorAzimuthDeg = nil; return
         }
         siteId = c.decodeFlexibleString(forKey: .siteId)
         operatorName = c.decodeFlexibleString(forKey: .operatorName)
@@ -577,6 +667,8 @@ struct ServingAntennaHypothesis: Decodable {
         distanceMeters = (try? c.decodeIfPresent(Double.self, forKey: .distanceMeters)) ?? nil
         evidence = c.decodeLossyArray([String].self, forKey: .evidence)
         enb = c.decodeFlexibleString(forKey: .enb)
+        confidenceScore = ((try? c.decodeIfPresent(Double.self, forKey: .confidenceScore)) ?? nil).map { Int($0.rounded()) }
+        sectorAzimuthDeg = (try? c.decodeIfPresent(Double.self, forKey: .sectorAzimuthDeg)) ?? nil
     }
 }
 
