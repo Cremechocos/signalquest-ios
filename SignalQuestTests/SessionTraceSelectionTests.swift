@@ -109,6 +109,46 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertEqual(SessionTraceHighlight.evenlySpaced([1, 2], limit: 60), [1, 2])
     }
 
+    /// Sites de l'opérateur autour des anneaux : un site sur le croisement des
+    /// anneaux ressort, un site à côté reste estompé.
+    func testCandidateSiteFitsTheTimingAdvanceRings() {
+        let site = CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72)
+        let rings = [0.0, 120, 240].map { bearing -> SessionTraceHighlight.Ring in
+            let center = SessionTraceHighlight.destination(from: site, bearingDeg: bearing, meters: 7 * 78)
+            return .init(center: center, radiusMeters: 7 * 78, emphasized: false)
+        }
+        let onIt = SessionTraceHighlight.ringFit(of: site, rings: rings)
+        XCTAssertEqual(onIt.matching, 3)
+        XCTAssertTrue(SessionTraceHighlight.isLikely(onIt))
+        let elsewhere = SessionTraceHighlight.ringFit(
+            of: SessionTraceHighlight.destination(from: site, bearingDeg: 45, meters: 1_500), rings: rings)
+        XCTAssertFalse(SessionTraceHighlight.isLikely(elsewhere))
+        // Un seul anneau ne suffit jamais à désigner un site.
+        XCTAssertFalse(SessionTraceHighlight.isLikely((1, 1)))
+
+        let box = try? XCTUnwrap(SessionTraceHighlight.searchBox(rings: rings, extra: []))
+        XCTAssertNotNil(box)
+        if let box {
+            XCTAssertTrue((box.south...box.north).contains(site.latitude))
+            XCTAssertTrue((box.west...box.east).contains(site.longitude))
+            XCTAssertLessThanOrEqual(box.north - box.south, 0.22 + 1e-9)
+        }
+    }
+
+    func testCandidateIdentificationUsesThePointNode() throws {
+        let point = try XCTUnwrap(detail().points.first { $0.id == "a" })
+        let site = AntennaSite(id: "0381999", siteId: "0381999", latitude: 45.18, longitude: 5.72,
+                               operators: ["ORANGE"], technologies: [], bands: [], azimuths: [],
+                               sharingType: nil, crozonLeader: nil, address: "Rue du Test", height: nil, owner: nil)
+        let antenna = ServingAntenna(candidate: site, node: point, operatorName: "ORANGE")
+        XCTAssertEqual(antenna.siteId, "0381999")
+        XCTAssertEqual(antenna.enb, "20500")
+        XCTAssertNil(antenna.gnb)
+        XCTAssertEqual(antenna.pci, "12")
+        XCTAssertTrue(antenna.isUnconfirmed)
+        XCTAssertEqual(SessionDetailViewModel.sample(for: antenna, in: [point])?.id, "a")
+    }
+
     func testConeOpensAroundTheAzimuth() {
         let origin = CLLocationCoordinate2D(latitude: 45, longitude: 5)
         let cone = SessionTraceHighlight.cone(at: origin, azimuthDeg: 90, radiusMeters: 1_000)

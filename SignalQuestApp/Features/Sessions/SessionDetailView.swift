@@ -1576,6 +1576,14 @@ private struct SessionTraceFullScreen: View {
     @State private var selectedSiteID: String?
     @State private var pendingIdentify: ServingAntenna?
     @State private var openedSite: AntennaSite?
+    @State private var openedSiteOperator: String?
+    /// Sites de l'opérateur autour des anneaux TA de la sélection (choix d'Alexandre
+    /// du 11/11 : sans eux, on ne voit pas sur quel support tombent les anneaux).
+    @State private var candidates: [AntennaSite] = []
+    @State private var candidatesKey: String?
+    @State private var candidatesLoading = false
+    @State private var candidatesFailed = false
+    @State private var selectedCandidateID: String?
     /// Renouvelé à chaque réglage : la carte ne se redessine que là.
     @State private var renderID = UUID()
 
@@ -1590,6 +1598,13 @@ private struct SessionTraceFullScreen: View {
             if let selectedGroup { return SessionTraceHighlight.forGroup(selectedGroup, in: points) }
             return nil
         }()
+        let request = Self.candidateRequest(point: selected, group: selectedGroup, groups: groups,
+                                            points: points, highlight: highlight)
+        let candidateSites = showsAntennas && request != nil && candidatesKey == request?.key
+            ? Self.candidateSites(candidates, rings: highlight?.rings ?? [], groups: groups,
+                                  operatorName: request?.operatorName)
+            : []
+        let selectedCandidate = selectedCandidateID.flatMap { id in candidateSites.first { $0.id == id } }
         SessionTraceMapView(points: points,
                             antennas: showsAntennas ? (detail?.servingAntennas ?? []) : [],
                             speedtests: showsSpeedtests ? (detail?.speedtests ?? []) : [],
@@ -1601,19 +1616,26 @@ private struct SessionTraceFullScreen: View {
                             onPointTap: { point in
                                 selected = point
                                 selectedSiteID = nil
+                                selectedCandidateID = nil
                             },
                             selectedPoint: selected,
                             onAntennaTap: { id in
                                 selectedSiteID = id
                                 selected = nil
+                                selectedCandidateID = nil
                             },
-                            highlight: highlight)
+                            highlight: highlight,
+                            candidateSites: candidateSites,
+                            onCandidateTap: { selectedCandidateID = $0 })
             .ignoresSafeArea()
             .accessibilityIdentifier("sessionDetail.fullMap")
             .safeAreaInset(edge: .top, spacing: 0) { topBar }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                bottomCard(points: points, groups: groups, selectedGroup: selectedGroup)
+                bottomCard(points: points, groups: groups, selectedGroup: selectedGroup,
+                           candidate: selectedCandidate, candidateSites: candidateSites,
+                           searchesCandidates: request != nil)
             }
+            .task(id: request?.key) { await loadCandidates(request) }
             .alert(
                 "Confirmer cette antenne ?",
                 isPresented: Binding(get: { pendingIdentify != nil }, set: { if !$0 { pendingIdentify = nil } }),
@@ -1635,7 +1657,7 @@ private struct SessionTraceFullScreen: View {
             .sheet(item: $openedSite) { site in
                 AntennaDetailSheet(site: site,
                                    market: Self.market(of: site, in: points),
-                                   operatorName: selectedGroup?.primary.operatorName ?? "ALL",
+                                   operatorName: openedSiteOperator ?? "ALL",
                                    service: services.antennas)
                     .environmentObject(services)
             }
@@ -1684,14 +1706,20 @@ private struct SessionTraceFullScreen: View {
     }
 
     private func bottomCard(points: [CoverageSessionPoint], groups: [ServingSiteGroup],
-                            selectedGroup: ServingSiteGroup?) -> some View {
+                            selectedGroup: ServingSiteGroup?, candidate: SessionCandidateSite?,
+                            candidateSites: [SessionCandidateSite], searchesCandidates: Bool) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            if let point = selected {
+            if let candidate {
+                candidateCard(candidate, node: Self.representativePoint(point: selected, group: selectedGroup, in: points))
+                Divider()
+            } else if let point = selected {
                 pointReading(point)
                 servedBy(point, groups: groups)
+                candidatesLine(candidateSites, searching: searchesCandidates)
                 Divider()
             } else if let group = selectedGroup {
                 siteCard(group, points: points)
+                candidatesLine(candidateSites, searching: searchesCandidates)
                 Divider()
             }
             if coloring == .generation {
@@ -1980,6 +2008,7 @@ private struct SessionTraceFullScreen: View {
                     }
                     if let siteId = antenna.siteId {
                         RadioLogActionButton(label: "Fiche du site", ghost: true) {
+                            openedSiteOperator = antenna.operatorName
                             openedSite = AntennaSite(
                                 id: siteId, siteId: siteId,
                                 latitude: antenna.lat, longitude: antenna.lng,
@@ -2028,6 +2057,197 @@ private struct SessionTraceFullScreen: View {
             parts.append(String(localized: "nœuds sans site trouvé : \(unresolved.count)"))
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// Recherche des sites de l'opérateur pour la sélection. La clé ne dépend que
+    /// de l'opérateur, du marché et des nœuds : passer d'un point à un autre du
+    /// même eNB ne relance rien.
+    struct CandidateRequest {
+        let key: String
+        let bbox: BoundingBox
+        let market: String
+        let operatorName: String
+    }
+
+    static func candidateRequest(point: CoverageSessionPoint?, group: ServingSiteGroup?, groups: [ServingSiteGroup],
+                                 points: [CoverageSessionPoint], highlight: SessionTraceHighlight?) -> CandidateRequest? {
+        guard let highlight else { return nil }
+        let nodeKeys: Set<String>
+        let operatorName: String?
+        var extra = highlight.links.flatMap { [$0.0, $0.1] }
+        if let point, let key = point.nodeKey {
+            nodeKeys = [key]
+            operatorName = point.operatorKey ?? groups.first { $0.nodeKeys.contains(key) }?.primary.operatorName
+            extra.append(point.coordinate)
+        } else if let group {
+            nodeKeys = group.nodeKeys
+            operatorName = group.primary.operatorName
+                ?? points.first { $0.nodeKey.map(group.nodeKeys.contains) == true }?.operatorKey
+            extra.append(group.coordinate)
+        } else {
+            return nil
+        }
+        guard let operatorName, !operatorName.isEmpty, !nodeKeys.isEmpty,
+              let bbox = SessionTraceHighlight.searchBox(rings: highlight.rings, extra: extra) else { return nil }
+        let sample = points.first { $0.nodeKey.map(nodeKeys.contains) == true } ?? point
+        let market = ((sample?.marketCode ?? sample?.countryCode) ?? "FR").uppercased()
+        return CandidateRequest(key: "\(operatorName.uppercased())|\(market)|\(nodeKeys.sorted().joined(separator: ","))",
+                                bbox: bbox, market: market, operatorName: operatorName.uppercased())
+    }
+
+    private func loadCandidates(_ request: CandidateRequest?) async {
+        selectedCandidateID = nil
+        candidatesFailed = false
+        guard let request else {
+            candidates = []
+            candidatesKey = nil
+            return
+        }
+        candidatesLoading = true
+        do {
+            let sites = try await services.antennas.list(bbox: request.bbox, market: request.market,
+                                                         operatorName: request.operatorName, technologies: [])
+            candidates = sites
+            candidatesKey = request.key
+        } catch {
+            guard !error.isCancellation else { return }
+            candidates = []
+            candidatesKey = nil
+            candidatesFailed = true
+        }
+        candidatesLoading = false
+    }
+
+    /// Sites placés, hors antennes desservantes déjà dessinées, avec leur accord
+    /// aux anneaux TA de la sélection.
+    static func candidateSites(_ sites: [AntennaSite], rings: [SessionTraceHighlight.Ring],
+                               groups: [ServingSiteGroup], operatorName: String?) -> [SessionCandidateSite] {
+        let serving = Set(groups.flatMap { $0.antennas.compactMap(\.siteId) })
+        return sites.compactMap { site in
+            guard let lat = site.latitude, let lng = site.longitude, lat != 0 || lng != 0,
+                  !serving.contains(site.writeSiteId), !serving.contains(site.siteId ?? site.id) else { return nil }
+            let fit = SessionTraceHighlight.ringFit(of: CLLocationCoordinate2D(latitude: lat, longitude: lng), rings: rings)
+            return SessionCandidateSite(site: site, operatorName: operatorName, fitMatching: fit.matching, fitTotal: fit.total)
+        }
+    }
+
+    /// Point dont les identifiants serviront à « C'est elle » : le point touché, ou
+    /// un point du nœud principal de l'antenne touchée.
+    static func representativePoint(point: CoverageSessionPoint?, group: ServingSiteGroup?,
+                                    in points: [CoverageSessionPoint]) -> CoverageSessionPoint? {
+        if let point, point.nodeKey != nil { return point }
+        guard let group else { return nil }
+        let keys = group.primary.lookupKey.map { [$0] } ?? group.nodeKeys
+        return points.first { $0.nodeKey.map(keys.contains) == true }
+    }
+
+    /// « Sites de l'opérateur autour : 14 · compatibles avec les anneaux TA : 2 ».
+    @ViewBuilder
+    private func candidatesLine(_ sites: [SessionCandidateSite], searching: Bool) -> some View {
+        if searching, showsAntennas {
+            Group {
+                if candidatesLoading {
+                    Text("Recherche des sites de l’opérateur autour…")
+                } else if candidatesFailed {
+                    Text("Sites de l’opérateur indisponibles pour le moment.")
+                } else {
+                    let likely = sites.filter(\.isLikely).count
+                    Text(verbatim: [String(localized: "Sites de l’opérateur autour : \(sites.count)"),
+                                    String(localized: "compatibles avec les anneaux TA : \(likely)")].joined(separator: " · "))
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .monospacedDigit()
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("sessionDetail.fullMap.candidates")
+        }
+    }
+
+    /// Fiche d'un site candidat : accord aux anneaux TA, distance au point, puis
+    /// « C'est elle » (le nœud du point sur ce site) et la fiche du site.
+    private func candidateCard(_ candidate: SessionCandidateSite, node: CoverageSessionPoint?) -> some View {
+        let site = candidate.site
+        let title = site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne")
+        var facts: [String] = []
+        if candidate.fitTotal > 0 {
+            facts.append(String(localized: "anneaux TA compatibles : \(candidate.fitMatching) sur \(candidate.fitTotal)"))
+        }
+        if let point = selected {
+            let meters = CLLocation(latitude: candidate.coordinate.latitude, longitude: candidate.coordinate.longitude)
+                .distance(from: CLLocation(latitude: point.lat, longitude: point.lng))
+            facts.append(String(localized: "à \(SQUnits.distance(meters: meters)) du point"))
+        }
+        let antenna = node.map { ServingAntenna(candidate: site, node: $0, operatorName: candidate.operatorName) }
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 34,
+                               tint: SQBrand.operatorColor(candidate.operatorName ?? ""))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: title)
+                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                        .sqSingleLine()
+                    if let address = site.address, !address.isEmpty {
+                        Text(verbatim: address)
+                            .font(SQFont.body(13, relativeTo: .footnote))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    if !facts.isEmpty {
+                        Text(verbatim: facts.joined(separator: " · "))
+                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .foregroundStyle(candidate.isLikely ? SQColor.accentInk : SQColor.labelSecondary)
+                            .monospacedDigit()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 0)
+                Button { selectedCandidateID = nil } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, -SQSpace.sm)
+                .accessibilityLabel(Text("Fermer la fiche du site"))
+                .accessibilityIdentifier("sessionDetail.fullMap.candidate.close")
+            }
+            if let node {
+                Text("Ce site n’est pas rattaché à \(Self.nodeLabel(node)). « C’est elle » l’y rattache avec les identifiants de ce point.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let result = model.identifyResult {
+                Label(result, systemImage: model.identifySucceeded ? "checkmark.seal" : "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(model.identifySucceeded ? SQColor.success : SQColor.dangerInk)
+            }
+            HStack(spacing: SQSpace.sm) {
+                if let antenna {
+                    if model.identifyingId == antenna.id {
+                        SQSpinner().tint(SQColor.brandRed).frame(minWidth: 44, minHeight: 44)
+                    } else {
+                        RadioLogActionButton(label: "C’est elle", systemImage: "checkmark") {
+                            pendingIdentify = antenna
+                        }
+                        .disabled(model.identifyingId != nil)
+                        .accessibilityLabel(Text("Valider l’antenne \(title)"))
+                        .accessibilityIdentifier("sessionDetail.fullMap.candidate.validate")
+                    }
+                }
+                RadioLogActionButton(label: "Fiche du site", ghost: true) {
+                    openedSiteOperator = candidate.operatorName
+                    openedSite = site
+                }
+                .accessibilityIdentifier("sessionDetail.fullMap.candidate.open")
+            }
+        }
+        .accessibilityIdentifier("sessionDetail.fullMap.candidate")
     }
 
     /// Marché de la fiche : celui des points mesurés, la France sinon.

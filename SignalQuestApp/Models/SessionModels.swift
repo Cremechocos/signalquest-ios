@@ -501,6 +501,32 @@ struct ServingAntenna: Identifiable, Equatable {
         self.id = wrapper.id ?? resolvedSiteId ?? "\(lat),\(lng)"
     }
 
+    /// Site de l'opérateur proposé sur la carte d'un trajet pour le nœud d'un point :
+    /// « C'est elle » l'identifie avec les identifiants radio de ce point.
+    init(candidate site: AntennaSite, node point: CoverageSessionPoint, operatorName: String?) {
+        let siteId = site.writeSiteId
+        self.id = "candidate|\(siteId)|\(point.nodeKey ?? "")"
+        self.lat = site.latitude ?? 0
+        self.lng = site.longitude ?? 0
+        self.operatorName = operatorName
+        self.operatorNames = [operatorName].compactMap { $0 }
+        self.status = .unknown
+        self.confidenceLabel = nil
+        self.distanceKm = nil
+        self.siteId = siteId
+        self.displayName = nil
+        self.commune = site.address
+        self.evidence = []
+        self.enb = point.enb.flatMap { $0.isEmpty ? nil : $0 }
+        self.gnb = self.enb == nil ? point.gnb.flatMap { $0.isEmpty ? nil : $0 } : nil
+        self.pci = point.pci
+        self.cellId = point.cellId
+        self.lookupKey = point.nodeKey
+        self.confidenceScore = nil
+        self.sectorAzimuthDeg = nil
+        self.estimatedSite = nil
+    }
+
     /// Même règle que le serveur : empreinte hexadécimale de 40 caractères
     /// (Canada, sites communautaires) ou UUID.
     static func isCommunitySiteKey(_ value: String) -> Bool {

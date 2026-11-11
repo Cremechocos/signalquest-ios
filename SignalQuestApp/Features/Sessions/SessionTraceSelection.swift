@@ -174,6 +174,46 @@ struct SessionTraceHighlight {
         return [origin] + arc + [origin]
     }
 
+    /// Écart toléré entre la distance à un site et un anneau TA : trois pas de TA,
+    /// pour la précision du GPS et l'arrondi du TA lui-même.
+    static let taToleranceMeters: Double = 3 * ServingAntenna.metersPerTimingAdvance
+
+    /// Anneaux TA (hors anneau fort en double) que la position d'un site satisfait.
+    static func ringFit(of site: CLLocationCoordinate2D, rings: [Ring]) -> (matching: Int, total: Int) {
+        let location = CLLocation(latitude: site.latitude, longitude: site.longitude)
+        let matching = rings.filter {
+            abs(location.distance(from: CLLocation(latitude: $0.center.latitude, longitude: $0.center.longitude)) - $0.radiusMeters)
+                <= taToleranceMeters
+        }.count
+        return (matching, rings.count)
+    }
+
+    /// Un site satisfait assez d'anneaux pour être mis en avant : au moins deux,
+    /// et au moins 60 % d'entre eux.
+    static func isLikely(_ fit: (matching: Int, total: Int)) -> Bool {
+        fit.total >= 2 && fit.matching >= 2 && Double(fit.matching) >= Double(fit.total) * 0.6
+    }
+
+    /// Zone où chercher les sites de l'opérateur : tout ce que les anneaux TA et
+    /// les traits couvrent, plus 300 m. Bornée à ~25 km de côté autour du centre.
+    static func searchBox(rings: [Ring], extra: [CLLocationCoordinate2D]) -> BoundingBox? {
+        var north = -90.0, south = 90.0, east = -180.0, west = 180.0
+        func include(_ c: CLLocationCoordinate2D, _ meters: Double) {
+            let dLat = meters / 111_320
+            let dLng = meters / max(111_320 * cos(c.latitude * .pi / 180), 1)
+            north = max(north, c.latitude + dLat); south = min(south, c.latitude - dLat)
+            east = max(east, c.longitude + dLng); west = min(west, c.longitude - dLng)
+        }
+        for ring in rings { include(ring.center, ring.radiusMeters + 300) }
+        for c in extra where c.latitude != 0 || c.longitude != 0 { include(c, 300) }
+        guard north > south, east > west else { return nil }
+        let maxSpan = 0.22
+        let midLat = (north + south) / 2, midLng = (east + west) / 2
+        let halfLat = min(north - south, maxSpan) / 2
+        let halfLng = min(east - west, maxSpan / max(cos(midLat * .pi / 180), 0.2)) / 2
+        return BoundingBox(north: midLat + halfLat, south: midLat - halfLat, east: midLng + halfLng, west: midLng - halfLng)
+    }
+
     /// Point à `meters` de `origin` dans la direction `bearingDeg` (sphère terrestre).
     static func destination(from origin: CLLocationCoordinate2D, bearingDeg: Double, meters: Double) -> CLLocationCoordinate2D {
         let radius = 6_371_000.0

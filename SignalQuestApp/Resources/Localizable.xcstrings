@@ -113143,6 +113143,118 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "anneaux TA compatibles : %lld sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "compatible TA rings: %1$lld of %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "anneaux TA compatibles : %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Ce site n’est pas rattaché à %@. « C’est elle » l’y rattache avec les identifiants de ce point." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site is not linked to %@. “This is it” links it using this point’s identifiers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce site n’est pas rattaché à %@. « C’est elle » l’y rattache avec les identifiants de ce point."
+          }
+        }
+      }
+    },
+    "Fermer la fiche du site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close the site card"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fiche du site"
+          }
+        }
+      }
+    },
+    "Recherche des sites de l’opérateur autour…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for the operator’s sites nearby…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche des sites de l’opérateur autour…"
+          }
+        }
+      }
+    },
+    "Sites de l’opérateur autour : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator sites nearby: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites de l’opérateur autour : %lld"
+          }
+        }
+      }
+    },
+    "Sites de l’opérateur indisponibles pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The operator’s sites are unavailable right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites de l’opérateur indisponibles pour le moment."
+          }
+        }
+      }
+    },
+    "compatibles avec les anneaux TA : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "compatible with the TA rings: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "compatibles avec les anneaux TA : %lld"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -30,6 +30,10 @@ struct SessionTraceMapView: UIViewRepresentable {
     var onAntennaTap: ((String) -> Void)? = nil
     /// Traits, anneaux TA et secteur de la sélection ; rien sans sélection.
     var highlight: SessionTraceHighlight? = nil
+    /// Sites de l'opérateur autour des anneaux de la sélection, à comparer.
+    var candidateSites: [SessionCandidateSite] = []
+    /// Toucher un site candidat (son `id`).
+    var onCandidateTap: ((String) -> Void)? = nil
     /// Carte d'une session (contrat session-signal-trace v1) : tracé ou points,
     /// teintes de l'échelle commune par techno et signal, sans coupure. `nil`
     /// garde l'ancien rendu (« Mes mesures »).
@@ -62,11 +66,13 @@ struct SessionTraceMapView: UIViewRepresentable {
         }
         context.coordinator.onPointTap = onPointTap
         context.coordinator.onAntennaTap = onAntennaTap
+        context.coordinator.onCandidateTap = onCandidateTap
         if context.coordinator.shouldRender(signature) {
             render(on: map, context: context)
         }
         context.coordinator.syncSelection(selectedPoint, on: map)
         context.coordinator.syncHighlight(highlight, on: map)
+        context.coordinator.syncCandidates(candidateSites, on: map)
     }
 
     private func render(on map: MKMapView, context: Context) {
@@ -77,6 +83,7 @@ struct SessionTraceMapView: UIViewRepresentable {
         let coords = validPoints.map(\.coordinate)
         context.coordinator.selection = nil
         context.coordinator.resetHighlight()
+        context.coordinator.resetCandidates()
         if onPointTap != nil { context.coordinator.points = validPoints }
 
         // Drive Test : un ruban coloré point par point ; sinon un nuage de perles.
@@ -128,6 +135,24 @@ struct SessionTraceMapView: UIViewRepresentable {
         var selection: SessionSelectedPointAnnotation?
         private var highlightID: String?
         private var highlightOverlays: [MKOverlay] = []
+        var onCandidateTap: ((String) -> Void)?
+        private var candidateSignature: [String] = []
+        private var candidateAnnotations: [SessionCandidateSiteAnnotation] = []
+
+        func resetCandidates() {
+            candidateSignature = []
+            candidateAnnotations = []
+        }
+
+        /// Ne retouche les repères que si la liste (ou leur mise en avant) change.
+        func syncCandidates(_ sites: [SessionCandidateSite], on map: MKMapView) {
+            let signature = sites.map { "\($0.id)|\($0.isLikely)" }
+            guard signature != candidateSignature else { return }
+            candidateSignature = signature
+            map.removeAnnotations(candidateAnnotations)
+            candidateAnnotations = sites.map(SessionCandidateSiteAnnotation.init)
+            map.addAnnotations(candidateAnnotations)
+        }
 
         /// Les overlays viennent d'être tous retirés : la sélection sera redessinée.
         func resetHighlight() {
@@ -168,6 +193,11 @@ struct SessionTraceMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            if let candidate = view.annotation as? SessionCandidateSiteAnnotation {
+                mapView.deselectAnnotation(candidate, animated: false)
+                onCandidateTap?(candidate.site.id)
+                return
+            }
             guard let onAntennaTap, let antenna = view.annotation as? ServingAntennaAnnotation else { return }
             mapView.deselectAnnotation(antenna, animated: false)
             onAntennaTap(antenna.groupID)
@@ -264,6 +294,20 @@ struct SessionTraceMapView: UIViewRepresentable {
                 view.canShowCallout = onAntennaTap == nil
                 view.accessibilityLabel = [serving.title, serving.subtitle].compactMap { $0 }.joined(separator: ", ")
                 view.accessibilityTraits = onAntennaTap == nil ? .none : .button
+                return view
+            }
+            if let candidate = annotation as? SessionCandidateSiteAnnotation {
+                let identifier = "session-candidate-site"
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
+                    ?? MKAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                view.annotation = annotation
+                view.image = candidate.markerImage(traits: mapView.traitCollection)
+                // Sous les antennes desservantes, au-dessus des points.
+                view.displayPriority = candidate.site.isLikely ? .required : .defaultHigh
+                view.zPriority = .min
+                view.canShowCallout = false
+                view.accessibilityLabel = candidate.accessibilityText
+                view.accessibilityTraits = .button
                 return view
             }
             if annotation is SessionSelectedPointAnnotation {
@@ -544,6 +588,58 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
                 .withTintColor(Self.outline, renderingMode: .alwaysOriginal) {
                 symbol.draw(at: CGPoint(x: badgeRect.midX - symbol.size.width / 2, y: badgeRect.midY - symbol.size.height / 2))
             }
+        }
+        Self.imageCache[key] = image
+        return image
+    }
+}
+
+/// Site de l'opérateur proposé autour des anneaux TA, avec son accord aux anneaux.
+struct SessionCandidateSite: Identifiable, Equatable {
+    let site: AntennaSite
+    let operatorName: String?
+    /// Anneaux TA satisfaits par la position du site, sur le total dessiné.
+    let fitMatching: Int
+    let fitTotal: Int
+
+    var id: String { site.id }
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: site.latitude ?? 0, longitude: site.longitude ?? 0)
+    }
+    var isLikely: Bool { SessionTraceHighlight.isLikely((fitMatching, fitTotal)) }
+}
+
+/// Repère d'un site candidat : plus petit qu'une antenne desservante, estompé
+/// sauf s'il satisfait la plupart des anneaux TA.
+final class SessionCandidateSiteAnnotation: NSObject, MKAnnotation {
+    let site: SessionCandidateSite
+    init(_ site: SessionCandidateSite) { self.site = site }
+    var coordinate: CLLocationCoordinate2D { site.coordinate }
+
+    var accessibilityText: String {
+        let name = site.site.siteId.map { String(localized: "Site \($0)") } ?? String(localized: "Antenne")
+        guard site.fitTotal > 0 else { return name }
+        return [name, String(localized: "anneaux TA compatibles : \(site.fitMatching) sur \(site.fitTotal)")].joined(separator: ", ")
+    }
+
+    @MainActor private static var imageCache: [String: UIImage] = [:]
+
+    @MainActor
+    func markerImage(traits: UITraitCollection) -> UIImage {
+        let fill = UIColor(SQBrand.operatorColor(site.operatorName ?? "")).resolvedColor(with: traits)
+        let accent = UIColor(SQColor.accentInk).resolvedColor(with: traits)
+        let key = "\(fill.description)|\(site.isLikely)|\(traits.userInterfaceStyle.rawValue)"
+        if let hit = Self.imageCache[key] { return hit }
+        let dot: CGFloat = site.isLikely ? 18 : 14, ring: CGFloat = site.isLikely ? 3 : 2, margin: CGFloat = 8
+        let side = dot + margin * 2
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { ctx in
+            let cg = ctx.cgContext
+            let rect = CGRect(x: margin, y: margin, width: dot, height: dot)
+            cg.setAlpha(site.isLikely ? 1 : 0.55)
+            (site.isLikely ? accent : UIColor(red: 0xFB / 255, green: 0xF7 / 255, blue: 0xEF / 255, alpha: 1)).setFill()
+            cg.fillEllipse(in: rect)
+            fill.setFill()
+            cg.fillEllipse(in: rect.insetBy(dx: ring, dy: ring))
         }
         Self.imageCache[key] = image
         return image
