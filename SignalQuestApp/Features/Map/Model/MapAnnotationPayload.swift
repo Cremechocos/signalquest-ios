@@ -140,6 +140,10 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// chaque zoom (retour d'Alexandre du 11/11). Sur un même site, l'incident opérateur passe
     /// alors au-dessus de la panne signalée (cf. `SQMapKitMarkerView.operatorIncidentZPriority`).
     var stepsAside: Bool = false
+    /// Couleur de l'opérateur d'une panne, en petite pastille sur son marqueur : seulement
+    /// en vue « Tous », où rien d'autre ne dit l'opérateur (choix d'Alexandre du 11/11).
+    /// La couleur du marqueur reste celle de la gravité.
+    var operatorDot: Color? = nil
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -185,7 +189,8 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.communityOutage == rhs.communityOutage &&
         lhs.operatorIncident == rhs.operatorIncident &&
         lhs.isSearchPin == rhs.isSearchPin &&
-        lhs.stepsAside == rhs.stepsAside
+        lhs.stepsAside == rhs.stepsAside &&
+        lhs.operatorDot == rhs.operatorDot
     }
 }
 

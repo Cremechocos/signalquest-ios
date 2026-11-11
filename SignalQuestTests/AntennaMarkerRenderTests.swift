@@ -263,6 +263,19 @@ final class AntennaMarkerRenderTests: XCTestCase {
         )
     }
 
+    /// Vue « Tous » : une pastille à la couleur de l'opérateur dit à qui est la panne, sans
+    /// toucher à la couleur de gravité ; absente avec un opérateur choisi (choix du 11/11).
+    func testOutageMarkerCarriesTheOperatorDotOnlyWhenGiven() {
+        XCTAssertTrue(markerView(outagePayload(severity: .down, confirmed: true)).operatorDotIsHiddenForTesting)
+        var withDot = outagePayload(severity: .degraded, confirmed: false)
+        withDot.operatorDot = .orange
+        XCTAssertFalse(markerView(withDot).operatorDotIsHiddenForTesting)
+        // Une antenne ne porte jamais cette pastille, même si le champ est rempli.
+        var antenna = payload()
+        antenna.operatorDot = .orange
+        XCTAssertTrue(markerView(antenna).operatorDotIsHiddenForTesting)
+    }
+
     /// Couche Pannes seule : aucune antenne à dégager, la panne reste sur sa coordonnée.
     /// Un décalage fixe de 22 pt valait plusieurs km au zoom large et la faisait glisser
     /// d'un zoom à l'autre (vidéo d'Alexandre du 11/11).

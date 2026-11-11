@@ -4018,7 +4018,8 @@ struct MapExplorerView: View {
                     severity: outage.severity,
                     confirmed: outage.state == .confirmed
                 ),
-                stepsAside: filters.contains(.antenna)
+                stepsAside: filters.contains(.antenna),
+                operatorDot: outageOperatorDot(outage.operatorKey)
             )
         }
         return clusteredPayloads(
@@ -4105,10 +4106,20 @@ struct MapExplorerView: View {
                 showsAzimuths: false,
                 tint: Self.outageColor(for: kindKey),
                 glyphOverride: Self.outageGlyph(for: kindKey),
-                stepsAside: filters.contains(.antenna)
+                stepsAside: filters.contains(.antenna),
+                operatorDot: site.operator.flatMap(outageOperatorDot)
             )
         }
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })
+    }
+
+    /// Pastille de l'opérateur sur un marqueur de panne, en vue « Tous » seulement : un
+    /// opérateur choisi colore déjà toute la carte. La teinte vient du registre du marché
+    /// (Belgique, Suisse, Canada, outre-mer…), sinon de la palette française.
+    private func outageOperatorDot(_ operatorKey: String) -> Color? {
+        guard model.operatorFilter.uppercased() == "ALL", !operatorKey.isEmpty,
+              operatorKey.uppercased() != "ALL" else { return nil }
+        return model.operatorAccent(operatorKey)
     }
 
     /// La gravité d'un incident opérateur, résolue à UN seul endroit.

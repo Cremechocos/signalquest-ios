@@ -48,6 +48,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// que la communauté a signalé. Sa forme est un TRIANGLE là où le communautaire est un
     /// disque, pour qu'on lise QUI affirme sans avoir à ouvrir quoi que ce soit.
     private let operatorBadge = UIImageView()
+    /// Pastille de l'opérateur d'un marqueur de panne (vue « Tous »), en bas à droite.
+    private let operatorDot = UIView()
 
     /// Diamètre de la pastille d'antenne. Les autres couches (speedtests, pannes,
     /// prévisionnels…) gardent l'ancien diamètre : elles n'ont ni lobes ni badges,
@@ -55,6 +57,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     private static let antennaDotSize: CGFloat = 26
     private static let otherDotSize: CGFloat = 36
     private static let badgeSize: CGFloat = 14
+    private static let operatorDotSize: CGFloat = 13
     /// Rayon minimal de la vue, badges et anneau compris : 22 pt, soit une cible
     /// tactile de 44 pt de diamètre.
     private static let minRadius: CGFloat = 22
@@ -154,6 +157,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         addSubview(outageBadge)
         operatorBadge.contentMode = .scaleAspectFit
         addSubview(operatorBadge)
+        operatorDot.isUserInteractionEnabled = false
+        operatorDot.isHidden = true
+        addSubview(operatorDot)
     }
     required init?(coder: NSCoder) { nil }
 
@@ -207,6 +213,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             photoBadge.isHidden = true
             outageBadge.isHidden = true
             operatorBadge.isHidden = true
+            operatorDot.isHidden = true
         } else {
             let isAntenna = payload.kind == .antenna
             let size = isAntenna ? Self.antennaDotSize : Self.otherDotSize
@@ -573,11 +580,14 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         // le puisse. Seul le marqueur de panne lui-même s'en exclut — il EST la panne.
         let outageMark = payload.kind == .communityOutage ? nil : payload.communityOutage
         let incidentMark = payload.kind == .outage ? nil : payload.operatorIncident
+        let isOutageMarker = payload.kind == .communityOutage || payload.kind == .outage
+        let dotTint = isOutageMarker ? payload.operatorDot : nil
         checkBadge.isHidden = !showsCheck
         photoBadge.isHidden = !showsPhoto
         outageBadge.isHidden = outageMark == nil
         operatorBadge.isHidden = incidentMark == nil
-        guard showsCheck || showsPhoto || outageMark != nil || incidentMark != nil else { return }
+        operatorDot.isHidden = dotTint == nil
+        guard showsCheck || showsPhoto || outageMark != nil || incidentMark != nil || dotTint != nil else { return }
 
         // Badges posés en diagonale, débordant de la pastille : leur centre est à
         // `rayon + moitié de badge − 3`, soit trois points de chevauchement — assez
@@ -616,6 +626,21 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
                 width: badge,
                 height: badge
             )
+        }
+        if let dotTint {
+            // En bas à DROITE, libre sur un marqueur de panne (il ne porte aucun autre badge).
+            // Liseré couleur de surface : la pastille se détache du rouge ou de l'ambre.
+            let dot = Self.operatorDotSize
+            operatorDot.frame = CGRect(
+                x: center.x + offset - dot / 2,
+                y: center.y + offset - dot / 2,
+                width: dot,
+                height: dot
+            )
+            operatorDot.layer.cornerRadius = dot / 2
+            operatorDot.backgroundColor = UIColor(dotTint).resolvedColor(with: traitCollection)
+            operatorDot.layer.borderWidth = 2
+            operatorDot.layer.borderColor = UIColor(SQColor.surface).resolvedColor(with: traitCollection).cgColor
         }
         if let incidentMark {
             // En bas à DROITE : la dernière diagonale libre, et la seule qui laisse les deux
@@ -664,6 +689,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     var lobeTransformForTesting: CATransform3D { lobes.transform }
     var checkBadgeIsHiddenForTesting: Bool { checkBadge.isHidden }
     var photoBadgeIsHiddenForTesting: Bool { photoBadge.isHidden }
+    var operatorDotIsHiddenForTesting: Bool { operatorDot.isHidden }
     var outageBadgeIsHiddenForTesting: Bool { outageBadge.isHidden }
     var operatorBadgeIsHiddenForTesting: Bool { operatorBadge.isHidden }
     /// Les deux badges de panne peuvent coexister : leurs cadres sont ce qui prouve qu'ils ne se
