@@ -294,6 +294,9 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
     /// bonne moitié de l'erreur à commettre.
     let operatorConfirmationPossible: Bool
     let operatorRaison: String?
+    /// L'incident opérateur auquel le serveur a rattaché la panne (OUTAGE-MERGE r1 §1). Absent
+    /// tant que l'opérateur ne l'a pas reconnue.
+    let operatorIncident: OutageOperatorIncidentLink?
 
     let startedAt: String?
     let reporterName: String?
@@ -334,7 +337,7 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         case affectedBands, affectedSectors, radioSummary, socialPostId, commentCount
         case sightings
         case confirmCount, disputeCount, confirmationsRemaining, confirmThreshold
-        case operatorConfirmed, operatorConfirmationPossible, operatorRaison, startedAt
+        case operatorConfirmed, operatorConfirmationPossible, operatorRaison, operatorIncident, startedAt
         case reporter, myVote, canVote, canClose, timeline
     }
 
@@ -389,6 +392,7 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         operatorConfirmed = (try? c.decode(Bool.self, forKey: .operatorConfirmed)) ?? false
         operatorConfirmationPossible = (try? c.decode(Bool.self, forKey: .operatorConfirmationPossible)) ?? false
         operatorRaison = try? c.decodeIfPresent(String.self, forKey: .operatorRaison)
+        operatorIncident = (try? c.decodeIfPresent(OutageOperatorIncidentLink.self, forKey: .operatorIncident)) ?? nil
         startedAt = try? c.decodeIfPresent(String.self, forKey: .startedAt)
         reporterName = (try? c.decodeIfPresent(Reporter.self, forKey: .reporter))??.displayName
 
@@ -685,5 +689,168 @@ struct OutageWriteResponse: Decodable {
         if let awards, !awards.isEmpty { return awards }
         if let award { return [award] }
         return []
+    }
+}
+
+// MARK: - OUTAGE-MERGE (rattachement d'une panne à un incident opérateur)
+
+/// Confiance d'un rattachement, enum FERMÉE du contrat : une valeur inconnue ou absente se lit
+/// `uncertain`, et on ne masque alors rien.
+enum OutageMatchConfidence: String, Equatable, Sendable {
+    case exact, near, uncertain
+
+    init(serverValue: String?) {
+        self = serverValue.flatMap { OutageMatchConfidence(rawValue: $0) } ?? .uncertain
+    }
+
+    /// Rattachement sûr : la panne peut se fondre dans l'incident.
+    var isSure: Bool { self != .uncertain }
+}
+
+/// Bloc `operatorIncident` d'une panne communautaire (tuile et fiche).
+struct OutageOperatorIncidentLink: Decodable, Equatable, Sendable {
+    /// `${sourceId}:${code_site_op}`, la même clé que `OutageSiteLive.incidentKey`.
+    let key: String?
+    let matchDistanceMeters: Int?
+    let matchConfidence: OutageMatchConfidence
+
+    enum CodingKeys: String, CodingKey { case key, sourceId, codeSiteOp, matchDistanceMeters, matchConfidence }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let sourceId = c.decodeFlexibleString(forKey: .sourceId)
+        let code = c.decodeFlexibleString(forKey: .codeSiteOp)
+        key = c.decodeFlexibleString(forKey: .key)
+            ?? sourceId.flatMap { s in code.map { "\(s):\($0)" } }
+        matchDistanceMeters = (try? c.decodeIfPresent(Int.self, forKey: .matchDistanceMeters)) ?? nil
+        matchConfidence = OutageMatchConfidence(
+            serverValue: (try? c.decodeIfPresent(String.self, forKey: .matchConfidence)) ?? nil)
+    }
+}
+
+/// Bloc `community` d'un incident opérateur : les pannes communautaires ouvertes qui lui sont
+/// rattachées (OUTAGE-MERGE r1 §1, r1.3). Les comptes peuvent avoir quelques minutes de retard :
+/// la fiche de la panne fait foi.
+struct IncidentCommunity: Decodable, Equatable, Sendable {
+    /// Une panne rattachée (r1.3). `memberCount` ne s'additionne pas d'une panne à l'autre.
+    struct Outage: Decodable, Equatable, Sendable {
+        let id: String
+        let reportedAt: Date?
+        let memberCount: Int?
+
+        enum CodingKeys: String, CodingKey { case id, reportedAt, memberCount }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            guard let id = c.decodeFlexibleString(forKey: .id) else {
+                throw DecodingError.keyNotFound(CodingKeys.id, .init(codingPath: c.codingPath, debugDescription: "id"))
+            }
+            self.id = id
+            reportedAt = c.decodeFlexibleString(forKey: .reportedAt).flatMap(SQDateParsing.parse)
+            memberCount = ((try? c.decodeIfPresent(Int.self, forKey: .memberCount)) ?? nil).flatMap { $0 >= 0 ? $0 : nil }
+        }
+    }
+
+    /// La plus ancienne d'abord, 10 au plus. `primaryOutageId` est la première.
+    let outageIds: [String]
+    let primaryOutageId: String
+    /// Membres distincts qui ont signalé ou confirmé.
+    let memberCount: Int
+    let commentCount: Int
+    /// Minutes d'avance de la communauté sur l'opérateur, seulement si elle l'a précédé.
+    let leadMinutes: Int?
+    /// r1.3 : date et compte de chaque panne, dans l'ordre d'`outageIds`. Vide avant r1.3.
+    let outages: [Outage]
+    /// r1.3 : nombre réel de pannes ouvertes rattachées, qui peut dépasser 10.
+    let outageCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case outageIds, primaryOutageId, memberCount, commentCount, leadMinutes, outages, outageCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let ids = c.decodeLossyArray([String].self, forKey: .outageIds).filter { !$0.isEmpty }
+        guard let primary = c.decodeFlexibleString(forKey: .primaryOutageId) ?? ids.first else {
+            throw DecodingError.keyNotFound(CodingKeys.primaryOutageId,
+                                            .init(codingPath: c.codingPath, debugDescription: "primaryOutageId"))
+        }
+        primaryOutageId = primary
+        outageIds = ids.isEmpty ? [primary] : ids
+        memberCount = max((try? c.decode(Int.self, forKey: .memberCount)) ?? 0, 0)
+        commentCount = max((try? c.decode(Int.self, forKey: .commentCount)) ?? 0, 0)
+        leadMinutes = ((try? c.decodeIfPresent(Int.self, forKey: .leadMinutes)) ?? nil).flatMap { $0 > 0 ? $0 : nil }
+        outages = c.decodeLossyArray([Outage].self, forKey: .outages)
+        outageCount = ((try? c.decodeIfPresent(Int.self, forKey: .outageCount)) ?? nil).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// Nombre de pannes à annoncer : le total servi, sinon les identifiants reçus.
+    var totalOutages: Int { max(outageCount ?? 0, outageIds.count) }
+
+    /// Date et compte d'une panne de la liste, quand r1.3 les sert.
+    func details(of id: String) -> Outage? { outages.first { $0.id == id } }
+}
+
+/// Bloc `site` d'un incident : le support le plus proche à 120 m ou moins (OUTAGE-MERGE r1 §5,
+/// r1.1). Absent = support non trouvé, jamais un support deviné.
+struct IncidentSupport: Decodable, Equatable, Sendable {
+    let supId: String
+    let address: String?
+    let locality: String?
+    let postalCode: String?
+    let commune: String?
+    let distanceMeters: Int?
+    let matchConfidence: OutageMatchConfidence
+
+    enum CodingKeys: String, CodingKey {
+        case supId, address, locality, postalCode, commune, distanceMeters, matchConfidence
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let supId = c.decodeFlexibleString(forKey: .supId), !supId.isEmpty else {
+            throw DecodingError.keyNotFound(CodingKeys.supId, .init(codingPath: c.codingPath, debugDescription: "supId"))
+        }
+        self.supId = supId
+        func text(_ key: CodingKeys) -> String? {
+            c.decodeFlexibleString(forKey: key).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        }
+        address = text(.address)
+        locality = text(.locality)
+        postalCode = text(.postalCode)
+        commune = text(.commune)
+        distanceMeters = (try? c.decodeIfPresent(Int.self, forKey: .distanceMeters)) ?? nil
+        matchConfidence = OutageMatchConfidence(
+            serverValue: (try? c.decodeIfPresent(String.self, forKey: .matchConfidence)) ?? nil)
+    }
+
+    /// L'adresse servie, sinon lieu-dit, code postal et commune.
+    var displayAddress: String? {
+        if let address { return address }
+        let parts = [locality, postalCode, commune].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+}
+
+/// Bloc `approxAddress` d'un incident sans support (OUTAGE-MERGE r1.2) : rue ou lieu-dit le plus
+/// proche selon la Base Adresse Nationale, sans numéro. Une `source` ou un `kind` inconnus, ou un
+/// libellé vide, font ignorer le bloc.
+struct IncidentApproxAddress: Decodable, Equatable, Sendable {
+    let label: String
+    let distanceMeters: Int?
+
+    enum CodingKeys: String, CodingKey { case label, kind, source, distanceMeters }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? nil
+        let source = (try? c.decodeIfPresent(String.self, forKey: .source)) ?? nil
+        guard source == "reverse_geocode", kind == "street" || kind == "locality",
+              let label = c.decodeFlexibleString(forKey: .label)?.trimmingCharacters(in: .whitespaces),
+              !label.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: c.codingPath, debugDescription: "approxAddress"))
+        }
+        self.label = label
+        distanceMeters = (try? c.decodeIfPresent(Int.self, forKey: .distanceMeters)) ?? nil
     }
 }

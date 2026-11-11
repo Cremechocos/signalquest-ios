@@ -285,6 +285,35 @@ final class AntennaMarkerRenderTests: XCTestCase {
         XCTAssertEqual(markerView(incident).centerOffset, CGPoint(x: -18, y: 0))
     }
 
+    /// OUTAGE-MERGE §3 : une panne disparaît seulement si son rattachement est sûr ET que son
+    /// incident est affiché ; l'incident qui la porte est marqué.
+    func testMergedOutagesHideOnlySureLinksToDisplayedIncidents() {
+        let merged = MapExplorerView.mergedOutages(
+            community: [("c1", "sfr:A"), ("c2", nil), ("c3", "sfr:B"), ("c4", "sfr:A")],
+            incidents: [("i1", "sfr:A"), ("i9", "sfr:Z")]
+        )
+        XCTAssertEqual(merged.hidden, ["c1", "c4"], "c2 incertaine, c3 sans incident affiché")
+        XCTAssertEqual(merged.carriers, ["i1"])
+    }
+
+    /// L'incident qui porte des pannes masquées a un anneau ; une vue recyclée le perd.
+    func testIncidentCarryingCommunityOutagesDrawsARing() {
+        var incident = MapAnnotationPayload(
+            id: "outage-1", kind: .outage, title: "Panne", subtitle: "SFR",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72), metric: nil,
+            backendId: nil, details: nil, antennaId: nil, clusterCount: nil, azimuths: [], showsAzimuths: false
+        )
+        let view = markerView(incident)
+        XCTAssertNil(view.ringPathForTesting)
+        incident.carriesCommunity = true
+        view.apply(incident)
+        XCTAssertNotNil(view.ringPathForTesting)
+        XCTAssertTrue(incident.accessibilityLabel.contains(String(localized: "Signalée aussi par la communauté")))
+        incident.carriesCommunity = false
+        view.apply(incident)
+        XCTAssertNil(view.ringPathForTesting)
+    }
+
     /// Vue « Tous » : une pastille à la couleur de l'opérateur dit à qui est la panne, sans
     /// toucher à la couleur de gravité ; absente avec un opérateur choisi (choix du 11/11).
     func testOutageMarkerCarriesTheOperatorDotOnlyWhenGiven() {

@@ -501,6 +501,22 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     }
 
     private func applyRing(_ payload: MapAnnotationPayload, size: CGFloat, color: UIColor) {
+        // Incident opérateur qui porte des pannes signalées masquées (OUTAGE-MERGE §3) :
+        // anneau plein de sa couleur, seul signe sur la carte que la communauté l'a vu aussi.
+        if payload.kind == .outage, payload.carriesCommunity {
+            hideRingArcs()
+            ring.lineWidth = 2
+            ring.path = UIBezierPath(
+                arcCenter: CGPoint(x: bounds.midX, y: bounds.midY),
+                radius: size / 2 + 4,
+                startAngle: 0,
+                endAngle: .pi * 2,
+                clockwise: true
+            ).cgPath
+            ring.strokeColor = color.cgColor
+            return
+        }
+        ring.lineWidth = 1.5
         guard payload.kind == .antenna, payload.has5G else {
             ring.path = nil
             hideRingArcs()

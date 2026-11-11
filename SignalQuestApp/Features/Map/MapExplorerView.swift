@@ -1808,7 +1808,22 @@ struct MapExplorerView: View {
             )
         }
         .sheet(item: $selectedOutage) { site in
-            OutageDetailSheet(site: site, operatorLabel: model.operatorLabel)
+            OutageDetailSheet(
+                site: site,
+                operatorLabel: model.operatorLabel,
+                mapOutages: model.communityOutages,
+                service: services.communityOutages,
+                onOpenSite: { support in
+                    // La fiche du site s'ouvre une fois celle de l'incident refermée : deux feuilles
+                    // ne se présentent pas en même temps depuis la carte.
+                    selectedOutage = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        router.openSiteOperator = site.operator
+                        router.openSiteId = support.supId
+                    }
+                },
+                onChanged: { Task { await reloadCurrentRegion() } }
+            )
         }
         .sheet(item: $selectedCommunityOutage) { outage in
             CommunityOutageDetailSheet(
@@ -3990,8 +4005,11 @@ struct MapExplorerView: View {
     private var communityOutagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
         let pairs = outagePairs
+        let merged = mergedOutages
         let individual = model.communityOutages.compactMap { outage -> MapAnnotationPayload? in
             guard outage.state.isVisible else { return nil }
+            // Fondue dans son incident, qui la porte et l'ouvre depuis sa fiche (OUTAGE-MERGE §3).
+            guard !merged.hidden.contains(outage.id) else { return nil }
             // Le serveur résout la position depuis son référentiel ; une panne dont
             // il n'a pas su la placer arriverait en (0, 0), au large du Ghana.
             guard outage.latitude != 0 || outage.longitude != 0 else { return nil }
@@ -4087,6 +4105,7 @@ struct MapExplorerView: View {
     private var outagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
         let pairs = outagePairs
+        let merged = mergedOutages
         let individual = model.outages.compactMap { site -> MapAnnotationPayload? in
             guard matchesSelectedOutageBands(site) else { return nil }
             guard let lat = site.lat, let lon = site.lon else { return nil }
@@ -4111,7 +4130,8 @@ struct MapExplorerView: View {
                 glyphOverride: Self.outageGlyph(for: kindKey),
                 stepsAside: filters.contains(.antenna),
                 operatorDot: site.operator.flatMap(outageOperatorDot),
-                pairNudge: pairs.incidents.contains(site.id) ? -SQMapKitMarkerView.outagePairNudge : 0
+                pairNudge: pairs.incidents.contains(site.id) ? -SQMapKitMarkerView.outagePairNudge : 0,
+                carriesCommunity: merged.carriers.contains(site.id)
             )
         }
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })
@@ -4123,8 +4143,10 @@ struct MapExplorerView: View {
     /// comme non fusionnée. Avec les antennes, les décalages diagonaux suffisent.
     private var outagePairs: (community: Set<String>, incidents: Set<String>) {
         guard !filters.contains(.antenna) else { return ([], []) }
+        // Une panne fondue dans son incident n'a plus de marqueur : rien à écarter.
+        let hidden = mergedOutages.hidden
         let community = model.communityOutages.filter {
-            $0.state.isVisible && ($0.latitude != 0 || $0.longitude != 0)
+            $0.state.isVisible && ($0.latitude != 0 || $0.longitude != 0) && !hidden.contains($0.id)
         }
         let incidents = model.outages.compactMap { site -> (id: String, lat: Double, lon: Double)? in
             guard matchesSelectedOutageBands(site), let lat = site.lat, let lon = site.lon else { return nil }
@@ -4137,6 +4159,41 @@ struct MapExplorerView: View {
     }
 
     static let outagePairRadiusMeters: Double = 120
+
+    /// Pannes communautaires fondues dans leur incident, et incidents qui en portent
+    /// (OUTAGE-MERGE §3). Décision PAR PANNE : rattachement sûr (`exact` ou `near`) ET incident
+    /// affiché. Sinon la panne garde son marqueur, pour ne pas cacher un signalement sous un
+    /// incident qui n'est peut-être pas le bon.
+    private var mergedOutages: (hidden: Set<String>, carriers: Set<String>) {
+        guard filters.contains(.outage) else { return ([], []) }
+        return Self.mergedOutages(
+            community: model.communityOutages.filter { $0.state.isVisible }.map {
+                ($0.id, $0.operatorIncident.flatMap { $0.matchConfidence.isSure ? $0.key : nil })
+            },
+            incidents: model.outages.compactMap { site -> (id: String, key: String)? in
+                guard matchesSelectedOutageBands(site), site.lat != nil, site.lon != nil,
+                      let key = site.incidentKey else { return nil }
+                return (site.id, key)
+            }
+        )
+    }
+
+    /// `community` : identifiant et clé d'incident d'un rattachement SÛR (nil sinon).
+    static func mergedOutages(
+        community: [(id: String, sureKey: String?)],
+        incidents: [(id: String, key: String)]
+    ) -> (hidden: Set<String>, carriers: Set<String>) {
+        var byKey: [String: String] = [:]
+        for incident in incidents where byKey[incident.key] == nil { byKey[incident.key] = incident.id }
+        var hidden = Set<String>()
+        var carriers = Set<String>()
+        for outage in community {
+            guard let key = outage.sureKey, let incident = byKey[key] else { continue }
+            hidden.insert(outage.id)
+            carriers.insert(incident)
+        }
+        return (hidden, carriers)
+    }
 
     static func outagePairs(
         community: [(id: String, lat: Double, lon: Double)],

@@ -465,6 +465,8 @@ struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let lon: Double?
     let commune: String?
     let departement: String?
+    /// Région servie par le flux d'incidents, affichée après le département dans la fiche.
+    let region: String?
     /// "down" | "maintenance" | "degraded" (contrat `/api/android/map/incidents`).
     let issueType: String?
     let reason: String?
@@ -473,6 +475,15 @@ struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let estimatedEnd: String?
     /// Services impactés (voix/data 2G→5G) avec leur statut, pour la sheet.
     let services: [OutageService]
+    /// `${sourceId}:${code_site_op}` : la clé que portent les pannes rattachées
+    /// (`operatorIncident.key`). Indépendante d'`id`, qui peut venir d'un autre champ.
+    let incidentKey: String?
+    /// Pannes communautaires ouvertes rattachées (OUTAGE-MERGE r1).
+    let community: IncidentCommunity?
+    /// Support trouvé à 120 m ou moins (OUTAGE-MERGE r1 §5). Absent = non trouvé.
+    let support: IncidentSupport?
+    /// Adresse approchée, seulement sans `support` (OUTAGE-MERGE r1.2).
+    let approxAddress: IncidentApproxAddress?
 
     /// Libellé court affiché en métrique du marqueur.
     var status: String? { reason ?? issueType }
@@ -484,7 +495,8 @@ struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
         // robuste si la source bascule sur `/api/sites-hs`.
         case id, siteId, sup_id, codeSite, code_site_op
         case lat, latitude, Lat, lon, lng, longitude, Lon
-        case commune, departement, issueType, raison, reason, detail, debut, fin_prev, status, updatedAt
+        case commune, departement, region, issueType, raison, reason, detail, debut, fin_prev, status, updatedAt
+        case community, site, approxAddress
         case voix2g = "2Gvoix", voix3g = "3Gvoix", voix4g = "4Gvoix"
         case data3g = "3Gdata", data4g = "4Gdata", data5g = "5Gdata"
         case `operator` = "operator"
@@ -498,6 +510,14 @@ struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
             ?? c.decodeFlexibleString(forKey: .sup_id)
             ?? c.decodeFlexibleString(forKey: .codeSite)
         let rawID = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? siteId ?? UUID().uuidString
+        let codeSiteOp = c.decodeFlexibleString(forKey: .code_site_op)
+        incidentKey = sourceId.flatMap { source in
+            codeSiteOp.flatMap { source.isEmpty || $0.isEmpty ? nil : "\(source):\($0)" }
+        }
+        community = (try? c.decodeIfPresent(IncidentCommunity.self, forKey: .community)) ?? nil
+        let support = (try? c.decodeIfPresent(IncidentSupport.self, forKey: .site)) ?? nil
+        self.support = support
+        approxAddress = support == nil ? ((try? c.decodeIfPresent(IncidentApproxAddress.self, forKey: .approxAddress)) ?? nil) : nil
         // Operator site codes are not globally unique across feed sources.
         id = sourceId.flatMap { $0.isEmpty ? nil : $0 + ":" + rawID } ?? rawID
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
@@ -510,6 +530,7 @@ struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
             ?? (try? c.decodeIfPresent(Double.self, forKey: .Lon))
         commune = try c.decodeIfPresent(String.self, forKey: .commune)
         departement = c.decodeFlexibleString(forKey: .departement)
+        region = c.decodeFlexibleString(forKey: .region)
         issueType = c.decodeFlexibleString(forKey: .issueType)
         reason = c.decodeFlexibleString(forKey: .raison)
             ?? c.decodeFlexibleString(forKey: .reason)

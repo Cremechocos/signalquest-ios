@@ -149,6 +149,9 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// incident opérateur à 120 m ou moins l'un de l'autre, sans couche Antennes : les deux
     /// restent touchables (OUTAGE-MERGE §3, décision d'Alexandre du 11/11). 0 ailleurs.
     var pairNudge: CGFloat = 0
+    /// Incident opérateur qui porte des pannes communautaires masquées : anneau autour de son
+    /// marqueur (OUTAGE-MERGE §3). Le compte des membres est dans la fiche, pas sur la carte.
+    var carriesCommunity: Bool = false
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -159,6 +162,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         var parts = [title]
         if !subtitle.isEmpty { parts.append(subtitle) }
         if let metric, !metric.isEmpty { parts.append(metric) }
+        if carriesCommunity { parts.append(String(localized: "Signalée aussi par la communauté")) }
         return parts.joined(separator: ", ")
     }
 
@@ -196,6 +200,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.isSearchPin == rhs.isSearchPin &&
         lhs.stepsAside == rhs.stepsAside &&
         lhs.operatorDot == rhs.operatorDot &&
+        lhs.carriesCommunity == rhs.carriesCommunity &&
         lhs.pairNudge == rhs.pairNudge
     }
 }

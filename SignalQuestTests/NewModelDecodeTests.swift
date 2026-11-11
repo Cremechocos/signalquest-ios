@@ -264,6 +264,85 @@ final class NewModelDecodeTests: XCTestCase {
         """.utf8)
     }
 
+    /// OUTAGE-MERGE r1 : le lien d'une panne vers son incident. Confiance inconnue = incertaine,
+    /// et la clé se reconstruit quand seul `sourceId` + `codeSiteOp` sont servis.
+    func testCommunityOutageDecodesItsOperatorIncidentLink() throws {
+        let sure = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: """
+        null, "operatorIncident": {"key": "orange-fr:LYO_0042", "matchMethod": "geo_120m", "matchDistanceMeters": 40, "matchConfidence": "near"}
+        """))
+        XCTAssertEqual(sure.operatorIncident?.key, "orange-fr:LYO_0042")
+        XCTAssertEqual(sure.operatorIncident?.matchDistanceMeters, 40)
+        XCTAssertTrue(sure.operatorIncident?.matchConfidence.isSure ?? false)
+
+        let rebuilt = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: """
+        null, "operatorIncident": {"sourceId": "sfr", "codeSiteOp": "38185_001", "matchConfidence": "certain"}
+        """))
+        XCTAssertEqual(rebuilt.operatorIncident?.key, "sfr:38185_001")
+        XCTAssertEqual(rebuilt.operatorIncident?.matchConfidence, .uncertain, "valeur inconnue = incertaine")
+
+        let none = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "null"))
+        XCTAssertNil(none.operatorIncident)
+    }
+
+    private func incidentJSON(_ extra: String) -> Data {
+        Data("""
+        {
+            "sourceId": "sfr", "code_site_op": "38185_001", "lat": 45.6, "lon": 5.3,
+            "raison": "INT", "issueType": "outage", "operator": "SFR", "debut": "2026-11-11T06:00:00Z",
+            "region": "Auvergne-Rhône-Alpes", "departement": "Isère", "commune": "SAINT-CHEF"\(extra)
+        }
+        """.utf8)
+    }
+
+    /// OUTAGE-MERGE r1, r1.1, r1.2 et r1.3 côté incident : `community`, `site` et `approxAddress`.
+    func testOperatorIncidentDecodesCommunitySupportAndApproxAddress() throws {
+        let incident = try JSONDecoder.signalQuest.decode(OutageSiteLive.self, from: incidentJSON("""
+        , "community": {"outageIds": ["o1", "o2"], "primaryOutageId": "o1", "memberCount": 5, "commentCount": 3,
+          "firstReportedAt": "2026-11-11T03:00:00Z", "leadMinutes": 180, "outageCount": 12,
+          "outages": [{"id": "o1", "reportedAt": "2026-11-11T05:42:00Z", "memberCount": 4}, {"id": "o2", "reportedAt": "bad", "memberCount": 0}]},
+          "site": {"supId": "3115949", "address": "Route de Lyon 38890 Saint-Chef", "distanceMeters": 30, "matchConfidence": "near"},
+          "approxAddress": {"label": "Route de Lyon 38890 Saint-Chef", "kind": "street", "distanceMeters": 20, "source": "reverse_geocode"}
+        """))
+        XCTAssertEqual(incident.incidentKey, "sfr:38185_001")
+        XCTAssertEqual(incident.region, "Auvergne-Rhône-Alpes")
+        let community = try XCTUnwrap(incident.community)
+        XCTAssertEqual(community.primaryOutageId, "o1")
+        XCTAssertEqual(community.memberCount, 5)
+        XCTAssertEqual(community.leadMinutes, 180)
+        XCTAssertEqual(community.totalOutages, 12)
+        XCTAssertNotNil(community.details(of: "o1")?.reportedAt)
+        XCTAssertNil(community.details(of: "o2")?.reportedAt, "date illisible = repli « Panne signalée n »")
+        XCTAssertEqual(incident.support?.supId, "3115949")
+        XCTAssertEqual(incident.support?.displayAddress, "Route de Lyon 38890 Saint-Chef")
+        XCTAssertNil(incident.approxAddress, "l'adresse approchée n'existe que sans support")
+
+        // Sans support : adresse approchée seulement si source et kind sont connus.
+        let approx = try JSONDecoder.signalQuest.decode(OutageSiteLive.self, from: incidentJSON("""
+        , "approxAddress": {"label": "Lieu-dit Les Vernes 38890 Saint-Chef", "kind": "locality", "distanceMeters": 90, "source": "reverse_geocode"}
+        """))
+        XCTAssertEqual(approx.approxAddress?.label, "Lieu-dit Les Vernes 38890 Saint-Chef")
+        let unknownSource = try JSONDecoder.signalQuest.decode(OutageSiteLive.self, from: incidentJSON("""
+        , "approxAddress": {"label": "Rue X", "kind": "street", "source": "ban_v2"}
+        """))
+        XCTAssertNil(unknownSource.approxAddress)
+
+        // Support sans adresse : lieu-dit, code postal, commune ; confiance inconnue = incertaine.
+        let bare = try JSONDecoder.signalQuest.decode(OutageSiteLive.self, from: incidentJSON("""
+        , "site": {"supId": 42, "locality": "Les Vernes", "postalCode": "38890", "commune": "Saint-Chef", "matchConfidence": "maybe"}
+        """))
+        XCTAssertEqual(bare.support?.displayAddress, "Les Vernes 38890 Saint-Chef")
+        XCTAssertEqual(bare.support?.matchConfidence, .uncertain)
+        XCTAssertNil(bare.community)
+    }
+
+    /// Les libellés du bloc Communauté de la fiche d'incident.
+    func testIncidentSheetCommunityTexts() {
+        XCTAssertEqual(OutageDetailSheet.leadText(45), String(localized: "\(45) min"))
+        XCTAssertEqual(OutageDetailSheet.leadText(180), String(localized: "\(3) h"))
+        XCTAssertEqual(OutageDetailSheet.leadText(3 * 24 * 60), String(localized: "\(3) j"))
+        XCTAssertEqual(OutageDetailSheet.outageRowText(nil, index: 1), String(localized: "Panne signalée \(2)"))
+    }
+
     func testDecodeCommunityOutageAddressAndCanClose() throws {
         let outage = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "null"))
         XCTAssertEqual(outage.address, "12 rue des Alpes, 38000 Grenoble")
