@@ -114615,6 +114615,54 @@
           }
         }
       }
+    },
+    "%@ : %@ des relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@ of readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ : %2$@ des relevés"
+          }
+        }
+      }
+    },
+    "%@ : moins de %@ des relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: less than %2$@ of readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ : moins de %2$@ des relevés"
+          }
+        }
+      }
+    },
+    "%@ : plus de %@ des relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: more than %2$@ of readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ : plus de %2$@ des relevés"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

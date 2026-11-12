@@ -37,6 +37,8 @@ struct SessionAnalysis: Decodable, Equatable, Sendable {
     struct Series: Decodable, Equatable, Sendable, Identifiable {
         /// Clé de liste seulement (rendue unique par l'analyse), jamais affichée.
         fileprivate(set) var id: String
+        /// Clé brute de la série, pour `seriesOperatorDisplay` du détail ; jamais affichée.
+        let seriesKey: String?
         let operatorKey: String?
         let marketCode: String?
         /// 1, 2… seulement quand deux séries ont le même opérateur.
@@ -73,7 +75,7 @@ struct SessionAnalysis: Decodable, Equatable, Sendable {
             quality = try? c.decodeIfPresent(Quality.self, forKey: .quality)
             verdict = try? c.decodeIfPresent(Verdict.self, forKey: .verdict)
             spotsTotal = try? c.decodeIfPresent(Int.self, forKey: .spotsTotal)
-            let seriesKey = try? c.decodeIfPresent(String.self, forKey: .seriesKey)
+            seriesKey = (try? c.decodeIfPresent(String.self, forKey: .seriesKey)) ?? nil
             id = seriesKey ?? [operatorKey ?? "unknown", operatorRank.map(String.init) ?? ""].joined(separator: "#")
         }
 

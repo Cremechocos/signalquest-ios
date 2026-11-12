@@ -98,4 +98,60 @@ final class SessionAnalysisTests: XCTestCase {
             try XCTUnwrap(image.pngData()).write(to: output.appendingPathComponent("card-\(scheme == .dark ? "dark" : "light").png"))
         }
     }
+
+    // MARK: TRAJET-SIM (règle MVNO-1)
+
+    private func display(_ json: String) throws -> SessionSeriesOperatorDisplay {
+        try JSONDecoder.signalQuest.decode(SessionSeriesOperatorDisplay.self, from: Data(json.utf8))
+    }
+
+    /// « Free · réseau Orange : 18 % des relevés » ; jamais de mention pour la SIM sur son réseau.
+    func testBrandMentionsFollowTheServedNetworks() throws {
+        let free = try display(#"""
+        {"brand":null,"network":"Free","pointCount":100,"networks":[
+         {"networkKey":"FREE","network":"Free","brand":"Free","brandSource":"sim-roaming","pointCount":82},
+         {"networkKey":"ORANGE","network":"Orange","brand":"Free","brandSource":"sim-roaming","pointCount":18},
+         {"networkKey":null,"network":null,"brand":null,"brandSource":null,"pointCount":0}]}
+        """#)
+        XCTAssertEqual(free.networks.map(\.networkKey), ["FREE", "ORANGE"], "Entrée sans clé écartée")
+        XCTAssertEqual(SessionTripBrand.mentions(free),
+                       [.init(brand: "Free", network: "Orange", share: .percent(18))],
+                       "Free sur Free Mobile n'est pas mentionné")
+        XCTAssertNil(SessionTripBrand.pointLabel(free, operatorKey: "FREE"))
+        XCTAssertNotNil(SessionTripBrand.pointLabel(free, operatorKey: "ORANGE"))
+        XCTAssertNil(SessionTripBrand.pointLabel(free, operatorKey: "SFR"))
+        XCTAssertNil(SessionTripBrand.pointLabel(free, operatorKey: nil))
+    }
+
+    func testBrandShareNeverReadsZeroNorAFalseHundred() throws {
+        let rare = try display(#"""
+        {"pointCount":1000,"networks":[
+         {"networkKey":"ORANGE","network":"Orange","brand":"Sosh","pointCount":996},
+         {"networkKey":"SFR","network":"SFR","brand":"Sosh","pointCount":4}]}
+        """#)
+        XCTAssertEqual(SessionTripBrand.mentions(rare).map(\.share), [.overNinetyNine, .underOne])
+        let whole = try display(#"{"pointCount":5,"networks":[{"networkKey":"ORANGE","brand":"Sosh","pointCount":5}]}"#)
+        XCTAssertEqual(SessionTripBrand.mentions(whole).map(\.share), [.percent(100)])
+        let half = try display(#"{"pointCount":8,"networks":[{"networkKey":"ORANGE","brand":"Sosh","pointCount":1}]}"#)
+        XCTAssertEqual(SessionTripBrand.mentions(half).map(\.share), [.percent(13)], "12,5 s'arrondit vers le haut")
+    }
+
+    func testOldServerWithoutCountsMentionsNothing() throws {
+        let old = try display(#"{"brand":"Free","network":"Orange","networkKey":"ORANGE"}"#)
+        XCTAssertTrue(SessionTripBrand.mentions(old).isEmpty)
+        XCTAssertTrue(SessionTripBrand.mentions(nil).isEmpty)
+    }
+
+    func testSessionAndPointsCarryTheSeriesKey() throws {
+        let json = #"""
+        {"session":{"id":"s1","seriesOperatorDisplay":{"sim-1":{"pointCount":2,"networks":[
+          {"networkKey":"ORANGE","network":"Orange","brand":"Free","pointCount":1}]},"broken":"x"},
+         "points":[{"id":"p1","latitude":45,"longitude":5,"operatorKey":"ORANGE","seriesKey":"sim-1"}]}}
+        """#
+        let detail = try JSONDecoder.signalQuest.decode(CoverageSessionDetail.self, from: Data(json.utf8))
+        XCTAssertEqual(Array(detail.session.seriesOperatorDisplay.keys), ["sim-1"], "Une série illisible ne fait pas tomber les autres")
+        XCTAssertEqual(detail.points.first?.seriesKey, "sim-1")
+        let analysis = try decode(#"{"analysis":{"status":"ready","operators":[{"seriesKey":"sim-1","operatorKey":"ORANGE","quality":{"score":50}}]}}"#)
+        XCTAssertEqual(analysis.operators.first?.seriesKey, "sim-1")
+    }
 }

@@ -56,10 +56,93 @@ enum SessionAnalysisText {
     }
 }
 
+/// TRAJET-SIM (règle MVNO-1 commune aux trois apps) : la marque de la SIM ne va
+/// jamais dans le titre d'une série, puisque l'itinérance n'est souvent que
+/// partielle. Elle se dit dans une mention sous la ligne, « Free · réseau Orange :
+/// 18 % des relevés », et sur un point seulement s'il est sur ce réseau.
+enum SessionTripBrand {
+    enum Share: Equatable {
+        case percent(Int)
+        /// Arrondi à 0 avec des relevés : jamais « 0 % ».
+        case underOne
+        /// Arrondi à 100 sans être toute la série.
+        case overNinetyNine
+    }
+
+    struct Mention: Equatable {
+        let brand: String
+        let network: String
+        let share: Share
+    }
+
+    /// Le réseau se nomme comme le titre de la série (sa clé brute) ; le libellé
+    /// servi ne sert que pour une clé que l'app ne connaît pas.
+    static func networkLabel(key: String, served: String?) -> String {
+        SQBrand.operatorName(key) ?? served.flatMap { $0.isEmpty ? nil : $0 } ?? key
+    }
+
+    /// Une mention par réseau qui porte une marque, dans l'ordre servi. Sans
+    /// `pointCount` ni `networks` (ancien serveur), rien : rien n'est déduit.
+    static func mentions(_ display: SessionSeriesOperatorDisplay?) -> [Mention] {
+        guard let display, let total = display.pointCount, total > 0 else { return [] }
+        return display.networks.compactMap { entry in
+            guard entry.pointCount > 0, let brand = brand(entry) else { return nil }
+            let percent = Int((100 * Double(entry.pointCount) / Double(total)).rounded())
+            let share: Share
+            if percent == 0 {
+                share = .underOne
+            } else if percent >= 100, entry.pointCount < total {
+                share = .overNinetyNine
+            } else {
+                share = .percent(min(percent, 100))
+            }
+            return Mention(brand: brand, network: networkLabel(key: entry.networkKey, served: entry.network), share: share)
+        }
+    }
+
+    static func text(_ mention: Mention) -> String {
+        let who = String(localized: "\(mention.brand) · réseau \(mention.network)")
+        switch mention.share {
+        case .percent(let value): return String(localized: "\(who) : \(percentText(value)) des relevés")
+        case .underOne: return String(localized: "\(who) : moins de \(percentText(1)) des relevés")
+        case .overNinetyNine: return String(localized: "\(who) : plus de \(percentText(99)) des relevés")
+        }
+    }
+
+    /// « Free · réseau Orange » pour UN relevé : l'entrée dont `networkKey` est
+    /// exactement l'`operatorKey` brut du point, jamais un appariement par libellé.
+    static func pointLabel(_ display: SessionSeriesOperatorDisplay?, operatorKey: String?) -> String? {
+        guard let display, let operatorKey,
+              let entry = display.networks.first(where: { $0.networkKey == operatorKey }),
+              let brand = brand(entry) else { return nil }
+        return String(localized: "\(brand) · réseau \(networkLabel(key: entry.networkKey, served: entry.network))")
+    }
+
+    /// La SIM sur son propre réseau (« Free » sur Free) n'a rien à mentionner,
+    /// que le serveur y mette sa marque ou non (garde d'Android, 12/11). Le réseau
+    /// s'écrit en nom complet (« Free Mobile ») : la marque se compare aussi au nom
+    /// court, au libellé servi et à la clé.
+    private static func brand(_ entry: SessionSeriesOperatorDisplay.Network) -> String? {
+        guard let brand = entry.brand?.trimmingCharacters(in: .whitespacesAndNewlines), !brand.isEmpty else { return nil }
+        let names = [networkLabel(key: entry.networkKey, served: entry.network),
+                     SQBrand.operatorShortName(entry.networkKey), entry.network, entry.networkKey]
+        let ownNetwork = names.contains { name in
+            name?.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(brand) == .orderedSame
+        }
+        return ownNetwork ? nil : brand
+    }
+
+    private static func percentText(_ value: Int) -> String {
+        (Double(value) / 100).formatted(.percent.precision(.fractionLength(0)))
+    }
+}
+
 /// « Analyse du trajet » : une ligne par opérateur, sans note globale (choix
 /// d'Alexandre du 10/11), puis le temps sans relevé du trajet.
 struct SessionAnalysisCard: View {
     let analysis: SessionAnalysis
+    /// `seriesOperatorDisplay` du détail, par `seriesKey` brut.
+    var operatorDisplays: [String: SessionSeriesOperatorDisplay] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -111,6 +194,13 @@ struct SessionAnalysisCard: View {
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
                     }
+                }
+                ForEach(Array(SessionTripBrand.mentions(series.seriesKey.flatMap { operatorDisplays[$0] }).enumerated()), id: \.offset) { _, mention in
+                    Text(verbatim: SessionTripBrand.text(mention))
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("sessionDetail.analysis.brandMention")
                 }
                 if let headline = SessionAnalysisText.headline(series) {
                     Text(verbatim: headline)

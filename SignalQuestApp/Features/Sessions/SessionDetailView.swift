@@ -405,7 +405,8 @@ struct SessionDetailView: View {
                 traceSection
                 summaryCard
                 if let analysis = model.analysis {
-                    SessionAnalysisCard(analysis: analysis)
+                    SessionAnalysisCard(analysis: analysis,
+                                        operatorDisplays: model.detail?.session.seriesOperatorDisplay ?? [:])
                 }
                 generationSection
                 signalSection
@@ -1788,6 +1789,11 @@ private struct SessionTraceFullScreen: View {
         if let t = point.timestamp { facts.append(t.formatted(.dateTime.hour().minute())) }
         if model.session.isDriveTest, let km = model.kilometer(at: point) {
             facts.append(SQUnits.routeMarker(kilometers: km))
+        }
+        // TRAJET-SIM : la marque de la SIM seulement si CE relevé est sur un autre réseau.
+        if let key = point.seriesKey,
+           let brand = SessionTripBrand.pointLabel(model.detail?.session.seriesOperatorDisplay[key], operatorKey: point.operatorKey) {
+            facts.append(brand)
         }
         // RSRQ, SINR, bande et TA, quand le trajet les a (Android) : ce qu'il faut
         // pour juger une identification.

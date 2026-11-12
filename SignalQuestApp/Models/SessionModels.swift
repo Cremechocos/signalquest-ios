@@ -54,6 +54,48 @@ struct CoverageDriveSummary: Decodable, Equatable, Sendable {
     let downloadMaxMbps: Double?
 }
 
+/// TRAJET-SIM : `seriesOperatorDisplay[seriesKey]` du détail d'un trajet, la part
+/// des relevés de la série servie par chaque réseau. La marque ne va jamais dans
+/// le titre de la série : une itinérance n'est souvent que partielle.
+struct SessionSeriesOperatorDisplay: Decodable, Equatable, Sendable {
+    /// Relevés visibles de la série ; nil sur un serveur qui ne le sert pas encore.
+    let pointCount: Int?
+    /// Du plus de relevés au moins ; vide = rien à mentionner, rien n'est déduit.
+    let networks: [Network]
+
+    struct Network: Decodable, Equatable, Sendable {
+        /// `operatorKey` BRUT des points de ce réseau.
+        let networkKey: String
+        let network: String?
+        /// Marque de la SIM, seulement là où elle diffère de ce réseau.
+        let brand: String?
+        let pointCount: Int
+    }
+
+    private enum CodingKeys: String, CodingKey { case pointCount, networks }
+    private enum NetworkKeys: String, CodingKey { case networkKey, network, brand, pointCount }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pointCount = (try? c.decodeIfPresent(Int.self, forKey: .pointCount)).flatMap { $0 }.flatMap { $0 >= 0 ? $0 : nil }
+        // Une entrée sans clé de réseau (points sans clé) ou sans compte ne s'apparie à rien : écartée.
+        var entries: [Network] = []
+        if var list = try? c.nestedUnkeyedContainer(forKey: .networks) {
+            while !list.isAtEnd {
+                guard let e = try? list.nestedContainer(keyedBy: NetworkKeys.self) else {
+                    _ = try? list.decode(JSONValue.self)
+                    continue
+                }
+                guard let key = e.decodeFlexibleString(forKey: .networkKey), !key.isEmpty,
+                      let count = try? e.decodeIfPresent(Int.self, forKey: .pointCount), count >= 0 else { continue }
+                entries.append(Network(networkKey: key, network: e.decodeFlexibleString(forKey: .network),
+                                       brand: e.decodeFlexibleString(forKey: .brand), pointCount: count))
+            }
+        }
+        networks = entries
+    }
+}
+
 struct CoverageSession: Decodable, Identifiable, Equatable {
     let id: String
     let name: String?
@@ -75,6 +117,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let showOnMap: Bool?
     /// Récap d'un trajet Drive Test envoyé sans tracé (MES-14) ; nil pour les autres.
     let driveSummary: CoverageDriveSummary?
+    /// TRAJET-SIM, par `seriesKey` brut (celui de l'analyse) ; vide sur un ancien serveur.
+    let seriesOperatorDisplay: [String: SessionSeriesOperatorDisplay]
 
     /// Trajet connu par son récap seulement : pas de points à montrer.
     var isSummaryOnly: Bool { driveSummary != nil && (totalPoints ?? 0) == 0 }
@@ -85,7 +129,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         case startTime, startedAt, createdAt, endTime, endedAt, duration
         case totalPoints, pointCount, distance
         case avgSignalStrength, minSignalStrength, maxSignalStrength
-        case operators, technologies, technologiesDetected, showOnMap
+        case operators, technologies, technologiesDetected, showOnMap, seriesOperatorDisplay
     }
 
     init(from decoder: Decoder) throws {
@@ -116,6 +160,14 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         }()
         showOnMap = (try? c.decodeIfPresent(Bool.self, forKey: .showOnMap)) ?? nil
         driveSummary = (try? c.decodeIfPresent(CoverageDriveSummary.self, forKey: .driveSummary)) ?? nil
+        // Une série illisible ne fait pas tomber les autres.
+        seriesOperatorDisplay = ((try? c.decodeIfPresent([String: FailableSeriesDisplay].self, forKey: .seriesOperatorDisplay)) ?? nil)?
+            .compactMapValues(\.value) ?? [:]
+    }
+
+    private struct FailableSeriesDisplay: Decodable {
+        let value: SessionSeriesOperatorDisplay?
+        init(from decoder: Decoder) throws { value = try? SessionSeriesOperatorDisplay(from: decoder) }
     }
 
     /// Décode `operators` comme tableau d'objets `{key,label,color,count}` ; repli
@@ -185,6 +237,8 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let tech: String?
     /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
+    /// Série SIM du point (DRIVE-ANALYSIS-1), opaque, jamais affichée.
+    let seriesKey: String?
     /// Preuve réseau du point, distincte du nom de SIM. Les chaînes préservent
     /// les MNC à trois chiffres avec zéro initial (`310001`).
     private let observedPlmnValue: JSONValue?
@@ -221,7 +275,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
         case rsrq, snr, timingAdvance, accuracy, cellMeasurements
-        case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
+        case technology, networkType, operatorKey, seriesKey, mobileOperator, mvnoKey, mvnoName, timestamp
         case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
         case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
     }
@@ -243,6 +297,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         // mélange que ce chantier supprime : un « Lebara » ou un « Orange F » ne
         // correspond à aucune clé et fausse tout ce qui s'appuie dessus.
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        seriesKey = c.decodeFlexibleString(forKey: .seriesKey)
         observedPlmnValue = try? c.decodeIfPresent(JSONValue.self, forKey: .observedPlmn)
         observedMccValue = (try? c.decodeIfPresent(JSONValue.self, forKey: .observedMcc))
             ?? (try? c.decodeIfPresent(JSONValue.self, forKey: .mobileCountryCode))
