@@ -33,10 +33,14 @@ struct ISEDCarrierSheet: Equatable {
 
     let sectors: [Sector]
     let source: [String]
+    /// Étape d : n° et catégorie de chaque licence, puis le titulaire. Vide tant que
+    /// l'import ne sert pas les licences (le titulaire seul reste dans Technique).
+    var licences: [Row] = []
 
     private static let nbsp = "\u{00A0}"
 
     static func make(carriers: [AntennaRadioCarrier], azimuths: [Double], datasetPublishedAt: String?,
+                     licences: [ISEDSiteLicence] = [], holder: String? = nil,
                      locale: Locale = .current) -> ISEDCarrierSheet {
         let groups = group(carriers, azimuths: azimuths)
         let directional = groups.filter { $0.kind == .sector }
@@ -54,7 +58,23 @@ struct ISEDCarrierSheet: Equatable {
             return Sector(title: title, rows: rows, note: note,
                           carriers: group.carriers.map { carrierView($0, locale: locale) })
         }
-        return ISEDCarrierSheet(sectors: sectors, source: sourceLines(carriers, datasetPublishedAt: datasetPublishedAt, locale: locale))
+        return ISEDCarrierSheet(sectors: sectors, source: sourceLines(carriers, datasetPublishedAt: datasetPublishedAt, locale: locale),
+                                licences: licenceRows(licences, holder: holder))
+    }
+
+    private static func licenceRows(_ licences: [ISEDSiteLicence], holder: String?) -> [Row] {
+        guard !licences.isEmpty else { return [] }
+        var rows: [Row] = []
+        for licence in licences {
+            rows.append(Row(label: String(localized: "N° de licence"), value: licence.number))
+            if let category = licence.category?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
+                rows.append(Row(label: String(localized: "Catégorie"), value: category))
+            }
+        }
+        if let holder = holder?.trimmingCharacters(in: .whitespacesAndNewlines), !holder.isEmpty {
+            rows.append(Row(label: String(localized: "Titulaire"), value: holder))
+        }
+        return rows
     }
 
     // MARK: Regroupement
@@ -310,6 +330,19 @@ struct ISEDCarriersPage: View {
             ForEach(Array(sheet.sectors.enumerated()), id: \.offset) { _, sector in
                 sectorCard(sector)
             }
+            if !sheet.licences.isEmpty {
+                VStack(alignment: .leading, spacing: SQSpace.xs2) {
+                    Text("Licences")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                    rows(sheet.licences)
+                }
+                .padding(SQSpace.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .accessibilityIdentifier("antenna.carriers.ised.licences")
+            }
             sourceBlock
         }
     }
@@ -397,5 +430,27 @@ struct ISEDCarriersPage: View {
         }
         .padding(.horizontal, SQSpace.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Provinces et territoires du Canada, pour l'en-tête d'un site ISED (« Québec »).
+enum ISEDProvince {
+    static func name(_ code: String?) -> String? {
+        switch code?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() {
+        case "AB": return String(localized: "Alberta")
+        case "BC": return String(localized: "Colombie-Britannique")
+        case "MB": return String(localized: "Manitoba")
+        case "NB": return String(localized: "Nouveau-Brunswick")
+        case "NL": return String(localized: "Terre-Neuve-et-Labrador")
+        case "NS": return String(localized: "Nouvelle-Écosse")
+        case "NT": return String(localized: "Territoires du Nord-Ouest")
+        case "NU": return String(localized: "Nunavut")
+        case "ON": return String(localized: "Ontario")
+        case "PE": return String(localized: "Île-du-Prince-Édouard")
+        case "QC": return String(localized: "Québec")
+        case "SK": return String(localized: "Saskatchewan")
+        case "YT": return String(localized: "Yukon")
+        default: return nil
+        }
     }
 }

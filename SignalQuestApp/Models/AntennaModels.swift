@@ -456,8 +456,11 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let radioCarriers: [AntennaRadioCarrier]
     /// Canada (contrat ISED r1) : date de l'extrait du registre (`YYYY-MM-DD`).
     let datasetPublishedAt: String?
-    /// Canada : nombre d'antennes omni du site, dont l'azimut n'entre plus dans `azimuts`.
-    let omniAntennaCount: Int?
+    /// Canada (ISED r1, étape e) : marque commerciale du site (« Freedom », « Bell »),
+    /// nil si inconnue ou si plusieurs marques s'y partagent le site.
+    let operatorBrand: String?
+    /// Canada (ISED r1, étape d) : licences du site, absentes tant que l'import ne les a pas produites.
+    let licences: [ISEDSiteLicence]
     let cellIdentifiers: AntennaCellIdentifiers
     let siteInfo: AntennaSiteInfo
     /// Statut ANFR brut (« En service », « Projet approuvé »…). Champ additif :
@@ -577,7 +580,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, mutualiseOperators, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
-        case datasetPublishedAt, omniAntennaCount
+        case datasetPublishedAt, operatorBrand, licences
         case isCustomSite, validationStatus, source, displayName, description
     }
 
@@ -632,7 +635,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
         frequencyBands = c.decodeLossyArray([String].self, forKey: .frequencyBands)
         radioCarriers = c.decodeLossyArray([AntennaRadioCarrier].self, forKey: .radioCarriers)
         datasetPublishedAt = c.decodeFlexibleString(forKey: .datasetPublishedAt)
-        omniAntennaCount = (try? c.decodeIfPresent(Int.self, forKey: .omniAntennaCount)) ?? nil
+        operatorBrand = c.decodeFlexibleString(forKey: .operatorBrand)
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        licences = c.decodeLossyArray([ISEDSiteLicence].self, forKey: .licences).filter { !$0.number.isEmpty }
         cellIdentifiers = (try? c.decode(AntennaCellIdentifiers.self, forKey: .cellIdentifiers)) ?? AntennaCellIdentifiers()
         siteInfo = (try? c.decode(AntennaSiteInfo.self, forKey: .siteInfo)) ?? AntennaSiteInfo()
         status = c.decodeFlexibleString(forKey: .status)
@@ -688,6 +693,12 @@ struct AntennaSectorSystems: Decodable, Equatable, Identifiable {
     var id: Double { azimuth }
     let azimuth: Double
     let systems: [String]
+}
+
+/// Une licence ISED d'un site (contrat r1, étape d).
+struct ISEDSiteLicence: Decodable, Equatable, Sendable {
+    let number: String
+    let category: String?
 }
 
 struct AntennaRadioCarrier: Decodable, Equatable, Identifiable {

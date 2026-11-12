@@ -666,11 +666,11 @@ struct AntennaDetailSheet: View {
                     if let supportLine {
                         Text(supportLine).sqKicker()
                     }
-                    Text(headerTitle)
+                    Text(shownTitle)
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let subtitle = headerCaption {
+                    if let subtitle = shownCaption {
                         Text(subtitle)
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
@@ -736,6 +736,21 @@ struct AntennaDetailSheet: View {
         let number = model.details?.core?.supId ?? site.siteId
         guard let number, !number.isEmpty, !isCustomSite else { return nil }
         return String(localized: "Support \(number)")
+    }
+
+    /// Canada (ISED r1, étape e) : la marque en titre, comme la fiche Web, puis le
+    /// site et sa province dessous. `headerTitle` (partage, CarPlay, favoris) reste le site.
+    private var canadaBrand: String? {
+        guard market.uppercased() == "CA" else { return nil }
+        return model.details?.core?.operatorBrand
+    }
+
+    private var shownTitle: String { canadaBrand ?? headerTitle }
+
+    private var shownCaption: String? {
+        guard canadaBrand != nil else { return headerCaption }
+        let province = ISEDProvince.name(model.details?.core?.commune)
+        return [headerTitle, province, distanceText].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// Adresse (ou nature du site) et distance depuis l'origine du repérage.
@@ -1566,7 +1581,8 @@ struct AntennaDetailSheet: View {
         if core.market?.uppercased() == "CA" {
             // Contrat ISED r1 : une carte par secteur, comme la fiche Web.
             ISEDCarriersPage(sheet: .make(carriers: core.radioCarriers, azimuths: core.azimuts,
-                                          datasetPublishedAt: core.datasetPublishedAt))
+                                          datasetPublishedAt: core.datasetPublishedAt,
+                                          licences: core.licences, holder: core.rawLicenseeName))
         } else {
             genericCarriersPage(core)
         }

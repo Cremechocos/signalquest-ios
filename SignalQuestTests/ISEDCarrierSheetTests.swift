@@ -114,4 +114,21 @@ final class ISEDCarrierSheetTests: XCTestCase {
         XCTAssertEqual(ISEDLicenceView.frequencyText(frequencies[2], locale: fr),
                        "\(2140.0.formatted(.number.locale(fr)))\(nbsp)MHz · 20\(nbsp)MHz de large · LTE B66")
     }
+
+    /// Étapes d et e (servies le 12/11) : licences en carte quand l'import les sert, marque et province.
+    func testLicencesBrandAndProvince() throws {
+        let licensed = ISEDCarrierSheet.make(carriers: [], azimuths: [], datasetPublishedAt: nil,
+                                             licences: [ISEDSiteLicence(number: "010587466-001", category: "Mobile")],
+                                             holder: " Vidéotron ", locale: fr)
+        XCTAssertEqual(licensed.licences.map(\.value), ["010587466-001", "Mobile", "Vidéotron"])
+        let unlicensed = ISEDCarrierSheet.make(carriers: [], azimuths: [], datasetPublishedAt: nil, holder: "Bell", locale: fr)
+        XCTAssertTrue(unlicensed.licences.isEmpty, "Sans licence servie, pas de carte : le titulaire reste dans Technique")
+        XCTAssertNotNil(ISEDProvince.name(" qc "))
+        XCTAssertNil(ISEDProvince.name("Montréal"))
+
+        let json = #"{"id":"M1229","market":"CA","operatorBrand":"Freedom","operatorBrandKey":"FREEDOM","networkKind":"mobile","licences":[{"number":"5076954","category":"Mobile","areaName":null,"uploadDate":null},{"number":""},{"category":"x"}],"licenceCount":3}"#
+        let core = try JSONDecoder.signalQuest.decode(AntennaCoreDetails.self, from: Data(json.utf8))
+        XCTAssertEqual(core.operatorBrand, "Freedom")
+        XCTAssertEqual(core.licences.map(\.number), ["5076954"], "Licences sans numéro écartées")
+    }
 }
