@@ -71,6 +71,20 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         XCTAssertFalse(core.isPendingStatus)
     }
 
+    /// Accueil, « Antennes suivies » : un projet sans panne n'est pas « En service » (12/11,
+    /// Clermont-l'Hérault), et sans statut ni pannes lues on n'affiche rien.
+    func testFollowedSiteBadgeShowsTheRealState() throws {
+        let project = try core(minimal(market: "FR", status: "Projet approuvé", supportType: "Pylône"))
+        let live = try core(minimal(market: "FR", status: "En service", supportType: "Pylône"))
+        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: false, core: project), .published("Projet approuvé", pending: true))
+        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: false, core: live), .inService)
+        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: true, core: project), .outage)
+        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: true, core: nil), .outage)
+        XCTAssertNil(FollowedSiteState.resolve(hasOutage: nil, core: live))
+        XCTAssertNil(FollowedSiteState.resolve(hasOutage: false, core: nil))
+        XCTAssertNil(FollowedSiteState.resolve(hasOutage: false, core: try core(minimal(market: "CA", supportType: "P"))))
+    }
+
     // MARK: Libellés
 
     /// « Code ANFR » devant un identifiant ISED, BIPT ou OFCOM serait faux.

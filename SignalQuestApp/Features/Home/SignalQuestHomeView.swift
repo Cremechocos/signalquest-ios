@@ -1678,8 +1678,8 @@ private struct HomeFollowedSitesModule: View {
     @EnvironmentObject private var router: AppRouter
     @ObservedObject var favorites: FavoriteAntennasService
     let registry: MarketRegistryEntry?
-    /// `true` = panne ouverte, `false` = rien de signalé ; absent = inconnu (on ne dit rien).
-    @State private var hasOutage: [String: Bool] = [:]
+    /// État de chaque suivi (clé `followKey`) ; absent = inconnu, et on ne dit rien.
+    @State private var states: [String: FollowedSiteState] = [:]
 
     private var shown: [FavoriteAntenna] { Array(favorites.favorites.prefix(3)) }
 
@@ -1767,14 +1767,8 @@ private struct HomeFollowedSitesModule: View {
                         .foregroundStyle(SQColor.ink2)
                 }
                 Spacer(minLength: 0)
-                if let outage = hasOutage[favorite.id] {
-                    Text(outage ? "Panne" : "En service")
-                        .font(SQType.chip)
-                        .foregroundStyle(outage ? SQColor.dangerInk : OutageTint.resolvedInk)
-                        .padding(.horizontal, SQSpace.sm2)
-                        .padding(.vertical, SQSpace.xs)
-                        .background(outage ? SQColor.dangerSoft : SQColor.successSoft, in: Capsule(style: .continuous))
-                        .fixedSize()
+                if let state = states[favorite.followKey] {
+                    stateBadge(state)
                 }
             }
             .frame(minHeight: 44)
@@ -1785,13 +1779,62 @@ private struct HomeFollowedSitesModule: View {
         .accessibilityHint("Ouvre la fiche du site")
     }
 
+    @ViewBuilder
+    private func stateBadge(_ state: FollowedSiteState) -> some View {
+        let (label, ink, fill): (Text, Color, Color) = {
+            switch state {
+            case .outage: return (Text("Panne"), SQColor.dangerInk, SQColor.dangerSoft)
+            case .inService: return (Text("En service"), OutageTint.resolvedInk, SQColor.successSoft)
+            case .published(let status, let pending):
+                return (Text(verbatim: status), pending ? SQColor.label : SQColor.ink2,
+                        pending ? SQColor.warningSoft : SQColor.surfaceMuted)
+            }
+        }()
+        label
+            .font(SQType.chip)
+            .foregroundStyle(ink)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs)
+            .background(fill, in: Capsule(style: .continuous))
+            .fixedSize()
+    }
+
+    /// Le badge dit l'état de la facette SUIVIE : pannes de son opérateur, puis statut que la
+    /// fiche de cet opérateur publie. Avant, « En service » sortait dès qu'aucune panne
+    /// n'était signalée, même pour un projet qui n'émet pas encore (12/11).
     private func loadStatuses() async {
         for favorite in shown {
-            guard let outages = try? await services.communityOutages.outages(
+            let token = FavoriteAntenna.operatorToken(favorite.operator)
+            let outages = try? await services.communityOutages.outages(
                 forSiteId: favorite.siteId, targetKind: "anfr", marketCode: favorite.market, operatorKey: "ALL"
-            ) else { continue }
-            hasOutage[favorite.id] = outages.contains { $0.state.isVisible }
+            )
+            let hasOutage = outages?.contains {
+                $0.state.isVisible && (token.isEmpty || FavoriteAntenna.operatorToken($0.operatorKey) == token)
+            }
+            var core: AntennaCoreDetails?
+            if let operatorName = favorite.operator, !operatorName.isEmpty {
+                core = try? await services.antennas.details(
+                    id: favorite.siteId, market: favorite.market, operatorName: operatorName
+                ).core
+            }
+            states[favorite.followKey] = FollowedSiteState.resolve(hasOutage: hasOutage, core: core)
         }
+    }
+}
+
+/// Ce que la liste des suivis affiche à droite d'une antenne.
+enum FollowedSiteState: Equatable {
+    case outage
+    case inService
+    /// Statut publié par le registre (« Projet approuvé ») quand le site n'est pas en service.
+    case published(String, pending: Bool)
+
+    /// `nil` quand on ne sait rien : mieux vaut aucun badge qu'un « En service » inventé.
+    static func resolve(hasOutage: Bool?, core: AntennaCoreDetails?) -> FollowedSiteState? {
+        if hasOutage == true { return .outage }
+        guard let core, let status = core.displayStatus else { return nil }
+        if core.isInService { return hasOutage == false ? .inService : nil }
+        return .published(status, pending: core.isPendingStatus)
     }
 }
 
