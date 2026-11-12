@@ -487,7 +487,8 @@ private struct CoverageRouteThumbnail: View {
     var states: [SQQualityScale.Signal]? = nil
     var spokenSummary: String? = nil
 
-    private static let aspect: CGFloat = 16 / 9
+    // 2:1 plutôt que 16:9 : la carte du fil reste compacte (Alexandre, 12/11).
+    private static let aspect: CGFloat = 2
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
