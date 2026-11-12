@@ -608,6 +608,17 @@ final class SessionPostBlockDecodeTests: XCTestCase {
         XCTAssertNil(try item(session: #""texte""#).session)
     }
 
+    /// La moitié vers le haut, comme le serveur et Android : 12 250 m s'écrit « 12,3 km ».
+    func testDistanceRoundsHalfUpLikeTheServer() throws {
+        try XCTSkipUnless(SQUnits.current == .metric)
+        func km(_ meters: Int) -> String { SessionPostText.distance(meters: meters).replacingOccurrences(of: "\u{00A0}", with: " ") }
+        XCTAssertEqual(km(12_250), "12,3 km")
+        XCTAssertEqual(km(12_350), "12,4 km")
+        XCTAssertEqual(km(12_249), "12,2 km")
+        XCTAssertEqual(km(1_000), "1,0 km")
+        XCTAssertEqual(km(950), "1,0 km")
+    }
+
     func testTitleKeyFollowsTheContract() throws {
         let text = try XCTUnwrap(FeedTextKey(key: "feed.session.drive_test_completed",
                                              args: ["distanceMeters": .number(12_350), "durationSeconds": .number(1_499), "logicalPoints": .number(412)])?.text)

@@ -372,7 +372,7 @@ enum SessionPostText {
         var metrics: [FeedMetricGrid.Metric] = []
         if let meters = block.distanceMeters {
             metrics.append(.init(label: String(localized: "Distance"),
-                                 value: meters > 0 ? SignalFormatters.meters(Double(meters)) : "—", highlight: meters > 0))
+                                 value: meters > 0 ? distance(meters: meters) : "—", highlight: meters > 0))
         }
         if let seconds = block.durationSeconds {
             metrics.append(.init(label: String(localized: "Durée"), value: SignalFormatters.duration(Double(seconds))))
@@ -381,6 +381,14 @@ enum SessionPostText {
             metrics.append(.init(label: String(localized: "Relevés"), value: points.formatted()))
         }
         return metrics
+    }
+
+    /// Km à une décimale, arrondis au plus proche, la moitié vers le haut comme le serveur
+    /// (12 250 m → « 12,3 km ») : le format d'Apple arrondirait l'égalité au pair (« 12,2 »).
+    /// Les mètres entiers passent d'abord aux 100 m, puis le format n'a plus d'égalité à trancher.
+    static func distance(meters: Int) -> String {
+        guard SQUnits.current == .metric, meters >= 950 else { return SQUnits.distance(meters: Double(meters)) }
+        return SQUnits.distance(meters: Double((meters + 50) / 100 * 100))
     }
 
     /// « Bon · 1 trou », ou « Peu fiable · Trop peu de mesures » (contrat §3.2).

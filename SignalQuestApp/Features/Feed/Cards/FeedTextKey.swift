@@ -144,7 +144,7 @@ struct FeedTextKey: Equatable {
             return String(localized: "Session de couverture terminée : \(distance), \(measures)")
         // DT-POST-1 : km à une décimale, minutes entières (floor), comme la page Trajet.
         case "feed.session.drive_test_completed", "feed.session.coverage_completed":
-            let distance = SQUnits.distance(meters: Double(integer("distanceMeters") ?? 0))
+            let distance = SessionPostText.distance(meters: Int(clamping: integer("distanceMeters") ?? 0))
             let minutes = count("durationSeconds") / 60
             return key == "feed.session.drive_test_completed"
                 ? String(localized: "Drive Test terminé : \(distance), \(minutes) min")
