@@ -164,7 +164,10 @@ enum NearestAntennaTemplateBuilder {
     // MARK: - Antenne
 
     private static func antennaItem(_ input: Input, _ actions: Actions) -> CPListItem {
-        let neutral = CarPlayImageFactory.operatorBadge(fills: [SQNetworkColors.unknownUIColor], ink: .white)
+        // Sans site connu, pas de point d'opérateur à montrer : le symbole dit
+        // de quoi parle la rangée.
+        let neutral = CarPlayImageFactory.badge(fill: SQNetworkColors.unknownUIColor,
+                                                symbol: "antenna.radiowaves.left.and.right")
         if input.phase == .loading {
             return item(.antenna, text: String(localized: "Recherche des antennes autour…"),
                         detail: nil, image: neutral)
@@ -256,19 +259,9 @@ enum NearestAntennaTemplateBuilder {
     }
 
     /// Une part par opérateur sur un support partagé : la pastille dit « qui »
-    /// avant le texte.
+    /// avant le texte, avec le point de la carte.
     private static func operatorBadge(for operators: [String]) -> UIImage {
-        let shown = Array(operators.prefix(4))
-        let fills = shown.map { UIColor(SQBrand.operatorColor($0)) }
-        // L'encre de la marque (noire sur Bouygues ou Orange) ; blanche dès
-        // qu'une des parts la demande, le glyphe chevauchant toutes les parts.
-        let ink: UIColor = !shown.isEmpty && shown.allSatisfy { SQBrand.operatorBadgeForeground($0) == .black }
-            ? .black
-            : .white
-        return CarPlayImageFactory.operatorBadge(
-            fills: fills.isEmpty ? [SQNetworkColors.unknownUIColor] : fills,
-            ink: ink
-        )
+        CarPlayImageFactory.operatorBadge(fills: operators.prefix(4).map { UIColor(SQBrand.operatorColor($0)) })
     }
 
     // MARK: - Connexion

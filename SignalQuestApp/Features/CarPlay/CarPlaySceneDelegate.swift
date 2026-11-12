@@ -26,7 +26,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
                                   didConnect interfaceController: CPInterfaceController) {
-        start(interfaceController)
+        start(interfaceController, scene: templateApplicationScene)
     }
 
     // MARK: - Déconnexion
@@ -46,7 +46,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Privé
 
-    private func start(_ interfaceController: CPInterfaceController) {
+    private func start(_ interfaceController: CPInterfaceController, scene: CPTemplateApplicationScene) {
         // CarPlay peut rappeler didConnect lors d'une reconnexion rapide. Un seul
         // coordinateur doit posséder les observers GPS, tâches et templates.
         coordinator?.stop()
@@ -56,7 +56,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         let coordinator = CarPlayCoordinator(
             interface: interfaceController,
             services: AppServicesHolder.services,
-            session: AppServicesHolder.session
+            session: AppServicesHolder.session,
+            // « Y aller » : Plans prend l'écran du véhicule pour guider.
+            openURL: { [weak scene] url in scene?.open(url, options: nil, completionHandler: nil) }
         )
         self.coordinator = coordinator
         coordinator.start()

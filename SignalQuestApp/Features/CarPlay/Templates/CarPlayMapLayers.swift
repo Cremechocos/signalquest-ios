@@ -57,6 +57,13 @@ enum CarPlayMapLayer: CaseIterable, Equatable {
         return String(localized: "Évolutions du \(date)")
     }
 
+    /// Rayon du compte affiché dans la liste des couches. Les antennes arrivent
+    /// par une zone de ±0,045° (5 km en latitude, 3,5 km en longitude) : seul
+    /// un rayon de 3 km y tient entier.
+    var countRadiusMeters: CLLocationDistance {
+        self == .antennas ? 3_000 : Self.radiusMeters
+    }
+
     var symbol: String {
         switch self {
         case .antennas: return "antenna.radiowaves.left.and.right"
@@ -201,20 +208,38 @@ enum CarPlayMapLayerPoints {
     }
 }
 
-/// Écran « Couches » : un niveau sous la carte, une rangée par couche, la
-/// couche affichée cochée.
+/// Racine de l'onglet Carte : une rangée par couche, avec ce qu'il y a autour.
+///
+/// La carte de points d'intérêt placée dans un onglet n'affiche pas ses boutons
+/// de barre (iOS 27.3, CarPlay Simulator, 12/11) : le bouton « Couches » ne
+/// s'y voyait jamais. Alexandre a choisi la liste : une touche ouvre la carte
+/// de la couche, un retour y ramène.
 @MainActor
 enum CarPlayMapLayersTemplateBuilder {
-    static func make(current: CarPlayMapLayer,
-                     available: [CarPlayMapLayer],
+    /// Ce qu'on sait du nombre de points d'une couche autour du véhicule.
+    enum Count: Equatable {
+        case loading
+        case failed
+        case value(Int)
+    }
+
+    static func make(available: [CarPlayMapLayer],
+                     counts: [CarPlayMapLayer: Count] = [:],
                      onSelect: @escaping (CarPlayMapLayer) -> Void) -> CPListTemplate {
+        CPListTemplate(title: String(localized: "Carte"),
+                       sections: sections(available: available, counts: counts, onSelect: onSelect))
+    }
+
+    static func sections(available: [CarPlayMapLayer],
+                         counts: [CarPlayMapLayer: Count],
+                         onSelect: @escaping (CarPlayMapLayer) -> Void) -> [CPListSection] {
         let items = available.map { layer -> CPListItem in
             let item = CPListItem(
                 text: layer.menuTitle,
-                detailText: layer.menuDetail,
+                detailText: detail(for: layer, count: counts[layer]),
                 image: CarPlayImageFactory.badge(fill: layer.tint, symbol: layer.symbol),
-                accessoryImage: layer == current ? UIImage(systemName: "checkmark") : nil,
-                accessoryType: .none
+                accessoryImage: nil,
+                accessoryType: .disclosureIndicator
             )
             item.userInfo = layer
             item.handler = { _, completion in
@@ -223,6 +248,24 @@ enum CarPlayMapLayersTemplateBuilder {
             }
             return item
         }
-        return CPListTemplate(title: String(localized: "Couches"), sections: [CPListSection(items: items)])
+        return [CPListSection(items: items)]
+    }
+
+    /// « 2 pannes à moins de 50 km » ; ce que montre la couche tant que le
+    /// compte n'est pas connu. Zéro se dit en toutes lettres.
+    static func detail(for layer: CarPlayMapLayer, count: Count?) -> String {
+        switch count {
+        case nil, .loading?: return layer.menuDetail
+        case .failed?: return String(localized: "Impossible de charger pour le moment.")
+        case .value(let total)?:
+            guard total > 0 else { return layer.emptyTitle }
+            let radius = SQUnits.distanceCompact(meters: layer.countRadiusMeters)
+            switch layer {
+            case .antennas: return String(localized: "\(total) antennes à moins de \(radius)")
+            case .changes: return String(localized: "\(total) évolutions à moins de \(radius)")
+            case .planned: return String(localized: "\(total) sites prévus à moins de \(radius)")
+            case .outages: return String(localized: "\(total) pannes à moins de \(radius)")
+            }
+        }
     }
 }

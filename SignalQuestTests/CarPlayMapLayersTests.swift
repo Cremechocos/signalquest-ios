@@ -48,7 +48,6 @@ final class CarPlayMapLayersTests: XCTestCase {
         let english = try XCTUnwrap(Bundle(path: path))
         XCTAssertEqual(english.localizedString(forKey: "Évolutions du %@", value: nil, table: nil), "Changes on %@")
         XCTAssertEqual(english.localizedString(forKey: "Aucune panne à proximité", value: nil, table: nil), "No outages nearby")
-        XCTAssertEqual(english.localizedString(forKey: "Couches", value: nil, table: nil), "Layers")
     }
 
     // MARK: - Pannes
@@ -148,29 +147,116 @@ final class CarPlayMapLayersTests: XCTestCase {
         XCTAssertNil(withoutDetails.first?.primaryButton, "les évolutions n'ont pas de bouton Détails")
     }
 
-    func testSymbolPinHasLightAndDarkVariants() {
-        let pin = CarPlayImageFactory.symbolPin(color: UIColor(SQColor.warning), symbol: "hammer.fill")
-        let dark = pin.imageAsset?.image(with: UITraitCollection(userInterfaceStyle: .dark))
-        XCTAssertNotNil(dark)
-        XCTAssertGreaterThan(pin.size.width, 0)
-    }
+    // MARK: - Onglet Carte : liste des couches
 
-    // MARK: - Écran « Couches »
-
-    func testLayerListChecksTheCurrentLayerAndReportsTheChoice() {
+    /// Le bouton de barre ne s'affiche pas sur une carte en onglet : la liste
+    /// des couches est la racine, chaque rangée ouvre sa carte.
+    func testLayerListOpensTheChosenLayer() {
         var chosen: CarPlayMapLayer?
-        let template = CarPlayMapLayersTemplateBuilder.make(
-            current: .planned, available: CarPlayMapLayer.allCases
-        ) { chosen = $0 }
+        let template = CarPlayMapLayersTemplateBuilder.make(available: CarPlayMapLayer.allCases) { chosen = $0 }
 
         let items = template.sections.flatMap(\.items).compactMap { $0 as? CPListItem }
+        XCTAssertEqual(template.title, String(localized: "Carte"))
         XCTAssertEqual(items.map { $0.userInfo as? CarPlayMapLayer }, CarPlayMapLayer.allCases)
-        XCTAssertEqual(items.filter { $0.accessoryImage != nil }.count, 1)
-        XCTAssertNotNil(items.first { ($0.userInfo as? CarPlayMapLayer) == .planned }?.accessoryImage)
-        XCTAssertTrue(items.allSatisfy { $0.image != nil })
+        XCTAssertTrue(items.allSatisfy { $0.image != nil && $0.accessoryType == .disclosureIndicator })
+        XCTAssertEqual(items.map(\.detailText), CarPlayMapLayer.allCases.map(\.menuDetail),
+                       "tant que le compte n'est pas connu, la rangée dit ce que montre la couche")
 
-        items.last?.handler?(items[3], {})
+        items[3].handler?(items[3], {})
         XCTAssertEqual(chosen, .outages)
+    }
+
+    /// Zéro se dit en toutes lettres ; un échec n'est pas un « aucune ».
+    func testLayerRowSaysWhatIsAround() {
+        typealias Builder = CarPlayMapLayersTemplateBuilder
+        XCTAssertEqual(Builder.detail(for: .outages, count: .value(0)), CarPlayMapLayer.outages.emptyTitle)
+        XCTAssertEqual(Builder.detail(for: .outages, count: .failed),
+                       String(localized: "Impossible de charger pour le moment."))
+        XCTAssertEqual(Builder.detail(for: .planned, count: .loading), CarPlayMapLayer.planned.menuDetail)
+        let two = Builder.detail(for: .outages, count: .value(2))
+        XCTAssertTrue(two.hasPrefix("2 "), two)
+        XCTAssertTrue(two.contains(SQUnits.distanceCompact(meters: 50_000)), two)
+        XCTAssertTrue(Builder.detail(for: .antennas, count: .value(12))
+            .contains(SQUnits.distanceCompact(meters: 3_000)), "les antennes se comptent dans 3 km")
+    }
+
+    func testLayerCountsArePluralized() throws {
+        func bundle(_ language: String) throws -> Bundle {
+            try XCTUnwrap(Bundle(path: try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))))
+        }
+        let french = try bundle("fr"), english = try bundle("en")
+        let cases: [(String, String, String, String, String)] = [
+            ("%lld pannes à moins de %@", "1 panne à moins de 50 km", "3 pannes à moins de 50 km",
+             "1 outage within 50 km", "3 outages within 50 km"),
+            ("%lld sites prévus à moins de %@", "1 site prévu à moins de 50 km", "3 sites prévus à moins de 50 km",
+             "1 planned site within 50 km", "3 planned sites within 50 km"),
+            ("%lld évolutions à moins de %@", "1 évolution à moins de 50 km", "3 évolutions à moins de 50 km",
+             "1 change within 50 km", "3 changes within 50 km"),
+            ("%lld antennes à moins de %@", "1 antenne à moins de 50 km", "3 antennes à moins de 50 km",
+             "1 antenna within 50 km", "3 antennas within 50 km"),
+        ]
+        for (key, fr1, fr3, en1, en3) in cases {
+            let fr = french.localizedString(forKey: key, value: nil, table: nil)
+            let en = english.localizedString(forKey: key, value: nil, table: nil)
+            XCTAssertEqual(String.localizedStringWithFormat(fr, 1, "50 km"), fr1)
+            XCTAssertEqual(String.localizedStringWithFormat(fr, 3, "50 km"), fr3)
+            XCTAssertEqual(String.localizedStringWithFormat(en, 1, "50 km"), en1)
+            XCTAssertEqual(String.localizedStringWithFormat(en, 3, "50 km"), en3)
+        }
+    }
+
+    // MARK: - « Y aller »
+
+    func testDirectionsOpenPlansToThePoint() throws {
+        let url = try XCTUnwrap(CarPlayPOIBuilder.directionsURL(
+            to: CLLocationCoordinate2D(latitude: 45.19, longitude: 5.72)))
+        XCTAssertEqual(url.absoluteString, "maps://?daddr=45.19,5.72&dirflg=d")
+        XCTAssertNil(CarPlayPOIBuilder.directionsURL(to: CLLocationCoordinate2D(latitude: 200, longitude: 0)))
+    }
+
+    /// CarPlay ne publie pas le handler d'un `CPTextButton` : on vérifie que le
+    /// bouton existe, le chemin vers Plans l'est par `directionsURL`.
+    func testNavigateAddsAGoThereButton() {
+        let entries = [CarPlayPOIBuilder.Entry(payload: payload(id: "a", latitude: 45.2, longitude: 5.7),
+                                               distanceMeters: 800)]
+        let points = CarPlayPOIBuilder.points(from: entries, userLocation: grenoble,
+                                              actions: .init(navigate: { _ in }))
+        XCTAssertEqual(points.first?.secondaryButton?.title, String(localized: "Y aller"))
+        XCTAssertNil(points.first?.primaryButton, "sans fiche possible, pas de bouton Détails")
+    }
+
+    // MARK: - Icônes
+
+    /// Pastille douce : le symbole garde la couleur du sens, assombrie ou
+    /// éclaircie jusqu'à 4,5:1. Le jaune « Moyen » ne se lirait pas tel quel.
+    func testSoftBadgeGlyphsStayReadable() {
+        let tints: [UIColor] = [
+            SQQualityScale.Signal.good.uiColor, SQQualityScale.Signal.fair.uiColor,
+            SQQualityScale.Signal.poor.uiColor, SQNetworkColors.unknownUIColor,
+            SQQualityScale.Generation.fiveG.uiColor, CarPlayImageFactory.brandColor,
+            UIColor(SQColor.warning), UIColor(SQColor.danger), UIColor(SQColor.info),
+        ]
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for tint in tints {
+                let glyph = CarPlayImageFactory.glyphColor(for: tint, style: style)
+                let backdrop = CarPlayImageFactory.softBackdrop(for: tint, style: style)
+                XCTAssertGreaterThanOrEqual(CarPlayImageFactory.contrast(glyph, backdrop), 4.5,
+                                            "\(tint) en \(style == .dark ? "sombre" : "clair")")
+            }
+        }
+    }
+
+    func testPinsHaveLightAndDarkVariants() {
+        let shared = [UIColor(SQBrand.operatorColor("SFR")), UIColor(SQBrand.operatorColor("BOUYGUES"))]
+        for pin in [CarPlayImageFactory.antennaPin(fills: shared, fiveG: true),
+                    CarPlayImageFactory.antennaPin(fills: [], selected: true),
+                    CarPlayImageFactory.symbolPin(color: UIColor(SQColor.warning), symbol: "hammer.fill")] {
+            XCTAssertNotNil(pin.imageAsset?.image(with: UITraitCollection(userInterfaceStyle: .dark)))
+            XCTAssertGreaterThan(pin.size.width, 0)
+        }
+        XCTAssertGreaterThan(CarPlayImageFactory.antennaPin(fills: shared, selected: true).size.width,
+                             CarPlayImageFactory.antennaPin(fills: shared).size.width,
+                             "le point mis en avant est plus grand")
     }
 
     // MARK: - Rythme des rechargements

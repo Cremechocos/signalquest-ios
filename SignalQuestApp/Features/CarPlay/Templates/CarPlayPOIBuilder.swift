@@ -87,11 +87,13 @@ enum CarPlayPOIBuilder {
             item.name = payload.title
 
             let color = payload.tint.map { UIColor($0) } ?? UIColor(SQColor.brandRed)
-            // Les couches autres que les antennes portent leur symbole.
+            // Le point de la carte iPhone : camembert des opérateurs et anneau
+            // 5G pour une antenne, symbole pour les autres couches.
+            let fills = payload.operatorTints.isEmpty ? [color] : payload.operatorTints.map { UIColor($0) }
             let pin = { (selected: Bool) -> UIImage in
                 payload.glyphOverride.map {
                     CarPlayImageFactory.symbolPin(color: color, symbol: $0, selected: selected)
-                } ?? CarPlayImageFactory.antennaPin(color: color, selected: selected)
+                } ?? CarPlayImageFactory.antennaPin(fills: fills, fiveG: payload.has5G, selected: selected)
             }
             let poi = CPPointOfInterest(
                 location: item,
@@ -136,11 +138,18 @@ enum CarPlayPOIBuilder {
             detailTitle: message,
             detailSubtitle: nil,
             detailSummary: nil,
-            pinImage: CarPlayImageFactory.antennaPin(color: color),
-            selectedPinImage: CarPlayImageFactory.antennaPin(color: color, selected: true)
+            pinImage: CarPlayImageFactory.symbolPin(color: color, symbol: "arrow.clockwise"),
+            selectedPinImage: CarPlayImageFactory.symbolPin(color: color, symbol: "arrow.clockwise", selected: true)
         )
         poi.primaryButton = CPTextButton(title: String(localized: "Réessayer"), textStyle: .confirm) { _ in onRetry() }
         return poi
+    }
+
+    /// Itinéraire jusqu'au point dans Plans (choix d'Alexandre du 12/11) : la
+    /// catégorie « driving task » ne guide pas, Plans prend l'écran du véhicule.
+    static func directionsURL(to coordinate: CLLocationCoordinate2D) -> URL? {
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        return URL(string: "maps://?daddr=\(coordinate.latitude),\(coordinate.longitude)&dirflg=d")
     }
 
     // MARK: - Textes

@@ -69,7 +69,7 @@ final class CarPlayCoordinator {
     /// tait. Sans ça, ouvrir une fiche, revenir, en rouvrir une autre laissait la
     /// réponse la plus LENTE repeindre l'écran de la plus récente.
     private enum Screen: Hashable {
-        case here, nearby, detail, speedtest, poi, comparison
+        case here, nearby, detail, speedtest, poi, comparison, layers
     }
     private var generations: [Screen: Int] = [:]
 
@@ -82,12 +82,18 @@ final class CarPlayCoordinator {
     /// existe pour empêcher.
     private var isEvaluatingAlert = false
 
+    /// Ouvre une URL hors de l'app (« Y aller » → Plans), par la scène CarPlay :
+    /// c'est elle qui fait passer Plans sur l'écran du véhicule.
+    private let openURL: (URL) -> Void
+
     init(interface: CarPlayInterfaceControlling,
          services: AppServices,
-         session: AuthSessionViewModel) {
+         session: AuthSessionViewModel,
+         openURL: @escaping (URL) -> Void = { _ in }) {
         self.interface = interface
         self.services = services
         self.session = session
+        self.openURL = openURL
     }
 
     func start() {
@@ -168,6 +174,10 @@ final class CarPlayCoordinator {
         poiController = nil
         lastPOICenter = nil
         anfrSnapshot = nil
+        mapLayersTemplate = nil
+        layerCounts.removeAll()
+        layerCountsAt = nil
+        layerCache.removeAll()
         outagesById.removeAll()
         plannedById.removeAll()
         services.setCarPlayConnected(false)
@@ -212,6 +222,8 @@ final class CarPlayCoordinator {
         generations.removeAll()
         outagesById.removeAll()
         plannedById.removeAll()
+        layerCache.removeAll()
+        layerCountsAt = nil
         installRoot()
     }
 
@@ -237,6 +249,15 @@ final class CarPlayCoordinator {
     /// coûterait du réseau pour un contenu identique.
     private var anfrSnapshot: (snapshot: ANFRMapSnapshot, loadedAt: Date)?
     private static let anfrSnapshotLifetime: TimeInterval = 30 * 60
+    /// Racine de l'onglet Carte quand plusieurs couches existent (France) ;
+    /// nil quand la carte des antennes est elle-même l'onglet.
+    private var mapLayersTemplate: CPListTemplate?
+    private var layerCounts: [CarPlayMapLayer: CarPlayMapLayersTemplateBuilder.Count] = [:]
+    private var layerCountsAt: Date?
+    private static let layerCountsInterval: TimeInterval = 120
+    /// Dernier chargement de chaque couche : ouvrir une couche juste après
+    /// l'avoir comptée ne refait pas le même appel réseau.
+    private var layerCache: [CarPlayMapLayer: (load: POILoad, area: CLLocation, at: Date)] = [:]
 
     /// Pose les onglets, et se rabat sur l'ancienne liste si le système
     /// les refuse.
@@ -253,19 +274,28 @@ final class CarPlayCoordinator {
         )
         hereTemplate = here
 
-        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: poiActions(for: mapLayer))
+        let layers = CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode())
+        mapLayer = .antennas
+        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: .init())
         poiTemplate = poi
         let controller = CarPlayPOIController { [weak self] region in
             self?.loadPOI(around: region.center)
         }
         poi.pointOfInterestDelegate = controller
         poiController = controller
-        // Hors de France, il n'y a que les antennes : pas de bouton pour une
-        // liste d'un seul choix.
-        if CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode()).count > 1 {
-            poi.trailingNavigationBarButtons = [
-                CPBarButton(title: String(localized: "Couches")) { [weak self] _ in self?.showMapLayers() },
-            ]
+        // Plusieurs couches (France) : l'onglet est la liste des couches, chaque
+        // rangée pousse sa carte. Une seule : la carte des antennes EST l'onglet,
+        // une liste d'un seul choix n'aurait pas de sens.
+        let mapTab: CPTemplate
+        if layers.count > 1 {
+            let list = CarPlayMapLayersTemplateBuilder.make(available: layers) { [weak self] layer in
+                self?.openMapLayer(layer)
+            }
+            mapLayersTemplate = list
+            mapTab = CarPlayTabBarBuilder.decorate(list, title: String(localized: "Carte"), systemImage: "map.fill")
+        } else {
+            mapLayersTemplate = nil
+            mapTab = poi
         }
 
         let speedtest = SpeedtestTemplateBuilder.make(
@@ -277,7 +307,7 @@ final class CarPlayCoordinator {
         let tabs = [
             CarPlayTabBarBuilder.decorate(here, title: String(localized: "Ici"),
                                           systemImage: "dot.radiowaves.left.and.right"),
-            poi,
+            mapTab,
             CarPlayTabBarBuilder.decorate(speedtest, title: String(localized: "Speedtest"),
                                           systemImage: "speedometer"),
         ]
@@ -285,8 +315,9 @@ final class CarPlayCoordinator {
         let tabBar = CarPlayTabBarBuilder.make(tabs: tabs)
         let tabDelegate = CarPlayTabBarDelegate()
         tabDelegate.onSelect = { [weak self] selected in
-            guard let self, let here = hereTemplate, selected === here else { return }
-            refreshHereIfStale(here)
+            guard let self else { return }
+            if let here = hereTemplate, selected === here { refreshHereIfStale(here) }
+            if let list = mapLayersTemplate, selected === list { refreshLayerCountsIfStale() }
         }
         tabBar.delegate = tabDelegate
         tabBarDelegate = tabDelegate
@@ -299,7 +330,7 @@ final class CarPlayCoordinator {
         // Les onglets qui dépendent de données se remplissent en parallèle :
         // l'utilisateur peut ouvrir n'importe lequel en premier.
         loadHere(into: here)
-        loadPOI(around: nil)
+        if mapLayersTemplate == nil { loadPOI(around: nil) }
         loadLastSpeedtest()
     }
 
@@ -327,42 +358,110 @@ final class CarPlayCoordinator {
         hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
+        mapLayersTemplate = nil
         speedtestTemplate = nil
         interface.setRoot(CarPlayRootTemplateBuilder.list { [weak self] entry in
             self?.open(entry)
         }, animated: false)
     }
 
+    /// Boutons de la carte du point.
+    ///
+    /// - « Détails » pousse une fiche. Carte en onglet : 2 écrans, toujours
+    ///   permis. Carte poussée depuis la liste des couches : 3 écrans, permis
+    ///   seulement depuis iOS 26.4 ; avant, la carte du point porte déjà
+    ///   distance, direction et opérateurs.
+    /// - « Y aller » ouvre Plans. Une évolution ANFR n'a ni fiche ni
+    ///   destination utile : c'est un changement administratif, pas un lieu.
     private func poiActions(for layer: CarPlayMapLayer) -> CarPlayPOIBuilder.Actions {
-        // Une évolution ANFR n'a pas de fiche à ouvrir : la carte du point dit
-        // déjà le changement, les opérateurs et la commune.
         guard layer != .changes else { return .init() }
-        return .init(details: { [weak self] payload in self?.showDetail(for: payload) })
+        var actions = CarPlayPOIBuilder.Actions(navigate: { [weak self] payload in self?.navigate(to: payload) })
+        if mapLayersTemplate == nil || Self.allowsThirdScreen {
+            actions.details = { [weak self] payload in self?.showDetail(for: payload) }
+        }
+        return actions
+    }
+
+    /// Plafond de pile des apps « driving task » : 2 écrans jusqu'à iOS 26.3,
+    /// 3 depuis 26.4.
+    private static var allowsThirdScreen: Bool {
+        if #available(iOS 26.4, *) { return true }
+        return false
+    }
+
+    private func navigate(to payload: MapAnnotationPayload) {
+        guard let url = CarPlayPOIBuilder.directionsURL(to: payload.coordinate) else { return }
+        openURL(url)
     }
 
     // MARK: - Couches de la carte
 
-    /// Liste des couches, un niveau sous la carte (profondeur 2, sous le plafond).
-    private func showMapLayers() {
-        let available = CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode())
-        interface.push(CarPlayMapLayersTemplateBuilder.make(current: mapLayer, available: available) { [weak self] layer in
-            self?.selectMapLayer(layer)
-        }, animated: true)
-    }
-
-    /// Revient à la carte et la recharge sur la couche choisie, dans la zone
-    /// qu'elle montrait. Le geste vient du conducteur : il passe avant la
-    /// limite d'un rechargement par minute.
-    private func selectMapLayer(_ layer: CarPlayMapLayer) {
-        interface.pop(animated: true)
-        guard layer != mapLayer, let poiTemplate else { return }
+    /// Pousse la carte de la couche choisie, centrée sur le véhicule.
+    private func openMapLayer(_ layer: CarPlayMapLayer) {
+        guard let poiTemplate else { return }
         mapLayer = layer
-        // Les points de l'ancienne couche ne doivent pas rester affichés sous
-        // le nom de la nouvelle.
-        poiTemplate.title = String(localized: "Chargement…")
+        lastPOICenter = nil
+        // Les points d'une autre couche ne doivent pas s'afficher sous ce nom.
+        poiTemplate.title = layer.title()
         poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
         poiController?.invalidate()
-        loadPOI(around: lastPOICenter)
+        interface.push(poiTemplate, animated: true)
+        loadPOI(around: nil)
+    }
+
+    /// Recompte les couches à l'ouverture de l'onglet, au plus toutes les deux
+    /// minutes : on roule, ce qui est « autour » change.
+    private func refreshLayerCountsIfStale() {
+        if let layerCountsAt, Date().timeIntervalSince(layerCountsAt) < Self.layerCountsInterval { return }
+        refreshLayerCounts()
+    }
+
+    private func refreshLayerCounts() {
+        guard let list = mapLayersTemplate else { return }
+        let market = MapMarketStore.initialMarketCode()
+        let layers = CarPlayMapLayer.available(market: market)
+        let generation = beginScreen(.layers)
+        layerCountsAt = Date()
+        layerCounts = Dictionary(uniqueKeysWithValues: layers.map { ($0, .loading) })
+        repaintLayers(list, layers)
+        track { [weak self] in
+            guard let self else { return }
+            guard let vehicle = await services.location.currentLocation(),
+                  !Task.isCancelled, isCurrent(.layers, generation) else {
+                // Sans position, « autour » ne veut rien dire : on retente à la
+                // prochaine ouverture plutôt que d'afficher un échec.
+                if isCurrent(.layers, generation) {
+                    layerCountsAt = nil
+                    layerCounts = [:]
+                    repaintLayers(list, layers)
+                }
+                return
+            }
+            for layer in layers {
+                track { [weak self] in
+                    guard let self else { return }
+                    let loaded = await poiLoad(for: layer, around: vehicle, market: market)
+                    guard !Task.isCancelled, isCurrent(.layers, generation) else { return }
+                    if let loaded {
+                        let nearby = loaded.payloads.filter {
+                            vehicle.distance(from: CLLocation(latitude: $0.coordinate.latitude,
+                                                              longitude: $0.coordinate.longitude))
+                                <= layer.countRadiusMeters
+                        }
+                        layerCounts[layer] = .value(nearby.count)
+                    } else {
+                        layerCounts[layer] = .failed
+                    }
+                    repaintLayers(list, layers)
+                }
+            }
+        }
+    }
+
+    private func repaintLayers(_ list: CPListTemplate, _ layers: [CarPlayMapLayer]) {
+        list.updateSections(CarPlayMapLayersTemplateBuilder.sections(
+            available: layers, counts: layerCounts
+        ) { [weak self] layer in self?.openMapLayer(layer) })
     }
 
     /// Ce qu'une couche a chargé : ses marqueurs, et les données sources que
@@ -445,6 +544,16 @@ final class CarPlayCoordinator {
     /// Pannes, projets et relevé ANFR arrivent pour tout le pays : les
     /// convertisseurs les bornent au rayon de la carte.
     private func poiLoad(for layer: CarPlayMapLayer, around area: CLLocation, market: String) async -> POILoad? {
+        if let cached = layerCache[layer], Date().timeIntervalSince(cached.at) < Self.layerCountsInterval,
+           cached.area.distance(from: area) < 1_000 {
+            return cached.load
+        }
+        let loaded = await fetchPOILoad(for: layer, around: area, market: market)
+        if let loaded { layerCache[layer] = (loaded, area, Date()) }
+        return loaded
+    }
+
+    private func fetchPOILoad(for layer: CarPlayMapLayer, around area: CLLocation, market: String) async -> POILoad? {
         let operatorKey = MapMarketStore.initialOperatorKey()
         switch layer {
         case .antennas:
@@ -1080,7 +1189,10 @@ final class CarPlayCoordinator {
             clusterCount: nil,
             azimuths: site.azimuths,
             showsAzimuths: false,
-            tint: SQBrand.operatorColor(site.operators.first)
+            tint: SQBrand.operatorColor(site.operators.first),
+            // Le point de la carte iPhone : une part par opérateur, anneau 5G.
+            has5G: site.technologies.contains { SQQualityScale.Generation(technology: $0) == .fiveG },
+            operatorTints: site.operators.prefix(4).map { SQBrand.operatorColor($0) }
         )
     }
 }
