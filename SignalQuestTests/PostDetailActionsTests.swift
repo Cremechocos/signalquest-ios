@@ -164,6 +164,30 @@ final class PostDeepLinkTests: XCTestCase {
         XCTAssertNil(parse("signalquest://messages/post-42"))
     }
 
+    func testGalleryPhotoLinks() {
+        let origin = URL(string: "https://signalquest.fr")!
+        func parse(_ raw: String) -> String? { PhotoDeepLink.photoID(from: URL(string: raw)!, appOrigin: origin) }
+        XCTAssertEqual(parse("https://signalquest.fr/gallery/cm3photo42"), "cm3photo42")
+        XCTAssertEqual(parse("https://SignalQuest.fr/gallery/photo_42/"), "photo_42")
+        XCTAssertNil(parse("https://signalquest.fr/gallery"), "La galerie seule reste au navigateur")
+        XCTAssertNil(parse("https://signalquest.fr/gallery?photo=cm3photo42"))
+        XCTAssertNil(parse("https://other.example/gallery/cm3photo42"))
+        XCTAssertNil(parse("http://signalquest.fr/gallery/cm3photo42"))
+        XCTAssertNil(parse("https://signalquest.fr/gallery/cm3photo42/extra"))
+        XCTAssertNil(parse("https://signalquest.fr/gallery/%2E%2E"))
+        XCTAssertNil(parse("https://signalquest.fr/posts/cm3photo42"))
+    }
+
+    func testGalleryLinkOpensTheProfileGalleryAndWaitsForIt() {
+        let router = AppRouter()
+        router.route(toPhoto: "cm3photo42")
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertEqual(router.openProfileScreen, .photos)
+        XCTAssertEqual(router.openPhotoId, "cm3photo42")
+        router.openProfileScreen = nil
+        XCTAssertTrue(router.hasPendingContentRoute, "La photo reste due après l'ouverture de la galerie")
+    }
+
     func testNotificationPostIntentSurvivesUntilFeedConsumesIt() {
         let router = AppRouter()
         router.handle(type: "reaction", conversationId: nil, postId: "post-42")

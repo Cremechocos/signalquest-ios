@@ -37,6 +37,21 @@ final class PhotoErrorRecoveryTests: XCTestCase {
         XCTAssertFalse(model.isLoadingMore)
     }
 
+    /// Lien `/gallery/<id>` : la photo lue au serveur s'ouvre ; introuvable, une alerte le dit.
+    func testLinkedPhotoOpensOrExplainsWhyNot() async {
+        let service = PhotoRecoveryFixture()
+        let model = PhotosViewModel(service: service)
+        await model.openLinked(id: "missing")
+        XCTAssertNil(model.selectedPhoto)
+        XCTAssertNotNil(model.linkedPhotoError)
+        model.linkedPhotoError = nil
+        service.photoResult = .success(Photo.demoList[1])
+        service.commentResult = .success([])
+        await model.openLinked(id: Photo.demoList[1].id)
+        XCTAssertEqual(model.selectedPhoto?.id, Photo.demoList[1].id)
+        XCTAssertNil(model.linkedPhotoError)
+    }
+
     func testCommentsFailureKeepsContentAndRetryCanReturnAnAuthoritativeEmpty() async {
         let service = PhotoRecoveryFixture()
         let model = PhotosViewModel(service: service)
@@ -232,7 +247,8 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
         if let galleryHandler { return try await galleryHandler() }
         return try gallery.get()
     }
-    func photo(id: String) async throws -> Photo { throw Failure.unavailable }
+    var photoResult: Result<Photo, Error> = .failure(Failure.unavailable)
+    func photo(id: String) async throws -> Photo { try photoResult.get() }
     func comments(photoId: String) async throws -> [PhotoComment] {
         if let commentHandler { return try await commentHandler(photoId) }
         return try commentResult.get()

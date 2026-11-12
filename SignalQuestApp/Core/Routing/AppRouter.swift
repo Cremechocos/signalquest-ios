@@ -21,11 +21,30 @@ enum PostDeepLink {
         } else {
             return nil
         }
-        guard !id.isEmpty, id.count <= 128,
-              id.utf8.allSatisfy({ ($0 >= 48 && $0 <= 57) ||
-                  ($0 >= 65 && $0 <= 90) || ($0 >= 97 && $0 <= 122) ||
-                  $0 == 45 || $0 == 95 }) else { return nil }
-        return id
+        return isLinkID(id) ? id : nil
+    }
+
+    /// Identifiant sûr à reprendre d'un lien : ASCII, chiffres, lettres, `-` et `_`.
+    static func isLinkID(_ id: String) -> Bool {
+        !id.isEmpty && id.count <= 128 &&
+            id.utf8.allSatisfy({ ($0 >= 48 && $0 <= 57) ||
+                ($0 >= 65 && $0 <= 90) || ($0 >= 97 && $0 <= 122) ||
+                $0 == 45 || $0 == 95 })
+    }
+}
+
+/// Lien de partage d'une photo de la galerie (`/gallery/<id>`, GALLERY-FILTERS v1 §6).
+/// Seul ce chemin est revendiqué par l'AASA : `/gallery` seul reste au navigateur.
+enum PhotoDeepLink {
+    static func photoID(from url: URL, appOrigin: URL) -> String? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.user == nil, components.password == nil,
+              components.scheme?.lowercased() == "https",
+              components.host?.lowercased() == appOrigin.host?.lowercased(),
+              components.port == appOrigin.port else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count == 2, parts[0] == "gallery", PostDeepLink.isLinkID(parts[1]) else { return nil }
+        return parts[1]
     }
 }
 
@@ -91,6 +110,8 @@ final class AppRouter: ObservableObject {
     @Published var openMessagesInbox = false
     /// Set to request opening a specific post on the Feed tab.
     @Published var openPostId: String?
+    /// Photo de la galerie ouverte par un lien `/gallery/<id>` ; la galerie du Profil la consomme.
+    @Published var openPhotoId: String?
     /// Set to request opening a user profile on the Feed tab (notification de follow).
     @Published var openUserProfileId: String?
     /// Demande d'ami : la liste des amis, où elle s'accepte ; le profil n'a
@@ -222,7 +243,7 @@ final class AppRouter: ObservableObject {
     /// Une destination reçue de l'extérieur garde la priorité sur le choix
     /// générique de fin d'introduction, notamment après une connexion.
     var hasPendingContentRoute: Bool {
-        openConversationId != nil || openMessagesInbox || openMessageRequests || openPostId != nil
+        openConversationId != nil || openMessagesInbox || openMessageRequests || openPostId != nil || openPhotoId != nil
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil || openBugId != nil
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
@@ -490,6 +511,12 @@ final class AppRouter: ObservableObject {
     func route(toPost id: String?) {
         selectedTab = .community
         if let id { openPostId = id }
+    }
+
+    /// Lien `/gallery/<id>` : la galerie du Profil, puis la fiche de la photo.
+    func route(toPhoto id: String) {
+        openPhotoId = id
+        route(toProfileScreen: .photos)
     }
 
     func route(toUserProfile id: String?) {

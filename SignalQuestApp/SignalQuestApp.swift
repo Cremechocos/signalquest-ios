@@ -476,6 +476,10 @@ struct AppRootView: View {
             windowRouter.route(toPost: postID)
             return
         }
+        if let photoID = PhotoDeepLink.photoID(from: url, appOrigin: AppConfig.current.appBaseURL) {
+            windowRouter.route(toPhoto: photoID)
+            return
+        }
         // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
         // vérifiée sur la foi du lien : elle relit le reçu de /api/auth/me.
         if url.scheme == SQSharedConfiguration.urlScheme, url.host == "verify-email" {

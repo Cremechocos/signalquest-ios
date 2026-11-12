@@ -129,6 +129,19 @@ final class PhotosViewModel: ObservableObject {
         else { await load() }
     }
 
+    /// Photo ouverte par un lien `/gallery/<id>` : lue au serveur, puis présentée
+    /// comme une photo touchée dans la grille. Introuvable ou non publique : 404.
+    @Published var linkedPhotoError: String?
+
+    func openLinked(id: String) async {
+        do {
+            let photo = try await service.photo(id: id)
+            await open(photo)
+        } catch {
+            if !error.isCancellation { linkedPhotoError = error.userFacingMessage }
+        }
+    }
+
     func open(_ photo: Photo) async {
         commentContext = UUID()
         selectedPhoto = photo
@@ -332,6 +345,12 @@ struct PhotosView: View {
         return false
     }
 
+    private func consumePhotoLink() {
+        guard let id = router.openPhotoId else { return }
+        router.openPhotoId = nil
+        Task { await model.openLinked(id: id) }
+    }
+
     /// Vrai si le filtre personnel a été remis sur « Toutes ».
     @discardableResult
     private func resetPersonalFilterIfSignedOut() -> Bool {
@@ -340,6 +359,7 @@ struct PhotosView: View {
         return true
     }
     @StateObject private var model: PhotosViewModel
+    @EnvironmentObject private var router: AppRouter
     @State private var showingUpload = false
     @Environment(\.dismiss) private var dismiss
 
@@ -398,6 +418,17 @@ struct PhotosView: View {
             guard resetPersonalFilterIfSignedOut() else { return }
             Task { await model.load() }
         }
+        .onAppear(perform: consumePhotoLink)
+        .onChangeCompat(of: router.openPhotoId) { _, _ in consumePhotoLink() }
+        .alert(
+            "Photo indisponible",
+            isPresented: Binding(
+                get: { model.linkedPhotoError != nil },
+                set: { if !$0 { model.linkedPhotoError = nil } }
+            ),
+            actions: { Button("OK", role: .cancel) {} },
+            message: { Text(model.linkedPhotoError ?? "") }
+        )
         .sheet(item: $model.selectedPhoto, onDismiss: { model.actionError = nil }) { _ in
             if let selected = model.selectedPhoto {
                 PhotoDetailView(
