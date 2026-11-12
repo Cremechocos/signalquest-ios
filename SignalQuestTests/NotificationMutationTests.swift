@@ -6,6 +6,136 @@ import XCTest
 
 @MainActor
 final class NotificationMutationTests: XCTestCase {
+    // MARK: NOTIF-I18N (contrat `notification-text-keys` v1, copie à l'octet de
+    // `contracts/notification-text-keys/v1.json`, 982af8f46, servi le 12/11)
+
+    private struct TextKeyVectors: Decodable {
+        struct Key: Decodable { let key: String; let args: [String: String]; let title: String; let fr: String }
+        struct Case: Decodable {
+            struct Expect: Decodable { let textKey: String?; let textArgs: [String: JSONValue]? }
+            let name: String
+            let expect: Expect
+        }
+        let version: Int
+        let keys: [Key]
+        let cases: [Case]
+    }
+
+    private func textKeyVectors() throws -> TextKeyVectors {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("contracts/notification-text-keys/v1.json"))
+        return try JSONDecoder().decode(TextKeyVectors.self, from: data)
+    }
+
+    func testNotificationTextCatalogMatchesTheContract() throws {
+        let vectors = try textKeyVectors()
+        XCTAssertEqual(vectors.version, 1)
+        XCTAssertEqual(vectors.keys.count, 14)
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0.args) }), NotificationTextKey.contractArgs)
+    }
+
+    /// Chaque sortie servie s'écrit, titre et texte, comme le gabarit français du
+    /// contrat. Écarts voulus : apostrophe typographique, tutoiement par défaut
+    /// (le gabarit du niveau est au « vous ») et « 1 autre » au singulier.
+    func testEveryServedNotificationCaseRendersLikeTheContract() throws {
+        guard Bundle.main.preferredLocalizations.first == "fr" else { return }
+        let vectors = try textKeyVectors()
+        XCTAssertEqual(vectors.cases.count, 35)
+        let templates = Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0) })
+        var rendered = 0
+        for testCase in vectors.cases {
+            guard let key = testCase.expect.textKey else {
+                XCTAssertNil(NotificationTextKey(key: nil, args: testCase.expect.textArgs), testCase.name)
+                continue
+            }
+            let text = try XCTUnwrap(NotificationTextKey(key: key, args: testCase.expect.textArgs), testCase.name)
+            let template = try XCTUnwrap(templates[key])
+            func fill(_ raw: String) -> String {
+                var out = raw
+                for (name, value) in testCase.expect.textArgs ?? [:] {
+                    let shown: String
+                    switch value {
+                    case .string(let string): shown = string
+                    case .number(let number): shown = String(Int(number))
+                    default: shown = ""
+                    }
+                    out = out.replacingOccurrences(of: "{\(name)}", with: shown)
+                }
+                return out.replacingOccurrences(of: "'", with: "’")
+                    .replacingOccurrences(of: "Vous passez", with: "Tu passes")
+                    .replacingOccurrences(of: " 1 autres ", with: " 1 autre ")
+            }
+            XCTAssertEqual(text.title, fill(template.title), testCase.name)
+            XCTAssertEqual(text.message, fill(template.fr), testCase.name)
+            rendered += 1
+        }
+        XCTAssertEqual(rendered, 24)
+    }
+
+    /// Tout ou rien : la ligne garde le texte du serveur dès qu'un argument manque,
+    /// est vide ou mal typé, ou que la clé est inconnue.
+    func testNotificationTextKeyRefusesWhatItCannotSay() {
+        let name: JSONValue = .string("Léa B.")
+        XCTAssertNil(NotificationTextKey(key: "notif.social.unknown", args: ["actorName": name]))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment", args: nil))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment", args: ["actorName": .string("  ")]))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment", args: ["actorName": .number(3)]))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment_group", args: ["actorName": name, "otherCount": .number(0)]))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment_group", args: ["actorName": name, "otherCount": .number(1.5)]))
+        XCTAssertNil(NotificationTextKey(key: "notif.social.comment_group", args: ["actorName": name, "otherCount": .string("2")]))
+        XCTAssertNil(NotificationTextKey(key: "notif.progress.level", args: ["newLevel": .number(0)]))
+        XCTAssertNil(NotificationTextKey(key: "notif.progress.badge", args: ["badgeName": .string("Explorateur")]))
+        XCTAssertNotNil(NotificationTextKey(key: "notif.social.comment", args: ["actorName": name, "extra": .null]))
+
+        let fallback = AppNotification(id: "n", type: "social_comment", title: "Titre serveur", message: "Texte serveur",
+            createdAt: nil, read: false, link: nil, metadata: nil, textKey: "notif.social.comment", textArgs: [:])
+        XCTAssertEqual(fallback.displayTitle, "Titre serveur")
+        XCTAssertEqual(fallback.displayMessage, "Texte serveur")
+    }
+
+    /// Les champs sont lus dans la liste ; des arguments illisibles ne font pas
+    /// tomber la notification, qui garde alors son texte.
+    func testNotificationDecodesTextKeyLeniently() throws {
+        let served = Data(#"{"id":"n1","type":"social_comment","title":"T","message":"M","textKey":"notif.social.comment","textArgs":{"actorName":"Léa B."}}"#.utf8)
+        let item = try JSONDecoder().decode(AppNotification.self, from: served)
+        XCTAssertEqual(item.textKey, "notif.social.comment")
+        XCTAssertEqual(item.textArgs, ["actorName": .string("Léa B.")])
+        XCTAssertNotEqual(item.displayMessage, "M")
+
+        let broken = Data(#"{"id":"n2","title":"T","message":"M","textKey":42,"textArgs":"oops"}"#.utf8)
+        let kept = try JSONDecoder().decode(AppNotification.self, from: broken)
+        XCTAssertNil(kept.textKey)
+        XCTAssertNil(kept.textArgs)
+        XCTAssertEqual(kept.displayTitle, "T")
+        XCTAssertEqual(kept.displayMessage, "M")
+    }
+
+    /// Chaque phrase écrite par l'app a sa traduction anglaise et, quand elle
+    /// s'adresse au membre, sa variante au « vous ».
+    func testNotificationTextsAreTranslated() throws {
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        let french = try XCTUnwrap(Bundle.main.path(forResource: "fr", ofType: "lproj").flatMap(Bundle.init(path:)))
+        let sentences = [
+            "Nouvelle réponse", "Publication repartagée", "Tu as été mentionné", "Nouvel abonné",
+            "%@ a aimé ta publication.", "%@ a réagi %@ à ta publication.",
+            "%@ et %lld autres ont réagi à ta publication.", "%@ et 1 autre ont réagi à ta publication.",
+            "%@ a commenté ta publication.", "%@ et %lld autres ont commenté ta publication.",
+            "%@ a répondu à ton commentaire.", "%@ et %lld autres ont répondu à ton commentaire.",
+            "%@ a repartagé ta publication.", "%@ et %lld autres ont repartagé ta publication.",
+            "%@ t’a mentionné dans le réseau social.", "%@ et %lld autres t’ont mentionné.",
+            "%@ suit maintenant ton profil public.", "Badge « %@ » obtenu.", "Tu passes au niveau %lld.",
+        ]
+        let missing = "\u{1}missing"
+        for sentence in sentences {
+            XCTAssertNotEqual(english.localizedString(forKey: sentence, value: missing, table: nil), missing, sentence)
+            let tutoiement = sentence.contains(" ta ") || sentence.contains(" ton ") || sentence.contains("t’")
+                || sentence.hasPrefix("Tu ")
+            if tutoiement {
+                XCTAssertNotEqual(french.localizedString(forKey: "SQFormal|" + sentence, value: missing, table: nil), missing, sentence)
+            }
+        }
+    }
+
     private func item(_ id: String, read: Bool = false) -> AppNotification {
         AppNotification(id: id, type: "social_comment", title: id, message: nil,
             createdAt: nil, read: read, link: nil, metadata: nil)

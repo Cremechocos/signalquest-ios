@@ -11,6 +11,14 @@ struct AppNotification: Codable, Identifiable, Equatable {
     let read: Bool?
     let link: String?
     let metadata: [String: JSONValue]?
+    /// NOTIF-I18N (contrat Hors France r1, servi le 12/11) : clé stable et arguments
+    /// typés, pour écrire le titre et le texte dans la langue de l'app.
+    var textKey: String? = nil
+    var textArgs: [String: JSONValue]? = nil
+
+    /// Le texte du serveur, sauf quand l'app sait écrire la clé servie.
+    var displayTitle: String? { NotificationTextKey(key: textKey, args: textArgs)?.title ?? title }
+    var displayMessage: String? { NotificationTextKey(key: textKey, args: textArgs)?.message ?? message }
 
     init(
         id: String,
@@ -20,7 +28,9 @@ struct AppNotification: Codable, Identifiable, Equatable {
         createdAt: Date?,
         read: Bool?,
         link: String?,
-        metadata: [String: JSONValue]?
+        metadata: [String: JSONValue]?,
+        textKey: String? = nil,
+        textArgs: [String: JSONValue]? = nil
     ) {
         self.id = id
         self.type = type
@@ -30,6 +40,8 @@ struct AppNotification: Codable, Identifiable, Equatable {
         self.read = read
         self.link = link
         self.metadata = metadata
+        self.textKey = textKey
+        self.textArgs = textArgs
     }
 
     // NOTIF-DECODE-01 : le backend sérialise `metadata` tantôt en OBJET JSON,
@@ -58,6 +70,120 @@ struct AppNotification: Codable, Identifiable, Equatable {
             metadata = parsed
         } else {
             metadata = nil
+        }
+        // Une clé illisible ne fait pas tomber la notification : elle garde son texte.
+        textKey = (try? c.decodeIfPresent(String.self, forKey: .textKey)) ?? nil
+        textArgs = (try? c.decodeIfPresent([String: JSONValue].self, forKey: .textArgs)) ?? nil
+    }
+}
+
+/// Texte traduisible d'une notification (NOTIF-I18N, `contracts/notification-text-keys/v1.json`),
+/// même mécanique que `FeedTextKey` : tout ou rien. Une clé inconnue, un argument
+/// manquant, vide ou mal typé donnent `nil`, et la ligne garde `title`/`message`.
+/// `actorName` est un nom de membre, jamais traduit ; le ton suit le réglage tu/vous.
+struct NotificationTextKey: Equatable {
+    let key: String
+    private let args: [String: JSONValue]
+
+    private enum Kind { case string, count }
+
+    private static let catalog: [String: [String: Kind]] = [
+        "notif.social.reaction_heart": ["actorName": .string],
+        "notif.social.reaction_emoji": ["actorName": .string, "emoji": .string],
+        "notif.social.reaction_group": ["actorName": .string, "otherCount": .count],
+        "notif.social.comment": ["actorName": .string],
+        "notif.social.comment_group": ["actorName": .string, "otherCount": .count],
+        "notif.social.reply": ["actorName": .string],
+        "notif.social.reply_group": ["actorName": .string, "otherCount": .count],
+        "notif.social.repost": ["actorName": .string],
+        "notif.social.repost_group": ["actorName": .string, "otherCount": .count],
+        "notif.social.mention": ["actorName": .string],
+        "notif.social.mention_group": ["actorName": .string, "otherCount": .count],
+        "notif.social.follow": ["actorName": .string],
+        "notif.progress.badge": ["badgeId": .string, "badgeName": .string],
+        "notif.progress.level": ["newLevel": .count],
+    ]
+
+    /// Schéma au format du contrat (`string` / `integer`), pour le test qui le compare.
+    static var contractArgs: [String: [String: String]] {
+        catalog.mapValues { $0.mapValues { $0 == .count ? "integer" : "string" } }
+    }
+
+    init?(key: String?, args: [String: JSONValue]?) {
+        guard let key, let schema = Self.catalog[key] else { return nil }
+        let args = args ?? [:]
+        for (name, kind) in schema {
+            switch (kind, args[name]) {
+            case (.string, .string(let text)?) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: continue
+            case (.count, .number(let number)?) where number.isFinite && number >= 1 && number == number.rounded()
+                && number <= 9_007_199_254_740_991: continue
+            default: return nil
+            }
+        }
+        self.key = key
+        self.args = args
+    }
+
+    private func string(_ name: String) -> String {
+        guard case .string(let text)? = args[name] else { return "" }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func count(_ name: String) -> Int {
+        guard case .number(let number)? = args[name] else { return 0 }
+        return Int(clamping: Int64(number))
+    }
+
+    /// Titre fixe par clé dans la liste ; la variante `_group` garde celui de sa clé de base.
+    var title: String {
+        switch key {
+        case "notif.social.reaction_heart", "notif.social.reaction_emoji", "notif.social.reaction_group":
+            return String(localized: "Réaction à ta publication")
+        case "notif.social.comment", "notif.social.comment_group": return String(localized: "Nouveau commentaire")
+        case "notif.social.reply", "notif.social.reply_group": return String(localized: "Nouvelle réponse")
+        case "notif.social.repost", "notif.social.repost_group": return String(localized: "Publication repartagée")
+        case "notif.social.mention", "notif.social.mention_group": return String(localized: "Tu as été mentionné")
+        case "notif.social.follow": return String(localized: "Nouvel abonné")
+        case "notif.progress.badge": return String(localized: "Nouveau badge")
+        case "notif.progress.level": return String(localized: "Niveau \(count("newLevel"))")
+        default: return ""
+        }
+    }
+
+    var message: String {
+        let actor = string("actorName")
+        let others = count("otherCount")
+        switch key {
+        case "notif.social.reaction_heart": return String(localized: "\(actor) a aimé ta publication.")
+        case "notif.social.reaction_emoji": return String(localized: "\(actor) a réagi \(string("emoji")) à ta publication.")
+        case "notif.social.reaction_group":
+            return others == 1
+                ? String(localized: "\(actor) et 1 autre ont réagi à ta publication.")
+                : String(localized: "\(actor) et \(others) autres ont réagi à ta publication.")
+        case "notif.social.comment": return String(localized: "\(actor) a commenté ta publication.")
+        case "notif.social.comment_group":
+            return others == 1
+                ? String(localized: "\(actor) et 1 autre ont commenté ta publication.")
+                : String(localized: "\(actor) et \(others) autres ont commenté ta publication.")
+        case "notif.social.reply": return String(localized: "\(actor) a répondu à ton commentaire.")
+        case "notif.social.reply_group":
+            return others == 1
+                ? String(localized: "\(actor) et 1 autre ont répondu à ton commentaire.")
+                : String(localized: "\(actor) et \(others) autres ont répondu à ton commentaire.")
+        case "notif.social.repost": return String(localized: "\(actor) a repartagé ta publication.")
+        case "notif.social.repost_group":
+            return others == 1
+                ? String(localized: "\(actor) et 1 autre ont repartagé ta publication.")
+                : String(localized: "\(actor) et \(others) autres ont repartagé ta publication.")
+        case "notif.social.mention": return String(localized: "\(actor) t’a mentionné dans le réseau social.")
+        case "notif.social.mention_group":
+            return others == 1
+                ? String(localized: "\(actor) et 1 autre t’ont mentionné.")
+                : String(localized: "\(actor) et \(others) autres t’ont mentionné.")
+        case "notif.social.follow": return String(localized: "\(actor) suit maintenant ton profil public.")
+        case "notif.progress.badge": return String(localized: "Badge « \(string("badgeName")) » obtenu.")
+        case "notif.progress.level": return String(localized: "Tu passes au niveau \(count("newLevel")).")
+        default: return ""
         }
     }
 }

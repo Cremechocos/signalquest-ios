@@ -114935,6 +114935,602 @@
           }
         }
       }
+    },
+    "Nouvelle réponse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New reply"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle réponse"
+          }
+        }
+      }
+    },
+    "Publication repartagée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post reshared"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication repartagée"
+          }
+        }
+      }
+    },
+    "Tu as été mentionné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You were mentioned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as été mentionné"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as été mentionné" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez été mentionné"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Nouvel abonné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New follower"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvel abonné"
+          }
+        }
+      }
+    },
+    "%@ a aimé ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ liked your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a aimé ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ a aimé ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a aimé votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ a réagi %@ à ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ reacted %2$@ to your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a réagi %@ à ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ a réagi %@ à ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a réagi %@ à votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et %lld autres ont réagi à ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$lld others reacted to your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont réagi à ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et %lld autres ont réagi à ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont réagi à votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ a commenté ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ commented on your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a commenté ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ a commenté ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a commenté votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et %lld autres ont commenté ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$lld others commented on your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont commenté ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et %lld autres ont commenté ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont commenté votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ a répondu à ton commentaire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ replied to your comment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a répondu à ton commentaire."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ a répondu à ton commentaire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a répondu à votre commentaire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et %lld autres ont répondu à ton commentaire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$lld others replied to your comment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont répondu à ton commentaire."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et %lld autres ont répondu à ton commentaire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont répondu à votre commentaire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ a repartagé ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ reshared your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a repartagé ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ a repartagé ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a repartagé votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et %lld autres ont repartagé ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$lld others reshared your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont repartagé ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et %lld autres ont repartagé ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres ont repartagé votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ t’a mentionné dans le réseau social." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ mentioned you in the social feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ t’a mentionné dans le réseau social."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ t’a mentionné dans le réseau social." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vous a mentionné dans le réseau social."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et %lld autres t’ont mentionné." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$lld others mentioned you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres t’ont mentionné."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et %lld autres t’ont mentionné." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et %lld autres vous ont mentionné."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ suit maintenant ton profil public." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ now follows your public profile."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ suit maintenant ton profil public."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ suit maintenant ton profil public." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ suit maintenant votre profil public."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Badge « %@ » obtenu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” badge earned."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge « %@ » obtenu."
+          }
+        }
+      }
+    },
+    "Tu passes au niveau %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You reach level %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu passes au niveau %lld."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu passes au niveau %lld." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous passez au niveau %lld."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et 1 autre ont réagi à ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and 1 other reacted to your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont réagi à ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et 1 autre ont réagi à ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont réagi à votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et 1 autre ont commenté ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and 1 other commented on your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont commenté ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et 1 autre ont commenté ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont commenté votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et 1 autre ont répondu à ton commentaire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and 1 other replied to your comment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont répondu à ton commentaire."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et 1 autre ont répondu à ton commentaire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont répondu à votre commentaire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et 1 autre ont repartagé ta publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and 1 other reshared your post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont repartagé ta publication."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et 1 autre ont repartagé ta publication." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre ont repartagé votre publication."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ et 1 autre t’ont mentionné." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and 1 other mentioned you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre t’ont mentionné."
+          }
+        }
+      }
+    },
+    "SQFormal|%@ et 1 autre t’ont mentionné." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ et 1 autre vous ont mentionné."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -678,7 +678,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                         platform: "ios",
                         deviceId: deviceID,
                         environment: api.config.environment.rawValue,
-                        locale: Locale.current.identifier,
+                        locale: AccountLocaleSync.appLocale, // langue de l’app (fr/en), comme /api/locale
                         timeZone: TimeZone.current.identifier
                     )
                 )

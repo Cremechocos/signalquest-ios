@@ -426,7 +426,7 @@ struct NotificationsCenterView: View {
     @ViewBuilder
     private func notificationRow(_ item: AppNotification, period: NotificationPeriod) -> some View {
         let isUnread = item.read != true
-        let titleText = item.title ?? Self.title(for: item.type)
+        let titleText = item.displayTitle ?? Self.title(for: item.type)
         let isOutage = Self.isOutage(item.type)
         HStack(alignment: .top, spacing: SQSpace.sm2) {
             SQIconPastille(systemImage: icon(for: item.type), size: 38,
@@ -437,7 +437,7 @@ struct NotificationsCenterView: View {
                 Text(titleText)
                     .font(SQType.callout(isUnread ? .heavy : .semibold))
                     .foregroundStyle(SQColor.label)
-                if let message = item.message, !message.isEmpty {
+                if let message = item.displayMessage, !message.isEmpty {
                     Text(message)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.ink2)

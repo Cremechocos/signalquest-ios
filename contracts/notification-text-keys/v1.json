@@ -1,0 +1,886 @@
+{
+  "contract": "hors-france-contract-r1.md §1 (NOTIF-I18N)",
+  "version": 1,
+  "frozen": "2026-11-12",
+  "note": "Gabarits fr : référence (le ton tu/vous est choisi par l'app avec addressForm). Une clé désigne un titre fixe (title) et un corps (fr) ; la variante _group garde le titre de sa clé de base. Entrée : type, metadata décodée, message (lu seulement pour l'historique : émoji d'une réaction, nom d'un badge). Sortie : textKey/textArgs servis ; null veut dire : afficher title et message.",
+  "keys": [
+    {
+      "key": "notif.social.reaction_heart",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Réaction à ta publication",
+      "fr": "{actorName} a aimé ta publication."
+    },
+    {
+      "key": "notif.social.reaction_emoji",
+      "args": {
+        "actorName": "string",
+        "emoji": "string"
+      },
+      "title": "Réaction à ta publication",
+      "fr": "{actorName} a réagi {emoji} à ta publication."
+    },
+    {
+      "key": "notif.social.reaction_group",
+      "args": {
+        "actorName": "string",
+        "otherCount": "integer"
+      },
+      "title": "Réaction à ta publication",
+      "fr": "{actorName} et {otherCount} autres ont réagi à ta publication."
+    },
+    {
+      "key": "notif.social.comment",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Nouveau commentaire",
+      "fr": "{actorName} a commenté ta publication."
+    },
+    {
+      "key": "notif.social.comment_group",
+      "args": {
+        "actorName": "string",
+        "otherCount": "integer"
+      },
+      "title": "Nouveau commentaire",
+      "fr": "{actorName} et {otherCount} autres ont commenté ta publication."
+    },
+    {
+      "key": "notif.social.reply",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Nouvelle réponse",
+      "fr": "{actorName} a répondu à ton commentaire."
+    },
+    {
+      "key": "notif.social.reply_group",
+      "args": {
+        "actorName": "string",
+        "otherCount": "integer"
+      },
+      "title": "Nouvelle réponse",
+      "fr": "{actorName} et {otherCount} autres ont répondu à ton commentaire."
+    },
+    {
+      "key": "notif.social.repost",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Publication repartagée",
+      "fr": "{actorName} a repartagé ta publication."
+    },
+    {
+      "key": "notif.social.repost_group",
+      "args": {
+        "actorName": "string",
+        "otherCount": "integer"
+      },
+      "title": "Publication repartagée",
+      "fr": "{actorName} et {otherCount} autres ont repartagé ta publication."
+    },
+    {
+      "key": "notif.social.mention",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Tu as été mentionné",
+      "fr": "{actorName} t'a mentionné dans le réseau social."
+    },
+    {
+      "key": "notif.social.mention_group",
+      "args": {
+        "actorName": "string",
+        "otherCount": "integer"
+      },
+      "title": "Tu as été mentionné",
+      "fr": "{actorName} et {otherCount} autres t'ont mentionné."
+    },
+    {
+      "key": "notif.social.follow",
+      "args": {
+        "actorName": "string"
+      },
+      "title": "Nouvel abonné",
+      "fr": "{actorName} suit maintenant ton profil public."
+    },
+    {
+      "key": "notif.progress.badge",
+      "args": {
+        "badgeId": "string",
+        "badgeName": "string"
+      },
+      "title": "Nouveau badge",
+      "fr": "Badge « {badgeName} » obtenu."
+    },
+    {
+      "key": "notif.progress.level",
+      "args": {
+        "newLevel": "integer"
+      },
+      "title": "Niveau {newLevel}",
+      "fr": "Vous passez au niveau {newLevel}."
+    }
+  ],
+  "cases": [
+    {
+      "name": "réaction ❤️ récente",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "emoji": "❤️",
+          "postId": "p1"
+        },
+        "message": "Léa B. a aimé ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_heart",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "réaction 😮 récente",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "emoji": "😮",
+          "postId": "p1"
+        },
+        "message": "Léa B. a réagi 😮 à ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_emoji",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "emoji": "😮"
+        }
+      }
+    },
+    {
+      "name": "réaction historique : émoji relu dans le message (tu)",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. a réagi 😮 à ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_emoji",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "emoji": "😮"
+        }
+      }
+    },
+    {
+      "name": "réaction historique : émoji relu dans le message (vous)",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. a réagi 🔥 à votre publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_emoji",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "emoji": "🔥"
+        }
+      }
+    },
+    {
+      "name": "réaction historique : « a aimé » donne ❤️",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. a aimé votre publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_heart",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "réaction historique illisible",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Quelqu'un a fait quelque chose."
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "réaction groupée : l'émoji n'est pas lu",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2",
+            "u3"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max",
+            "Zoé"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 3,
+          "emoji": "😮",
+          "postId": "p1"
+        },
+        "message": "Léa B. et 2 autres personnes ont réagi à ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 2
+        }
+      }
+    },
+    {
+      "name": "réaction groupée historique (message d'avant l'amendement)",
+      "input": {
+        "type": "social_reaction",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 2,
+          "postId": "p1"
+        },
+        "message": "Léa B. et 1 autre personne ont aimé ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.reaction_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 1
+        }
+      }
+    },
+    {
+      "name": "comment",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. a commenté ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.comment",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "comment groupé",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2",
+            "u3"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max",
+            "Zoé"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 3,
+          "postId": "p1"
+        },
+        "message": "Léa B. et 2 autres personnes …"
+      },
+      "expect": {
+        "textKey": "notif.social.comment_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 2
+        }
+      }
+    },
+    {
+      "name": "reply",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1",
+          "groupKind": "reply"
+        },
+        "message": "Léa B. a répondu à ton commentaire."
+      },
+      "expect": {
+        "textKey": "notif.social.reply",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "reply groupé",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2",
+            "u3"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max",
+            "Zoé"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 3,
+          "postId": "p1",
+          "groupKind": "reply"
+        },
+        "message": "Léa B. et 2 autres personnes …"
+      },
+      "expect": {
+        "textKey": "notif.social.reply_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 2
+        }
+      }
+    },
+    {
+      "name": "repost",
+      "input": {
+        "type": "social_repost",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. a repartagé ta publication."
+      },
+      "expect": {
+        "textKey": "notif.social.repost",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "repost groupé",
+      "input": {
+        "type": "social_repost",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2",
+            "u3"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max",
+            "Zoé"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 3,
+          "postId": "p1"
+        },
+        "message": "Léa B. et 2 autres personnes …"
+      },
+      "expect": {
+        "textKey": "notif.social.repost_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 2
+        }
+      }
+    },
+    {
+      "name": "mention",
+      "input": {
+        "type": "social_mention",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "Léa B. t'a mentionné dans le réseau social."
+      },
+      "expect": {
+        "textKey": "notif.social.mention",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "mention groupé",
+      "input": {
+        "type": "social_mention",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1",
+            "u2",
+            "u3"
+          ],
+          "actorNames": [
+            "Léa B.",
+            "Max",
+            "Zoé"
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 3,
+          "postId": "p1"
+        },
+        "message": "Léa B. et 2 autres personnes …"
+      },
+      "expect": {
+        "textKey": "notif.social.mention_group",
+        "textArgs": {
+          "actorName": "Léa B.",
+          "otherCount": 2
+        }
+      }
+    },
+    {
+      "name": "mention d'une story : sans postId",
+      "input": {
+        "type": "social_mention",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1
+        },
+        "message": "Léa B. t'a mentionné dans le réseau social."
+      },
+      "expect": {
+        "textKey": "notif.social.mention",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "abonnement",
+      "input": {
+        "type": "social_follow",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1
+        },
+        "message": "Léa B. suit maintenant ton profil public."
+      },
+      "expect": {
+        "textKey": "notif.social.follow",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "nom : repli sur actorNames[0]",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorNames": [
+            "Max",
+            "Zoé"
+          ],
+          "actorCount": 1,
+          "postId": "p1"
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": "notif.social.comment",
+        "textArgs": {
+          "actorName": "Max"
+        }
+      }
+    },
+    {
+      "name": "nom : firstActorName prime sur actorNames",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "firstActorName": "Léa B.",
+          "actorNames": [
+            "Max"
+          ],
+          "actorCount": 1
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": "notif.social.comment",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "ancienne forme sans nom : tout est null",
+      "input": {
+        "type": "social_follow",
+        "metadata": {
+          "actorId": "u1"
+        },
+        "message": "Léa B. suit maintenant ton profil public."
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "ancienne forme sans nom, groupée : tout est null",
+      "input": {
+        "type": "social_comment",
+        "metadata": {
+          "actorIds": [
+            "u1",
+            "u2"
+          ],
+          "actorCount": 2
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "nom vide : null",
+      "input": {
+        "type": "social_repost",
+        "metadata": {
+          "firstActorName": "  ",
+          "actorNames": [],
+          "actorCount": 1
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "actorCount absent : un seul acteur",
+      "input": {
+        "type": "social_repost",
+        "metadata": {
+          "firstActorName": "Léa B."
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": "notif.social.repost",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "actorCount invalide : un seul acteur",
+      "input": {
+        "type": "social_repost",
+        "metadata": {
+          "firstActorName": "Léa B.",
+          "actorCount": "3"
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": "notif.social.repost",
+        "textArgs": {
+          "actorName": "Léa B."
+        }
+      }
+    },
+    {
+      "name": "metadata absente",
+      "input": {
+        "type": "social_follow",
+        "metadata": null,
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "type social inconnu",
+      "input": {
+        "type": "social_reply",
+        "metadata": {
+          "actorId": "u1",
+          "actorIds": [
+            "u1"
+          ],
+          "actorNames": [
+            "Léa B."
+          ],
+          "firstActorName": "Léa B.",
+          "actorCount": 1
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "badge",
+      "input": {
+        "type": "badge",
+        "metadata": {
+          "badgeId": "explorer",
+          "badgeName": "Explorateur"
+        },
+        "message": "Badge « Explorateur » obtenu."
+      },
+      "expect": {
+        "textKey": "notif.progress.badge",
+        "textArgs": {
+          "badgeId": "explorer",
+          "badgeName": "Explorateur"
+        }
+      }
+    },
+    {
+      "name": "badge historique : nom relu dans le message",
+      "input": {
+        "type": "badge",
+        "metadata": {
+          "badgeId": "explorer"
+        },
+        "message": "Badge « Explorateur » obtenu."
+      },
+      "expect": {
+        "textKey": "notif.progress.badge",
+        "textArgs": {
+          "badgeId": "explorer",
+          "badgeName": "Explorateur"
+        }
+      }
+    },
+    {
+      "name": "badge sans nom lisible",
+      "input": {
+        "type": "badge",
+        "metadata": {
+          "badgeId": "explorer"
+        },
+        "message": "Un badge."
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "badge sans identifiant",
+      "input": {
+        "type": "badge",
+        "metadata": {},
+        "message": "Badge « Explorateur » obtenu."
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "niveau",
+      "input": {
+        "type": "level_up",
+        "metadata": {
+          "newLevel": 7
+        },
+        "message": "Vous passez au niveau 7 · Professionnel."
+      },
+      "expect": {
+        "textKey": "notif.progress.level",
+        "textArgs": {
+          "newLevel": 7
+        }
+      }
+    },
+    {
+      "name": "niveau illisible",
+      "input": {
+        "type": "level_up",
+        "metadata": {
+          "newLevel": "7"
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "niveau 0",
+      "input": {
+        "type": "level_up",
+        "metadata": {
+          "newLevel": 0
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "autre type",
+      "input": {
+        "type": "anfr_update",
+        "metadata": {
+          "actorCount": 1
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    }
+  ]
+}
