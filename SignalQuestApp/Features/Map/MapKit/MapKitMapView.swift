@@ -330,6 +330,7 @@ struct MapKitMapView: UIViewRepresentable {
         map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
         map.register(SQFriendMarkerView.self, forAnnotationViewWithReuseIdentifier: SQFriendMarkerView.reuseID)
         map.register(SQPhotoMarkerView.self, forAnnotationViewWithReuseIdentifier: SQPhotoMarkerView.reuseID)
+        map.register(SQSpeedDotMarkerView.self, forAnnotationViewWithReuseIdentifier: SQSpeedDotMarkerView.reuseID)
         // Tap pour les points speedtest (overlay non-tappable nativement) → hit-test.
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSpeedtestTap(_:)))
         tap.delegate = context.coordinator

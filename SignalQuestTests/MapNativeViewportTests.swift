@@ -189,6 +189,26 @@ final class MapNativeViewportTests: XCTestCase {
                       "The accessibility sibling must not intercept the map's touch routing")
     }
 
+    /// Régression du 12/11 (iPhone d'Alexandre) : la pastille d'un speedtest de trajet
+    /// passait par un identifiant non enregistré, et MapKit levait une exception à
+    /// l'ouverture du tracé.
+    func testTripSpeedDotViewIsRegisteredAndTouchable() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let map = try await fixture.loadedMap()
+        let coordinator = try XCTUnwrap(map.delegate as? MapKitMapView.Coordinator)
+        let feature = SpeedtestFeature(id: "trip-measure", coordinate: map.centerCoordinate,
+                                      downloadMbps: 1_200, uploadMbps: 40, pingMs: 15,
+                                      tech: "5G", band: nil, frequency: nil, timestamp: nil)
+        var payload = MapKitMapView.Coordinator.speedtestPayload(from: feature)
+        payload.isTripSpeedDot = true
+        let annotation = SQMapKitAnnotation(payload: payload)
+        let view = try XCTUnwrap(coordinator.mapView(map, viewFor: annotation) as? SQSpeedDotMarkerView)
+        XCTAssertEqual(view.bounds.size, CGSize(width: 18, height: 18))
+        XCTAssertEqual(view.displayPriority, .required)
+        XCTAssertTrue(view.isAccessibilityElement)
+    }
+
     func testVisibleSpeedtestBeyondOrnamentMarginRemainsAccessible() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
