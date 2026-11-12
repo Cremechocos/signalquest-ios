@@ -2301,10 +2301,14 @@ struct MapExplorerView: View {
         sessionFocus = MapSessionFocus(id: request.id, title: request.title, returnRegion: returnRegion)
         sessionLoadTask = Task {
             do {
-                let track = try await services.sessions.sessionTrack(id: request.id)
+                // Le tracé est servi en vignette, sans speedtests : ils viennent du résumé,
+                // en parallèle. Sans eux, le tracé s'affiche quand même.
+                async let speedtests = try? await services.sessions.sessionSpeedtests(id: request.id)
+                let points = try await services.sessions.sessionTrack(id: request.id).filter(\.hasValidCoordinate)
+                let tests = await speedtests ?? []
                 guard !Task.isCancelled, sessionFocus?.id == request.id else { return }
-                sessionFocus?.points = track.points.filter(\.hasValidCoordinate)
-                sessionFocus?.speedtests = MapSessionFocus.speedtestFeatures(track.speedtests)
+                sessionFocus?.points = points
+                sessionFocus?.speedtests = MapSessionFocus.speedtestFeatures(tests)
                 sessionFocus?.phase = .loaded
                 sessionFocus?.revision &+= 1
                 sessionFitToken &+= 1

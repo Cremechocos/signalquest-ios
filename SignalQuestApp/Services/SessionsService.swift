@@ -421,8 +421,10 @@ protocol SessionsServicing: Sendable {
     /// Tracé seul d'une session, échantillonné par le serveur (10 à 5 000 points) :
     /// la carte principale le montre quand un post du fil l'ouvre (contrat #958).
     /// Accessible au propriétaire, ou si la session est visible ou partagée.
-    /// La première page porte aussi `session.speedtests`, déjà masqués par le serveur.
-    func sessionTrack(id: String) async throws -> CoverageSessionDetail
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint]
+    /// Speedtests d'une session (`fields=summary`, sans points), masqués par le serveur :
+    /// le tracé (`maxPoints`) est servi en vignette, sans eux.
+    func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest]
     /// Analyse figée d'un trajet (DRIVE-ANALYSIS-1), mêmes droits que le détail.
     func sessionAnalysis(id: String) async throws -> SessionAnalysis?
     // L'enregistrement de couverture est retiré d'iOS : les anciennes files
@@ -446,8 +448,12 @@ extension SessionsServicing {
         SessionPointsPageResponse(points: [], page: nil)
     }
 
-    func sessionTrack(id: String) async throws -> CoverageSessionDetail {
-        try await sessionDetail(id: id)
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
+        try await sessionDetail(id: id).points
+    }
+
+    func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest] {
+        try await sessionDetail(id: id).speedtests
     }
 
     func sessionAnalysis(id: String) async throws -> SessionAnalysis? { nil }
@@ -491,7 +497,7 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         )
     }
 
-    func sessionTrack(id: String) async throws -> CoverageSessionDetail {
+    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
         try await api.request(
             APIEndpoint(
                 path: "/api/coverage/sessions",
@@ -502,7 +508,20 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
                 ]
             ),
             as: CoverageSessionDetail.self
-        )
+        ).points
+    }
+
+    func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest] {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/coverage/sessions",
+                query: [
+                    URLQueryItem(name: "sessionId", value: id),
+                    URLQueryItem(name: "fields", value: "summary")
+                ]
+            ),
+            as: CoverageSessionDetail.self
+        ).speedtests
     }
 
     func sessionAnalysis(id: String) async throws -> SessionAnalysis? {
