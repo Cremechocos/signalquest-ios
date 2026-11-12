@@ -12,6 +12,24 @@ final class MapTileAdmissionTests: XCTestCase {
                                                          expectedTile: AndroidMapTile(z: 14, x: 8300, y: 5636)))
     }
 
+    /// `detail=grid` (N2-3a) sert `clusters: []` et ses cellules dans `grid` : une tuile de grille
+    /// non vide était refusée (0 élément brut contre N clusters décodés), d'où « Données
+    /// incomplètes » au dézoom. Deux cellules réelles (ORANGE, 9/260/186, 12/11).
+    func testNonEmptyGridTileIsAdmitted() throws {
+        let grid = AndroidMapTile(z: 9, x: 260, y: 186)
+        let body = Data(#"""
+        {"tile":{"z":9,"x":260,"y":186},"points":[],"clusters":[],"grid":{"version":1,"projection":"web-mercator","divisions":128,"cells":[
+        {"id":"9/260/186:90:92","row":90,"col":92,"groups":[{"tech":"4G","source":"android","count":3,"observedPlmn":null,"mcc":208,"mnc":1,"lat":43.72785,"lng":3.32310,"measuredCount":3,"noServiceCount":0,"avgRsrp":-98,"earliestTimestamp":"2026-06-09T06:00:00.000Z","latestTimestamp":"2026-06-09T06:00:00.000Z"}]},
+        {"id":"9/260/186:90:93","row":90,"col":93,"groups":[{"tech":"4G","source":"android","count":8,"observedPlmn":null,"mcc":208,"mnc":1,"lat":43.72840,"lng":3.32389,"measuredCount":8,"noServiceCount":0,"avgRsrp":-99.5,"earliestTimestamp":"2026-06-09T06:00:00.000Z","latestTimestamp":"2026-06-09T06:00:00.000Z"},{"tech":"5G","source":"android","count":4,"observedPlmn":null,"mcc":208,"mnc":1,"lat":43.72786,"lng":3.32415,"measuredCount":4,"noServiceCount":0,"avgRsrp":-95,"earliestTimestamp":"2026-06-09T06:00:00.000Z","latestTimestamp":"2026-06-09T06:00:00.000Z"}]}
+        ]},"revision":"d172e305","stats":{"avgRsrp":null,"sampleCount":15,"returnedCount":2,"hasMore":false,"truncated":false,"representation":"grid"},"timestampPrecision":"hour"}
+        """#.utf8)
+        let response = try MapTileAdmission.decode(AndroidCoverageTileResponse.self, from: body, expectedTile: grid)
+        XCTAssertEqual(response.clusters.map(\.tech), ["4G", "4G", "5G"])
+        XCTAssertEqual(response.clusters.map(\.count), [3, 8, 4])
+        XCTAssertThrowsError(try MapTileAdmission.decode(AndroidCoverageTileResponse.self, from: body,
+                                                         expectedTile: AndroidMapTile(z: 9, x: 261, y: 186)))
+    }
+
     func testMissingTileCannotBeFabricatedAsTheWorldTile() {
         let body = Data(#"{"markers":[]}"#.utf8)
         XCTAssertThrowsError(try MapTileAdmission.decode(AndroidCustomSiteTileResponse.self, from: body,

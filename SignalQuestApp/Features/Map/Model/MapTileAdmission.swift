@@ -19,7 +19,8 @@ extension AndroidSpeedtestTileResponse: MapTilePayload {
 }
 extension AndroidCoverageTileResponse: MapTilePayload {
     static var payloadArrays: [String] { ["points", "clusters"] }
-    var decodedItemCount: Int { points.count + clusters.count }
+    // Une grille se contrôle par son décodage strict, pas par le tableau `clusters` (vide).
+    var decodedItemCount: Int { points.count + (fromGrid ? 0 : clusters.count) }
 }
 extension AndroidCommunitySiteTileResponse: MapTilePayload {
     static var payloadArrays: [String] { ["markers", "clusters"] }

@@ -980,6 +980,8 @@ struct AndroidCoverageTileResponse: Decodable, Equatable, Sendable {
     let points: [AndroidCoveragePoint]
     let stats: AndroidCoverageStats?
     let clusters: [AndroidMapCluster]
+    /// Clusters tirés de `grid` : le tableau brut `clusters` est alors servi vide.
+    var fromGrid = false
 }
 
 extension AndroidCoverageTileResponse {
@@ -996,7 +998,8 @@ extension AndroidCoverageTileResponse {
         self.init(tile: tile,
                   points: try c.decode([AndroidCoveragePoint].self, forKey: .points),
                   stats: try c.decodeIfPresent(AndroidCoverageStats.self, forKey: .stats),
-                  clusters: clusters.map { $0.scoped(to: tile) })
+                  clusters: clusters.map { $0.scoped(to: tile) },
+                  fromGrid: grid != nil)
     }
 }
 
