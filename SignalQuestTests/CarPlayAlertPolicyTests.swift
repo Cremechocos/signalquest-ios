@@ -22,13 +22,11 @@ final class CarPlayAlertPolicyTests: XCTestCase {
         coordinate: CLLocationCoordinate2D? = nil,
         lastAlertAt: Date? = nil,
         lastAlertCoordinate: CLLocationCoordinate2D? = nil,
-        now: Date? = nil,
-        isManeuverImminent: Bool = false
+        now: Date? = nil
     ) -> CarPlayAlertPolicy.Context {
         .init(isEnabled: isEnabled, verdict: verdict, sampleCount: sampleCount, speed: speed,
               coordinate: coordinate ?? paris, lastAlertAt: lastAlertAt,
-              lastAlertCoordinate: lastAlertCoordinate, now: now ?? t0,
-              isManeuverImminent: isManeuverImminent)
+              lastAlertCoordinate: lastAlertCoordinate, now: now ?? t0)
     }
 
     func testAlertsFireOnPoorCoverage() {
@@ -38,12 +36,6 @@ final class CarPlayAlertPolicyTests: XCTestCase {
     /// Opt-in : personne ne doit découvrir cette fonctionnalité en sursautant.
     func testNothingHappensWhenDisabled() {
         XCTAssertFalse(CarPlayAlertPolicy.shouldAlert(context(isEnabled: false)))
-    }
-
-    /// Rien ne doit couvrir une manœuvre annoncée : le conducteur a besoin de
-    /// son attention pour tourner, pas pour apprendre que le réseau est mauvais.
-    func testManeuverSilencesTheAlert() {
-        XCTAssertFalse(CarPlayAlertPolicy.shouldAlert(context(isManeuverImminent: true)))
     }
 
     /// Un bon réseau n'a rien à signaler.

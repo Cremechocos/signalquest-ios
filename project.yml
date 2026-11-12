@@ -47,8 +47,8 @@ targets:
           - Resources/**
           - .claude/**
           # Glob et non un nom précis : un second fichier d'entitlements peut
-          # apparaître localement pour tester CarPlay au simulateur (cf.
-          # Config/Local.xcconfig et .gitignore). Sans le glob, XcodeGen
+          # apparaître localement pour un essai (cf. Config/Local.xcconfig et
+          # .gitignore). Sans le glob, XcodeGen
           # l'ajouterait aux sources compilées de la cible.
           - "*.entitlements"
           # Injecté uniquement par le script optionnel ci-dessous. L'inclure aussi
@@ -101,12 +101,10 @@ targets:
         PRODUCT_NAME: SignalQuest
         INFOPLIST_FILE: SignalQuestApp/Info.plist
         # Choisi PAR CONFIGURATION via les xcconfig (SQ_ENTITLEMENTS), et non figé
-        # ici : l'entitlement CarPlay ne peut pas figurer dans une archive tant
-        # qu'Apple ne l'a pas accordé (la signature automatique exige que chaque
-        # clé soit présente dans le profil), alors qu'il est nécessaire pour que
-        # la scène CarPlay se connecte au simulateur. La substitution de variables
-        # ne suffit pas : elle change une VALEUR, elle ne peut pas faire
-        # disparaître une clé. D'où deux fichiers.
+        # ici. Les trois configurations pointent sur le même fichier depuis
+        # qu'Apple a accordé l'entitlement CarPlay « driving task » (12892a96) ;
+        # la variable laisse Config/Local.xcconfig substituer un fichier local
+        # pour un essai, sans toucher aux archives.
         CODE_SIGN_ENTITLEMENTS: $(SQ_ENTITLEMENTS)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES

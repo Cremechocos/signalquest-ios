@@ -46,7 +46,7 @@ enum NearestAntennaTemplateBuilder {
         [
             CPInformationItem(
                 title: String(localized: "Position inconnue"),
-                detail: String(localized: "Autorise la localisation pour voir les sites autour.")
+                detail: String(localized: "SignalQuest n'a pas accès à ta position pour l'instant.")
             ),
             connectionItem(for: path),
         ]

@@ -1,14 +1,7 @@
 import CarPlay
 
-/// Construit les templates racine de la surface CarPlay.
-///
-/// Deux racines très différentes selon l'entitlement accordé par Apple :
-///
-/// - avec `carplay-maps`, la racine est la CARTE (`CPMapTemplate`) et cette
-///   liste ne sert qu'aux états dégradés — chargement, session absente ;
-/// - sans elle, cette liste EST l'application. Tout doit donc y être
-///   atteignable, sans quoi la scène s'ouvrirait sur un écran inerte alors que
-///   fiches, speedtest, « Ici » et Sentinelle existent déjà.
+/// Construit les templates racine de la surface CarPlay : chargement, session
+/// absente, et la liste de repli posée si le véhicule refusait les onglets.
 ///
 /// Fonctions pures — aucune I/O, entrées explicites. C'est ce qui rend la
 /// surface vérifiable en test : le système ne fournit jamais de
@@ -19,14 +12,13 @@ enum CarPlayRootTemplateBuilder {
     /// Destinations de la racine en mode liste. L'ordre est celui de l'utilité
     /// au volant : ce qui est autour, puis ce qu'on capte, puis les outils.
     enum Entry: CaseIterable {
-        case nearby, here, speedtest, sentinelle
+        case nearby, here, speedtest
 
         var title: String {
             switch self {
             case .nearby: return String(localized: "Antennes autour")
             case .here: return String(localized: "Ici")
             case .speedtest: return String(localized: "Speedtest")
-            case .sentinelle: return String(localized: "Sentinelle")
             }
         }
 
@@ -35,7 +27,6 @@ enum CarPlayRootTemplateBuilder {
             case .nearby: return String(localized: "Les sites les plus proches")
             case .here: return String(localized: "Ce que vaut le réseau à cet endroit")
             case .speedtest: return String(localized: "Mesurer la connexion")
-            case .sentinelle: return String(localized: "État des box surveillées")
             }
         }
 
@@ -44,7 +35,6 @@ enum CarPlayRootTemplateBuilder {
             case .nearby: return "antenna.radiowaves.left.and.right"
             case .here: return "dot.radiowaves.left.and.right"
             case .speedtest: return "speedometer"
-            case .sentinelle: return "wifi.router.fill"
             }
         }
     }
@@ -62,10 +52,12 @@ enum CarPlayRootTemplateBuilder {
 
     static func signedOut() -> CPListTemplate {
         // Pas de parcours de connexion au volant : saisir un mot de passe en
-        // conduisant n'est ni faisable ni acceptable en revue App Store.
+        // conduisant n'est ni faisable ni acceptable en revue App Store. Et le
+        // message constate l'état sans demander de prendre l'iPhone : Apple
+        // l'interdit, même pour une erreur (CarPlay Developer Guide, règle 2).
         let item = CPListItem(
             text: String(localized: "Connexion requise"),
-            detailText: String(localized: "Ouvre SignalQuest sur ton iPhone pour te connecter.")
+            detailText: String(localized: "Aucun compte SignalQuest n'est connecté.")
         )
         return CPListTemplate(
             title: String(localized: "SignalQuest"),
@@ -73,8 +65,7 @@ enum CarPlayRootTemplateBuilder {
         )
     }
 
-    /// Racine du mode liste — l'application entière quand Apple n'a pas accordé
-    /// la catégorie navigation.
+    /// Racine de repli, posée seulement si le véhicule refuse les onglets.
     static func list(onSelect: @escaping (Entry) -> Void) -> CPListTemplate {
         let items: [CPListItem] = Entry.allCases.map { entry in
             let item = CPListItem(text: entry.title, detailText: entry.subtitle)

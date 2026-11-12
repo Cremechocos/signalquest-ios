@@ -40,14 +40,10 @@ enum CarPlayAlertPolicy {
         var lastAlertAt: Date?
         var lastAlertCoordinate: CLLocationCoordinate2D?
         var now: Date
-        /// Une manœuvre est annoncée : le conducteur a besoin de son attention
-        /// pour tourner, pas pour apprendre que le réseau est mauvais.
-        var isManeuverImminent: Bool
     }
 
     static func shouldAlert(_ context: Context) -> Bool {
         guard context.isEnabled else { return false }
-        guard !context.isManeuverImminent else { return false }
 
         // Seuls les mauvais verdicts alertent, et seulement s'ils reposent sur
         // assez de mesures : signaler « mauvais » sur trois relevés serait une

@@ -6,12 +6,10 @@ import UIKit
 ///
 /// Deux points à connaître avant d'y toucher :
 ///
-/// 1. CarPlay appelle une méthode DIFFÉRENTE selon la catégorie qu'Apple a
-///    accordée. Avec `carplay-maps` (navigation), le système confie une
-///    `CPWindow` où dessiner notre propre `MKMapView`. Sans elle, on ne reçoit
-///    que le contrôleur d'interface et l'on se rabat sur des templates. Les deux
-///    variantes sont implémentées : la bascule est automatique, et l'app ne se
-///    retrouve jamais muette dans le véhicule.
+/// 1. Apple n'a accordé que la catégorie « driving task » : le système appelle
+///    la variante SANS fenêtre (`didConnect interfaceController:`), et l'app
+///    n'affiche que des templates. La variante à `CPWindow` est réservée à la
+///    navigation (`carplay-maps`), que nous n'avons pas.
 ///
 /// 2. `CPTemplateApplicationSceneDelegate` hérite de `UISceneDelegate`, annoté
 ///    `NS_SWIFT_UI_ACTOR` : tout est isolé au main actor, comme `AppServices`.
@@ -19,41 +17,27 @@ import UIKit
 ///
 /// On hérite de `UIResponder` — et non de `NSObject` — comme tout délégué de
 /// scène : UIKit l'instancie par `init()` et l'insère dans la chaîne de
-/// répondeurs, ce dont la variante à `CPWindow` aura besoin.
+/// répondeurs.
 @MainActor
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var coordinator: CarPlayCoordinator?
 
     // MARK: - Connexion
 
-    /// Catégorie navigation (`carplay-maps`) : on reçoit la fenêtre du véhicule.
-    func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
-                                  didConnect interfaceController: CPInterfaceController,
-                                  to window: CPWindow) {
-        start(interfaceController, carWindow: window)
-    }
-
-    /// Repli sans carte : templates seuls.
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
                                   didConnect interfaceController: CPInterfaceController) {
-        start(interfaceController, carWindow: nil)
+        start(interfaceController)
     }
 
     // MARK: - Déconnexion
-
-    func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
-                                  didDisconnect interfaceController: CPInterfaceController,
-                                  from window: CPWindow) {
-        stop()
-    }
 
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene,
                                   didDisconnectInterfaceController interfaceController: CPInterfaceController) {
         stop()
     }
 
-    /// Ceinture et bretelles : les deux méthodes ci-dessus sont `@optional` côté
-    /// protocole et ne couvrent pas toutes les terminaisons de scène. Sans ce
+    /// Ceinture et bretelles : la méthode ci-dessus est `@optional` côté
+    /// protocole et ne couvre pas toutes les terminaisons de scène. Sans ce
     /// filet, un débranchement mal signalé laisserait les tâches du coordinateur
     /// tourner pour un écran qui n'existe plus.
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -62,7 +46,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Privé
 
-    private func start(_ interfaceController: CPInterfaceController, carWindow: CPWindow?) {
+    private func start(_ interfaceController: CPInterfaceController) {
         // CarPlay peut rappeler didConnect lors d'une reconnexion rapide. Un seul
         // coordinateur doit posséder les observers GPS, tâches et templates.
         coordinator?.stop()
@@ -72,8 +56,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         let coordinator = CarPlayCoordinator(
             interface: interfaceController,
             services: AppServicesHolder.services,
-            session: AppServicesHolder.session,
-            carWindow: carWindow
+            session: AppServicesHolder.session
         )
         self.coordinator = coordinator
         coordinator.start()

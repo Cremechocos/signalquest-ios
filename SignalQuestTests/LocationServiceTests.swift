@@ -168,112 +168,6 @@ final class LocationServiceTests: XCTestCase {
         model.onDisappear(isLeavingScreen: true)
     }
 
-    private func carPlayCoordinator(_ interface: FakeCarPlayInterface, location: LocationService,
-                                    routes: CarPlayRouteRecorder) -> CarPlayCoordinator {
-        CarPlayCoordinator(
-            interface: interface,
-            services: AppServices(config: .test, location: location),
-            session: AuthSessionViewModel(service: MockAuthService()),
-            carWindow: nil,
-            routeService: CarPlayRouteService(calculate: { origin, destination in
-                routes.requests.append((origin, destination))
-                throw CarPlayRouteService.RouteError.noRoute
-            })
-        )
-    }
-
-    private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
-        for _ in 0..<200 where !condition() {
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-    }
-
-    /// Un relevé expiré n'est pas un point de départ : le guidage redemande une
-    /// position au lieu de refuser d'emblée (CAR-03), et n'en obtenant pas,
-    /// n'appelle jamais le calcul d'itinéraire.
-    func testCarPlayNavigationRejectsExpiredOriginOnResume() async throws {
-        let (service, _, single, clock) = makeService(immediateTimeout: true)
-        service.receiveLocations([fix()])
-        clock.advance(3_600)
-        XCTAssertNotNil(service.lastLocation, "Le timer d'expiration peut être suspendu en arrière-plan")
-
-        let interface = FakeCarPlayInterface()
-        let routes = CarPlayRouteRecorder()
-        let coordinator = carPlayCoordinator(interface, location: service, routes: routes)
-        coordinator.startNavigation(
-            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
-            title: "Destination"
-        )
-
-        try await waitUntil { interface.presented != nil }
-        XCTAssertTrue(interface.presented is CPAlertTemplate)
-        XCTAssertEqual(single.requests, 1, "Une position fraîche doit être demandée")
-        XCTAssertTrue(routes.requests.isEmpty, "Ne pas calculer d'itinéraire depuis un fix expiré")
-        withExtendedLifetime(coordinator) {}
-    }
-
-    func testCarPlayNavigationRejectsOriginAfterPermissionRevocation() async throws {
-        let (service, driver, _, _) = makeService()
-        service.receiveLocations([fix()])
-        driver.authorizationStatus = .denied
-        XCTAssertNotNil(service.lastLocation, "Le callback de révocation peut être encore en file")
-
-        let interface = FakeCarPlayInterface()
-        let routes = CarPlayRouteRecorder()
-        let coordinator = carPlayCoordinator(interface, location: service, routes: routes)
-        coordinator.startNavigation(
-            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
-            title: "Destination"
-        )
-
-        try await waitUntil { interface.presented != nil }
-        XCTAssertTrue(interface.presented is CPAlertTemplate)
-        XCTAssertTrue(routes.requests.isEmpty, "Ne pas calculer d'itinéraire après révocation système")
-        withExtendedLifetime(coordinator) {}
-    }
-
-    /// Relevé frais : il sert d'origine au calcul, sans attendre (CAR-03).
-    func testCarPlayNavigationRoutesFromAFreshFix() async throws {
-        let (service, _, single, _) = makeService()
-        service.receiveLocations([fix()])
-
-        let interface = FakeCarPlayInterface()
-        let routes = CarPlayRouteRecorder()
-        let coordinator = carPlayCoordinator(interface, location: service, routes: routes)
-        coordinator.startNavigation(
-            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
-            title: "Destination"
-        )
-
-        try await waitUntil { !routes.requests.isEmpty }
-        XCTAssertEqual(routes.requests.first?.origin.latitude, 48.85)
-        XCTAssertEqual(single.requests, 0)
-        withExtendedLifetime(coordinator) {}
-    }
-
-    /// Deux « Y aller » coup sur coup : seul le dernier est calculé. Le premier,
-    /// revenu après coup, ne se taisait pas et pouvait guider vers la mauvaise
-    /// destination (CAR-04).
-    func testCarPlayOnlyTheLatestDestinationIsRouted() async throws {
-        let (service, _, single, _) = makeService()
-        let requested = expectation(description: "position demandée")
-        single.onRequest = { requested.fulfill() }
-
-        let interface = FakeCarPlayInterface()
-        let routes = CarPlayRouteRecorder()
-        let coordinator = carPlayCoordinator(interface, location: service, routes: routes)
-        coordinator.startNavigation(to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36), title: "A")
-        coordinator.startNavigation(to: CLLocationCoordinate2D(latitude: 45.76, longitude: 4.83), title: "B")
-        await fulfillment(of: [requested], timeout: 2)
-
-        service.receiveLocations([fix()], fromOneShot: true)
-        try await waitUntil { interface.presented != nil }
-
-        XCTAssertEqual(routes.requests.map(\.destination.latitude), [45.76])
-        XCTAssertTrue(interface.presented is CPAlertTemplate, "L'échec du dernier calcul reste signalé")
-        withExtendedLifetime(coordinator) {}
-    }
-
     func testCarPlayNetworkResponseDoesNotRenderAfterFixExpires() async throws {
         let (service, _, _, clock) = makeService()
         service.receiveLocations([fix()])
@@ -529,12 +423,6 @@ final class LocationServiceTests: XCTestCase {
         service.refreshAuthorization()
         XCTAssertEqual(single.requests, 0)
     }
-}
-
-/// Itinéraires demandés au calcul factice.
-@MainActor
-final class CarPlayRouteRecorder {
-    var requests: [(origin: CLLocationCoordinate2D, destination: CLLocationCoordinate2D)] = []
 }
 
 @MainActor

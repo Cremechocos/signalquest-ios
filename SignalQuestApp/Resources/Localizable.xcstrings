@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Aucun compte SignalQuest n'est connecté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No SignalQuest account is signed in."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte SignalQuest n'est connecté."
+          }
+        }
+      }
+    },
+    "SignalQuest n'a pas accès à ta position pour l'instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can't access your location right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n'a pas accès à ta position pour l'instant."
+          }
+        }
+      }
+    },
+    "SQFormal|SignalQuest n'a pas accès à ta position pour l'instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n'a pas accès à votre position pour l'instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Chute RSRP" : {
       "localizations" : {
         "en" : {

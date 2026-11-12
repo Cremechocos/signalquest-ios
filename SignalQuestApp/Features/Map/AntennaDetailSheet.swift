@@ -557,28 +557,12 @@ struct AntennaDetailSheet: View {
         )
     }
 
-    /// Ouvre un itinéraire vers le site.
-    ///
-    /// Quand un véhicule CarPlay est branché, la destination lui est envoyée :
-    /// le guidage se fait alors sur NOTRE carte, antennes et lobes visibles
-    /// par-dessus la route. Passer par Plan dans ce cas ferait basculer l'écran
-    /// du véhicule sur une autre app et perdrait tout l'intérêt.
-    ///
-    /// Hors CarPlay — ou quand la scène CarPlay ne sait pas guider, faute de la
-    /// catégorie `carplay-maps` — comportement inchangé : Plan, avec le nom du
-    /// site comme étiquette pour que la destination y soit reconnaissable. Plan
-    /// s'affiche de toute façon sur l'écran du véhicule, donc l'utilisateur est
-    /// guidé ; le détourner vers une app qui ne peut pas le faire aboutissait à
-    /// un bouton sans effet.
+    /// Ouvre un itinéraire vers le site dans Plan, avec le nom du site comme
+    /// étiquette pour que la destination y soit reconnaissable. Plan s'affiche
+    /// aussi sur l'écran du véhicule quand CarPlay est branché : SignalQuest n'a
+    /// que la catégorie « driving task » et ne guide pas lui-même.
     private func openRoute(to coordinate: CLLocationCoordinate2D) {
         Haptics.light()
-        if services.isCarPlayGuidanceAvailable {
-            CarPlayDestinationStore.record(title: headerTitle, coordinate: coordinate)
-            CarPlayDashboardRoute.request(.navigate(title: headerTitle,
-                                                    latitude: coordinate.latitude,
-                                                    longitude: coordinate.longitude))
-            return
-        }
         let placemark = MKPlacemark(coordinate: coordinate)
         let item = MKMapItem(placemark: placemark)
         item.name = headerTitle
