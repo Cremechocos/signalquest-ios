@@ -1,14 +1,14 @@
 {
   "schemaVersion": 3,
   "contract": {
-    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-ab25f05e6253",
+    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names4-c385cce4f80a-55f0ef788981",
     "minimumCompatibleSchemaVersion": 3,
     "positionDate": "2026-08-15",
-    "plmnRegistryVersion": "2026-08-15-ob1346-a62-parser2-names3",
-    "plmnContentSha256": "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e",
+    "plmnRegistryVersion": "2026-08-15-ob1346-a62-parser2-names4",
+    "plmnContentSha256": "a5da20a3549a7f2906629d542ebdccf4ffd07b58978a8e4ff678da5b12cd4376",
     "plmnResolutionVersion": 1,
     "plmnResolutionSha256": "c385cce4f80ac6734c5ef7d4a6ec31cf404b1c2a80fd36fb387c07138ea0d6b7",
-    "marketContentSha256": "ab25f05e62532b7bef55a22739dcc5037fe5a7ec2bfa23a3cd46ac6f3e09951e"
+    "marketContentSha256": "55f0ef78898101080da78f8ed7375b17e99dad7f698fefc3f9eafa760f992759"
   },
   "registeredPlmnMarkets": {
     "20200": "GR",
@@ -2530,7 +2530,7 @@
         },
         {
           "key": "BOUYGUES",
-          "label": "Bouygues",
+          "label": "Bouygues Telecom",
           "shortLabel": "Bouygues",
           "color": "#009DDC",
           "background": "rgba(0, 157, 220, 0.1)"
@@ -2840,6 +2840,25 @@
             }
           ],
           "aliases": []
+        },
+        {
+          "key": "LA_POSTE_MOBILE",
+          "label": "La Poste Mobile",
+          "hostOperatorKey": "BOUYGUES",
+          "plmns": [],
+          "aliases": [
+            "la poste mobile"
+          ]
+        },
+        {
+          "key": "CDISCOUNT_MOBILE",
+          "label": "Cdiscount Mobile",
+          "hostOperatorKey": "BOUYGUES",
+          "plmns": [],
+          "aliases": [
+            "cdiscount",
+            "cdiscount mobile"
+          ]
         }
       ]
     },
@@ -36873,5 +36892,19 @@
         }
       ]
     }
-  ]
+  ],
+  "nrGnbIdBits": {
+    "20801": 22,
+    "20802": 22,
+    "20808": 22,
+    "20810": 22,
+    "20811": 22,
+    "20813": 22,
+    "20815": 22,
+    "20816": 22,
+    "20820": 22,
+    "20821": 22,
+    "20888": 22,
+    "27099": 22
+  }
 }

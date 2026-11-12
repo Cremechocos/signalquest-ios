@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "registryVersion": "3gpp-r17-r18-2026-08-24",
+  "registryVersion": "3gpp-r17-r18-2026-09-29",
   "minimumCompatibleSchemaVersion": 1,
-  "positionDate": "2026-08-24",
-  "contentSha256": "59ab8b0dc49ef4c06e3f7048acec2b186142a2b9c691841738292e67cfe0b6c7",
+  "positionDate": "2026-09-29",
+  "contentSha256": "925688a3085ef8eed9912dd8d3237a0de3c918ca3cf6f4e24494e62a35567abb",
   "sources": [
     {
       "specification": "3GPP TS 45.005",
@@ -384,403 +384,470 @@
         "band": 1,
         "first": 0,
         "last": 599,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2110
       },
       {
         "band": 2,
         "first": 600,
         "last": 1199,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1930
       },
       {
         "band": 3,
         "first": 1200,
         "last": 1949,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1805
       },
       {
         "band": 4,
         "first": 1950,
         "last": 2399,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2110
       },
       {
         "band": 5,
         "first": 2400,
         "last": 2649,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 869
       },
       {
         "band": 6,
         "first": 2650,
         "last": 2749,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 875
       },
       {
         "band": 7,
         "first": 2750,
         "last": 3449,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2620
       },
       {
         "band": 8,
         "first": 3450,
         "last": 3799,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 925
       },
       {
         "band": 9,
         "first": 3800,
         "last": 4149,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1844.9
       },
       {
         "band": 10,
         "first": 4150,
         "last": 4749,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2110
       },
       {
         "band": 11,
         "first": 4750,
         "last": 4949,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1475.9
       },
       {
         "band": 12,
         "first": 5010,
         "last": 5179,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 729
       },
       {
         "band": 13,
         "first": 5180,
         "last": 5279,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 746
       },
       {
         "band": 14,
         "first": 5280,
         "last": 5379,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 758
       },
       {
         "band": 17,
         "first": 5730,
         "last": 5849,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 734
       },
       {
         "band": 18,
         "first": 5850,
         "last": 5999,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 860
       },
       {
         "band": 19,
         "first": 6000,
         "last": 6149,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 875
       },
       {
         "band": 20,
         "first": 6150,
         "last": 6449,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 791
       },
       {
         "band": 21,
         "first": 6450,
         "last": 6599,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1495.9
       },
       {
         "band": 22,
         "first": 6600,
         "last": 7399,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3510
       },
       {
         "band": 23,
         "first": 7500,
         "last": 7699,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2180
       },
       {
         "band": 24,
         "first": 7700,
         "last": 8039,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1525
       },
       {
         "band": 25,
         "first": 8040,
         "last": 8689,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1930
       },
       {
         "band": 26,
         "first": 8690,
         "last": 9039,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 859
       },
       {
         "band": 27,
         "first": 9040,
         "last": 9209,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 852
       },
       {
         "band": 28,
         "first": 9210,
         "last": 9659,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 758
       },
       {
         "band": 29,
         "first": 9660,
         "last": 9769,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 717
       },
       {
         "band": 30,
         "first": 9770,
         "last": 9869,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2350
       },
       {
         "band": 31,
         "first": 9870,
         "last": 9919,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 462.5
       },
       {
         "band": 32,
         "first": 9920,
         "last": 10359,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1452
       },
       {
         "band": 33,
         "first": 36000,
         "last": 36199,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1900
       },
       {
         "band": 34,
         "first": 36200,
         "last": 36349,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2010
       },
       {
         "band": 35,
         "first": 36350,
         "last": 36949,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1850
       },
       {
         "band": 36,
         "first": 36950,
         "last": 37549,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1930
       },
       {
         "band": 37,
         "first": 37550,
         "last": 37749,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1910
       },
       {
         "band": 38,
         "first": 37750,
         "last": 38249,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2570
       },
       {
         "band": 39,
         "first": 38250,
         "last": 38649,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1880
       },
       {
         "band": 40,
         "first": 38650,
         "last": 39649,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2300
       },
       {
         "band": 41,
         "first": 39650,
         "last": 41589,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2496
       },
       {
         "band": 42,
         "first": 41590,
         "last": 43589,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3400
       },
       {
         "band": 43,
         "first": 43590,
         "last": 45589,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3600
       },
       {
         "band": 44,
         "first": 45590,
         "last": 46589,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 703
       },
       {
         "band": 45,
         "first": 46590,
         "last": 46789,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1447
       },
       {
         "band": 46,
         "first": 46790,
         "last": 54539,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 5150
       },
       {
         "band": 47,
         "first": 54540,
         "last": 55239,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 5855
       },
       {
         "band": 48,
         "first": 55240,
         "last": 56739,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3550
       },
       {
         "band": 49,
         "first": 56740,
         "last": 58239,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3550
       },
       {
         "band": 50,
         "first": 58240,
         "last": 59089,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1432
       },
       {
         "band": 51,
         "first": 59090,
         "last": 59139,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1427
       },
       {
         "band": 52,
         "first": 59140,
         "last": 60139,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 3300
       },
       {
         "band": 53,
         "first": 60140,
         "last": 60254,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2483.5
       },
       {
         "band": 65,
         "first": 65536,
         "last": 66435,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2110
       },
       {
         "band": 66,
         "first": 66436,
         "last": 67335,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2110
       },
       {
         "band": 67,
         "first": 67336,
         "last": 67535,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 738
       },
       {
         "band": 68,
         "first": 67536,
         "last": 67835,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 753
       },
       {
         "band": 69,
         "first": 67836,
         "last": 68335,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 2570
       },
       {
         "band": 70,
         "first": 68336,
         "last": 68585,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1995
       },
       {
         "band": 71,
         "first": 68586,
         "last": 68935,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 617
       },
       {
         "band": 72,
         "first": 68936,
         "last": 68985,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 461
       },
       {
         "band": 73,
         "first": 68986,
         "last": 69035,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 460
       },
       {
         "band": 74,
         "first": 69036,
         "last": 69465,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1475
       },
       {
         "band": 75,
         "first": 69466,
         "last": 70315,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1432
       },
       {
         "band": 76,
         "first": 70316,
         "last": 70365,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 1427
       },
       {
         "band": 85,
         "first": 70366,
         "last": 70545,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 728
       },
       {
         "band": 87,
         "first": 70546,
         "last": 70595,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 420
       },
       {
         "band": 88,
         "first": 70596,
         "last": 70645,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 422
       },
       {
         "band": 103,
         "first": 70646,
         "last": 70655,
-        "step": 1
+        "step": 1,
+        "dlLowMhz": 757
       }
     ],
     "nrDownlinkRaster": [

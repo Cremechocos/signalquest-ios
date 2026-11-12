@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "registryVersion": "2026-08-15-ob1346-a62-parser2-names3",
+  "registryVersion": "2026-08-15-ob1346-a62-parser2-names4",
   "sourceParsingVersion": 2,
-  "namePolicyVersion": 3,
+  "namePolicyVersion": 4,
   "positionDate": "2026-08-15",
   "minimumCompatibleSchemaVersion": 1,
-  "contentSha256": "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e",
+  "contentSha256": "a5da20a3549a7f2906629d542ebdccf4ffd07b58978a8e4ff678da5b12cd4376",
   "source": {
     "authority": "International Telecommunication Union (ITU)",
     "recommendation": "ITU-T E.212 (06/2024)",
@@ -1198,9 +1198,9 @@
       "countryOrArea": "France",
       "legalOperatorName": "Free Mobile",
       "scope": "geographic",
-      "displayName": "Free",
+      "displayName": "Free Mobile",
       "aliases": [
-        "Free Mobile"
+        "Free"
       ],
       "nameSource": "legacy-brand"
     },
@@ -1212,9 +1212,9 @@
       "countryOrArea": "France",
       "legalOperatorName": "Free Mobile",
       "scope": "geographic",
-      "displayName": "Free",
+      "displayName": "Free Mobile",
       "aliases": [
-        "Free Mobile"
+        "Free"
       ],
       "nameSource": "legacy-brand"
     },
@@ -1257,9 +1257,9 @@
           "legalOperatorName": "Bouygues Telecom"
         }
       ],
-      "displayName": "Bouygues",
+      "displayName": "Bouygues Telecom",
       "aliases": [
-        "Bouygues Telecom"
+        "Bouygues"
       ],
       "nameSource": "legacy-brand"
     },
@@ -1450,10 +1450,10 @@
       "countryOrArea": "France",
       "legalOperatorName": "Free mobile",
       "scope": "geographic",
-      "displayName": "Free",
+      "displayName": "Free Mobile",
       "aliases": [
         "Free mobile",
-        "Free Mobile"
+        "Free"
       ],
       "nameSource": "legacy-brand"
     },
@@ -1465,10 +1465,10 @@
       "countryOrArea": "France",
       "legalOperatorName": "Free mobile",
       "scope": "geographic",
-      "displayName": "Free",
+      "displayName": "Free Mobile",
       "aliases": [
         "Free mobile",
-        "Free Mobile"
+        "Free"
       ],
       "nameSource": "legacy-brand"
     },
@@ -1756,9 +1756,9 @@
       "countryOrArea": "France",
       "legalOperatorName": "Bouygues Telecom",
       "scope": "geographic",
-      "displayName": "Bouygues",
+      "displayName": "Bouygues Telecom",
       "aliases": [
-        "Bouygues Telecom"
+        "Bouygues"
       ],
       "nameSource": "legacy-brand"
     },

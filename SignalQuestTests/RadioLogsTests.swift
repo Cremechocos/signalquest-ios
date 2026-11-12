@@ -1416,10 +1416,10 @@ extension RadioLogsTests {
         XCTAssertEqual(payload.schemaVersion, 3)
         XCTAssertEqual(payload.markets.count, 212)
         XCTAssertEqual(payload.contract?.minimumCompatibleSchemaVersion, 3)
-        XCTAssertEqual(payload.contract?.plmnRegistryVersion, "2026-08-15-ob1346-a62-parser2-names3")
+        XCTAssertEqual(payload.contract?.plmnRegistryVersion, "2026-08-15-ob1346-a62-parser2-names4")
         XCTAssertEqual(
             payload.contract?.plmnContentSha256,
-            "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e"
+            "a5da20a3549a7f2906629d542ebdccf4ffd07b58978a8e4ff678da5b12cd4376"
         )
 
         let france = try XCTUnwrap(payload.market(forCode: "FR"))
@@ -1428,7 +1428,7 @@ extension RadioLogsTests {
         XCTAssertEqual(bouygues.aliases, ["Bouygues", "Bouygues Telecom", "ByTel", "Bouygtel"])
         XCTAssertEqual(france.source.status, "compatible")
         XCTAssertTrue(france.radioCapabilities.officialAntennas)
-        XCTAssertEqual(france.radioMvnos.count, 7)
+        XCTAssertEqual(france.radioMvnos.count, 9)
         XCTAssertEqual(france.radioMvnos.first(where: { $0.key == "LEBARA" })?.hostOperatorKey, "SFR")
         XCTAssertEqual(france.radioMvnos.first(where: { $0.key == "LEBARA" })?.plmns.first?.plmn, "20838")
         XCTAssertNil(france.radioOperatorKey(observedPlmn: "20838"))
@@ -1442,7 +1442,8 @@ extension RadioLogsTests {
         XCTAssertNil(payload.radioMvno(simPlmn: "20838", simOperatorName: "Lycamobile"))
         XCTAssertEqual(
             Set(france.radioMvnos.map(\.key)),
-            Set(["LEBARA", "LYCAMOBILE", "NRJ_MOBILE", "CORIOLIS", "VECTONE", "TRANSATEL", "AIRMOB"])
+            Set(["LEBARA", "LYCAMOBILE", "NRJ_MOBILE", "CORIOLIS", "VECTONE", "TRANSATEL", "AIRMOB",
+                 "LA_POSTE_MOBILE", "CDISCOUNT_MOBILE"])
         )
 
         let cayman = try XCTUnwrap(payload.market(forCode: "KY"))
@@ -1524,13 +1525,13 @@ extension RadioLogsTests {
 
         XCTAssertEqual(object["schemaVersion"] as? Int, 1)
         XCTAssertEqual(object["minimumCompatibleSchemaVersion"] as? Int, 1)
-        XCTAssertEqual(object["registryVersion"] as? String, "3gpp-r17-r18-2026-08-24")
+        XCTAssertEqual(object["registryVersion"] as? String, "3gpp-r17-r18-2026-09-29")
         XCTAssertEqual((tables["umtsDownlinkUarfcn"] as? [[String: Any]])?.count, 21)
         XCTAssertEqual((tables["lteDownlinkEarfcn"] as? [[String: Any]])?.count, 67)
         XCTAssertEqual((tables["nrDownlinkRaster"] as? [[String: Any]])?.count, 63)
         XCTAssertEqual(
             object["contentSha256"] as? String,
-            "59ab8b0dc49ef4c06e3f7048acec2b186142a2b9c691841738292e67cfe0b6c7"
+            "925688a3085ef8eed9912dd8d3237a0de3c918ca3cf6f4e24494e62a35567abb"
         )
     }
 
