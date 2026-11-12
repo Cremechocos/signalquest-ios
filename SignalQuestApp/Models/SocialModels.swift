@@ -529,6 +529,9 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// repli français quand l'app ne sait pas écrire la phrase.
     let textKey: String?
     let textArgs: [String: JSONValue]?
+    /// Post de fin de trajet (DT-POST-1 r2) : résumé lu par le fil dans l'analyse figée, au
+    /// moment de servir. Absent sur un autre post et sur un serveur antérieur au 12/11.
+    let session: SocialSessionPostBlock?
 
     /// Texte du serveur dans la langue de l'app, quand sa clé est connue (F8).
     var feedText: String? { FeedTextKey(key: textKey, args: textArgs)?.text }
@@ -623,6 +626,134 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         // Une clé mal formée ne coûte que la traduction : `text` reste.
         textKey = (try? c.decodeIfPresent(String.self, forKey: .textKey)) ?? nil
         textArgs = (try? c.decodeIfPresent([String: JSONValue].self, forKey: .textArgs)) ?? nil
+        // Un bloc illisible ou d'une source inconnue ne coûte que le résumé : la carte générique reste.
+        let extra = try decoder.container(keyedBy: SessionKeys.self)
+        session = (try? extra.decodeIfPresent(SocialSessionPostBlock.self, forKey: .session)) ?? nil
+    }
+
+    /// Hors `CodingKeys` : le bloc est servi, jamais renvoyé ni mis en cache.
+    private enum SessionKeys: String, CodingKey { case session }
+}
+
+/// Bloc `session` d'un post de fin de trajet (DT-POST-1 r2 §3.2). Les chiffres sont ceux de la
+/// page Trajet, au chiffre près : l'app ne recalcule rien, elle formate.
+struct SocialSessionPostBlock: Decodable, Equatable {
+    enum Source: String { case driveTest = "drive_test", coverage }
+
+    let id: String
+    let source: Source
+    let distanceMeters: Int?
+    let durationSeconds: Int?
+    let logicalPoints: Int?
+    /// `ready`, `not_computed`, `unavailable` ou `live` ; seul `ready` porte des séries.
+    let analysisStatus: String?
+    /// Vide hors `ready` : la carte montre alors l'en-tête seul, sans message.
+    let series: [Series]
+    let speedtests: Speedtests?
+    let annotations: [Annotation]
+
+    struct Series: Decodable, Equatable, Identifiable {
+        let id: String
+        let seriesKey: String?
+        let operatorKey: String?
+        let operatorRank: Int?
+        let score: Int?
+        let level: String?
+        /// `OK`, `WITH_HOLES` ou `UNRELIABLE`.
+        let headlineCode: String?
+        let holes: Int?
+        let operatorDisplay: SessionSeriesOperatorDisplay?
+        /// Entiers 0–100, tronqués par le serveur comme dans l'analyse.
+        let pct5g: Int?
+        let coveragePct: Int?
+        let goodSignalPct: Int?
+
+        var isUnreliable: Bool { headlineCode == "UNRELIABLE" }
+
+        private enum CodingKeys: String, CodingKey {
+            case seriesKey, operatorKey, operatorRank, score, level, headlineCode, holes, operatorDisplay, pct5g, coveragePct, goodSignalPct
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            seriesKey = c.decodeFlexibleString(forKey: .seriesKey)
+            operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+            operatorRank = try? c.decodeIfPresent(Int.self, forKey: .operatorRank)
+            score = try? c.decodeIfPresent(Int.self, forKey: .score)
+            level = c.decodeFlexibleString(forKey: .level)
+            headlineCode = c.decodeFlexibleString(forKey: .headlineCode)
+            holes = try? c.decodeIfPresent(Int.self, forKey: .holes)
+            operatorDisplay = (try? c.decodeIfPresent(SessionSeriesOperatorDisplay.self, forKey: .operatorDisplay)) ?? nil
+            pct5g = Self.percent(c, .pct5g)
+            coveragePct = Self.percent(c, .coveragePct)
+            goodSignalPct = Self.percent(c, .goodSignalPct)
+            id = seriesKey ?? [operatorKey ?? "unknown", operatorRank.map(String.init) ?? ""].joined(separator: "#")
+        }
+
+        private static func percent(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+            guard let value = try? c.decodeIfPresent(Int.self, forKey: key), (0...100).contains(value) else { return nil }
+            return value
+        }
+
+        /// Même forme que la série de la page Trajet, pour réutiliser ses libellés.
+        var operatorLabel: String {
+            guard let key = operatorKey, !key.isEmpty else { return String(localized: "Réseau inconnu") }
+            let name = SQBrand.operatorName(key) ?? key
+            return operatorRank.map { "\(name) (\($0))" } ?? name
+        }
+    }
+
+    struct Speedtests: Decodable, Equatable {
+        let count: Int
+        let downloadMedianMbps: Double?
+        let uploadMedianMbps: Double?
+    }
+
+    struct Annotation: Decodable, Equatable {
+        /// Type choisi par le membre (« tunnel »), affiché tel quel.
+        let type: String
+        let count: Int
+    }
+
+    private struct Analysis: Decodable {
+        let series: [Failable]
+    }
+
+    private struct Failable: Decodable {
+        let value: Series?
+        init(from decoder: Decoder) throws { value = try? Series(from: decoder) }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, source, distanceMeters, durationSeconds, logicalPoints, analysisStatus, analysis, speedtests, annotations
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let id = c.decodeFlexibleString(forKey: .id) else {
+            throw DecodingError.keyNotFound(CodingKeys.id, .init(codingPath: c.codingPath, debugDescription: "session.id"))
+        }
+        // Énumération fermée : une source inconnue retombe sur la carte générique.
+        guard let raw = c.decodeFlexibleString(forKey: .source), let source = Source(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(forKey: .source, in: c, debugDescription: "session.source")
+        }
+        self.id = id
+        self.source = source
+        distanceMeters = Self.count(c, .distanceMeters)
+        durationSeconds = Self.count(c, .durationSeconds)
+        logicalPoints = Self.count(c, .logicalPoints)
+        analysisStatus = c.decodeFlexibleString(forKey: .analysisStatus)
+        let analysis = analysisStatus == "ready" ? (try? c.decodeIfPresent(Analysis.self, forKey: .analysis)) ?? nil : nil
+        var seen = Set<String>()
+        series = (analysis?.series ?? []).compactMap(\.value).filter { seen.insert($0.id).inserted }
+        speedtests = (try? c.decodeIfPresent(Speedtests.self, forKey: .speedtests)) ?? nil
+        annotations = c.decodeLossyArray([Annotation].self, forKey: .annotations)
+            .filter { $0.count > 0 && !$0.type.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private static func count(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+        guard let value = try? c.decodeIfPresent(Int.self, forKey: key), value >= 0 else { return nil }
+        return value
     }
 }
 

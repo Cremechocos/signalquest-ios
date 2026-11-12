@@ -339,6 +339,26 @@
       "args": {},
       "fr": "Combo LIVE SIGNAL Canada",
       "en": "LIVE SIGNAL Canada combo"
+    },
+    {
+      "key": "feed.session.drive_test_completed",
+      "args": {
+        "distanceMeters": "integer",
+        "durationSeconds": "integer",
+        "logicalPoints": "integer"
+      },
+      "fr": "Drive Test terminé : {distance} km, {duration} min",
+      "en": "Drive Test finished: {distance}, {duration} min"
+    },
+    {
+      "key": "feed.session.coverage_completed",
+      "args": {
+        "distanceMeters": "integer",
+        "durationSeconds": "integer",
+        "logicalPoints": "integer"
+      },
+      "fr": "Session de couverture terminée : {distance} km, {duration} min",
+      "en": "Coverage session finished: {distance}, {duration} min"
     }
   ],
   "cases": [
@@ -2166,6 +2186,128 @@
         "text": "Nouveau truc",
         "metadata": {
           "activityType": "future_activity"
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "DT-POST-1 : trajet Drive Test",
+      "input": {
+        "sourceType": "session",
+        "text": "Drive Test terminé",
+        "metadata": {
+          "kind": "session",
+          "sessionId": "cmdt0001",
+          "sessionSource": "drive_test",
+          "distanceMeters": 12350,
+          "durationSeconds": 1500,
+          "logicalPoints": 412
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.session.drive_test_completed",
+        "textArgs": {
+          "distanceMeters": 12350,
+          "durationSeconds": 1500,
+          "logicalPoints": 412
+        }
+      }
+    },
+    {
+      "name": "DT-POST-1 : session de couverture à 1 km pile",
+      "input": {
+        "sourceType": "session",
+        "text": "Drive Test terminé",
+        "metadata": {
+          "kind": "session",
+          "sessionId": "cmdt0002",
+          "sessionSource": "coverage",
+          "distanceMeters": 1000,
+          "durationSeconds": 0,
+          "logicalPoints": 0
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": "feed.session.coverage_completed",
+        "textArgs": {
+          "distanceMeters": 1000,
+          "durationSeconds": 0,
+          "logicalPoints": 0
+        }
+      }
+    },
+    {
+      "name": "DT-POST-1 : source inconnue, pas de clé",
+      "input": {
+        "sourceType": "session",
+        "text": "Drive Test terminé",
+        "metadata": {
+          "kind": "session",
+          "sessionId": "cmdt0003",
+          "sessionSource": "future_source",
+          "distanceMeters": 1000,
+          "durationSeconds": 600,
+          "logicalPoints": 20
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "DT-POST-1 : argument manquant, pas de clé",
+      "input": {
+        "sourceType": "session",
+        "text": "Drive Test terminé",
+        "metadata": {
+          "kind": "session",
+          "sessionId": "cmdt0004",
+          "sessionSource": "drive_test",
+          "distanceMeters": 1000,
+          "durationSeconds": 600
+        },
+        "marketCode": null,
+        "place": null,
+        "badgeName": null,
+        "questTitle": null
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "DT-POST-1 : argument non entier, pas de clé",
+      "input": {
+        "sourceType": "session",
+        "text": "Drive Test terminé",
+        "metadata": {
+          "kind": "session",
+          "sessionId": "cmdt0005",
+          "sessionSource": "drive_test",
+          "distanceMeters": 1000.5,
+          "durationSeconds": 600,
+          "logicalPoints": 20
         },
         "marketCode": null,
         "place": null,

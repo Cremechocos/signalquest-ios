@@ -13,11 +13,13 @@ struct FeedTextKey: Equatable {
         case integer, decimal, string, identifierType, countryCode
     }
 
-    /// Les 36 clés de la v1 et le type de chaque argument.
+    /// Les 38 clés (v1, puis les deux de DT-POST-1) et le type de chaque argument.
     private static let catalog: [String: [String: Kind]] = [
         "feed.speedtest.done": ["downloadMbps": .decimal],
         "feed.speedtest.done_no_speed": [:],
         "feed.session.completed": ["distanceMeters": .integer, "measureCount": .integer],
+        "feed.session.drive_test_completed": ["distanceMeters": .integer, "durationSeconds": .integer, "logicalPoints": .integer],
+        "feed.session.coverage_completed": ["distanceMeters": .integer, "durationSeconds": .integer, "logicalPoints": .integer],
         "feed.badge.earned": ["badgeId": .string, "badgeName": .string],
         "feed.level.reached": ["level": .integer],
         "feed.quest.completed": ["questKey": .string, "questTitle": .string],
@@ -140,6 +142,13 @@ struct FeedTextKey: Equatable {
             let distance = SQUnits.distance(meters: Double(integer("distanceMeters") ?? 0))
             let measures = String(localized: "\(count("measureCount")) mesures")
             return String(localized: "Session de couverture terminée : \(distance), \(measures)")
+        // DT-POST-1 : km à une décimale, minutes entières (floor), comme la page Trajet.
+        case "feed.session.drive_test_completed", "feed.session.coverage_completed":
+            let distance = SQUnits.distance(meters: Double(integer("distanceMeters") ?? 0))
+            let minutes = count("durationSeconds") / 60
+            return key == "feed.session.drive_test_completed"
+                ? String(localized: "Drive Test terminé : \(distance), \(minutes) min")
+                : String(localized: "Session de couverture terminée : \(distance), \(minutes) min")
         case "feed.badge.earned": return String(localized: "Badge « \(string("badgeName") ?? "") » obtenu !")
         case "feed.level.reached": return String(localized: "Niveau \(count("level")) atteint !")
         case "feed.quest.completed": return String(localized: "Quête « \(string("questTitle") ?? "") » terminée")

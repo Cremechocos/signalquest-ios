@@ -44,7 +44,7 @@ final class FeedTextKeysContractTests: XCTestCase {
     func testCatalogMatchesTheContract() throws {
         let vectors = try vectors()
         XCTAssertEqual(vectors.version, 2)
-        XCTAssertEqual(vectors.keys.count, 36)
+        XCTAssertEqual(vectors.keys.count, 38)
         XCTAssertEqual(Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0.args) }), FeedTextKey.contractArgs)
         // Règle 8 : une clé n'est jamais le préfixe d'une autre.
         let keys = vectors.keys.map(\.key)
@@ -57,7 +57,7 @@ final class FeedTextKeysContractTests: XCTestCase {
     /// et le libellé de l'identifiant passent tels quels dans la phrase.
     func testEveryCaseRendersOrFallsBack() throws {
         let vectors = try vectors()
-        XCTAssertEqual(vectors.cases.count, 87)
+        XCTAssertEqual(vectors.cases.count, 92)
         let labels = ["cellid": "Cell ID", "pci": "PCI", "enb": "eNB", "gnb": "gNB"]
         for vector in vectors.cases {
             let item = try decodeItem(text: vector.input.text, textKey: vector.expect.textKey, textArgs: vector.expect.textArgs)

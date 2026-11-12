@@ -526,3 +526,94 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertEqual(ObservedCellSheet.confidenceLabel("experimental"), "experimental")
     }
 }
+
+/// DT-POST-1 r2 : le bloc `session` d'un post de fin de trajet, d'après la fixture du serveur
+/// (`apps/web/lib/social/session-post.test.ts`, trajet A : médiane 854,85 servie à 854,9).
+final class SessionPostBlockDecodeTests: XCTestCase {
+    /// « 34 % » s'écrit avec une espace insécable (fine ou non) selon la langue.
+    private static func plainSpaces(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{202F}", with: " ")
+    }
+
+    private func item(session: String) throws -> UnifiedSocialFeedItem {
+        let json = """
+        {"id":"p1","kind":"session","author":{"id":"u1"},"text":"Drive Test terminé","generated":true,
+         "textKey":"feed.session.drive_test_completed",
+         "textArgs":{"distanceMeters":12350,"durationSeconds":1500,"logicalPoints":412},
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,
+         "session":\(session)}
+        """
+        return try JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(json.utf8))
+    }
+
+    func testReadyBlockReadsTheFrozenAnalysis() throws {
+        let block = try XCTUnwrap(item(session: """
+        {"id":"s1","source":"drive_test","startedAt":"2026-11-12T08:00:00.000Z","endedAt":"2026-11-12T09:00:00.000Z",
+         "distanceMeters":12350,"durationSeconds":1500,"logicalPoints":412,"analysisStatus":"ready",
+         "analysis":{"formulaVersion":3,"series":[
+           {"seriesKey":"sim1","operatorKey":"ORANGE","marketCode":"FR","operatorRank":null,"score":82,"level":"good",
+            "headlineCode":"WITH_HOLES","holes":1,"pct5g":34,"coveragePct":98,"goodSignalPct":71,"noServiceRuns":1,
+            "rsrpMedianDbm":-92,"sinrMedianDb":11,"spotsTotal":3},
+           {"seriesKey":"sim2","operatorKey":"SFR","score":40,"level":"poor","headlineCode":"UNRELIABLE","holes":0,
+            "pct5g":140,"coveragePct":null,"goodSignalPct":12},
+           "illisible"]},
+         "speedtests":{"count":2,"downloadMedianMbps":854.9,"uploadMedianMbps":92.3},
+         "annotations":[{"type":"tunnel","count":2},{"type":"pont","count":1},{"type":" ","count":4},{"type":"x","count":0}]}
+        """).session)
+        XCTAssertEqual(block.source, .driveTest)
+        XCTAssertEqual(block.series.count, 2, "une série illisible ne fait pas tomber les autres")
+        let orange = block.series[0]
+        XCTAssertEqual(orange.operatorLabel, "Orange")
+        XCTAssertEqual(SessionPostText.headline(orange), "Bon · 1 trou")
+        XCTAssertEqual(SessionPostText.shares(orange).map(Self.plainSpaces),
+                       "5G 34 % · couvert 98 % · bon signal 71 %")
+        let sfr = block.series[1]
+        XCTAssertTrue(sfr.isUnreliable)
+        XCTAssertEqual(SessionPostText.headline(sfr), "Peu fiable · Trop peu de mesures")
+        XCTAssertNil(sfr.pct5g, "une part hors 0–100 est écartée")
+        XCTAssertEqual(SessionPostText.shares(sfr).map(Self.plainSpaces), "bon signal 12 %")
+        let speed = try XCTUnwrap(SessionPostText.speedtests(block.speedtests))
+        XCTAssertTrue(speed.contains("855"), speed)
+        XCTAssertTrue(speed.hasPrefix("2 speedtests"), speed)
+        XCTAssertEqual(SessionPostText.annotations(block.annotations), "Repères : tunnel ×2 · pont ×1")
+        let metrics = SessionPostText.metrics(block)
+        XCTAssertEqual(metrics.map(\.label), ["Distance", "Durée", "Relevés"])
+        XCTAssertEqual(metrics[1].value, "25 min")
+        XCTAssertEqual(metrics[2].value, "412")
+    }
+
+    func testHeaderOnlyStatesAndUnknownSource() throws {
+        let pending = try XCTUnwrap(item(session: """
+        {"id":"s2","source":"drive_test","distanceMeters":6000,"durationSeconds":659,"logicalPoints":188,
+         "analysisStatus":"not_computed","analysis":null,"speedtests":{"count":0,"downloadMedianMbps":null,"uploadMedianMbps":null},
+         "annotations":[]}
+        """).session)
+        XCTAssertTrue(pending.series.isEmpty)
+        XCTAssertNil(SessionPostText.speedtests(pending.speedtests))
+        XCTAssertNil(SessionPostText.annotations(pending.annotations))
+        XCTAssertEqual(SessionPostText.metrics(pending)[1].value, "10 min", "minutes en floor, comme la page Trajet")
+
+        // Une analyse servie hors `ready` n'est pas lue.
+        let live = try XCTUnwrap(item(session: """
+        {"id":"s3","source":"drive_test","analysisStatus":"live","analysis":{"series":[{"seriesKey":"a","operatorKey":"FREE"}]}}
+        """).session)
+        XCTAssertTrue(live.series.isEmpty)
+
+        let coverage = try XCTUnwrap(item(session: #"{"id":"s4","source":"coverage","analysisStatus":"unavailable"}"#).session)
+        XCTAssertEqual(SessionPostText.title(coverage.source), "Session de couverture terminée")
+
+        // Source inconnue : pas de bloc, la carte générique reste.
+        XCTAssertNil(try item(session: #"{"id":"s5","source":"future"}"#).session)
+        XCTAssertNil(try item(session: #""texte""#).session)
+    }
+
+    func testTitleKeyFollowsTheContract() throws {
+        let text = try XCTUnwrap(FeedTextKey(key: "feed.session.drive_test_completed",
+                                             args: ["distanceMeters": .number(12_350), "durationSeconds": .number(1_499), "logicalPoints": .number(412)])?.text)
+        XCTAssertTrue(text.hasPrefix("Drive Test terminé : "), text)
+        XCTAssertTrue(text.hasSuffix(", 24 min"), text)
+        XCTAssertNil(FeedTextKey(key: "feed.session.coverage_completed",
+                                 args: ["distanceMeters": .number(1_000), "durationSeconds": .number(600)]), "tout ou rien")
+    }
+}

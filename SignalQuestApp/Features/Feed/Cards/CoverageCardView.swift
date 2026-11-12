@@ -55,6 +55,82 @@ struct CoverageCardView: View {
 
     var body: some View {
         Button(action: onTap) {
+            if let block = item.session {
+                sessionPostContent(block)
+            } else {
+                legacyContent
+            }
+        }
+        .buttonStyle(SQPressButtonStyle())
+    }
+
+    // MARK: Post de fin de trajet (DT-POST-1 r2)
+
+    /// Le résumé du trajet tel que la page Trajet le calcule : tracé, trois tuiles, une ligne
+    /// par SIM quand l'analyse est prête, speedtests et repères s'il y en a. Ni lieu ni adresse
+    /// (choix du 12/11) : le post ne dit pas d'où part le trajet.
+    private func sessionPostContent(_ block: SocialSessionPostBlock) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
+            CardHeader(
+                author: item.author,
+                place: nil,
+                createdAt: item.createdAt,
+                kindBadge: nil,
+                kindColor: SQColor.brandRed,
+                onAuthorTap: onAuthorTap,
+                isPinned: item.isPinned
+            )
+            FeedKindLine(symbol: block.source == .driveTest ? "car" : "point.topleft.down.curvedto.point.bottomright.up",
+                         title: SessionPostText.title(block.source), points: item.earnedPoints)
+            // Trajet privé (D2) : pas de tracé servi, la carte commence aux tuiles.
+            if let trace, !trace.isEmpty {
+                CoverageRouteThumbnail(
+                    postId: item.id, coordinates: trace, lineColor: accent,
+                    states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
+                    spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
+                )
+                if !tracePoints.isEmpty { traceLegend }
+            }
+            FeedMetricGrid(metrics: SessionPostText.metrics(block))
+            if !block.series.isEmpty {
+                SessionPostSeriesList(series: block.series)
+            }
+            let extras = [SessionPostText.speedtests(block.speedtests), SessionPostText.annotations(block.annotations)]
+            if extras.contains(where: { $0 != nil }) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    if let line = extras[0] {
+                        Label(line, systemImage: "speedometer")
+                    }
+                    if let line = extras[1] {
+                        Label(line, systemImage: "flag")
+                    }
+                }
+                .font(SQType.caption)
+                .monospacedDigit()
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            FeedOpenCapsule(
+                title: String(localized: "Voir le trajet"),
+                symbol: "map",
+                destination: .link(.session(id: block.id, title: nil)),
+                onOpenPost: onTap
+            )
+            CardActionsBar(
+                item: item,
+                onLike: onLike,
+                onRepost: onRepost,
+                onComment: onComment,
+                onFavorite: onFavorite,
+                onShare: onShare,
+                onReact: onReact
+            )
+        }
+        .padding(SQSpace.lg)
+        .sqEditorialCard()
+    }
+
+    private var legacyContent: some View {
             VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
@@ -136,8 +212,6 @@ struct CoverageCardView: View {
             }
             .padding(SQSpace.lg)
             .sqEditorialCard()
-        }
-        .buttonStyle(SQPressButtonStyle())
     }
 
     private var metrics: [FeedMetricGrid.Metric] {
@@ -280,6 +354,135 @@ struct CoverageCardView: View {
 
 private extension String {
     var nonEmpty: String? { isEmpty ? nil : self }
+}
+
+// MARK: - Post de fin de trajet
+
+/// Textes du post de fin de trajet (DT-POST-1 r2 §3) : les nombres sont servis, l'app formate.
+enum SessionPostText {
+    static func title(_ source: SocialSessionPostBlock.Source) -> String {
+        switch source {
+        case .driveTest: return String(localized: "Drive Test terminé")
+        case .coverage: return String(localized: "Session de couverture terminée")
+        }
+    }
+
+    /// Distance (km à une décimale), durée (minutes entières, comme la page Trajet), relevés.
+    static func metrics(_ block: SocialSessionPostBlock) -> [FeedMetricGrid.Metric] {
+        var metrics: [FeedMetricGrid.Metric] = []
+        if let meters = block.distanceMeters {
+            metrics.append(.init(label: String(localized: "Distance"),
+                                 value: meters > 0 ? SignalFormatters.meters(Double(meters)) : "—", highlight: meters > 0))
+        }
+        if let seconds = block.durationSeconds {
+            metrics.append(.init(label: String(localized: "Durée"), value: SignalFormatters.duration(Double(seconds))))
+        }
+        if let points = block.logicalPoints {
+            metrics.append(.init(label: String(localized: "Relevés"), value: points.formatted()))
+        }
+        return metrics
+    }
+
+    /// « Bon · 1 trou », ou « Peu fiable · Trop peu de mesures » (contrat §3.2).
+    static func headline(_ series: SocialSessionPostBlock.Series) -> String? {
+        if series.isUnreliable { return String(localized: "Peu fiable · Trop peu de mesures") }
+        let parts = [SessionAnalysisText.levelLabel(series.level), series.holes.map(SessionAnalysisText.holesLabel)]
+            .compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// « 5G 34 % · couvert 98 % · bon signal 71 % » ; une part absente est omise.
+    static func shares(_ series: SocialSessionPostBlock.Series) -> String? {
+        let parts = [
+            series.pct5g.map { String(localized: "5G \(percent($0))") },
+            series.coveragePct.map { String(localized: "couvert \(percent($0))") },
+            series.goodSignalPct.map { String(localized: "bon signal \(percent($0))") },
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// « 2 speedtests · médiane ↓ 855 Mb/s · ↑ 92 Mb/s » ; rien sans speedtest.
+    static func speedtests(_ speedtests: SocialSessionPostBlock.Speedtests?) -> String? {
+        guard let speedtests, speedtests.count > 0 else { return nil }
+        var parts = [String(localized: "\(speedtests.count) speedtests")]
+        let rates = [
+            speedtests.downloadMedianMbps.map { "↓ \(SignalFormatters.speed($0))" },
+            speedtests.uploadMedianMbps.map { "↑ \(SignalFormatters.speed($0))" },
+        ].compactMap { $0 }
+        if !rates.isEmpty { parts.append(String(localized: "médiane \(rates.joined(separator: " · "))")) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// « Repères : tunnel ×2 · pont ×1 », le type tel que le membre l'a choisi.
+    static func annotations(_ annotations: [SocialSessionPostBlock.Annotation]) -> String? {
+        guard !annotations.isEmpty else { return nil }
+        let list = annotations.map { "\($0.type) ×\($0.count)" }.joined(separator: " · ")
+        return String(localized: "Repères : \(list)")
+    }
+
+    private static func percent(_ value: Int) -> String {
+        (Double(value) / 100).formatted(.percent.precision(.fractionLength(0)))
+    }
+}
+
+/// Une ligne par série opérateur × SIM, dans l'ordre servi (celui de la page Trajet).
+private struct SessionPostSeriesList: View {
+    let series: [SocialSessionPostBlock.Series]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            ForEach(Array(series.enumerated()), id: \.element.id) { position, line in
+                if position > 0 { Divider() }
+                row(line)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private func row(_ line: SocialSessionPostBlock.Series) -> some View {
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            Circle()
+                .fill(SQBrand.operatorColor(line.operatorKey))
+                .frame(width: 10, height: 10)
+                .padding(.top, 5)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text(verbatim: line.operatorLabel)
+                        .font(SQFont.body(15, .semibold))
+                    Spacer(minLength: 0)
+                    if let score = line.score {
+                        Text(verbatim: "\(score)/100")
+                            .font(SQFont.body(15, .bold))
+                            .monospacedDigit()
+                    }
+                }
+                .foregroundStyle(SQColor.label)
+                // TRAJET-SIM : la marque de la SIM sous la ligne, jamais dans son titre.
+                ForEach(Array(SessionTripBrand.mentions(line.operatorDisplay).enumerated()), id: \.offset) { _, mention in
+                    Text(verbatim: SessionTripBrand.text(mention))
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                if let headline = SessionPostText.headline(line) {
+                    Text(verbatim: headline)
+                        .font(SQType.callout)
+                        .foregroundStyle(line.isUnreliable ? OutageTint.degradedInk : SQColor.label)
+                }
+                if let shares = SessionPostText.shares(line) {
+                    Text(verbatim: shares)
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 // MARK: - Miniature du parcours
