@@ -90,6 +90,30 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertEqual(profile.badges.first?.tier, "bronze")
     }
 
+    /// HORS FRANCE r1 (#1202, servi le 12/11) : `badges.hiddenBadgeIds` se lit dans la
+    /// forme servie (objet `badges` à la racine) ; une valeur illisible n'est pas masquée,
+    /// un champ absent ou l'ancienne forme (tableau) ne masquent rien.
+    func testDecodeGamificationHiddenBadgeIds() throws {
+        let served = """
+        {
+            "profile": {"level": 3, "points": 120, "badges": [{"id": "first_test", "title": "Premier test"}]},
+            "badges": {"catalog": [], "unlockedBadgeIds": ["first_test"], "hiddenBadgeIds": ["dept_75", "dept_2a", 7, ""]}
+        }
+        """
+        let profile = try JSONDecoder.signalQuest.decode(GamificationProfile.self, from: Data(served.utf8))
+        XCTAssertEqual(profile.hiddenBadgeIds, ["dept_75", "dept_2a"])
+        XCTAssertEqual(profile.badges.map(\.id), ["first_test"])
+
+        let older = """
+        {"profile": {"level": 3, "badges": []}, "badges": {"catalog": []}}
+        """
+        XCTAssertEqual(try JSONDecoder.signalQuest.decode(GamificationProfile.self, from: Data(older.utf8)).hiddenBadgeIds, [])
+        let flat = """
+        {"level": 3, "badges": [{"id": "b1"}]}
+        """
+        XCTAssertEqual(try JSONDecoder.signalQuest.decode(GamificationProfile.self, from: Data(flat.utf8)).hiddenBadgeIds, [])
+    }
+
     func testDecodeGamificationProfileWrappedBackendShape() throws {
         let json = """
         {

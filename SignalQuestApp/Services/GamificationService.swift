@@ -13,6 +13,22 @@ struct GamificationProfile: Decodable, Equatable {
     let nextLevelAt: Int?
     /// Avancement dans le niveau courant, de 0 à 100.
     let levelProgress: Double?
+    /// Badges du catalogue masqués pour ce membre (HORS FRANCE r1, `badges.hiddenBadgeIds`
+    /// servi le 12/11) : la règle vit au serveur, l'app retire seulement ces identifiants
+    /// de ce qu'elle lit dans `/catalog`. Absent ou illisible : rien de masqué.
+    var hiddenBadgeIds: Set<String> = []
+
+    private enum BadgeGroupKeys: String, CodingKey { case hiddenBadgeIds }
+
+    /// `badges` est un objet à la racine de `/profile` ; un tableau (ancienne forme) n'a rien de masqué.
+    private static func hiddenBadgeIds(in root: KeyedDecodingContainer<CodingKeys>) -> Set<String> {
+        guard let group = try? root.nestedContainer(keyedBy: BadgeGroupKeys.self, forKey: .badges),
+              let ids = try? group.decodeIfPresent([JSONValue].self, forKey: .hiddenBadgeIds) else { return [] }
+        return Set(ids.compactMap { value in
+            guard case .string(let id) = value, !id.isEmpty else { return nil }
+            return id
+        })
+    }
 
     enum CodingKeys: String, CodingKey {
         case profile, level, points, xpToNextLevel, pointsToNextLevel, nextLevelAt, levelProgress, consecutiveDays, badges
@@ -46,6 +62,7 @@ struct GamificationProfile: Decodable, Equatable {
                 nextLevelAt: nested.nextLevelAt,
                 levelProgress: nested.levelProgress
             )
+            hiddenBadgeIds = Self.hiddenBadgeIds(in: root)
             return
         }
         level = try root.decodeIfPresent(Int.self, forKey: .level)
@@ -56,6 +73,7 @@ struct GamificationProfile: Decodable, Equatable {
         levelProgress = try? root.decodeIfPresent(Double.self, forKey: .levelProgress)
         consecutiveDays = try root.decodeIfPresent(Int.self, forKey: .consecutiveDays)
         badges = root.decodeLossyArray([GamificationBadge].self, forKey: .badges)
+        hiddenBadgeIds = Self.hiddenBadgeIds(in: root)
     }
 
     /// Points restant à gagner : la valeur du serveur, sinon `nextLevelAt - points`,

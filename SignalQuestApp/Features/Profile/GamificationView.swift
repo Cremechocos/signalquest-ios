@@ -305,9 +305,11 @@ struct GamificationView: View {
     /// Badges du catalogue pas encore débloqués = succès à accomplir,
     /// branchés sur le même système de badges/points que la progression.
     /// (Distincts des Quêtes v2, qui ont leur propre section dédiée.)
+    /// Sans les badges que le serveur masque pour ce membre (ex. départements hors France).
     private var lockedBadges: [GamificationBadge] {
         let earned = Set(badgeList.map(\.id))
-        return model.catalog.filter { !earned.contains($0.id) }
+        let hidden = model.profile?.hiddenBadgeIds ?? []
+        return model.catalog.filter { !earned.contains($0.id) && !hidden.contains($0.id) }
     }
 
     // MARK: - Quêtes v2
