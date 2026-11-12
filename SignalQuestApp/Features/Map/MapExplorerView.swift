@@ -2304,9 +2304,13 @@ struct MapExplorerView: View {
                 // Le tracé est servi en vignette, sans speedtests : ils viennent du résumé,
                 // en parallèle, et s'ajoutent après le tracé, qui ne les attend pas.
                 async let speedtests = try? await services.sessions.sessionSpeedtests(id: request.id)
-                let points = try await services.sessions.sessionTrack(id: request.id).filter(\.hasValidCoordinate)
+                let track = try await services.sessions.sessionTrack(id: request.id)
+                // Une mesure Android = plusieurs lignes au même endroit : on en dessine une.
+                let measurements = SessionMeasurement.group(track.points.filter(\.hasValidCoordinate))
                 guard !Task.isCancelled, sessionFocus?.id == request.id else { return }
-                sessionFocus?.points = points
+                sessionFocus?.measurements = measurements
+                sessionFocus?.points = measurements.map(\.drawPoint)
+                sessionFocus?.deviceModel = track.deviceModel
                 sessionFocus?.phase = .loaded
                 sessionFocus?.revision &+= 1
                 sessionFocus?.layerRevision &+= 1
@@ -2407,7 +2411,9 @@ struct MapExplorerView: View {
                     coloring: sessionTraceColoring,
                     fitToken: sessionFitToken,
                     // Bandeau, pastille d'état et boutons flottants.
-                    bottomInset: mapControlsBottomInset + 200
+                    bottomInset: mapControlsBottomInset + 200,
+                    measurements: focus.measurements,
+                    deviceModel: focus.deviceModel
                 )
             }
         )
@@ -5258,7 +5264,8 @@ struct MapExplorerView: View {
             coordinate: annotation.coordinate,
             metric: annotation.metric,
             backendId: annotation.backendId,
-            details: annotation.details
+            details: annotation.details,
+            tripPoint: annotation.tripPoint
         )
     }
 
@@ -5482,7 +5489,11 @@ struct MapItemSheet: View {
                 case .speedtest:
                     speedtestContent
                 case .coverage:
-                    coverageContent
+                    if let tripPoint = item.tripPoint {
+                        tripPointContent(tripPoint)
+                    } else {
+                        coverageContent
+                    }
                 default:
                     genericContent
                 }
@@ -5612,6 +5623,54 @@ struct MapItemSheet: View {
 
     /// Petites capitales qui disent quoi, quel opérateur, quelle technologie ;
     /// grand chiffre d'encre et son unité ; date et distance.
+    /// Point d'un trajet : la mesure entière. Signal de la cellule servante (en 5G NSA,
+    /// l'ancre 4G), génération de la mesure, cellule 5G à part, téléphone qui a mesuré.
+    private func tripPointContent(_ trip: TripPointDetail) -> some View {
+        let measurement = trip.measurement
+        let point = measurement.primary
+        let quality = SQQualityScale.Signal(dbm: point.signalStrength, technology: point.tech)
+        let bands = [point.primaryBand.map { SQUnits.band($0, technology: point.tech) },
+                     measurement.nr?.primaryBand.map { SQUnits.band($0, isNR: true) }]
+            .compactMap { $0 }.joined(separator: " + ")
+        let source: String = ["SignalQuest", trip.deviceModel].compactMap { $0 }.joined(separator: " · ")
+        let rows: [(String, String?)] = [
+            ("Source", source),
+            ("Cellule", Self.cellText(point)),
+            ("Cellule 5G", measurement.nr.flatMap(Self.nrCellText)),
+            ("Précision", point.accuracy.map { "± \(SQUnits.distance(meters: $0))" }),
+            ("Position", coordinatesText(lat: point.lat, lon: point.lng))
+        ]
+        return VStack(alignment: .leading, spacing: SQSpace.lg) {
+            header(
+                kicker: [String(localized: "Couverture"), item.details?.operatorName, measurement.generation, bands],
+                value: point.signalStrength.map { "\(Int($0.rounded()))" } ?? "—",
+                unit: point.signalStrength.map { _ in String(localized: "dBm · signal \(quality.label.lowercased())") },
+                caption: [point.timestamp.map(SignalFormatters.dateAroundHour), distanceText]
+            )
+            tiles([
+                ("RSRQ", point.rsrq.map { "\(Int($0.rounded()))" }, "dB"),
+                ("SNR", point.snr.map { "\(Int($0.rounded()))" }, "dB")
+            ])
+            detailRows(rows)
+        }
+    }
+
+    /// « eNB 632423 · PCI 234 », « gNB … » en 5G SA ; le numéro de cellule seul en dernier recours.
+    static func cellText(_ point: CoverageSessionPoint) -> String? {
+        let node = point.enb.map { "eNB \($0)" } ?? point.gnb.map { "gNB \($0)" }
+            ?? point.cellId.map { "CID \($0)" }
+        let parts = [node, point.pci.map { "PCI \($0)" }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// « n78 · -81 dBm · PCI 580 » : la cellule NR d'une mesure 5G NSA.
+    static func nrCellText(_ nr: CoverageSessionPoint) -> String? {
+        let parts = [nr.primaryBand.map { SQUnits.band($0, isNR: true) },
+                     nr.signalStrength.map { "\(Int($0.rounded())) dBm" },
+                     nr.pci.map { "PCI \($0)" }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private func header(kicker: [String?], value: String, unit: String?, caption: [String?]) -> some View {
         let kickerText = kicker.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         let captionText = caption.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
@@ -5749,7 +5808,11 @@ struct MapSessionFocus {
     let id: String
     let title: String?
     let returnRegion: MKCoordinateRegion
+    /// Un point dessiné par mesure : la cellule servante, à la génération de la mesure.
     var points: [CoverageSessionPoint] = []
+    var measurements: [SessionMeasurement] = []
+    /// Téléphone qui a mesuré, servi au seul propriétaire.
+    var deviceModel: String?
     /// Speedtests du trajet, touchables comme sur la carte (masqués par le serveur).
     var speedtests: [SpeedtestFeature] = []
     var phase: Phase = .loading

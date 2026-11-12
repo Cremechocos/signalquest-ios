@@ -210,18 +210,38 @@ final class MapNativeViewportTests: XCTestCase {
     }
 
     /// Choix du 12/11 : un point de couverture du trajet ouvre la fiche « Couverture »,
-    /// comme un speedtest ouvre la sienne.
-    func testTripCoveragePointOpensTheCoverageSheet() throws {
-        let json = #"{"id":"p1","latitude":45.76,"longitude":4.85,"signalStrength":-97.4,"rsrq":-11,"snr":8,"technology":"4G","operatorKey":"SFR"}"#
-        let point = try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: Data(json.utf8))
-        let payload = MapKitMapView.Coordinator.coveragePayload(from: point)
+    /// comme un speedtest ouvre la sienne. Une mesure Android arrive en lignes sœurs
+    /// (servante, autres bandes, NR en NSA) : un seul point, servante en tête, génération 5G.
+    func testTripCoveragePointOpensTheCoverageSheetOfTheWholeMeasurement() throws {
+        // Lignes réelles d'une mesure du 12/11 (identifiants remplacés), dans l'ordre servi.
+        let json = #"""
+        [{"id":"r1","pointGroupId":"g1","latitude":45.76,"longitude":4.85,"signalStrength":-81,"technology":"5G","pci":580,"bands":[78],"rsrq":-10},
+         {"id":"r2","pointGroupId":"g1","latitude":45.76,"longitude":4.85,"signalStrength":-116,"technology":"4G","enb":"632423","cellId":"29","pci":234,"bands":[1],"rsrq":-17,"snr":-1,"accuracy":46.9,"operatorKey":"SFR"},
+         {"id":"r3","pointGroupId":"g1","latitude":45.76,"longitude":4.85,"signalStrength":-81,"technology":"4G","pci":236,"bands":[3]},
+         {"id":"r4","pointGroupId":"g1","latitude":45.76,"longitude":4.85,"signalStrength":-77,"technology":"4G","pci":236,"bands":[20]},
+         {"id":"r5","pointGroupId":"g2","latitude":45.77,"longitude":4.86,"signalStrength":-101,"technology":"4G","enb":"632423","pci":234,"bands":[1]},
+         {"id":"r6","latitude":45.78,"longitude":4.87,"signalStrength":-95,"technology":"4G"}]
+        """#
+        let rows = try JSONDecoder.signalQuest.decode([CoverageSessionPoint].self, from: Data(json.utf8))
+        let measurements = SessionMeasurement.group(rows)
+        XCTAssertEqual(measurements.map(\.primary.id), ["r2", "r5", "r6"])
+        XCTAssertEqual(measurements.map(\.generation), ["5G", "4G", "4G"])
+        XCTAssertEqual(measurements[0].nr?.id, "r1")
+        XCTAssertNil(measurements[1].nr)
+        // Le tracé dessine la servante (son signal) à la génération de la mesure.
+        XCTAssertEqual(measurements[0].drawPoint.signalStrength, -116)
+        XCTAssertEqual(measurements[0].drawPoint.tech, "5G")
+        XCTAssertEqual(measurements[0].primary.primaryBand, 1)
+
+        let payload = MapKitMapView.Coordinator.coveragePayload(from: measurements[0], deviceModel: "Pixel 9 Pro")
         XCTAssertEqual(payload.kind, .coverage)
         XCTAssertNil(payload.backendId)
-        XCTAssertEqual(payload.details?.rsrp, -97.4)
-        XCTAssertEqual(payload.details?.rsrq, -11)
-        XCTAssertEqual(payload.details?.tech, "4G")
+        XCTAssertEqual(payload.details?.rsrp, -116)
         XCTAssertEqual(payload.details?.operatorName, "SFR")
-        XCTAssertEqual(payload.coordinate.latitude, 45.76, accuracy: 1e-9)
+        XCTAssertEqual(payload.tripPoint?.deviceModel, "Pixel 9 Pro")
+        XCTAssertEqual(payload.tripPoint?.measurement.nr?.id, "r1")
+        XCTAssertEqual(MapItemSheet.cellText(measurements[0].primary), "eNB 632423 · PCI 234")
+        XCTAssertEqual(MapItemSheet.nrCellText(rows[0]), "n78 · -81 dBm · PCI 580")
     }
 
     func testVisibleSpeedtestBeyondOrnamentMarginRemainsAccessible() async throws {

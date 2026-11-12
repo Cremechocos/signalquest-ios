@@ -119,6 +119,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let driveSummary: CoverageDriveSummary?
     /// TRAJET-SIM, par `seriesKey` brut (celui de l'analyse) ; vide sur un ancien serveur.
     let seriesOperatorDisplay: [String: SessionSeriesOperatorDisplay]
+    /// Modèle du téléphone qui a mesuré ; servi au seul propriétaire du trajet.
+    let deviceModel: String?
 
     /// Trajet connu par son récap seulement : pas de points à montrer.
     var isSummaryOnly: Bool { driveSummary != nil && (totalPoints ?? 0) == 0 }
@@ -129,7 +131,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         case startTime, startedAt, createdAt, endTime, endedAt, duration
         case totalPoints, pointCount, distance
         case avgSignalStrength, minSignalStrength, maxSignalStrength
-        case operators, technologies, technologiesDetected, showOnMap, seriesOperatorDisplay
+        case operators, technologies, technologiesDetected, showOnMap, seriesOperatorDisplay, deviceModel
     }
 
     init(from decoder: Decoder) throws {
@@ -163,6 +165,10 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         // Une série illisible ne fait pas tomber les autres.
         seriesOperatorDisplay = ((try? c.decodeIfPresent([String: FailableSeriesDisplay].self, forKey: .seriesOperatorDisplay)) ?? nil)?
             .compactMapValues(\.value) ?? [:]
+        deviceModel = c.decodeFlexibleString(forKey: .deviceModel).flatMap {
+            let model = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return model.isEmpty ? nil : model
+        }
     }
 
     private struct FailableSeriesDisplay: Decodable {
@@ -234,7 +240,11 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let gnb: String?
     let pci: String?
     let cellId: String?
-    let tech: String?
+    /// Variable : une mesure 5G NSA (ancre 4G + cellule NR) prend la génération la plus haute.
+    var tech: String?
+    /// Mesure dont cette ligne fait partie : Android enregistre la cellule servante, les
+    /// autres bandes vues et la cellule NR d'un même instant en lignes sœurs (`fields=detail`).
+    let pointGroupId: String?
     /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
     /// Série SIM du point (DRIVE-ANALYSIS-1), opaque, jamais affichée.
@@ -274,7 +284,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
-        case rsrq, snr, timingAdvance, accuracy, cellMeasurements
+        case rsrq, snr, timingAdvance, accuracy, cellMeasurements, pointGroupId, bands
         case technology, networkType, operatorKey, seriesKey, mobileOperator, mvnoKey, mvnoName, timestamp
         case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
         case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
@@ -292,6 +302,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         pci = c.decodeFlexibleString(forKey: .pci)
         cellId = c.decodeFlexibleString(forKey: .cellId)
         tech = c.decodeFlexibleString(forKey: .technology) ?? c.decodeFlexibleString(forKey: .networkType)
+        pointGroupId = c.decodeFlexibleString(forKey: .pointGroupId)
         // Deux champs DISTINCTS. Le repli `operatorKey ?? mobileOperator` écrivait un
         // nom de SIM dans un champ censé porter une clé canonique — soit exactement le
         // mélange que ce chantier supprime : un « Lebara » ou un « Orange F » ne
@@ -319,7 +330,9 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
             .flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         let cells = c.decodeLossyArray([PrimaryCellProbe].self, forKey: .cellMeasurements)
         let primary = cells.first { $0.isPrimary == true } ?? cells.first
-        primaryBand = primary?.band.flatMap { $0 > 0 ? $0 : nil }
+        // Sans `cellMeasurements`, la ligne porte sa propre bande (`bands`, `fields=detail`).
+        let ownBand = ((try? c.decodeIfPresent([Int].self, forKey: .bands)) ?? nil)?.first
+        primaryBand = (primary?.band ?? ownBand).flatMap { $0 > 0 ? $0 : nil }
         primaryBandIsNR = primary?.cellType?.uppercased().contains("NR") == true
     }
 
@@ -368,6 +381,73 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     }
 
     var servingPlmn: (mcc: String, mnc: String, plmn: String)? { plmnEvidence.components }
+}
+
+/// Tracé d'une session pour la carte principale, et le téléphone qui l'a mesuré.
+struct SessionTrack: Equatable {
+    /// Taille d'une page (plafond du serveur) et lignes lues au plus : 30 000 lignes font
+    /// environ 1 Mo compressé, soit 4 000 à 7 000 mesures Android.
+    static let pageLimit = 10_000
+    static let maxRows = 30_000
+
+    let points: [CoverageSessionPoint]
+    /// Servi au seul propriétaire du trajet.
+    let deviceModel: String?
+}
+
+/// Une mesure d'un trajet. Android l'enregistre en 4 à 8 lignes du même instant :
+/// la cellule servante, les autres bandes vues et, en 5G NSA, la cellule NR. Dessinées
+/// une à une, elles posaient au même endroit des points de couleurs différentes, et la
+/// fiche lisait au hasard l'une d'elles, souvent « 4G » (12/11, trajet d'Alexandre).
+struct SessionMeasurement: Equatable {
+    /// Cellule servante : la ligne qui porte une identité de cellule, sinon la première
+    /// qui n'est pas la NR, sinon la première.
+    let primary: CoverageSessionPoint
+    /// Cellule 5G NR de la même mesure (NSA), quand elle n'est pas la servante.
+    let nr: CoverageSessionPoint?
+    /// Génération de la mesure, la plus haute de ses lignes (règle du serveur, network-generation.ts).
+    let generation: String?
+
+    /// Ce que le tracé dessine : la servante, à la génération de la mesure.
+    var drawPoint: CoverageSessionPoint {
+        var point = primary
+        point.tech = generation ?? primary.tech
+        return point
+    }
+
+    /// Regroupe par `pointGroupId` (une ligne sans groupe est une mesure à elle seule),
+    /// dans l'ordre d'arrivée.
+    static func group(_ points: [CoverageSessionPoint]) -> [SessionMeasurement] {
+        var order: [String] = []
+        var rows: [String: [CoverageSessionPoint]] = [:]
+        for point in points {
+            let key = point.pointGroupId.flatMap { $0.isEmpty ? nil : $0 } ?? "id:\(point.id)"
+            if rows[key] == nil { order.append(key) }
+            rows[key, default: []].append(point)
+        }
+        return order.compactMap { key in rows[key].flatMap(Self.init(rows:)) }
+    }
+
+    init?(rows: [CoverageSessionPoint]) {
+        guard let first = rows.first else { return nil }
+        let isNR: (CoverageSessionPoint) -> Bool = { Self.rank($0.tech) == 5 }
+        let identified = rows.first { !isNR($0) && ($0.cellId != nil || $0.enb != nil) }
+            ?? rows.first { $0.gnb != nil || ($0.cellId != nil && isNR($0)) }
+        let primary = identified ?? rows.first { !isNR($0) } ?? first
+        self.primary = primary
+        nr = isNR(primary) ? nil : rows.first(where: isNR)
+        generation = rows.max { Self.rank($0.tech) < Self.rank($1.tech) }?.tech ?? primary.tech
+    }
+
+    /// Rang de génération par préfixe de libellé, comme `networkGenerationRank` du serveur.
+    static func rank(_ tech: String?) -> Int {
+        let t = (tech ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        if t.hasPrefix("5G") || t.hasPrefix("NR") { return 5 }
+        if t.hasPrefix("4G") || t.hasPrefix("LTE") { return 4 }
+        if t.hasPrefix("3G") || t.hasPrefix("WCDMA") || t.hasPrefix("UMTS") || t.hasPrefix("HSPA") { return 3 }
+        if t.hasPrefix("2G") || t.hasPrefix("GSM") || t.hasPrefix("EDGE") || t.hasPrefix("GPRS") { return 2 }
+        return 0
+    }
 }
 
 /// Speedtest rattaché à une session Drive Test — renvoyé par le backend SOUS

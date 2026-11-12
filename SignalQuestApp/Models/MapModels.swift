@@ -1438,6 +1438,8 @@ struct MapDisplayItem: Identifiable, Equatable {
     let metric: String?
     let backendId: String?
     let details: MapItemDetails?
+    /// Point de couverture d'un trajet : la fiche lit sa mesure entière.
+    let tripPoint: TripPointDetail?
 
     init(
         id: String,
@@ -1447,7 +1449,8 @@ struct MapDisplayItem: Identifiable, Equatable {
         coordinate: CLLocationCoordinate2D,
         metric: String?,
         backendId: String? = nil,
-        details: MapItemDetails? = nil
+        details: MapItemDetails? = nil,
+        tripPoint: TripPointDetail? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -1457,6 +1460,7 @@ struct MapDisplayItem: Identifiable, Equatable {
         self.metric = metric
         self.backendId = backendId
         self.details = details
+        self.tripPoint = tripPoint
     }
 
     static func == (lhs: MapDisplayItem, rhs: MapDisplayItem) -> Bool {
@@ -1468,8 +1472,16 @@ struct MapDisplayItem: Identifiable, Equatable {
         lhs.coordinate.longitude == rhs.coordinate.longitude &&
         lhs.metric == rhs.metric &&
         lhs.backendId == rhs.backendId &&
-        lhs.details == rhs.details
+        lhs.details == rhs.details &&
+        lhs.tripPoint == rhs.tripPoint
     }
+}
+
+/// Mesure d'un trajet touchée sur la carte, et le téléphone qui l'a faite.
+struct TripPointDetail: Equatable {
+    let measurement: SessionMeasurement
+    /// Servi au seul propriétaire du trajet.
+    let deviceModel: String?
 }
 
 struct MapItemDetails: Equatable {

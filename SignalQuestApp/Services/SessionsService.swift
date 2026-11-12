@@ -418,10 +418,12 @@ protocol SessionsServicing: Sendable {
     /// tout d'un bloc, sans `page`.
     func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail
     func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse
-    /// Tracé seul d'une session, échantillonné par le serveur (10 à 5 000 points) :
-    /// la carte principale le montre quand un post du fil l'ouvre (contrat #958).
+    /// Tracé d'une session, en lignes détaillées (`fields=detail`, pages suivies jusqu'à
+    /// `SessionTrack.maxRows`) : la carte principale le montre quand un post du fil
+    /// l'ouvre (contrat #958). La vignette (`maxPoints`) échantillonnait ligne par ligne
+    /// et coupait les mesures en morceaux, sans cellule ni bande.
     /// Accessible au propriétaire, ou si la session est visible ou partagée.
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint]
+    func sessionTrack(id: String) async throws -> SessionTrack
     /// Speedtests d'une session (`fields=summary`, sans points), masqués par le serveur :
     /// le tracé (`maxPoints`) est servi en vignette, sans eux.
     func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest]
@@ -448,8 +450,9 @@ extension SessionsServicing {
         SessionPointsPageResponse(points: [], page: nil)
     }
 
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
-        try await sessionDetail(id: id).points
+    func sessionTrack(id: String) async throws -> SessionTrack {
+        let detail = try await sessionDetail(id: id)
+        return SessionTrack(points: detail.points, deviceModel: detail.session.deviceModel)
     }
 
     func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest] {
@@ -497,18 +500,27 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         )
     }
 
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
-        try await api.request(
+    func sessionTrack(id: String) async throws -> SessionTrack {
+        let first = try await api.request(
             APIEndpoint(
                 path: "/api/coverage/sessions",
                 query: [
                     URLQueryItem(name: "sessionId", value: id),
-                    URLQueryItem(name: "fields", value: "track"),
-                    URLQueryItem(name: "maxPoints", value: "5000")
+                    URLQueryItem(name: "fields", value: "detail"),
+                    URLQueryItem(name: "limit", value: String(SessionTrack.pageLimit))
                 ]
             ),
             as: CoverageSessionDetail.self
-        ).points
+        )
+        var points = first.points
+        var cursor = first.page?.nextCursor
+        while let next = cursor, points.count < SessionTrack.maxRows {
+            try Task.checkCancellation()
+            let page = try await sessionPoints(id: id, after: next, limit: SessionTrack.pageLimit)
+            points += page.points
+            cursor = page.points.isEmpty ? nil : page.page?.nextCursor
+        }
+        return SessionTrack(points: points, deviceModel: first.session.deviceModel)
     }
 
     func sessionSpeedtests(id: String) async throws -> [SessionSpeedtest] {

@@ -96,6 +96,8 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     var glyphOverride: String? = nil
     /// Speedtest d'un trajet vu seul : pastille compacte plutôt que marqueur.
     var isTripSpeedDot: Bool = false
+    /// Point de couverture d'un trajet vu seul : sa mesure entière, pour la fiche.
+    var tripPoint: TripPointDetail? = nil
     /// Nombre de photos publiques sur le site (antennes) → badge appareil-photo.
     var contributionPhotos: Int = 0
     /// eNB du site identifié par la communauté → coche verte sur le marqueur.
@@ -188,6 +190,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.plannedStatus == rhs.plannedStatus &&
         lhs.glyphOverride == rhs.glyphOverride &&
         lhs.isTripSpeedDot == rhs.isTripSpeedDot &&
+        lhs.tripPoint == rhs.tripPoint &&
         lhs.contributionPhotos == rhs.contributionPhotos &&
         lhs.hasEnb == rhs.hasEnb &&
         lhs.hasGnb == rhs.hasGnb &&
