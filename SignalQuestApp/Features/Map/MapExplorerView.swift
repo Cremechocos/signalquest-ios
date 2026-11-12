@@ -3660,6 +3660,15 @@ struct MapExplorerView: View {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 mapZoom = 15
             }
+            // La recherche couvre tous les opérateurs, la carte seulement celui affiché : un site
+            // d'un autre opérateur fait basculer le filtre sur le sien (comme le Web, #1018,
+            // décision du 09/11). Rien ne change en vue « Tous » ni si le site porte l'opérateur affiché.
+            let shown = model.operatorFilter
+            if shown.uppercased() != "ALL",
+               !site.operators.contains(where: { $0.caseInsensitiveCompare(shown) == .orderedSame }),
+               let target = site.operators.first {
+                model.chooseOperatorManually(target)
+            }
             // Ouvre la fiche même sans coordonnées valides (corrige l'ancien tap mort).
             selectedAntenna = site
         }
