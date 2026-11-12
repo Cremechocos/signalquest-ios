@@ -291,12 +291,23 @@ struct ConversationDetailView: View {
     /// ce fil, l'écran le dit au lieu de proposer « Réessayer »
     /// (cmw9quitter0leave0a2deux1, choix d'Alexandre du 09/11).
     @State private var noLongerMember = false
+    /// Cause servie d'un 403 « plus membre » ou 404 de conversation (CONV-MEMBERSHIP r1) ;
+    /// nil sur le chemin chiffré, dont la carte garde ses textes.
+    @State private var membershipLoss: ConversationMembershipLoss?
     @State private var isRemovingFromList = false
     @State private var confirmsLocalErase = false
     @State private var isStartingNewConversation = false
     /// Posé quand la conversation s'affiche à côté de la liste (iPad) : pas de retour.
     @Environment(\.sqMessagesCloseDetail) private var closeSplitDetail
     private var inSplitDetail: Bool { closeSplitDetail != nil }
+
+    /// Phrase sous le titre : celle de la cause servie, sinon celle du chemin chiffré.
+    private var noLongerMemberMessage: String? {
+        guard let membershipLoss else {
+            return String(localized: "Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus.")
+        }
+        return membershipLoss.message
+    }
 
     /// Carte affichée quand ce compte ne fait plus partie de la conversation :
     /// ni « Réessayer » ni champ de saisie, seulement le retrait de la liste.
@@ -311,15 +322,17 @@ struct ConversationDetailView: View {
                     font: SQFont.body(22, .medium, relativeTo: .title3)
                 )
                 .padding(.bottom, SQSpace.xs)
-                Text("Tu ne fais plus partie de cette conversation")
+                Text(membershipLoss?.title ?? String(localized: "Tu ne fais plus partie de cette conversation"))
                     .font(SQType.stateTitle)
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
-                Text("Les messages envoyés depuis ton départ ne te sont plus destinés. Les anciens restent sur les appareils qui les ont reçus.")
-                    .font(SQType.callout)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .multilineTextAlignment(.center)
+                if let message = noLongerMemberMessage {
+                    Text(message)
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.center)
+                }
                 if otherParticipantId != nil {
                     GradientButton(
                         String(localized: "Nouvelle conversation"), systemImage: "square.and.pencil",
@@ -3612,12 +3625,17 @@ struct ConversationDetailView: View {
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
             if !receiptsKnown { readReceipts = page.readReceipts ?? [] }
             errorMessage = nil
+            if membershipLoss != nil { membershipLoss = nil; noLongerMember = false }
             advanceLastSync(with: page.messages)
             await refreshE2EEState()
             await decryptLoadedMessages()
             refreshPolls()
             await acknowledgeDelivery()
             await refreshReceipts()
+        } catch let error where ConversationMembershipLoss(error: error) != nil {
+            membershipLoss = ConversationMembershipLoss(error: error)
+            errorMessage = nil
+            noLongerMember = true
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -7214,6 +7232,59 @@ private struct BottomAnchoredScroll: ViewModifier {
             content.defaultScrollAnchor(.bottom)
         } else {
             content
+        }
+    }
+}
+
+/// Pourquoi ce compte ne peut plus ouvrir une conversation (CONV-MEMBERSHIP r1) : la cause
+/// d'un 403 « plus membre », ou le 404 d'une conversation qui n'existe plus. Textes d'Android,
+/// choisis par Alexandre le 12/11. Les autres 403 (blocage, demande en attente) n'en sont pas.
+enum ConversationMembershipLoss: Equatable {
+    case left
+    case removed
+    case deletedForSelf(returnsOnNewMessage: Bool)
+    case requestDeclined
+    /// Cause absente de la liste, ou inconnue de cette version : texte générique.
+    case notMember
+    case gone
+
+    init?(error: Error) {
+        guard let api = error as? APIError, case .http(let status, let code, _, _, _) = api else { return nil }
+        if status == 404, code == "NOT_FOUND" { self = .gone; return }
+        let prefix = BackendErrorResponse.membershipPrefix
+        guard status == 403, let code, code.hasPrefix(prefix) else { return nil }
+        switch String(code.dropFirst(prefix.count)) {
+        case "left": self = .left
+        case "removed": self = .removed
+        case "deleted_for_self" + BackendErrorResponse.membershipReturnsSuffix: self = .deletedForSelf(returnsOnNewMessage: true)
+        case "deleted_for_self": self = .deletedForSelf(returnsOnNewMessage: false)
+        case "request_declined": self = .requestDeclined
+        default: self = .notMember
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .left: return String(localized: "Tu as quitté cette conversation")
+        case .removed: return String(localized: "Tu ne fais plus partie de ce groupe")
+        case .deletedForSelf: return String(localized: "Tu as supprimé cette conversation")
+        case .requestDeclined: return String(localized: "Tu as refusé cette demande")
+        case .notMember: return String(localized: "Tu ne fais plus partie de cette conversation")
+        case .gone: return String(localized: "Cette conversation n’existe plus")
+        }
+    }
+
+    /// nil : le titre suffit (conversation de groupe supprimée pour soi, qui ne revient pas).
+    var message: String? {
+        switch self {
+        case .left, .requestDeclined, .notMember:
+            return String(localized: "Tu ne peux plus lire ni envoyer de messages ici.")
+        case .removed:
+            return String(localized: "Ton accès a été retiré : tu ne peux plus lire ni envoyer de messages ici.")
+        case .deletedForSelf(let returns):
+            return returns ? String(localized: "Elle reviendra dans ta liste au prochain message.") : nil
+        case .gone:
+            return String(localized: "Elle a été supprimée et ne peut plus s’ouvrir.")
         }
     }
 }

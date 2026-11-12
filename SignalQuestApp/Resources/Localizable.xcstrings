@@ -1,6 +1,234 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Tu as quitté cette conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You left this conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as quitté cette conversation"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as quitté cette conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez quitté cette conversation"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu ne fais plus partie de ce groupe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re no longer part of this group"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne fais plus partie de ce groupe"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu ne fais plus partie de ce groupe" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous ne faites plus partie de ce groupe"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu as supprimé cette conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You deleted this conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as supprimé cette conversation"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as supprimé cette conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez supprimé cette conversation"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu as refusé cette demande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You declined this request"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as refusé cette demande"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as refusé cette demande" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez refusé cette demande"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette conversation n’existe plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation no longer exists"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation n’existe plus"
+          }
+        }
+      }
+    },
+    "Tu ne peux plus lire ni envoyer de messages ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can no longer read or send messages here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne peux plus lire ni envoyer de messages ici."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu ne peux plus lire ni envoyer de messages ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous ne pouvez plus lire ni envoyer de messages ici."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton accès a été retiré : tu ne peux plus lire ni envoyer de messages ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your access was removed: you can no longer read or send messages here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton accès a été retiré : tu ne peux plus lire ni envoyer de messages ici."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton accès a été retiré : tu ne peux plus lire ni envoyer de messages ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre accès a été retiré : vous ne pouvez plus lire ni envoyer de messages ici."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Elle reviendra dans ta liste au prochain message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will come back to your list with the next message."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle reviendra dans ta liste au prochain message."
+          }
+        }
+      }
+    },
+    "SQFormal|Elle reviendra dans ta liste au prochain message." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle reviendra dans votre liste au prochain message."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Elle a été supprimée et ne peut plus s’ouvrir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It was deleted and can no longer be opened."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle a été supprimée et ne peut plus s’ouvrir."
+          }
+        }
+      }
+    },
     "Cellule 5G" : {
       "localizations" : {
         "en" : {

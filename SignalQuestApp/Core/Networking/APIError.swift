@@ -238,12 +238,20 @@ struct BackendErrorResponse: Codable {
     /// message la nomme ; une fonction inconnue garde le code nu, donc le
     /// message générique. À ne pas confondre avec `OPERATOR_REQUIRED` (FAV-1).
     var appCode: String? {
+        // CONV-MEMBERSHIP r1 : un 403 « plus membre » d'une conversation dit sa cause
+        // (`details.membership`) ; l'app la porte dans le code, `FORBIDDEN.MEMBERSHIP.left`.
+        if code == "FORBIDDEN", case .string(let membership)? = details?["membership"], !membership.isEmpty {
+            let returns = membership == "deleted_for_self" && details?["returnsOnNewMessage"] == .bool(true)
+            return Self.membershipPrefix + membership + (returns ? Self.membershipReturnsSuffix : "")
+        }
         guard code == Self.supportedNetworkRequired,
               let feature = feature?.lowercased(),
               Self.supportedNetworkFeatures.contains(feature) else { return code }
         return "\(Self.supportedNetworkRequired).\(feature.uppercased())"
     }
 
+    static let membershipPrefix = "FORBIDDEN.MEMBERSHIP."
+    static let membershipReturnsSuffix = ".returns"
     static let supportedNetworkRequired = "SUPPORTED_NETWORK_REQUIRED"
     static let supportedNetworkFeatures: Set<String> = ["live_share", "session_share", "coverage", "coverage_import", "identify"]
 }
