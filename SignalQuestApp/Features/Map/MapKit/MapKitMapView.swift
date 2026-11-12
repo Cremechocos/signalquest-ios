@@ -602,7 +602,7 @@ struct MapKitMapView: UIViewRepresentable {
                 elements.append(summary)
             }
             elements.append(contentsOf: exposed.map { feature in
-                let payload = speedtestPayload(from: feature)
+                let payload = Self.speedtestPayload(from: feature)
                 let description = MapAccessibility.describe(payload)
                 let element = SQMapOverlayAccessibilityElement(accessibilityContainer: container)
                 element.accessibilityLabel = description.label
@@ -733,7 +733,7 @@ struct MapKitMapView: UIViewRepresentable {
                 let d = hypot(p.x - tap.x, p.y - tap.y)
                 if d < bestDist { bestDist = d; best = f }
             }
-            if let best { onSelect(speedtestPayload(from: best)) }
+            if let best { onSelect(Self.speedtestPayload(from: best)) }
         }
 
         /// Point retenu au début d'un appui long, remis au lever du doigt.
@@ -768,7 +768,7 @@ struct MapKitMapView: UIViewRepresentable {
             }
         }
 
-        func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
+        static func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
             MapAnnotationPayload(
                 id: "speed-\(speedtest.id)",
                 kind: .speedtest,

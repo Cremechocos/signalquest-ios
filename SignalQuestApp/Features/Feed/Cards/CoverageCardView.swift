@@ -89,7 +89,6 @@ struct CoverageCardView: View {
                     states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
                     spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
                 )
-                if !tracePoints.isEmpty { traceLegend }
             }
             SessionPostSummary(block: block)
             FeedOpenCapsule(
@@ -132,7 +131,6 @@ struct CoverageCardView: View {
                         states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
                         spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
                     )
-                    if !tracePoints.isEmpty { traceLegend }
                 } else {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
@@ -235,25 +233,6 @@ struct CoverageCardView: View {
     private var measuresDetail: String? {
         guard let count = signal?.pointsCount, count > 0 else { return nil }
         return String(localized: "\(count) mesures")
-    }
-
-    /// Les niveaux réellement présents sur le tracé, dans l'ordre de l'échelle.
-    private var traceLegend: some View {
-        let present = Set(SessionSignalTrace.states(tracePoints))
-        let order: [SQQualityScale.Signal] = [.excellent, .good, .fair, .weak, .poor, .noService]
-        return FlowRow(spacing: SQSpace.md) {
-            ForEach(order.filter { present.contains($0) }, id: \.self) { level in
-                HStack(spacing: SQSpace.xs2) {
-                    Capsule(style: .continuous)
-                        .fill(level.color)
-                        .frame(width: 16, height: 4)
-                    Text(verbatim: level.label)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-            }
-        }
-        .accessibilityHidden(true)
     }
 
     private var tagTech: String { signal?.technology ?? bestDetectedTech ?? "—" }

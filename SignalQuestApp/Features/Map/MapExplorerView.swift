@@ -2302,16 +2302,19 @@ struct MapExplorerView: View {
         sessionLoadTask = Task {
             do {
                 // Le tracé est servi en vignette, sans speedtests : ils viennent du résumé,
-                // en parallèle. Sans eux, le tracé s'affiche quand même.
+                // en parallèle, et s'ajoutent après le tracé, qui ne les attend pas.
                 async let speedtests = try? await services.sessions.sessionSpeedtests(id: request.id)
                 let points = try await services.sessions.sessionTrack(id: request.id).filter(\.hasValidCoordinate)
-                let tests = await speedtests ?? []
                 guard !Task.isCancelled, sessionFocus?.id == request.id else { return }
                 sessionFocus?.points = points
-                sessionFocus?.speedtests = MapSessionFocus.speedtestFeatures(tests)
                 sessionFocus?.phase = .loaded
                 sessionFocus?.revision &+= 1
+                sessionFocus?.layerRevision &+= 1
                 sessionFitToken &+= 1
+                let tests = await speedtests ?? []
+                guard !Task.isCancelled, sessionFocus?.id == request.id, !tests.isEmpty else { return }
+                sessionFocus?.speedtests = MapSessionFocus.speedtestFeatures(tests)
+                sessionFocus?.layerRevision &+= 1
             } catch {
                 guard !error.isCancellation, sessionFocus?.id == request.id else { return }
                 switch error as? APIError {
@@ -2354,12 +2357,15 @@ struct MapExplorerView: View {
         // Trajet vu seul : les couches de la carte s'effacent derrière lui. La
         // parité de la version suffit à les retirer puis à les remettre.
         MapKitMapView(
-            annotations: sessionFocus == nil ? renderedAnnotations : [],
+            // Les speedtests d'un trajet sont des marqueurs, au-dessus du tracé : sur la
+            // route, une pastille de débit se perdait sous le trait aux mêmes couleurs.
+            annotations: sessionFocus.map { $0.speedtests.map(MapKitMapView.Coordinator.speedtestPayload(from:)) }
+                ?? renderedAnnotations,
             coverageHeatFeatures: sessionFocus == nil ? renderedCoverageFeatures : [],
-            speedtestFeatures: sessionFocus?.speedtests ?? renderedSpeedtestFeatures,
-            // Paire hors trajet, impaire en trajet : la révision du trajet fait
-            // passer ses speedtests, chargés après l'ouverture.
-            renderVersion: sessionFocus.map { $0.revision &* 2 &+ 1 } ?? renderVersion &* 2,
+            speedtestFeatures: sessionFocus == nil ? renderedSpeedtestFeatures : [],
+            // Paire hors trajet, impaire en trajet : la version des couches du trajet
+            // fait passer ses speedtests, chargés après le tracé.
+            renderVersion: sessionFocus.map { $0.layerRevision &* 2 &+ 1 } ?? renderVersion &* 2,
             viewportRefreshID: viewportRefreshID,
             colorScheme: colorScheme,
             // iPad : la mention légale d'Apple passe au-dessus de la rangée du bas
@@ -5742,7 +5748,10 @@ struct MapSessionFocus {
     /// Speedtests du trajet, touchables comme sur la carte (masqués par le serveur).
     var speedtests: [SpeedtestFeature] = []
     var phase: Phase = .loading
+    /// Change quand le tracé change (il est redessiné).
     var revision = 0
+    /// Change quand le tracé ou les speedtests changent (couches de la carte).
+    var layerRevision = 0
 
     /// Un test sans position ni débit descendant ne se place pas sur la carte.
     static func speedtestFeatures(_ speedtests: [SessionSpeedtest]) -> [SpeedtestFeature] {
