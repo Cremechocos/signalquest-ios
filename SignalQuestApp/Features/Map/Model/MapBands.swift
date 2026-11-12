@@ -168,13 +168,11 @@ enum SpeedBand: String, CaseIterable {
     case medium
     case good
     case veryGood
-    case excellent
     case exceptional
 
     static func band(forDownload mbps: Double) -> SpeedBand {
         switch SQQualityScale.Throughput(mbps: mbps) {
         case .exceptional: return .exceptional
-        case .excellent: return .excellent
         case .veryGood: return .veryGood
         case .good: return .good
         case .medium: return .medium
@@ -187,7 +185,6 @@ enum SpeedBand: String, CaseIterable {
         let scale: SQQualityScale.Throughput
         switch self {
         case .exceptional: scale = .exceptional
-        case .excellent: scale = .excellent
         case .veryGood: scale = .veryGood
         case .good: scale = .good
         case .medium: scale = .medium

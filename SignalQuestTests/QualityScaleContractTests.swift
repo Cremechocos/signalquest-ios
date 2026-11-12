@@ -11,14 +11,34 @@ import XCTest
 /// cette copie et de son empreinte.
 final class QualityScaleContractTests: XCTestCase {
     private static let expectedSHA256 = "4ac6086facc0f8879dc8420a9189e0005b2b03dd7fd17cf025c2695ea48631a3"
+    /// v2 (#1220, servie le 12/11) : seul le débit descendant change.
+    private static let expectedV2SHA256 = "f9b6ea96b9e4d7fb1f0a84067069fb896884fefe41bf7972e374bf1e11c460b0"
 
-    private func contractData() throws -> Data {
+    private func contractData(_ name: String = "quality-scale-v1.json") throws -> Data {
         let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        return try Data(contentsOf: repository.appendingPathComponent("contracts/quality-scale-v1.json"))
+        return try Data(contentsOf: repository.appendingPathComponent("contracts/\(name)"))
     }
 
     private func contract() throws -> [String: Any] {
         try XCTUnwrap(try JSONSerialization.jsonObject(with: contractData()) as? [String: Any])
+    }
+
+    private func contractV2() throws -> [String: Any] {
+        try XCTUnwrap(try JSONSerialization.jsonObject(with: contractData("quality-scale-v2.json")) as? [String: Any])
+    }
+
+    func testTheV2CopyIsTheFrozenContract() throws {
+        let digest = SHA256.hash(data: try contractData("quality-scale-v2.json")).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, Self.expectedV2SHA256, "La copie doit être celle du web, octet pour octet")
+        let root = try contractV2()
+        XCTAssertEqual(root["contract"] as? String, "quality-scale")
+        XCTAssertEqual(root["version"] as? String, "2")
+        XCTAssertEqual(root["status"] as? String, "frozen")
+        // Le reste de la v2 est la v1 : signal, génération et opérateurs inchangés.
+        let v1 = try contract()
+        for key in ["signal", "generation", "operators"] {
+            XCTAssertEqual(root[key] as? NSDictionary, v1[key] as? NSDictionary, key)
+        }
     }
 
     private func hex(_ value: Any?) throws -> UInt32 {
@@ -67,7 +87,7 @@ final class QualityScaleContractTests: XCTestCase {
     }
 
     func testDownloadVectorsPass() throws {
-        let vectors = try XCTUnwrap(((try contract())["vectors"] as? [String: Any])?["downloadSpeed"] as? [[String: Any]])
+        let vectors = try XCTUnwrap(((try contractV2())["vectors"] as? [String: Any])?["downloadSpeed"] as? [[String: Any]])
         XCTAssertEqual(vectors.count, 11)
         for vector in vectors {
             let expected = try XCTUnwrap(vector["expected"] as? String)
@@ -104,7 +124,7 @@ final class QualityScaleContractTests: XCTestCase {
     }
 
     func testDownloadThresholdsAndColors() throws {
-        let download = try XCTUnwrap((try contract())["downloadSpeed"] as? [String: Any])
+        let download = try XCTUnwrap((try contractV2())["downloadSpeed"] as? [String: Any])
         let levels = try XCTUnwrap(download["levels"] as? [[String: Any]])
         let app = Dictionary(uniqueKeysWithValues: SQQualityScale.Throughput.allCases.map { ($0.contractKey, $0) })
         XCTAssertEqual(levels.count, app.count)

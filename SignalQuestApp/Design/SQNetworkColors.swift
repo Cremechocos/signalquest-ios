@@ -17,9 +17,9 @@ enum SQNetworkColors {
 
     // MARK: Débit (Mb/s) → couleur
 
-    /// 7 paliers descendants — seuils {1000, 600, 300, 100, 30, 10} :
-    /// ≥1000 bleu · excellent cyan · très bon vert · bon vert clair ·
-    /// moyen jaune · lent orange · <10 rouge.
+    /// 6 paliers descendants (quality-scale v2) — seuils {1000, 300, 100, 30, 10} :
+    /// ≥1000 vert foncé · très bon vert · bon vert clair · moyen jaune ·
+    /// lent orange · <10 rouge.
     static func speedColor(_ mbps: Double) -> Color { Color(hex: speedHex(mbps)) }
     static func speedUIColor(_ mbps: Double) -> UIColor { uiColor(speedHex(mbps)) }
 

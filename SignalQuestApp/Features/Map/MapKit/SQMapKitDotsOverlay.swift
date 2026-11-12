@@ -99,7 +99,9 @@ final class SQSpeedDotMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
 
     func apply(_ payload: MapAnnotationPayload) {
         clusteringIdentifier = nil
-        dot.backgroundColor = SQNetworkColors.speedUIColor(payload.details?.downloadMbps ?? 0)
+        // Sans moyenne : « Pas de mesure » (gris du contrat), jamais le rouge de 0 Mb/s.
+        dot.backgroundColor = payload.details?.downloadMbps.map(SQNetworkColors.speedUIColor)
+            ?? SQNetworkColors.uiColor(SQQualityScale.unknownHex)
         applyAccessibility(for: payload)
     }
 }

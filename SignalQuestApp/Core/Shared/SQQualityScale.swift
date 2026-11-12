@@ -8,8 +8,10 @@ import Foundation
 /// commun `contracts/quality-scale-v1.json` (figé le 01/10/2026 avec Alexandre),
 /// vérifié par `QualityScaleContractTests` ; les bandes ANFR et les traits de
 /// génération en sombre, sa v1.1 (`contracts/quality-scale-v1.1.json`, même
-/// jour), vérifiée par `QualityScaleContractV11Tests`. Toute nouvelle version
-/// passe par un changement visible de ces copies.
+/// jour), vérifiée par `QualityScaleContractV11Tests`. Le débit suit la v2
+/// (`contracts/quality-scale-v2.json`, servie le 12/11 : six paliers, vert foncé
+/// au sommet, choix d'Alexandre), vérifiée par `QualityScaleContractTests`. Toute
+/// nouvelle version passe par un changement visible de ces copies.
 ///
 /// Partagé avec la cible widget : Foundation seulement, couleurs en hexadécimal.
 /// Les glyphes donnent une lecture qui ne dépend pas des couleurs (WCAG 1.4.1) et
@@ -25,13 +27,12 @@ enum SQQualityScale {
 
     /// Paliers de débit, du plus rapide au plus lent.
     enum Throughput: CaseIterable, Sendable {
-        case exceptional, excellent, veryGood, good, medium, slow, verySlow
+        case exceptional, veryGood, good, medium, slow, verySlow
 
         init(mbps: Double) {
             switch mbps {
             case 1_000...: self = .exceptional
-            case 600..<1_000: self = .excellent
-            case 300..<600: self = .veryGood
+            case 300..<1_000: self = .veryGood
             case 100..<300: self = .good
             case 30..<100: self = .medium
             case 10..<30: self = .slow
@@ -43,7 +44,6 @@ enum SQQualityScale {
         var lowerBoundMbps: Double {
             switch self {
             case .exceptional: return 1_000
-            case .excellent: return 600
             case .veryGood: return 300
             case .good: return 100
             case .medium: return 30
@@ -52,11 +52,10 @@ enum SQQualityScale {
             }
         }
 
-        /// Rouge → orange → jaune → vert clair → vert → cyan → bleu.
+        /// Rouge → orange → jaune → vert clair → vert → vert foncé (v2 : plus de cyan ni de bleu).
         var hex: UInt32 {
             switch self {
-            case .exceptional: return 0x3B82F6
-            case .excellent: return 0x06B6D4
+            case .exceptional: return 0x15803D
             case .veryGood: return 0x22C55E
             case .good: return 0x84CC16
             case .medium: return 0xEAB308
@@ -69,7 +68,6 @@ enum SQQualityScale {
         var contractKey: String {
             switch self {
             case .exceptional: return "exceptional"
-            case .excellent: return "excellent"
             case .veryGood: return "very-good"
             case .good: return "good"
             case .medium: return "fair"
@@ -81,7 +79,7 @@ enum SQQualityScale {
         /// Rapide, moyen ou lent : trois repères suffisent, le chiffre dit le reste.
         var glyph: String {
             switch self {
-            case .exceptional, .excellent, .veryGood, .good: return "hare"
+            case .exceptional, .veryGood, .good: return "hare"
             case .medium: return "equal"
             case .slow, .verySlow: return "tortoise"
             }

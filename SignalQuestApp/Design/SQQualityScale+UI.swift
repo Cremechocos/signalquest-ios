@@ -11,7 +11,6 @@ extension SQQualityScale.Throughput {
     var label: String {
         switch self {
         case .exceptional: return String(localized: "Exceptionnel")
-        case .excellent: return String(localized: "Excellent")
         case .veryGood: return String(localized: "Très bon")
         case .good: return String(localized: "Bon")
         case .medium: return String(localized: "Moyen")
@@ -20,7 +19,7 @@ extension SQQualityScale.Throughput {
         }
     }
 
-    /// Plage du palier pour une légende : « 600–1 000 », « 1 000+ », « < 10 ».
+    /// Plage du palier pour une légende : « 300–1 000 », « 1 000+ », « < 10 ».
     var rangeLabel: String {
         let lower = Int(lowerBoundMbps).formatted()
         switch self {

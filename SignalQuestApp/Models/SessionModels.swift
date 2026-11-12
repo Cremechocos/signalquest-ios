@@ -482,9 +482,9 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
             ?? (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
         lng = (try? c.decodeIfPresent(Double.self, forKey: .longitude))
             ?? (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? nil
-        // Débit : moyenne si dispo, sinon valeur brute (mêmes replis que le web).
-        downloadMbps = (try? c.decodeIfPresent(Double.self, forKey: .averageSpeed))
-            ?? (try? c.decodeIfPresent(Double.self, forKey: .downloadSpeed)) ?? nil
+        // Débit : la moyenne seule (quality-scale v2). `downloadSpeed` est le MAX public
+        // (schema.prisma) : s'y rabattre peignait un pic comme une moyenne.
+        downloadMbps = (try? c.decodeIfPresent(Double.self, forKey: .averageSpeed)) ?? nil
         uploadMbps = (try? c.decodeIfPresent(Double.self, forKey: .uploadAvg))
             ?? (try? c.decodeIfPresent(Double.self, forKey: .uploadSpeed)) ?? nil
         pingMs = (try? c.decodeIfPresent(Double.self, forKey: .pingMin))

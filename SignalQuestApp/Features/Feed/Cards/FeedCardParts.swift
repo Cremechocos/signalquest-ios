@@ -302,7 +302,7 @@ struct FeedOpenCapsule: View {
 
 // MARK: - Jauge de débit
 
-/// Les 7 paliers de débit du contrat, aux couleurs de la couche speedtest de la
+/// Les 6 paliers de débit du contrat (v2), aux couleurs de la couche speedtest de la
 /// carte (`SQQualityScale.Throughput.hex`, les mêmes en clair et en sombre).
 /// Un palier par couleur, de largeur égale ; le repère avance en échelle log
 /// dans son palier. Le dernier va de 1 000 à 3 000 Mbit/s : la 5G dépasse

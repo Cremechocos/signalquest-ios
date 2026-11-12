@@ -63,7 +63,6 @@ func speedColor(_ mbps: Double) -> Color {
 func speedQualityLabel(_ mbps: Double) -> String {
     switch SQQualityScale.Throughput(mbps: mbps) {
     case .exceptional: return String(localized: "Exceptionnel")
-    case .excellent: return String(localized: "Excellent")
     case .veryGood: return String(localized: "Très bon")
     case .good: return String(localized: "Bon")
     case .medium: return String(localized: "Moyen")

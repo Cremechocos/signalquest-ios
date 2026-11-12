@@ -7,13 +7,14 @@ import UIKit
 final class QualityScaleTests: XCTestCase {
     func testThroughputTiersMatchTheWebThresholds() {
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 1_000), .exceptional)
-        XCTAssertEqual(SQQualityScale.Throughput(mbps: 999.9), .excellent)
+        XCTAssertEqual(SQQualityScale.Throughput(mbps: 999.9), .veryGood)
+        XCTAssertEqual(SQQualityScale.Throughput(mbps: 600), .veryGood)
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 300), .veryGood)
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 100), .good)
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 30), .medium)
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 10), .slow)
         XCTAssertEqual(SQQualityScale.Throughput(mbps: 9.9), .verySlow)
-        XCTAssertEqual(SQQualityScale.Throughput.exceptional.hex, 0x3B82F6)
+        XCTAssertEqual(SQQualityScale.Throughput.exceptional.hex, 0x15803D)
         XCTAssertEqual(SQQualityScale.Throughput.verySlow.hex, 0xEF4444)
     }
 

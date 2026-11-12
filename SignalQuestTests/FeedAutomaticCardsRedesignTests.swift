@@ -7,26 +7,26 @@ final class FeedAutomaticCardsRedesignTests: XCTestCase {
     // MARK: Jauge de débit
 
     func testSpeedScaleSitsOnTheTierBoundaries() {
-        // Sept paliers de largeur égale : chaque seuil du contrat tombe sur une frontière.
-        for (index, threshold) in [10.0, 30, 100, 300, 600, 1_000].enumerated() {
-            XCTAssertEqual(FeedSpeedScale.position(mbps: threshold), Double(index + 1) / 7, accuracy: 1e-9, "\(threshold)")
+        // Six paliers de largeur égale (v2) : chaque seuil du contrat tombe sur une frontière.
+        for (index, threshold) in [10.0, 30, 100, 300, 1_000].enumerated() {
+            XCTAssertEqual(FeedSpeedScale.position(mbps: threshold), Double(index + 1) / 6, accuracy: 1e-9, "\(threshold)")
         }
     }
 
     func testSpeedScaleKeepsRoomAboveOneGigabit() {
         // La 5G dépasse souvent 1 000 Mbit/s : le dernier palier va jusqu'à 3 000.
-        XCTAssertEqual(FeedSpeedScale.position(mbps: 1_450), (6 + log(1.45) / log(3)) / 7, accuracy: 1e-9)
+        XCTAssertEqual(FeedSpeedScale.position(mbps: 1_450), (5 + log(1.45) / log(3)) / 6, accuracy: 1e-9)
         XCTAssertLessThan(FeedSpeedScale.position(mbps: 2_000), 1)
         XCTAssertEqual(FeedSpeedScale.position(mbps: 3_000), 1, accuracy: 1e-9)
         XCTAssertEqual(FeedSpeedScale.position(mbps: 9_000), 1, accuracy: 1e-9)
-        XCTAssertEqual(FeedSpeedScale.position(mbps: 118), (3 + log(1.18) / log(3)) / 7, accuracy: 1e-9)
+        XCTAssertEqual(FeedSpeedScale.position(mbps: 118), (3 + log(1.18) / log(3)) / 6, accuracy: 1e-9)
         XCTAssertEqual(FeedSpeedScale.position(mbps: 0), 0)
     }
 
     func testSpeedScaleUsesTheMapColours() {
         // Les couleurs de la couche speedtest de la carte, du plus lent au plus rapide.
         XCTAssertEqual(FeedSpeedScale.tiers.map(\.hex),
-                       [0xEF4444, 0xF97316, 0xEAB308, 0x84CC16, 0x22C55E, 0x06B6D4, 0x3B82F6])
+                       [0xEF4444, 0xF97316, 0xEAB308, 0x84CC16, 0x22C55E, 0x15803D])
         XCTAssertEqual(FeedSpeedScale.tiers.map { SQNetworkColors.speedHex($0.lowerBoundMbps) }, FeedSpeedScale.tiers.map(\.hex))
     }
 
