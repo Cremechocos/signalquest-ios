@@ -1,6 +1,222 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Dans l'axe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-axis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans l'axe"
+          }
+        }
+      }
+    },
+    "Hors de l'axe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off-axis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors de l'axe"
+          }
+        }
+      }
+    },
+    "%lld mesures à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurement within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurements within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesure à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesures à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Antenne à %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna %1$@ away, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne à %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Analyse du réseau ici…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the network here…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse du réseau ici…"
+          }
+        }
+      }
+    },
+    "Aucun réseau constaté ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network found here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun réseau constaté ici"
+          }
+        }
+      }
+    },
+    "Réseau ici : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network here: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau ici : %@"
+          }
+        }
+      }
+    },
+    "Recherche des antennes autour…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for nearby antennas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche des antennes autour…"
+          }
+        }
+      }
+    },
+    "Antennes indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes indisponibles"
+          }
+        }
+      }
+    },
+    "Antenne à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna %@ away"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne à %@"
+          }
+        }
+      }
+    },
+    "Connexion : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion : %@"
+          }
+        }
+      }
+    },
+    "Débit médian de chaque réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median throughput of each network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit médian de chaque réseau"
+          }
+        }
+      }
+    },
     "Aucun compte SignalQuest n'est connecté." : {
       "localizations" : {
         "en" : {
@@ -27120,22 +27336,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moyenne"
-          }
-        }
-      }
-    },
-    "carplay.here.connection" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connection"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connexion"
           }
         }
       }
@@ -56644,22 +56844,6 @@
         }
       }
     },
-    "Hors de l'axe des secteurs" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Off the sector axes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hors de l'axe des secteurs"
-          }
-        }
-      }
-    },
     "Hors ligne" : {
       "localizations" : {
         "en" : {
@@ -71567,22 +71751,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas assez de mesures"
-          }
-        }
-      }
-    },
-    "Pas assez de mesures dans cette zone." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not enough measurements in this area."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas assez de mesures dans cette zone."
           }
         }
       }
@@ -87246,34 +87414,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous dites que ça marche"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Tu es dans l'axe d'un secteur" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You are aligned with a sector"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu es dans l'axe d'un secteur"
-          }
-        }
-      }
-    },
-    "SQFormal|Tu es dans l'axe d'un secteur" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous êtes dans l'axe d'un secteur"
           }
         }
       },

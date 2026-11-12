@@ -215,7 +215,7 @@ final class CarPlayCoordinator {
 
     // MARK: - Racine à onglets
 
-    private var hereTemplate: CPInformationTemplate?
+    private var hereTemplate: CPListTemplate?
     private var tabBarDelegate: CarPlayTabBarDelegate?
     /// Dernier remplissage de l'onglet « Ici ». L'onglet suit le trajet : il se
     /// recharge quand on y revient, au plus une fois par intervalle.
@@ -236,8 +236,8 @@ final class CarPlayCoordinator {
     /// complétion ajouté au protocole permet de le détecter et de réagir.
     private func installTabBar() {
         let here = NearestAntennaTemplateBuilder.make(
-            input: .init(path: services.networkPath.status, quality: nil),
-            actions: .init()
+            input: .init(phase: .loading, path: services.networkPath.status),
+            actions: hereActions()
         )
         hereTemplate = here
 
@@ -528,16 +528,31 @@ final class CarPlayCoordinator {
     /// avoir pressé un bouton.
     private func showHere() {
         let template = NearestAntennaTemplateBuilder.make(
-            input: .init(path: services.networkPath.status, quality: nil),
-            actions: .init()
+            input: .init(phase: .loading, path: services.networkPath.status),
+            actions: hereActions()
         )
         interface.push(template, animated: true)
         loadHere(into: template)
     }
 
+    /// Ce que chaque rangée de « Ici » ouvre, un niveau plus bas — le seul
+    /// disponible sous un onglet en catégorie « driving task ».
+    private func hereActions() -> NearestAntennaTemplateBuilder.Actions {
+        .init(
+            showQuality: { [weak self] quality in
+                self?.interface.push(NearestAntennaTemplateBuilder.qualityDetail(quality), animated: true)
+            },
+            showAntenna: { [weak self] site in
+                guard let payload = Self.payload(for: site) else { return }
+                self?.showAntennaDetail(for: payload)
+            },
+            compareOperators: { [weak self] in self?.showOperatorComparison() }
+        )
+    }
+
     /// Remplit l'écran « Ici ». Séparé de `showHere` pour que l'ONGLET puisse
     /// s'alimenter sans rien empiler : en mode onglets, cet écran est la racine.
-    private func loadHere(into template: CPInformationTemplate) {
+    private func loadHere(into template: CPListTemplate) {
         hereLoadedAt = Date()
         let generation = beginScreen(.here)
         track { [weak self] in
@@ -556,16 +571,9 @@ final class CarPlayCoordinator {
             let input = await hereInput(at: location)
             guard !Task.isCancelled, isCurrent(.here, generation) else { return }
             let didRender = CarPlayLocationRenderGate.commit(location, service: services.location) {
-                let filled = NearestAntennaTemplateBuilder.make(
-                    input: input,
-                    actions: .init(
-                        compareOperators: { [weak self] in self?.showOperatorComparison() }
-                    )
-                )
                 // Mise à jour EN PLACE, comme pour les fiches : re-pousser empilerait
                 // deux écrans identiques.
-                template.items = filled.items
-                template.actions = filled.actions
+                template.updateSections(NearestAntennaTemplateBuilder.sections(for: input, actions: hereActions()))
             }
             if !didRender {
                 showHereWithoutLocation(into: template)
@@ -573,14 +581,16 @@ final class CarPlayCoordinator {
         }
     }
 
-    private func refreshHereIfStale(_ template: CPInformationTemplate) {
+    private func refreshHereIfStale(_ template: CPListTemplate) {
         if let hereLoadedAt, Date().timeIntervalSince(hereLoadedAt) < Self.hereRefreshInterval { return }
         loadHere(into: template)
     }
 
-    private func showHereWithoutLocation(into template: CPInformationTemplate) {
-        template.items = NearestAntennaTemplateBuilder.itemsWithoutLocation(path: services.networkPath.status)
-        template.actions = []
+    private func showHereWithoutLocation(into template: CPListTemplate) {
+        template.updateSections(NearestAntennaTemplateBuilder.sections(
+            for: .init(phase: .withoutLocation, path: services.networkPath.status),
+            actions: hereActions()
+        ))
     }
 
     /// Classement des opérateurs à l'endroit où l'on se trouve.
@@ -664,8 +674,12 @@ final class CarPlayCoordinator {
         )
 
         var input = NearestAntennaTemplateBuilder.Input(path: path, quality: await quality)
-        guard let sites = await antennas,
-              let nearest = AntennaSectorGeometry.nearest(to: coordinate, among: sites) else {
+        // `nil` = requête échouée, à distinguer d'une zone réellement vide.
+        guard let sites = await antennas else {
+            input.antennasUnavailable = true
+            return input
+        }
+        guard let nearest = AntennaSectorGeometry.nearest(to: coordinate, among: sites) else {
             return input
         }
         input.nearestSite = nearest.site
@@ -934,8 +948,10 @@ final class CarPlayCoordinator {
             id: "antenna-\(site.id)",
             kind: .antenna,
             title: String(localized: "Site \(site.siteId ?? site.id)"),
-            subtitle: [site.operators.joined(separator: "/"),
-                       site.technologies.prefix(3).joined(separator: "/")]
+            // Noms complets (« Bouygues Telecom ») : la carte en tire le titre
+            // de ses épingles, la fiche son sous-titre.
+            subtitle: [NearestAntennaTemplateBuilder.operatorNames(site.operators),
+                       NearestAntennaTemplateBuilder.generations(site.technologies)]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · "),
             coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),

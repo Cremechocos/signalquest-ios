@@ -163,6 +163,17 @@ final class CarPlayTabsAndPOITests: XCTestCase {
         XCTAssertLessThanOrEqual(items.count, Int(CPListTemplate.maximumItemCount))
         XCTAssertEqual(items.first?.text, "1. Op 0", "un classement se lit par rang")
     }
+
+    /// Le classement porte les clés du serveur : on lit « Bouygues Telecom »,
+    /// pas « BOUYGUES » ; une clé inconnue reste telle quelle plutôt qu'un faux nom.
+    func testRankingShowsFullOperatorNames() {
+        let stats = [
+            OperatorMetricStat(operatorName: "BOUYGUES", value: 866, sampleCount: 21, detail: nil),
+            OperatorMetricStat(operatorName: "PROXIMUS", value: 40, sampleCount: 9, detail: nil),
+        ]
+        let items = OperatorComparisonTemplateBuilder.items(for: stats, metric: .download)
+        XCTAssertEqual(items.map(\.text), ["1. Bouygues Telecom", "2. PROXIMUS"])
+    }
     /// CarPlay appelle le délégué depuis sa file XPC (crash des builds 178 à 181) :
     /// l'appel hors du fil principal ne doit pas planter et recharge sur le fil principal.
     func testMapRegionChangeFromABackgroundQueueReloadsOnTheMainThread() {

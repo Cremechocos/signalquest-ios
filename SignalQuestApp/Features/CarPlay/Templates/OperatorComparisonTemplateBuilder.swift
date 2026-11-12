@@ -27,7 +27,10 @@ enum OperatorComparisonTemplateBuilder {
     static func items(for stats: [OperatorMetricStat],
                       metric: NearbyOperatorMetric) -> [CPListItem] {
         stats.prefix(CPListTemplate.maximumItemCount).enumerated().map { index, stat in
-            let item = CPListItem(text: "\(index + 1). \(stat.operatorName)",
+            // Nom complet (« Bouygues Telecom ») : le classement porte la clé
+            // du serveur (« BOUYGUES »), illisible telle quelle.
+            let name = SQBrand.operatorName(stat.operatorName) ?? stat.operatorName
+            let item = CPListItem(text: "\(index + 1). \(name)",
                                   detailText: detail(for: stat, metric: metric))
             // Couleur de l'opérateur plutôt que du verdict : à cette échelle,
             // c'est elle qui permet de retrouver le sien d'un coup d'œil, sans

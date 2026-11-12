@@ -39,8 +39,9 @@ enum CarPlayDetailTemplateBuilder {
         }
         let operators = details?.operators.isEmpty == false ? details!.operators : []
         if !operators.isEmpty {
+            // Noms complets (« Bouygues Telecom »), pas les clés du serveur.
             items.append(CPInformationItem(title: String(localized: "Opérateurs"),
-                                           detail: operators.joined(separator: ", ")))
+                                           detail: NearestAntennaTemplateBuilder.operatorNames(operators)))
         }
         if let technologies = details?.technologies, !technologies.isEmpty {
             items.append(CPInformationItem(title: String(localized: "Technologies"),
