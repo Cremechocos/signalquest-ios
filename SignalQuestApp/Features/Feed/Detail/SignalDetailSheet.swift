@@ -118,7 +118,15 @@ struct SignalDetailSheet: View {
                 if let experience {
                     experienceSummary(experience)
                 }
-                detailsSection
+                if let block = item.session {
+                    // Post de trajet : le résumé de sa carte, sans l'ancienne fiche radio.
+                    FeedKindLine(symbol: block.source == .driveTest ? "car" : "point.topleft.down.curvedto.point.bottomright.up",
+                                 title: SessionPostText.title(block.source), points: item.earnedPoints)
+                    SessionPostSummary(block: block)
+                        .accessibilityIdentifier("signal.detail.sessionPost")
+                } else {
+                    detailsSection
+                }
                 map
                 CardActionsBar(
                     item: item,
@@ -752,8 +760,16 @@ struct SignalDetailSheet: View {
                     .accessibilityElement()
                     .accessibilityLabel(Text("Carte du parcours"))
                     .accessibilityIdentifier("signal.detail.trace")
+                // Post de trajet : « Voir le trajet », comme sa carte, vers la carte du trajet.
+                if let block = item.session {
+                    GradientButton(String(localized: "Voir le trajet"), systemImage: "map", style: .secondary) {
+                        Haptics.selection()
+                        dismiss()
+                        FeedActivity.Link.session(id: block.id, title: nil).open(with: services.router)
+                    }
+                    .accessibilityIdentifier("signal.detail.openTrip")
                 // Seulement avec un tracé : sans point, la session n'a rien de plus à montrer.
-                if let sessionId = metaString("sessionId") {
+                } else if let sessionId = metaString("sessionId") {
                     GradientButton("Voir la session", systemImage: "point.topleft.down.to.point.bottomright.curvepath", style: .secondary) {
                         Haptics.selection()
                         openedSession = OpenedSession(id: sessionId)

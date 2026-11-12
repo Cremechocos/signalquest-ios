@@ -421,7 +421,8 @@ protocol SessionsServicing: Sendable {
     /// Tracé seul d'une session, échantillonné par le serveur (10 à 5 000 points) :
     /// la carte principale le montre quand un post du fil l'ouvre (contrat #958).
     /// Accessible au propriétaire, ou si la session est visible ou partagée.
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint]
+    /// La première page porte aussi `session.speedtests`, déjà masqués par le serveur.
+    func sessionTrack(id: String) async throws -> CoverageSessionDetail
     /// Analyse figée d'un trajet (DRIVE-ANALYSIS-1), mêmes droits que le détail.
     func sessionAnalysis(id: String) async throws -> SessionAnalysis?
     // L'enregistrement de couverture est retiré d'iOS : les anciennes files
@@ -445,8 +446,8 @@ extension SessionsServicing {
         SessionPointsPageResponse(points: [], page: nil)
     }
 
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
-        try await sessionDetail(id: id).points
+    func sessionTrack(id: String) async throws -> CoverageSessionDetail {
+        try await sessionDetail(id: id)
     }
 
     func sessionAnalysis(id: String) async throws -> SessionAnalysis? { nil }
@@ -490,7 +491,7 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         )
     }
 
-    func sessionTrack(id: String) async throws -> [CoverageSessionPoint] {
+    func sessionTrack(id: String) async throws -> CoverageSessionDetail {
         try await api.request(
             APIEndpoint(
                 path: "/api/coverage/sessions",
@@ -501,7 +502,7 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
                 ]
             ),
             as: CoverageSessionDetail.self
-        ).points
+        )
     }
 
     func sessionAnalysis(id: String) async throws -> SessionAnalysis? {

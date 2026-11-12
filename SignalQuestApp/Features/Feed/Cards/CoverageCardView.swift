@@ -91,25 +91,7 @@ struct CoverageCardView: View {
                 )
                 if !tracePoints.isEmpty { traceLegend }
             }
-            FeedMetricGrid(metrics: SessionPostText.metrics(block))
-            if !block.series.isEmpty {
-                SessionPostSeriesList(series: block.series)
-            }
-            let extras = [SessionPostText.speedtests(block.speedtests), SessionPostText.annotations(block.annotations)]
-            if extras.contains(where: { $0 != nil }) {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    if let line = extras[0] {
-                        Label(line, systemImage: "speedometer")
-                    }
-                    if let line = extras[1] {
-                        Label(line, systemImage: "flag")
-                    }
-                }
-                .font(SQType.caption)
-                .monospacedDigit()
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            SessionPostSummary(block: block)
             FeedOpenCapsule(
                 title: String(localized: "Voir le trajet"),
                 symbol: "map",
@@ -747,6 +729,36 @@ final class RouteSnapshotCache {
         coordinates.map { coordinate in
             let point = MKMapPoint(coordinate)
             return CGPoint(x: (point.x - rect.minX) / rect.width, y: (point.y - rect.minY) / rect.height)
+        }
+    }
+}
+
+/// Tuiles, une ligne par SIM, speedtests et repères d'un post de trajet : le même
+/// résumé dans le fil et dans le détail du post (DT-POST-1, 12/11).
+struct SessionPostSummary: View {
+    let block: SocialSessionPostBlock
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
+            FeedMetricGrid(metrics: SessionPostText.metrics(block))
+            if !block.series.isEmpty {
+                SessionPostSeriesList(series: block.series)
+            }
+            let extras = [SessionPostText.speedtests(block.speedtests), SessionPostText.annotations(block.annotations)]
+            if extras.contains(where: { $0 != nil }) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    if let line = extras[0] {
+                        Label(line, systemImage: "speedometer")
+                    }
+                    if let line = extras[1] {
+                        Label(line, systemImage: "flag")
+                    }
+                }
+                .font(SQType.caption)
+                .monospacedDigit()
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

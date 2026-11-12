@@ -530,6 +530,23 @@ final class NewModelDecodeTests: XCTestCase {
 /// DT-POST-1 r2 : le bloc `session` d'un post de fin de trajet, d'après la fixture du serveur
 /// (`apps/web/lib/social/session-post.test.ts`, trajet A : médiane 854,85 servie à 854,9).
 final class SessionPostBlockDecodeTests: XCTestCase {
+    /// La carte d'un trajet place ses speedtests servis ; un test sans position
+    /// ou sans débit descendant n'a pas de pastille (choix du 12/11).
+    func testTripMapPlacesOnlyLocatedSpeedtests() throws {
+        let json = """
+        [{"id":"s1","latitude":45.6,"longitude":5.2,"averageSpeed":123.4,"uploadAvg":5.1,"ping":21,"connectionType":"5G"},
+         {"id":"s2","averageSpeed":80},
+         {"id":"s3","latitude":0,"longitude":0,"averageSpeed":50},
+         {"id":"s4","latitude":45.7,"longitude":5.3}]
+        """
+        let tests = try JSONDecoder.signalQuest.decode([SessionSpeedtest].self, from: Data(json.utf8))
+        let features = MapSessionFocus.speedtestFeatures(tests)
+        XCTAssertEqual(features.map(\.id), ["s1"])
+        XCTAssertEqual(features.first?.downloadMbps, 123.4)
+        XCTAssertEqual(features.first?.uploadMbps, 5.1)
+        XCTAssertEqual(features.first?.tech, "5G")
+    }
+
     /// « 34 % » s'écrit avec une espace insécable (fine ou non) selon la langue.
     private static func plainSpaces(_ text: String) -> String {
         text.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{202F}", with: " ")

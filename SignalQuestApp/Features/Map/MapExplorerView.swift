@@ -2301,9 +2301,10 @@ struct MapExplorerView: View {
         sessionFocus = MapSessionFocus(id: request.id, title: request.title, returnRegion: returnRegion)
         sessionLoadTask = Task {
             do {
-                let points = try await services.sessions.sessionTrack(id: request.id).filter(\.hasValidCoordinate)
+                let track = try await services.sessions.sessionTrack(id: request.id)
                 guard !Task.isCancelled, sessionFocus?.id == request.id else { return }
-                sessionFocus?.points = points
+                sessionFocus?.points = track.points.filter(\.hasValidCoordinate)
+                sessionFocus?.speedtests = MapSessionFocus.speedtestFeatures(track.speedtests)
                 sessionFocus?.phase = .loaded
                 sessionFocus?.revision &+= 1
                 sessionFitToken &+= 1
@@ -2351,8 +2352,10 @@ struct MapExplorerView: View {
         MapKitMapView(
             annotations: sessionFocus == nil ? renderedAnnotations : [],
             coverageHeatFeatures: sessionFocus == nil ? renderedCoverageFeatures : [],
-            speedtestFeatures: sessionFocus == nil ? renderedSpeedtestFeatures : [],
-            renderVersion: renderVersion &* 2 &+ (sessionFocus == nil ? 0 : 1),
+            speedtestFeatures: sessionFocus?.speedtests ?? renderedSpeedtestFeatures,
+            // Paire hors trajet, impaire en trajet : la révision du trajet fait
+            // passer ses speedtests, chargés après l'ouverture.
+            renderVersion: sessionFocus.map { $0.revision &* 2 &+ 1 } ?? renderVersion &* 2,
             viewportRefreshID: viewportRefreshID,
             colorScheme: colorScheme,
             // iPad : la mention légale d'Apple passe au-dessus de la rangée du bas
@@ -5732,6 +5735,28 @@ struct MapSessionFocus {
     let title: String?
     let returnRegion: MKCoordinateRegion
     var points: [CoverageSessionPoint] = []
+    /// Speedtests du trajet, touchables comme sur la carte (masqués par le serveur).
+    var speedtests: [SpeedtestFeature] = []
     var phase: Phase = .loading
     var revision = 0
+
+    /// Un test sans position ni débit descendant ne se place pas sur la carte.
+    static func speedtestFeatures(_ speedtests: [SessionSpeedtest]) -> [SpeedtestFeature] {
+        speedtests.compactMap { test in
+            guard let lat = test.lat, let lng = test.lng, let download = test.downloadMbps,
+                  CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: lat, longitude: lng)),
+                  !(lat == 0 && lng == 0) else { return nil }
+            return SpeedtestFeature(
+                id: test.id,
+                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                downloadMbps: download,
+                uploadMbps: test.uploadMbps,
+                pingMs: test.pingMs,
+                tech: test.networkType,
+                band: nil,
+                frequency: nil,
+                timestamp: test.timestamp
+            )
+        }
+    }
 }
