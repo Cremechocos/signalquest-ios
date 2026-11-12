@@ -52,13 +52,37 @@ enum SpeedtestTemplateBuilder {
         var start: (() -> Void)?
     }
 
-    static func make(state: State, actions: Actions) -> CPInformationTemplate {
+    static func make(state: State, actions: Actions, now: Date = Date()) -> CPInformationTemplate {
         CPInformationTemplate(
-            title: String(localized: "Speedtest"),
+            title: title(for: state, now: now),
             layout: .twoColumn,
             items: Array(items(for: state).prefix(CarPlayDetailTemplateBuilder.maxItems)),
             actions: buttons(for: state, actions: actions)
         )
+    }
+
+    /// Un verdict et sa date en titre (« Très bon · il y a 2 h ») : des
+    /// chiffres seuls ne disent pas si c'est bien, et un résultat sans date ne
+    /// dit pas s'il vaut encore ici. Le verdict suit l'échelle de débit de
+    /// l'app, sur le débit descendant.
+    static func title(for state: State, now: Date = Date()) -> String {
+        let result: SpeedtestRunResult
+        switch state {
+        case .idle(let last?): result = last
+        case .finished(let finished), .finishedUnsaved(let finished): result = finished
+        case .idle(.none), .running, .failed: return String(localized: "Speedtest")
+        }
+        let verdict = SQQualityScale.Throughput(mbps: result.downloadMbps).label
+        return "\(verdict) · \(relativeDate(result.createdAt, now: now))"
+    }
+
+    /// « il y a 2 h », « maintenant » juste après la mesure.
+    static func relativeDate(_ date: Date, now: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        formatter.dateTimeStyle = .named
+        let elapsed = date.timeIntervalSince(now)
+        return formatter.localizedString(fromTimeInterval: abs(elapsed) < 60 ? 0 : min(elapsed, 0))
     }
 
     static func items(for state: State) -> [CPInformationItem] {
@@ -70,7 +94,7 @@ enum SpeedtestTemplateBuilder {
                     detail: String(localized: "Lance un test pour mesurer le réseau ici.")
                 )]
             }
-            return resultItems(last, titlePrefix: String(localized: "Dernier test"))
+            return resultItems(last)
 
         case .running(let progress):
             var items = [CPInformationItem(title: String(localized: "En cours"),
@@ -96,10 +120,10 @@ enum SpeedtestTemplateBuilder {
             return items
 
         case .finished(let result):
-            return resultItems(result, titlePrefix: nil)
+            return resultItems(result)
 
         case .finishedUnsaved(let result):
-            return resultItems(result, titlePrefix: nil) + [CPInformationItem(
+            return resultItems(result) + [CPInformationItem(
                 title: String(localized: "Non enregistré"),
                 detail: String(localized: "Ce résultat n’a pas pu être sauvegardé.")
             )]
@@ -109,11 +133,10 @@ enum SpeedtestTemplateBuilder {
         }
     }
 
-    static func resultItems(_ result: SpeedtestRunResult, titlePrefix: String?) -> [CPInformationItem] {
+    /// Les quatre valeurs de la maquette : descendant, montant, latence, réseau.
+    /// Le libellé interne du test (« iOS speedtest ») n'y figure plus.
+    static func resultItems(_ result: SpeedtestRunResult) -> [CPInformationItem] {
         var items: [CPInformationItem] = []
-        if let titlePrefix {
-            items.append(CPInformationItem(title: titlePrefix, detail: result.label))
-        }
         items.append(CPInformationItem(title: String(localized: "Descendant"),
                                        detail: mbps(result.downloadMbps)))
         if let upload = result.uploadMbps {
@@ -123,10 +146,28 @@ enum SpeedtestTemplateBuilder {
             items.append(CPInformationItem(title: String(localized: "Latence"),
                                            detail: "\(Int(ping.rounded())) ms"))
         }
-        if let technology = result.cellularTechnology?.displayName ?? result.networkOperatorName {
-            items.append(CPInformationItem(title: String(localized: "Réseau"), detail: technology))
+        if let network = networkLabel(result) {
+            items.append(CPInformationItem(title: String(localized: "Réseau"), detail: network))
         }
         return items
+    }
+
+    /// « Bouygues 5G », « Wi-Fi » : le réseau mesuré, en nom court (la
+    /// colonne est étroite). L'opérateur est celui du réseau hôte
+    /// (`operatorKey`), pas la marque de la SIM d'un MVNO.
+    static func networkLabel(_ result: SpeedtestRunResult) -> String? {
+        switch result.connectionType {
+        case .wifi:
+            return "Wi-Fi"
+        case .cellular:
+            let raw = result.operatorKey ?? result.networkOperatorName ?? result.carrierName
+            let name = SQBrand.operatorShortName(raw) ?? raw.flatMap { $0.isEmpty ? nil : $0 }
+            let generation = SQQualityScale.Generation(technology: result.cellularTechnology?.rawValue)
+            let parts = [name, generation == .none ? nil : generation.label].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        case .wired, .other:
+            return nil
+        }
     }
 
     /// Un seul test à la fois : pendant la mesure, aucun bouton. Deux tests
@@ -135,11 +176,11 @@ enum SpeedtestTemplateBuilder {
     private static func buttons(for state: State, actions: Actions) -> [CPTextButton] {
         guard let start = actions.start else { return [] }
         if case .running = state { return [] }
+        // Au repos, même avec un ancien résultat, c'est un NOUVEAU test qu'on
+        // lance ; « Relancer » ne vaut que juste après une mesure ou un échec.
         let title: String
         switch state {
-        case .idle(let last): title = last == nil
-            ? String(localized: "Lancer le test")
-            : String(localized: "Relancer")
+        case .idle: title = String(localized: "Lancer le test")
         case .finished, .finishedUnsaved, .failed: title = String(localized: "Relancer")
         case .running: title = ""
         }

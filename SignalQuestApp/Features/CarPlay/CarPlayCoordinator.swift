@@ -318,6 +318,8 @@ final class CarPlayCoordinator {
             guard let self else { return }
             if let here = hereTemplate, selected === here { refreshHereIfStale(here) }
             if let list = mapLayersTemplate, selected === list { refreshLayerCountsIfStale() }
+            // « il y a 2 h » vieillit : on recalcule le titre au retour sur l'onglet.
+            if let speedtest = speedtestTemplate, selected === speedtest { updateSpeedtest(state: speedtestState) }
         }
         tabBar.delegate = tabDelegate
         tabBarDelegate = tabDelegate
@@ -1093,6 +1095,7 @@ final class CarPlayCoordinator {
             state: state,
             actions: .init(start: { [weak self] in self?.runSpeedtest() })
         )
+        speedtestTemplate.title = refreshed.title
         speedtestTemplate.items = refreshed.items
         speedtestTemplate.actions = refreshed.actions
     }

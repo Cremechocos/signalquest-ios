@@ -52140,22 +52140,6 @@
         }
       }
     },
-    "Dernier test" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latest test"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernier test"
-          }
-        }
-      }
-    },
     "Dernier trajet · %@" : {
       "localizations" : {
         "en" : {
