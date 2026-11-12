@@ -36,7 +36,8 @@ final class NotificationMutationTests: XCTestCase {
 
     /// Chaque sortie servie s'écrit, titre et texte, comme le gabarit français du
     /// contrat. Écarts voulus : apostrophe typographique, tutoiement par défaut
-    /// (le gabarit du niveau est au « vous ») et « 1 autre » au singulier.
+    /// (référence du niveau corrigée par le serveur le 12/11) et « autre(s) personne(s) »,
+    /// comme le texte de repli du serveur.
     func testEveryServedNotificationCaseRendersLikeTheContract() throws {
         guard Bundle.main.preferredLocalizations.first == "fr" else { return }
         let vectors = try textKeyVectors()
@@ -63,7 +64,8 @@ final class NotificationMutationTests: XCTestCase {
                 }
                 return out.replacingOccurrences(of: "'", with: "’")
                     .replacingOccurrences(of: "Vous passez", with: "Tu passes")
-                    .replacingOccurrences(of: " 1 autres ", with: " 1 autre ")
+                    .replacingOccurrences(of: " autres ", with: " autres personnes ")
+                    .replacingOccurrences(of: " 1 autres personnes ", with: " 1 autre personne ")
             }
             XCTAssertEqual(text.title, fill(template.title), testCase.name)
             XCTAssertEqual(text.message, fill(template.fr), testCase.name)
@@ -118,11 +120,11 @@ final class NotificationMutationTests: XCTestCase {
         let sentences = [
             "Nouvelle réponse", "Publication repartagée", "Tu as été mentionné", "Nouvel abonné",
             "%@ a aimé ta publication.", "%@ a réagi %@ à ta publication.",
-            "%@ et %lld autres ont réagi à ta publication.", "%@ et 1 autre ont réagi à ta publication.",
-            "%@ a commenté ta publication.", "%@ et %lld autres ont commenté ta publication.",
-            "%@ a répondu à ton commentaire.", "%@ et %lld autres ont répondu à ton commentaire.",
-            "%@ a repartagé ta publication.", "%@ et %lld autres ont repartagé ta publication.",
-            "%@ t’a mentionné dans le réseau social.", "%@ et %lld autres t’ont mentionné.",
+            "%@ et %lld autres personnes ont réagi à ta publication.", "%@ et 1 autre personne ont réagi à ta publication.",
+            "%@ a commenté ta publication.", "%@ et %lld autres personnes ont commenté ta publication.",
+            "%@ a répondu à ton commentaire.", "%@ et %lld autres personnes ont répondu à ton commentaire.",
+            "%@ a repartagé ta publication.", "%@ et %lld autres personnes ont repartagé ta publication.",
+            "%@ t’a mentionné dans le réseau social.", "%@ et %lld autres personnes t’ont mentionné.",
             "%@ suit maintenant ton profil public.", "Badge « %@ » obtenu.", "Tu passes au niveau %lld.",
         ]
         let missing = "\u{1}missing"

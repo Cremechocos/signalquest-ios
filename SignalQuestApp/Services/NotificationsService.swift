@@ -158,28 +158,28 @@ struct NotificationTextKey: Equatable {
         case "notif.social.reaction_emoji": return String(localized: "\(actor) a réagi \(string("emoji")) à ta publication.")
         case "notif.social.reaction_group":
             return others == 1
-                ? String(localized: "\(actor) et 1 autre ont réagi à ta publication.")
-                : String(localized: "\(actor) et \(others) autres ont réagi à ta publication.")
+                ? String(localized: "\(actor) et 1 autre personne ont réagi à ta publication.")
+                : String(localized: "\(actor) et \(others) autres personnes ont réagi à ta publication.")
         case "notif.social.comment": return String(localized: "\(actor) a commenté ta publication.")
         case "notif.social.comment_group":
             return others == 1
-                ? String(localized: "\(actor) et 1 autre ont commenté ta publication.")
-                : String(localized: "\(actor) et \(others) autres ont commenté ta publication.")
+                ? String(localized: "\(actor) et 1 autre personne ont commenté ta publication.")
+                : String(localized: "\(actor) et \(others) autres personnes ont commenté ta publication.")
         case "notif.social.reply": return String(localized: "\(actor) a répondu à ton commentaire.")
         case "notif.social.reply_group":
             return others == 1
-                ? String(localized: "\(actor) et 1 autre ont répondu à ton commentaire.")
-                : String(localized: "\(actor) et \(others) autres ont répondu à ton commentaire.")
+                ? String(localized: "\(actor) et 1 autre personne ont répondu à ton commentaire.")
+                : String(localized: "\(actor) et \(others) autres personnes ont répondu à ton commentaire.")
         case "notif.social.repost": return String(localized: "\(actor) a repartagé ta publication.")
         case "notif.social.repost_group":
             return others == 1
-                ? String(localized: "\(actor) et 1 autre ont repartagé ta publication.")
-                : String(localized: "\(actor) et \(others) autres ont repartagé ta publication.")
+                ? String(localized: "\(actor) et 1 autre personne ont repartagé ta publication.")
+                : String(localized: "\(actor) et \(others) autres personnes ont repartagé ta publication.")
         case "notif.social.mention": return String(localized: "\(actor) t’a mentionné dans le réseau social.")
         case "notif.social.mention_group":
             return others == 1
-                ? String(localized: "\(actor) et 1 autre t’ont mentionné.")
-                : String(localized: "\(actor) et \(others) autres t’ont mentionné.")
+                ? String(localized: "\(actor) et 1 autre personne t’ont mentionné.")
+                : String(localized: "\(actor) et \(others) autres personnes t’ont mentionné.")
         case "notif.social.follow": return String(localized: "\(actor) suit maintenant ton profil public.")
         case "notif.progress.badge": return String(localized: "Badge « \(string("badgeName")) » obtenu.")
         case "notif.progress.level": return String(localized: "Tu passes au niveau \(count("newLevel")).")
