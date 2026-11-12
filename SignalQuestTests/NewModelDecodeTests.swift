@@ -577,6 +577,11 @@ final class SessionPostBlockDecodeTests: XCTestCase {
         XCTAssertTrue(speed.contains("855"), speed)
         XCTAssertTrue(speed.hasPrefix("2 speedtests"), speed)
         XCTAssertEqual(SessionPostText.annotations(block.annotations), "Repères : tunnel ×2 · pont ×1")
+        // Codes des repères automatiques d'Android : traduits, comparés casse comprise.
+        XCTAssertEqual(SessionPostText.annotations([.init(type: "AUTO_RSRP_DROP", count: 10)]), "Repères : Chute RSRP ×10")
+        XCTAssertEqual(SessionPostText.annotationLabel("AUTO_HANDOVER_STORM"), "Tempête de handovers")
+        XCTAssertEqual(SessionPostText.annotationLabel("AUTO_NO_SERVICE"), "Perte de service")
+        XCTAssertEqual(SessionPostText.annotationLabel("auto_rsrp_drop"), "auto_rsrp_drop")
         let metrics = SessionPostText.metrics(block)
         XCTAssertEqual(metrics.map(\.label), ["Distance", "Durée", "Relevés"])
         XCTAssertEqual(metrics[1].value, "25 min")

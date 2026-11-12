@@ -424,8 +424,19 @@ enum SessionPostText {
     /// « Repères : tunnel ×2 · pont ×1 », le type tel que le membre l'a choisi.
     static func annotations(_ annotations: [SocialSessionPostBlock.Annotation]) -> String? {
         guard !annotations.isEmpty else { return nil }
-        let list = annotations.map { "\($0.type) ×\($0.count)" }.joined(separator: " · ")
+        let list = annotations.map { "\(annotationLabel($0.type)) ×\($0.count)" }.joined(separator: " · ")
         return String(localized: "Repères : \(list)")
+    }
+
+    /// Un repère est le libellé que l'auteur a choisi, affiché tel quel, sauf les trois codes
+    /// des repères automatiques d'Android (comparaison stricte, casse comprise ; Android 12/11).
+    static func annotationLabel(_ type: String) -> String {
+        switch type {
+        case "AUTO_RSRP_DROP": return String(localized: "Chute RSRP")
+        case "AUTO_HANDOVER_STORM": return String(localized: "Tempête de handovers")
+        case "AUTO_NO_SERVICE": return String(localized: "Perte de service")
+        default: return type
+        }
     }
 
     private static func percent(_ value: Int) -> String {
