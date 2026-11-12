@@ -41,20 +41,28 @@ enum CarPlayPOIBuilder {
 
     /// Trie par distance croissante, écarte les clusters (un « 42 sites » n'a
     /// pas de fiche) et coupe au plafond.
+    ///
+    /// - Parameters:
+    ///   - userLocation: position du VÉHICULE, d'où se mesure la distance
+    ///     affichée : « 1,2 km » doit dire à quelle distance on est, pas à
+    ///     quelle distance du centre de la carte déplacée.
+    ///   - center: zone affichée, d'où se choisissent les 12 points quand le
+    ///     conducteur a déplacé la carte. Par défaut, la position du véhicule.
     static func entries(from payloads: [MapAnnotationPayload],
-                        userLocation: CLLocation?) -> [Entry] {
-        payloads
+                        userLocation: CLLocation?,
+                        around center: CLLocation? = nil) -> [Entry] {
+        let origin = center ?? userLocation
+        return payloads
             .filter { $0.clusterCount == nil }
-            .map { payload in
-                let distance = userLocation.map {
-                    $0.distance(from: CLLocation(latitude: payload.coordinate.latitude,
-                                                 longitude: payload.coordinate.longitude))
-                }
-                return Entry(payload: payload, distanceMeters: distance)
+            .map { payload -> (entry: Entry, rank: CLLocationDistance) in
+                let point = CLLocation(latitude: payload.coordinate.latitude,
+                                       longitude: payload.coordinate.longitude)
+                let entry = Entry(payload: payload, distanceMeters: userLocation.map { $0.distance(from: point) })
+                return (entry, origin.map { $0.distance(from: point) } ?? .greatestFiniteMagnitude)
             }
-            .sorted { ($0.distanceMeters ?? .greatestFiniteMagnitude) < ($1.distanceMeters ?? .greatestFiniteMagnitude) }
+            .sorted { $0.rank < $1.rank }
             .prefix(maxPoints)
-            .map { $0 }
+            .map(\.entry)
     }
 
     static func make(entries: [Entry],
@@ -79,6 +87,12 @@ enum CarPlayPOIBuilder {
             item.name = payload.title
 
             let color = payload.tint.map { UIColor($0) } ?? UIColor(SQColor.brandRed)
+            // Les couches autres que les antennes portent leur symbole.
+            let pin = { (selected: Bool) -> UIImage in
+                payload.glyphOverride.map {
+                    CarPlayImageFactory.symbolPin(color: color, symbol: $0, selected: selected)
+                } ?? CarPlayImageFactory.antennaPin(color: color, selected: selected)
+            }
             let poi = CPPointOfInterest(
                 location: item,
                 title: headline(for: entry),
@@ -87,8 +101,8 @@ enum CarPlayPOIBuilder {
                 detailTitle: payload.title,
                 detailSubtitle: payload.subtitle.isEmpty ? nil : payload.subtitle,
                 detailSummary: detailSummary(for: entry, userLocation: userLocation),
-                pinImage: CarPlayImageFactory.antennaPin(color: color),
-                selectedPinImage: CarPlayImageFactory.antennaPin(color: color, selected: true)
+                pinImage: pin(false),
+                selectedPinImage: pin(true)
             )
             poi.userInfo = payload
             if let details = actions.details {

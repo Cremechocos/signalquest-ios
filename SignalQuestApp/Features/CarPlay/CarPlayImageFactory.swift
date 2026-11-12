@@ -56,6 +56,31 @@ enum CarPlayImageFactory {
         }
     }
 
+    /// Épingle d'une couche autre que les antennes : même pastille cerclée de
+    /// blanc, mais un symbole SF à la place du glyphe maison (triangle d'une
+    /// panne, coche d'une mise en service…), pour qu'on sache ce que montre la
+    /// carte sans relire son titre. Encre noire ou blanche selon le fond, en
+    /// variantes claire et sombre : le jaune d'un projet ne porte pas de blanc.
+    static func symbolPin(color: UIColor, symbol: String, selected: Bool = false) -> UIImage {
+        let size = selected ? selectedPinSize : pinSize
+        return dynamicImage { style in
+            let resolved = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+            return UIGraphicsImageRenderer(size: size).image { context in
+                let cg = context.cgContext
+                let inset = size.width * 0.08
+                let disc = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                cg.setFillColor(UIColor.white.cgColor)
+                cg.fillEllipse(in: disc.insetBy(dx: -inset * 0.75, dy: -inset * 0.75))
+                cg.setFillColor(resolved.cgColor)
+                cg.fillEllipse(in: disc)
+                let configuration = UIImage.SymbolConfiguration(pointSize: disc.height * 0.42, weight: .bold)
+                guard let glyph = UIImage(systemName: symbol, withConfiguration: configuration)?
+                    .withTintColor(inkColor(on: resolved), renderingMode: .alwaysOriginal) else { return }
+                glyph.draw(in: centered(glyph.size, in: disc))
+            }
+        }
+    }
+
     /// Pastille pleine, pour porter un verdict de couleur dans une liste.
     static func dot(color: UIColor, diameter: CGFloat = 24) -> UIImage {
         let size = CGSize(width: diameter, height: diameter)

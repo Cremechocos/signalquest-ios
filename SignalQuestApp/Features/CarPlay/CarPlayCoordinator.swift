@@ -166,6 +166,8 @@ final class CarPlayCoordinator {
         hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
+        lastPOICenter = nil
+        anfrSnapshot = nil
         outagesById.removeAll()
         plannedById.removeAll()
         services.setCarPlayConnected(false)
@@ -225,6 +227,16 @@ final class CarPlayCoordinator {
     /// Retenu ici : `pointOfInterestDelegate` est une référence faible, un
     /// contrôleur local serait libéré avant le premier déplacement de carte.
     private var poiController: CarPlayPOIController?
+    /// Couche affichée par la carte, une seule à la fois.
+    private var mapLayer: CarPlayMapLayer = .antennas
+    /// Centre de la dernière zone demandée par la carte ; nil tant que le
+    /// conducteur ne l'a pas déplacée (la carte suit alors le véhicule).
+    private var lastPOICenter: CLLocationCoordinate2D?
+    /// Dernier relevé ANFR complet. Il ne change qu'une fois par semaine et
+    /// couvre tout le pays : le retélécharger à chaque déplacement de carte
+    /// coûterait du réseau pour un contenu identique.
+    private var anfrSnapshot: (snapshot: ANFRMapSnapshot, loadedAt: Date)?
+    private static let anfrSnapshotLifetime: TimeInterval = 30 * 60
 
     /// Pose les onglets, et se rabat sur l'ancienne liste si le système
     /// les refuse.
@@ -241,13 +253,20 @@ final class CarPlayCoordinator {
         )
         hereTemplate = here
 
-        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: poiActions())
+        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: poiActions(for: mapLayer))
         poiTemplate = poi
         let controller = CarPlayPOIController { [weak self] region in
             self?.loadPOI(around: region.center)
         }
         poi.pointOfInterestDelegate = controller
         poiController = controller
+        // Hors de France, il n'y a que les antennes : pas de bouton pour une
+        // liste d'un seul choix.
+        if CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode()).count > 1 {
+            poi.trailingNavigationBarButtons = [
+                CPBarButton(title: String(localized: "Couches")) { [weak self] _ in self?.showMapLayers() },
+            ]
+        }
 
         let speedtest = SpeedtestTemplateBuilder.make(
             state: speedtestState,
@@ -314,70 +333,169 @@ final class CarPlayCoordinator {
         }, animated: false)
     }
 
-    private func poiActions() -> CarPlayPOIBuilder.Actions {
-        .init(details: { [weak self] payload in self?.showDetail(for: payload) })
+    private func poiActions(for layer: CarPlayMapLayer) -> CarPlayPOIBuilder.Actions {
+        // Une évolution ANFR n'a pas de fiche à ouvrir : la carte du point dit
+        // déjà le changement, les opérateurs et la commune.
+        guard layer != .changes else { return .init() }
+        return .init(details: { [weak self] payload in self?.showDetail(for: payload) })
     }
 
-    /// Charge les antennes autour d'un point et repeint la carte à onglets.
+    // MARK: - Couches de la carte
+
+    /// Liste des couches, un niveau sous la carte (profondeur 2, sous le plafond).
+    private func showMapLayers() {
+        let available = CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode())
+        interface.push(CarPlayMapLayersTemplateBuilder.make(current: mapLayer, available: available) { [weak self] layer in
+            self?.selectMapLayer(layer)
+        }, animated: true)
+    }
+
+    /// Revient à la carte et la recharge sur la couche choisie, dans la zone
+    /// qu'elle montrait. Le geste vient du conducteur : il passe avant la
+    /// limite d'un rechargement par minute.
+    private func selectMapLayer(_ layer: CarPlayMapLayer) {
+        interface.pop(animated: true)
+        guard layer != mapLayer, let poiTemplate else { return }
+        mapLayer = layer
+        // Les points de l'ancienne couche ne doivent pas rester affichés sous
+        // le nom de la nouvelle.
+        poiTemplate.title = String(localized: "Chargement…")
+        poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
+        poiController?.invalidate()
+        loadPOI(around: lastPOICenter)
+    }
+
+    /// Ce qu'une couche a chargé : ses marqueurs, et les données sources que
+    /// la fiche d'une panne ou d'un projet relit.
+    private struct POILoad {
+        var payloads: [MapAnnotationPayload]
+        var snapshotDate: String?
+        var outages: [String: OutageSiteLive] = [:]
+        var planned: [String: PlannedSiteLive] = [:]
+    }
+
+    /// Charge la couche affichée autour d'un point et repeint la carte à onglets.
+    ///
+    /// - Parameter center: centre de la carte déplacée ; nil = position du
+    ///   véhicule.
     private func loadPOI(around center: CLLocationCoordinate2D?) {
         guard let poiTemplate else { return }
         let generation = beginScreen(.poi)
+        let market = MapMarketStore.initialMarketCode()
+        // Le pays a pu changer depuis le choix : une couche absente devient vide
+        // pour toujours, on revient aux antennes.
+        if !CarPlayMapLayer.available(market: market).contains(mapLayer) { mapLayer = .antennas }
+        let layer = mapLayer
+        if let center { lastPOICenter = center }
         track { [weak self] in
             guard let self else { return }
-            let location: CLLocation?
+            let area: CLLocation?
             if let center {
-                location = CLLocation(latitude: center.latitude, longitude: center.longitude)
+                area = CLLocation(latitude: center.latitude, longitude: center.longitude)
             } else {
-                location = await services.location.currentLocation()
+                area = await services.location.currentLocation()
             }
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
-            guard let location else {
+            guard let area else {
                 poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
                 return
             }
+            // Le prochain déplacement de carte compte à partir de ce chargement.
+            poiController?.noteLoaded(center: area.coordinate)
 
-            let coordinate = location.coordinate
-            let delta = 0.045
-            let fetched: [AntennaSite]?
-            do {
-                fetched = try await services.antennas.list(
-                    bbox: BoundingBox(north: coordinate.latitude + delta,
-                                      south: coordinate.latitude - delta,
-                                      east: coordinate.longitude + delta,
-                                      west: coordinate.longitude - delta),
-                    market: MapMarketStore.initialMarketCode(),
-                    operatorName: MapMarketStore.initialOperatorKey(),
-                    technologies: []
-                )
-            } catch {
-                fetched = nil
-            }
+            let loaded = await poiLoad(for: layer, around: area, market: market)
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
             // Échec ≠ vide : on le dit, avec un bouton pour recommencer.
-            guard let sites = fetched else {
+            guard let loaded else {
+                poiTemplate.title = layer.title()
                 poiTemplate.setPointsOfInterest(
-                    [CarPlayPOIBuilder.failurePoint(at: coordinate) { [weak self] in self?.loadPOI(around: center) }],
+                    [CarPlayPOIBuilder.failurePoint(at: area.coordinate) { [weak self] in self?.loadPOI(around: center) }],
                     selectedIndex: NSNotFound
                 )
                 return
             }
 
             let update = {
-                let payloads = sites.compactMap { Self.payload(for: $0) }
-                let entries = CarPlayPOIBuilder.entries(from: payloads, userLocation: location)
+                // La distance affichée part du VÉHICULE, même carte déplacée :
+                // « 3 km » doit dire à quelle distance on est.
+                let vehicle = center == nil ? area : self.services.location.cachedLocation()
+                let entries = CarPlayPOIBuilder.entries(from: loaded.payloads, userLocation: vehicle, around: area)
+                self.outagesById = loaded.outages
+                self.plannedById = loaded.planned
+                // Un template de points d'intérêt n'a pas de vue vide : le titre
+                // dit qu'il n'y a rien, plutôt qu'une carte muette.
+                poiTemplate.title = entries.isEmpty ? layer.emptyTitle : layer.title(snapshotDate: loaded.snapshotDate)
                 poiTemplate.setPointsOfInterest(
-                    CarPlayPOIBuilder.points(from: entries, userLocation: location,
-                                             actions: self.poiActions()),
+                    CarPlayPOIBuilder.points(from: entries, userLocation: vehicle,
+                                             actions: self.poiActions(for: layer)),
                     selectedIndex: NSNotFound
                 )
             }
             // Un centre choisi sur la carte reste une intention manuelle ; seul
             // le point GPS doit encore être autorisé et frais après le réseau.
             if center != nil { update() }
-            else if !CarPlayLocationRenderGate.commit(location, service: services.location, update: update) {
+            else if !CarPlayLocationRenderGate.commit(area, service: services.location, update: update) {
                 poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
             }
         }
+    }
+
+    /// Données d'une couche autour d'un point ; nil si le serveur n'a pas répondu.
+    ///
+    /// Pannes, projets et relevé ANFR arrivent pour tout le pays : les
+    /// convertisseurs les bornent au rayon de la carte.
+    private func poiLoad(for layer: CarPlayMapLayer, around area: CLLocation, market: String) async -> POILoad? {
+        let operatorKey = MapMarketStore.initialOperatorKey()
+        switch layer {
+        case .antennas:
+            let coordinate = area.coordinate
+            let delta = 0.045
+            guard let sites = try? await services.antennas.list(
+                bbox: BoundingBox(north: coordinate.latitude + delta,
+                                  south: coordinate.latitude - delta,
+                                  east: coordinate.longitude + delta,
+                                  west: coordinate.longitude - delta),
+                market: market,
+                operatorName: operatorKey,
+                technologies: []
+            ) else { return nil }
+            return POILoad(payloads: sites.compactMap { Self.payload(for: $0) })
+        case .outages:
+            guard let sites = try? await services.map.outageSites(
+                market: market, operatorName: operatorKey, territory: nil, bands: []
+            ) else { return nil }
+            let payloads = CarPlayMapLayerPoints.outages(sites, around: area)
+            let shown = Set(payloads.map(\.id))
+            return POILoad(payloads: payloads, outages: Dictionary(
+                sites.map { (CarPlayMapLayerPoints.outageId($0), $0) }.filter { shown.contains($0.0) },
+                uniquingKeysWith: { first, _ in first }
+            ))
+        case .planned:
+            guard let sites = try? await services.map.plannedSites(
+                market: market, operatorName: operatorKey, territory: nil, bands: []
+            ) else { return nil }
+            let payloads = CarPlayMapLayerPoints.planned(sites, around: area)
+            let shown = Set(payloads.map(\.id))
+            return POILoad(payloads: payloads, planned: Dictionary(
+                sites.map { (CarPlayMapLayerPoints.plannedId($0), $0) }.filter { shown.contains($0.0) },
+                uniquingKeysWith: { first, _ in first }
+            ))
+        case .changes:
+            guard let snapshot = await latestANFRSnapshot() else { return nil }
+            return POILoad(payloads: CarPlayMapLayerPoints.changes(snapshot.sites, around: area),
+                           snapshotDate: snapshot.snapshotDate)
+        }
+    }
+
+    /// Dernier relevé ANFR, gardé une demi-heure ; l'ancien reste servi si le
+    /// réseau tombe, plutôt qu'une carte en échec.
+    private func latestANFRSnapshot() async -> ANFRMapSnapshot? {
+        if let cached = anfrSnapshot, Date().timeIntervalSince(cached.loadedAt) < Self.anfrSnapshotLifetime {
+            return cached.snapshot
+        }
+        guard let snapshot = try? await services.anfr.mapSnapshot(date: nil) else { return anfrSnapshot?.snapshot }
+        anfrSnapshot = (snapshot, Date())
+        return snapshot
     }
 
     /// Ouvre une entrée de la racine en mode liste.

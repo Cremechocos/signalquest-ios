@@ -1,6 +1,182 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Évolutions ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR changes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Évolutions ANFR"
+          }
+        }
+      }
+    },
+    "Sites prévus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planned sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites prévus"
+          }
+        }
+      }
+    },
+    "Aucune antenne à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No antennas nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune antenne à proximité"
+          }
+        }
+      }
+    },
+    "Aucune évolution à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No changes nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune évolution à proximité"
+          }
+        }
+      }
+    },
+    "Aucun site prévu à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No planned sites nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun site prévu à proximité"
+          }
+        }
+      }
+    },
+    "Aucune panne à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No outages nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune panne à proximité"
+          }
+        }
+      }
+    },
+    "Évolutions du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Évolutions du %@"
+          }
+        }
+      }
+    },
+    "Supports et opérateurs à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masts and operators nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports et opérateurs à proximité"
+          }
+        }
+      }
+    },
+    "Dernier relevé hebdomadaire de l'ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest weekly ANFR snapshot"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier relevé hebdomadaire de l'ANFR"
+          }
+        }
+      }
+    },
+    "Projets déclarés par les opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projects declared by operators"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projets déclarés par les opérateurs"
+          }
+        }
+      }
+    },
+    "Incidents déclarés par les opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidents reported by operators"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidents déclarés par les opérateurs"
+          }
+        }
+      }
+    },
     "Dans l'axe" : {
       "localizations" : {
         "en" : {
@@ -50271,6 +50447,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Layers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couches"
           }
         }
       }

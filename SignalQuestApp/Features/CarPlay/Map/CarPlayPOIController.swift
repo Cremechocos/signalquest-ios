@@ -22,10 +22,21 @@ final class CarPlayPOIController: NSObject, CPPointOfInterestTemplateDelegate {
     /// interrogerait le serveur en continu pour un contenu identique.
     private static let reloadDistanceMeters: CLLocationDistance = 400
 
+    /// Intervalle minimal entre deux rechargements dus au déplacement de la
+    /// carte : CarPlay demande de ne pas rafraîchir les points d'intérêt plus
+    /// d'une fois par minute. Une zone demandée entre-temps n'est pas perdue :
+    /// elle se charge à l'échéance.
+    private let minimumInterval: TimeInterval
+
     private let onReload: (MKCoordinateRegion) -> Void
     private var lastLoadedCenter: CLLocationCoordinate2D?
+    private var lastLoadedAt: Date?
+    /// Dernière zone demandée pendant l'intervalle, chargée à son terme.
+    private var pendingRegion: MKCoordinateRegion?
+    private var catchUp: Task<Void, Never>?
 
-    init(onReload: @escaping (MKCoordinateRegion) -> Void) {
+    init(minimumInterval: TimeInterval = 60, onReload: @escaping (MKCoordinateRegion) -> Void) {
+        self.minimumInterval = minimumInterval
         self.onReload = onReload
         super.init()
     }
@@ -43,16 +54,56 @@ final class CarPlayPOIController: NSObject, CPPointOfInterestTemplateDelegate {
         if let last = lastLoadedCenter {
             let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
                 .distance(from: CLLocation(latitude: center.latitude, longitude: center.longitude))
-            guard moved >= Self.reloadDistanceMeters else { return }
+            guard moved >= Self.reloadDistanceMeters else {
+                // Revenue près de la zone chargée : l'attente n'a plus d'objet.
+                pendingRegion = nil
+                return
+            }
         }
-        lastLoadedCenter = center
+        if let lastLoadedAt {
+            let remaining = minimumInterval - Date().timeIntervalSince(lastLoadedAt)
+            if remaining > 0 {
+                pendingRegion = region
+                scheduleCatchUp(after: remaining)
+                return
+            }
+        }
+        load(region)
+    }
+
+    private func load(_ region: MKCoordinateRegion) {
+        catchUp?.cancel()
+        catchUp = nil
+        pendingRegion = nil
+        noteLoaded(center: region.center)
         onReload(region)
     }
 
+    private func scheduleCatchUp(after delay: TimeInterval) {
+        guard catchUp == nil else { return }
+        catchUp = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(max(delay, 0) * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            catchUp = nil
+            if let pendingRegion { load(pendingRegion) }
+        }
+    }
+
+    /// Le coordinateur a chargé cette zone lui-même (ouverture de l'onglet,
+    /// changement de couche) : le prochain déplacement compte à partir d'ici.
+    func noteLoaded(center: CLLocationCoordinate2D) {
+        lastLoadedCenter = center
+        lastLoadedAt = Date()
+    }
+
     /// Autorise un rechargement immédiat, quel que soit le dernier centre connu.
-    /// Utile après un changement de filtre, où la zone n'a pas bougé mais le
+    /// Utile après un changement de couche, où la zone n'a pas bougé mais le
     /// contenu attendu, si.
     func invalidate() {
+        catchUp?.cancel()
+        catchUp = nil
+        pendingRegion = nil
         lastLoadedCenter = nil
+        lastLoadedAt = nil
     }
 }
