@@ -1641,7 +1641,9 @@ struct AntennaDetailSheet: View {
                 measureTile("RSRP moyen", details.signalStats?.avgRsrp.map { "\(Int($0.rounded()))" }, unit: "dBm")
                 measureTile("Speedtests", details.speedtestsCount.map(String.init))
             }
-            if let stats = details.signalStats {
+            // SITE-SIGNAL-1 : un support sans cellule rattachée renvoie count 0 et des moyennes
+            // nulles ; sans ce garde, la carte resterait affichée vide.
+            if let stats = details.signalStats, stats.measurementCount > 0 {
                 factCard {
                     VStack(spacing: SQSpace.sm) {
                         detailRow("RSRQ moyen", SignalFormatters.db(stats.avgRsrq))
