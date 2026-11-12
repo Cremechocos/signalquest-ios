@@ -16,6 +16,37 @@ struct E2EEAutoMediaRef: Equatable {
     /// Adresse d'une pièce chiffrée : son `blobId`, jamais une URL de stockage (§7.4).
     static func url(blobId: String) -> URL? { URL(string: "\(scheme):\(blobId)") }
 
+    /// Les pièces d'un import v1 (E2EE-AUTO §8), sous la forme commune : même rendu
+    /// qu'une pièce révision 17. Le nom et le type peuvent manquer à la source :
+    /// « fichier » et `application/octet-stream`, ouvert comme un fichier.
+    static func attachments(ofImport body: E2EEV2HistoryImportBody, into media: inout [String: E2EEAutoMediaRef]) -> [MessageAttachment] {
+        body.attachments.map { piece in
+            let manifest = E2EEAutoContentR17.Manifest(
+                blobId: piece.blobId, mediaKeyB64: piece.mediaKeyB64, noncePrefixB64: piece.noncePrefixB64,
+                plaintextSize: piece.plaintextSize, ciphertextSize: piece.ciphertextSize,
+                plaintextSha256: piece.plaintextSha256, ciphertextSha256: piece.ciphertextSha256,
+                fileName: piece.fileName.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "fichier"),
+                mimeType: piece.mimeType.flatMap { $0.isEmpty ? nil : $0 } ?? "application/octet-stream",
+                width: piece.width, height: piece.height, durationMs: piece.durationMs.map(Int64.init)
+            )
+            media[manifest.blobId] = .init(file: manifest, thumbnail: nil)
+            let kind: String
+            if manifest.mimeType.hasPrefix("audio/") {
+                kind = "AUDIO"
+            } else {
+                kind = switch E2EEAutoContentR17.presentation(mimeType: manifest.mimeType) {
+                case .image: "IMAGE"
+                case .video: "VIDEO"
+                case .file: "FILE"
+                }
+            }
+            return MessageAttachment(
+                id: manifest.blobId, kind: kind, url: url(blobId: manifest.blobId), fileName: manifest.fileName,
+                contentType: manifest.mimeType, size: Int(manifest.plaintextSize), width: manifest.width, height: manifest.height
+            )
+        }
+    }
+
     /// Les pièces d'un message révision 17, sous la forme commune `MessageAttachment`.
     static func attachments(of body: E2EEAutoContentR17.Body, into media: inout [String: E2EEAutoMediaRef]) -> [MessageAttachment] {
         func attachment(

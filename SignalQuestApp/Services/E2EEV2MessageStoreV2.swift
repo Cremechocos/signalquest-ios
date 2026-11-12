@@ -318,6 +318,13 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     }
 
     /// Le contenu révision 17 d'un message gardé, relu de sa charge ; `nil` après sa suppression.
+    /// Corps d'un import v1 gardé (§8) : ses pièces s'affichent comme celles d'un média.
+    static func historyImportBody(_ stored: Stored) -> E2EEV2HistoryImportBody? {
+        guard let data = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
+              let payload = try? E2EEV2ContentPayloadV2.parse(data), case .historyImport(let body) = payload.body else { return nil }
+        return body
+    }
+
     static func r17Body(_ stored: Stored) -> E2EEAutoContentR17.Body? {
         guard let data = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
               let payload = try? E2EEV2ContentPayloadV2.parse(data), case .r17(let body) = payload.body else { return nil }

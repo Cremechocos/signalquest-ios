@@ -185,9 +185,16 @@ enum E2EEV2ThreadPresenter {
                     record, importer: members[stored.senderUserId], startsBlock: stored.messageRef == ordered.first?.messageRef
                 )
                 imports[stored.messageRef]?.contested = record.source.map { contested.contains($0.messageId) } ?? false
+                // Pièces importées (§8) : téléchargées par l'enveloppe de l'import, comme un média.
+                var attachments: [MessageAttachment] = []
+                if record.source != nil, !stored.deleted, let body = E2EEV2MessageStoreV2.historyImportBody(stored),
+                   !body.attachments.isEmpty {
+                    blobEnvelopes[stored.messageRef] = stored.envelopeId
+                    attachments = E2EEAutoMediaRef.attachments(ofImport: body, into: &media)
+                }
                 return importedItem(
                     stored, record: record, conversationId: conversationId, members: members,
-                    importRefs: importRefs, blockEndMs: blockEndMs
+                    importRefs: importRefs, blockEndMs: blockEndMs, attachments: attachments
                 )
             }
             // Révision 17 : chaque pièce devient une pièce jointe dont l'adresse désigne son blob.
@@ -338,7 +345,8 @@ enum E2EEV2ThreadPresenter {
         conversationId: String,
         members: [String: MessageUser],
         importRefs: [String: String],
-        blockEndMs: Int64
+        blockEndMs: Int64,
+        attachments: [MessageAttachment] = []
     ) -> MessageItem {
         let dateMs = min(blockEndMs, stored.serverTimeMs)
         guard let source = record.source else {
@@ -351,19 +359,26 @@ enum E2EEV2ThreadPresenter {
             )
         }
         let created = E2EEV2HistoryMigrationContract.date(source.createdAt).map { min($0, date(blockEndMs)) } ?? date(dateMs)
-        // Une pièce sans texte n'a plus rien à montrer que sa mention.
+        // Une pièce sans texte n'a plus rien à montrer que sa mention, sauf si ses
+        // pièces ont été importées : elles s'affichent alors comme un média.
         let attachmentOnly = source.kind == "ATTACHMENT"
-        let content = attachmentOnly && source.content.isEmpty
+        let content = attachmentOnly && source.content.isEmpty && attachments.isEmpty
             ? String(localized: "pièce jointe non importée") : source.content
+        let kind: String
+        if !attachments.isEmpty {
+            kind = attachments.count == 1 && attachments[0].kind == "AUDIO" ? "AUDIO" : "MEDIA"
+        } else {
+            kind = attachmentOnly ? "TEXT" : source.kind
+        }
         return MessageItem(
             id: stored.messageRef, conversationId: conversationId, senderId: source.senderId,
-            kind: attachmentOnly ? "TEXT" : source.kind, content: content, e2eeVersion: 2, e2eeIvB64: nil,
-            e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: attachmentOnly ? nil : source.metadata, createdAt: created,
+            kind: kind, content: content, e2eeVersion: 2, e2eeIvB64: nil,
+            e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: attachmentOnly || !attachments.isEmpty ? nil : source.metadata, createdAt: created,
             editedAt: source.editedAt.flatMap(E2EEV2HistoryMigrationContract.date), deletedAt: nil, expiresAt: nil,
             replyToId: source.replyToId.flatMap { importRefs[$0] }, threadReplyCount: nil,
             sender: members[source.senderId]
                 ?? MessageUser(id: source.senderId, name: String(localized: "ancien membre"), email: "", avatarUrl: nil),
-            attachments: [], reactions: []
+            attachments: attachments, reactions: []
         )
     }
 

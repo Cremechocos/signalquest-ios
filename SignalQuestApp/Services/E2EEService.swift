@@ -73,6 +73,10 @@ protocol E2EEServicing: Sendable {
     /// renvoyée dans le payload et utilisée telle quelle au déchiffrement.
     func encryptText(conversationId: String, text: String, aad: Data) async throws -> E2EEPayload
     func decryptText(conversationId: String, message: MessageItem) async throws -> String
+    /// Pièce jointe v1 chiffrée par le site (E2EE-AUTO §8) : AES-256-GCM par la clé de
+    /// conversation, IV de 12 octets, sans AAD, étiquette en fin. `E2EEError.locked` si
+    /// la clé n'est pas détenue, `decryptFailed` si elle l'est et que la pièce ne s'ouvre pas.
+    func decryptLegacyAttachment(conversationId: String, iv: Data, ciphertext: Data) async throws -> Data
     func moderationWrappedConversationKey(conversationId: String) async throws -> String?
     /// Logout revokes access and clears RAM/legacy v1, but keeps owner-scoped v2 vaults.
     func lockLocalKeys() async
@@ -439,6 +443,20 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: ivData), ciphertext: ciphertext, tag: tag)
         let plain = try AES.GCM.open(box, using: key, authenticating: authenticatedData)
         return String(data: plain, encoding: .utf8) ?? ""
+    }
+
+    func decryptLegacyAttachment(conversationId: String, iv: Data, ciphertext: Data) async throws -> Data {
+        let key: SymmetricKey
+        do { key = try await conversationKey(conversationId: conversationId) } catch { throw E2EEError.locked }
+        guard iv.count == 12, ciphertext.count >= 16 else { throw E2EEError.decryptFailed }
+        do {
+            let box = try AES.GCM.SealedBox(
+                nonce: AES.GCM.Nonce(data: iv), ciphertext: ciphertext.prefix(ciphertext.count - 16), tag: ciphertext.suffix(16)
+            )
+            return try AES.GCM.open(box, using: key)
+        } catch {
+            throw E2EEError.decryptFailed
+        }
     }
 
     private func conversationKey(conversationId: String) async throws -> SymmetricKey {

@@ -115531,6 +115531,22 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "fichier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "file"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fichier"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

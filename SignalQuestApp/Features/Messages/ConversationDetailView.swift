@@ -3320,13 +3320,20 @@ struct ConversationDetailView: View {
     }
 
     /// Texte des messages v1 que cet appareil sait encore lire : clé de
-    /// conversation gardée ou session v1 ouverte (E2EE-AUTO §8).
+    /// conversation gardée ou session v1 ouverte (E2EE-AUTO §8). Un message sans
+    /// texte chiffré (pièce seule envoyée par le site) se lit par son `content`
+    /// servi, comme chez Android, une fois la clé détenue.
     private func legacyReadings(of legacy: [MessageItem]) async -> [String: String] {
-        let encrypted = legacy.filter { $0.isEncrypted && $0.deletedAt == nil }
-        guard !encrypted.isEmpty, let e2ee, await e2ee.isConversationUnlocked(conversationId: conversation.id) else { return [:] }
+        let live = legacy.filter { $0.deletedAt == nil }
+        guard live.contains(where: \.isEncrypted), let e2ee,
+              await e2ee.isConversationUnlocked(conversationId: conversation.id) else { return [:] }
         var readings: [String: String] = [:]
-        for item in encrypted {
-            if let text = try? await e2ee.decryptText(conversationId: conversation.id, message: item) { readings[item.id] = text }
+        for item in live {
+            if item.e2eeIvB64?.isEmpty == false, item.e2eeCiphertextB64?.isEmpty == false {
+                if let text = try? await e2ee.decryptText(conversationId: conversation.id, message: item) { readings[item.id] = text }
+            } else {
+                readings[item.id] = item.content ?? ""
+            }
         }
         return readings
     }
@@ -3351,7 +3358,9 @@ struct ConversationDetailView: View {
             guard !v2ImportedV1Ids.contains(item.id), !v2ImportSettled.contains(item.id),
                   let text = v2LegacyReadings[item.id],
                   let source = E2EEAutoHistoryImporter.source(item, text: text, conversationId: conversation.id) else { return nil }
-            return E2EEAutoHistoryImporter.candidate(source)
+            var candidate = E2EEAutoHistoryImporter.candidate(source)
+            candidate?.pieces = E2EEAutoHistoryImporter.pieces(of: item)
+            return candidate
         }
         guard !candidates.isEmpty else { return }
         v2ImportRunning = true
@@ -3359,15 +3368,53 @@ struct ConversationDetailView: View {
         let messaging = services.e2eeV2Messaging
         let (conversationId, isGroup) = (conversation.id, conversation.isGroup)
         let participantIds = conversation.participants.map(\.userId)
+        let e2ee = self.e2ee
+        let blobs = messaging.blobClient()
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("e2ee-import", isDirectory: true)
         let report = await E2EEAutoHistoryImporter.run(candidates) { candidate in
-            await messaging.send(
-                .init(body: .historyImport(candidate.body), replyToRef: nil, mentions: [], ttlSeconds: candidate.ttlSeconds),
+            var body = candidate.body
+            if !candidate.pieces.isEmpty {
+                // Pièces v1 (révision 16) : relues, déchiffrées, renvoyées en blobs neufs ; une attente garde le message.
+                guard let e2ee, let (client, _) = blobs,
+                      let prepared = await E2EEAutoHistoryImporter.prepareAttachments(
+                          candidate, workDirectory: work,
+                          read: { piece in
+                              await E2EEAutoHistoryImporter.read(piece, in: work) { iv, ciphertext in
+                                  try await e2ee.decryptLegacyAttachment(conversationId: conversationId, iv: iv, ciphertext: ciphertext)
+                              }
+                          },
+                          upload: { file in await Self.uploadImportedPiece(file, client: client, in: work) }
+                      ) else { return .waiting }
+                body = prepared
+            }
+            return E2EEAutoHistoryImporter.outcome(await messaging.send(
+                .init(body: .historyImport(body), replyToRef: nil, mentions: [], ttlSeconds: candidate.ttlSeconds),
                 clientRequestId: candidate.clientRequestId, conversationId: conversationId, isGroup: isGroup,
                 participantIds: participantIds
-            )
+            ))
         }
-        v2ImportSettled.formUnion(report.outcomes.filter { $0.value != .retry }.keys)
+        v2ImportSettled.formUnion(report.outcomes.filter { $0.value != .retry && $0.value != .waiting }.keys)
         await loadV2()
+    }
+
+    /// Chiffre une pièce v1 relue sous une nouvelle clé de média et l'envoie en
+    /// blob (§7.4) ; un `blobId` refusé ou périmé repart une fois sous un neuf.
+    private nonisolated static func uploadImportedPiece(
+        _ file: URL, client: E2EEAutoBlobClient, in work: URL
+    ) async -> E2EEV2BlobEncryptionManifest? {
+        for _ in 0..<2 {
+            let ciphertext = work.appendingPathComponent(UUID().uuidString + ".blob")
+            defer { try? FileManager.default.removeItem(at: ciphertext) }
+            guard let prepared = try? E2EEV2BlobFileEncryptor.encryptFile(
+                sourceURL: file, ciphertextURL: ciphertext, blobId: E2EEAutoMediaPreparation.newBlobId()
+            ) else { return nil }
+            switch await client.upload(prepared) {
+            case .complete: return prepared.manifest
+            case .restart: continue
+            case .failure: return nil
+            }
+        }
+        return nil
     }
 
     /// Les messages déjà déchiffrés et gardés sur l'appareil, affichés tout de

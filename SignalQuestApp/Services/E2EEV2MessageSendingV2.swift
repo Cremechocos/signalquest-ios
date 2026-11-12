@@ -29,6 +29,8 @@ enum E2EEV2MessageComposerV2 {
         // Révision 17 : les blobs cités, dans l'ordre du contenu (règle (a)), et la livraison de la nature.
         var blobIds: [String] = []
         if case .r17(let body) = parsed.body { blobIds = body.blobIds }
+        // Import v1 (§8, révision 16) : ses pièces, dans l'ordre de `attachments`.
+        if case .historyImport(let body) = parsed.body { blobIds = body.attachments.map(\.blobId) }
         var context = E2EEV2MessageContextV2(
             conversationId: conversationId, epochNumber: epoch.epochNumber, senderDeviceId: device.deviceId,
             clientRequestId: clientRequestId, counter: parsed.counter, ttlSeconds: ttlSeconds, encryptedBlobIds: blobIds

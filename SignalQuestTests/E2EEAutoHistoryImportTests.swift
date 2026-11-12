@@ -196,6 +196,38 @@ final class E2EEAutoHistoryImportTests: XCTestCase {
 
     /// Anciens messages d'une conversation passée en auto (E2EE-AUTO §8) : après
     /// le bloc, avant les messages v2 ; l'import vérifié cache sa source v1.
+    /// Pièces importées (révision 16) : l'import « pièce seule » du vecteur
+    /// s'affiche comme un média, téléchargé par l'enveloppe de l'import, et non
+    /// plus « pièce jointe non importée ».
+    func testImportedAttachmentsShowAsMedia() throws {
+        let valid = try XCTUnwrap(vector()["valid"] as? [[String: Any]])
+        let item = try XCTUnwrap(valid.first { $0["case"] as? String == "attachment" })
+        let payload = try XCTUnwrap((item["payloadUtf8"] as? String)?.data(using: .utf8))
+        let sourceObject = try XCTUnwrap(item["source"])
+        let source = try JSONDecoder().decode(
+            E2EEV2LegacyMessageSource.self, from: JSONSerialization.data(withJSONObject: sourceObject)
+        )
+        var imported = stored("ref_import_d_0000000000000000000000000006", sequence: 6, sender: bruno.id, text: nil,
+                              serverTimeMs: 1_790_000_009_000, historyImport: .init(
+                                  source: source, missingAttachments: 0, importerPlatform: "android"))
+        imported.payloadB64 = payload.base64EncodedString()
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 6, messages: [imported], equivocalRefs: []),
+            unsupported: [], missingByDevice: [:], waitingForEpoch: false
+        )
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: source.conversationId, members: [alice.id: alice, bruno.id: bruno], deviceOwners: [:]
+        )
+        let message = try XCTUnwrap(thread.messages.first)
+        XCTAssertEqual(message.kind, "MEDIA")
+        XCTAssertEqual(message.content, "")
+        XCTAssertEqual(message.attachments.map(\.kind), ["IMAGE"])
+        XCTAssertEqual(message.attachments.first?.fileName, "antenne.jpg")
+        XCTAssertEqual(message.attachments.first?.url, E2EEAutoMediaRef.url(blobId: "opaque_blob_fixture_0123456789"))
+        XCTAssertEqual(thread.blobEnvelopes[imported.messageRef], imported.envelopeId)
+        XCTAssertEqual(thread.media["opaque_blob_fixture_0123456789"]?.file.width, 640)
+    }
+
     func testOlderMessagesFollowTheBlockWithTheirMention() {
         let genesis: Int64 = 1_790_000_000_000
         let recent = stored("ref_recent_000000000000000000000000000001", sequence: 1, sender: alice.id, text: "Après la bascule",

@@ -39,9 +39,11 @@ enum E2EEAutoLegacyHistory {
                     attachments: item.attachments, reactions: item.reactions
                 )
             }
+            // Pièce seule sans texte : sa lecture vide ne montre rien, la mention reste.
+            let reading = readings[item.id].flatMap { $0.isEmpty && !item.attachments.isEmpty ? nil : $0 }
             return MessageItem(
                 id: id, conversationId: item.conversationId, senderId: item.senderId, kind: "TEXT",
-                content: item.deletedAt == nil ? readings[item.id] ?? String(localized: "ancien message non importé") : nil,
+                content: item.deletedAt == nil ? reading ?? String(localized: "ancien message non importé") : nil,
                 e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
                 createdAt: item.createdAt, editedAt: nil, deletedAt: item.deletedAt, expiresAt: item.expiresAt,
                 replyToId: replyToId, threadReplyCount: nil, sender: item.sender, attachments: [], reactions: []
