@@ -13,15 +13,11 @@ final class SQMapKitDotsOverlay: NSObject, MKOverlay {
         var hatched = false
     }
     let dots: [Dot]
-    /// Speedtests d'un trajet : plus grands et cernés de blanc, pour se détacher
-    /// du tracé aux mêmes couleurs sur lequel ils ont été mesurés.
-    let emphasized: Bool
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
-    init(dots: [Dot], emphasized: Bool = false) {
+    init(dots: [Dot]) {
         self.dots = dots
-        self.emphasized = emphasized
         var rect = MKMapRect.null
         for d in dots { rect = rect.union(MKMapRect(origin: d.point, size: MKMapSize(width: 0.5, height: 0.5))) }
         let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
@@ -35,8 +31,7 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
         guard let overlay = overlay as? SQMapKitDotsOverlay else { return }
         // Points PLEINS : disque de couleur opaque, sans halo ni aucun contour. Taille
         // écran ~constante via `k / zoomScale` → nettement visibles à TOUS les zooms.
-        let radius = overlay.emphasized ? 7 / zoomScale : max(2.6, 4.6 / zoomScale)
-        let ring = 2 / zoomScale
+        let radius = max(2.6, 4.6 / zoomScale)
         let pad = radius * 3
         let cull = mapRect.insetBy(dx: -pad, dy: -pad)
         context.setShouldAntialias(true)
@@ -47,10 +42,6 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
             if dot.hatched {
                 Self.drawHatched(dot.color, in: r, context: context)
             } else {
-                if overlay.emphasized {
-                    context.setFillColor(UIColor.white.cgColor)
-                    context.fillEllipse(in: r.insetBy(dx: -ring, dy: -ring))
-                }
                 context.setFillColor(dot.color)
                 context.fillEllipse(in: r)
             }
@@ -78,3 +69,38 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
         context.restoreGState()
     }
 }
+
+/// Speedtest d'un trajet vu seul : un disque de la couleur de son débit, cerné de
+/// blanc. Vue d'annotation plutôt que couche dessinée : MapKit agrandit les tuiles
+/// d'une couche entre deux niveaux de zoom, et les pastilles y devenaient floues.
+final class SQSpeedDotMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
+    static let reuseID = "sq-speed-dot"
+    private static let diameter: CGFloat = 18
+    private static let ring: CGFloat = 2
+    private let dot = UIView()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        frame = CGRect(x: 0, y: 0, width: Self.diameter, height: Self.diameter)
+        layer.cornerRadius = Self.diameter / 2
+        layer.backgroundColor = UIColor.white.cgColor
+        dot.frame = bounds.insetBy(dx: Self.ring, dy: Self.ring)
+        dot.layer.cornerRadius = dot.bounds.width / 2
+        dot.isUserInteractionEnabled = false
+        addSubview(dot)
+        // Toujours affichée : un trajet n'a que quelques dizaines de tests.
+        displayPriority = .required
+        collisionMode = .circle
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func apply(_ payload: MapAnnotationPayload) {
+        clusteringIdentifier = nil
+        dot.backgroundColor = SQNetworkColors.speedUIColor(payload.details?.downloadMbps ?? 0)
+        applyAccessibility(for: payload)
+    }
+}
+
