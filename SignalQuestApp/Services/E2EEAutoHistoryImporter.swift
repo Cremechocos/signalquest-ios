@@ -196,6 +196,12 @@ extension E2EEAutoHistoryImporter {
         case otherFailure
     }
 
+    /// Message v1 qui ne se lit qu'avec la clé de conversation : texte chiffré, ou
+    /// pièce chiffrée par le site (une pièce seule n'a pas de texte chiffré).
+    static func requiresV1Key(_ item: MessageItem) -> Bool {
+        item.isEncrypted || pieces(of: item).contains { $0.ivB64 != nil || $0.unknownFormat }
+    }
+
     static func pieces(of item: MessageItem) -> [V1Piece] {
         let entries: [[String: Any]] = item.metadata
             .flatMap { $0.data(using: .utf8) }
@@ -204,7 +210,7 @@ extension E2EEAutoHistoryImporter {
             .compactMap { $0 as? [String: Any] } ?? []
         return item.attachments.map { attachment in
             let address = attachment.url?.absoluteString ?? ""
-            let https = attachment.url.flatMap { $0.scheme?.lowercased() == "https" ? $0 : nil }
+            let https = attachment.url.flatMap { isReadableSource($0) ? $0 : nil }
             guard !address.isEmpty, let entry = entries.first(where: { ($0["url"] as? String) == address }) else {
                 return V1Piece(url: https, ivB64: nil, unknownFormat: false,
                                fileName: attachment.fileName, mimeType: attachment.contentType)
@@ -221,6 +227,17 @@ extension E2EEAutoHistoryImporter {
                 mimeType: text("originalContentType") ?? attachment.contentType
             )
         }
+    }
+
+    /// Seul `https` se lit (§8). Exception des builds Debug : le stockage local de
+    /// la pile QA (MinIO en `http://127.0.0.1`), jamais un autre hôte en clair.
+    static func isReadableSource(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "https" { return true }
+        #if DEBUG
+        return url.scheme?.lowercased() == "http" && ["127.0.0.1", "localhost"].contains(url.host?.lowercased() ?? "")
+        #else
+        return false
+        #endif
     }
 
     static func state(_ read: PieceRead) -> PieceState {

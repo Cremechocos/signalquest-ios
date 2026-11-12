@@ -235,6 +235,27 @@ final class E2EEAutoHistoryImporterTests: XCTestCase {
         XCTAssertFalse(pieces[4].unknownFormat)
     }
 
+    /// Une pièce seule chiffrée par le site n'a pas de texte chiffré, mais demande
+    /// la clé v1 comme un texte chiffré (vu sur la pile QA le 12/11) ; une pièce
+    /// en clair, non.
+    func testSiteEncryptedPieceAloneRequiresTheV1Key() {
+        func attachment(_ url: String) -> MessageAttachment {
+            MessageAttachment(id: "attachment_a_000000000001", kind: "FILE", url: URL(string: url), fileName: "a.png.enc",
+                              contentType: "application/octet-stream", size: 1, width: nil, height: nil)
+        }
+        let sealed = v1("message_123456789031", encrypted: false,
+                        metadata: #"{"e2eeAttachments":[{"url":"https://cdn.test/a.enc","v":1,"ivB64":"AAECAwQFBgcICQoL"}]}"#,
+                        attachments: [attachment("https://cdn.test/a.enc")])
+        let odd = v1("message_123456789032", encrypted: false,
+                     metadata: #"{"e2eeAttachments":[{"url":"https://cdn.test/a.enc","v":2,"ivB64":"AAECAwQFBgcICQoL"}]}"#,
+                     attachments: [attachment("https://cdn.test/a.enc")])
+        let clear = v1("message_123456789033", encrypted: false, metadata: nil, attachments: [attachment("https://cdn.test/a.png")])
+        XCTAssertFalse(sealed.isEncrypted)
+        XCTAssertTrue(E2EEAutoHistoryImporter.requiresV1Key(sealed))
+        XCTAssertTrue(E2EEAutoHistoryImporter.requiresV1Key(odd))
+        XCTAssertFalse(E2EEAutoHistoryImporter.requiresV1Key(clear))
+    }
+
     /// Lecture à la source : déchiffrée avec la clé v1, sans AAD ; 404 perdue,
     /// 503 en attente ; IV qui n'a pas 12 octets ou étiquette fausse : perdue ;
     /// clé absente : en attente ; pièce en clair gardée telle quelle.

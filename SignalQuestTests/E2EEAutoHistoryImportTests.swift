@@ -284,6 +284,28 @@ final class E2EEAutoHistoryImportTests: XCTestCase {
         XCTAssertTrue(recentOnly.legacyCaptions.isEmpty)
     }
 
+    /// Une pièce seule chiffrée par le site (sans texte chiffré) n'est ni « non
+    /// chiffrée » ni montrée comme fichier `.enc` brut : la mention « non
+    /// importé » reste tant qu'aucun import ne la remplace (pile QA, 12/11).
+    func testASiteEncryptedPieceAloneIsNotShownAsPlain() {
+        let url = "https://cdn.test/photo.png.enc"
+        let item = MessageItem(
+            id: "message_v1_piece_0000001", conversationId: conversationId, senderId: bruno.id, kind: "ATTACHMENT", content: "",
+            e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil,
+            metadata: #"{"e2eeAttachments":[{"url":"\#(url)","v":1,"ivB64":"AAECAwQFBgcICQoL"}]}"#,
+            createdAt: ISO8601DateFormatter().date(from: "2026-08-24T00:00:00Z"), editedAt: nil, deletedAt: nil,
+            expiresAt: nil, replyToId: nil, threadReplyCount: nil, sender: bruno,
+            attachments: [MessageAttachment(id: "attachment_a_000000000001", kind: "FILE", url: URL(string: url),
+                                            fileName: "photo.png.enc", contentType: "application/octet-stream",
+                                            size: 1, width: nil, height: nil)],
+            reactions: []
+        )
+        let shown = E2EEAutoLegacyHistory.present([item], importRefs: [:], readings: [item.id: ""])
+        XCTAssertTrue(shown.captions.isEmpty)
+        XCTAssertEqual(shown.messages.map(\.content), ["ancien message non importé"])
+        XCTAssertEqual(shown.messages.first?.attachments.count, 0)
+    }
+
     /// La lecture v1 de cet appareil s'affiche tant qu'aucun import ne la
     /// remplace ; un import dont la source en diffère est contesté, et la
     /// lecture v1 reste affichée (E2EE-AUTO §8).

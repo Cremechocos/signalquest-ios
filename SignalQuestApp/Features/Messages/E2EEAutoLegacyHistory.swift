@@ -29,7 +29,8 @@ enum E2EEAutoLegacyHistory {
             let replyToId = item.replyToId.flatMap { target in
                 shownIds.contains(target) ? idPrefix + target : importRefs[target]
             }
-            guard item.isEncrypted else {
+            // Une pièce seule chiffrée par le site n'a pas de texte chiffré mais reste chiffrée.
+            guard E2EEAutoHistoryImporter.requiresV1Key(item) else {
                 captions[id] = String(localized: "ancien message non chiffré")
                 return MessageItem(
                     id: id, conversationId: item.conversationId, senderId: item.senderId, kind: item.kind,

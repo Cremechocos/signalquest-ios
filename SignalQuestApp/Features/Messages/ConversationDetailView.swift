@@ -3325,7 +3325,7 @@ struct ConversationDetailView: View {
     /// servi, comme chez Android, une fois la clé détenue.
     private func legacyReadings(of legacy: [MessageItem]) async -> [String: String] {
         let live = legacy.filter { $0.deletedAt == nil }
-        guard live.contains(where: \.isEncrypted), let e2ee,
+        guard live.contains(where: E2EEAutoHistoryImporter.requiresV1Key), let e2ee,
               await e2ee.isConversationUnlocked(conversationId: conversation.id) else { return [:] }
         var readings: [String: String] = [:]
         for item in live {
@@ -3342,7 +3342,7 @@ struct ConversationDetailView: View {
     /// mot de passe v1 est demandé, une seule fois pour le compte (E2EE-AUTO §8).
     private func askImportPasswordIfNeeded() {
         guard E2EEV2ServerGate.autoActive, usesV2, v2LegacyReadings.isEmpty,
-              v2Legacy.contains(where: { $0.isEncrypted && $0.deletedAt == nil && !v2ImportedV1Ids.contains($0.id) }),
+              v2Legacy.contains(where: { E2EEAutoHistoryImporter.requiresV1Key($0) && $0.deletedAt == nil && !v2ImportedV1Ids.contains($0.id) }),
               let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
         let key = "e2ee.auto.importPasswordAsked.\(scope)"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
@@ -3355,7 +3355,8 @@ struct ConversationDetailView: View {
     private func importLegacyHistoryIfNeeded() async {
         guard !v2ImportRunning, usesV2, E2EEV2ServerGate.autoActive else { return }
         let candidates = v2Legacy.compactMap { item -> E2EEAutoHistoryImporter.Candidate? in
-            guard !v2ImportedV1Ids.contains(item.id), !v2ImportSettled.contains(item.id),
+            // Seul un texte v1 déchiffré s'importe, avec ses pièces (§8) : une pièce seule reste « non importée ».
+            guard item.isEncrypted, !v2ImportedV1Ids.contains(item.id), !v2ImportSettled.contains(item.id),
                   let text = v2LegacyReadings[item.id],
                   let source = E2EEAutoHistoryImporter.source(item, text: text, conversationId: conversation.id) else { return nil }
             var candidate = E2EEAutoHistoryImporter.candidate(source)
