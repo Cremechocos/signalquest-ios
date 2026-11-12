@@ -290,6 +290,8 @@ struct MapKitMapView: UIViewRepresentable {
     var zoneCompare: MapZoneCompareOverlay? = nil
     /// Fin d'un glissé de l'épingle de comparaison.
     var onZoneCompareMove: ((CLLocationCoordinate2D) -> Void)? = nil
+    /// Speedtests d'un trajet vu seul : pastilles agrandies au-dessus du tracé.
+    var emphasizesSpeedtests = false
     /// Session vue seule (« Voir le tracé » d'un post du fil) ; `nil` hors de ce mode.
     var sessionTrace: MapSessionTrace? = nil
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
@@ -359,7 +361,7 @@ struct MapKitMapView: UIViewRepresentable {
         if context.coordinator.lastRenderVersion != renderVersion {
             context.coordinator.lastRenderVersion = renderVersion
             context.coordinator.setCoverage(coverageHeatFeatures, on: map)
-            context.coordinator.setSpeedtest(speedtestFeatures, on: map)
+            context.coordinator.setSpeedtest(speedtestFeatures, emphasized: emphasizesSpeedtests, on: map)
             context.coordinator.apply(annotations: annotations, on: map)
         }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
@@ -539,8 +541,8 @@ struct MapKitMapView: UIViewRepresentable {
             map.addOverlay(overlay, level: .aboveLabels)
         }
 
-        func setSpeedtest(_ features: [SpeedtestFeature], on map: MKMapView) {
-            guard features != latestSpeedtestFeatures else { return }
+        func setSpeedtest(_ features: [SpeedtestFeature], emphasized: Bool = false, on map: MKMapView) {
+            guard features != latestSpeedtestFeatures || emphasized != speedtestOverlay?.emphasized ?? false else { return }
             latestSpeedtestFeatures = features
             if let old = speedtestOverlay { map.removeOverlay(old); speedtestOverlay = nil }
             guard !features.isEmpty else {
@@ -550,7 +552,7 @@ struct MapKitMapView: UIViewRepresentable {
             let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
                 .init(point: MKMapPoint(f.coordinate), color: Self.speedColor(f.downloadMbps).withAlphaComponent(0.9).cgColor)
             }
-            let overlay = SQMapKitDotsOverlay(dots: dots)
+            let overlay = SQMapKitDotsOverlay(dots: dots, emphasized: emphasized)
             speedtestOverlay = overlay
             map.addOverlay(overlay, level: .aboveLabels)
             updateSpeedtestAccessibility(on: map)
@@ -688,10 +690,14 @@ struct MapKitMapView: UIViewRepresentable {
                         points: trace.points,
                         coloring: trace.coloring,
                         followsContract: true,
-                        connects: trace.style == .trace && trace.points.count >= 2,
-                        casing: (isDark ? UIColor(white: 0.1, alpha: 0.9) : UIColor.white).cgColor
+                        connects: trace.style == .trace && trace.points.count >= 2
                     )
-                    map.addOverlay(overlay, level: .aboveLabels)
+                    // Sous les speedtests du trajet, qui ont été mesurés sur la route.
+                    if let speedtestOverlay, map.overlays.contains(where: { $0 === speedtestOverlay }) {
+                        map.insertOverlay(overlay, below: speedtestOverlay)
+                    } else {
+                        map.addOverlay(overlay, level: .aboveLabels)
+                    }
                     sessionOverlay = overlay
                 }
             }

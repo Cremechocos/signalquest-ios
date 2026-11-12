@@ -2357,12 +2357,11 @@ struct MapExplorerView: View {
         // Trajet vu seul : les couches de la carte s'effacent derrière lui. La
         // parité de la version suffit à les retirer puis à les remettre.
         MapKitMapView(
-            // Les speedtests d'un trajet sont des marqueurs, au-dessus du tracé : sur la
-            // route, une pastille de débit se perdait sous le trait aux mêmes couleurs.
-            annotations: sessionFocus.map { $0.speedtests.map(MapKitMapView.Coordinator.speedtestPayload(from:)) }
-                ?? renderedAnnotations,
+            annotations: sessionFocus == nil ? renderedAnnotations : [],
             coverageHeatFeatures: sessionFocus == nil ? renderedCoverageFeatures : [],
-            speedtestFeatures: sessionFocus == nil ? renderedSpeedtestFeatures : [],
+            // Speedtests d'un trajet : pastilles agrandies et cernées, au-dessus du tracé
+            // (des marqueurs se recouvraient dès quelques dizaines de tests).
+            speedtestFeatures: sessionFocus?.speedtests ?? renderedSpeedtestFeatures,
             // Paire hors trajet, impaire en trajet : la version des couches du trajet
             // fait passer ses speedtests, chargés après le tracé.
             renderVersion: sessionFocus.map { $0.layerRevision &* 2 &+ 1 } ?? renderVersion &* 2,
@@ -2394,6 +2393,7 @@ struct MapExplorerView: View {
                 )
             },
             onZoneCompareMove: { coordinate in zoneCompareTarget?.coordinate = coordinate },
+            emphasizesSpeedtests: sessionFocus != nil,
             sessionTrace: sessionFocus.map { focus in
                 MapSessionTrace(
                     points: focus.points,

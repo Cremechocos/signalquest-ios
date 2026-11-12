@@ -91,12 +91,10 @@ struct SessionTraceMapView: UIViewRepresentable {
 
         // Drive Test : un ruban coloré point par point ; sinon un nuage de perles.
         if !validPoints.isEmpty {
-            let isDark = context.environment.colorScheme == .dark
             let connects = (style.map { $0 == .trace } ?? drawPath) && coords.count >= 2
             map.addOverlay(SessionPointsOverlay(points: validPoints, coloring: coloring,
                                                 followsContract: style != nil,
-                                                connects: connects,
-                                                casing: (isDark ? UIColor(white: 0.1, alpha: 0.9) : UIColor.white).cgColor),
+                                                connects: connects),
                            level: .aboveLabels)
         }
         // Antennes desservantes géolocalisées, une pastille par site et opérateur.
@@ -381,13 +379,11 @@ final class SessionPointsOverlay: NSObject, MKOverlay {
     let connects: Bool
     /// Contrat du tracé : aucune coupure, même sur un trou de mesure.
     let cutsGaps: Bool
-    /// Liseré clair (ou sombre) qui détache le tracé du fond de carte.
-    let casing: CGColor
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
     init(points: [CoverageSessionPoint], coloring: SessionPointColoring = .rsrp, followsContract: Bool = false,
-         connects: Bool = false, casing: CGColor = UIColor.white.cgColor) {
+         connects: Bool = false) {
         var rect = MKMapRect.null
         dots = points.map { p in
             let mp = MKMapPoint(p.coordinate)
@@ -402,7 +398,6 @@ final class SessionPointsOverlay: NSObject, MKOverlay {
         }
         self.connects = connects
         self.cutsGaps = !followsContract
-        self.casing = casing
         let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
         boundingMapRect = bounding
         coordinate = MKMapPoint(x: bounding.midX, y: bounding.midY).coordinate
@@ -449,20 +444,8 @@ final class SessionPointsRenderer: MKOverlayRenderer {
             drawPearls(overlay, screen: screen, cull: cull, in: context)
             return
         }
-        // 1. Liseré ombré sous tout le ruban.
-        let casing = CGMutablePath()
-        for i in segments {
-            casing.move(to: point(for: dots[i - 1].point))
-            casing.addLine(to: point(for: dots[i].point))
-        }
-        context.saveGState()
-        context.setShadow(offset: .zero, blur: 4, color: UIColor.black.withAlphaComponent(0.28).cgColor)
-        context.addPath(casing)
-        context.setStrokeColor(overlay.casing)
-        context.setLineWidth(9 * screen)
-        context.strokePath()
-        context.restoreGState()
-        // 2. Ruban coloré : les segments consécutifs de même couleur en un seul tracé.
+        // Ruban coloré, sans liseré ni ombre (choix d'Alexandre du 12/11, comme les
+        // perles le 11/11) : les segments consécutifs de même couleur en un seul tracé.
         context.setLineWidth(5.5 * screen)
         var run = CGMutablePath()
         var runColor: CGColor?

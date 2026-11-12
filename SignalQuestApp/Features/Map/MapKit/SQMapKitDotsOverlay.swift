@@ -13,11 +13,15 @@ final class SQMapKitDotsOverlay: NSObject, MKOverlay {
         var hatched = false
     }
     let dots: [Dot]
+    /// Speedtests d'un trajet : plus grands et cernés de blanc, pour se détacher
+    /// du tracé aux mêmes couleurs sur lequel ils ont été mesurés.
+    let emphasized: Bool
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
-    init(dots: [Dot]) {
+    init(dots: [Dot], emphasized: Bool = false) {
         self.dots = dots
+        self.emphasized = emphasized
         var rect = MKMapRect.null
         for d in dots { rect = rect.union(MKMapRect(origin: d.point, size: MKMapSize(width: 0.5, height: 0.5))) }
         let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
@@ -31,7 +35,8 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
         guard let overlay = overlay as? SQMapKitDotsOverlay else { return }
         // Points PLEINS : disque de couleur opaque, sans halo ni aucun contour. Taille
         // écran ~constante via `k / zoomScale` → nettement visibles à TOUS les zooms.
-        let radius = max(2.6, 4.6 / zoomScale)
+        let radius = overlay.emphasized ? 7 / zoomScale : max(2.6, 4.6 / zoomScale)
+        let ring = 2 / zoomScale
         let pad = radius * 3
         let cull = mapRect.insetBy(dx: -pad, dy: -pad)
         context.setShouldAntialias(true)
@@ -42,6 +47,10 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
             if dot.hatched {
                 Self.drawHatched(dot.color, in: r, context: context)
             } else {
+                if overlay.emphasized {
+                    context.setFillColor(UIColor.white.cgColor)
+                    context.fillEllipse(in: r.insetBy(dx: -ring, dy: -ring))
+                }
                 context.setFillColor(dot.color)
                 context.fillEllipse(in: r)
             }
