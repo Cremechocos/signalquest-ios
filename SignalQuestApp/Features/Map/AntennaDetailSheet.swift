@@ -1027,6 +1027,11 @@ struct AntennaDetailSheet: View {
         // Les projets ne vont PAS ici : `technologiesInProject` est un champ du
         // support, sans opérateur (Android, 09/11) ; ils restent en pied du bloc.
         if op == selectedOperator, let details = model.details {
+            // Canada : les familles de bande des porteuses ISED, que le registre ne publie pas en bandes.
+            if market.uppercased() == "CA", let carriers = details.core?.radioCarriers {
+                let rows = ISEDBandFamily.generationRows(carriers)
+                if !rows.isEmpty { return rows }
+            }
             let rows = GenerationBands.rows(systems: Self.scopedSystems(of: details))
             if !rows.isEmpty { return rows }
         }
@@ -1096,16 +1101,16 @@ struct AntennaDetailSheet: View {
 
     /// « 4G ··· 700 · 800 · 1800 », les projets en gris à la suite.
     private func generationRow(_ row: GenerationBands) -> some View {
-        let active = row.bands.map(String.init).joined(separator: " · ")
-        let planned = row.plannedBands.map(String.init).joined(separator: " · ")
+        let active = row.bands.map(row.name).joined(separator: " · ")
+        let planned = row.plannedBands.map(row.name).joined(separator: " · ")
         var value = Text(verbatim: active)
         if !planned.isEmpty {
             value = value + Text(verbatim: active.isEmpty ? "" : " · ")
                 + Text("\(planned) en projet").foregroundColor(SQColor.labelTertiary)
         }
-        var spoken = Text(verbatim: "\(row.generation), \(row.bands.map(String.init).joined(separator: ", "))")
+        var spoken = Text(verbatim: "\(row.generation), \(row.bands.map(row.name).joined(separator: ", "))")
         if !planned.isEmpty {
-            spoken = spoken + Text(verbatim: ", ") + Text("\(row.plannedBands.map(String.init).joined(separator: ", ")) en projet")
+            spoken = spoken + Text(verbatim: ", ") + Text("\(row.plannedBands.map(row.name).joined(separator: ", ")) en projet")
         }
         return HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
             Text(verbatim: row.generation)
@@ -1514,10 +1519,15 @@ struct AntennaDetailSheet: View {
     /// Le rayonnement du site : technologies, bandes, et — seulement quand les
     /// secteurs diffèrent réellement — la grille qui montre où est l'écart.
     private func sectorContent(_ details: AntennaDetails) -> some View {
-        AntennaSectorGridView(
+        // Canada : bandes et secteurs tirés des porteuses ISED (« LTE AWS », « 5G NR 3500 »).
+        let carriers = market.uppercased() == "CA" ? (details.core?.radioCarriers ?? []) : []
+        let isedBands = ISEDBandFamily.siteSystems(carriers)
+        return AntennaSectorGridView(
             azimuths: displayedAzimuths,
-            siteBands: (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
-            sectorSystems: details.core?.sectorSystems ?? [],
+            siteBands: !isedBands.isEmpty ? isedBands
+                : (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
+            sectorSystems: !isedBands.isEmpty ? ISEDBandFamily.sectorSystems(carriers, azimuths: displayedAzimuths)
+                : details.core?.sectorSystems ?? [],
             fhBeams: details.core?.fhBeams ?? [],
             technologies: (details.core?.technologies ?? []).isEmpty ? details.technologies : (details.core?.technologies ?? []),
             projectBands: details.core?.technologiesInProject ?? [],

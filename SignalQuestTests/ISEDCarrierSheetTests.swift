@@ -131,4 +131,26 @@ final class ISEDCarrierSheetTests: XCTestCase {
         XCTAssertEqual(core.operatorBrand, "Freedom")
         XCTAssertEqual(core.licences.map(\.number), ["5076954"], "Licences sans numéro écartées")
     }
+
+    /// Onglet Essentiel (retour d'Alexandre, 12/11) : les bandes d'un site canadien, en familles
+    /// du serveur, et non « LTE » / « 5GDSS » sans fréquence.
+    func testEssentialBandsComeFromCarrierFrequencies() throws {
+        let list = try carriers("""
+        [{"id":"a","technology":"LTE","technologyDetail":"LTE","txFrequencyMhz":2145,"sectorAzimuthDeg":70,"omni":false,"cellIds":[],"physicalIds":[]},
+         {"id":"b","technology":"NR","technologyDetail":"5GDSS","txFrequencyMhz":2145,"sectorAzimuthDeg":200,"omni":false,"cellIds":[],"physicalIds":[]},
+         {"id":"c","technology":"NR","technologyDetail":"5GNR","txFrequencyMhz":3535,"sectorAzimuthDeg":70,"omni":false,"cellIds":[],"physicalIds":[]},
+         {"id":"d","technology":"LTE","technologyDetail":"LTE","txFrequencyMhz":739,"sectorAzimuthDeg":200,"omni":false,"cellIds":[],"physicalIds":[]},
+         {"id":"e","technology":"LTE","technologyDetail":"LTE","txFrequencyMhz":5000,"cellIds":[],"physicalIds":[]}]
+        """)
+        XCTAssertEqual(ISEDBandFamily.siteSystems(list), ["LTE AWS", "5G NR AWS", "5G NR 3500", "LTE 700"],
+                       "Une fréquence hors famille ne fabrique pas de bande")
+        let rows = ISEDBandFamily.generationRows(list)
+        XCTAssertEqual(rows.map(\.generation), ["5G", "4G"])
+        XCTAssertEqual(rows[0].bands.map(rows[0].name), ["AWS", "3500"])
+        XCTAssertEqual(rows[1].bands.map(rows[1].name), ["700", "AWS"])
+        let sectors = ISEDBandFamily.sectorSystems(list, azimuths: [70, 200])
+        XCTAssertEqual(sectors.map(\.systems), [["LTE AWS", "5G NR 3500"], ["5G NR AWS", "LTE 700"]])
+        let same = ISEDBandFamily.sectorSystems(Array(list.prefix(1)), azimuths: [70])
+        XCTAssertTrue(same.isEmpty, "Un seul secteur : pas de détail")
+    }
 }

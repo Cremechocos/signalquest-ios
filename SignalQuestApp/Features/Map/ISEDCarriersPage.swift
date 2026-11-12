@@ -454,3 +454,91 @@ enum ISEDProvince {
         }
     }
 }
+
+/// Bandes d'un site canadien pour l'onglet Essentiel, comme en France : la famille de
+/// bande du serveur (`canadaBandFamily`, `apps/web/lib/canada-ised-history.ts`), lue sur
+/// la fréquence d'émission, sinon de réception. ISED ne publie pas de bande ANFR : sans
+/// cela, la grille ne montrait que « LTE » et « 5GDSS », et la carte Radio
+/// « Bandes non publiées ».
+enum ISEDBandFamily {
+    /// Nom, borne basse, borne haute (MHz), clé de tri. Plages disjointes.
+    private static let families: [(name: String, low: Double, high: Double, key: Int)] = [
+        ("600", 617, 652, 600),
+        ("700", 716, 768, 700),
+        ("850", 869, 894, 850),
+        ("1900", 1930, 1995, 1900),
+        ("2000", 1995.001, 2020, 2000),
+        ("AWS", 2110, 2200, 2110),
+        ("2300", 2305, 2360, 2300),
+        ("2500", 2496, 2690, 2500),
+        ("3500", 3400, 3799.999, 3500),
+        ("3800", 3800, 3980, 3800),
+        ("mmWave", 24000, 50000, 24000),
+    ]
+
+    static func family(_ carrier: AntennaRadioCarrier) -> (name: String, key: Int)? {
+        for value in [carrier.txFrequencyMhz, carrier.rxFrequencyMhz] {
+            guard let value, value.isFinite else { continue }
+            if let family = families.first(where: { value >= $0.low && value <= $0.high }) {
+                return (family.name, family.key)
+            }
+        }
+        return nil
+    }
+
+    /// Clé de tri d'un nom de famille (« AWS » → 2110), pour ranger la grille.
+    static func sortKey(_ name: String) -> Int? {
+        families.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.key
+    }
+
+    static func generation(_ carrier: AntennaRadioCarrier) -> String? {
+        let value = (carrier.technologyDetail ?? carrier.technology ?? "").uppercased()
+        if value.contains("5G") || value.contains("NR") { return "5G" }
+        if value.contains("LTE") { return "4G" }
+        if value.contains("HSPA") || value.contains("UMTS") || value.contains("WCDMA") { return "3G" }
+        if value.contains("GSM") { return "2G" }
+        return nil
+    }
+
+    /// « 5G NR 3500 », « LTE AWS » : le libellé de la grille, au format ANFR.
+    static func system(_ carrier: AntennaRadioCarrier) -> String? {
+        guard let generation = generation(carrier), let family = family(carrier) else { return nil }
+        let prefix = ["5G": "5G NR", "4G": "LTE", "3G": "UMTS", "2G": "GSM"][generation] ?? generation
+        return "\(prefix) \(family.name)"
+    }
+
+    static func siteSystems(_ carriers: [AntennaRadioCarrier]) -> [String] {
+        var seen = Set<String>()
+        return carriers.compactMap(system).filter { seen.insert($0).inserted }
+    }
+
+    /// Détail par secteur seulement si les secteurs diffèrent (même règle que l'ANFR) ;
+    /// une porteuse omni ou sans azimut n'entre dans aucune colonne.
+    static func sectorSystems(_ carriers: [AntennaRadioCarrier], azimuths: [Double]) -> [AntennaSectorSystems] {
+        let columns = azimuths.filter(\.isFinite).map { azimuth -> AntennaSectorSystems in
+            let rounded = Int(azimuth.rounded())
+            let systems = carriers.filter { carrier in
+                carrier.omni != true && carrier.sectorAzimuthDeg.map { Int($0.rounded()) == rounded } == true
+            }
+            return AntennaSectorSystems(azimuth: azimuth, systems: siteSystems(systems))
+        }
+        guard columns.count > 1, Set(columns.map { Set($0.systems) }).count > 1 else { return [] }
+        return columns
+    }
+
+    /// Rangées de la carte Radio : une par génération, ses familles de la plus basse à la plus haute.
+    static func generationRows(_ carriers: [AntennaRadioCarrier]) -> [GenerationBands] {
+        var keys: [String: Set<Int>] = [:]
+        var names: [Int: String] = [:]
+        for carrier in carriers {
+            guard let generation = generation(carrier), let family = family(carrier) else { continue }
+            keys[generation, default: []].insert(family.key)
+            if family.name != String(family.key) { names[family.key] = family.name }
+        }
+        return GenerationBands.order.compactMap { generation in
+            guard let bands = keys[generation], !bands.isEmpty else { return nil }
+            return GenerationBands(generation: generation, bands: bands.sorted(), plannedBands: [], bandNames: names)
+        }
+    }
+}
+

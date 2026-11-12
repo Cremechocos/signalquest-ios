@@ -397,7 +397,10 @@ struct AntennaSectorGridView: View {
     }
 
     private static func frequency(in band: String) -> Int? {
-        guard let range = band.range(of: #"\d{3,4}"#, options: .regularExpression) else { return nil }
+        guard let range = band.range(of: #"\d{3,4}"#, options: .regularExpression) else {
+            // Canada : « LTE AWS », « 5G NR mmWave » se rangent à leur fréquence.
+            return band.split(separator: " ").last.flatMap { ISEDBandFamily.sortKey(String($0)) }
+        }
         return Int(band[range])
     }
 }

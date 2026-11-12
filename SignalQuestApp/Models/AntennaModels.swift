@@ -959,7 +959,11 @@ struct GenerationBands: Equatable, Identifiable {
     let bands: [Int]
     /// Bandes déclarées en projet pour cet opérateur, absentes de `bands`.
     let plannedBands: [Int]
+    /// Nom d'une bande qui ne se dit pas en MHz (Canada : « AWS », « mmWave »), par clé de tri.
+    var bandNames: [Int: String] = [:]
     var id: String { generation }
+
+    func name(_ band: Int) -> String { bandNames[band] ?? String(band) }
 
     static let order = ["5G", "4G", "3G", "2G"]
 
