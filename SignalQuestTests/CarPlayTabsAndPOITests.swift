@@ -70,17 +70,34 @@ final class CarPlayTabsAndPOITests: XCTestCase {
         XCTAssertEqual(entries.first?.payload.id, "s")
     }
 
-    /// Entre douze épingles, « Site 12345 » ne distingue rien. L'opérateur, si.
+    /// Entre douze épingles, « Site 12345 » ne distingue rien. L'opérateur, si,
+    /// en nom court : la liste de la carte tronquait « Bouygues Tele… ».
     func testHeadlineLeadsWithTheOperator() {
         let entry = CarPlayPOIBuilder.Entry(
-            payload: makePayload(id: "1", title: "Site 12345", subtitle: "Orange/SFR · 4G/5G",
+            payload: makePayload(id: "1", title: "Site 12345", subtitle: "SFR / Bouygues Telecom · 5G, 4G",
                                  latitude: 48.85, longitude: 2.35),
             distanceMeters: 340
         )
 
-        XCTAssertEqual(CarPlayPOIBuilder.headline(for: entry), "Orange/SFR")
-        XCTAssertTrue(CarPlayPOIBuilder.subtitle(for: entry).hasPrefix("340 m"),
-                      "la distance est le critère de tri : elle se lit en premier")
+        XCTAssertEqual(CarPlayPOIBuilder.headline(for: entry), "SFR / Bouygues")
+        XCTAssertEqual(CarPlayPOIBuilder.subtitle(for: entry), "340 m · 5G, 4G",
+                       "la distance d'abord (critère de tri), puis les générations, pas l'identifiant")
+    }
+
+    /// Une panne, un projet ou une évolution n'ont pas d'identifiant en titre :
+    /// leur état y est, et c'est lui qui suit la distance.
+    func testOtherLayersKeepTheirStateAfterTheDistance() {
+        let outage = MapAnnotationPayload(
+            id: "outage-1", kind: .outage, title: "Panne de courant", subtitle: "Free Mobile · Grenoble",
+            coordinate: CLLocationCoordinate2D(latitude: 45.19, longitude: 5.72), metric: nil,
+            backendId: "1", details: nil, antennaId: nil, clusterCount: nil, azimuths: [], showsAzimuths: false
+        )
+        let entry = CarPlayPOIBuilder.Entry(payload: outage, distanceMeters: 2_000)
+
+        XCTAssertEqual(CarPlayPOIBuilder.headline(for: entry), "Free")
+        XCTAssertEqual(CarPlayPOIBuilder.subtitle(for: entry), "\(SQUnits.distance(meters: 2_000)) · Panne de courant")
+        XCTAssertEqual(CarPlayPOIBuilder.detailTitle(for: outage), "Panne de courant")
+        XCTAssertEqual(CarPlayPOIBuilder.detailSubtitle(for: outage), "Free Mobile · Grenoble")
     }
 
     /// Sans opérateur connu, on ne doit pas afficher une chaîne vide.
@@ -110,8 +127,8 @@ final class CarPlayTabsAndPOITests: XCTestCase {
         )
 
         let poi = points.first
-        XCTAssertEqual(poi?.detailTitle, "Site 12345")
-        XCTAssertEqual(poi?.detailSubtitle, "Orange · 4G")
+        XCTAssertEqual(poi?.detailTitle, "Orange", "les opérateurs en entier ; l'identifiant reste dans Détails")
+        XCTAssertEqual(poi?.detailSubtitle, "4G")
         XCTAssertNotNil(poi?.detailSummary, "la fiche doit porter distance et direction")
         XCTAssertNotNil(poi?.pinImage, "l'épingle porte l'identité visuelle de l'app")
         XCTAssertNotNil(poi?.primaryButton)

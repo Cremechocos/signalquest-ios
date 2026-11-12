@@ -1175,8 +1175,9 @@ final class CarPlayCoordinator {
             id: "antenna-\(site.id)",
             kind: .antenna,
             title: String(localized: "Site \(site.siteId ?? site.id)"),
-            // Noms complets (« Bouygues Telecom ») : la carte en tire le titre
-            // de ses épingles, la fiche son sous-titre.
+            // « Opérateurs · générations », noms complets : la carte en tire
+            // ses textes (noms courts dans sa liste étroite), la fiche son
+            // sous-titre.
             subtitle: [NearestAntennaTemplateBuilder.operatorNames(site.operators),
                        NearestAntennaTemplateBuilder.generations(site.technologies)]
                 .filter { !$0.isEmpty }
