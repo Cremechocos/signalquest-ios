@@ -408,6 +408,8 @@ struct MapKitMapView: UIViewRepresentable {
         weak var zoneCompareView: SQZoneCompareOverlayView?
         var lastZoneCompareFitToken: Int?
         var sessionOverlay: SessionPointsOverlay?
+        /// Points du trajet dessiné, pour ouvrir la fiche d'un point touché.
+        var sessionTracePoints: [CoverageSessionPoint] = []
         var lastSessionKey: MapSessionTrace.Key?
         var lastSessionFitToken: Int?
         private var isMovingCamera = false
@@ -679,6 +681,7 @@ struct MapKitMapView: UIViewRepresentable {
         /// Tracé de la session vue seule, aux couleurs du contrat, au-dessus des
         /// libellés ; recadré sur tout le trajet à chaque nouveau chargement.
         func applySessionTrace(_ trace: MapSessionTrace?, isDark: Bool, on map: MKMapView) {
+            sessionTracePoints = trace?.points ?? []
             let key = trace.map { MapSessionTrace.Key(revision: $0.revision, style: $0.style, coloring: $0.coloring, isDark: isDark) }
             if key != lastSessionKey {
                 lastSessionKey = key
@@ -716,7 +719,7 @@ struct MapKitMapView: UIViewRepresentable {
 
         @objc func handleSpeedtestTap(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended, let map = recognizer.view as? MKMapView,
-                  !latestSpeedtestFeatures.isEmpty else { return }
+                  !latestSpeedtestFeatures.isEmpty || !sessionTracePoints.isEmpty else { return }
             let tap = recognizer.location(in: map)
             // Un tap sur un marqueur (antenne, photo, ami) est déjà traité par
             // `didSelect` : ouvrir aussi le speedtest voisin demandait deux feuilles
@@ -733,7 +736,43 @@ struct MapKitMapView: UIViewRepresentable {
                 let d = hypot(p.x - tap.x, p.y - tap.y)
                 if d < bestDist { bestDist = d; best = f }
             }
-            if let best { onSelect(Self.speedtestPayload(from: best)) }
+            if let best { onSelect(Self.speedtestPayload(from: best)); return }
+            // Trajet vu seul : un point de couverture ouvre sa fiche, comme un speedtest (12/11).
+            var nearest: CoverageSessionPoint?
+            var nearestDist: CGFloat = 22
+            for point in sessionTracePoints {
+                let p = map.convert(point.coordinate, toPointTo: map)
+                let d = hypot(p.x - tap.x, p.y - tap.y)
+                if d < nearestDist { nearestDist = d; nearest = point }
+            }
+            if let nearest { onSelect(Self.coveragePayload(from: nearest)) }
+        }
+
+        /// Point d'un trajet → fiche « Couverture » de la carte (signal, techno, bande, heure).
+        static func coveragePayload(from point: CoverageSessionPoint) -> MapAnnotationPayload {
+            let operatorName = point.operatorKey.map { SQBrand.operatorName($0) ?? $0 }
+            return MapAnnotationPayload(
+                id: "trip-point-\(point.id)",
+                kind: .coverage,
+                title: point.signalStrength.map { "\(Int($0.rounded())) dBm" } ?? String(localized: "Couverture"),
+                subtitle: point.tech ?? String(localized: "Couverture"),
+                coordinate: point.coordinate,
+                metric: nil,
+                backendId: nil,
+                details: MapItemDetails(
+                    rsrp: point.signalStrength,
+                    rsrq: point.rsrq,
+                    snr: point.snr,
+                    tech: point.tech,
+                    band: point.primaryBand,
+                    timestamp: point.timestamp,
+                    operatorName: operatorName
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false
+            )
         }
 
         /// Point retenu au début d'un appui long, remis au lever du doigt.

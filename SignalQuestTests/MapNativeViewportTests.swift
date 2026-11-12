@@ -209,6 +209,21 @@ final class MapNativeViewportTests: XCTestCase {
         XCTAssertTrue(view.isAccessibilityElement)
     }
 
+    /// Choix du 12/11 : un point de couverture du trajet ouvre la fiche « Couverture »,
+    /// comme un speedtest ouvre la sienne.
+    func testTripCoveragePointOpensTheCoverageSheet() throws {
+        let json = #"{"id":"p1","latitude":45.76,"longitude":4.85,"signalStrength":-97.4,"rsrq":-11,"snr":8,"technology":"4G","operatorKey":"SFR"}"#
+        let point = try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: Data(json.utf8))
+        let payload = MapKitMapView.Coordinator.coveragePayload(from: point)
+        XCTAssertEqual(payload.kind, .coverage)
+        XCTAssertNil(payload.backendId)
+        XCTAssertEqual(payload.details?.rsrp, -97.4)
+        XCTAssertEqual(payload.details?.rsrq, -11)
+        XCTAssertEqual(payload.details?.tech, "4G")
+        XCTAssertEqual(payload.details?.operatorName, "SFR")
+        XCTAssertEqual(payload.coordinate.latitude, 45.76, accuracy: 1e-9)
+    }
+
     func testVisibleSpeedtestBeyondOrnamentMarginRemainsAccessible() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
