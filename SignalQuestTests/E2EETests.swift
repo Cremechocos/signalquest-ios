@@ -2474,6 +2474,15 @@ final class E2EETests: XCTestCase {
         XCTAssertFalse(wrapped.contains("="), "wrappedKeyB64 doit être sans padding")
         let unwrapped = try E2EEService.unwrapConversationKey(wrappedKeyB64: wrapped, privateJwk: privateJwk)
         XCTAssertEqual(unwrapped, rawKey)
+
+        // Clé créée sur le site : WebCrypto exporte aussi `alg`, `ext` (booléen) et
+        // `key_ops` (tableau) ; elle doit s'ouvrir pareil (pile QA, 12/11).
+        var webObject: [String: Any] = privateObj
+        webObject["alg"] = "RSA-OAEP-256"
+        webObject["ext"] = true
+        webObject["key_ops"] = ["decrypt"]
+        let webJwk = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: webObject), encoding: .utf8))
+        XCTAssertEqual(try E2EEService.unwrapConversationKey(wrappedKeyB64: wrapped, privateJwk: webJwk), rawKey)
     }
 
     /// Signalement d'un message chiffré (SOC-12) : la clé de la conversation

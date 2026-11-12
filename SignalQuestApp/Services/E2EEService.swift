@@ -627,12 +627,14 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
 
     private static func privateSecKey(from jwk: String) throws -> SecKey? {
         guard let data = jwk.data(using: .utf8),
-              let object = try JSONSerialization.jsonObject(with: data) as? [String: String] else {
+              // Un JWK exporté par WebCrypto (site) porte aussi `ext` (booléen) et
+              // `key_ops` (tableau) : seuls les entiers RSA sont lus.
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw E2EEError.invalidKey
         }
         let fields = ["n", "e", "d", "p", "q", "dp", "dq", "qi"]
         let integers = try fields.map { key -> Data in
-            guard let raw = object[key], let decoded = Data(base64URLEncoded: raw) else { throw E2EEError.invalidKey }
+            guard let raw = object[key] as? String, let decoded = Data(base64URLEncoded: raw) else { throw E2EEError.invalidKey }
             return decoded
         }
         let der = ASN1.sequence([ASN1.integer(Data([0]))] + integers.map(ASN1.integer))
