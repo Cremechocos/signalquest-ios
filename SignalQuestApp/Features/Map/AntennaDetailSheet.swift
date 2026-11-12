@@ -749,8 +749,8 @@ struct AntennaDetailSheet: View {
 
     private var shownCaption: String? {
         guard canadaBrand != nil else { return headerCaption }
-        let province = ISEDProvince.name(model.details?.core?.commune)
-        return [headerTitle, province, distanceText].compactMap { $0 }.joined(separator: " · ")
+        // ISED r1 (f) : « nom du site · Montréal, Québec », comme le Web.
+        return [headerTitle, model.details?.core?.isedPlace, distanceText].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// Adresse (ou nature du site) et distance depuis l'origine du repérage.
@@ -1676,7 +1676,7 @@ struct AntennaDetailSheet: View {
                           term: !core.isCustomSite && ["FR", "DROM"].contains(core.market?.uppercased() ?? "") ? .anfr : nil)
                 // « France » plutôt que « FR ».
                 detailRow("Marché", core.market.map { Locale.current.localizedString(forRegionCode: $0) ?? $0 })
-                detailRow(core.localityLabel, [core.postalCode, core.commune].compactMap { $0 }.joined(separator: " "))
+                detailRow(core.localityLabel, core.localityValue)
                 detailRow("Adresse", core.address)
                 detailRow("Partage", sharingDescription(core), term: .siteSharing)
                 if leaderReport != nil {

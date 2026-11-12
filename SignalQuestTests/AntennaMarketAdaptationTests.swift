@@ -15,6 +15,7 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         status: String? = nil,
         supportType: String? = nil,
         commune: String? = nil,
+        extraTop: String = "",
         extraSiteInfo: String = ""
     ) -> String {
         let statusJSON = status.map { "\"status\": \"\($0)\"," } ?? ""
@@ -23,7 +24,7 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         return """
         {
           "id": "x", "supId": "x", "anfrCode": "ID-1", "market": "\(market)",
-          "lat": 0, "lng": 0, \(communeJSON) \(statusJSON)
+          "lat": 0, "lng": 0, \(communeJSON) \(statusJSON) \(extraTop)
           "operators": [], "technologies": [], "azimuts": [],
           "frequencyBands": [], "radioCarriers": [],
           "cellIdentifiers": { "enb": [], "gnb": [], "pci": [], "cellId": [] },
@@ -82,10 +83,38 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         XCTAssertEqual(try core(minimal(market: "PT")).registryLabel, "Identifiant du registre")
     }
 
-    /// ISED met le code de province (« QC ») là où la France met une commune.
-    func testCanadaLocalityIsLabelledProvince() throws {
-        XCTAssertEqual(try core(minimal(market: "CA", commune: "QC")).localityLabel, "Province")
+    /// Canada : la rangée porte la ville et la province (« Lieu »), pas une commune.
+    func testCanadaLocalityIsLabelledPlace() throws {
+        XCTAssertEqual(try core(minimal(market: "CA", commune: "QC")).localityLabel, "Lieu")
         XCTAssertEqual(try core(minimal(market: "FR", commune: "Paris 4e")).localityLabel, "Commune")
+    }
+
+    /// ISED r1 (f) : `commune` = `municipality` (la ville), province servie à part ; un serveur
+    /// d'avant f met encore le code de province dans `commune`.
+    func testCanadaPlaceJoinsCityAndProvince() throws {
+        let both = try core(minimal(market: "CA", commune: "Montréal",
+                                    extraTop: #""municipality": "Montréal", "provinceCode": "QC", "address": "1 rue X","#))
+        XCTAssertEqual(both.isedPlace, "Montréal, Québec")
+        XCTAssertEqual(both.localityValue, "Montréal, Québec")
+        XCTAssertEqual(both.fullAddress, "1 rue X, Montréal, Québec")
+
+        // Ville seule : le serveur f ne sert pas encore la province sur R2.
+        let cityOnly = try core(minimal(market: "CA", commune: "Montréal", extraTop: #""municipality": "Montréal","#))
+        XCTAssertEqual(cityOnly.isedPlace, "Montréal")
+
+        // Hors de toute ville : province seule, comme le Web.
+        let provinceOnly = try core(minimal(market: "CA", extraTop: #""municipality": null, "provinceCode": "ON","#))
+        XCTAssertEqual(provinceOnly.isedPlace, "Ontario")
+
+        // Serveur d'avant f : `commune` porte le code de province, jamais pris pour une ville.
+        let legacy = try core(minimal(market: "CA", commune: "QC"))
+        XCTAssertNil(legacy.isedCity)
+        XCTAssertEqual(legacy.isedPlace, "Québec")
+
+        // La France garde code postal + commune.
+        let france = try core(minimal(market: "FR", commune: "Paris 4e"))
+        XCTAssertNil(france.isedPlace)
+        XCTAssertEqual(france.localityValue, "Paris 4e")
     }
 
     // MARK: Données structurelles

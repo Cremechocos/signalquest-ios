@@ -509,7 +509,8 @@ final class RadioLogsViewModel: ObservableObject {
 
     static func locationLabel(from details: AntennaDetails?) -> String? {
         guard let details else { return nil }
-        let commune = details.core?.commune?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Canada : « Montréal, Québec » plutôt qu'un code de province brut.
+        let commune = (details.core?.isedPlace ?? details.core?.commune)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let address = details.address?.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = [commune, address].compactMap { $0 }.filter { !$0.isEmpty }
         guard !parts.isEmpty else { return nil }

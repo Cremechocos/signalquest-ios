@@ -461,6 +461,11 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let operatorBrand: String?
     /// Canada (ISED r1, étape d) : licences du site, absentes tant que l'import ne les a pas produites.
     let licences: [ISEDSiteLicence]
+    /// Canada (ISED r1, étape f) : ville du site par géocodage inverse, nil hors de toute ville
+    /// ou sur un serveur antérieur. Depuis f, `commune` vaut cette ville et non plus la province.
+    let municipality: String?
+    /// Canada : code de la province (« QC »), servi à part depuis l'étape f. Champ additif.
+    let provinceCode: String?
     let cellIdentifiers: AntennaCellIdentifiers
     let siteInfo: AntennaSiteInfo
     /// Statut ANFR brut (« En service », « Projet approuvé »…). Champ additif :
@@ -538,17 +543,50 @@ struct AntennaCoreDetails: Decodable, Equatable {
         fhLinks.isEmpty ? azimutsFh.map { AntennaFhLink(azimuth: $0) } : fhLinks
     }
 
+    /// Canada : code de province, servi à part ou, sur un serveur d'avant l'étape f, porté par
+    /// `commune` (« QC »).
+    var isedProvinceCode: String? {
+        guard market?.uppercased() == "CA" else { return nil }
+        if let provinceCode, ISEDProvince.name(provinceCode) != nil { return provinceCode }
+        return ISEDProvince.name(commune) != nil ? commune : nil
+    }
+
+    /// Canada : ville du site. `commune` n'en est une que s'il ne contient pas un code de province.
+    var isedCity: String? {
+        guard market?.uppercased() == "CA" else { return nil }
+        let city = municipality ?? (ISEDProvince.name(commune) == nil ? commune : nil)
+        return city.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+    }
+
+    /// Canada : « Montréal, Québec », la province seule si la ville est inconnue (comme le Web).
+    var isedPlace: String? {
+        let parts = [isedCity, ISEDProvince.name(isedProvinceCode)].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    /// Valeur de la rangée `localityLabel`.
+    var localityValue: String? {
+        if market?.uppercased() == "CA" { return isedPlace }
+        let value = [postalCode, commune].compactMap { $0 }.joined(separator: " ")
+        return value.isEmpty ? nil : value
+    }
+
     var fullAddress: String? {
+        if market?.uppercased() == "CA" {
+            let values = [address?.trimmingCharacters(in: .whitespacesAndNewlines), isedPlace]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            return values.isEmpty ? nil : values.joined(separator: ", ")
+        }
         let values = [address, postalCode, commune]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return values.isEmpty ? nil : values.joined(separator: " ")
     }
 
-    /// Libellé du champ « commune ». Le Canada y met le code de province
-    /// (« QC »), pas une commune : l'étiqueter « Commune » était faux.
+    /// Libellé du champ « commune ». Au Canada, la rangée porte la ville et la province.
     var localityLabel: String {
-        market?.uppercased() == "CA" ? String(localized: "Province") : String(localized: "Commune")
+        market?.uppercased() == "CA" ? String(localized: "Lieu") : String(localized: "Commune")
     }
 
     /// Libellé de l'identifiant de site, selon le régulateur du marché. « ANFR »
@@ -580,7 +618,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, mutualiseOperators, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
-        case datasetPublishedAt, operatorBrand, licences
+        case datasetPublishedAt, operatorBrand, licences, municipality, provinceCode
         case isCustomSite, validationStatus, source, displayName, description
     }
 
@@ -638,6 +676,10 @@ struct AntennaCoreDetails: Decodable, Equatable {
         operatorBrand = c.decodeFlexibleString(forKey: .operatorBrand)
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         licences = c.decodeLossyArray([ISEDSiteLicence].self, forKey: .licences).filter { !$0.number.isEmpty }
+        municipality = c.decodeFlexibleString(forKey: .municipality)
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        provinceCode = c.decodeFlexibleString(forKey: .provinceCode)
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         cellIdentifiers = (try? c.decode(AntennaCellIdentifiers.self, forKey: .cellIdentifiers)) ?? AntennaCellIdentifiers()
         siteInfo = (try? c.decode(AntennaSiteInfo.self, forKey: .siteInfo)) ?? AntennaSiteInfo()
         status = c.decodeFlexibleString(forKey: .status)
