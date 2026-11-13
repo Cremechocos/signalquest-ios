@@ -1878,6 +1878,13 @@ struct MapExplorerView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openLinkedSite(check) }
                 },
                 onNotice: { model.showMarketNotice($0) },
+                onViewOfficial: { site in
+                    cellsForNewSite = []
+                    // Même chemin qu'un site officiel : recherche exacte de la siteKey dans son marché.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        router.route(toSite: site.siteKey, market: site.market)
+                    }
+                },
                 onCreated: { Task { await reloadCurrentRegion() } }
             )
         }

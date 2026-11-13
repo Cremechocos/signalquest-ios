@@ -1,6 +1,242 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%lld eNB posés" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld eNB placed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld eNBs placed"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld eNB posé"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld eNB posés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Ton antenne est peut-être déjà là" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your antenna may already be here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton antenne est peut-être déjà là"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton antenne est peut-être déjà là" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre antenne est peut-être déjà là"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le registre belge ne donne pas les eNB." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Belgian registry doesn’t list eNBs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le registre belge ne donne pas les eNB."
+          }
+        }
+      }
+    },
+    "Le registre suisse ne donne pas les eNB." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Swiss registry doesn’t list eNBs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le registre suisse ne donne pas les eNB."
+          }
+        }
+      }
+    },
+    "Si le nœud %@ est sur l’une de ces positions, c’est la même antenne : inutile de créer un doublon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If node %@ is at one of these positions, it’s the same antenna: no need to create a duplicate."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si le nœud %@ est sur l’une de ces positions, c’est la même antenne : inutile de créer un doublon."
+          }
+        }
+      }
+    },
+    "Si ton antenne est l’une de ces positions, inutile de créer un doublon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If your antenna is one of these positions, no need to create a duplicate."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ton antenne est l’une de ces positions, inutile de créer un doublon."
+          }
+        }
+      }
+    },
+    "SQFormal|Si ton antenne est l’une de ces positions, inutile de créer un doublon." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si votre antenne est l’une de ces positions, inutile de créer un doublon."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Une position peut porter plusieurs eNB du même opérateur : un eNB déjà posé n’exclut pas le tien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A position can carry several eNBs of the same operator: one already placed doesn’t rule yours out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une position peut porter plusieurs eNB du même opérateur : un eNB déjà posé n’exclut pas le tien."
+          }
+        }
+      }
+    },
+    "SQFormal|Une position peut porter plusieurs eNB du même opérateur : un eNB déjà posé n’exclut pas le tien." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une position peut porter plusieurs eNB du même opérateur : un eNB déjà posé n’exclut pas le vôtre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucune ne convient, créer le site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of these, create the site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune ne convient, créer le site"
+          }
+        }
+      }
+    },
+    "Aucun eNB posé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No eNB placed yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun eNB posé"
+          }
+        }
+      }
+    },
+    "Voir cette position" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View this position"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir cette position"
+          }
+        }
+      }
+    },
+    "Bruxelles Environnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brussels Environment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bruxelles Environnement"
+          }
+        }
+      }
+    },
     "Site créé. Une position officielle est à %@ : c’est peut-être la même antenne." : {
       "localizations" : {
         "en" : {

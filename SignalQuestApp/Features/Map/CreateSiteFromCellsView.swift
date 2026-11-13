@@ -25,6 +25,8 @@ struct CreateSiteFromCellsView: View {
     let onWrongSite: ((CustomSiteDispute?) -> Void)?
     /// Message à montrer une fois la feuille fermée (position officielle proche du site créé).
     let onNotice: ((String) -> Void)?
+    /// « Voir cette position » (OFFICIAL-NEARBY r1) : l'hôte ouvre la fiche officielle ; nil = pas de bouton.
+    let onViewOfficial: ((OfficialNearbySite) -> Void)?
 
     @State private var name = ""
     @State private var type = "PYLONE"
@@ -39,6 +41,10 @@ struct CreateSiteFromCellsView: View {
     /// Le nœud a déjà un site : la feuille du refus remplace le formulaire.
     @State private var linked: CustomSiteAlreadyLinked?
     @State private var dispute: CustomSiteDispute?
+    /// Positions officielles BE/CH proches : la feuille passe avant la création.
+    @State private var officialNearby: [OfficialNearbySite] = []
+    /// « Aucune ne convient, créer le site » : on ne redemande plus pour ce formulaire.
+    @State private var skipsOfficialNearby = false
     @Environment(\.dismiss) private var dismiss
 
     /// Types acceptés par le backend (`ALLOWED_TYPES`). Envoyer autre chose fait
@@ -60,6 +66,7 @@ struct CreateSiteFromCellsView: View {
         onViewSite: ((CustomSiteRadioCheck) -> Void)? = nil,
         onWrongSite: ((CustomSiteDispute?) -> Void)? = nil,
         onNotice: ((String) -> Void)? = nil,
+        onViewOfficial: ((OfficialNearbySite) -> Void)? = nil,
         onCreated: @escaping () -> Void
     ) {
         self.cells = cells
@@ -69,6 +76,7 @@ struct CreateSiteFromCellsView: View {
         self.onViewSite = onViewSite
         self.onWrongSite = onWrongSite
         self.onNotice = onNotice
+        self.onViewOfficial = onViewOfficial
         self.onCreated = onCreated
         // Centroïde des cellules retenues : le meilleur point de départ dont on
         // dispose, même s'il n'est pas le bon.
@@ -97,6 +105,8 @@ struct CreateSiteFromCellsView: View {
         Group {
             if let linked {
                 alreadyLinked(linked)
+            } else if !officialNearby.isEmpty {
+                officialNearbySheet
             } else {
                 form
             }
@@ -121,6 +131,44 @@ struct CreateSiteFromCellsView: View {
                     onViewSite: onViewSite.map { open in { open(linked.check) } },
                     onWrongSite: wrongSiteAction(for: linked),
                     opensMapIdentification: onWrongSite != nil
+                )
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .sqSheet(background: SQColor.bg)
+    }
+
+    /// « Ton antenne est peut-être déjà là » : « Retour » rend le formulaire (pour déplacer le
+    /// point), « Aucune ne convient » crée le site sans redemander.
+    private var officialNearbySheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    Button("Retour") { officialNearby = [] }
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .disabled(isSubmitting)
+                        .accessibilityIdentifier("createSite.officialNearby.back")
+                    Spacer()
+                }
+                CustomSiteOfficialNearbyView(
+                    sites: officialNearby,
+                    radio: draft.radio,
+                    operatorLabel: operatorLabel,
+                    onViewPosition: onViewOfficial,
+                    onCreate: {
+                        skipsOfficialNearby = true
+                        Task {
+                            await submit()
+                            // Un refus ou un envoi en file s'affiche dans le formulaire.
+                            officialNearby = []
+                        }
+                    },
+                    isBusy: isSubmitting
                 )
             }
             .padding(.horizontal, SQSpace.lg)
@@ -328,6 +376,19 @@ struct CreateSiteFromCellsView: View {
         errorMessage = nil
         pendingMessage = nil
         defer { isSubmitting = false }
+        // OFFICIAL-NEARBY r1 : en Belgique et en Suisse, les positions officielles proches d'abord.
+        // Un échec, un délai dépassé ou hors ligne laisse créer : la réponse de création signale
+        // encore une position proche, et le site en file attend la connexion comme avant.
+        if !skipsOfficialNearby, let query = OfficialNearbyQuery(draft: draft) {
+            let disputed = dispute?.siteId
+            let sites = ((try? await service.officialNearby(query)) ?? [])
+                // Le site que le membre conteste, il l'a déjà écarté.
+                .filter { disputed == nil || ($0.siteKey != disputed && $0.supId != disputed) }
+            if !sites.isEmpty {
+                officialNearby = sites
+                return
+            }
+        }
         do {
             let result = try await service.create(draft)
             Haptics.success()

@@ -219,6 +219,7 @@
 		34B3762FBE08DA44D5FE0185 /* MessageDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F680267D2F6D4D6A1ADDA594 /* MessageDraftStore.swift */; };
 		34BA73B5085E3FEA3207B12F /* ProfileCardQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4886511AB14489C9F2B2CD6B /* ProfileCardQATests.swift */; };
 		34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */; };
+		352303D3080F9036E5BBB4CB /* CustomSiteOfficialNearbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7505B3FAA779728681639452 /* CustomSiteOfficialNearbyView.swift */; };
 		3544D1A314DE63A90BF89006 /* DriveTestMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */; };
 		36498E869AD0176877E7A254 /* SocialPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F24B90CDD67FFE038702151 /* SocialPreferences.swift */; };
 		36EAEB947CAC3EE9C09EE9F6 /* CarVoiceIntentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10E7204A92359A1E0109733 /* CarVoiceIntentTests.swift */; };
@@ -1483,6 +1484,7 @@
 		743199D868E04642B691ED1A /* MentionAutocomplete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocomplete.swift; sourceTree = "<group>"; };
 		74C44E54A806F05156B150F1 /* CustomSitesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSitesService.swift; sourceTree = "<group>"; };
 		74CF7E1DDA21B03198307ED6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7505B3FAA779728681639452 /* CustomSiteOfficialNearbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSiteOfficialNearbyView.swift; sourceTree = "<group>"; };
 		7522BAFD6316060C367DAA7E /* E2EEV2CallFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2CallFormats.swift; sourceTree = "<group>"; };
 		75277B9215C74B786F3456E4 /* FeedSignalsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedSignalsCollector.swift; sourceTree = "<group>"; };
 		752CA575743D913E207E4A67 /* ChooseHandleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooseHandleSheet.swift; sourceTree = "<group>"; };
@@ -3451,6 +3453,7 @@
 				C4B07689CEE23E4CB2951068 /* CommunityOutagesListView.swift */,
 				D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */,
 				E160136B5B59E50C4DCDEE61 /* CustomSiteAlreadyLinkedView.swift */,
+				7505B3FAA779728681639452 /* CustomSiteOfficialNearbyView.swift */,
 				CB55790C931377A64C3D3477 /* DromRegion.swift */,
 				26324103A524AEF88109B0E1 /* FavoriteAntennasView.swift */,
 				A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */,
@@ -4004,6 +4007,7 @@
 				480E595E70AD0121DC5AFD80 /* CreateSiteFromCellsView.swift in Sources */,
 				33C988E6EFCB2A0AD84D7D26 /* CredentialStore.swift in Sources */,
 				EE67160E6739F2198E7A02A7 /* CustomSiteAlreadyLinkedView.swift in Sources */,
+				352303D3080F9036E5BBB4CB /* CustomSiteOfficialNearbyView.swift in Sources */,
 				BFF7354BDB3F58AF98940DC3 /* CustomSiteOutbox.swift in Sources */,
 				40ADB14D3FEDE7371042A6BA /* CustomSitesService.swift in Sources */,
 				7A6F7ECD75E23DF7211D5EBF /* DefaultPostVisibility.swift in Sources */,

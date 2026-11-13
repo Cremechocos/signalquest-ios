@@ -19,6 +19,8 @@ protocol CustomSitesServicing: Sendable {
     func createAnyway(_ review: CustomSitePendingReview) async throws -> CustomSiteCreationResult
     /// « Abandonner mon site » : il ne sera pas envoyé.
     func abandon(_ review: CustomSitePendingReview) async
+    /// OFFICIAL-NEARBY r1 : positions officielles BE/CH du même opérateur près du site à créer.
+    func officialNearby(_ query: OfficialNearbyQuery) async throws -> [OfficialNearbySite]
 }
 
 extension CustomSitesServicing {
@@ -26,6 +28,7 @@ extension CustomSitesServicing {
     func pendingReviews() async -> [CustomSitePendingReview] { [] }
     func createAnyway(_ review: CustomSitePendingReview) async throws -> CustomSiteCreationResult { .pending }
     func abandon(_ review: CustomSitePendingReview) async {}
+    func officialNearby(_ query: OfficialNearbyQuery) async throws -> [OfficialNearbySite] { [] }
 }
 
 extension Notification.Name {
@@ -331,6 +334,116 @@ struct CustomSiteCreationResult: Decodable, Sendable {
     static let pending = CustomSiteCreationResult(id: nil, slug: nil, isPending: true)
 }
 
+/// OFFICIAL-NEARBY r1 : le registre belge ou suisse ne donne pas les eNB. Avant de créer un site
+/// là-bas, le serveur dit quelles positions officielles du même opérateur sont à 300 m ou moins.
+struct OfficialNearbyQuery: Encodable, Equatable, Sendable {
+    let lat: Double
+    let lon: Double
+    let market: String
+    let `operator`: String
+    var radiusM = OfficialNearbySite.maxDistanceMeters
+
+    /// Le contrat ne connaît que la Belgique et la Suisse : le MCC du relevé (206, 228, fixés par
+    /// l'UIT) suffit à les reconnaître. Sans opérateur, rien à comparer : pas de requête.
+    init?(draft: CustomSiteDraft) {
+        guard let radio = draft.radio,
+              let market = radio.mcc.flatMap({ Self.markets[$0] }),
+              let operatorKey = radio.mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !operatorKey.isEmpty
+        else { return nil }
+        lat = draft.latitude
+        lon = draft.longitude
+        self.market = market
+        self.operator = operatorKey
+    }
+
+    private static let markets = [206: "BE", 228: "CH"]
+}
+
+/// Une position officielle proche. Filtre d'Android (caadccd59) : même opérateur, 300 m au plus,
+/// région connue, siteKey et supId présents, cinq lignes au plus, la plus proche d'abord.
+struct OfficialNearbySite: Decodable, Equatable, Identifiable, Sendable {
+    enum Region: String, Sendable {
+        case flanders = "BE-VLA"
+        case brussels = "BE-BRU"
+        case switzerland = "CH"
+    }
+
+    let siteKey: String
+    let supId: String
+    let region: Region
+    let operatorKey: String
+    let distanceMeters: Double
+    /// eNB déjà posés sur la position ; à défaut, 1 si `hasEnb`, sinon 0.
+    let enbCount: Int
+
+    var id: String { siteKey }
+    var market: String { region == .switzerland ? "CH" : "BE" }
+
+    static let maxDistanceMeters = 300
+    static let maxRows = 5
+
+    private enum CodingKeys: String, CodingKey {
+        case siteKey, supId, region, distanceMeters, hasEnb, enbCount
+        case operatorKey = "operator"
+    }
+
+    init(siteKey: String, supId: String, region: Region, operatorKey: String, distanceMeters: Double, enbCount: Int) {
+        self.siteKey = siteKey
+        self.supId = supId
+        self.region = region
+        self.operatorKey = operatorKey
+        self.distanceMeters = distanceMeters
+        self.enbCount = enbCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func text(_ key: CodingKeys) throws -> String {
+            let value = try c.decode(String.self, forKey: key).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else {
+                throw DecodingError.dataCorruptedError(forKey: key, in: c, debugDescription: "empty")
+            }
+            return value
+        }
+        siteKey = try text(.siteKey)
+        supId = try text(.supId)
+        guard let region = Region(rawValue: try text(.region)) else {
+            throw DecodingError.dataCorruptedError(forKey: .region, in: c, debugDescription: "unknown region")
+        }
+        self.region = region
+        operatorKey = try text(.operatorKey)
+        distanceMeters = try c.decode(Double.self, forKey: .distanceMeters)
+        let hasEnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasEnb)) ?? false
+        enbCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .enbCount)) ?? nil ?? (hasEnb ? 1 : 0))
+    }
+
+    /// Réponse `{sites, operatorIgnored}` : un opérateur ignoré par le serveur ne donne rien.
+    static func rows(from data: Data, operatorKey: String) throws -> [OfficialNearbySite] {
+        let response = try JSONDecoder.signalQuest.decode(Response.self, from: data)
+        guard response.operatorIgnored != true else { return [] }
+        return response.sites
+            .filter { $0.operatorKey.caseInsensitiveCompare(operatorKey) == .orderedSame }
+            .filter { $0.distanceMeters.isFinite && $0.distanceMeters >= 0 && $0.distanceMeters <= Double(maxDistanceMeters) }
+            .sorted { $0.distanceMeters < $1.distanceMeters }
+            .prefix(maxRows)
+            .map { $0 }
+    }
+
+    private struct Response: Decodable {
+        let sites: [OfficialNearbySite]
+        let operatorIgnored: Bool?
+
+        private enum CodingKeys: String, CodingKey { case sites, operatorIgnored }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            sites = c.decodeLossyArray([OfficialNearbySite].self, forKey: .sites)
+            operatorIgnored = try? c.decodeIfPresent(Bool.self, forKey: .operatorIgnored)
+        }
+    }
+}
+
 actor CustomSitesService: CustomSitesServicing {
     private let api: APIClient
     private let currentUserId: @Sendable () -> String?
@@ -423,6 +536,19 @@ actor CustomSitesService: CustomSitesServicing {
             radio.mobileOperator.map { URLQueryItem(name: "operator", value: $0) },
             radio.mcc.map { URLQueryItem(name: "mcc", value: String($0)) },
         ].compactMap { $0 }
+    }
+
+    /// Quatre secondes au plus, comme Android : au-delà, le formulaire continue et la réponse de
+    /// création signale encore une position proche (`warnings.nearbyOfficial`).
+    func officialNearby(_ query: OfficialNearbyQuery) async throws -> [OfficialNearbySite] {
+        let data = try await api.requestData(APIEndpoint(
+            path: "/api/sites/official-nearby",
+            method: .post,
+            headers: ["Content-Type": "application/json"],
+            body: try JSONEncoder().encode(query),
+            responseDeadline: .seconds(4)
+        ))
+        return try OfficialNearbySite.rows(from: data, operatorKey: query.operator)
     }
 
     func pendingReviews() async -> [CustomSitePendingReview] {
