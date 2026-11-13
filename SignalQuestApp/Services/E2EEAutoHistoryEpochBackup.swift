@@ -196,7 +196,12 @@ actor E2EEAutoHistoryEpochBackup {
     }
 
     /// Enveloppe vers la dernière HK chaque époque reçue ici qui n'y est pas encore (§5.2).
-    func backfill() async -> Outcome {
+    /// Les dépôts suivent la cadence partagée avec l'import des messages v1 (N1-6).
+    func backfill(pacer: APIWritePacer? = .shared) async -> Outcome {
+        await APIWritePacer.$current.withValue(pacer) { await backfillPages() }
+    }
+
+    private func backfillPages() async -> Outcome {
         let device: E2EEV2DeviceDescriptor
         do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
         var account: E2EEAutoLog.AccountState

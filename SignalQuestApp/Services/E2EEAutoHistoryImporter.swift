@@ -113,7 +113,16 @@ enum E2EEAutoHistoryImporter {
     /// Envoie les imports par lots de `batchSize`, dans l'ordre des sources
     /// (`send` rend `outcome(_:)` du résultat, ou `.waiting` pour une pièce en
     /// attente). Une attente du serveur arrête la tournée après le lot en cours.
+    /// Les écritures de `send` (messages, blobs) suivent la cadence de `pacer` (N1-6).
     static func run(
+        _ candidates: [Candidate],
+        pacer: APIWritePacer? = .shared,
+        send: @escaping @Sendable (Candidate) async -> Outcome
+    ) async -> Report {
+        await APIWritePacer.$current.withValue(pacer) { await runBatches(candidates, send: send) }
+    }
+
+    private static func runBatches(
         _ candidates: [Candidate],
         send: @escaping @Sendable (Candidate) async -> Outcome
     ) async -> Report {

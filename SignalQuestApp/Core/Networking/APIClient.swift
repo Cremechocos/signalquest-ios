@@ -678,6 +678,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// n'est jamais un HTTP 503 susceptible de déclencher un retry automatique.
     private func validateTransmissionAdmission(_ endpoint: APIEndpoint,
                                                context: CredentialStore.Snapshot) async throws {
+        // Lots cadencés (N1-6) : chaque émission d'une écriture, rejeux compris, prend
+        // sa place avant les contrôles qui suivent, pour qu'ils portent sur l'instant d'envoi.
+        if endpoint.method != .get, let pacer = APIWritePacer.current {
+            do { try await pacer.acquire() } catch { throw APIError.cancelled }
+        }
         guard !Task.isCancelled else { throw APIError.cancelled }
         guard credentials.isCurrent(context) else { throw APIError.cancelled }
         if let admission = endpoint.validateBeforeSend {
@@ -858,5 +863,33 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 private extension Data {
     mutating func appendString(_ value: String) {
         append(Data(value.utf8))
+    }
+}
+
+/// Cadence des écritures d'un lot (N1-6, décision d'Alexandre du 13/11) : dès le 20/11, le
+/// serveur refuse en 429 un compte qui écrit plus de 300 fois par minute. L'import des
+/// messages v1 et la sauvegarde des époques vers HK partagent un plafond client de
+/// 240 écritures par minute, tout compris (messages, blobs, dépôts, rejeux) : une émission
+/// toutes les 250 ms au plus. Le lot active la cadence pour ses tâches par `$current`.
+actor APIWritePacer {
+    static let shared = APIWritePacer()
+    static let writesPerMinute = 240
+    @TaskLocal static var current: APIWritePacer?
+
+    private let interval: Duration
+    private let clock = ContinuousClock()
+    private var next: ContinuousClock.Instant?
+
+    init(writesPerMinute: Int = APIWritePacer.writesPerMinute) {
+        interval = .seconds(60) / max(1, writesPerMinute)
+    }
+
+    /// Réserve la prochaine place libre, puis l'attend. La réservation précède toute
+    /// suspension : deux appels concurrents ne prennent jamais la même place.
+    func acquire() async throws {
+        let now = clock.now
+        let slot = max(now, next ?? now)
+        next = slot.advanced(by: interval)
+        if slot > now { try await Task.sleep(until: slot, clock: clock) }
     }
 }

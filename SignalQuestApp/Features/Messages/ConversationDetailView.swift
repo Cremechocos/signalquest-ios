@@ -5137,7 +5137,7 @@ struct ConversationDetailView: View {
             pendingE2EEMedia[localId] = nil
             sendStatus[localId] = nil
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
-        case .retry:
+        case .retry, .throttled:
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             Haptics.error()
         case .failed(let reason):

@@ -272,6 +272,38 @@ final class E2EEAutoBlobTransportTests: XCTestCase {
         XCTAssertEqual(sent, .sent)
     }
 
+    /// N1-6 (13/11) : un 429 du serveur arrête la reprise de la file ; les envois suivants
+    /// attendent le prochain passage au lieu d'ajouter des refus. Un autre échec passager, non.
+    func testOutboxRetryStopsAtTheFirstRateLimit() async throws {
+        let server = FakeBlobServer()
+        let client = E2EEAutoBlobClient(requests: server.requests, workDirectory: directory)
+        let outbox = E2EEAutoMediaOutbox(rootURL: directory.appendingPathComponent("outbox"), keyStore: InMemoryTokenStore())
+        let owner = "user:outbox-test"
+        for index in 0..<3 {
+            _ = try await outbox.stage(
+                [E2EEAutoMediaSource(data: Data([UInt8(index), 2, 3]), fileName: "note\(index).txt", mimeType: "text/plain",
+                                     width: nil, height: nil, durationMs: nil, thumbnail: nil)],
+                caption: nil, replyToRef: nil, ttlSeconds: 0, conversationId: "conv_0123456789abcdef", isGroup: false,
+                participantIds: [], ownerScopeId: owner
+            )
+        }
+        let attempts = DraftBox()
+        await outbox.retryAll(ownerScopeId: owner, client: client, cache: nil) { draft, _ in
+            await attempts.append(draft)
+            return .failure(.init(kind: .retryable, statusCode: 429, code: "RATE_LIMITED", message: "limited"))
+        }
+        let limited = await attempts.items
+        XCTAssertEqual(limited.count, 1, "le premier 429 arrête la tournée")
+        let kept = await outbox.records(ownerScopeId: owner)
+        XCTAssertEqual(kept.count, 3, "rien n'est perdu")
+        await outbox.retryAll(ownerScopeId: owner, client: client, cache: nil) { draft, _ in
+            await attempts.append(draft)
+            return .failure(.init(kind: .retryable, message: "offline"))
+        }
+        let all = await attempts.items
+        XCTAssertEqual(all.count, 4, "un échec réseau laisse tenter les suivants")
+    }
+
     func testOutboxQueuesPurgesUntilTheServerSettlesThem() async throws {
         let server = FakeBlobServer()
         let client = E2EEAutoBlobClient(requests: server.requests, workDirectory: directory)

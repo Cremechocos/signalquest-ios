@@ -386,6 +386,9 @@ final class AppServices: ObservableObject {
                     reason: String(localized: "Ta demande de message n’a pas encore été acceptée."),
                     ownerScopeId: session.ownerScopeId
                 )
+            case .failure(let failure) where failure.statusCode == 429:
+                // N1-6 : le serveur limite le compte ; les textes suivants attendent le prochain passage.
+                return
             default:
                 break
             }

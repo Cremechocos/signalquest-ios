@@ -136,7 +136,7 @@ enum E2EEAutoPostShare {
         switch outcome {
         case .sent:
             return true
-        case .retry, .failed:
+        case .retry, .throttled, .failed:
             // Rien ne reste dans la file : l'échec s'affiche dans la feuille, qu'on peut relancer.
             await E2EEAutoMediaOutbox.shared.remove(record.clientRequestId, ownerScopeId: scope)
             return false

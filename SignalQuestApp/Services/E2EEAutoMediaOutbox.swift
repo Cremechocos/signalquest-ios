@@ -270,6 +270,8 @@ actor E2EEAutoMediaOutbox {
         case sent
         /// Passager : réessayé plus tard, sources gardées.
         case retry
+        /// Passager, le serveur limite le compte (429, N1-6) : la file attend le prochain passage.
+        case throttled
         /// Refus définitif, gardé « Non envoyé » avec sa raison.
         case failed(String)
     }
@@ -401,9 +403,9 @@ actor E2EEAutoMediaOutbox {
                         return fail(&record, ownerScopeId, String(localized: "Ton espace pour les pièces jointes chiffrées est plein."))
                     case .failure(let failure) where failure.kind == .permanent:
                         return fail(&record, ownerScopeId, String(localized: "Cette pièce jointe n’a pas pu être envoyée."))
-                    case .failure:
+                    case .failure(let failure):
                         save(&record, blob, index: index, thumbnail: isThumbnail, ownerScopeId)
-                        return .retry
+                        return failure.statusCode == 429 ? .throttled : .retry
                     }
                     save(&record, blob, index: index, thumbnail: isThumbnail, ownerScopeId)
                 }
@@ -443,15 +445,20 @@ actor E2EEAutoMediaOutbox {
             return fail(&record, ownerScopeId, String(localized: "Ta demande de message n’a pas encore été acceptée."))
         case .failure(let failure) where failure.kind == .permanent:
             return fail(&record, ownerScopeId, String(localized: "Cette pièce jointe n’a pas pu être envoyée."))
+        case .failure(let failure) where failure.statusCode == 429:
+            return .throttled
         default:
             return .retry
         }
     }
 
-    /// Reprend tout ce qui attend, dans l'ordre d'arrivée.
+    /// Reprend tout ce qui attend, dans l'ordre d'arrivée. Un 429 arrête la tournée (N1-6) :
+    /// le reste attend le prochain passage au lieu d'ajouter des refus.
     func retryAll(ownerScopeId: String, client: E2EEAutoBlobClient, cache: E2EEAutoMediaCache?, send: Send) async {
         for record in records(ownerScopeId: ownerScopeId) where record.failureReason == nil {
-            _ = await process(clientRequestId: record.clientRequestId, ownerScopeId: ownerScopeId, client: client, cache: cache, send: send)
+            let outcome = await process(clientRequestId: record.clientRequestId, ownerScopeId: ownerScopeId,
+                                        client: client, cache: cache, send: send)
+            if outcome == .throttled { return }
         }
     }
 

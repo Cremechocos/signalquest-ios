@@ -156,6 +156,59 @@ final class E2EEAutoHistoryImporterTests: XCTestCase {
         XCTAssertNil(report.outcomes["message_000000000010"])
     }
 
+    /// N1-6 (13/11) : les écritures d'un import passent par le client API au plus une fois
+    /// par intervalle du cadenceur, même à 5 en parallèle ; une lecture n'attend pas, et
+    /// hors d'un lot cadencé rien ne ralentit.
+    func testImportWritesArePacedThroughTheAPIClient() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-import-writer")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        // La première requête d'une session neuve peut tarder (plusieurs secondes au simulateur) :
+        // les écritures déjà cadencées s'y empileraient et arriveraient ensemble au faux serveur.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        try? await api.request(APIEndpoint(path: "/api/e2ee/v2/conversations/c/epochs"))
+        let sent = PacedRequestLog()
+        MockURLProtocol.requestHandler = { request in
+            sent.record(request.httpMethod ?? "GET")
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                    headerFields: ["Content-Type": "application/json"])!, Data("{}".utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let candidates = try (0..<6).map { index in
+            let source = try XCTUnwrap(E2EEAutoHistoryImporter.source(
+                v1(String(format: "message_%012d", index)), text: "m\(index)", conversationId: conversationId
+            ))
+            return try XCTUnwrap(E2EEAutoHistoryImporter.candidate(source))
+        }
+        // 1 200 écritures par minute : une toutes les 50 ms, pour un test court.
+        _ = await E2EEAutoHistoryImporter.run(candidates, pacer: APIWritePacer(writesPerMinute: 1_200)) { _ in
+            try? await api.request(APIEndpoint(path: "/api/e2ee/v2/conversations/c/messages", method: .post))
+            try? await api.request(APIEndpoint(path: "/api/e2ee/v2/conversations/c/epochs"))
+            return .imported
+        }
+        let writes = sent.times(of: "POST")
+        XCTAssertEqual(writes.count, 6)
+        let gaps = zip(writes.dropFirst(), writes).map { $0 - $1 }
+        XCTAssertGreaterThanOrEqual(gaps.min() ?? 0, 0.045, "deux écritures du lot ne partent jamais à moins de 50 ms")
+        let reads = sent.times(of: "GET")
+        XCTAssertEqual(reads.count, 6)
+        XCTAssertLessThan(reads.first! - writes.first!, 0.045, "une lecture n'attend pas sa place")
+
+        let before = sent.times(of: "POST").count
+        let start = Date()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<6 {
+                group.addTask { try? await api.request(APIEndpoint(path: "/api/feed/posts", method: .post)) }
+            }
+        }
+        XCTAssertEqual(sent.times(of: "POST").count, before + 6)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.25, "hors d'un lot cadencé, aucune attente")
+    }
+
     // MARK: Pièces jointes v1 (§8, révision 16)
 
     /// Vecteur `importEligibility` de `blob-transport-v1` : une pièce en attente
@@ -396,5 +449,21 @@ private extension ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
+    }
+}
+
+/// Heure d'arrivée de chaque requête au faux serveur, par méthode.
+private final class PacedRequestLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [(String, TimeInterval)] = []
+
+    func record(_ method: String) {
+        lock.lock(); defer { lock.unlock() }
+        entries.append((method, Date().timeIntervalSinceReferenceDate))
+    }
+
+    func times(of method: String) -> [TimeInterval] {
+        lock.lock(); defer { lock.unlock() }
+        return entries.filter { $0.0 == method }.map(\.1).sorted()
     }
 }
