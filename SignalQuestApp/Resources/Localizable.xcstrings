@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "La demande précédente n’est plus ouverte. Voici la plus récente : vérifie à nouveau l’empreinte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The previous request is no longer open. Here is the latest one: check the fingerprint again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande précédente n’est plus ouverte. Voici la plus récente : vérifie à nouveau l’empreinte."
+          }
+        }
+      }
+    },
+    "SQFormal|La demande précédente n’est plus ouverte. Voici la plus récente : vérifie à nouveau l’empreinte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande précédente n’est plus ouverte. Voici la plus récente : vérifiez à nouveau l’empreinte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "session.countries.drom" : {
       "localizations" : {
         "en" : {

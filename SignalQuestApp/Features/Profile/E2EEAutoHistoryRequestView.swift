@@ -149,6 +149,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     struct Approval: Equatable {
         let pending: E2EEAutoHistoryRequests.Pending
         var phase: ApprovalPhase
+        /// La demande montrée avant celle-ci n'était plus ouverte : l'empreinte est à revérifier.
+        var replacesClosed = false
     }
 
     @Published private(set) var requester: Requester?
@@ -383,9 +385,18 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         guard approval == nil, !listing, let client = dependencies.client() else { return }
         listing = true
         defer { listing = false }
-        guard case .requests(let items) = await client.openRequests(), approval == nil,
-              let next = items.first(where: { !postponedApprovals.contains($0.requestId) }) else { return }
+        guard let next = await newestOpenRequest(client), approval == nil else { return }
         approval = Approval(pending: next, phase: .ready)
+    }
+
+    /// La plus récente des demandes à montrer : c'est celle que l'autre écran affiche. Le
+    /// serveur les liste de la plus ancienne à la plus récente ; `expiresAtMs` vaut la
+    /// création plus 24 h, donc le même ordre.
+    private func newestOpenRequest(_ client: Client, excluding closed: String? = nil) async -> E2EEAutoHistoryRequests.Pending? {
+        guard case .requests(let items) = await client.openRequests() else { return nil }
+        return items
+            .filter { $0.requestId != closed && !postponedApprovals.contains($0.requestId) }
+            .max { $0.expiresAtMs < $1.expiresAtMs }
     }
 
     func approve() async {
@@ -399,8 +410,15 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             approval?.phase = .served
             dependencies.removeDelivered(current.pending.requestId)
         case .closed:
-            approval?.phase = .closed
             dependencies.removeDelivered(current.pending.requestId)
+            // Une autre demande encore ouverte prend sa place, l'empreinte à revérifier.
+            let next = await newestOpenRequest(client, excluding: current.pending.requestId)
+            guard approval?.pending.requestId == current.pending.requestId else { return }
+            if let next {
+                approval = Approval(pending: next, phase: .ready, replacesClosed: true)
+            } else {
+                approval?.phase = .closed
+            }
         case .noHistoryKey: approval?.phase = .noHistoryKey
         case .unknownDevice: approval?.phase = .unknownDevice
         case .tooRecent: approval?.phase = .tooRecent
@@ -655,6 +673,14 @@ struct E2EEAutoHistoryApprovalView: View {
             GradientButton(String(localized: "OK")) { coordinator.closeApproval() }
                 .accessibilityIdentifier("e2eeAuto.historyApproval.done")
         } else {
+            if approval.replacesClosed {
+                Label(String(localized: "La demande précédente n’est plus ouverte. Voici la plus récente : vérifie à nouveau l’empreinte."),
+                      systemImage: "arrow.triangle.2.circlepath")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("e2eeAuto.historyApproval.replaced")
+            }
             Group {
                 if approval.pending.activate {
                     Text("Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte.")
@@ -750,14 +776,16 @@ struct E2EEAutoHistoryFingerprintCard: View {
 /// Banc visuel (simulateur Debug) : `--qa-auto-history-request` (demandeur),
 /// `--qa-auto-history-approval` (« C'est moi ») ; avec `--qa-auto-history-activation`,
 /// la variante du mode renforcé (§6) ; avec `--qa-auto-history-passkey`, la passkey (§5.5)
-/// et `--qa-auto-history-passkey-older` après une passkey périmée.
+/// et `--qa-auto-history-passkey-older` après une passkey périmée ; avec
+/// `--qa-auto-history-approval-replaced`, la première demande est déjà close et une autre la remplace.
 struct E2EEAutoHistoryRequestQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     nonisolated private static let activation = AppEnvironment.hasQAFlag("auto-history-activation")
     nonisolated private static let passkey = AppEnvironment.hasQAFlag("auto-history-passkey")
         || AppEnvironment.hasQAFlag("auto-history-passkey-older")
+    nonisolated private static let replaced = AppEnvironment.hasQAFlag("auto-history-approval-replaced")
     /// Horloge du banc : l'attente de synchro passe aussitôt pour la passkey.
-    private final class Clock: @unchecked Sendable { var date = Date() }
+    private final class Clock: @unchecked Sendable { var date = Date(); var closedOnce = false }
     nonisolated private static let clock = Clock()
     @StateObject private var coordinator = E2EEAutoHistoryRequestCoordinator(dependencies: .init(
         client: {
@@ -767,13 +795,23 @@ struct E2EEAutoHistoryRequestQAScreen: View {
                 hasOpenRequest: { !Self.passkey },
                 ownFingerprint: { ["48213", "09177", "66402", "31958"] },
                 openRequests: {
-                    .requests([.init(
-                        requestId: "hreq_qa_000000000000002", deviceId: "android_device_qa_0000001", platform: .android,
-                        addedAtMs: 1_793_000_000_000, fingerprint: ["48213", "09177", "66402", "31958"], expiresAtMs: Int64.max,
-                        activate: Self.activation
-                    )])
+                    Self.clock.closedOnce
+                        ? .requests([.init(
+                            requestId: "hreq_qa_000000000000003", deviceId: "web_device_qa_00000000001", platform: .web,
+                            addedAtMs: 1_793_000_000_000, fingerprint: ["70512", "38846", "15093", "62271"], expiresAtMs: Int64.max,
+                            activate: Self.activation
+                        )])
+                        : .requests([.init(
+                            requestId: "hreq_qa_000000000000002", deviceId: "android_device_qa_0000001", platform: .android,
+                            addedAtMs: 1_793_000_000_000, fingerprint: ["48213", "09177", "66402", "31958"], expiresAtMs: Int64.max,
+                            activate: Self.activation
+                        )])
                 },
-                approve: { _ in .served },
+                approve: { _ in
+                    guard Self.replaced, !Self.clock.closedOnce else { return .served }
+                    Self.clock.closedOnce = true
+                    return .closed
+                },
                 hasPasskey: { Self.passkey },
                 usePasskey: { .older }
             )

@@ -209,6 +209,53 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         XCTAssertTrue(world.approved.isEmpty)
     }
 
+    nonisolated private static func browser(_ suffix: String, expiresAtMs: Int64) -> E2EEAutoHistoryRequests.Pending {
+        E2EEAutoHistoryRequests.Pending(
+            requestId: "hreq_00000000000000000\(suffix)", deviceId: "web_device_000000000\(suffix)", platform: .web,
+            addedAtMs: 8_000, fingerprint: ["5555\(suffix)", "66666", "77777", "88888"], expiresAtMs: expiresAtMs
+        )
+    }
+
+    /// Plusieurs demandes ouvertes : la plus récente d'abord, celle que l'autre écran affiche
+    /// (le serveur liste de la plus ancienne à la plus récente).
+    func testNewestOpenRequestIsShownFirst() async {
+        let world = World()
+        let older = Self.browser("3", expiresAtMs: 1_000), newer = Self.browser("4", expiresAtMs: 2_000)
+        world.listing = .requests([older, newer])
+        let coordinator = world.coordinator()
+        await coordinator.refreshApprovals()
+        XCTAssertEqual(coordinator.approval?.pending, newer)
+        XCTAssertEqual(coordinator.approval?.replacesClosed, false)
+    }
+
+    /// Demande close entre-temps : la liste est relue et la suivante s'affiche, à revérifier ;
+    /// rien n'est servi sans un nouveau « C'est moi ».
+    func testClosedApprovalOffersTheNextOpenRequest() async {
+        let world = World()
+        let closed = Self.browser("3", expiresAtMs: 1_000), next = Self.browser("4", expiresAtMs: 2_000)
+        world.listing = .requests([closed])
+        let coordinator = world.coordinator()
+        await coordinator.refreshApprovals()
+        world.approveOutcome = .closed
+        world.listing = .requests([next])
+        await coordinator.approve()
+        XCTAssertEqual(world.approved, [closed.requestId])
+        XCTAssertEqual(world.removed, [closed.requestId])
+        XCTAssertEqual(coordinator.approval, .init(pending: next, phase: .ready, replacesClosed: true))
+    }
+
+    /// Demande close et aucune autre : « Cette demande n'est plus ouverte. »
+    func testClosedApprovalWithoutAnotherRequestSaysSo() async {
+        let world = World()
+        world.listing = .requests([Self.pending])
+        let coordinator = world.coordinator()
+        await coordinator.refreshApprovals()
+        world.approveOutcome = .closed
+        world.listing = .requests([])
+        await coordinator.approve()
+        XCTAssertEqual(coordinator.approval, .init(pending: Self.pending, phase: .closed))
+    }
+
     /// « Pas maintenant » : plus présentée avant le prochain lancement.
     func testPostponedApprovalIsNotShownAgain() async {
         let world = World()
