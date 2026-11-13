@@ -39,8 +39,9 @@ enum CarPlayDetailTemplateBuilder {
         }
         let operators = details?.operators.isEmpty == false ? details!.operators : []
         if !operators.isEmpty {
+            // Noms complets (« Bouygues Telecom »), pas les clés du serveur.
             items.append(CPInformationItem(title: String(localized: "Opérateurs"),
-                                           detail: operators.joined(separator: ", ")))
+                                           detail: NearestAntennaTemplateBuilder.operatorNames(operators)))
         }
         if let technologies = details?.technologies, !technologies.isEmpty {
             items.append(CPInformationItem(title: String(localized: "Technologies"),
@@ -86,16 +87,21 @@ enum CarPlayDetailTemplateBuilder {
                                      to: CLLocationCoordinate2D(latitude: lat, longitude: lon)) {
             items.append(bearing)
         }
-        if let status = outageStatusLabel(site) {
+        let status = outageStatusLabel(site)
+        if let status {
             items.append(CPInformationItem(title: String(localized: "État"), detail: status))
         }
-        if let operatorName = site.operator {
-            items.append(CPInformationItem(title: String(localized: "Opérateur"), detail: operatorName))
+        // Nom complet (« Bouygues Telecom »), comme le sous-titre de la carte,
+        // plutôt que la clé brute du flux (« BOUYGUES »).
+        if let raw = site.operator, !raw.isEmpty {
+            items.append(CPInformationItem(title: String(localized: "Opérateur"),
+                                           detail: SQBrand.operatorName(raw) ?? raw))
         }
-        if let commune = site.commune {
+        if let commune = communeLabel(site.commune) {
             items.append(CPInformationItem(title: String(localized: "Commune"), detail: commune))
         }
-        if let detail = site.detail, !detail.isEmpty {
+        // L'état reprend déjà le détail quand le code opérateur est inconnu.
+        if let detail = site.detail, !detail.isEmpty, detail != status {
             items.append(CPInformationItem(title: String(localized: "Détail"), detail: detail))
         }
         if let startedAt = SignalFormatters.date(site.startedAt, includingTime: true, relative: true) {
@@ -129,7 +135,7 @@ enum CarPlayDetailTemplateBuilder {
             items.append(CPInformationItem(title: String(localized: "Technologies prévues"),
                                            detail: site.technologies.joined(separator: ", ")))
         }
-        if let commune = site.commune {
+        if let commune = communeLabel(site.commune) {
             items.append(CPInformationItem(title: String(localized: "Commune"), detail: commune))
         }
         return CPInformationTemplate(
@@ -151,12 +157,26 @@ enum CarPlayDetailTemplateBuilder {
         }
     }
 
-    /// Le motif tel que l'opérateur l'écrit ; à défaut, la nature de l'incident en toutes lettres
-    /// (« down » ne se lit pas au volant).
+    /// Le motif en toutes lettres, comme la fiche iPhone : un code opérateur
+    /// connu (« INT ») traduit, sinon le détail de l'opérateur, sinon le motif
+    /// tel quel ; sans motif, la nature de l'incident (« down » ne se lit pas
+    /// au volant).
     static func outageStatusLabel(_ site: OutageSiteLive) -> String? {
-        if let reason = site.reason, !reason.isEmpty { return reason }
+        if let reason = site.reason, !reason.isEmpty {
+            if let label = OutageSiteLive.reasonLabel(code: reason) { return label }
+            if let detail = site.detail, !detail.isEmpty { return detail }
+            return reason
+        }
         guard let issueType = site.issueType, !issueType.isEmpty else { return nil }
         return OperatorIncidentCard.issueLabel(for: issueType)
+    }
+
+    /// « Chindrieux » plutôt que « CHINDRIEUX » : les flux opérateur écrivent
+    /// la commune en capitales, l'iPhone l'affiche en `capitalized`. Un nom
+    /// déjà en casse mixte reste tel quel (« La Tour-du-Pin », pas « Du »).
+    static func communeLabel(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        return raw == raw.uppercased() ? raw.capitalized : raw
     }
 
     /// « à 340 m, à l'est » — distance ET direction. La distance seule ne dit pas

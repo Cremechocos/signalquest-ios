@@ -457,13 +457,16 @@ final class AuthService: AuthServicing {
         LocalCoverageArchiveReader.eraseAll()
     }
 
-    /// Ce que l'app expose HORS de l'app (widgets, Spotlight, destinations
-    /// CarPlay) appartient au compte qui se déconnecte : on l'efface avec la
-    /// session (MES-13).
+    /// Ce que l'app expose HORS de l'app (widgets, Spotlight) appartient au
+    /// compte qui se déconnecte : on l'efface avec la session (MES-13).
+    ///
+    /// La clé des anciennes destinations CarPlay (guidage retiré le 12/11/2026)
+    /// est encore effacée : une installation mise à jour peut la conserver, et
+    /// ces adresses appartiennent au compte.
     private static func clearDeviceSurfaces() {
         WidgetSharedStore.clear()
         SQSpotlight.removeAll()
-        CarPlayDestinationStore.reset()
+        UserDefaults.standard.removeObject(forKey: "sq.carplay.recentDestinations.v1")
         WidgetCenter.shared.reloadAllTimelines()
     }
 

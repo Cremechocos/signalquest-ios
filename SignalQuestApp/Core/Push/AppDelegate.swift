@@ -178,10 +178,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// SignalQuest figure dans la liste des apps d'itinéraire de Plan. Sans ce
     /// handler, la choisir ouvrirait l'app sur rien — motif de rejet en revue.
     ///
-    /// La destination est mémorisée dans les récents CarPlay et, si un véhicule
-    /// est branché, poussée vers sa carte : c'est là que le trajet a de l'intérêt
-    /// pour nous, les antennes restant visibles par-dessus la route. Sinon, elle
-    /// ouvre la carte de l'app sur le point demandé.
+    /// La destination ouvre la carte de l'app sur le point demandé. (CarPlay ne
+    /// guide pas : Apple n'a accordé que la catégorie « driving task ».)
     func application(_ app: UIApplication, open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         Self.routeDirectionsRequest(url)
@@ -193,7 +191,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     @MainActor @discardableResult
     static func routeDirectionsRequest(_ url: URL) -> Bool {
         guard let destination = DirectionsRequestHandler.destination(from: url) else { return false }
-        CarPlayDestinationStore.record(title: destination.name, coordinate: destination.coordinate)
         // Passe par le holder plutôt qu'une statique de plus : le graphe est déjà
         // construit à cet instant (didFinishLaunching précède toujours l'ouverture
         // d'URL), et c'est le même routeur que la fenêtre SwiftUI observe.
@@ -202,14 +199,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         router.pendingMapFocus = Coordinates(latitude: destination.coordinate.latitude,
                                              longitude: destination.coordinate.longitude)
         router.selectedTab = .map
-        // Seulement si le véhicule peut réellement guider : sans `carplay-maps`,
-        // pousser vers la scène CarPlay afficherait une liste d'antennes en
-        // réponse à une demande d'itinéraire.
-        if services.isCarPlayGuidanceAvailable {
-            CarPlayDashboardRoute.request(.navigate(title: destination.name,
-                                                    latitude: destination.coordinate.latitude,
-                                                    longitude: destination.coordinate.longitude))
-        }
         return true
     }
 }

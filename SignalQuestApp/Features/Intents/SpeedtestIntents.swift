@@ -234,22 +234,51 @@ struct SendMessageIntent: AppIntent {
     }
 }
 
-/// Raccourci « Ouvrir le Drive Test » (F4). Ouvre l'app sur l'onglet Speed et
-/// présente le mode Drive Test, prêt à démarrer : le préflight, la localisation
-/// et l'information de collecte passent par l'écran, la mesure ne part pas seule.
+/// « Lance un drive test » (lot 5 CarPlay, choix d'Alexandre du 13/11), qui
+/// remplace « Ouvrir le Drive Test ».
+///
+/// CarPlay branché : le trajet démarre sans écran et Siri répond à voix haute,
+/// refus compris — en voiture, on ne renvoie personne vers son iPhone. Sans
+/// CarPlay, rien ne change (F4) : l'app s'ouvre sur le Drive Test prêt à
+/// démarrer, le préflight, la localisation et l'information de collecte
+/// passant par l'écran.
 struct RunDriveTestIntent: AppIntent {
-    static let title: LocalizedStringResource = "Ouvrir le Drive Test"
-    static let description = IntentDescription("Ouvre SignalQuest sur le Drive Test, prêt à démarrer.")
-    static let openAppWhenRun = true
+    static let title: LocalizedStringResource = "Lancer un drive test"
+    static let description = IntentDescription("En voiture, lance un drive test sans écran ; sinon, ouvre le Drive Test prêt à démarrer.")
+    // L'app ne s'ouvre plus d'office : seulement hors voiture, à la demande.
+    static let openAppWhenRun = false
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background, .foreground(.dynamic)] }
 
     @MainActor
-    func perform() async throws -> some IntentResult {
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let services = AppServicesHolder.services
+        guard services.isCarPlayConnected else {
+            try await openDriveTestScreen()
+            return .result(dialog: IntentDialog(stringLiteral: String(localized: "Le Drive Test est prêt dans SignalQuest.")))
+        }
+        let answer = DriveTestVoice.start(services: services, isSignedIn: DriveTestVoice.isSignedIn)
+        return .result(dialog: IntentDialog(stringLiteral: answer))
+    }
+
+    @MainActor
+    private func openDriveTestScreen() async throws {
+        if #available(iOS 26.0, *) {
+            try await continueInForeground(nil, alwaysConfirm: false)
+        } else if #available(iOS 16.4, *) {
+            try await requestToContinueInForeground()
+        }
         let router = AppServicesHolder.services.router
         router.selectedTab = .speed
         router.pendingDriveTest = true
-        return .result()
     }
 }
+
+/// Ouverture de l'app à la demande, hors voiture (iOS 16.4 à 25 ; ensuite
+/// `supportedModes`).
+@available(iOS 16.4, *)
+extension RunDriveTestIntent: ForegroundContinuableIntent {}
 
 /// « Dernier résultat » (plan 3, vague 1) : Siri ou un raccourci donnent le
 /// débit du dernier test sans ouvrir l'app. Lu dans l'instantané des widgets,
@@ -314,11 +343,33 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: RunDriveTestIntent(),
             phrases: [
-                "Ouvre le drive test avec \(.applicationName)",
-                "Prépare un drive test \(.applicationName)"
+                "Lance un drive test avec \(.applicationName)",
+                "Démarre un drive test \(.applicationName)",
+                "Ouvre le drive test avec \(.applicationName)"
             ],
             shortTitle: "Drive Test",
-            systemImageName: "location.north.line.fill"
+            systemImageName: "car.fill"
+        )
+        // Les deux suivants répondent à voix haute sans ouvrir l'app : ils
+        // servent en voiture (lot 5 CarPlay). Avec eux, 10 raccourcis, le
+        // plafond d'Apple.
+        AppShortcut(
+            intent: StopDriveTestIntent(),
+            phrases: [
+                "Arrête le drive test \(.applicationName)",
+                "Arrête le drive test avec \(.applicationName)"
+            ],
+            shortTitle: "Arrêter le drive test",
+            systemImageName: "stop.circle"
+        )
+        AppShortcut(
+            intent: NetworkHereIntent(),
+            phrases: [
+                "Comment est le réseau ici avec \(.applicationName)",
+                "Le réseau ici \(.applicationName)"
+            ],
+            shortTitle: "Réseau ici",
+            systemImageName: "cellularbars"
         )
         AppShortcut(
             intent: LastSpeedtestResultIntent(),

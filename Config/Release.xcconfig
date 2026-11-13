@@ -12,8 +12,8 @@ SQ_ASSOCIATED_DOMAIN = webcredentials:signalquest.fr
 SQ_APPLINKS_DOMAIN = applinks:signalquest.fr
 SQ_URL_SCHEME = signalquest
 // Fichier d'entitlements de la cible app (project.yml lit $(SQ_ENTITLEMENTS)).
-// Reste SANS clé CarPlay tant qu'elle n'est pas présente dans le profil App
-// Store effectivement utilisé pour signer l'archive. Une clé absente du profil
-// ferait échouer la signature, même si la capacité existe dans le code.
+// Contient l'entitlement CarPlay « driving task » accordé par Apple (12892a96),
+// présent dans le profil App Store. Une clé absente du profil ferait échouer la
+// signature, même si la capacité existe dans le code.
 SQ_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements
 SWIFT_ACTIVE_COMPILATION_CONDITIONS =

@@ -441,12 +441,9 @@ struct OutageDetailSheet: View {
 
     /// Code opérateur brut → libellé lisible (au lieu d'« INT » / « MAINT »).
     var reasonText: String {
-        switch (site.reason ?? "").uppercased() {
-        case "INT": return String(localized: "Interruption de service")
-        case "MAINT": return String(localized: "Maintenance programmée")
-        case "": return site.detail ?? issueLabel
-        default: return site.detail ?? (site.reason ?? issueLabel)
-        }
+        let code = site.reason ?? ""
+        if let label = OutageSiteLive.reasonLabel(code: code) { return label }
+        return site.detail ?? (code.isEmpty ? issueLabel : code)
     }
 
     func serviceStatusLabel(_ status: String) -> String {
@@ -495,5 +492,17 @@ struct OutageDetailSheet: View {
         out.dateStyle = .medium
         out.timeStyle = raw.contains("T") ? .short : .none
         return out.string(from: date)
+    }
+}
+
+extension OutageSiteLive {
+    /// Libellé d'un code opérateur connu (« INT », « MAINT »), nil sinon :
+    /// partagé par cette fiche et CarPlay, où un code brut ne se lit pas au volant.
+    static func reasonLabel(code: String) -> String? {
+        switch code.uppercased() {
+        case "INT": return String(localized: "Interruption de service")
+        case "MAINT": return String(localized: "Maintenance programmée")
+        default: return nil
+        }
     }
 }

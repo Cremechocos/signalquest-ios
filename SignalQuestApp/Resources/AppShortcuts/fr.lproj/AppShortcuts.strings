@@ -6,7 +6,12 @@
 "Ouvre la messagerie ${applicationName}" = "Ouvre la messagerie ${applicationName}";
 "Ouvre mes messages ${applicationName}" = "Ouvre mes messages ${applicationName}";
 "Ouvre le drive test avec ${applicationName}" = "Ouvre le drive test avec ${applicationName}";
-"Prépare un drive test ${applicationName}" = "Prépare un drive test ${applicationName}";
+"Lance un drive test avec ${applicationName}" = "Lance un drive test avec ${applicationName}";
+"Démarre un drive test ${applicationName}" = "Démarre un drive test ${applicationName}";
+"Arrête le drive test ${applicationName}" = "Arrête le drive test ${applicationName}";
+"Arrête le drive test avec ${applicationName}" = "Arrête le drive test avec ${applicationName}";
+"Comment est le réseau ici avec ${applicationName}" = "Comment est le réseau ici avec ${applicationName}";
+"Le réseau ici ${applicationName}" = "Le réseau ici ${applicationName}";
 "Quel est mon dernier débit ${applicationName}" = "Quel est mon dernier débit ${applicationName}";
 "Mon dernier speedtest ${applicationName}" = "Mon dernier speedtest ${applicationName}";
 "Ouvre une antenne suivie avec ${applicationName}" = "Ouvre une antenne suivie avec ${applicationName}";

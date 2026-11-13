@@ -113,4 +113,62 @@ final class CarPlaySpeedtestTests: XCTestCase {
         )
         XCTAssertLessThanOrEqual(template.items.count, CarPlayDetailTemplateBuilder.maxItems)
     }
+
+    // MARK: - Verdict, date et réseau (lot 3, maquette du 12/11)
+
+    private func result(download: Double, createdAt: Date, connection: NetworkConnectionKind = .cellular,
+                        technology: CellularRadioTechnology? = .fiveGNSA,
+                        operatorKey: String? = "bouygues") -> SpeedtestRunResult {
+        SpeedtestRunResult(label: "iOS speedtest", downloadMbps: download, downloadAverageMbps: download,
+                           downloadMaxMbps: download, uploadMbps: 75, pingMs: 25, durationSeconds: 10,
+                           connectionType: connection, cellularTechnology: technology,
+                           operatorKey: operatorKey, createdAt: createdAt)
+    }
+
+    /// Des chiffres seuls ne disent pas si c'est bien, ni s'ils valent encore :
+    /// le titre porte le verdict de l'échelle de l'app et la date.
+    func testTitleCarriesTheVerdictAndTheDate() {
+        let now = Date()
+        let twoHoursAgo = now.addingTimeInterval(-2 * 3_600)
+        let title = SpeedtestTemplateBuilder.title(for: .idle(last: result(download: 323, createdAt: twoHoursAgo)),
+                                                   now: now)
+
+        XCTAssertEqual(title, "\(SQQualityScale.Throughput.veryGood.label) · "
+                       + SpeedtestTemplateBuilder.relativeDate(twoHoursAgo, now: now))
+        XCTAssertTrue(SpeedtestTemplateBuilder.relativeDate(twoHoursAgo, now: now).contains("2"))
+        XCTAssertEqual(SpeedtestTemplateBuilder.relativeDate(now.addingTimeInterval(-20), now: now),
+                       SpeedtestTemplateBuilder.relativeDate(now, now: now),
+                       "juste après la mesure : « maintenant », pas « il y a 20 secondes »")
+        XCTAssertEqual(SpeedtestTemplateBuilder.title(for: .idle(last: nil)), String(localized: "Speedtest"))
+    }
+
+    /// Le libellé interne « iOS speedtest » ne s'affiche plus : quatre valeurs,
+    /// dans l'ordre de la maquette.
+    func testResultShowsFourValuesWithoutTheInternalLabel() {
+        let items = SpeedtestTemplateBuilder.items(for: .idle(last: result(download: 323, createdAt: Date())))
+
+        XCTAssertEqual(items.map(\.title), [String(localized: "Descendant"), String(localized: "Montant"),
+                                            String(localized: "Latence"), String(localized: "Réseau")])
+        XCTAssertFalse(items.contains { $0.detail == "iOS speedtest" })
+        XCTAssertEqual(items.last?.detail, "Bouygues 5G")
+    }
+
+    func testNetworkReadsShortCarrierAndGenerationOrWiFi() {
+        XCTAssertEqual(SpeedtestTemplateBuilder.networkLabel(result(download: 50, createdAt: Date(),
+                                                                    technology: .fourG, operatorKey: "free")),
+                       "Free 4G")
+        XCTAssertEqual(SpeedtestTemplateBuilder.networkLabel(result(download: 50, createdAt: Date(),
+                                                                    connection: .wifi)), "Wi-Fi")
+        XCTAssertNil(SpeedtestTemplateBuilder.networkLabel(result(download: 50, createdAt: Date(),
+                                                                  technology: nil, operatorKey: nil)))
+    }
+
+    /// Au repos, même avec un ancien résultat, on lance un NOUVEAU test.
+    func testIdleWithAnOldResultStartsANewTest() {
+        let template = SpeedtestTemplateBuilder.make(
+            state: .idle(last: result(download: 323, createdAt: Date().addingTimeInterval(-7_200))),
+            actions: .init(start: {})
+        )
+        XCTAssertEqual(template.actions.first?.title, String(localized: "Lancer le test"))
+    }
 }

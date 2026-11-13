@@ -4,13 +4,26 @@ import ActivityKit
 
 /// Live Activity affichée pendant un test de débit (écran verrouillé + Dynamic
 /// Island). Alimentée par l'app via `SpeedtestLiveActivityController`.
+///
+/// Depuis iOS 18, la famille « small » la rend aussi sur le tableau de bord
+/// CarPlay (iOS 26) et la pile de l'Apple Watch : le drive test lancé en
+/// voiture reste lisible quand l'écran affiche Plans (choix d'Alexandre du
+/// 12/11). Avant iOS 18, la configuration reste celle d'origine.
 @available(iOS 16.1, *)
 struct SpeedtestLiveActivity: Widget {
     var body: some WidgetConfiguration {
+        // Deux types différents selon la version : permis pour un type opaque
+        // tant que la seule condition est `#available` (SE-0360).
+        if #available(iOS 18.0, *) {
+            return configuration.supplementalActivityFamilies([.small])
+        } else {
+            return configuration
+        }
+    }
+
+    private var configuration: ActivityConfiguration<SpeedtestActivityAttributes> {
         ActivityConfiguration(for: SpeedtestActivityAttributes.self) { context in
-            LockScreenSpeedtestActivity(state: context.state, attributes: context.attributes)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+            SpeedtestActivityContent(state: context.state, attributes: context.attributes)
                 .activityBackgroundTint(Color(.systemBackground))
                 .activitySystemActionForegroundColor(speedColor(context.state.downloadMbps))
         } dynamicIsland: { context in
@@ -76,6 +89,86 @@ struct SpeedtestLiveActivity: Widget {
             }
             .keylineTint(context.state.finished ? SpeedtestLiveStyle.success : speedColor(context.state.downloadMbps))
         }
+    }
+}
+
+/// Écran verrouillé, ou petite vue quand le système la demande (iOS 18+).
+@available(iOS 16.1, *)
+private struct SpeedtestActivityContent: View {
+    let state: SpeedtestActivityAttributes.ContentState
+    let attributes: SpeedtestActivityAttributes
+
+    var body: some View {
+        if #available(iOS 18.0, *) {
+            FamilyAwareSpeedtestActivity(state: state, attributes: attributes)
+        } else {
+            LockScreenSpeedtestActivity(state: state, attributes: attributes)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct FamilyAwareSpeedtestActivity: View {
+    @Environment(\.activityFamily) private var family
+    let state: SpeedtestActivityAttributes.ContentState
+    let attributes: SpeedtestActivityAttributes
+
+    var body: some View {
+        switch family {
+        case .small:
+            SmallSpeedtestActivity(state: state)
+        default:
+            LockScreenSpeedtestActivity(state: state, attributes: attributes)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+        }
+    }
+}
+
+/// Tableau de bord CarPlay et Apple Watch : une ligne d'état et un seul
+/// chiffre, lisibles d'un coup d'œil. Pour le drive test, l'état est celui du
+/// trajet (« Bouygues · Test 3 · Réception », « En pause — à l'arrêt ») et le
+/// chiffre le dernier débit descendant.
+@available(iOS 18.0, *)
+private struct SmallSpeedtestActivity: View {
+    let state: SpeedtestActivityAttributes.ContentState
+
+    private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
+    private var hasValue: Bool { state.downloadMbps > 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: state.finished ? "checkmark.circle.fill" : "speedometer")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(state.phaseLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(verbatim: hasValue ? WidgetUnits.throughputValue(mbps: state.downloadMbps) : "—")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .stableNumericTransition(state.downloadMbps)
+                if hasValue {
+                    Text(verbatim: WidgetUnits.throughputUnit(mbps: state.downloadMbps))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 

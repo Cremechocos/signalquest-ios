@@ -819,19 +819,8 @@ final class AppServices: ObservableObject {
     /// Vrai tant qu'une scène CarPlay est connectée au véhicule.
     private(set) var isCarPlayConnected = false
 
-    /// La scène CarPlay peut-elle réellement GUIDER vers une destination ?
-    ///
-    /// Distinct de `isCarPlayConnected` : le guidage exige une `CPMapTemplate`,
-    /// donc la catégorie `carplay-maps`. Avec la catégorie « driving task »
-    /// accordée aujourd'hui, la scène est bien connectée mais ne sait pas
-    /// conduire quelqu'un quelque part. Sans cette distinction, l'iPhone
-    /// détournait « Y aller » vers un véhicule incapable d'y répondre — et
-    /// n'ouvrait plus Plan non plus, donc le bouton ne faisait rien.
-    private(set) var isCarPlayGuidanceAvailable = false
-
-    func setCarPlayConnected(_ connected: Bool, canGuide: Bool = false) {
+    func setCarPlayConnected(_ connected: Bool) {
         isCarPlayConnected = connected
-        isCarPlayGuidanceAvailable = connected && canGuide
     }
 
     /// Reste-t-il une fenêtre visible ? (La scène CarPlay n'en est pas une :

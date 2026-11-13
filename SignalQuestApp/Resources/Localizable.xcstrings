@@ -1,6 +1,1002 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Des speedtests le long de la route." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests along the road."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des speedtests le long de la route."
+          }
+        }
+      }
+    },
+    "Lancer un drive test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a drive test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancer un drive test"
+          }
+        }
+      }
+    },
+    "En voiture, lance un drive test sans écran ; sinon, ouvre le Drive Test prêt à démarrer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the car, starts a drive test with no screen; otherwise opens Drive Test ready to start."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En voiture, lance un drive test sans écran ; sinon, ouvre le Drive Test prêt à démarrer."
+          }
+        }
+      }
+    },
+    "Le Drive Test est prêt dans SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive Test is ready in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Drive Test est prêt dans SignalQuest."
+          }
+        }
+      }
+    },
+    "Arrête le drive test en cours et en donne le bilan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops the current drive test and reads its summary."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrête le drive test en cours et en donne le bilan."
+          }
+        }
+      }
+    },
+    "Aucun drive test en cours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No drive test running."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun drive test en cours."
+          }
+        }
+      }
+    },
+    "Dit ce que vaut le réseau à la position actuelle, d'après les mesures de la communauté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Says how good the network is at the current location, based on community measurements."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit ce que vaut le réseau à la position actuelle, d'après les mesures de la communauté."
+          }
+        }
+      }
+    },
+    "Position indisponible pour l'instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unavailable for now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position indisponible pour l'instant."
+          }
+        }
+      }
+    },
+    "Aucun compte connecté sur SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No account signed in to SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte connecté sur SignalQuest."
+          }
+        }
+      }
+    },
+    "Un drive test est déjà en cours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A drive test is already running."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un drive test est déjà en cours."
+          }
+        }
+      }
+    },
+    "Drive test lancé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test started."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test lancé."
+          }
+        }
+      }
+    },
+    "Drive test lancé. Attention : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test started. Warning: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test lancé. Attention : %@."
+          }
+        }
+      }
+    },
+    "Drive test arrêté, trop court pour être enregistré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test stopped, too short to be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test arrêté, trop court pour être enregistré."
+          }
+        }
+      }
+    },
+    "Drive test arrêté : %@, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test stopped: %@, %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test arrêté : %@, %@."
+          }
+        }
+      }
+    },
+    "Pas assez de mesures ici pour juger le réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough measurements here to judge the network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas assez de mesures ici pour juger le réseau."
+          }
+        }
+      }
+    },
+    "%@ chez %@, d'après %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ with %@, based on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ chez %@, d'après %@."
+          }
+        }
+      }
+    },
+    "Premier trajet pas encore présenté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First trip not introduced yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier trajet pas encore présenté"
+          }
+        }
+      }
+    },
+    "Ce qu'un trajet partage est présenté avant le premier départ." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What a trip shares is shown before the first start."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'un trajet partage est présenté avant le premier départ."
+          }
+        }
+      }
+    },
+    "Aucun trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No trip yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun trajet"
+          }
+        }
+      }
+    },
+    "Impossible de démarrer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't start"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de démarrer"
+          }
+        }
+      }
+    },
+    "Dernier débit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier débit"
+          }
+        }
+      }
+    },
+    "Zones faibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weak areas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zones faibles"
+          }
+        }
+      }
+    },
+    "Attention" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warning"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention"
+          }
+        }
+      }
+    },
+    "Localisation non autorisée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location not allowed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Localisation non autorisée"
+          }
+        }
+      }
+    },
+    "Le trajet a besoin de la position pour placer chaque mesure." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A trip needs the location to place each measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le trajet a besoin de la position pour placer chaque mesure."
+          }
+        }
+      }
+    },
+    "Il reste %lld Mo, trop peu pour enregistrer un trajet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld MB left, too little to record a trip."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il reste %lld Mo, trop peu pour enregistrer un trajet."
+          }
+        }
+      }
+    },
+    "%lld antennes à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld antenna within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld antennas within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld antenne à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld antennes à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld évolutions à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld évolution à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld évolutions à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sites prévus à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld planned site within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld planned sites within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld site prévu à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sites prévus à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld pannes à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outage within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outages within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld panne à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pannes à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Évolutions ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR changes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Évolutions ANFR"
+          }
+        }
+      }
+    },
+    "Sites prévus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planned sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites prévus"
+          }
+        }
+      }
+    },
+    "Aucune antenne à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No antennas nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune antenne à proximité"
+          }
+        }
+      }
+    },
+    "Aucune évolution à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No changes nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune évolution à proximité"
+          }
+        }
+      }
+    },
+    "Aucun site prévu à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No planned sites nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun site prévu à proximité"
+          }
+        }
+      }
+    },
+    "Aucune panne à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No outages nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune panne à proximité"
+          }
+        }
+      }
+    },
+    "Évolutions du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Évolutions du %@"
+          }
+        }
+      }
+    },
+    "Supports et opérateurs à proximité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masts and operators nearby"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports et opérateurs à proximité"
+          }
+        }
+      }
+    },
+    "Dernier relevé hebdomadaire de l'ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest weekly ANFR snapshot"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier relevé hebdomadaire de l'ANFR"
+          }
+        }
+      }
+    },
+    "Projets déclarés par les opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projects declared by operators"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projets déclarés par les opérateurs"
+          }
+        }
+      }
+    },
+    "Incidents déclarés par les opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidents reported by operators"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidents déclarés par les opérateurs"
+          }
+        }
+      }
+    },
+    "Dans l'axe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-axis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans l'axe"
+          }
+        }
+      }
+    },
+    "Hors de l'axe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off-axis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors de l'axe"
+          }
+        }
+      }
+    },
+    "%lld mesures à moins de %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurement within %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurements within %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesure à moins de %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesures à moins de %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Analyse du réseau ici…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the network here…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyse du réseau ici…"
+          }
+        }
+      }
+    },
+    "Aucun réseau constaté ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network found here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun réseau constaté ici"
+          }
+        }
+      }
+    },
+    "Réseau ici : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network here: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau ici : %@"
+          }
+        }
+      }
+    },
+    "Recherche des antennes autour…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for nearby antennas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche des antennes autour…"
+          }
+        }
+      }
+    },
+    "Antennes indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes indisponibles"
+          }
+        }
+      }
+    },
+    "Antenne à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna %@ away"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne à %@"
+          }
+        }
+      }
+    },
+    "Connexion : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion : %@"
+          }
+        }
+      }
+    },
+    "Débit médian de chaque réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median throughput of each network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit médian de chaque réseau"
+          }
+        }
+      }
+    },
+    "Aucun compte SignalQuest n'est connecté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No SignalQuest account is signed in."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte SignalQuest n'est connecté."
+          }
+        }
+      }
+    },
+    "SignalQuest n'a pas accès à ta position pour l'instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can't access your location right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n'a pas accès à ta position pour l'instant."
+          }
+        }
+      }
+    },
+    "SQFormal|SignalQuest n'a pas accès à ta position pour l'instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n'a pas accès à votre position pour l'instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "aucun trou de couverture" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20597,22 +21593,6 @@
         }
       }
     },
-    "Ouvre SignalQuest sur le Drive Test, prêt à démarrer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opens SignalQuest on Drive Test, ready to start."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvre SignalQuest sur le Drive Test, prêt à démarrer."
-          }
-        }
-      }
-    },
     "SQFormal|Ouvre SignalQuest sur le Drive Test, prêt à démarrer." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -28246,22 +29226,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moyenne"
-          }
-        }
-      }
-    },
-    "carplay.here.connection" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connection"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connexion"
           }
         }
       }
@@ -41848,7 +42812,6 @@
       }
     },
     "Arrêter le drive test" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -51198,6 +52161,12 @@
             "state" : "translated",
             "value" : "Layers"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couches"
+          }
         }
       }
     },
@@ -52720,22 +53689,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernier relevé"
-          }
-        }
-      }
-    },
-    "Dernier test" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latest test"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernier test"
           }
         }
       }
@@ -57766,22 +58719,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hors connexion"
-          }
-        }
-      }
-    },
-    "Hors de l'axe des secteurs" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Off the sector axes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hors de l'axe des secteurs"
           }
         }
       }
@@ -72693,22 +73630,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas assez de mesures"
-          }
-        }
-      }
-    },
-    "Pas assez de mesures dans cette zone." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not enough measurements in this area."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas assez de mesures dans cette zone."
           }
         }
       }
@@ -88372,34 +89293,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous dites que ça marche"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Tu es dans l'axe d'un secteur" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You are aligned with a sector"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu es dans l'axe d'un secteur"
-          }
-        }
-      }
-    },
-    "SQFormal|Tu es dans l'axe d'un secteur" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous êtes dans l'axe d'un secteur"
           }
         }
       },

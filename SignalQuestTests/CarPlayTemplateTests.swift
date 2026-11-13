@@ -2,7 +2,7 @@ import CarPlay
 import XCTest
 @testable import SignalQuest
 
-/// Verrouille les racines CarPlay et le relais du Dashboard.
+/// Verrouille les racines CarPlay.
 ///
 /// Ces tests existent parce que la surface CarPlay est invérifiable autrement :
 /// le système ne fournit un `CPInterfaceController` que dans un véhicule, et
@@ -19,24 +19,24 @@ final class CarPlayTemplateTests: XCTestCase {
         XCTAssertEqual(template.sections.first?.items.count, 1)
     }
 
-    /// Pas de parcours de connexion au volant : on renvoie vers l'iPhone. Un
-    /// écran de login dans le véhicule serait refusé en revue, et de toute façon
-    /// impraticable en conduisant.
-    func testSignedOutPointsToThePhoneInsteadOfOfferingLogin() {
+    /// Pas de parcours de connexion au volant : un écran de login dans le
+    /// véhicule serait refusé en revue, et impraticable en conduisant. Le
+    /// message constate l'état sans demander de prendre l'iPhone (règle 2 du
+    /// CarPlay Developer Guide).
+    func testSignedOutStatesTheConditionWithoutAskingToUseThePhone() {
         let items = CarPlayRootTemplateBuilder.signedOut()
             .sections.flatMap(\.items).compactMap { $0 as? CPListItem }
         XCTAssertEqual(items.count, 1)
         XCTAssertFalse(items[0].text?.isEmpty ?? true)
-        // Le détail doit expliquer où agir, sinon l'écran est un cul-de-sac.
-        XCTAssertFalse(items[0].detailText?.isEmpty ?? true)
+        let detail = try? XCTUnwrap(items[0].detailText)
+        XCTAssertFalse(detail?.isEmpty ?? true, "l'état doit être dit, sinon l'écran est un cul-de-sac")
+        XCTAssertFalse(detail?.localizedCaseInsensitiveContains("iPhone") ?? true)
     }
 
-    // MARK: - Mode liste (sans carte)
+    // MARK: - Racine de repli
 
-    /// Si Apple accorde `driving-task` au lieu de `carplay-maps`, cette liste EST
-    /// l'application. Une racine sans entrée cliquable ouvrirait sur un écran
-    /// inerte alors que fiches, speedtest, « Ici » et Sentinelle existent déjà —
-    /// c'est exactement le défaut que ce test interdit.
+    /// Posée si le véhicule refuse les onglets : une racine sans entrée
+    /// cliquable ouvrirait sur un écran inerte.
     func testListRootIsNavigable() {
         var opened: [CarPlayRootTemplateBuilder.Entry] = []
         let template = CarPlayRootTemplateBuilder.list { opened.append($0) }
@@ -72,27 +72,5 @@ final class CarPlayTemplateTests: XCTestCase {
         let total = template.sections.reduce(0) { $0 + $1.items.count }
         XCTAssertLessThanOrEqual(total, CPListTemplate.maximumItemCount)
         XCTAssertLessThanOrEqual(template.sections.count, CPListTemplate.maximumSectionCount)
-    }
-
-    // MARK: - Relais du Dashboard
-
-    /// Les deux scènes sont indépendantes : un raccourci pressé alors que la
-    /// scène principale n'est pas installée doit malgré tout arriver.
-    func testDashboardRouteIsHandedOver() {
-        CarPlayDashboardRoute.request(.here)
-        XCTAssertEqual(CarPlayDashboardRoute.consume(), .here)
-    }
-
-    /// Consommée une fois, et une seule : sinon l'écran se rouvrirait au retour
-    /// de chaque sous-écran.
-    func testDashboardRouteIsConsumedOnlyOnce() {
-        CarPlayDashboardRoute.request(.map)
-        _ = CarPlayDashboardRoute.consume()
-        XCTAssertNil(CarPlayDashboardRoute.consume())
-    }
-
-    func testNoDashboardRouteByDefault() {
-        _ = CarPlayDashboardRoute.consume()
-        XCTAssertNil(CarPlayDashboardRoute.consume())
     }
 }

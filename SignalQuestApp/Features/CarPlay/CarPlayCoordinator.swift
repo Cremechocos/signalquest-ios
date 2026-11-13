@@ -1,7 +1,6 @@
 import CarPlay
 import Combine
 import CoreLocation
-import MapKit
 
 @MainActor
 enum CarPlayLocationRenderGate {
@@ -26,61 +25,28 @@ final class CarPlayTabBarDelegate: NSObject, CPTabBarTemplateDelegate {
     }
 }
 
-/// Pilote la surface CarPlay : pile de templates, carte, chargement, cycle de vie.
+/// Pilote la surface CarPlay : pile de templates, onglets, chargement, cycle de vie.
 ///
-/// Le délégué de scène se contente de le créer et de le détruire ; toute la
-/// logique vit ici, derrière `CarPlayInterfaceControlling`, pour rester
-/// testable sans véhicule ni simulateur CarPlay.
+/// Apple n'a accordé que la catégorie « driving task » : pas de carte dessinée,
+/// pas de guidage, seulement les templates Apple (onglets, listes, fiches,
+/// points d'intérêt). Le délégué de scène se contente de créer et détruire ce
+/// coordinateur ; toute la logique vit ici, derrière
+/// `CarPlayInterfaceControlling`, pour rester testable sans véhicule ni
+/// simulateur CarPlay.
 @MainActor
 final class CarPlayCoordinator {
     private let interface: CarPlayInterfaceControlling
     private let services: AppServices
     private let session: AuthSessionViewModel
 
-    /// Non nul en catégorie navigation (`carplay-maps`) : la fenêtre du véhicule
-    /// dans laquelle on installe notre `MKMapView`. Nil en repli « liste », où
-    /// l'on ne dispose que des templates.
-    private let carWindow: CPWindow?
-
-    private var mapController: CarPlayMapController?
-    private let layers: CarPlayLayerController
-
-    /// Dernier chargement, conservé pour deux usages : alimenter la liste
-    /// « Autour de toi », et retrouver la donnée SOURCE d'un marqueur. Les
-    /// pannes et les évolutions portent des champs (services touchés, statut
-    /// d'activation) que `MapAnnotationPayload` ne transporte pas — sans ça, il
-    /// faudrait refaire un appel réseau pour afficher ce qu'on vient de charger.
-    private var loadedLayers = CarPlayLayerController.Layers()
+    /// Données SOURCES des pannes et des sites prévus affichés, indexées par
+    /// l'identifiant du marqueur : `MapAnnotationPayload` ne transporte ni les
+    /// services touchés par une panne ni le statut d'activation d'un site prévu,
+    /// et refaire un appel réseau pour réafficher ce qu'on vient de charger
+    /// ferait attendre le conducteur.
     private var outagesById: [String: OutageSiteLive] = [:]
     private var plannedById: [String: PlannedSiteLive] = [:]
 
-    // MARK: Guidage
-    private let routeService: CarPlayRouteService
-    private var mapTemplate: CPMapTemplate?
-    /// Retenu ici : `CPMapTemplate.mapDelegate` est faible.
-    private var mapTemplateDelegate: CarPlayMapTemplateDelegate?
-    private var isPanning = false
-    /// Jeton des calculs d'itinéraire. Un nouveau « Y aller » ou la fin du
-    /// guidage l'incrémente : un calcul qui revient après coup se tait, au lieu
-    /// de relancer un guidage arrêté ou de redessiner un tracé orphelin (CAR-04).
-    private var routeGeneration = 0
-    private var navigationSession: CPNavigationSession?
-    private var tracker: RouteProgressTracker?
-    private var currentPlan: RoutePlan?
-    private var destination: CLLocationCoordinate2D?
-    /// Dernière progression observée, réutilisée par les alertes pour savoir si
-    /// une manœuvre est imminente.
-    private var lastProgress: RouteProgress?
-    private var voiceGuide: CarPlayVoiceGuide?
-    /// Retenu ici : `CPSearchTemplate.delegate` est faible, un contrôleur local
-    /// serait libéré avant la première frappe.
-    private var searchController: CarPlaySearchController?
-    /// Conservées pour recomposer la barre : « Arrêter » n'apparaît que pendant
-    /// un guidage, donc les boutons changent en cours de route.
-    private var mapActions: CarPlayMapTemplateBuilder.Actions?
-    /// Jeton d'abonnement aux positions, à relâcher en fin de guidage : sans
-    /// cela, le suivi continuerait à alimenter un guidage terminé.
-    private var locationObserver: UUID?
     private var sessionCancellable: AnyCancellable?
 
     /// Travaux longs à annuler à la déconnexion.
@@ -103,7 +69,7 @@ final class CarPlayCoordinator {
     /// tait. Sans ça, ouvrir une fiche, revenir, en rouvrir une autre laissait la
     /// réponse la plus LENTE repeindre l'écran de la plus récente.
     private enum Screen: Hashable {
-        case here, nearby, sentinelle, detail, speedtest, poi, comparison, layers
+        case here, nearby, detail, speedtest, poi, comparison, layers
     }
     private var generations: [Screen: Int] = [:]
 
@@ -116,40 +82,30 @@ final class CarPlayCoordinator {
     /// existe pour empêcher.
     private var isEvaluatingAlert = false
 
-    /// Centre de la dernière requête de tuiles, pour ne pas recharger à chaque
-    /// micro-déplacement. Le seuil vient du drive test, où il est éprouvé.
-    private var lastLoadedCenter: CLLocationCoordinate2D?
-    private static let reloadDistanceMeters: CLLocationDistance = 400
-
-    /// Zoom fixé en conduite : la carte se lit d'un coup d'œil ou pas du tout.
-    /// À ce niveau le clustering serveur suffit, donc pas besoin du regroupement
-    /// client de `MapExplorerView`.
-    private static let drivingZoom: Double = 14
-
-    var isShowingMap: Bool { carWindow != nil }
+    /// Ouvre une URL hors de l'app (« Y aller » → Plans), par la scène CarPlay :
+    /// c'est elle qui fait passer Plans sur l'écran du véhicule.
+    private let openURL: (URL) -> Void
 
     init(interface: CarPlayInterfaceControlling,
          services: AppServices,
          session: AuthSessionViewModel,
-         carWindow: CPWindow?,
-         routeService: CarPlayRouteService = CarPlayRouteService()) {
+         openURL: @escaping (URL) -> Void = { _ in }) {
         self.interface = interface
         self.services = services
         self.session = session
-        self.carWindow = carWindow
-        self.routeService = routeService
-        self.layers = CarPlayLayerController(map: services.map)
+        self.openURL = openURL
     }
 
     func start() {
-        services.setCarPlayConnected(true, canGuide: isShowingMap)
+        services.setCarPlayConnected(true)
         interface.setRoot(CarPlayRootTemplateBuilder.loading(), animated: false)
 
-        // Les alertes de couverture valent pour TOUT trajet. Elles étaient
-        // posées dans `installMap`, donc jamais en mode liste — c'est-à-dire
-        // jamais du tout avec la catégorie « driving task » réellement accordée.
-        // Le réglage était visible dans l'app et sans le moindre effet.
+        // Les alertes de couverture valent pour TOUT trajet, quel que soit
+        // l'onglet affiché.
         syncCoverageAlertObserver()
+        // Un drive test, de la voiture ou de l'iPhone, allume aussi les
+        // alertes et anime l'onglet Trajet.
+        observeDriveTest()
         // Le réglage peut être activé en roulant : l'abonnement suit sa valeur.
         alertSettingObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
@@ -195,16 +151,20 @@ final class CarPlayCoordinator {
     func stop() {
         sessionCancellable?.cancel()
         sessionCancellable = nil
-        // Le guidage d'abord : il détient un abonnement aux positions et une
-        // session de navigation, qui survivraient au débranchement du véhicule.
-        endGuidance(finished: false)
-        voiceGuide = nil
         // Le speedtest tient une assertion d'arrière-plan : le laisser courir
         // véhicule débranché maintiendrait le processus éveillé pour un écran
         // qui n'existe plus.
         speedtestTask?.cancel()
         speedtestTask = nil
         speedtestTemplate = nil
+        // Un trajet lancé depuis la voiture s'arrête au débranchement, avec
+        // son bilan (choix d'Alexandre du 13/11) ; un trajet de l'iPhone garde
+        // sa règle et continue.
+        tripCancellables.removeAll()
+        tripTicker?.cancel()
+        tripTicker = nil
+        tripTemplate = nil
+        if services.driveTest.startedFromCarPlay { services.driveTest.stop() }
         if let alertSettingObserver {
             NotificationCenter.default.removeObserver(alertSettingObserver)
             self.alertSettingObserver = nil
@@ -213,29 +173,24 @@ final class CarPlayCoordinator {
             services.location.removeLocationObserver(alertObserver)
             self.alertObserver = nil
         }
-        CarPlayDashboardRoute.setListener(nil)
         tasks.values.forEach { $0.cancel() }
         tasks.removeAll()
         // Invalide toute réponse encore en vol : au retour, son jeton ne
         // correspondra plus et elle n'ira repeindre aucun template.
         generations.removeAll()
-        searchController = nil
-        layersTemplate = nil
         hereTemplate = nil
         tabBarDelegate = nil
         hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
-        sentinelleTemplate = nil
-        mapActions = nil
-        lastProgress = nil
-        loadedLayers = CarPlayLayerController.Layers()
+        lastPOICenter = nil
+        anfrSnapshot = nil
+        mapLayersTemplate = nil
+        layerCounts.removeAll()
+        layerCountsAt = nil
+        layerCache.removeAll()
         outagesById.removeAll()
         plannedById.removeAll()
-        mapController = nil
-        mapTemplate = nil
-        mapTemplateDelegate = nil
-        isPanning = false
         services.setCarPlayConnected(false)
     }
 
@@ -246,21 +201,14 @@ final class CarPlayCoordinator {
             interface.setRoot(CarPlayRootTemplateBuilder.signedOut(), animated: true)
             return
         }
-        guard let carWindow else {
-            // Sans carte plein écran, la surface à onglets EST l'application.
-            installTabBar()
-            observeDashboardRoute()
-            return
-        }
-        installMap(in: carWindow)
-        observeDashboardRoute()
+        installTabBar()
     }
 
     private func observeSessionChanges() {
         sessionCancellable?.cancel()
         // L'état porte l'utilisateur entier : un simple rafraîchissement du
         // profil (points, avatar) le change. Seule l'identité du compte doit
-        // réinstaller la voiture et annuler un guidage (CAR-01).
+        // réinstaller la voiture (CAR-01).
         sessionCancellable = session.$state
             .map(CarPlayAccountKey.init)
             .removeDuplicates()
@@ -280,34 +228,49 @@ final class CarPlayCoordinator {
     }
 
     private func accountStateDidChange() {
-        endGuidance(finished: false)
         tasks.values.forEach { $0.cancel() }
         tasks.removeAll()
         generations.removeAll()
-        loadedLayers = CarPlayLayerController.Layers()
         outagesById.removeAll()
         plannedById.removeAll()
-        // Nouveau compte : la nouvelle carte doit recharger même si le véhicule n'a
-        // pas bougé (`installMap` relance le premier chargement).
-        lastLoadedCenter = nil
+        layerCache.removeAll()
+        layerCountsAt = nil
         installRoot()
     }
 
     // MARK: - Racine à onglets
 
-    private var hereTemplate: CPInformationTemplate?
+    private var hereTemplate: CPListTemplate?
     private var tabBarDelegate: CarPlayTabBarDelegate?
     /// Dernier remplissage de l'onglet « Ici ». L'onglet suit le trajet : il se
     /// recharge quand on y revient, au plus une fois par intervalle.
     private var hereLoadedAt: Date?
     private static let hereRefreshInterval: TimeInterval = 30
     private var poiTemplate: CPPointOfInterestTemplate?
-    private var sentinelleTemplate: CPListTemplate?
     /// Retenu ici : `pointOfInterestDelegate` est une référence faible, un
     /// contrôleur local serait libéré avant le premier déplacement de carte.
     private var poiController: CarPlayPOIController?
+    /// Couche affichée par la carte, une seule à la fois.
+    private var mapLayer: CarPlayMapLayer = .antennas
+    /// Centre de la dernière zone demandée par la carte ; nil tant que le
+    /// conducteur ne l'a pas déplacée (la carte suit alors le véhicule).
+    private var lastPOICenter: CLLocationCoordinate2D?
+    /// Dernier relevé ANFR complet. Il ne change qu'une fois par semaine et
+    /// couvre tout le pays : le retélécharger à chaque déplacement de carte
+    /// coûterait du réseau pour un contenu identique.
+    private var anfrSnapshot: (snapshot: ANFRMapSnapshot, loadedAt: Date)?
+    private static let anfrSnapshotLifetime: TimeInterval = 30 * 60
+    /// Racine de l'onglet Carte quand plusieurs couches existent (France) ;
+    /// nil quand la carte des antennes est elle-même l'onglet.
+    private var mapLayersTemplate: CPListTemplate?
+    private var layerCounts: [CarPlayMapLayer: CarPlayMapLayersTemplateBuilder.Count] = [:]
+    private var layerCountsAt: Date?
+    private static let layerCountsInterval: TimeInterval = 120
+    /// Dernier chargement de chaque couche : ouvrir une couche juste après
+    /// l'avoir comptée ne refait pas le même appel réseau.
+    private var layerCache: [CarPlayMapLayer: (load: POILoad, area: CLLocation, at: Date)] = [:]
 
-    /// Pose les quatre onglets, et se rabat sur l'ancienne liste si le système
+    /// Pose les onglets, et se rabat sur l'ancienne liste si le système
     /// les refuse.
     ///
     /// Le repli n'est pas de la prudence gratuite : les templates autorisés
@@ -317,18 +280,34 @@ final class CarPlayCoordinator {
     /// complétion ajouté au protocole permet de le détecter et de réagir.
     private func installTabBar() {
         let here = NearestAntennaTemplateBuilder.make(
-            input: .init(path: services.networkPath.status, quality: nil),
-            actions: .init()
+            input: .init(phase: .loading, path: services.networkPath.status),
+            actions: hereActions()
         )
         hereTemplate = here
 
-        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: poiActions())
+        let layers = CarPlayMapLayer.available(market: MapMarketStore.initialMarketCode())
+        mapLayer = .antennas
+        let poi = CarPlayPOIBuilder.make(entries: [], userLocation: nil, actions: .init())
         poiTemplate = poi
         let controller = CarPlayPOIController { [weak self] region in
             self?.loadPOI(around: region.center)
         }
         poi.pointOfInterestDelegate = controller
         poiController = controller
+        // Plusieurs couches (France) : l'onglet est la liste des couches, chaque
+        // rangée pousse sa carte. Une seule : la carte des antennes EST l'onglet,
+        // une liste d'un seul choix n'aurait pas de sens.
+        let mapTab: CPTemplate
+        if layers.count > 1 {
+            let list = CarPlayMapLayersTemplateBuilder.make(available: layers) { [weak self] layer in
+                self?.openMapLayer(layer)
+            }
+            mapLayersTemplate = list
+            mapTab = CarPlayTabBarBuilder.decorate(list, title: String(localized: "Carte"), systemImage: "map.fill")
+        } else {
+            mapLayersTemplate = nil
+            mapTab = poi
+        }
 
         let speedtest = SpeedtestTemplateBuilder.make(
             state: speedtestState,
@@ -336,25 +315,30 @@ final class CarPlayCoordinator {
         )
         speedtestTemplate = speedtest
 
-        let sentinelle = SentinelleTemplateBuilder.list(targets: []) { _ in }
-        CarPlayListPlaceholder.applyLoading(to: sentinelle)
-        sentinelleTemplate = sentinelle
+        tripState = currentTripState()
+        let trip = DriveTripTemplateBuilder.make(state: tripState, actions: tripActions())
+        tripTemplate = trip
 
         let tabs = [
             CarPlayTabBarBuilder.decorate(here, title: String(localized: "Ici"),
                                           systemImage: "dot.radiowaves.left.and.right"),
-            poi,
+            mapTab,
+            CarPlayTabBarBuilder.decorate(trip, title: String(localized: "Trajet"), systemImage: "car.fill"),
             CarPlayTabBarBuilder.decorate(speedtest, title: String(localized: "Speedtest"),
                                           systemImage: "speedometer"),
-            CarPlayTabBarBuilder.decorate(sentinelle, title: String(localized: "Sentinelle"),
-                                          systemImage: "wifi.router.fill"),
         ]
 
         let tabBar = CarPlayTabBarBuilder.make(tabs: tabs)
         let tabDelegate = CarPlayTabBarDelegate()
         tabDelegate.onSelect = { [weak self] selected in
-            guard let self, let here = hereTemplate, selected === here else { return }
-            refreshHereIfStale(here)
+            guard let self else { return }
+            if let here = hereTemplate, selected === here { refreshHereIfStale(here) }
+            if let list = mapLayersTemplate, selected === list { refreshLayerCountsIfStale() }
+            // « il y a 2 h » vieillit : on recalcule le titre au retour sur l'onglet.
+            if let speedtest = speedtestTemplate, selected === speedtest { updateSpeedtest(state: speedtestState) }
+            // Un blocage a pu se lever (connexion revenue) et la date du
+            // dernier trajet a vieilli.
+            if let trip = tripTemplate, selected === trip { repaintTrip() }
         }
         tabBar.delegate = tabDelegate
         tabBarDelegate = tabDelegate
@@ -367,8 +351,7 @@ final class CarPlayCoordinator {
         // Les onglets qui dépendent de données se remplissent en parallèle :
         // l'utilisateur peut ouvrir n'importe lequel en premier.
         loadHere(into: here)
-        loadPOI(around: nil)
-        loadSentinelle(into: sentinelle)
+        if mapLayersTemplate == nil { loadPOI(around: nil) }
         loadLastSpeedtest()
     }
 
@@ -396,108 +379,253 @@ final class CarPlayCoordinator {
         hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
-        sentinelleTemplate = nil
+        mapLayersTemplate = nil
         speedtestTemplate = nil
         interface.setRoot(CarPlayRootTemplateBuilder.list { [weak self] entry in
             self?.open(entry)
         }, animated: false)
     }
 
-    private func poiActions() -> CarPlayPOIBuilder.Actions {
-        .init(
-            details: { [weak self] payload in self?.showDetail(for: payload) },
-            // Comme partout ailleurs : pas de guidage sans `CPMapTemplate`.
-            navigate: isShowingMap ? { [weak self] payload in
-                self?.startNavigation(to: payload.coordinate, title: payload.title)
-            } : nil
-        )
+    /// Boutons de la carte du point.
+    ///
+    /// - « Détails » pousse une fiche. Carte en onglet : 2 écrans, toujours
+    ///   permis. Carte poussée depuis la liste des couches : 3 écrans, permis
+    ///   seulement depuis iOS 26.4 ; avant, la carte du point porte déjà
+    ///   distance, direction et opérateurs.
+    /// - « Y aller » ouvre Plans. Une évolution ANFR n'a ni fiche ni
+    ///   destination utile : c'est un changement administratif, pas un lieu.
+    private func poiActions(for layer: CarPlayMapLayer) -> CarPlayPOIBuilder.Actions {
+        guard layer != .changes else { return .init() }
+        var actions = CarPlayPOIBuilder.Actions(navigate: { [weak self] payload in self?.navigate(to: payload) })
+        if mapLayersTemplate == nil || Self.allowsThirdScreen {
+            actions.details = { [weak self] payload in self?.showDetail(for: payload) }
+        }
+        return actions
     }
 
-    /// Charge les antennes autour d'un point et repeint la carte à onglets.
+    /// Plafond de pile des apps « driving task » : 2 écrans jusqu'à iOS 26.3,
+    /// 3 depuis 26.4.
+    private static var allowsThirdScreen: Bool {
+        if #available(iOS 26.4, *) { return true }
+        return false
+    }
+
+    private func navigate(to payload: MapAnnotationPayload) {
+        guard let url = CarPlayPOIBuilder.directionsURL(to: payload.coordinate) else { return }
+        openURL(url)
+    }
+
+    // MARK: - Couches de la carte
+
+    /// Pousse la carte de la couche choisie, centrée sur le véhicule.
+    private func openMapLayer(_ layer: CarPlayMapLayer) {
+        guard let poiTemplate else { return }
+        mapLayer = layer
+        lastPOICenter = nil
+        // Les points d'une autre couche ne doivent pas s'afficher sous ce nom.
+        poiTemplate.title = layer.title()
+        poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
+        poiController?.invalidate()
+        interface.push(poiTemplate, animated: true)
+        loadPOI(around: nil)
+    }
+
+    /// Recompte les couches à l'ouverture de l'onglet, au plus toutes les deux
+    /// minutes : on roule, ce qui est « autour » change.
+    private func refreshLayerCountsIfStale() {
+        if let layerCountsAt, Date().timeIntervalSince(layerCountsAt) < Self.layerCountsInterval { return }
+        refreshLayerCounts()
+    }
+
+    private func refreshLayerCounts() {
+        guard let list = mapLayersTemplate else { return }
+        let market = MapMarketStore.initialMarketCode()
+        let layers = CarPlayMapLayer.available(market: market)
+        let generation = beginScreen(.layers)
+        layerCountsAt = Date()
+        layerCounts = CarPlayMapLayersTemplateBuilder.reloading(layerCounts, layers: layers)
+        repaintLayers(list, layers)
+        track { [weak self] in
+            guard let self else { return }
+            guard let vehicle = await services.location.currentLocation(),
+                  !Task.isCancelled, isCurrent(.layers, generation) else {
+                // Sans position, « autour » ne veut rien dire : on retente à la
+                // prochaine ouverture plutôt que d'afficher un échec.
+                if isCurrent(.layers, generation) {
+                    layerCountsAt = nil
+                    layerCounts = [:]
+                    repaintLayers(list, layers)
+                }
+                return
+            }
+            for layer in layers {
+                track { [weak self] in
+                    guard let self else { return }
+                    let loaded = await poiLoad(for: layer, around: vehicle, market: market)
+                    guard !Task.isCancelled, isCurrent(.layers, generation) else { return }
+                    if let loaded {
+                        let nearby = loaded.payloads.filter {
+                            vehicle.distance(from: CLLocation(latitude: $0.coordinate.latitude,
+                                                              longitude: $0.coordinate.longitude))
+                                <= layer.countRadiusMeters
+                        }
+                        layerCounts[layer] = .value(nearby.count)
+                    } else {
+                        layerCounts[layer] = .failed
+                    }
+                    repaintLayers(list, layers)
+                }
+            }
+        }
+    }
+
+    private func repaintLayers(_ list: CPListTemplate, _ layers: [CarPlayMapLayer]) {
+        list.updateSections(CarPlayMapLayersTemplateBuilder.sections(
+            available: layers, counts: layerCounts
+        ) { [weak self] layer in self?.openMapLayer(layer) })
+    }
+
+    /// Ce qu'une couche a chargé : ses marqueurs, et les données sources que
+    /// la fiche d'une panne ou d'un projet relit.
+    private struct POILoad {
+        var payloads: [MapAnnotationPayload]
+        var snapshotDate: String?
+        var outages: [String: OutageSiteLive] = [:]
+        var planned: [String: PlannedSiteLive] = [:]
+    }
+
+    /// Charge la couche affichée autour d'un point et repeint la carte à onglets.
+    ///
+    /// - Parameter center: centre de la carte déplacée ; nil = position du
+    ///   véhicule.
     private func loadPOI(around center: CLLocationCoordinate2D?) {
         guard let poiTemplate else { return }
         let generation = beginScreen(.poi)
+        let market = MapMarketStore.initialMarketCode()
+        // Le pays a pu changer depuis le choix : une couche absente devient vide
+        // pour toujours, on revient aux antennes.
+        if !CarPlayMapLayer.available(market: market).contains(mapLayer) { mapLayer = .antennas }
+        let layer = mapLayer
+        if let center { lastPOICenter = center }
         track { [weak self] in
             guard let self else { return }
-            let location: CLLocation?
+            let area: CLLocation?
             if let center {
-                location = CLLocation(latitude: center.latitude, longitude: center.longitude)
+                area = CLLocation(latitude: center.latitude, longitude: center.longitude)
             } else {
-                location = await services.location.currentLocation()
+                area = await services.location.currentLocation()
             }
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
-            guard let location else {
+            guard let area else {
                 poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
                 return
             }
+            // Le prochain déplacement de carte compte à partir de ce chargement.
+            poiController?.noteLoaded(center: area.coordinate)
 
-            let coordinate = location.coordinate
-            let delta = 0.045
-            let fetched: [AntennaSite]?
-            do {
-                fetched = try await services.antennas.list(
-                    bbox: BoundingBox(north: coordinate.latitude + delta,
-                                      south: coordinate.latitude - delta,
-                                      east: coordinate.longitude + delta,
-                                      west: coordinate.longitude - delta),
-                    market: MapMarketStore.initialMarketCode(),
-                    operatorName: MapMarketStore.initialOperatorKey(),
-                    technologies: []
-                )
-            } catch {
-                fetched = nil
-            }
+            let loaded = await poiLoad(for: layer, around: area, market: market)
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
             // Échec ≠ vide : on le dit, avec un bouton pour recommencer.
-            guard let sites = fetched else {
+            guard let loaded else {
+                poiTemplate.title = layer.title()
                 poiTemplate.setPointsOfInterest(
-                    [CarPlayPOIBuilder.failurePoint(at: coordinate) { [weak self] in self?.loadPOI(around: center) }],
+                    [CarPlayPOIBuilder.failurePoint(at: area.coordinate) { [weak self] in self?.loadPOI(around: center) }],
                     selectedIndex: NSNotFound
                 )
                 return
             }
 
             let update = {
-                let payloads = sites.compactMap { Self.payload(for: $0) }
-                let entries = CarPlayPOIBuilder.entries(from: payloads, userLocation: location)
+                // La distance affichée part du VÉHICULE, même carte déplacée :
+                // « 3 km » doit dire à quelle distance on est.
+                let vehicle = center == nil ? area : self.services.location.cachedLocation()
+                let entries = CarPlayPOIBuilder.entries(from: loaded.payloads, userLocation: vehicle, around: area)
+                self.outagesById = loaded.outages
+                self.plannedById = loaded.planned
+                // Un template de points d'intérêt n'a pas de vue vide : le titre
+                // dit qu'il n'y a rien, plutôt qu'une carte muette.
+                poiTemplate.title = entries.isEmpty ? layer.emptyTitle : layer.title(snapshotDate: loaded.snapshotDate)
                 poiTemplate.setPointsOfInterest(
-                    CarPlayPOIBuilder.points(from: entries, userLocation: location,
-                                             actions: self.poiActions()),
+                    CarPlayPOIBuilder.points(from: entries, userLocation: vehicle,
+                                             actions: self.poiActions(for: layer)),
                     selectedIndex: NSNotFound
                 )
             }
             // Un centre choisi sur la carte reste une intention manuelle ; seul
             // le point GPS doit encore être autorisé et frais après le réseau.
             if center != nil { update() }
-            else if !CarPlayLocationRenderGate.commit(location, service: services.location, update: update) {
+            else if !CarPlayLocationRenderGate.commit(area, service: services.location, update: update) {
                 poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
             }
         }
     }
 
-    /// S'abonne aux intentions venues du Dashboard ou de l'iPhone.
+    /// Données d'une couche autour d'un point ; nil si le serveur n'a pas répondu.
     ///
-    /// Installé une fois la racine posée : pousser un écran avant qu'elle existe
-    /// laisserait une pile incohérente derrière le bouton retour. L'abonnement
-    /// sert AUSSI les intentions déposées plus tôt — et, contrairement à la
-    /// lecture unique d'avant, celles qui arrivent véhicule déjà branché.
-    private func observeDashboardRoute() {
-        CarPlayDashboardRoute.setListener { [weak self] destination in
-            guard let self else { return }
-            switch destination {
-            case .here: showHere()
-            // La carte est déjà la racine en mode navigation ; en mode liste, on
-            // ouvre ce qui s'en rapproche le plus.
-            case .map: if !isShowingMap { showNearby() }
-            case .navigate(let title, let latitude, let longitude):
-                if isShowingMap {
-                    startNavigation(to: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
-                                    title: title)
-                } else {
-                    showNearby()
-                }
-            }
+    /// Pannes, projets et relevé ANFR arrivent pour tout le pays : les
+    /// convertisseurs les bornent au rayon de la carte.
+    private func poiLoad(for layer: CarPlayMapLayer, around area: CLLocation, market: String) async -> POILoad? {
+        if let cached = layerCache[layer], Date().timeIntervalSince(cached.at) < Self.layerCountsInterval,
+           cached.area.distance(from: area) < 1_000 {
+            return cached.load
         }
+        let loaded = await fetchPOILoad(for: layer, around: area, market: market)
+        if let loaded { layerCache[layer] = (loaded, area, Date()) }
+        return loaded
+    }
+
+    private func fetchPOILoad(for layer: CarPlayMapLayer, around area: CLLocation, market: String) async -> POILoad? {
+        let operatorKey = MapMarketStore.initialOperatorKey()
+        switch layer {
+        case .antennas:
+            let coordinate = area.coordinate
+            let delta = 0.045
+            guard let sites = try? await services.antennas.list(
+                bbox: BoundingBox(north: coordinate.latitude + delta,
+                                  south: coordinate.latitude - delta,
+                                  east: coordinate.longitude + delta,
+                                  west: coordinate.longitude - delta),
+                market: market,
+                operatorName: operatorKey,
+                technologies: []
+            ) else { return nil }
+            return POILoad(payloads: sites.compactMap { Self.payload(for: $0) })
+        case .outages:
+            guard let sites = try? await services.map.outageSites(
+                market: market, operatorName: operatorKey, territory: nil, bands: []
+            ) else { return nil }
+            let payloads = CarPlayMapLayerPoints.outages(sites, around: area)
+            let shown = Set(payloads.map(\.id))
+            return POILoad(payloads: payloads, outages: Dictionary(
+                sites.map { (CarPlayMapLayerPoints.outageId($0), $0) }.filter { shown.contains($0.0) },
+                uniquingKeysWith: { first, _ in first }
+            ))
+        case .planned:
+            guard let sites = try? await services.map.plannedSites(
+                market: market, operatorName: operatorKey, territory: nil, bands: []
+            ) else { return nil }
+            let payloads = CarPlayMapLayerPoints.planned(sites, around: area)
+            let shown = Set(payloads.map(\.id))
+            return POILoad(payloads: payloads, planned: Dictionary(
+                sites.map { (CarPlayMapLayerPoints.plannedId($0), $0) }.filter { shown.contains($0.0) },
+                uniquingKeysWith: { first, _ in first }
+            ))
+        case .changes:
+            guard let snapshot = await latestANFRSnapshot() else { return nil }
+            return POILoad(payloads: CarPlayMapLayerPoints.changes(snapshot.sites, around: area),
+                           snapshotDate: snapshot.snapshotDate)
+        }
+    }
+
+    /// Dernier relevé ANFR, gardé une demi-heure ; l'ancien reste servi si le
+    /// réseau tombe, plutôt qu'une carte en échec.
+    private func latestANFRSnapshot() async -> ANFRMapSnapshot? {
+        if let cached = anfrSnapshot, Date().timeIntervalSince(cached.loadedAt) < Self.anfrSnapshotLifetime {
+            return cached.snapshot
+        }
+        guard let snapshot = try? await services.anfr.mapSnapshot(date: nil) else { return anfrSnapshot?.snapshot }
+        anfrSnapshot = (snapshot, Date())
+        return snapshot
     }
 
     /// Ouvre une entrée de la racine en mode liste.
@@ -506,7 +634,6 @@ final class CarPlayCoordinator {
         case .nearby: showNearby()
         case .here: showHere()
         case .speedtest: showSpeedtest()
-        case .sentinelle: showSentinelle()
         }
     }
 
@@ -515,165 +642,29 @@ final class CarPlayCoordinator {
         return false
     }
 
-    // MARK: - Carte
-
-    private func installMap(in window: CPWindow) {
-        let controller = CarPlayMapController()
-        mapController = controller
-        window.rootViewController = controller
-
-        controller.onRegionChange = { [weak self] bounds, zoom in
-            self?.reloadLayersIfNeeded(bounds: bounds, zoom: zoom)
-        }
-        controller.onSelect = { [weak self] payload in
-            self?.showDetail(for: payload)
-        }
-        controller.onFollowChange = { [weak self] _ in
-            self?.refreshMapControls()
-        }
-
-        let actions = CarPlayMapTemplateBuilder.Actions(
-            recenter: { [weak self, weak controller] in
-                if self?.mapTemplate?.isPanningInterfaceVisible == true {
-                    self?.mapTemplate?.dismissPanningInterface(animated: true)
-                }
-                controller?.recenterOnUser()
-            },
-            zoomIn: { [weak controller] in controller?.zoomIn() },
-            zoomOut: { [weak controller] in controller?.zoomOut() },
-            showLayers: { [weak self] in self?.showLayers() },
-            showHere: { [weak self] in self?.showHere() },
-            showNearby: { [weak self] in self?.showNearby() },
-            stopGuidance: { [weak self] in self?.endGuidance(finished: false) },
-            showSpeedtest: { [weak self] in self?.showSpeedtest() },
-            showPanning: { [weak self] in self?.mapTemplate?.showPanningInterface(animated: true) },
-            dismissPanning: { [weak self] in self?.mapTemplate?.dismissPanningInterface(animated: true) }
-        )
-        mapActions = actions
-        let template = CarPlayMapTemplateBuilder.make(actions: actions)
-        let delegate = CarPlayMapTemplateDelegate()
-        delegate.onPan = { [weak controller] direction in controller?.pan(direction) }
-        delegate.onPanGesture = { [weak controller] delta in controller?.pan(by: delta) }
-        delegate.onPanningInterfaceChange = { [weak self] visible in
-            self?.isPanning = visible
-            self?.refreshMapControls()
-        }
-        delegate.onNavigationCancelledBySystem = { [weak self] in
-            // Le système a déjà clos la session : on ne l'annule pas une seconde
-            // fois, on libère seulement le reste (voix, GPS, tracé).
-            self?.navigationSession = nil
-            self?.endGuidance(finished: false)
-        }
-        template.mapDelegate = delegate
-        mapTemplateDelegate = delegate
-        mapTemplate = template
-        interface.setRoot(template, animated: true)
-
-        // (Les alertes de couverture sont posées dans `start()` : elles ne
-        // dépendent pas de la carte.)
-
-        // Premier cadrage : la dernière position connue si elle est fraîche,
-        // sinon une position demandée à l'instant — jamais d'invite
-        // d'autorisation depuis la voiture.
-        if let location = services.location.cachedLocation() {
-            frameFirstLoad(around: location.coordinate, in: controller)
-        } else if LocationFixPolicy.isAuthorized(services.location.authorizationStatus) {
-            track { [weak self] in
-                guard let location = await self?.services.location.currentLocation(),
-                      !Task.isCancelled, let self, let controller = self.mapController else { return }
-                frameFirstLoad(around: location.coordinate, in: controller)
-            }
-        }
-    }
-
-    /// Premier chargement, cadré sur le véhicule et non sur la région de la
-    /// carte : tant que le suivi ne l'a pas recentrée, elle montre la région
-    /// par défaut. Les couches chargées pour celle-ci laissaient la carte vide
-    /// autour du véhicule jusqu'aux 400 m suivants (CAR-04).
-    private func frameFirstLoad(around coordinate: CLLocationCoordinate2D, in controller: CarPlayMapController) {
-        controller.setZoom(Self.drivingZoom, animated: false)
-        reloadLayersIfNeeded(
-            bounds: SQMapProjection.bounds(of: controller.region(around: coordinate, zoom: Self.drivingZoom)),
-            zoom: Self.drivingZoom,
-            around: coordinate
-        )
-    }
-
-    private func reloadLayersIfNeeded(bounds: MapBounds,
-                                     zoom: Double,
-                                     around center: CLLocationCoordinate2D? = nil) {
-        let newCenter = center ?? CLLocationCoordinate2D(
-            latitude: (bounds.north + bounds.south) / 2,
-            longitude: (bounds.east + bounds.west) / 2
-        )
-        if let last = lastLoadedCenter {
-            let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
-                .distance(from: CLLocation(latitude: newCenter.latitude, longitude: newCenter.longitude))
-            guard moved >= Self.reloadDistanceMeters else { return }
-        }
-        lastLoadedCenter = newCenter
-        // Un rechargement tous les 400 m : seule la zone la plus récente peut
-        // repeindre la carte, même si une réponse plus ancienne arrive après.
-        let generation = beginScreen(.layers)
-
-        track { [weak self] in
-            guard let self else { return }
-            let loaded = await layers.load(
-                bounds: bounds,
-                zoom: zoom,
-                filters: MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters,
-                market: MapMarketStore.initialMarketCode(),
-                operatorKey: MapMarketStore.initialOperatorKey()
-            )
-            guard !Task.isCancelled, isCurrent(.layers, generation),
-                  let controller = mapController else { return }
-            // Un échec n'est pas « aucune donnée ici » : on garde la carte affichée
-            // et on oublie la zone pour retenter au prochain déplacement.
-            if loaded.failedLayers > 0 { lastLoadedCenter = nil }
-            if loaded.allFailed { return }
-            loadedLayers = loaded
-            outagesById = loaded.outageSources
-            plannedById = loaded.plannedSources
-            controller.apply(payloads: loaded.annotations)
-            controller.setCoverage(loaded.coverage)
-            controller.setSpeedtests(loaded.speedtests)
-        }
-    }
-
-    // MARK: - Actions de barre (remplies par les lots suivants)
-
-    /// Grille des couches, retenue pour pouvoir en rafraîchir les libellés
-    /// après une bascule.
-    private var layersTemplate: CPGridTemplate?
-
-    private func showLayers() {
-        let template = LayersGridBuilder.make(
-            current: MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters,
-            onToggle: { [weak self] kind in self?.toggleLayer(kind) },
-            onSentinelle: { [weak self] in self?.showSentinelle() },
-            // Recherche seulement en mode carte : sans `CPMapTemplate`, il n'y a
-            // pas de session de navigation à démarrer derrière un résultat.
-            onSearch: isShowingMap ? { [weak self] in self?.showSearch() } : nil,
-            onRecents: isShowingMap ? { [weak self] in self?.showRecentDestinations() } : nil
-        )
-        layersTemplate = template
-        interface.push(template, animated: true)
-    }
-
     // MARK: - Alertes « zone mal couverte »
 
     private var lastAlertAt: Date?
     private var lastAlertCoordinate: CLLocationCoordinate2D?
     private var lastAlertCheckCoordinate: CLLocationCoordinate2D?
-    /// Abonnement DISTINCT de celui du guidage : les alertes de couverture
-    /// valent pour tout trajet, pas seulement quand on suit un itinéraire.
-    /// Séparer les deux évite aussi qu'arrêter un guidage ne coupe les alertes.
+    /// Abonnement aux positions, posé seulement quand les alertes sont actives :
+    /// suivre la position sans raison coûte de la batterie et de la vie privée.
     private var alertObserver: UUID?
     private var alertSettingObserver: NSObjectProtocol?
 
+    /// Alertes actives : réglage iPhone, ou drive test en cours — un trajet
+    /// enregistré compte ses zones faibles même réglage éteint (choix
+    /// d'Alexandre du 12/11).
+    private var coverageAlertsActive: Bool {
+        CarPlayAlertSettings.coverageAlertsEnabled || services.driveTest.isRunning
+    }
+
+    /// Pour les tests : l'abonnement des alertes est-il posé ?
+    var isObservingCoverageAlerts: Bool { alertObserver != nil }
+
     /// Pose ou retire l'abonnement aux positions selon le réglage des alertes.
     private func syncCoverageAlertObserver() {
-        if CarPlayAlertSettings.coverageAlertsEnabled {
+        if coverageAlertsActive {
             guard alertObserver == nil else { return }
             alertObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
                 self?.evaluateCoverageAlert(at: location)
@@ -692,7 +683,7 @@ final class CarPlayCoordinator {
     /// interrogerait le service en continu pour un verdict qui ne change pas
     /// d'un lampadaire à l'autre.
     private func evaluateCoverageAlert(at location: CLLocation) {
-        guard CarPlayAlertSettings.coverageAlertsEnabled else { return }
+        guard coverageAlertsActive else { return }
         // Une seule évaluation à la fois : voir `isEvaluatingAlert`.
         guard !isEvaluatingAlert else { return }
         if let last = lastAlertCheckCoordinate {
@@ -724,30 +715,17 @@ final class CarPlayCoordinator {
                 coordinate: location.coordinate,
                 lastAlertAt: lastAlertAt,
                 lastAlertCoordinate: lastAlertCoordinate,
-                now: Date(),
-                // Rien ne doit couvrir une manœuvre annoncée : le conducteur a
-                // besoin de son attention pour tourner.
-                isManeuverImminent: isManeuverImminent
+                now: Date()
             )
             guard CarPlayAlertPolicy.shouldAlert(context) else { return }
 
             lastAlertAt = context.now
             lastAlertCoordinate = location.coordinate
+            if services.driveTest.isRunning { tripWeakZones += 1 }
             presentCoverageAlert(
                 CarPlayAlertPolicy.message(for: verdict.level, operatorLabel: verdict.operatorLabel)
             )
         }
-    }
-
-    /// Vrai quand une manœuvre est proche. Le seuil correspond au deuxième
-    /// palier d'annonce vocale : à partir de là, l'écran et la voix
-    /// appartiennent au guidage.
-    ///
-    /// Lu sur la dernière progression observée plutôt que recalculé : le suivi
-    /// vient de le faire, et refaire le calcul ici risquerait de diverger.
-    private var isManeuverImminent: Bool {
-        guard let lastProgress else { return false }
-        return lastProgress.distanceToManeuver <= 300
     }
 
     /// Alerte affichée dans le véhicule si notre scène est au premier plan,
@@ -799,75 +777,6 @@ final class CarPlayCoordinator {
         }
     }
 
-    // MARK: - Sentinelle
-
-    /// Liste des box surveillées, chargée à l'ouverture.
-    ///
-    /// Pas de rafraîchissement périodique : une box qui tombe déclenche une
-    /// notification (lot 8), et sonder l'API en boucle depuis un véhicule
-    /// coûterait des données pour une information qu'on ne regarde pas en
-    /// roulant.
-    private func showSentinelle() {
-        let template = SentinelleTemplateBuilder.list(targets: []) { _ in }
-        CarPlayListPlaceholder.applyLoading(to: template)
-        interface.push(template, animated: true)
-        loadSentinelle(into: template)
-    }
-
-    /// Remplit l'écran Sentinelle — extrait de `showSentinelle` pour que le
-    /// bouton « Réessayer » puisse relancer le chargement sans réempiler
-    /// d'écran (la profondeur autorisée est trop courte pour se le permettre).
-    private func loadSentinelle(into template: CPListTemplate) {
-        let generation = beginScreen(.sentinelle)
-        track { [weak self] in
-            guard let self else { return }
-            do {
-                let response = try await services.sentinelle.targets()
-                guard !Task.isCancelled, isCurrent(.sentinelle, generation) else { return }
-                guard !response.targets.isEmpty else {
-                    CarPlayListPlaceholder.applyEmpty(
-                        to: template,
-                        title: String(localized: "Aucune box surveillée"),
-                        subtitle: String(localized: "Ajoute une connexion à surveiller depuis l'app.")
-                    )
-                    return
-                }
-                let filled = SentinelleTemplateBuilder.list(targets: response.targets) { [weak self] target in
-                    self?.interface.push(SentinelleTemplateBuilder.detail(target), animated: true)
-                }
-                // `updateSections` plutôt qu'un nouveau push : l'écran de chargement
-                // et l'écran rempli sont le même, pas deux étapes de navigation.
-                template.updateSections(filled.sections)
-            } catch {
-                guard !Task.isCancelled, isCurrent(.sentinelle, generation) else { return }
-                CarPlayListPlaceholder.applyFailure(to: template) { [weak self] in
-                    CarPlayListPlaceholder.applyLoading(to: template)
-                    self?.loadSentinelle(into: template)
-                }
-            }
-        }
-    }
-
-    private func toggleLayer(_ kind: MapDisplayItem.Kind) {
-        var filters = MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters
-        if filters.contains(kind) { filters.remove(kind) } else { filters.insert(kind) }
-        MapFilterStore.save(filters)
-        // Repeindre la grille : sans ça le « ✓ » du bouton restait figé et
-        // l'appui semblait n'avoir aucun effet.
-        layersTemplate?.updateGridButtons(LayersGridBuilder.buttons(
-            current: filters,
-            onToggle: { [weak self] kind in self?.toggleLayer(kind) },
-            onSentinelle: { [weak self] in self?.showSentinelle() },
-            onSearch: isShowingMap ? { [weak self] in self?.showSearch() } : nil,
-            onRecents: isShowingMap ? { [weak self] in self?.showRecentDestinations() } : nil
-        ))
-        // Forcer le rechargement : la zone n'a pas bougé, seul le contenu change.
-        lastLoadedCenter = nil
-        guard let controller = mapController else { return }
-        reloadLayersIfNeeded(bounds: SQMapProjection.bounds(of: controller.mapView.region),
-                             zoom: controller.currentZoom)
-    }
-
     /// Écran « Ici » : ce que vaut le réseau à cet endroit, et quelle antenne le
     /// dessert.
     ///
@@ -878,16 +787,31 @@ final class CarPlayCoordinator {
     /// avoir pressé un bouton.
     private func showHere() {
         let template = NearestAntennaTemplateBuilder.make(
-            input: .init(path: services.networkPath.status, quality: nil),
-            actions: .init()
+            input: .init(phase: .loading, path: services.networkPath.status),
+            actions: hereActions()
         )
         interface.push(template, animated: true)
         loadHere(into: template)
     }
 
+    /// Ce que chaque rangée de « Ici » ouvre, un niveau plus bas — le seul
+    /// disponible sous un onglet en catégorie « driving task ».
+    private func hereActions() -> NearestAntennaTemplateBuilder.Actions {
+        .init(
+            showQuality: { [weak self] quality in
+                self?.interface.push(NearestAntennaTemplateBuilder.qualityDetail(quality), animated: true)
+            },
+            showAntenna: { [weak self] site in
+                guard let payload = Self.payload(for: site) else { return }
+                self?.showAntennaDetail(for: payload)
+            },
+            compareOperators: { [weak self] in self?.showOperatorComparison() }
+        )
+    }
+
     /// Remplit l'écran « Ici ». Séparé de `showHere` pour que l'ONGLET puisse
     /// s'alimenter sans rien empiler : en mode onglets, cet écran est la racine.
-    private func loadHere(into template: CPInformationTemplate) {
+    private func loadHere(into template: CPListTemplate) {
         hereLoadedAt = Date()
         let generation = beginScreen(.here)
         track { [weak self] in
@@ -906,35 +830,9 @@ final class CarPlayCoordinator {
             let input = await hereInput(at: location)
             guard !Task.isCancelled, isCurrent(.here, generation) else { return }
             let didRender = CarPlayLocationRenderGate.commit(location, service: services.location) {
-                let filled = NearestAntennaTemplateBuilder.make(
-                    input: input,
-                    actions: .init(
-                        // Comme « Y aller », conditionné à la présence d'une carte :
-                        // sans elle, ce bouton promettait un recentrage et se
-                        // contentait de fermer la fiche.
-                        showOnMap: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
-                            guard let lat = site.latitude, let lon = site.longitude else { return nil }
-                            return { [weak self] in
-                                self?.mapController?.center(on: .init(latitude: lat, longitude: lon))
-                                self?.interface.pop(animated: true)
-                            }
-                        } : nil,
-                        navigate: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
-                            guard let lat = site.latitude, let lon = site.longitude else { return nil }
-                            return { [weak self] in
-                                self?.startNavigation(
-                                    to: .init(latitude: lat, longitude: lon),
-                                    title: String(localized: "Site \(site.siteId ?? site.id)")
-                                )
-                            }
-                        } : nil,
-                        compareOperators: { [weak self] in self?.showOperatorComparison() }
-                    )
-                )
                 // Mise à jour EN PLACE, comme pour les fiches : re-pousser empilerait
                 // deux écrans identiques.
-                template.items = filled.items
-                template.actions = filled.actions
+                template.updateSections(NearestAntennaTemplateBuilder.sections(for: input, actions: hereActions()))
             }
             if !didRender {
                 showHereWithoutLocation(into: template)
@@ -942,14 +840,16 @@ final class CarPlayCoordinator {
         }
     }
 
-    private func refreshHereIfStale(_ template: CPInformationTemplate) {
+    private func refreshHereIfStale(_ template: CPListTemplate) {
         if let hereLoadedAt, Date().timeIntervalSince(hereLoadedAt) < Self.hereRefreshInterval { return }
         loadHere(into: template)
     }
 
-    private func showHereWithoutLocation(into template: CPInformationTemplate) {
-        template.items = NearestAntennaTemplateBuilder.itemsWithoutLocation(path: services.networkPath.status)
-        template.actions = []
+    private func showHereWithoutLocation(into template: CPListTemplate) {
+        template.updateSections(NearestAntennaTemplateBuilder.sections(
+            for: .init(phase: .withoutLocation, path: services.networkPath.status),
+            actions: hereActions()
+        ))
     }
 
     /// Classement des opérateurs à l'endroit où l'on se trouve.
@@ -972,7 +872,7 @@ final class CarPlayCoordinator {
                 CarPlayListPlaceholder.applyEmpty(
                     to: template,
                     title: String(localized: "Position inconnue"),
-                    subtitle: String(localized: "Autorise la localisation pour comparer les opérateurs.")
+                    subtitle: String(localized: "SignalQuest n'a pas accès à ta position pour l'instant.")
                 )
                 return
             }
@@ -1000,7 +900,7 @@ final class CarPlayCoordinator {
                 CarPlayListPlaceholder.applyEmpty(
                     to: template,
                     title: String(localized: "Position inconnue"),
-                    subtitle: String(localized: "Autorise la localisation pour comparer les opérateurs.")
+                    subtitle: String(localized: "SignalQuest n'a pas accès à ta position pour l'instant.")
                 )
             }
         }
@@ -1033,8 +933,12 @@ final class CarPlayCoordinator {
         )
 
         var input = NearestAntennaTemplateBuilder.Input(path: path, quality: await quality)
-        guard let sites = await antennas,
-              let nearest = AntennaSectorGeometry.nearest(to: coordinate, among: sites) else {
+        // `nil` = requête échouée, à distinguer d'une zone réellement vide.
+        guard let sites = await antennas else {
+            input.antennasUnavailable = true
+            return input
+        }
+        guard let nearest = AntennaSectorGeometry.nearest(to: coordinate, among: sites) else {
             return input
         }
         input.nearestSite = nearest.site
@@ -1060,22 +964,19 @@ final class CarPlayCoordinator {
     /// conducteur devant un écran inchangé, sans savoir si son geste a été pris
     /// en compte.
     private func showDetail(for payload: MapAnnotationPayload) {
-        // Un cluster n'a pas de fiche : on s'en approche pour l'éclater.
-        if let count = payload.clusterCount, count > 0 {
-            mapController?.zoomIn()
-            return
-        }
+        // Un cluster n'a pas de fiche.
+        if let count = payload.clusterCount, count > 0 { return }
 
         switch payload.kind {
         case .outage:
             guard let site = outagesById[payload.id] else { return }
             interface.push(CarPlayDetailTemplateBuilder.outage(
-                site, userLocation: services.location.cachedLocation(), actions: detailActions(for: payload)
+                site, userLocation: services.location.cachedLocation(), actions: .init()
             ), animated: true)
         case .planned:
             guard let site = plannedById[payload.id] else { return }
             interface.push(CarPlayDetailTemplateBuilder.planned(
-                site, userLocation: services.location.cachedLocation(), actions: detailActions(for: payload)
+                site, userLocation: services.location.cachedLocation(), actions: .init()
             ), animated: true)
         default:
             showAntennaDetail(for: payload)
@@ -1083,7 +984,7 @@ final class CarPlayCoordinator {
     }
 
     private func showAntennaDetail(for payload: MapAnnotationPayload) {
-        let actions = detailActions(for: payload)
+        let actions = CarPlayDetailTemplateBuilder.Actions()
         let template = CarPlayDetailTemplateBuilder.antenna(
             payload: payload, details: nil,
             userLocation: services.location.cachedLocation(), actions: actions
@@ -1114,208 +1015,136 @@ final class CarPlayCoordinator {
         }
     }
 
-    private func detailActions(for payload: MapAnnotationPayload) -> CarPlayDetailTemplateBuilder.Actions {
-        .init(
-            // « Y aller » n'est proposé qu'en mode carte : sans `CPMapTemplate`,
-            // il n'y a pas de session de navigation à démarrer.
-            navigate: isShowingMap ? { [weak self] in
-                self?.startNavigation(to: payload.coordinate, title: payload.title)
-            } : nil,
-            // « Centrer » non plus : sans carte à centrer, le bouton se
-            // contentait de refermer la fiche, ce qui ressemble à un bug.
-            center: isShowingMap ? { [weak self] in
-                self?.mapController?.center(on: payload.coordinate)
-                self?.interface.pop(animated: true)
-            } : nil
-        )
+    // MARK: - Trajet
+
+    private var tripTemplate: CPInformationTemplate?
+    private var tripState = DriveTripTemplateBuilder.State.idle(lastTrip: nil, notice: nil)
+    private var tripCancellables: Set<AnyCancellable> = []
+    /// Repeint l'onglet pendant le trajet. Une `Task` et non un `Timer`, pour
+    /// la même raison que `tasks` : elle s'annule au débranchement.
+    private var tripTicker: Task<Void, Never>?
+    /// Alertes « réseau faible » émises pendant le trajet en cours.
+    private var tripWeakZones = 0
+    /// Avertissements du préflight au départ du trajet en cours.
+    private var tripStartWarnings: [DriveTestPreflightIssue] = []
+    /// Raison d'un départ refusé à l'instant, effacée au départ suivant.
+    private var tripNotice: String?
+
+    private func tripActions() -> DriveTripTemplateBuilder.Actions {
+        .init(start: { [weak self] in self?.startTrip() },
+              stop: { [weak self] in self?.services.driveTest.stop() })
     }
 
-    // MARK: - Guidage
+    /// Suit le drive test, qu'il parte de la voiture ou de l'iPhone : l'onglet
+    /// change d'état aussitôt, et les alertes zone faible s'allument avec lui.
+    private func observeDriveTest() {
+        tripCancellables.removeAll()
+        services.driveTest.$isRunning
+            .removeDuplicates()
+            // `@Published` émet AVANT l'affectation : sur la boucle suivante,
+            // le modèle a fini son départ ou son bilan.
+            .receive(on: RunLoop.main)
+            .sink { [weak self] running in self?.driveTestRunningDidChange(running) }
+            .store(in: &tripCancellables)
+        // Au repos, la connexion qui tombe ou revient change le blocage.
+        services.networkPath.$isOnline
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, !services.driveTest.isRunning else { return }
+                repaintTrip()
+            }
+            .store(in: &tripCancellables)
+    }
 
-    /// Calcule l'itinéraire et démarre le guidage.
-    ///
-    /// L'ordre compte : on revient d'abord à la carte, PUIS on calcule. Laisser
-    /// la fiche affichée pendant l'appel réseau donnerait l'impression que le
-    /// bouton n'a rien fait.
-    func startNavigation(to coordinate: CLLocationCoordinate2D, title: String) {
-        // Toute la pile : « Y aller » peut venir d'une fiche ouverte depuis
-        // « Autour », et un seul retour laissait la liste sur la carte (CAR-04).
-        interface.popToRoot(animated: true)
-        // Jamais de demande d'autorisation depuis la voiture : elle s'afficherait
-        // sur l'iPhone, hors de la vue du conducteur.
-        guard LocationFixPolicy.isAuthorized(services.location.authorizationStatus) else {
-            presentNavigationAlert(Self.locationUnavailableMessage)
+    private func driveTestRunningDidChange(_ running: Bool) {
+        if running {
+            tripWeakZones = 0
+            // Lus au départ, quel qu'il soit (onglet, Siri, iPhone) : ils
+            // s'affichent jusqu'au premier test réussi.
+            tripStartWarnings = DriveTestPreflightPolicy.evaluate(.current(services: services))
+                .issues.filter { $0.severity == .warning }
+            startTripTicker()
+        } else {
+            tripTicker?.cancel()
+            tripTicker = nil
+            tripStartWarnings = []
+        }
+        syncCoverageAlertObserver()
+        repaintTrip()
+    }
+
+    private func startTrip() {
+        tripNotice = nil
+        let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
+        // Le bouton n'existait pas, mais l'état a pu changer depuis le dernier
+        // rafraîchissement : on repeint la raison au lieu de démarrer.
+        guard DriveTestHandsFreeStart.refusal(disclosureSeen: DriveTestHandsFreeStart.disclosureSeen,
+                                              report: report) == nil else {
+            repaintTrip()
             return
         }
-        // Mémorisé AVANT le calcul : une destination choisie reste utile dans les
-        // récents même si l'itinéraire échoue — c'est justement là qu'on voudra
-        // réessayer sans avoir à la ressaisir.
-        CarPlayDestinationStore.record(title: title, coordinate: coordinate)
-        routeGeneration += 1
-        let generation = routeGeneration
-
-        track { [weak self] in
-            guard let self else { return }
-            // Position FRAÎCHE, demandée au besoin : en mode carte, rien
-            // n'entretient le cache entre deux trajets, et un relevé de plus de
-            // 60 s faisait refuser « Y aller » (CAR-03).
-            let location = await services.location.currentLocation()
-            guard !Task.isCancelled, generation == routeGeneration else { return }
-            guard let origin = location?.coordinate else {
-                presentNavigationAlert(Self.locationUnavailableMessage)
-                return
-            }
-            let plan: RoutePlan
-            do {
-                plan = try await routeService.route(from: origin, to: coordinate)
-            } catch {
-                guard !Task.isCancelled, generation == routeGeneration else { return }
-                presentNavigationAlert(Self.routeFailureMessage(for: error))
-                return
-            }
-            guard !Task.isCancelled, generation == routeGeneration else { return }
-            beginGuidance(with: plan, title: title, from: origin, to: coordinate)
+        let drive = services.driveTest
+        drive.startFromCarPlay()
+        // Refus du moteur (un speedtest mesure déjà) : sa raison s'affiche.
+        if !drive.isRunning {
+            tripNotice = drive.errorMessage
+            repaintTrip()
         }
     }
 
-    /// Un itinéraire introuvable n'est pas un problème de connexion : le
-    /// conducteur doit savoir qu'il faut choisir une autre destination.
-    static func routeFailureMessage(for error: Error) -> String {
-        if (error as? CarPlayRouteService.RouteError) == .noRoute
-            || (error as? MKError)?.code == .directionsNotFound {
-            return String(localized: "Aucun itinéraire trouvé vers cette destination.")
-        }
-        return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
-    }
-
-    private static var locationUnavailableMessage: String {
-        String(localized: "Position indisponible — autorise la localisation dans les réglages.")
-    }
-
-    private func presentNavigationAlert(_ message: String) {
-        let alert = CPAlertTemplate(
-            titleVariants: [message],
-            actions: [CPAlertAction(title: String(localized: "OK"), style: .default) { [weak self] _ in
-                self?.interface.dismiss(animated: true)
-            }]
-        )
-        interface.present(alert, animated: true)
-    }
-
-    private func beginGuidance(with plan: RoutePlan, title: String,
-                               from origin: CLLocationCoordinate2D,
-                               to destination: CLLocationCoordinate2D) {
-        guard let mapTemplate else { return }
-        if navigationSession != nil { endGuidance(finished: false) }
-        // Posée APRÈS la fin du trajet précédent, qui l'efface : sinon les
-        // recalculs du nouveau trajet n'avaient plus de destination.
-        self.destination = destination
-        currentPlan = plan
-        tracker = RouteProgressTracker(plan: plan)
-        // Un seul guide pour la connexion : il doit survivre à la fin du trajet
-        // le temps de prononcer l'arrivée.
-        if voiceGuide == nil {
-            voiceGuide = CarPlayVoiceGuide { [weak self] in
-                // Se taire pendant un appel : le guidage parlerait par-dessus
-                // l'interlocuteur, sur le même haut-parleur.
-                self?.services.callManager.activeCall != nil
+    private func startTripTicker() {
+        guard tripTicker == nil else { return }
+        tripTicker = Task { [weak self] in
+            let interval = UInt64(DriveTripTemplateBuilder.refreshInterval * 1_000_000_000)
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled else { return }
+                self?.repaintTrip()
             }
         }
-
-        let choice = CPRouteChoice(
-            summaryVariants: [title],
-            additionalInformationVariants: [SQUnits.distance(meters: plan.totalDistanceMeters)],
-            selectionSummaryVariants: [title]
-        )
-        // L'init par `CPNavigationWaypoint` n'existe qu'à partir d'iOS 26.4 et la
-        // cible du projet est iOS 16 : celui-ci, déprécié depuis, reste le seul
-        // disponible sur toute la plage supportée.
-        let trip = CPTrip(
-            origin: MKMapItem(placemark: MKPlacemark(coordinate: origin)),
-            destination: MKMapItem(placemark: MKPlacemark(coordinate: destination)),
-            routeChoices: [choice]
-        )
-        navigationSession = mapTemplate.startNavigationSession(for: trip)
-        navigationSession?.upcomingManeuvers = ManeuverMapper.maneuvers(for: plan, from: 0)
-
-        mapController?.showRoute(plan.polyline)
-        refreshMapControls()
-        locationObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
-            self?.handleGuidance(location: location)
-        }
     }
 
-    private func handleGuidance(location: CLLocation) {
-        guard let tracker, let plan = currentPlan else { return }
-        let previousStep = tracker.stepIndex
-        let progress = tracker.update(with: location)
-        lastProgress = progress
-
-        if progress.hasArrived {
-            voiceGuide?.announceArrival()
-            endGuidance(finished: true)
-            return
-        }
-
-        if progress.stepIndex != previousStep {
-            navigationSession?.upcomingManeuvers = ManeuverMapper.maneuvers(for: plan, from: progress.stepIndex)
-        }
-        if let maneuver = navigationSession?.upcomingManeuvers.first {
-            // Swift importe `updateTravelEstimates:forManeuver:` sous ce nom.
-            navigationSession?.updateEstimates(
-                ManeuverMapper.travelEstimates(
-                    distanceMeters: progress.distanceToManeuver,
-                    timeRemaining: ManeuverMapper.timeRemaining(forDistance: progress.distanceToManeuver, in: plan)
-                ),
-                for: maneuver
-            )
-        }
-        // Distance et heure d'arrivée du trajet entier, jamais transmises
-        // jusqu'ici : le véhicule n'affichait aucune heure d'arrivée (CAR-04).
-        if let trip = navigationSession?.trip {
-            mapTemplate?.updateEstimates(
-                ManeuverMapper.travelEstimates(
-                    distanceMeters: progress.distanceRemaining,
-                    timeRemaining: ManeuverMapper.timeRemaining(forDistance: progress.distanceRemaining, in: plan)
-                ),
-                for: trip
-            )
-        }
-        voiceGuide?.handle(progress: progress, plan: plan)
-
-        // Sortie CONFIRMÉE seulement, et seulement si le budget d'appels le
-        // permet : `MKDirections` est throttlé, et une rafale de recalculs
-        // arrêterait le guidage pour de bon.
-        if progress.isOffRoute, routeService.canRecalculate() {
-            recalculate(from: location.coordinate)
-        }
+    /// Mise à jour EN PLACE, comme le Speedtest : re-pousser empilerait un
+    /// écran par rafraîchissement.
+    private func repaintTrip() {
+        // Sans onglet (déconnecté, racine de repli), rien à lire ni à peindre.
+        guard let tripTemplate else { return }
+        tripState = currentTripState()
+        let refreshed = DriveTripTemplateBuilder.make(state: tripState, actions: tripActions())
+        tripTemplate.title = refreshed.title
+        tripTemplate.items = refreshed.items
+        tripTemplate.actions = refreshed.actions
     }
 
-    private func recalculate(from origin: CLLocationCoordinate2D) {
-        guard let destination else { return }
-        let generation = routeGeneration
-        track { [weak self] in
-            guard let self else { return }
-            guard let plan = try? await routeService.route(from: origin, to: destination,
-                                                           isRecalculation: true) else { return }
-            // Trajet arrêté, arrivé ou remplacé pendant le calcul : ne pas
-            // redessiner un tracé que plus rien ne suit (CAR-04).
-            guard !Task.isCancelled, generation == routeGeneration, navigationSession != nil else { return }
-            currentPlan = plan
-            tracker = RouteProgressTracker(plan: plan)
-            navigationSession?.upcomingManeuvers = ManeuverMapper.maneuvers(for: plan, from: 0)
-            mapController?.showRoute(plan.polyline)
+    private func currentTripState() -> DriveTripTemplateBuilder.State {
+        let drive = services.driveTest
+        if drive.isRunning, let startedAt = drive.sessionStartDate {
+            let completed = drive.summary?.count ?? 0
+            let path = services.networkPath.status
+            return .running(.init(
+                startedAt: startedAt,
+                isPaused: drive.isPausedForWiFi || drive.isPausedStationary,
+                distanceMeters: drive.distanceMeters,
+                completedTests: completed,
+                // `lastResult` survit d'un trajet à l'autre : il n'appartient
+                // à celui-ci qu'après son premier test.
+                lastDownloadMbps: completed > 0 ? drive.lastResult?.downloadMbps : nil,
+                network: DriveTripTemplateBuilder.networkLabel(connection: path.connection,
+                                                               operatorLabel: drive.displayedOperatorLabel,
+                                                               technology: path.cellularTechnology),
+                weakZones: tripWeakZones,
+                status: drive.errorMessage ?? drive.statusLabel,
+                warnings: tripStartWarnings
+            ))
         }
-    }
-
-    /// Recompose les boutons : « Arrêter » pendant un trajet, « Terminé » en
-    /// panoramique, « Recentrer » une fois la carte déplacée.
-    private func refreshMapControls() {
-        guard let mapTemplate, let mapActions else { return }
-        mapTemplate.mapButtons = CarPlayMapTemplateBuilder.mapButtons(
-            isFollowingUser: mapController?.isFollowingUser ?? true, actions: mapActions)
-        mapTemplate.trailingNavigationBarButtons = CarPlayMapTemplateBuilder.trailingButtons(
-            isGuiding: navigationSession != nil, isPanning: isPanning, actions: mapActions)
+        let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
+        if let refusal = DriveTestHandsFreeStart.refusal(disclosureSeen: DriveTestHandsFreeStart.disclosureSeen,
+                                                         report: report) {
+            return .blocked(refusal)
+        }
+        return .idle(lastTrip: drive.lastSessionRecap ?? DriveTestViewModel.SessionRecap.load(), notice: tripNotice)
     }
 
     // MARK: - Speedtest
@@ -1428,50 +1257,23 @@ final class CarPlayCoordinator {
             state: state,
             actions: .init(start: { [weak self] in self?.runSpeedtest() })
         )
+        speedtestTemplate.title = refreshed.title
         speedtestTemplate.items = refreshed.items
         speedtestTemplate.actions = refreshed.actions
     }
 
-    private func endGuidance(finished: Bool) {
-        if finished { navigationSession?.finishTrip() } else { navigationSession?.cancelTrip() }
-        navigationSession = nil
-        routeGeneration += 1
-        tracker = nil
-        currentPlan = nil
-        destination = nil
-        // Sans cette remise à zéro, la dernière manœuvre du trajet restait
-        // « imminente » et faisait taire les alertes de couverture ensuite.
-        lastProgress = nil
-        voiceGuide?.endTrip(interrupting: !finished)
-        mapController?.clearRoute()
-        refreshMapControls()
-        if let locationObserver {
-            services.location.removeLocationObserver(locationObserver)
-            self.locationObserver = nil
-        }
-    }
-
-    /// Liste « Autour de toi » — le seul chemin vers les fiches sur un véhicule
-    /// à molette, où viser un marqueur est impossible, et la porte d'entrée des
-    /// antennes en mode liste.
+    /// Liste « Antennes autour » de la racine de repli. Elle part vide, et ce
+    /// vide est un CHARGEMENT — pas une absence de sites.
     private func showNearby() {
-        let known = NearbyListTemplateBuilder.entries(from: loadedLayers.annotations,
-                                                     userLocation: services.location.cachedLocation())
-        let template = NearbyListTemplateBuilder.make(entries: known) { [weak self] payload in
+        let template = NearbyListTemplateBuilder.make(entries: []) { [weak self] payload in
             self?.showDetail(for: payload)
         }
-        // En mode carte les marqueurs sont déjà chargés, la liste est complète
-        // d'emblée. Sinon elle part vide, et ce vide est un CHARGEMENT — pas une
-        // absence de sites.
-        if known.isEmpty { CarPlayListPlaceholder.applyLoading(to: template) }
+        CarPlayListPlaceholder.applyLoading(to: template)
         interface.push(template, animated: true)
-
-        guard known.isEmpty else { return }
         loadNearby(into: template)
     }
 
-    /// Charge les sites autour de la position, pour le mode liste où personne
-    /// n'a chargé de marqueurs de carte. Extrait de `showNearby` pour que
+    /// Charge les sites autour de la position. Extrait de `showNearby` pour que
     /// « Réessayer » relance sans réempiler d'écran.
     private func loadNearby(into template: CPListTemplate) {
         let generation = beginScreen(.nearby)
@@ -1485,7 +1287,7 @@ final class CarPlayCoordinator {
                 CarPlayListPlaceholder.applyEmpty(
                     to: template,
                     title: String(localized: "Position inconnue"),
-                    subtitle: String(localized: "Autorise la localisation pour voir les sites autour.")
+                    subtitle: String(localized: "SignalQuest n'a pas accès à ta position pour l'instant.")
                 )
                 return
             }
@@ -1530,35 +1332,6 @@ final class CarPlayCoordinator {
         }
     }
 
-    /// Recherche d'une destination — adresse ou site par son code.
-    ///
-    /// Le contrôleur est RETENU par le coordinateur : `CPSearchTemplate.delegate`
-    /// est une référence faible, un contrôleur local serait libéré avant la
-    /// première frappe et la recherche ne répondrait jamais.
-    private func showSearch() {
-        let controller = CarPlaySearchController(
-            antennas: services.antennas,
-            around: { [weak self] in self?.services.location.cachedLocation()?.coordinate },
-            market: { MapMarketStore.initialMarketCode() },
-            onSelect: { [weak self] coordinate, title in
-                self?.startNavigation(to: coordinate, title: title)
-            }
-        )
-        searchController = controller
-        interface.push(controller.makeTemplate(), animated: true)
-    }
-
-    /// Destinations récentes : une pression, aucune saisie. Sur les véhicules où
-    /// le clavier se bloque en roulant, c'est la seule source encore utilisable.
-    private func showRecentDestinations() {
-        let template = RecentDestinationsTemplateBuilder.make(
-            CarPlayDestinationStore.all()
-        ) { [weak self] destination in
-            self?.startNavigation(to: destination.coordinate, title: destination.title)
-        }
-        interface.push(template, animated: true)
-    }
-
     /// Convertit un site de la liste `/api/antennas` en marqueur, pour que les
     /// fiches reçoivent la même forme qu'en mode carte.
     private static func payload(for site: AntennaSite) -> MapAnnotationPayload? {
@@ -1567,8 +1340,11 @@ final class CarPlayCoordinator {
             id: "antenna-\(site.id)",
             kind: .antenna,
             title: String(localized: "Site \(site.siteId ?? site.id)"),
-            subtitle: [site.operators.joined(separator: "/"),
-                       site.technologies.prefix(3).joined(separator: "/")]
+            // « Opérateurs · générations », noms complets : la carte en tire
+            // ses textes (noms courts dans sa liste étroite), la fiche son
+            // sous-titre.
+            subtitle: [NearestAntennaTemplateBuilder.operatorNames(site.operators),
+                       NearestAntennaTemplateBuilder.generations(site.technologies)]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · "),
             coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
@@ -1579,7 +1355,10 @@ final class CarPlayCoordinator {
             clusterCount: nil,
             azimuths: site.azimuths,
             showsAzimuths: false,
-            tint: SQBrand.operatorColor(site.operators.first)
+            tint: SQBrand.operatorColor(site.operators.first),
+            // Le point de la carte iPhone : une part par opérateur, anneau 5G.
+            has5G: site.technologies.contains { SQQualityScale.Generation(technology: $0) == .fiveG },
+            operatorTints: site.operators.prefix(4).map { SQBrand.operatorColor($0) }
         )
     }
 }

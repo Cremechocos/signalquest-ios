@@ -80,10 +80,6 @@ final class CarPlayCoordinatorTests: XCTestCase {
 
     override func tearDown() {
         UserDefaults.standard.set(alertsWereEnabled, forKey: CarPlayAlertSettings.coverageAlertsKey)
-        // Le relais est un état de PROCESSUS : le laisser installé ferait fuir
-        // un coordinateur d'un test dans le suivant.
-        CarPlayDashboardRoute.setListener(nil)
-        _ = CarPlayDashboardRoute.consume()
         super.tearDown()
     }
 
@@ -92,10 +88,7 @@ final class CarPlayCoordinatorTests: XCTestCase {
         CarPlayCoordinator(
             interface: interface,
             services: services,
-            session: AuthSessionViewModel(service: MockAuthService()),
-            // Nil = catégorie « driving task », la configuration réellement
-            // livrée. C'est celle qu'il faut tester.
-            carWindow: nil
+            session: AuthSessionViewModel(service: MockAuthService())
         )
     }
 
@@ -113,50 +106,11 @@ final class CarPlayCoordinatorTests: XCTestCase {
         XCTAssertTrue(interface.stack.first is CPListTemplate)
     }
 
-    /// Sans `carplay-maps`, la scène est connectée mais INCAPABLE de guider.
-    /// L'iPhone doit le savoir, sinon il détourne « Y aller » vers un véhicule
-    /// qui ne fera rien — et n'ouvre plus Plan non plus.
-    func testGuidanceIsNotAdvertisedWithoutAMap() {
-        let services = AppServices(config: .test)
-        let coordinator = makeCoordinator(interface: FakeCarPlayInterface(), services: services)
-
-        coordinator.start()
-
-        XCTAssertTrue(services.isCarPlayConnected)
-        XCTAssertFalse(services.isCarPlayGuidanceAvailable,
-                       "en mode liste, aucun guidage n'est possible")
-    }
-
-    /// Localisation refusée : alerte immédiate, sans invite d'autorisation — elle
-    /// s'afficherait sur l'iPhone, hors de la vue du conducteur. Et « Y aller »
-    /// ramène à la racine, pas seulement un écran plus haut (CAR-04).
-    func testNavigationWithoutLocationShowsAnActionableAlert() {
-        let driver = LocationTestDriver()
-        driver.authorizationStatus = .denied
-        let location = LocationService(manager: driver, makeOneShotManager: { LocationTestDriver() })
-        let interface = FakeCarPlayInterface()
-        interface.maximumDepth = 3
-        let coordinator = makeCoordinator(interface: interface,
-                                          services: AppServices(config: .test, location: location))
-        interface.setRoot(CPListTemplate(title: "Racine", sections: []), animated: false)
-        interface.push(CPListTemplate(title: "Autour", sections: []), animated: false)
-        interface.push(CPListTemplate(title: "Fiche", sections: []), animated: false)
-
-        coordinator.startNavigation(
-            to: CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522),
-            title: "Destination"
-        )
-
-        XCTAssertTrue(interface.presented is CPAlertTemplate)
-        XCTAssertEqual(interface.templateCount, 1, "Toute la pile doit être dépilée")
-        XCTAssertEqual(driver.authorizationRequests, 0)
-    }
-
     // MARK: - Alertes de couverture
 
     /// Le réglage existait dans l'app et n'avait AUCUN effet : l'observateur
-    /// n'était posé que par `installMap`, jamais appelé sans `carplay-maps`.
-    func testCoverageAlertsAreObservedWithoutAMap() {
+    /// n'était posé que par l'ancienne carte, jamais installée en « driving task ».
+    func testCoverageAlertsAreObservedOnConnect() {
         UserDefaults.standard.set(true, forKey: CarPlayAlertSettings.coverageAlertsKey)
         let services = AppServices(config: .test)
         let coordinator = makeCoordinator(interface: FakeCarPlayInterface(), services: services)
@@ -182,7 +136,6 @@ final class CarPlayCoordinatorTests: XCTestCase {
         XCTAssertFalse(services.location.wantsTracking,
                        "le suivi doit s'arrêter quand le dernier abonné se retire")
         XCTAssertFalse(services.isCarPlayConnected)
-        XCTAssertFalse(services.isCarPlayGuidanceAvailable)
     }
 
     /// Alertes désactivées : on ne doit RIEN allumer. Une app qui suit la
@@ -231,39 +184,12 @@ final class CarPlayCoordinatorTests: XCTestCase {
         XCTAssertNotNil(reported, "le refus doit remonter à l'appelant, pas disparaître")
     }
 
-    // MARK: - Relais depuis l'iPhone
-
-    /// Le cas nominal, et celui qui était cassé : véhicule DÉJÀ branché, scène
-    /// déjà installée. L'intention dormait jusqu'à la prochaine connexion.
-    func testIntentReachesAnAlreadyInstalledScene() {
-        var received: [CarPlayDashboardRoute.Destination] = []
-        CarPlayDashboardRoute.setListener { received.append($0) }
-
-        CarPlayDashboardRoute.request(.here)
-
-        XCTAssertEqual(received.count, 1)
-        XCTAssertNil(CarPlayDashboardRoute.consume(),
-                     "servie au vol, l'intention ne doit pas rester en attente")
-    }
-
-    /// L'inverse : intention déposée avant que la scène n'existe. Elle doit être
-    /// servie à l'installation, et une seule fois.
-    func testIntentDepositedBeforeInstallIsServedOnce() {
-        CarPlayDashboardRoute.request(.map)
-
-        var received: [CarPlayDashboardRoute.Destination] = []
-        CarPlayDashboardRoute.setListener { received.append($0) }
-
-        XCTAssertEqual(received.count, 1)
-        XCTAssertNil(CarPlayDashboardRoute.consume())
-    }
-
     // MARK: - États de liste
 
-    /// Trois états, pas deux : un échec réseau annonçait « Aucune box
-    /// surveillée », c'est-à-dire un fait faux présenté comme certain.
+    /// Trois états, pas deux : un échec réseau annonçait « rien ici »,
+    /// c'est-à-dire un fait faux présenté comme certain.
     func testFailureOffersRetryInsteadOfClaimingEmptiness() {
-        let template = CPListTemplate(title: "Sentinelle", sections: [])
+        let template = CPListTemplate(title: "Antennes autour", sections: [])
         var retried = false
 
         CarPlayListPlaceholder.applyFailure(to: template) { retried = true }
@@ -276,8 +202,8 @@ final class CarPlayCoordinatorTests: XCTestCase {
     }
 
     func testLoadingIsNotPresentedAsEmptiness() {
-        let template = CPListTemplate(title: "Sentinelle", sections: [])
-        CarPlayListPlaceholder.applyEmpty(to: template, title: "Aucune box surveillée", subtitle: "…")
+        let template = CPListTemplate(title: "Antennes autour", sections: [])
+        CarPlayListPlaceholder.applyEmpty(to: template, title: "Rien à proximité", subtitle: "…")
 
         CarPlayListPlaceholder.applyLoading(to: template)
 
@@ -286,32 +212,20 @@ final class CarPlayCoordinatorTests: XCTestCase {
                       "pendant le chargement, on n'affirme rien sur le contenu")
     }
 
-    /// Un itinéraire introuvable ne se présente pas comme une panne de connexion.
-    @MainActor
-    func testNoRouteIsNotReportedAsConnectionFailure() {
-        XCTAssertEqual(CarPlayCoordinator.routeFailureMessage(for: CarPlayRouteService.RouteError.noRoute),
-                       String(localized: "Aucun itinéraire trouvé vers cette destination."))
-        XCTAssertEqual(CarPlayCoordinator.routeFailureMessage(for: URLError(.notConnectedToInternet)),
-                       String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie."))
-    }
 }
 
 extension CarPlayCoordinatorTests {
-    func testLayerReloadsAndSearchResultsKeepTheirIdentity() throws {
+    func testPOIReloadsAndAlertSettingAreTracked() throws {
         let carPlay = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("SignalQuestApp/Features/CarPlay")
         let coordinator = try String(contentsOf: carPlay.appendingPathComponent("CarPlayCoordinator.swift"))
-        let search = try String(contentsOf: carPlay.appendingPathComponent("Navigation/CarPlaySearchController.swift"))
         // Seule la zone la plus récente repeint la carte.
-        XCTAssertTrue(coordinator.contains("let generation = beginScreen(.layers)"))
-        XCTAssertTrue(coordinator.contains("isCurrent(.layers, generation)"))
+        XCTAssertTrue(coordinator.contains("let generation = beginScreen(.poi)"))
+        XCTAssertTrue(coordinator.contains("isCurrent(.poi, generation)"))
         // Le réglage des alertes est suivi pendant le trajet.
         XCTAssertTrue(coordinator.contains("forName: UserDefaults.didChangeNotification"))
         XCTAssertTrue(coordinator.contains("syncCoverageAlertObserver()"))
-        // Deux résultats homonymes gardent chacun leur destination.
-        XCTAssertTrue(search.contains("item.userInfo = index"))
-        XCTAssertFalse(search.contains("uniquingKeysWith"))
     }
 }

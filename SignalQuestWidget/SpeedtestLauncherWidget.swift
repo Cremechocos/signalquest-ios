@@ -5,7 +5,18 @@ import WidgetKit
 /// 3, vague 1) : un toucher ouvre SignalQuest, qui propose aussitôt le test
 /// avec confirmation. Même lien que le widget de débit et le contrôle iOS 18.
 struct SpeedtestLauncherWidget: Widget {
+    /// Pas sur l'écran CarPlay (iOS 26+, lot 5) : un toucher y ouvrirait
+    /// l'app sur l'iPhone, ce qu'un écran de voiture ne doit jamais demander.
+    /// L'onglet Speedtest de CarPlay lance le test sans quitter la route.
     var body: some WidgetConfiguration {
+        if #available(iOS 26.0, *) {
+            return configuration.disfavoredLocations([.carPlay], for: [.systemSmall])
+        } else {
+            return configuration
+        }
+    }
+
+    private var configuration: some WidgetConfiguration {
         StaticConfiguration(kind: "fr.signalquest.ios.widget.launcher", provider: SpeedtestLauncherProvider()) { _ in
             SpeedtestLauncherView()
         }

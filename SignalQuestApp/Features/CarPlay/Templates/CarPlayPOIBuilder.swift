@@ -41,20 +41,28 @@ enum CarPlayPOIBuilder {
 
     /// Trie par distance croissante, écarte les clusters (un « 42 sites » n'a
     /// pas de fiche) et coupe au plafond.
+    ///
+    /// - Parameters:
+    ///   - userLocation: position du VÉHICULE, d'où se mesure la distance
+    ///     affichée : « 1,2 km » doit dire à quelle distance on est, pas à
+    ///     quelle distance du centre de la carte déplacée.
+    ///   - center: zone affichée, d'où se choisissent les 12 points quand le
+    ///     conducteur a déplacé la carte. Par défaut, la position du véhicule.
     static func entries(from payloads: [MapAnnotationPayload],
-                        userLocation: CLLocation?) -> [Entry] {
-        payloads
+                        userLocation: CLLocation?,
+                        around center: CLLocation? = nil) -> [Entry] {
+        let origin = center ?? userLocation
+        return payloads
             .filter { $0.clusterCount == nil }
-            .map { payload in
-                let distance = userLocation.map {
-                    $0.distance(from: CLLocation(latitude: payload.coordinate.latitude,
-                                                 longitude: payload.coordinate.longitude))
-                }
-                return Entry(payload: payload, distanceMeters: distance)
+            .map { payload -> (entry: Entry, rank: CLLocationDistance) in
+                let point = CLLocation(latitude: payload.coordinate.latitude,
+                                       longitude: payload.coordinate.longitude)
+                let entry = Entry(payload: payload, distanceMeters: userLocation.map { $0.distance(from: point) })
+                return (entry, origin.map { $0.distance(from: point) } ?? .greatestFiniteMagnitude)
             }
-            .sorted { ($0.distanceMeters ?? .greatestFiniteMagnitude) < ($1.distanceMeters ?? .greatestFiniteMagnitude) }
+            .sorted { $0.rank < $1.rank }
             .prefix(maxPoints)
-            .map { $0 }
+            .map(\.entry)
     }
 
     static func make(entries: [Entry],
@@ -76,19 +84,27 @@ enum CarPlayPOIBuilder {
         entries.map { entry in
             let payload = entry.payload
             let item = MKMapItem(placemark: MKPlacemark(coordinate: payload.coordinate))
-            item.name = payload.title
+            item.name = detailTitle(for: payload)
 
             let color = payload.tint.map { UIColor($0) } ?? UIColor(SQColor.brandRed)
+            // Le point de la carte iPhone : camembert des opérateurs et anneau
+            // 5G pour une antenne, symbole pour les autres couches.
+            let fills = payload.operatorTints.isEmpty ? [color] : payload.operatorTints.map { UIColor($0) }
+            let pin = { (selected: Bool) -> UIImage in
+                payload.glyphOverride.map {
+                    CarPlayImageFactory.symbolPin(color: color, symbol: $0, selected: selected)
+                } ?? CarPlayImageFactory.antennaPin(fills: fills, fiveG: payload.has5G, selected: selected)
+            }
             let poi = CPPointOfInterest(
                 location: item,
                 title: headline(for: entry),
                 subtitle: subtitle(for: entry),
                 summary: nil,
-                detailTitle: payload.title,
-                detailSubtitle: payload.subtitle.isEmpty ? nil : payload.subtitle,
+                detailTitle: detailTitle(for: payload),
+                detailSubtitle: detailSubtitle(for: payload),
                 detailSummary: detailSummary(for: entry, userLocation: userLocation),
-                pinImage: CarPlayImageFactory.antennaPin(color: color),
-                selectedPinImage: CarPlayImageFactory.antennaPin(color: color, selected: true)
+                pinImage: pin(false),
+                selectedPinImage: pin(true)
             )
             poi.userInfo = payload
             if let details = actions.details {
@@ -122,30 +138,83 @@ enum CarPlayPOIBuilder {
             detailTitle: message,
             detailSubtitle: nil,
             detailSummary: nil,
-            pinImage: CarPlayImageFactory.antennaPin(color: color),
-            selectedPinImage: CarPlayImageFactory.antennaPin(color: color, selected: true)
+            pinImage: CarPlayImageFactory.symbolPin(color: color, symbol: "arrow.clockwise"),
+            selectedPinImage: CarPlayImageFactory.symbolPin(color: color, symbol: "arrow.clockwise", selected: true)
         )
         poi.primaryButton = CPTextButton(title: String(localized: "Réessayer"), textStyle: .confirm) { _ in onRetry() }
         return poi
+    }
+
+    /// Itinéraire jusqu'au point dans Plans (choix d'Alexandre du 12/11) : la
+    /// catégorie « driving task » ne guide pas, Plans prend l'écran du véhicule.
+    static func directionsURL(to coordinate: CLLocationCoordinate2D) -> URL? {
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        return URL(string: "maps://?daddr=\(coordinate.latitude),\(coordinate.longitude)&dirflg=d")
     }
 
     // MARK: - Textes
 
     /// Ce qu'on lit en premier doit être ce qui distingue les points entre eux.
     /// Entre douze épingles, « Site 12345 » ne distingue rien : l'opérateur, si.
+    /// En noms courts (« SFR / Bouygues ») : la liste de la carte est étroite et
+    /// y tronquait « Bouygues Tele… » (choix d'Alexandre, 13/11). La carte du
+    /// point garde les noms complets.
     static func headline(for entry: Entry) -> String {
-        let operators = entry.payload.subtitle
-            .split(separator: "·")
-            .first
-            .map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-        return operators.isEmpty ? entry.payload.title : operators
+        let operators = segments(of: entry.payload).first ?? ""
+        guard !operators.isEmpty else { return entry.payload.title }
+        return operators
+            .split(separator: "/")
+            .map { part in
+                let name = part.trimmingCharacters(in: .whitespaces)
+                return SQBrand.operatorShortName(name) ?? name
+            }
+            .joined(separator: " / ")
     }
 
     /// La distance d'abord : c'est le critère de tri, elle doit se lire sans
-    /// être cherchée.
+    /// être cherchée. Puis ce qui décrit le point : ses générations pour un
+    /// site (l'identifiant n'apprend rien au conducteur), son état pour une
+    /// panne, un projet ou une évolution.
     static func subtitle(for entry: Entry) -> String {
-        guard let distance = entry.distanceMeters else { return entry.payload.title }
-        return "\(SQUnits.distance(meters: distance)) · \(entry.payload.title)"
+        let what = isSite(entry.payload) ? (siteFacts(entry.payload) ?? "") : entry.payload.title
+        let parts = [entry.distanceMeters.map { SQUnits.distance(meters: $0) }, what]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? entry.payload.title : parts.joined(separator: " · ")
+    }
+
+    /// Titre de la carte du point : les opérateurs en entier pour un site, son
+    /// état pour les autres couches. L'identifiant reste dans la fiche Détails.
+    static func detailTitle(for payload: MapAnnotationPayload) -> String {
+        guard isSite(payload), let operators = segments(of: payload).first, !operators.isEmpty else {
+            return payload.title
+        }
+        return operators
+    }
+
+    static func detailSubtitle(for payload: MapAnnotationPayload) -> String? {
+        let text = isSite(payload) ? siteFacts(payload) : payload.subtitle
+        return text?.isEmpty == false ? text : nil
+    }
+
+    /// Un site d'antennes (il a une fiche), par opposition aux pannes, projets
+    /// et évolutions ANFR, dont le titre dit déjà l'état.
+    private static func isSite(_ payload: MapAnnotationPayload) -> Bool {
+        payload.kind == .antenna && payload.antennaId != nil
+    }
+
+    /// « 5G, 4G » : ce qui suit les opérateurs dans le sous-titre d'un site.
+    private static func siteFacts(_ payload: MapAnnotationPayload) -> String? {
+        let facts = segments(of: payload).dropFirst().joined(separator: " · ")
+        return facts.isEmpty ? nil : facts
+    }
+
+    /// Le sous-titre d'un marqueur, « opérateurs · générations · commune ».
+    private static func segments(of payload: MapAnnotationPayload) -> [String] {
+        payload.subtitle
+            .split(separator: "·")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 
     /// Résumé de la fiche intégrée : distance, direction, et la position dans
