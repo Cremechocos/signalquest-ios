@@ -192,8 +192,17 @@ final class E2EEAutoHistoryImporterTests: XCTestCase {
         }
         let writes = sent.times(of: "POST")
         XCTAssertEqual(writes.count, 6)
+        // Le cadenceur réserve des places à 50 ms d'écart, mais `Task.sleep` peut réveiller une
+        // écriture en retard : suivie d'une écriture à l'heure, l'écart vu par le faux serveur
+        // descend sous 50 ms (44,8 ms en suite complète) sans que le débit dépasse le plafond.
+        // On vérifie donc le cumul (la k-ième jamais avant k places, au retard de la première
+        // près) et qu'aucune paire ne part ensemble.
+        for (k, time) in writes.enumerated() {
+            XCTAssertGreaterThanOrEqual(time - writes[0], Double(k) * 0.050 - 0.010,
+                                        "l'écriture \(k) du lot ne part jamais avant sa place")
+        }
         let gaps = zip(writes.dropFirst(), writes).map { $0 - $1 }
-        XCTAssertGreaterThanOrEqual(gaps.min() ?? 0, 0.045, "deux écritures du lot ne partent jamais à moins de 50 ms")
+        XCTAssertGreaterThanOrEqual(gaps.min() ?? 0, 0.025, "deux écritures du lot ne partent jamais ensemble")
         let reads = sent.times(of: "GET")
         XCTAssertEqual(reads.count, 6)
         XCTAssertLessThan(reads.first! - writes.first!, 0.045, "une lecture n'attend pas sa place")

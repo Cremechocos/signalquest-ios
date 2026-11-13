@@ -166,6 +166,13 @@ final class CarPlayDriveTripTests: XCTestCase {
 
     // MARK: - Cycle de vie avec le coordinateur
 
+    /// Position autorisée par un faux pilote : sans lui, le trajet dépend de
+    /// l'autorisation réelle du simulateur et ne démarre pas là où elle est refusée.
+    private func makeServices() -> AppServices {
+        AppServices(config: .test, location: LocationService(manager: LocationTestDriver(),
+                                                             makeOneShotManager: { LocationTestDriver() }))
+    }
+
     private func makeCoordinator(services: AppServices) -> CarPlayCoordinator {
         CarPlayCoordinator(interface: FakeCarPlayInterface(), services: services,
                            session: AuthSessionViewModel(service: MockAuthService()))
@@ -173,7 +180,7 @@ final class CarPlayDriveTripTests: XCTestCase {
 
     /// Débrancher la voiture arrête le trajet qu'elle a lancé, avec son bilan.
     func testUnpluggingStopsATripStartedFromTheCar() {
-        let services = AppServices(config: .test)
+        let services = makeServices()
         let coordinator = makeCoordinator(services: services)
         coordinator.start()
         services.driveTest.startFromCarPlay()
@@ -189,7 +196,7 @@ final class CarPlayDriveTripTests: XCTestCase {
     /// Un trajet lancé sur l'iPhone garde sa règle : la voiture qui se
     /// débranche ne le coupe pas.
     func testUnpluggingKeepsATripStartedOnTheIPhone() {
-        let services = AppServices(config: .test)
+        let services = makeServices()
         let coordinator = makeCoordinator(services: services)
         coordinator.start()
         services.driveTest.start()
@@ -206,7 +213,7 @@ final class CarPlayDriveTripTests: XCTestCase {
         let wasEnabled = CarPlayAlertSettings.coverageAlertsEnabled
         UserDefaults.standard.set(false, forKey: CarPlayAlertSettings.coverageAlertsKey)
         defer { UserDefaults.standard.set(wasEnabled, forKey: CarPlayAlertSettings.coverageAlertsKey) }
-        let services = AppServices(config: .test)
+        let services = makeServices()
         let coordinator = makeCoordinator(services: services)
         coordinator.start()
         XCTAssertFalse(coordinator.isObservingCoverageAlerts)
