@@ -269,6 +269,10 @@ final class DriveTestViewModel: ObservableObject {
     private var locationObserverToken: UUID?
     /// Attend l'accès à la position pour s'abonner (MES-10).
     private var authorizationCancellable: AnyCancellable?
+    /// Trajet lancé depuis CarPlay (lot 4, choix d'Alexandre du 13/11) : il
+    /// n'appartient pas à l'écran iPhone. Il s'arrête sur « Arrêter » ou au
+    /// débranchement du véhicule, pas en quittant l'écran Drive Test.
+    @Published private(set) var startedFromCarPlay = false
     /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
     private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
@@ -375,7 +379,28 @@ final class DriveTestViewModel: ObservableObject {
     /// l'alimente reste branché.
     func onDisappear(isLeavingScreen: Bool) {
         guard isLeavingScreen else { return }
+        // Un passager qui regarde le trajet lancé en voiture ne doit pas le
+        // couper : l'écran se détache, le trajet et sa position continuent.
+        if startedFromCarPlay, isRunning {
+            authorizationCancellable = nil
+            return
+        }
         shutDown()
+    }
+
+    /// Démarrage depuis CarPlay : aucun écran n'a branché la position du
+    /// trajet (c'est `onAppear` qui le fait sur l'iPhone). Sans elle, ni trace
+    /// ni distance, et la cadence retomberait sur le seul repli au temps.
+    func startFromCarPlay() {
+        guard !isRunning else { return }
+        start()
+        guard isRunning else { return }
+        startedFromCarPlay = true
+        guard locationObserverToken == nil else { return }
+        locationObserverToken = services.location.addLocationObserver { [weak self] location in
+            self?.receiveTripFix(location)
+            self?.apply(coordinate: location.coordinate)
+        }
     }
 
     /// Sans abonnement à l'autorisation, l'écran a été quitté entre-temps : ne
@@ -511,6 +536,15 @@ final class DriveTestViewModel: ObservableObject {
         isPausedStationary = false
         liveMbps = 0
         livePhase = .idle
+        // Trajet de la voiture sans écran iPhone ouvert : sa position s'arrête
+        // avec lui (MES-01), sinon le GPS resterait allumé sans raison.
+        if startedFromCarPlay {
+            startedFromCarPlay = false
+            if authorizationCancellable == nil, let token = locationObserverToken {
+                services.location.removeLocationObserver(token)
+                locationObserverToken = nil
+            }
+        }
     }
 
     // MARK: Pause auto en WiFi / reprise en cellulaire
@@ -2326,41 +2360,12 @@ struct DriveTestView: View {
     }
 
     private func requestStart() {
-        let report = DriveTestPreflightPolicy.evaluate(makePreflightSnapshot())
+        let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
         guard !report.isReady else {
             model.start()
             return
         }
         preflightReport = report
-    }
-
-    private func makePreflightSnapshot() -> DriveTestPreflightSnapshot {
-        services.location.refreshAuthorization()
-        let authorization: DriveTestPreflightSnapshot.LocationAuthorization
-        switch services.location.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            authorization = .authorized
-        case .notDetermined:
-            authorization = .notDetermined
-        default:
-            authorization = .denied
-        }
-
-        let location = services.location.cachedLocation()
-        let locationAge = location.map { max(0, Date().timeIntervalSince($0.timestamp)) }
-        let status = services.networkPath.status
-        let battery = Self.currentBatterySnapshot()
-        return DriveTestPreflightSnapshot(
-            locationAuthorization: authorization,
-            locationAgeSeconds: locationAge,
-            horizontalAccuracyMeters: location?.horizontalAccuracy,
-            availableStorageBytes: Self.availableStorageBytes(),
-            batteryPercent: battery.percent,
-            isCharging: battery.isCharging,
-            isOnline: services.networkPath.isOnline,
-            connection: status.connection,
-            isConstrained: status.isConstrained
-        )
     }
 
     private func handlePreflightAction(_ action: DriveTestPreflightIssue.Action) {
@@ -2375,27 +2380,6 @@ struct DriveTestView: View {
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)
         }
-    }
-
-    private static func availableStorageBytes() -> Int64? {
-        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-        return try? home.resourceValues(
-            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-        ).volumeAvailableCapacityForImportantUsage
-    }
-
-    private static func currentBatterySnapshot() -> (percent: Int?, isCharging: Bool) {
-        let device = UIDevice.current
-        let monitoringWasEnabled = device.isBatteryMonitoringEnabled
-        device.isBatteryMonitoringEnabled = true
-        defer {
-            if !monitoringWasEnabled { device.isBatteryMonitoringEnabled = false }
-        }
-        let percent = device.batteryLevel >= 0
-            ? Int((device.batteryLevel * 100).rounded())
-            : nil
-        let isCharging = device.batteryState == .charging || device.batteryState == .full
-        return (percent, isCharging)
     }
 
     private var startButtonTitle: String { String(localized: "Démarrer le Drive Test") }

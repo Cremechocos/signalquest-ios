@@ -103,6 +103,9 @@ final class CarPlayCoordinator {
         // Les alertes de couverture valent pour TOUT trajet, quel que soit
         // l'onglet affiché.
         syncCoverageAlertObserver()
+        // Un drive test, de la voiture ou de l'iPhone, allume aussi les
+        // alertes et anime l'onglet Trajet.
+        observeDriveTest()
         // Le réglage peut être activé en roulant : l'abonnement suit sa valeur.
         alertSettingObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
@@ -154,6 +157,14 @@ final class CarPlayCoordinator {
         speedtestTask?.cancel()
         speedtestTask = nil
         speedtestTemplate = nil
+        // Un trajet lancé depuis la voiture s'arrête au débranchement, avec
+        // son bilan (choix d'Alexandre du 13/11) ; un trajet de l'iPhone garde
+        // sa règle et continue.
+        tripCancellables.removeAll()
+        tripTicker?.cancel()
+        tripTicker = nil
+        tripTemplate = nil
+        if services.driveTest.startedFromCarPlay { services.driveTest.stop() }
         if let alertSettingObserver {
             NotificationCenter.default.removeObserver(alertSettingObserver)
             self.alertSettingObserver = nil
@@ -304,10 +315,15 @@ final class CarPlayCoordinator {
         )
         speedtestTemplate = speedtest
 
+        tripState = currentTripState()
+        let trip = DriveTripTemplateBuilder.make(state: tripState, actions: tripActions())
+        tripTemplate = trip
+
         let tabs = [
             CarPlayTabBarBuilder.decorate(here, title: String(localized: "Ici"),
                                           systemImage: "dot.radiowaves.left.and.right"),
             mapTab,
+            CarPlayTabBarBuilder.decorate(trip, title: String(localized: "Trajet"), systemImage: "car.fill"),
             CarPlayTabBarBuilder.decorate(speedtest, title: String(localized: "Speedtest"),
                                           systemImage: "speedometer"),
         ]
@@ -320,6 +336,9 @@ final class CarPlayCoordinator {
             if let list = mapLayersTemplate, selected === list { refreshLayerCountsIfStale() }
             // « il y a 2 h » vieillit : on recalcule le titre au retour sur l'onglet.
             if let speedtest = speedtestTemplate, selected === speedtest { updateSpeedtest(state: speedtestState) }
+            // Un blocage a pu se lever (connexion revenue) et la date du
+            // dernier trajet a vieilli.
+            if let trip = tripTemplate, selected === trip { repaintTrip() }
         }
         tabBar.delegate = tabDelegate
         tabBarDelegate = tabDelegate
@@ -633,9 +652,19 @@ final class CarPlayCoordinator {
     private var alertObserver: UUID?
     private var alertSettingObserver: NSObjectProtocol?
 
+    /// Alertes actives : réglage iPhone, ou drive test en cours — un trajet
+    /// enregistré compte ses zones faibles même réglage éteint (choix
+    /// d'Alexandre du 12/11).
+    private var coverageAlertsActive: Bool {
+        CarPlayAlertSettings.coverageAlertsEnabled || services.driveTest.isRunning
+    }
+
+    /// Pour les tests : l'abonnement des alertes est-il posé ?
+    var isObservingCoverageAlerts: Bool { alertObserver != nil }
+
     /// Pose ou retire l'abonnement aux positions selon le réglage des alertes.
     private func syncCoverageAlertObserver() {
-        if CarPlayAlertSettings.coverageAlertsEnabled {
+        if coverageAlertsActive {
             guard alertObserver == nil else { return }
             alertObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
                 self?.evaluateCoverageAlert(at: location)
@@ -654,7 +683,7 @@ final class CarPlayCoordinator {
     /// interrogerait le service en continu pour un verdict qui ne change pas
     /// d'un lampadaire à l'autre.
     private func evaluateCoverageAlert(at location: CLLocation) {
-        guard CarPlayAlertSettings.coverageAlertsEnabled else { return }
+        guard coverageAlertsActive else { return }
         // Une seule évaluation à la fois : voir `isEvaluatingAlert`.
         guard !isEvaluatingAlert else { return }
         if let last = lastAlertCheckCoordinate {
@@ -692,6 +721,7 @@ final class CarPlayCoordinator {
 
             lastAlertAt = context.now
             lastAlertCoordinate = location.coordinate
+            if services.driveTest.isRunning { tripWeakZones += 1 }
             presentCoverageAlert(
                 CarPlayAlertPolicy.message(for: verdict.level, operatorLabel: verdict.operatorLabel)
             )
@@ -983,6 +1013,134 @@ final class CarPlayCoordinator {
             template.items = enriched.items
             template.actions = enriched.actions
         }
+    }
+
+    // MARK: - Trajet
+
+    private var tripTemplate: CPInformationTemplate?
+    private var tripState = DriveTripTemplateBuilder.State.idle(lastTrip: nil, notice: nil)
+    private var tripCancellables: Set<AnyCancellable> = []
+    /// Repeint l'onglet pendant le trajet. Une `Task` et non un `Timer`, pour
+    /// la même raison que `tasks` : elle s'annule au débranchement.
+    private var tripTicker: Task<Void, Never>?
+    /// Alertes « réseau faible » émises pendant le trajet en cours.
+    private var tripWeakZones = 0
+    /// Avertissements du préflight au départ depuis la voiture.
+    private var tripStartWarnings: [DriveTestPreflightIssue] = []
+    /// Raison d'un départ refusé à l'instant, effacée au départ suivant.
+    private var tripNotice: String?
+
+    private func tripActions() -> DriveTripTemplateBuilder.Actions {
+        .init(start: { [weak self] in self?.startTrip() },
+              stop: { [weak self] in self?.services.driveTest.stop() })
+    }
+
+    /// Suit le drive test, qu'il parte de la voiture ou de l'iPhone : l'onglet
+    /// change d'état aussitôt, et les alertes zone faible s'allument avec lui.
+    private func observeDriveTest() {
+        tripCancellables.removeAll()
+        services.driveTest.$isRunning
+            .removeDuplicates()
+            // `@Published` émet AVANT l'affectation : sur la boucle suivante,
+            // le modèle a fini son départ ou son bilan.
+            .receive(on: RunLoop.main)
+            .sink { [weak self] running in self?.driveTestRunningDidChange(running) }
+            .store(in: &tripCancellables)
+        // Au repos, la connexion qui tombe ou revient change le blocage.
+        services.networkPath.$isOnline
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, !services.driveTest.isRunning else { return }
+                repaintTrip()
+            }
+            .store(in: &tripCancellables)
+    }
+
+    private func driveTestRunningDidChange(_ running: Bool) {
+        if running {
+            tripWeakZones = 0
+            startTripTicker()
+        } else {
+            tripTicker?.cancel()
+            tripTicker = nil
+            tripStartWarnings = []
+        }
+        syncCoverageAlertObserver()
+        repaintTrip()
+    }
+
+    private func startTrip() {
+        tripNotice = nil
+        let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
+        // Le bouton n'existait pas, mais l'état a pu changer depuis le dernier
+        // rafraîchissement : on repeint la raison au lieu de démarrer.
+        guard !report.isBlocked else {
+            repaintTrip()
+            return
+        }
+        tripStartWarnings = report.issues.filter { $0.severity == .warning }
+        let drive = services.driveTest
+        drive.startFromCarPlay()
+        // Refus du moteur (un speedtest mesure déjà) : sa raison s'affiche.
+        if !drive.isRunning {
+            tripNotice = drive.errorMessage
+            tripStartWarnings = []
+            repaintTrip()
+        }
+    }
+
+    private func startTripTicker() {
+        guard tripTicker == nil else { return }
+        tripTicker = Task { [weak self] in
+            let interval = UInt64(DriveTripTemplateBuilder.refreshInterval * 1_000_000_000)
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled else { return }
+                self?.repaintTrip()
+            }
+        }
+    }
+
+    /// Mise à jour EN PLACE, comme le Speedtest : re-pousser empilerait un
+    /// écran par rafraîchissement.
+    private func repaintTrip() {
+        // Sans onglet (déconnecté, racine de repli), rien à lire ni à peindre.
+        guard let tripTemplate else { return }
+        tripState = currentTripState()
+        let refreshed = DriveTripTemplateBuilder.make(state: tripState, actions: tripActions())
+        tripTemplate.title = refreshed.title
+        tripTemplate.items = refreshed.items
+        tripTemplate.actions = refreshed.actions
+    }
+
+    private func currentTripState() -> DriveTripTemplateBuilder.State {
+        let drive = services.driveTest
+        if drive.isRunning, let startedAt = drive.sessionStartDate {
+            let completed = drive.summary?.count ?? 0
+            let path = services.networkPath.status
+            return .running(.init(
+                startedAt: startedAt,
+                isPaused: drive.isPausedForWiFi || drive.isPausedStationary,
+                distanceMeters: drive.distanceMeters,
+                completedTests: completed,
+                // `lastResult` survit d'un trajet à l'autre : il n'appartient
+                // à celui-ci qu'après son premier test.
+                lastDownloadMbps: completed > 0 ? drive.lastResult?.downloadMbps : nil,
+                network: DriveTripTemplateBuilder.networkLabel(connection: path.connection,
+                                                               operatorLabel: drive.displayedOperatorLabel,
+                                                               technology: path.cellularTechnology),
+                weakZones: tripWeakZones,
+                status: drive.errorMessage ?? drive.statusLabel,
+                warnings: tripStartWarnings
+            ))
+        }
+        let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
+        if let blocking = report.issues.first(where: { $0.severity == .blocking }) {
+            return .blocked(blocking)
+        }
+        return .idle(lastTrip: drive.lastSessionRecap ?? DriveTestViewModel.SessionRecap.load(), notice: tripNotice)
     }
 
     // MARK: - Speedtest

@@ -1,6 +1,150 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Aucun trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No trip yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun trajet"
+          }
+        }
+      }
+    },
+    "Des speedtests tout au long de la route, placés sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests all along the road, placed on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des speedtests tout au long de la route, placés sur la carte."
+          }
+        }
+      }
+    },
+    "Impossible de démarrer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't start"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de démarrer"
+          }
+        }
+      }
+    },
+    "Dernier débit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier débit"
+          }
+        }
+      }
+    },
+    "Zones faibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weak areas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zones faibles"
+          }
+        }
+      }
+    },
+    "Attention" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warning"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention"
+          }
+        }
+      }
+    },
+    "Localisation non autorisée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location not allowed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Localisation non autorisée"
+          }
+        }
+      }
+    },
+    "Le trajet a besoin de la position pour placer chaque mesure." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A trip needs the location to place each measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le trajet a besoin de la position pour placer chaque mesure."
+          }
+        }
+      }
+    },
+    "Il reste %lld Mo, trop peu pour enregistrer un trajet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld MB left, too little to record a trip."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il reste %lld Mo, trop peu pour enregistrer un trajet."
+          }
+        }
+      }
+    },
     "%lld antennes à moins de %@" : {
       "localizations" : {
         "en" : {

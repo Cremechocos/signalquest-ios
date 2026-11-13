@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Photo instantanée des seuls prérequis qu'iOS permet d'observer sans inventer
 /// un état de SIM, d'itinérance ou de mode avion. Les valeurs indisponibles restent
@@ -20,6 +21,62 @@ struct DriveTestPreflightSnapshot: Equatable {
     let isOnline: Bool
     let connection: NetworkConnectionKind
     let isConstrained: Bool
+}
+
+extension DriveTestPreflightSnapshot {
+    /// État réel de l'appareil, lu par l'écran Drive Test comme par CarPlay :
+    /// un départ depuis la voiture suit les mêmes règles que sur l'iPhone.
+    @MainActor
+    static func current(services: AppServices) -> DriveTestPreflightSnapshot {
+        services.location.refreshAuthorization()
+        let authorization: LocationAuthorization
+        switch services.location.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            authorization = .authorized
+        case .notDetermined:
+            authorization = .notDetermined
+        default:
+            authorization = .denied
+        }
+
+        let location = services.location.cachedLocation()
+        let locationAge = location.map { max(0, Date().timeIntervalSince($0.timestamp)) }
+        let status = services.networkPath.status
+        let battery = currentBatterySnapshot()
+        return DriveTestPreflightSnapshot(
+            locationAuthorization: authorization,
+            locationAgeSeconds: locationAge,
+            horizontalAccuracyMeters: location?.horizontalAccuracy,
+            availableStorageBytes: availableStorageBytes(),
+            batteryPercent: battery.percent,
+            isCharging: battery.isCharging,
+            isOnline: services.networkPath.isOnline,
+            connection: status.connection,
+            isConstrained: status.isConstrained
+        )
+    }
+
+    private static func availableStorageBytes() -> Int64? {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        return try? home.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ).volumeAvailableCapacityForImportantUsage
+    }
+
+    @MainActor
+    private static func currentBatterySnapshot() -> (percent: Int?, isCharging: Bool) {
+        let device = UIDevice.current
+        let monitoringWasEnabled = device.isBatteryMonitoringEnabled
+        device.isBatteryMonitoringEnabled = true
+        defer {
+            if !monitoringWasEnabled { device.isBatteryMonitoringEnabled = false }
+        }
+        let percent = device.batteryLevel >= 0
+            ? Int((device.batteryLevel * 100).rounded())
+            : nil
+        let isCharging = device.batteryState == .charging || device.batteryState == .full
+        return (percent, isCharging)
+    }
 }
 
 struct DriveTestPreflightIssue: Identifiable, Equatable {

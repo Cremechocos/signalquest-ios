@@ -220,6 +220,48 @@ final class LocationServiceTests: XCTestCase {
         model.onDisappear(isLeavingScreen: true)
     }
 
+    /// Trajet lancé depuis CarPlay (lot 4) : aucun écran ne branche sa
+    /// position, il doit la prendre lui-même ; un passager qui ouvre puis
+    /// quitte l'écran Drive Test ne le coupe pas ; à l'arrêt, le GPS s'éteint.
+    func testCarPlayTripFollowsTheRoadWithoutTheScreenAndReleasesTheGPS() {
+        let (service, _, _, clock) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+
+        model.startFromCarPlay()
+        XCTAssertTrue(model.isRunning)
+        XCTAssertTrue(model.startedFromCarPlay)
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.851, at: clock.value)])
+        XCTAssertEqual(model.trace.last?.latitude, 48.851, "la trace avance sans écran iPhone")
+
+        model.onAppear()
+        model.onDisappear(isLeavingScreen: true)
+        XCTAssertTrue(model.isRunning, "quitter l'écran n'arrête pas un trajet de la voiture")
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.852, at: clock.value)])
+        XCTAssertEqual(model.trace.last?.latitude, 48.852)
+
+        model.stop()
+        XCTAssertFalse(model.startedFromCarPlay)
+        XCTAssertFalse(service.wantsTracking, "le GPS du trajet s'éteint avec lui")
+    }
+
+    /// Le trajet lancé sur l'iPhone garde sa règle : quitter l'écran l'arrête.
+    func testIPhoneTripStillStopsWhenLeavingTheScreen() {
+        let (service, _, _, _) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        model.start()
+        XCTAssertTrue(model.isRunning)
+
+        model.onDisappear(isLeavingScreen: true)
+
+        XCTAssertFalse(model.isRunning)
+        XCTAssertFalse(service.wantsTracking)
+    }
+
     func testAQueuedLocationAfterRevocationCannotRepopulateCacheOrObservers() {
         let (service, tracking, _, _) = makeService()
         var observed = 0
