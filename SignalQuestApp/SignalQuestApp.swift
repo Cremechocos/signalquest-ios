@@ -527,6 +527,8 @@ struct RootView: View {
     @State private var showsAddressPrompt = false
     /// Identité membre v1 : « Ton nom d'utilisateur », à garder ou changer, non repoussable.
     @State private var showsUsernameConfirmation = false
+    /// Nom affiché facultatif, proposé en entrant dans Communauté (fil et messagerie).
+    @State private var showsDisplayNamePrompt = false
     /// Appareils ajoutés à son compte, tirés du journal vérifié (E2EE-AUTO §4.2).
     @StateObject private var newDeviceAlerts = E2EEAutoNewDeviceAlertCoordinator()
     /// Fourche ou retour en arrière du journal gardé ici (E2EE-AUTO §3.5) : passe avant les autres invites.
@@ -585,8 +587,32 @@ struct RootView: View {
     private var presentsUsernameConfirmation: Bool {
         guard showsUsernameConfirmation, let user = authenticatedUser, user.needsHandleConfirmation,
               session.serverProfileUserID == user.id else { return false }
-        return !showsAddressPrompt && !showsV2Activation && newDeviceAlerts.presented == nil && !logAlerts.isPresented
-            && !showsHistoryApproval && !showsHistoryRequester
+        return !showsOtherLaunchPrompt
+    }
+
+    private var showsOtherLaunchPrompt: Bool {
+        showsAddressPrompt || showsV2Activation || newDeviceAlerts.presented != nil || logAlerts.isPresented
+            || showsHistoryApproval || showsHistoryRequester
+    }
+
+    /// Le nom affiché se propose là où les autres le lisent : en entrant dans Communauté (fil et
+    /// messagerie), après « Ton nom d'utilisateur », sans passer devant un lien vers un contenu.
+    private func refreshDisplayNamePrompt() {
+        guard !showsDisplayNamePrompt, !showsUsernameConfirmation, router.selectedTab == .community,
+              !router.hasPendingContentRoute, !AppEnvironment.usesDemoData,
+              let user = authenticatedUser, session.serverProfileUserID == user.id,
+              DisplayNamePromptPolicy.shouldPresent(user: user) else { return }
+        #if DEBUG
+        if AppEnvironment.injectedAuthToken != nil, !AppEnvironment.hasQAFlag("display-name-prompt-live") { return }
+        #endif
+        DisplayNamePromptPolicy.markPresented(userID: user.id)
+        showsDisplayNamePrompt = true
+    }
+
+    private var presentsDisplayNamePrompt: Bool {
+        guard showsDisplayNamePrompt, let user = authenticatedUser, session.serverProfileUserID == user.id,
+              MemberIdentity.name(user.name, handle: nil) == nil else { return false }
+        return !presentsUsernameConfirmation && !showsOtherLaunchPrompt
     }
 
     /// Comme les autres invites : jamais pendant un appel ni par-dessus l'une d'elles.
@@ -663,6 +689,8 @@ struct RootView: View {
                 E2EEAutoDevicesQAScreen()
             } else if AppEnvironment.showsUsernameConfirmationQA {
                 UsernameConfirmationQAScreen()
+            } else if AppEnvironment.showsDisplayNamePromptQA {
+                DisplayNamePromptQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {
                 E2EEV2AccountKeyQAScreen()
             } else if AppEnvironment.showsApprovalScannerQA {
@@ -696,6 +724,7 @@ struct RootView: View {
                     .onChangeCompat(of: router.selectedTab) { _, _ in
                         addressStore.applyTone()
                         refreshUsernameConfirmation()
+                        refreshDisplayNamePrompt()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
                         refreshV2ActivationPrompt()
@@ -742,7 +771,8 @@ struct RootView: View {
                     // plus haut, doit pouvoir passer devant. Deux présentations
                     // modales concurrentes, et l'appel entrant restait invisible.
                     .accessibilityHidden(showsV2Activation || showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
-                                         || showsHistoryApproval || showsHistoryRequester || presentsUsernameConfirmation)
+                                         || showsHistoryApproval || showsHistoryRequester || presentsUsernameConfirmation
+                                         || presentsDisplayNamePrompt)
                     .overlay {
                         if showsAddressPrompt {
                             SQAddressFormPrompt(onClose: {
@@ -765,6 +795,8 @@ struct RootView: View {
                                 onSaved: { updated in
                                     session.applyProfileIdentity(updated)
                                     showsUsernameConfirmation = false
+                                    // Le nom affiché vient d'être proposé sur cet écran : pas avant une semaine.
+                                    DisplayNamePromptPolicy.markPresented(userID: updated.id)
                                     Task { await session.refreshUser() }
                                 }
                             )
@@ -774,6 +806,23 @@ struct RootView: View {
                         }
                     }
                     .sqAnimation(SQMotion.smooth, value: presentsUsernameConfirmation)
+                    .overlay {
+                        if presentsDisplayNamePrompt, let user = authenticatedUser {
+                            DisplayNamePromptView(
+                                user: user,
+                                save: { [users = services.users] in try await users.updateProfile($0) },
+                                onSaved: { updated in
+                                    session.applyProfileIdentity(updated)
+                                    showsDisplayNamePrompt = false
+                                },
+                                onLater: { showsDisplayNamePrompt = false }
+                            )
+                            .id(user.id)
+                            .accessibilityAddTraits(.isModal)
+                            .transition(.move(edge: .bottom))
+                        }
+                    }
+                    .sqAnimation(SQMotion.smooth, value: presentsDisplayNamePrompt)
                     .overlay {
                         if showsV2Activation {
                             E2EEV2ActivationScreen(

@@ -831,6 +831,7 @@
 		D794EE40CF5E7B73E5E675FB /* RemoteVoiceNoteBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E578A11F7C683E4ABFCA9 /* RemoteVoiceNoteBubble.swift */; };
 		D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */; };
 		D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */; };
+		D8348601742FD712C954DA2F /* DisplayNamePromptPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9353CC4D7C0D6C3C77079B33 /* DisplayNamePromptPolicyTests.swift */; };
 		D86A09EF6CD52CAA01BC2A29 /* E2EEAutoLogReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55375AB91078EE45BE10E38 /* E2EEAutoLogReader.swift */; };
 		D86A7ED4DB41D234F89833B7 /* E2EEV2ConversationMessagingV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15B5E5210CC19ED923782CA /* E2EEV2ConversationMessagingV2Tests.swift */; };
 		D896252223AB17FB003282CB /* LiveKitJoinProofLoopbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ED3B258F3FC986B9699440 /* LiveKitJoinProofLoopbackTests.swift */; };
@@ -967,6 +968,7 @@
 		FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */; };
 		FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */; };
 		FB57CD4C24B26102CCD880A0 /* SpeedtestBurstSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8ED2F3CAFB9F5358E68F4 /* SpeedtestBurstSummary.swift */; };
+		FB93AB8D7D38D9C8DD23C134 /* DisplayNamePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6368196354CE3462E9559DBC /* DisplayNamePrompt.swift */; };
 		FBDF562F75587E8FF056E504 /* E2EEV2MessageSendingV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0EA69007EEEBEA853E24CD /* E2EEV2MessageSendingV2.swift */; };
 		FC00E6124A3556DA366FD4AE /* MessageRenderCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375FEBD8DD79973A3821B193 /* MessageRenderCache.swift */; };
 		FC56E7C3FFDFBDBD65E65037 /* SQComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0078226636E735A7665D8A3 /* SQComponents.swift */; };
@@ -1415,6 +1417,7 @@
 		6271ABB0B34FEC9D121379E3 /* ExperienceScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceScore.swift; sourceTree = "<group>"; };
 		6272799437D816FFE9DACCBD /* AntennaLeaderReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaLeaderReportTests.swift; sourceTree = "<group>"; };
 		632946BE7DBA07E9F73FEC3C /* WeeklyRecap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyRecap.swift; sourceTree = "<group>"; };
+		6368196354CE3462E9559DBC /* DisplayNamePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayNamePrompt.swift; sourceTree = "<group>"; };
 		63E25FA981D46B361EA3D34E /* E2EEAutoEpoch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoEpoch.swift; sourceTree = "<group>"; };
 		63F121F16DC7FF76A1D7D6ED /* SQMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMotion.swift; sourceTree = "<group>"; };
 		649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
@@ -1608,6 +1611,7 @@
 		9251F38206885980205B046C /* RadioLogIdentifyChainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogIdentifyChainView.swift; sourceTree = "<group>"; };
 		92E156E2B3CA6D911D4A0C30 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		92EDF67ED3ECB619E984D991 /* ANFRBandsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRBandsView.swift; sourceTree = "<group>"; };
+		9353CC4D7C0D6C3C77079B33 /* DisplayNamePromptPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayNamePromptPolicyTests.swift; sourceTree = "<group>"; };
 		935937F42798C1626D6792E3 /* E2EEV2AccountIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2AccountIdentityTests.swift; sourceTree = "<group>"; };
 		93B1CEE997E54F26D8E2E986 /* SpeedtestPhase+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpeedtestPhase+Display.swift"; sourceTree = "<group>"; };
 		945166A7A50265C9FF4A1A16 /* E2EEAutoHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryImporter.swift; sourceTree = "<group>"; };
@@ -2424,6 +2428,7 @@
 			children = (
 				0A6F8CBC682F830C6285FAB7 /* AndroidDataPresence.swift */,
 				752CA575743D913E207E4A67 /* ChooseHandleSheet.swift */,
+				6368196354CE3462E9559DBC /* DisplayNamePrompt.swift */,
 				B598C10F8FA1BAC84FFF9CB0 /* E2EEAutoDevicesView.swift */,
 				BA58037339854F2104DD26DB /* E2EEAutoHistoryRequestView.swift */,
 				A9B67566C7F2560694C68F6A /* E2EEAutoNewDeviceAlertView.swift */,
@@ -3183,6 +3188,7 @@
 				F2D0A9C2F9B2D680E6651B25 /* DefaultPostVisibilityTests.swift */,
 				A84A348D80B0B5882E1A9AC9 /* DesignTokenContrastTests.swift */,
 				1DD63B04CFDED17637F04A03 /* DirectionsRequestTests.swift */,
+				9353CC4D7C0D6C3C77079B33 /* DisplayNamePromptPolicyTests.swift */,
 				EBF8CC37A3C6E43766E4063A /* DriveShareTests.swift */,
 				87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */,
 				BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */,
@@ -4042,6 +4048,7 @@
 				E5CD442A08DDC960F35967B7 /* DefaultPostVisibilitySheet.swift in Sources */,
 				0E2FA15498AD22C352AF080E /* DirectionsRequestHandler.swift in Sources */,
 				1C8AA28EE4CFA6F012C5B69F /* DiskCache.swift in Sources */,
+				FB93AB8D7D38D9C8DD23C134 /* DisplayNamePrompt.swift in Sources */,
 				49393BB586B4C19FD9E60E20 /* DriveShareCard.swift in Sources */,
 				BBDB6CA0C0170E72A212922C /* DriveShareSheet.swift in Sources */,
 				54BABDC82991B465A6A670BC /* DriveShareTrace.swift in Sources */,
@@ -4622,6 +4629,7 @@
 				EB2C72EC6FE2CFF93A876BDB /* DefaultPostVisibilityTests.swift in Sources */,
 				5D7466C54936C9FAEC120C2D /* DesignTokenContrastTests.swift in Sources */,
 				B08E0E2192F630A0ECEECCE9 /* DirectionsRequestTests.swift in Sources */,
+				D8348601742FD712C954DA2F /* DisplayNamePromptPolicyTests.swift in Sources */,
 				71FEDBD14AA6AB62C6F6940B /* DriveShareTests.swift in Sources */,
 				FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */,
 				FCDA55A3E109754904290CDF /* DriveTestSessionRecapTests.swift in Sources */,

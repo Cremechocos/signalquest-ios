@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Ajoute un nom affiché" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a display name"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute un nom affiché"
+          }
+        }
+      }
+    },
+    "SQFormal|Ajoute un nom affiché" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un nom affiché"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Ton compte" : {
       "localizations" : {
         "en" : {

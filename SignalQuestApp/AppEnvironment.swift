@@ -270,6 +270,14 @@ enum AppEnvironment {
         #endif
     }
 
+    static var showsDisplayNamePromptQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-display-name-prompt")
+        #else
+        false
+        #endif
+    }
+
     static var showsAccountKeyQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-account-key") || hasArgument("--qa-account-key-verified")
