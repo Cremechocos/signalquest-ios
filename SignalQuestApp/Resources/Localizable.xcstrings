@@ -1,6 +1,630 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "ton site communautaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "your community site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ton site communautaire"
+          }
+        }
+      }
+    },
+    "SQFormal|ton site communautaire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "votre site communautaire"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "données officielles ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR official data"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "données officielles ANFR"
+          }
+        }
+      }
+    },
+    "données officielles ISED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED official data"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "données officielles ISED"
+          }
+        }
+      }
+    },
+    "site communautaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "community site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "site communautaire"
+          }
+        }
+      }
+    },
+    "site déjà identifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "already identified site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "site déjà identifié"
+          }
+        }
+      }
+    },
+    "Envoi en attente · à revoir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload pending · to review"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi en attente · à revoir"
+          }
+        }
+      }
+    },
+    "Ce nœud est déjà sur ton site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node is already on your site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est déjà sur ton site"
+          }
+        }
+      }
+    },
+    "SQFormal|Ce nœud est déjà sur ton site" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud est déjà sur votre site"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce nœud a déjà un site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node already has a site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud a déjà un site"
+          }
+        }
+      }
+    },
+    "« %@ » n’a pas été créé : le nœud %@ est déjà sur un site que tu as créé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” was not created: node %@ is already on a site you created."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’a pas été créé : le nœud %@ est déjà sur un site que tu as créé."
+          }
+        }
+      }
+    },
+    "SQFormal|« %@ » n’a pas été créé : le nœud %@ est déjà sur un site que tu as créé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’a pas été créé : le nœud %@ est déjà sur un site que vous avez créé."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "« %@ » n’a pas été créé : entre-temps, le nœud %@ a été rattaché à un site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” was not created: in the meantime, node %@ was linked to a site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’a pas été créé : entre-temps, le nœud %@ a été rattaché à un site."
+          }
+        }
+      }
+    },
+    "Le nœud %@ est rattaché à un site que tu as créé. Corrige-le plutôt que d’en créer un second." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node %@ is linked to a site you created. Correct it rather than creating a second one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ est rattaché à un site que tu as créé. Corrige-le plutôt que d’en créer un second."
+          }
+        }
+      }
+    },
+    "SQFormal|Le nœud %@ est rattaché à un site que tu as créé. Corrige-le plutôt que d’en créer un second." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ est rattaché à un site que vous avez créé. Corrigez-le plutôt que d’en créer un second."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le nœud %@ est déjà rattaché à un site. On n’en crée pas un second : il masquerait le premier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node %@ is already linked to a site. We don’t create a second one: it would hide the first."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ est déjà rattaché à un site. On n’en crée pas un second : il masquerait le premier."
+          }
+        }
+      }
+    },
+    "Créer quand même : le nœud %@ quittera « %@ », le site d’un autre membre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create anyway: node %@ will leave “%@”, another member’s site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le nœud %@ quittera « %@ », le site d’un autre membre."
+          }
+        }
+      }
+    },
+    "Créer quand même : le nœud %@ quittera le site d’un autre membre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create anyway: node %@ will leave another member’s site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le nœud %@ quittera le site d’un autre membre."
+          }
+        }
+      }
+    },
+    "Créer quand même : le site officiel ne change pas, ton site portera le nœud %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create anyway: the official site does not change, your site will carry node %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le site officiel ne change pas, ton site portera le nœud %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Créer quand même : le site officiel ne change pas, ton site portera le nœud %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le site officiel ne change pas, votre site portera le nœud %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Créer quand même : le nœud %@ sera rattaché à ton site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create anyway: node %@ will be linked to your site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le nœud %@ sera rattaché à ton site."
+          }
+        }
+      }
+    },
+    "SQFormal|Créer quand même : le nœud %@ sera rattaché à ton site." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même : le nœud %@ sera rattaché à votre site."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "« Corriger ton site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Correct your site” opens identification on the map: you link the cell to the right site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Corriger ton site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site."
+          }
+        }
+      }
+    },
+    "SQFormal|« Corriger ton site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Corriger votre site » ouvre l’identification sur la carte : vous rattachez la cellule au bon site."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "« Ce n’est pas le bon site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site, ou tu en crées un si aucun ne convient." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Not the right site” opens identification on the map: you link the cell to the right site, or create one if none fits."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Ce n’est pas le bon site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site, ou tu en crées un si aucun ne convient."
+          }
+        }
+      }
+    },
+    "SQFormal|« Ce n’est pas le bon site » ouvre l’identification sur la carte : tu rattaches la cellule au bon site, ou tu en crées un si aucun ne convient." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Ce n’est pas le bon site » ouvre l’identification sur la carte : vous rattachez la cellule au bon site, ou vous en créez un si aucun ne convient."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Voir ton site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View your site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir ton site"
+          }
+        }
+      }
+    },
+    "SQFormal|Voir ton site" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir votre site"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Voir ce site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View this site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir ce site"
+          }
+        }
+      }
+    },
+    "Créer quand même" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create anyway"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer quand même"
+          }
+        }
+      }
+    },
+    "Abandonner mon site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandon my site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abandonner mon site"
+          }
+        }
+      }
+    },
+    "Corriger ton site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correct your site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriger ton site"
+          }
+        }
+      }
+    },
+    "SQFormal|Corriger ton site" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriger votre site"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce n’est pas le bon site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not the right site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce n’est pas le bon site"
+          }
+        }
+      }
+    },
+    "Le nœud %@ quittera « %@ », le site d’un autre membre, pour celui-ci. « %@ » reste sur la carte avec ses autres cellules." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node %@ will leave “%@”, another member’s site, for this one. “%@” stays on the map with its other cells."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ quittera « %@ », le site d’un autre membre, pour celui-ci. « %@ » reste sur la carte avec ses autres cellules."
+          }
+        }
+      }
+    },
+    "Le nœud %@ quittera le site d’un autre membre pour celui-ci. L’ancien site reste sur la carte avec ses autres cellules." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node %@ will leave another member’s site for this one. That site stays on the map with its other cells."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ quittera le site d’un autre membre pour celui-ci. L’ancien site reste sur la carte avec ses autres cellules."
+          }
+        }
+      }
+    },
+    "Le site officiel ne change pas : ton site portera le nœud %@, et l’écart restera visible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The official site does not change: your site will carry node %@, and the difference stays visible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le site officiel ne change pas : ton site portera le nœud %@, et l’écart restera visible."
+          }
+        }
+      }
+    },
+    "SQFormal|Le site officiel ne change pas : ton site portera le nœud %@, et l’écart restera visible." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le site officiel ne change pas : votre site portera le nœud %@, et l’écart restera visible."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le nœud %@ sera rattaché à ton nouveau site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Node %@ will be linked to your new site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ sera rattaché à ton nouveau site."
+          }
+        }
+      }
+    },
+    "SQFormal|Le nœud %@ sera rattaché à ton nouveau site." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nœud %@ sera rattaché à votre nouveau site."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce nœud a déjà un site : le nouveau site n’a pas été ajouté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This node already has a site: the new site was not added."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nœud a déjà un site : le nouveau site n’a pas été ajouté."
+          }
+        }
+      }
+    },
+    "Site abandonné : il ne sera pas envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site abandoned: it will not be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site abandonné : il ne sera pas envoyé."
+          }
+        }
+      }
+    },
     "Des speedtests le long de la route." : {
       "localizations" : {
         "en" : {

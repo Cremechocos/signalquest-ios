@@ -1716,6 +1716,11 @@ struct MapExplorerView: View {
     /// Cellules retenues pour créer un site — non vide = l'écran de création
     /// est présenté.
     @State private var cellsForNewSite: [AndroidCommunitySiteMarker] = []
+    /// DISPUTED-SITE r1 : envoi en attente « à revoir », présenté jusqu'au choix du membre.
+    @State private var pendingSiteReview: CustomSitePendingReview?
+    /// Revus et refermés sans choix pendant cette session : ils reviennent au prochain lancement.
+    @State private var postponedSiteReviewIds: Set<String> = []
+    @State private var isResolvingSiteReview = false
     @State private var fetchTask: Task<Void, Never>?
     /// Échec du recentrage GPS : un état à part de `model.errorMessage`, dont le
     /// « Réessayer » recharge la carte et non la position.
@@ -1865,8 +1870,28 @@ struct MapExplorerView: View {
                 cells: cellsForNewSite,
                 operatorLabel: { model.operatorLabel($0) },
                 service: services.customSites,
+                // « Ce n'est pas le bon site » : la carte n'a pas d'identification pour une cellule
+                // observée, la contestation s'ouvre donc dans le formulaire (écart assumé avec Android).
+                onViewSite: { check in
+                    cellsForNewSite = []
+                    // Laisser la feuille se fermer avant d'en présenter une autre (iOS 16).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openLinkedSite(check) }
+                },
                 onCreated: { Task { await reloadCurrentRegion() } }
             )
+        }
+        .sheet(item: Binding(
+            get: { pendingSiteReview },
+            set: { value in
+                if value == nil, let current = pendingSiteReview { postponedSiteReviewIds.insert(current.id) }
+                pendingSiteReview = value
+            }
+        )) { review in
+            pendingSiteReviewSheet(review)
+        }
+        .task { await refreshPendingSiteReviews() }
+        .onReceive(NotificationCenter.default.publisher(for: .customSitePendingReviewsChanged)) { _ in
+            Task { await refreshPendingSiteReviews() }
         }
         .sheet(item: $selectedPlanned) { site in
             PlannedDetailSheet(
@@ -5384,6 +5409,91 @@ struct MapExplorerView: View {
                 }
             }
         )
+    }
+
+    /// « Voir ce site » (DISPUTED-SITE r1) : la fiche du site que le serveur désigne. Un site
+    /// communautaire s'ouvre s'il est chargé sur la carte ; un site officiel passe par la recherche.
+    private func openLinkedSite(_ check: CustomSiteRadioCheck) {
+        guard let siteId = check.linkedSiteId else { return }
+        if check.currentKind == .custom {
+            guard let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) else {
+                model.showMarketNotice(String(localized: "Site introuvable"))
+                return
+            }
+            mapCenter = CLLocationCoordinate2D(latitude: site.lat, longitude: site.lng)
+            mapZoom = max(mapZoom, 15)
+            selectedCustomSite = site
+            return
+        }
+        router.route(toSite: siteId, market: check.registryMarket)
+    }
+
+    private func refreshPendingSiteReviews() async {
+        let reviews = await services.customSites.pendingReviews()
+        guard pendingSiteReview == nil || !reviews.contains(where: { $0.id == pendingSiteReview?.id }) else { return }
+        pendingSiteReview = reviews.first { !postponedSiteReviewIds.contains($0.id) }
+    }
+
+    private func pendingSiteReviewSheet(_ review: CustomSitePendingReview) -> some View {
+        let linked = CustomSiteAlreadyLinked(
+            check: review.check,
+            radio: review.radio,
+            operatorLabel: review.radio.mobileOperator.map { model.operatorLabel($0) },
+            pending: review
+        )
+        return ScrollView {
+            CustomSiteAlreadyLinkedView(
+                linked: linked,
+                onViewSite: {
+                    postponedSiteReviewIds.insert(review.id)
+                    pendingSiteReview = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openLinkedSite(review.check) }
+                },
+                onCreateAnyway: {
+                    Task { await resolveSiteReview(review, createAnyway: true) }
+                },
+                onAbandon: {
+                    Task { await resolveSiteReview(review, createAnyway: false) }
+                },
+                isBusy: isResolvingSiteReview
+            )
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.xl)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .sqSheet(background: SQColor.bg)
+        .interactiveDismissDisabled(isResolvingSiteReview)
+    }
+
+    private func resolveSiteReview(_ review: CustomSitePendingReview, createAnyway: Bool) async {
+        guard !isResolvingSiteReview else { return }
+        isResolvingSiteReview = true
+        defer { isResolvingSiteReview = false }
+        guard createAnyway else {
+            await services.customSites.abandon(review)
+            pendingSiteReview = nil
+            model.showMarketNotice(String(localized: "Site abandonné : il ne sera pas envoyé."))
+            return
+        }
+        do {
+            let result = try await services.customSites.createAnyway(review)
+            pendingSiteReview = nil
+            Haptics.success()
+            if result.isPending {
+                model.showMarketNotice(String(localized: "Proposition enregistrée. Elle sera envoyée automatiquement dès que la connexion le permettra."))
+            } else {
+                await reloadCurrentRegion()
+            }
+        } catch is CustomSiteAlreadyLinkedError {
+            // Le site actuel a encore changé : la file l'a gardé « à revoir », la feuille se relit.
+            Haptics.error()
+            pendingSiteReview = nil
+            await refreshPendingSiteReviews()
+        } catch {
+            Haptics.error()
+            model.showMarketNotice(error.userFacingMessage)
+        }
     }
 
     /// Deux cellules « au même endroit » : moins de 150 m. Assez large pour

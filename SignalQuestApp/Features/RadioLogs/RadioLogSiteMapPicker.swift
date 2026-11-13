@@ -84,6 +84,9 @@ struct RadioLogSiteMapPicker: View {
     /// officiel ? Ça change ce qu'on peut promettre : ces sites ont été placés à la main.
     @State private var isCommunityFallback = false
     @State private var showsCreateSite = false
+    /// DISPUTED-SITE r1 : « Ce n'est pas le bon site » ramène ici, sur l'identification ; la
+    /// création suivante du même nœud reprend la contestation.
+    @State private var activeDispute: CustomSiteDispute?
     /// Le recadrage sur les anneaux n'a lieu qu'une fois : après, la carte appartient à
     /// l'utilisateur et la lui reprendre en pleine exploration serait insupportable.
     @State private var didFrameOnRings = false
@@ -159,7 +162,13 @@ struct RadioLogSiteMapPicker: View {
                         ],
                         operatorLabel: { $0 },
                         service: customSites,
+                        initialDispute: activeDispute,
+                        onWrongSite: { dispute in
+                            activeDispute = dispute
+                            showsCreateSite = false
+                        },
                         onCreated: {
+                            activeDispute = nil
                             showsCreateSite = false
                             // Forcer le rechargement : le site tout juste créé doit apparaître
                             // comme candidat, sinon on l'a posé sans pouvoir s'y rattacher.

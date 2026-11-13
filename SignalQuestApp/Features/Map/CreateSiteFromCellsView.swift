@@ -15,6 +15,14 @@ struct CreateSiteFromCellsView: View {
     let service: CustomSitesServicing
     /// Appelé après création réussie, pour rafraîchir la carte.
     let onCreated: () -> Void
+    /// Contestation déjà ouverte par « Ce n'est pas le bon site » (DISPUTED-SITE r1).
+    let initialDispute: CustomSiteDispute?
+    /// « Voir ce site » : l'hôte ouvre le site désigné ; nil = pas de bouton.
+    let onViewSite: ((CustomSiteRadioCheck) -> Void)?
+    /// « Ce n'est pas le bon site » / « Corriger ton site » : l'hôte rouvre l'identification sur
+    /// la carte avec la contestation (nil pour son propre site). Sans hôte, la contestation
+    /// s'ouvre ici, dans le formulaire, et son propre site ne se corrige pas d'ici.
+    let onWrongSite: ((CustomSiteDispute?) -> Void)?
 
     @State private var name = ""
     @State private var type = "PYLONE"
@@ -24,6 +32,11 @@ struct CreateSiteFromCellsView: View {
     @State private var errorMessage: String?
     @State private var pendingMessage: String?
     @State private var isQueued = false
+    /// Contrôle du nœud en cours : le bouton attend sa réponse.
+    @State private var isChecking = true
+    /// Le nœud a déjà un site : la feuille du refus remplace le formulaire.
+    @State private var linked: CustomSiteAlreadyLinked?
+    @State private var dispute: CustomSiteDispute?
     @Environment(\.dismiss) private var dismiss
 
     /// Types acceptés par le backend (`ALLOWED_TYPES`). Envoyer autre chose fait
@@ -41,11 +54,17 @@ struct CreateSiteFromCellsView: View {
         cells: [AndroidCommunitySiteMarker],
         operatorLabel: @escaping (String) -> String,
         service: CustomSitesServicing,
+        initialDispute: CustomSiteDispute? = nil,
+        onViewSite: ((CustomSiteRadioCheck) -> Void)? = nil,
+        onWrongSite: ((CustomSiteDispute?) -> Void)? = nil,
         onCreated: @escaping () -> Void
     ) {
         self.cells = cells
         self.operatorLabel = operatorLabel
         self.service = service
+        self.initialDispute = initialDispute
+        self.onViewSite = onViewSite
+        self.onWrongSite = onWrongSite
         self.onCreated = onCreated
         // Centroïde des cellules retenues : le meilleur point de départ dont on
         // dispose, même s'il n'est pas le bon.
@@ -58,7 +77,7 @@ struct CreateSiteFromCellsView: View {
     }
 
     private var draft: CustomSiteDraft {
-        CustomSiteDraft.fromObservedCells(
+        var draft = CustomSiteDraft.fromObservedCells(
             cells,
             latitude: region.center.latitude,
             longitude: region.center.longitude,
@@ -66,9 +85,75 @@ struct CreateSiteFromCellsView: View {
             type: type,
             description: note.isEmpty ? nil : note
         )
+        draft.disputedSiteId = dispute?.siteId
+        return draft
     }
 
     var body: some View {
+        Group {
+            if let linked {
+                alreadyLinked(linked)
+            } else {
+                form
+            }
+        }
+        .task { await checkNode() }
+    }
+
+    /// Le refus sous les yeux du membre : il choisit, la feuille ne se referme pas seule.
+    private func alreadyLinked(_ linked: CustomSiteAlreadyLinked) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    Button("Fermer") { dismiss() }
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .accessibilityIdentifier("createSite.cancel")
+                    Spacer()
+                }
+                CustomSiteAlreadyLinkedView(
+                    linked: linked,
+                    onViewSite: onViewSite.map { open in { open(linked.check) } },
+                    onWrongSite: wrongSiteAction(for: linked),
+                    opensMapIdentification: onWrongSite != nil
+                )
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .sqSheet(background: SQColor.bg)
+    }
+
+    private func wrongSiteAction(for linked: CustomSiteAlreadyLinked) -> (() -> Void)? {
+        let dispute = CustomSiteDispute(check: linked.check, radio: linked.radio)
+        if let onWrongSite {
+            // Son propre site se corrige sur la carte, sans contestation (le serveur la refuserait).
+            return { onWrongSite(linked.isOwn ? nil : dispute) }
+        }
+        guard !linked.isOwn, let dispute else { return nil }
+        return {
+            self.dispute = dispute
+            self.linked = nil
+        }
+    }
+
+    /// DISPUTED-SITE r1 : avant le formulaire, le serveur dit si le nœud a déjà un site. Un échec
+    /// (hors ligne) laisse créer : la création, elle, contrôle toujours.
+    private func checkNode() async {
+        defer { isChecking = false }
+        guard let radio = draft.radio, radio.hasNode else { return }
+        guard let check = try? await service.check(radio), check.blocksCreation else { return }
+        if let initialDispute, initialDispute.applies(to: radio, check: check) {
+            dispute = initialDispute
+            return
+        }
+        linked = CustomSiteAlreadyLinked(check: check, radio: radio, operatorLabel: radio.mobileOperator.map(operatorLabel))
+    }
+
+    private var form: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
@@ -85,6 +170,10 @@ struct CreateSiteFromCellsView: View {
                 typePicker
                 field(String(localized: "Note (facultatif)"), text: $note, placeholder: String(localized: "Ce qui aide à le reconnaître"))
                 radioSummary
+                if let dispute {
+                    SQNotice(message: dispute.formNote, systemImage: "exclamationmark.circle", tone: .warning)
+                        .accessibilityIdentifier("createSite.disputeNote")
+                }
                 if let errorMessage {
                     SQNotice(message: errorMessage, tone: .danger)
                 }
@@ -215,7 +304,7 @@ struct CreateSiteFromCellsView: View {
         }
     }
 
-    private var canSubmit: Bool { draft.isValid && !isSubmitting && !isQueued }
+    private var canSubmit: Bool { draft.isValid && !isSubmitting && !isQueued && !isChecking }
 
     private var submitButton: some View {
         GradientButton(
@@ -244,6 +333,16 @@ struct CreateSiteFromCellsView: View {
             } else {
                 onCreated()
                 dismiss()
+            }
+        } catch let refusal as CustomSiteAlreadyLinkedError {
+            Haptics.error()
+            // Le site actuel a changé depuis le contrôle (ou c'est celui du membre) : la feuille
+            // revient avec ce que le serveur dit maintenant. Sans site désigné, un message suffit.
+            if let check = refusal.check, check.linkedSiteId != nil, let radio = draft.radio {
+                dispute = nil
+                linked = CustomSiteAlreadyLinked(check: check, radio: radio, operatorLabel: radio.mobileOperator.map(operatorLabel))
+            } else {
+                errorMessage = String(localized: "Ce nœud a déjà un site : le nouveau site n’a pas été ajouté.")
             }
         } catch {
             Haptics.error()

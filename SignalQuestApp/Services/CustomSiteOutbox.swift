@@ -6,6 +6,9 @@ struct PendingCustomSiteCreation: Codable, Equatable, Sendable {
     let ownerScopeId: String
     let draft: CustomSiteDraft
     let createdAtMs: Int64
+    /// DISPUTED-SITE r1 : refusé à l'envoi, le nœud ayant trouvé ce site entre-temps. L'envoi
+    /// attend alors le choix du membre et n'est plus rejoué. Absent des fichiers plus anciens.
+    var review: CustomSiteRadioCheck? = nil
 }
 
 private struct CustomSiteOutboxFile: Codable, Sendable {
@@ -101,6 +104,14 @@ actor CustomSiteOutboxStore {
         let ownerScopeId = CustomSiteOutboxOwner.scope(for: userId)
         return try read(ownerScopeId: ownerScopeId).records
             .sorted { $0.createdAtMs < $1.createdAtMs }
+    }
+
+    func markReview(userId: String, requestId: String, check: CustomSiteRadioCheck) throws {
+        let ownerScopeId = CustomSiteOutboxOwner.scope(for: userId)
+        var snapshot = try read(ownerScopeId: ownerScopeId)
+        guard let index = snapshot.records.firstIndex(where: { $0.requestId == requestId }) else { return }
+        snapshot.records[index].review = check
+        try write(snapshot, ownerScopeId: ownerScopeId)
     }
 
     func remove(userId: String, requestId: String) throws {
