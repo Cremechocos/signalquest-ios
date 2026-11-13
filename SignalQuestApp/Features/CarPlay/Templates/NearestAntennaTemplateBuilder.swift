@@ -182,8 +182,8 @@ enum NearestAntennaTemplateBuilder {
         }
         let row = item(
             .antenna,
-            text: antennaTitle(distanceMeters: input.nearestDistanceMeters, bearingDegrees: input.bearingDegrees),
-            detail: antennaDetail(site, isInSector: input.isInSector),
+            text: antennaTitle(distanceMeters: input.nearestDistanceMeters),
+            detail: antennaDetail(site, isInSector: input.isInSector, bearingDegrees: input.bearingDegrees),
             image: operatorBadge(for: site.operators)
         )
         if let showAntenna = actions.showAntenna {
@@ -196,28 +196,35 @@ enum NearestAntennaTemplateBuilder {
         return row
     }
 
-    /// Distance ET direction : la distance seule ne dit pas où regarder.
-    static func antennaTitle(distanceMeters: CLLocationDistance?, bearingDegrees: Double?) -> String {
+    /// La distance seule en titre : avec la direction, le titre se coupait en
+    /// taille Minimum (« Antenne à 208 m, au sud… »), qui est justement ce
+    /// qu'on cherche. La direction ouvre le détail.
+    static func antennaTitle(distanceMeters: CLLocationDistance?) -> String {
         guard let distanceMeters else { return String(localized: "Antenne la plus proche") }
-        let distance = SQUnits.distance(meters: distanceMeters)
-        guard let bearingDegrees else { return String(localized: "Antenne à \(distance)") }
-        let direction = CarPlayDetailTemplateBuilder.compassLabel(bearingDegrees)
-        return String(localized: "Antenne à \(distance), \(direction)")
+        return String(localized: "Antenne à \(SQUnits.distance(meters: distanceMeters))")
     }
 
-    /// Qui émet, si l'on est dans l'axe d'un secteur — ce qui explique une
-    /// bonne réception malgré la distance, et l'inverse — puis la génération la
-    /// plus récente. Dans cet ordre et en mots courts : la ligne de détail tient
-    /// en une quarantaine de caractères sur un écran standard (800 × 480), et
-    /// c'est la fin qui est coupée.
-    static func antennaDetail(_ site: AntennaSite, isInSector: Bool?) -> String {
+    /// Où regarder (« Au sud-est »), qui émet, si l'on est dans l'axe d'un
+    /// secteur — ce qui explique une bonne réception malgré la distance, et
+    /// l'inverse — puis la génération la plus récente. Dans cet ordre et en
+    /// mots courts : la ligne de détail tient en une quarantaine de caractères
+    /// sur un écran standard (800 × 480), et c'est la fin qui est coupée.
+    static func antennaDetail(_ site: AntennaSite, isInSector: Bool?, bearingDegrees: Double? = nil) -> String {
+        let direction = bearingDegrees.map { sentenceCase(CarPlayDetailTemplateBuilder.compassLabel($0)) }
         let axis = isInSector.map {
             $0 ? String(localized: "Dans l'axe") : String(localized: "Hors de l'axe")
         }
-        return [operatorNames(site.operators), axis, newestGeneration(site.technologies)]
+        return [direction, operatorNames(site.operators), axis, newestGeneration(site.technologies)]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
+    }
+
+    /// « au sud-est » → « Au sud-est », « à l'est » → « À l'est » : la direction
+    /// ouvre la ligne.
+    private static func sentenceCase(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
     }
 
     /// « SFR / Bouygues Telecom » : noms complets, clé brute en secours plutôt

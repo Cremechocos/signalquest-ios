@@ -140,15 +140,20 @@ final class CarPlayHereTests: XCTestCase {
 
     // MARK: - Antenne
 
-    /// Distance ET direction : la distance seule ne dit pas où regarder.
+    /// Distance ET direction : la distance seule ne dit pas où regarder. La
+    /// direction ouvre le détail plutôt que de finir le titre, qui se coupait
+    /// en taille Minimum juste avant elle (CarPlay Simulator, 13/11).
     func testAntennaRowGivesDistanceAndDirection() throws {
         let antenna = try XCTUnwrap(row(.antenna, in: Builder.items(
             for: .init(path: cellularPath(), quality: quality(), nearestSite: try site(),
-                       nearestDistanceMeters: 340, bearingDegrees: 90)
+                       nearestDistanceMeters: 340, bearingDegrees: 135)
         )))
         let text = try XCTUnwrap(antenna.text)
-        XCTAssertTrue(text.contains(SQUnits.distance(meters: 340)), text)
-        XCTAssertTrue(text.contains(CarPlayDetailTemplateBuilder.compassLabel(90)), text)
+        XCTAssertEqual(text, String(localized: "Antenne à \(SQUnits.distance(meters: 340))"))
+        let detail = try XCTUnwrap(antenna.detailText)
+        let direction = CarPlayDetailTemplateBuilder.compassLabel(135)
+        XCTAssertTrue(detail.hasPrefix(direction.prefix(1).uppercased() + direction.dropFirst()), detail)
+        XCTAssertTrue(detail.contains("Orange"), detail)
     }
 
     /// Être dans l'axe d'un secteur explique une bonne réception malgré la

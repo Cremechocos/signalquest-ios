@@ -33,7 +33,10 @@ final class CarPlayDriveTripTests: XCTestCase {
         XCTAssertEqual(template.actions.map(\.title), [String(localized: "Démarrer")])
         XCTAssertEqual(template.title, String(localized: "Trajet"))
         XCTAssertEqual(template.items.count, 1, "sans trajet passé, une phrase dit ce que fait l'onglet")
-        XCTAssertFalse(template.items[0].detail?.isEmpty ?? true)
+        let detail = template.items[0].detail ?? ""
+        XCTAssertFalse(detail.isEmpty)
+        // Deux lignes d'une vingtaine de caractères en taille Minimum (13/11).
+        XCTAssertLessThanOrEqual(detail.count, 40, detail)
     }
 
     /// Le dernier trajet se relit avec sa date en titre.

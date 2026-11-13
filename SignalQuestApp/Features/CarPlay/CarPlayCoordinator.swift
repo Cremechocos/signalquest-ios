@@ -443,7 +443,7 @@ final class CarPlayCoordinator {
         let layers = CarPlayMapLayer.available(market: market)
         let generation = beginScreen(.layers)
         layerCountsAt = Date()
-        layerCounts = Dictionary(uniqueKeysWithValues: layers.map { ($0, .loading) })
+        layerCounts = CarPlayMapLayersTemplateBuilder.reloading(layerCounts, layers: layers)
         repaintLayers(list, layers)
         track { [weak self] in
             guard let self else { return }

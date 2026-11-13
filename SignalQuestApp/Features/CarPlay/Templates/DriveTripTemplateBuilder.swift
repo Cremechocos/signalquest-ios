@@ -86,7 +86,10 @@ enum DriveTripTemplateBuilder {
             } else {
                 items = [CPInformationItem(
                     title: String(localized: "Aucun trajet"),
-                    detail: String(localized: "Des speedtests tout au long de la route, placés sur la carte.")
+                    // Courte : la colonne de droite tient deux lignes d'une
+                    // vingtaine de caractères en taille Minimum (CarPlay
+                    // Simulator, 13/11) et coupait l'ancienne phrase.
+                    detail: String(localized: "Des speedtests le long de la route.")
                 )]
             }
             if let notice, !notice.isEmpty {

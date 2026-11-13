@@ -110,7 +110,7 @@ enum CarPlayMapLayerPoints {
                 kind: .outage,
                 // La nature de l'incident d'abord : c'est ce qu'on lit sur la fiche.
                 title: CarPlayDetailTemplateBuilder.outageStatusLabel(site) ?? String(localized: "Site en panne"),
-                subtitle: [operatorName(site.operator), site.commune]
+                subtitle: [operatorName(site.operator), CarPlayDetailTemplateBuilder.communeLabel(site.commune)]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
                 coordinate: coordinate,
                 metric: nil,
@@ -136,7 +136,7 @@ enum CarPlayMapLayerPoints {
                 title: CarPlayDetailTemplateBuilder.statusLabel(status),
                 subtitle: [operatorName(site.operator),
                            NearestAntennaTemplateBuilder.generations(site.technologies),
-                           site.commune ?? ""]
+                           CarPlayDetailTemplateBuilder.communeLabel(site.commune) ?? ""]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
                 coordinate: coordinate,
                 metric: nil,
@@ -173,7 +173,7 @@ enum CarPlayMapLayerPoints {
                 title: type.label,
                 subtitle: [NearestAntennaTemplateBuilder.operatorNames(operators),
                            NearestAntennaTemplateBuilder.generations(site.antennas.map(\.generationRaw)),
-                           site.city]
+                           CarPlayDetailTemplateBuilder.communeLabel(site.city) ?? ""]
                     .filter { !$0.isEmpty }.joined(separator: " · "),
                 coordinate: coordinate,
                 metric: nil,
@@ -221,6 +221,17 @@ enum CarPlayMapLayersTemplateBuilder {
         case loading
         case failed
         case value(Int)
+    }
+
+    /// Ce que montre la liste pendant un recompte : un compte déjà connu
+    /// reste à sa place (revenir à la phrase d'attente toutes les 2 minutes
+    /// faisait clignoter la liste) ; le reste attend.
+    static func reloading(_ previous: [CarPlayMapLayer: Count],
+                          layers: [CarPlayMapLayer]) -> [CarPlayMapLayer: Count] {
+        Dictionary(uniqueKeysWithValues: layers.map { layer in
+            if case .value? = previous[layer] { return (layer, previous[layer]!) }
+            return (layer, .loading)
+        })
     }
 
     static func make(available: [CarPlayMapLayer],

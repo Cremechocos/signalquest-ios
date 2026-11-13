@@ -67,6 +67,50 @@ final class CarPlayMapLayersTests: XCTestCase {
         XCTAssertEqual(point.glyphOverride, CarPlayMapLayer.outages.symbol)
     }
 
+    /// Captures du 13/11 : « INT » et « CHINDRIEUX » s'affichaient tels quels.
+    /// La voiture lit désormais l'incident comme la fiche de l'iPhone.
+    func testOutageReadsTheIncidentLikeTheIPhoneSheet() throws {
+        let interrupted = try outage(id: "int", lat: 45.20, lon: 5.73, operatorName: "BOUYGUES",
+                                     commune: "CHINDRIEUX", raison: "INT")
+        let point = try XCTUnwrap(CarPlayMapLayerPoints.outages([interrupted], around: grenoble).first)
+        XCTAssertEqual(point.title, String(localized: "Interruption de service"))
+        XCTAssertEqual(point.subtitle, "Bouygues Telecom · Chindrieux")
+
+        let card = CarPlayDetailTemplateBuilder.outage(interrupted, userLocation: grenoble, actions: .init())
+        let details = card.items.compactMap(\.detail)
+        XCTAssertTrue(details.contains(String(localized: "Interruption de service")), "\(details)")
+        XCTAssertTrue(details.contains("Bouygues Telecom"), "\(details)")
+        XCTAssertTrue(details.contains("Chindrieux"), "\(details)")
+        XCTAssertFalse(details.contains("INT"), "\(details)")
+
+        let maintenance = try outage(id: "m", lat: 45.20, lon: 5.73, operatorName: "SFR", commune: "Meylan",
+                                     raison: "maint")
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.outageStatusLabel(maintenance),
+                       String(localized: "Maintenance programmée"))
+    }
+
+    /// Un code inconnu laisse parler le détail de l'opérateur, affiché une seule fois.
+    func testUnknownOutageCodeFallsBackToTheOperatorDetail() throws {
+        let explained = try outage(id: "x", lat: 45.20, lon: 5.73, operatorName: "SFR", commune: "Meylan",
+                                   raison: "XYZ", detail: "Coupure électrique")
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.outageStatusLabel(explained), "Coupure électrique")
+        let card = CarPlayDetailTemplateBuilder.outage(explained, userLocation: nil, actions: .init())
+        XCTAssertEqual(card.items.compactMap(\.detail).filter { $0 == "Coupure électrique" }.count, 1)
+
+        let bare = try outage(id: "y", lat: 45.20, lon: 5.73, operatorName: "SFR", commune: "Meylan", raison: "XYZ")
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.outageStatusLabel(bare), "XYZ")
+    }
+
+    /// Seule une commune tout en capitales est remise en forme : « La Tour-du-Pin »
+    /// deviendrait « La Tour-Du-Pin ».
+    func testCommuneLabelOnlyFixesAllCaps() {
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.communeLabel("CHINDRIEUX"), "Chindrieux")
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.communeLabel("La Tour-du-Pin"), "La Tour-du-Pin")
+        XCTAssertEqual(CarPlayDetailTemplateBuilder.communeLabel("Meylan"), "Meylan")
+        XCTAssertNil(CarPlayDetailTemplateBuilder.communeLabel(""))
+        XCTAssertNil(CarPlayDetailTemplateBuilder.communeLabel(nil))
+    }
+
     // MARK: - Sites prévus
 
     func testPlannedSitesShowStatusOperatorAndGenerations() throws {
@@ -205,6 +249,18 @@ final class CarPlayMapLayersTests: XCTestCase {
         }
     }
 
+    /// Le recompte toutes les 2 minutes ne repasse plus par la phrase d'attente
+    /// (captures du 13/11 : la liste clignotait) ; un échec ou une couche jamais
+    /// comptée attend, et une couche qui n'est plus servie disparaît.
+    func testRecountKeepsKnownCounts() {
+        let previous: [CarPlayMapLayer: CarPlayMapLayersTemplateBuilder.Count] = [
+            .antennas: .value(0), .outages: .value(6), .planned: .failed,
+        ]
+        let reloading = CarPlayMapLayersTemplateBuilder.reloading(previous, layers: [.antennas, .changes, .planned, .outages])
+        XCTAssertEqual(reloading, [.antennas: .value(0), .changes: .loading, .planned: .loading, .outages: .value(6)])
+        XCTAssertEqual(CarPlayMapLayersTemplateBuilder.reloading(previous, layers: [.antennas]), [.antennas: .value(0)])
+    }
+
     // MARK: - « Y aller »
 
     func testDirectionsOpenPlansToThePoint() throws {
@@ -313,10 +369,12 @@ final class CarPlayMapLayersTests: XCTestCase {
         )
     }
 
-    private func outage(id: String, lat: Double?, lon: Double?, operatorName: String, commune: String) throws -> OutageSiteLive {
+    private func outage(id: String, lat: Double?, lon: Double?, operatorName: String, commune: String,
+                        raison: String? = nil, detail: String? = nil) throws -> OutageSiteLive {
         let position = [lat.map { "\"lat\": \($0)" }, lon.map { "\"lon\": \($0)" }].compactMap { $0 }
+        let incident = [raison.map { "\"raison\": \"\($0)\"" }, detail.map { "\"detail\": \"\($0)\"" }].compactMap { $0 }
         let fields = (["\"id\": \"\(id)\"", "\"code_site_op\": \"\(id)\"", "\"issueType\": \"down\"",
-                       "\"operator\": \"\(operatorName)\"", "\"commune\": \"\(commune)\""] + position)
+                       "\"operator\": \"\(operatorName)\"", "\"commune\": \"\(commune)\""] + position + incident)
             .joined(separator: ", ")
         return try JSONDecoder.signalQuest.decode(OutageSiteLive.self, from: Data("{\(fields)}".utf8))
     }

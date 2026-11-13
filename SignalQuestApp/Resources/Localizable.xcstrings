@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Des speedtests le long de la route." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests along the road."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des speedtests le long de la route."
+          }
+        }
+      }
+    },
     "Lancer un drive test" : {
       "localizations" : {
         "en" : {
@@ -285,22 +301,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun trajet"
-          }
-        }
-      }
-    },
-    "Des speedtests tout au long de la route, placés sur la carte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speedtests all along the road, placed on the map."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des speedtests tout au long de la route, placés sur la carte."
           }
         }
       }
@@ -821,22 +821,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "Antenne à %@, %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antenna %1$@ away, %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antenne à %1$@, %2$@"
           }
         }
       }
