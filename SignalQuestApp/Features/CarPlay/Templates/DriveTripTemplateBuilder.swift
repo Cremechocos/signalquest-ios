@@ -7,8 +7,8 @@ import CarPlay
 /// `AppServices`) : cet écran ne fait que montrer son état et poser un bouton.
 /// Une seule pression pour démarrer ; un simple avertissement du préflight
 /// (GPS, batterie, réseau restreint) s'affiche sans bloquer ; un vrai blocage
-/// remplace le bouton par une phrase neutre, qui dit pourquoi sans envoyer le
-/// conducteur sur son iPhone.
+/// (`DriveTestHandsFreeStart`) remplace le bouton par une phrase neutre, qui
+/// dit pourquoi sans envoyer le conducteur sur son iPhone.
 @MainActor
 enum DriveTripTemplateBuilder {
     /// CarPlay limite les mises à jour de données à une toutes les 10 s, et
@@ -37,8 +37,9 @@ enum DriveTripTemplateBuilder {
         /// Au repos, avec le dernier trajet s'il existe, et la raison d'un
         /// départ refusé à l'instant (un speedtest qui mesure déjà, par exemple).
         case idle(lastTrip: DriveTestViewModel.SessionRecap?, notice: String?)
-        /// Démarrer est impossible : localisation, stockage ou connexion.
-        case blocked(DriveTestPreflightIssue)
+        /// Démarrer est impossible : premier trajet pas encore présenté,
+        /// localisation, stockage ou connexion.
+        case blocked(DriveTestHandsFreeStart.Refusal)
         case running(Running)
     }
 
@@ -94,8 +95,8 @@ enum DriveTripTemplateBuilder {
             }
             return items
 
-        case .blocked(let issue):
-            let reason = blockingReason(issue)
+        case .blocked(let refusal):
+            let reason = DriveTestHandsFreeStart.reason(refusal)
             return [CPInformationItem(title: reason.title, detail: reason.detail)]
         }
     }
@@ -162,22 +163,6 @@ enum DriveTripTemplateBuilder {
             return parts.isEmpty ? nil : parts.joined(separator: " ")
         case .wired, .other:
             return nil
-        }
-    }
-
-    /// Pourquoi on ne peut pas démarrer, sans consigne : l'écran du véhicule
-    /// ne doit pas envoyer le conducteur sur son téléphone.
-    static func blockingReason(_ issue: DriveTestPreflightIssue) -> (title: String, detail: String) {
-        switch issue.id {
-        case .locationPermission:
-            return (String(localized: "Localisation non autorisée"),
-                    String(localized: "Le trajet a besoin de la position pour placer chaque mesure."))
-        case .storage:
-            return (String(localized: "Espace de stockage faible"),
-                    String(localized: "Il reste \(issue.value ?? 0) Mo, trop peu pour enregistrer un trajet."))
-        case .connectivity, .gpsFix, .battery, .wifi, .constrainedNetwork:
-            return (String(localized: "Connexion indisponible"),
-                    String(localized: "Le speedtest continu nécessite une connexion réseau."))
         }
     }
 

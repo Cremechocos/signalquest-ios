@@ -1025,7 +1025,7 @@ final class CarPlayCoordinator {
     private var tripTicker: Task<Void, Never>?
     /// Alertes « réseau faible » émises pendant le trajet en cours.
     private var tripWeakZones = 0
-    /// Avertissements du préflight au départ depuis la voiture.
+    /// Avertissements du préflight au départ du trajet en cours.
     private var tripStartWarnings: [DriveTestPreflightIssue] = []
     /// Raison d'un départ refusé à l'instant, effacée au départ suivant.
     private var tripNotice: String?
@@ -1061,6 +1061,10 @@ final class CarPlayCoordinator {
     private func driveTestRunningDidChange(_ running: Bool) {
         if running {
             tripWeakZones = 0
+            // Lus au départ, quel qu'il soit (onglet, Siri, iPhone) : ils
+            // s'affichent jusqu'au premier test réussi.
+            tripStartWarnings = DriveTestPreflightPolicy.evaluate(.current(services: services))
+                .issues.filter { $0.severity == .warning }
             startTripTicker()
         } else {
             tripTicker?.cancel()
@@ -1076,17 +1080,16 @@ final class CarPlayCoordinator {
         let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
         // Le bouton n'existait pas, mais l'état a pu changer depuis le dernier
         // rafraîchissement : on repeint la raison au lieu de démarrer.
-        guard !report.isBlocked else {
+        guard DriveTestHandsFreeStart.refusal(disclosureSeen: DriveTestHandsFreeStart.disclosureSeen,
+                                              report: report) == nil else {
             repaintTrip()
             return
         }
-        tripStartWarnings = report.issues.filter { $0.severity == .warning }
         let drive = services.driveTest
         drive.startFromCarPlay()
         // Refus du moteur (un speedtest mesure déjà) : sa raison s'affiche.
         if !drive.isRunning {
             tripNotice = drive.errorMessage
-            tripStartWarnings = []
             repaintTrip()
         }
     }
@@ -1137,8 +1140,9 @@ final class CarPlayCoordinator {
             ))
         }
         let report = DriveTestPreflightPolicy.evaluate(.current(services: services))
-        if let blocking = report.issues.first(where: { $0.severity == .blocking }) {
-            return .blocked(blocking)
+        if let refusal = DriveTestHandsFreeStart.refusal(disclosureSeen: DriveTestHandsFreeStart.disclosureSeen,
+                                                         report: report) {
+            return .blocked(refusal)
         }
         return .idle(lastTrip: drive.lastSessionRecap ?? DriveTestViewModel.SessionRecap.load(), notice: tripNotice)
     }

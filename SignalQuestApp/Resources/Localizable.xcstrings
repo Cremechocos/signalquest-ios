@@ -1,6 +1,278 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Lancer un drive test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a drive test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancer un drive test"
+          }
+        }
+      }
+    },
+    "En voiture, lance un drive test sans écran ; sinon, ouvre le Drive Test prêt à démarrer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the car, starts a drive test with no screen; otherwise opens Drive Test ready to start."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En voiture, lance un drive test sans écran ; sinon, ouvre le Drive Test prêt à démarrer."
+          }
+        }
+      }
+    },
+    "Le Drive Test est prêt dans SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive Test is ready in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Drive Test est prêt dans SignalQuest."
+          }
+        }
+      }
+    },
+    "Arrête le drive test en cours et en donne le bilan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops the current drive test and reads its summary."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrête le drive test en cours et en donne le bilan."
+          }
+        }
+      }
+    },
+    "Aucun drive test en cours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No drive test running."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun drive test en cours."
+          }
+        }
+      }
+    },
+    "Dit ce que vaut le réseau à la position actuelle, d'après les mesures de la communauté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Says how good the network is at the current location, based on community measurements."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit ce que vaut le réseau à la position actuelle, d'après les mesures de la communauté."
+          }
+        }
+      }
+    },
+    "Position indisponible pour l'instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unavailable for now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position indisponible pour l'instant."
+          }
+        }
+      }
+    },
+    "Aucun compte connecté sur SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No account signed in to SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte connecté sur SignalQuest."
+          }
+        }
+      }
+    },
+    "Un drive test est déjà en cours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A drive test is already running."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un drive test est déjà en cours."
+          }
+        }
+      }
+    },
+    "Drive test lancé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test started."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test lancé."
+          }
+        }
+      }
+    },
+    "Drive test lancé. Attention : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test started. Warning: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test lancé. Attention : %@."
+          }
+        }
+      }
+    },
+    "Drive test arrêté, trop court pour être enregistré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test stopped, too short to be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test arrêté, trop court pour être enregistré."
+          }
+        }
+      }
+    },
+    "Drive test arrêté : %@, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test stopped: %@, %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drive test arrêté : %@, %@."
+          }
+        }
+      }
+    },
+    "Pas assez de mesures ici pour juger le réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough measurements here to judge the network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas assez de mesures ici pour juger le réseau."
+          }
+        }
+      }
+    },
+    "%@ chez %@, d'après %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ with %@, based on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ chez %@, d'après %@."
+          }
+        }
+      }
+    },
+    "Premier trajet pas encore présenté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First trip not introduced yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier trajet pas encore présenté"
+          }
+        }
+      }
+    },
+    "Ce qu'un trajet partage est présenté avant le premier départ." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What a trip shares is shown before the first start."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'un trajet partage est présenté avant le premier départ."
+          }
+        }
+      }
+    },
     "Aucun trajet" : {
       "localizations" : {
         "en" : {
@@ -20163,22 +20435,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouverts · %lld"
-          }
-        }
-      }
-    },
-    "Ouvre SignalQuest sur le Drive Test, prêt à démarrer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opens SignalQuest on Drive Test, ready to start."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvre SignalQuest sur le Drive Test, prêt à démarrer."
           }
         }
       }
@@ -41402,7 +41658,6 @@
       }
     },
     "Arrêter le drive test" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

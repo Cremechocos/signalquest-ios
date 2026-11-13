@@ -72,7 +72,7 @@ final class CarPlayDriveTripTests: XCTestCase {
                                                 issue(.storage, .blocking, value: 80),
                                                 issue(.connectivity, .blocking)]
         for blocking in cases {
-            let template = DriveTripTemplateBuilder.make(state: .blocked(blocking),
+            let template = DriveTripTemplateBuilder.make(state: .blocked(.preflight(blocking)),
                                                          actions: .init(start: {}, stop: {}))
             XCTAssertTrue(template.actions.isEmpty, "\(blocking.id)")
             XCTAssertEqual(template.items.count, 1)
@@ -80,7 +80,7 @@ final class CarPlayDriveTripTests: XCTestCase {
             XCTAssertFalse(text.localizedCaseInsensitiveContains("iPhone"), text)
             XCTAssertFalse(text.localizedCaseInsensitiveContains("Réglages"), text)
         }
-        XCTAssertTrue(DriveTripTemplateBuilder.blockingReason(issue(.storage, .blocking, value: 80))
+        XCTAssertTrue(DriveTestHandsFreeStart.reason(.preflight(issue(.storage, .blocking, value: 80)))
             .detail.contains("80"))
     }
 
