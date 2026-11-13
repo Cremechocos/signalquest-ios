@@ -1155,7 +1155,7 @@ struct PhotoDetailView: View {
             SQAvatar(url: comment.avatarUrl, name: comment.userName ?? "?", size: 32)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(comment.userName ?? String(localized: "Utilisateur"))
+                    Text(comment.userName ?? MemberIdentity.someone)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(SQColor.label)
                     Spacer()

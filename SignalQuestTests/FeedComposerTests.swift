@@ -276,7 +276,7 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertTrue(person.following)
         XCTAssertTrue(person.followsMe)
         XCTAssertFalse(person.friend)
-        XCTAssertEqual(person.displayName, String(localized: "Membre"))
+        XCTAssertEqual(person.displayName, MemberIdentity.someone)
     }
 
     /// Une clé absente prend sa valeur par défaut, un élément sans id est écarté :

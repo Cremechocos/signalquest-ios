@@ -2225,7 +2225,7 @@ struct ConversationDetailView: View {
               quotedMessage(for: message) == nil,
               location(for: message) == nil,
               pollsByMessageId[message.id] == nil else { return nil }
-        let sender = mine ? String(localized: "Toi") : (message.sender?.displayName ?? String(localized: "Membre"))
+        let sender = mine ? String(localized: "Toi") : (message.sender?.displayName ?? MemberIdentity.someone)
         let body = message.deletedAt != nil ? String(localized: "Message supprimé") : displayedContent(for: message)
         var parts = [String(localized: "\(sender) : \(body)")]
         if let transcription = transcriptions[message.id], !transcription.isEmpty { parts.append(transcription) }
@@ -2722,7 +2722,7 @@ struct ConversationDetailView: View {
         // « Photo envoyée » se disait aussi des photos reçues (SOC-31).
         .accessibilityLabel(mine
             ? String(localized: "Ta photo")
-            : String(localized: "Photo de \(message.sender?.displayName ?? String(localized: "Membre"))"))
+            : String(localized: "Photo de \(message.sender?.displayName ?? MemberIdentity.someone)"))
         .accessibilityHint("Toucher pour afficher en plein écran")
     }
 
@@ -2971,7 +2971,7 @@ struct ConversationDetailView: View {
         MessageReadInfo.resolve(
             messageDate: message.createdAt ?? .distantFuture,
             currentUserId: currentUserId,
-            participants: conversation.participants.map { (id: $0.userId, name: $0.user.displayName.isEmpty ? nil : $0.user.displayName) },
+            participants: conversation.participants.map { (id: $0.userId, name: $0.user.knownName) },
             readReceipts: readReceipts,
             deliveryReceipts: deliveryReceipts
         )
@@ -6615,7 +6615,7 @@ private struct MessageInfoSheet: View {
                     HStack(spacing: SQSpace.md) {
                         SQAvatar(url: nil, name: member.name ?? "?", size: 32)
                             .accessibilityHidden(true)
-                        Text(verbatim: member.name ?? String(localized: "Un membre"))
+                        Text(verbatim: member.name ?? MemberIdentity.someone)
                             .font(SQType.body)
                             .foregroundStyle(SQColor.label)
                         Spacer(minLength: SQSpace.sm)

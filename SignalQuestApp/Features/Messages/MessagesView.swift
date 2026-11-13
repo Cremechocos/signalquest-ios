@@ -1657,7 +1657,7 @@ struct MessagesView: View {
     private func requestRow(_ conversation: MessageConversation) -> some View {
         let sender = conversation.request?.sender
         let fallback = conversation.displayTitle(excluding: currentUserId)
-        let name = sender?.displayName ?? (fallback.isEmpty ? String(localized: "Membre") : fallback)
+        let name = sender?.displayName ?? (fallback.isEmpty ? MemberIdentity.someone : fallback)
         let preview = lastMessagePreview(conversation)
         let date = conversation.lastMessageAt ?? conversation.request?.createdAt
         let tier = sender?.tier

@@ -91,7 +91,7 @@ struct CloseFriend: Decodable, Identifiable, Equatable {
     let handle: String?
     let avatarUrl: URL?
 
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? "Ami" }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 }
 
 private struct CloseFriendsResponse: Decodable { let closeFriends: [CloseFriend] }

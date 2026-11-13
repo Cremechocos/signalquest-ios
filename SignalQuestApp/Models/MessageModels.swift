@@ -99,12 +99,7 @@ struct MessageRequestSender: Codable, Equatable, Sendable {
 
     var tier: MessageRequestTier? { reputation.flatMap(MessageRequestTier.init(rawValue:)) }
 
-    var displayName: String {
-        for candidate in [name, handle] {
-            if let value = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty { return value }
-        }
-        return String(localized: "Membre")
-    }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 
     init(id: String, handle: String?, name: String?, avatarUrl: URL?, reputation: String?) {
         self.id = id
@@ -451,25 +446,28 @@ struct ConversationParticipant: Decodable, Equatable, Identifiable {
 struct MessageUser: Decodable, Identifiable, Equatable {
     let id: String
     let name: String?
+    /// Nom d'utilisateur, servi à côté du nom depuis l'identité membre v1 (13/11).
+    let handle: String?
     let email: String
     let avatarUrl: URL?
     /// Badges sociaux : ceux accordés par l'équipe, plus celui dérivé de
     /// l'abonnement actif. Même contrat que `SocialFeedAuthor.badges`.
     let badges: [SocialUserBadge]
 
-    /// Jamais l'e-mail complet : il apparaîtrait dans la liste, l'en-tête et
-    /// les Récents de CallKit. Vide quand rien n'est connu : l'appelant choisit
-    /// sa formule (« un membre »).
-    var displayName: String {
-        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
-        return email.components(separatedBy: "@").first ?? ""
-    }
+    /// Nom affiché, sinon @nom d'utilisateur ; `nil` quand rien n'est connu, pour
+    /// l'appelant qui choisit sa formule. Jamais l'e-mail, même tronqué : il apparaîtrait
+    /// dans la liste, l'en-tête et les Récents de CallKit.
+    var knownName: String? { MemberIdentity.name(name, handle: handle) }
 
-    enum CodingKeys: String, CodingKey { case id, name, email, avatarUrl, badges }
+    /// Le nom lu partout : `knownName`, sinon « Quelqu'un ».
+    var displayName: String { knownName ?? MemberIdentity.someone }
 
-    init(id: String, name: String?, email: String, avatarUrl: URL?, badges: [SocialUserBadge] = []) {
+    enum CodingKeys: String, CodingKey { case id, name, handle, email, avatarUrl, badges }
+
+    init(id: String, name: String?, handle: String? = nil, email: String, avatarUrl: URL?, badges: [SocialUserBadge] = []) {
         self.id = id
         self.name = name
+        self.handle = handle
         self.email = email
         self.avatarUrl = avatarUrl
         self.badges = badges
@@ -479,6 +477,7 @@ struct MessageUser: Decodable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
         name = c.decodeFlexibleString(forKey: .name)
+        handle = c.decodeFlexibleString(forKey: .handle)
         email = c.decodeFlexibleString(forKey: .email) ?? ""
         avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
         badges = c.decodeLossyArray([SocialUserBadge].self, forKey: .badges)
@@ -498,7 +497,7 @@ struct MessageSearchUser: Decodable, Identifiable, Equatable {
 
     /// Jamais dérivé de l'e-mail : l'adresse d'un autre membre ne doit pas
     /// s'afficher, même tronquée (SOC-09).
-    var displayName: String { name ?? handle ?? String(localized: "Membre") }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 
     /// Ce qu'on montre sous le nom dans une recherche : le @pseudo, jamais l'e-mail.
     var publicSubtitle: String? { handle.map { "@\($0)" } }

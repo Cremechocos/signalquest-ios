@@ -102,6 +102,8 @@ struct PointsLeaderboardEntry: Decodable, Identifiable, Equatable {
     let rank: Int
     let userId: String?
     let name: String?
+    /// Nom d'utilisateur, servi seulement si le membre a choisi de le montrer au classement.
+    let handle: String?
     let avatarUrl: URL?
     let points: Int?
     let periodPoints: Int?
@@ -109,10 +111,13 @@ struct PointsLeaderboardEntry: Decodable, Identifiable, Equatable {
     let badges: [String]
     let stats: PointsLeaderboardStats?
 
-    enum CodingKeys: String, CodingKey { case rank, userId, id, name, avatarUrl, points, periodPoints, level, badges, stats }
+    enum CodingKeys: String, CodingKey { case rank, userId, id, name, handle, avatarUrl, points, periodPoints, level, badges, stats }
 
     var id: String { userId ?? "rank-\(rank)" }
-    var displayName: String { name ?? "Membre" }
+    /// Avec l'option « nom d'utilisateur au classement », le serveur met aussi le handle dans
+    /// `name`, pour les anciens clients : il se lit alors « @handle ». Sans nom ni handle
+    /// visible, « Quelqu'un ».
+    var displayName: String { MemberIdentity.displayName(name == handle ? nil : name, handle: handle) }
 
     /// Score pertinent pour la période affichée : points de la période quand le
     /// backend les fournit, cumul sinon.
@@ -125,6 +130,7 @@ struct PointsLeaderboardEntry: Decodable, Identifiable, Equatable {
         rank: Int,
         userId: String?,
         name: String?,
+        handle: String? = nil,
         avatarUrl: URL?,
         points: Int?,
         periodPoints: Int?,
@@ -135,6 +141,7 @@ struct PointsLeaderboardEntry: Decodable, Identifiable, Equatable {
         self.rank = rank
         self.userId = userId
         self.name = name
+        self.handle = handle
         self.avatarUrl = avatarUrl
         self.points = points
         self.periodPoints = periodPoints
@@ -148,6 +155,7 @@ struct PointsLeaderboardEntry: Decodable, Identifiable, Equatable {
         rank = (try? c.decode(Int.self, forKey: .rank)) ?? 0
         userId = c.decodeFlexibleString(forKey: .userId) ?? c.decodeFlexibleString(forKey: .id)
         name = c.decodeFlexibleString(forKey: .name)
+        handle = c.decodeFlexibleString(forKey: .handle)
         avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
         points = try? c.decodeIfPresent(Int.self, forKey: .points)
         periodPoints = try? c.decodeIfPresent(Int.self, forKey: .periodPoints)

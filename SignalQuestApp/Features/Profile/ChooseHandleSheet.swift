@@ -168,27 +168,8 @@ struct ChooseHandleSheet: View {
             : String(localized: "Tu pourras changer de nom d’utilisateur dans \(days) jours.")
     }
 
-    /// Normalisation client (aperçu + longueur min) alignée sur le backend :
-    /// minuscule, sans accent, charset `[a-z0-9_.-]`, bords nettoyés, 32 max.
-    static func normalizeHandle(_ value: String) -> String {
-        let folded = value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US"))
-            .lowercased()
-        var result = ""
-        var lastDash = false
-        for ch in folded {
-            if ch == "@" && result.isEmpty { continue }
-            if (ch.isASCII && (ch.isLetter || ch.isNumber)) || ch == "_" || ch == "." || ch == "-" {
-                result.append(ch); lastDash = false
-            } else if !lastDash {
-                result.append("-"); lastDash = true
-            }
-        }
-        while let f = result.first, f == "-" || f == "." || f == "_" { result.removeFirst() }
-        while let l = result.last, l == "-" || l == "." || l == "_" { result.removeLast() }
-        return String(result.prefix(32))
-    }
+    /// Normalisation du serveur, vérifiée sur les vecteurs partagés (`UserHandle`).
+    static func normalizeHandle(_ value: String) -> String { UserHandle.normalize(value) }
 }
 
 /// Quand proposer de choisir un @pseudo : en entrant dans Communauté, où il sert

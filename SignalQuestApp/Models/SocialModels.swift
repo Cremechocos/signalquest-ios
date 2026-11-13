@@ -56,7 +56,7 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
     let badges: [SocialUserBadge]
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
+        MemberIdentity.displayName(name, handle: handle)
     }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio, badges }
@@ -882,7 +882,7 @@ struct SocialUserProfile: Codable, Equatable {
     let statsHidden: Bool
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
+        MemberIdentity.displayName(name, handle: handle)
     }
 
     /// Vrai quand le membre masque ses listes Abonnés / Abonnements : les
@@ -990,9 +990,9 @@ struct SocialFollowPerson: Codable, Identifiable, Equatable, Hashable {
     let followsMe: Bool
     let friend: Bool
 
-    /// Repli « Membre » : une ligne sans nom ni pseudo reste lisible et touchable.
+    /// Repli « Quelqu’un » : une ligne sans nom ni nom d’utilisateur reste lisible et touchable.
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? String(localized: "Membre")
+        MemberIdentity.displayName(name, handle: handle)
     }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, following, followsMe, friend }
@@ -1169,7 +1169,7 @@ struct SocialUserSearchResult: Codable, Identifiable, Equatable {
     let isFriend: Bool?
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
+        MemberIdentity.displayName(name, handle: handle)
     }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend }

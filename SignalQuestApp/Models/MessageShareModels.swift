@@ -48,7 +48,7 @@ struct ShareCardAuthor: Equatable {
     let handle: String?
     let avatarUrl: URL?
 
-    var displayName: String { name?.nilIfEmpty ?? handle?.nilIfEmpty ?? "SignalQuest" }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
     /// Handle normalisé avec « @ » de tête.
     var handleLine: String? {
         guard let h = handle?.nilIfEmpty else { return nil }

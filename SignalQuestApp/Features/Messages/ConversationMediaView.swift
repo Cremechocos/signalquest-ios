@@ -177,7 +177,7 @@ struct ConversationMediaView: View {
     }
 
     private func photoLabel(_ entry: Entry) -> String {
-        let author = entry.message.sender?.displayName ?? String(localized: "Membre")
+        let author = entry.message.sender?.displayName ?? MemberIdentity.someone
         guard let date = entry.message.createdAt else { return String(localized: "Photo de \(author)") }
         return String(localized: "Photo de \(author), \(date.sqFormatted(date: .medium))")
     }
@@ -208,7 +208,7 @@ struct ConversationMediaView: View {
 
     /// « Camille · 12 oct. 14:40 » : qui l'a envoyé et quand.
     private func fileSubtitle(_ entry: Entry) -> String {
-        let author = entry.message.sender?.displayName ?? String(localized: "Membre")
+        let author = entry.message.sender?.displayName ?? MemberIdentity.someone
         guard let date = entry.message.createdAt else { return author }
         return "\(author) · \(date.sqFormatted(date: .medium))"
     }

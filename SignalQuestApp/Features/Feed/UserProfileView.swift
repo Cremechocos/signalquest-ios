@@ -675,7 +675,7 @@ struct UserProfileView: View {
                 avatar
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(profile?.displayName ?? model.prefill?.displayName ?? String(localized: "Utilisateur"))
+                        Text(profile?.displayName ?? model.prefill?.displayName ?? MemberIdentity.someone)
                             .font(SQFont.display(22, .bold, relativeTo: .title2))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(2)

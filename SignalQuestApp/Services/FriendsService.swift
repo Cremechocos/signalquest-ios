@@ -19,7 +19,7 @@ struct Friend: Codable, Identifiable, Equatable {
     let presence: FriendPresence?
 
     var id: String { friendshipId }
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Ami") }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 }
 
 struct FriendRequestUser: Codable, Equatable {
@@ -27,7 +27,7 @@ struct FriendRequestUser: Codable, Equatable {
     let name: String?
     let handle: String?
     let avatarUrl: URL?
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur") }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 }
 
 struct FriendRequest: Codable, Identifiable, Equatable {
@@ -51,7 +51,7 @@ struct BlockedUser: Codable, Identifiable, Equatable {
     let avatarUrl: URL?
     let blockedAt: Date?
     var id: String { userId }
-    var displayName: String { name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur") }
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 }
 
 protocol FriendsServicing: Sendable {

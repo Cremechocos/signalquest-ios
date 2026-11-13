@@ -255,9 +255,8 @@ final class E2EEV2NotificationContextBridge: @unchecked Sendable {
         for conversation in response.conversations {
             for participant in conversation.participants where names.count < 500 {
                 guard E2EEV2PortableInventoryContract.validOpaqueId(participant.userId) else { continue }
-                let user = participant.user
-                let label = user.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let name = (label?.isEmpty == false ? label : user.email.split(separator: "@").first.map(String.init)) ?? ""
+                // Nom affiché, sinon @nom d'utilisateur ; jamais l'e-mail d'un autre membre.
+                let name = participant.user.knownName ?? ""
                 let clean = String(name.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(120))
                 if !clean.isEmpty { names[participant.userId] = clean }
             }

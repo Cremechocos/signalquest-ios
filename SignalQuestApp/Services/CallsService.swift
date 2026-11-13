@@ -118,7 +118,7 @@ struct CallSession: Decodable, Identifiable, Equatable {
         displayName = conversationTitle
             ?? conversation?.title
             ?? callerName
-            ?? caller?.name
+            ?? MemberIdentity.name(caller?.name, handle: caller?.handle)
             ?? decodedParticipants?.first
         isGroup = (try? c.decodeIfPresent(Bool.self, forKey: .isGroup))
             ?? conversation?.isGroup
@@ -149,6 +149,8 @@ struct CallSession: Decodable, Identifiable, Equatable {
 
 private struct CallDisplayEntity: Decodable {
     let name: String?
+    /// Nom d'utilisateur, servi à côté du nom depuis l'identité membre v1 (13/11).
+    let handle: String?
 }
 
 private struct CallConversationSummary: Decodable {
@@ -452,8 +454,10 @@ final class CallsService: CallsServicing {
 private extension KeyedDecodingContainer where Key == CallSession.CodingKeys {
     func decodeLossyParticipants(forKey key: Key) throws -> [String]? {
         guard contains(key) else { return nil }
-        if let values = try? decodeIfPresent([[String: String]].self, forKey: key) {
-            let names = values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
+        if let values = try? decodeIfPresent([CallDisplayEntity?].self, forKey: key) {
+            // Nom affiché, sinon @nom d'utilisateur ; jamais l'e-mail ni l'identifiant d'un
+            // autre membre (identité membre v1).
+            let names = values.compactMap { $0.map { MemberIdentity.displayName($0.name, handle: $0.handle) } }
             // Renvoyer nil (et non []) en cas d'échec/vide : un [] non-nil stoppait le
             // repli `?? otherParticipants` et perdait tous les noms (CALL-DEC-A).
             return names.isEmpty ? nil : names

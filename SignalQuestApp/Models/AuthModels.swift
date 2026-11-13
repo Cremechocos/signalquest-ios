@@ -34,9 +34,9 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
         return copy
     }
 
-    var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? email.components(separatedBy: "@").first ?? "Utilisateur"
-    }
+    /// Nom affiché, sinon @nom d'utilisateur, sinon « Quelqu'un » : jamais l'e-mail, ce nom
+    /// pouvant être montré à d'autres membres.
+    var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 
     var isEmailVerificationPending: Bool { emailVerified == false }
 }

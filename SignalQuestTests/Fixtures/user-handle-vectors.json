@@ -1,0 +1,142 @@
+[
+  {
+    "input": "alex",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "Alex",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "ALEX_92",
+    "normalized": "alex_92",
+    "valid": true
+  },
+  {
+    "input": "@alex",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "@@alex",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "  alex  ",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "alex dupont",
+    "normalized": "alex-dupont",
+    "valid": true
+  },
+  {
+    "input": "Éléonore",
+    "normalized": "eleonore",
+    "valid": true
+  },
+  {
+    "input": "Zoë.B",
+    "normalized": "zoe.b",
+    "valid": true
+  },
+  {
+    "input": "jean-luc",
+    "normalized": "jean-luc",
+    "valid": true
+  },
+  {
+    "input": "-alex-",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "__a__",
+    "normalized": "a",
+    "valid": false
+  },
+  {
+    "input": "._.",
+    "normalized": "",
+    "valid": false
+  },
+  {
+    "input": ".",
+    "normalized": "",
+    "valid": false
+  },
+  {
+    "input": "a",
+    "normalized": "a",
+    "valid": false
+  },
+  {
+    "input": "ab",
+    "normalized": "ab",
+    "valid": true
+  },
+  {
+    "input": "😀alex😀",
+    "normalized": "alex",
+    "valid": true
+  },
+  {
+    "input": "😀",
+    "normalized": "",
+    "valid": false
+  },
+  {
+    "input": "alex😀dupont",
+    "normalized": "alex-dupont",
+    "valid": true
+  },
+  {
+    "input": "日本語",
+    "normalized": "",
+    "valid": false
+  },
+  {
+    "input": "Сергей",
+    "normalized": "",
+    "valid": false
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "valid": true
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "valid": true
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-b",
+    "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "valid": true
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bcd",
+    "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-b",
+    "valid": true
+  },
+  {
+    "input": "alex@mail.com",
+    "normalized": "alex-mail.com",
+    "valid": true
+  },
+  {
+    "input": "a..b",
+    "normalized": "a..b",
+    "valid": true
+  },
+  {
+    "input": "Ñandú_77",
+    "normalized": "nandu_77",
+    "valid": true
+  }
+]

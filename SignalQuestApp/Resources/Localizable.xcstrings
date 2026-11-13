@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Quelqu’un" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Someone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelqu’un"
+          }
+        }
+      }
+    },
     "La demande précédente n’est plus ouverte. Voici la plus récente : vérifie à nouveau l’empreinte." : {
       "localizations" : {
         "en" : {

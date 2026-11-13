@@ -110,8 +110,7 @@ enum E2EEV2MembershipEvents {
         }
 
         private func name(_ userId: String) -> String? {
-            let name = members[userId]?.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-            return name?.isEmpty == false ? name : nil
+            members[userId]?.knownName
         }
 
         func text(_ kind: E2EEV2MembershipEvent.Kind, isGroup: Bool) -> String {

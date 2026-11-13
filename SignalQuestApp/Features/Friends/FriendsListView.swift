@@ -322,7 +322,7 @@ struct FriendsListView: View {
     /// l'expéditeur, qui serait moi), avec l'annulation.
     private func sentRequestRow(_ request: FriendRequest) -> some View {
         let recipient = request.recipient
-        let name: String = recipient?.displayName ?? String(localized: "Utilisateur")
+        let name: String = recipient?.displayName ?? MemberIdentity.someone
         let avatar: URL? = recipient?.avatarUrl
         return HStack(spacing: SQSpace.md) {
             SQAvatar(url: avatar, name: name)
@@ -378,7 +378,7 @@ struct FriendsListView: View {
     }
 
     private func requestRow(_ request: FriendRequest) -> some View {
-        let name = request.user?.displayName ?? String(localized: "Utilisateur")
+        let name = request.user?.displayName ?? MemberIdentity.someone
         return HStack(spacing: SQSpace.sm2) {
             // Le profil du demandeur s'ouvre avant d'accepter.
             Button {

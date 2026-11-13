@@ -560,7 +560,7 @@ struct MapPhotoViewer: View {
     private func commentRow(_ comment: PhotoComment) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text(comment.userName ?? String(localized: "Membre"))
+                Text(comment.userName ?? MemberIdentity.someone)
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 if let date = comment.createdAt {
