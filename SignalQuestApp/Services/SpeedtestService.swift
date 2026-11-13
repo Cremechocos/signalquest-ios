@@ -378,9 +378,17 @@ final class SpeedtestRunGate: @unchecked Sendable {
     }
 }
 
-private enum SpeedtestEngineError: LocalizedError {
+private enum SpeedtestEngineError: LocalizedError, SpeedtestFailureClassifiable {
     case pingFailed
     case noServerReachable
+
+    /// SPEEDTEST-FAIL-1 : « occupés ou injoignables » est une indisponibilité du serveur.
+    var failureCode: String {
+        switch self {
+        case .pingFailed: return "PING_UNREACHABLE"
+        case .noServerReachable: return "TEMPORARILY_UNAVAILABLE"
+        }
+    }
 
     var errorDescription: String? {
         switch self {
@@ -435,8 +443,10 @@ final class CloudflareAutoFallbackPolicy: @unchecked Sendable {
 /// Erreur typée uniquement le temps de sortir du moteur Cloudflare. Elle évite
 /// de confondre une indisponibilité du fournisseur avec un échec du réseau de
 /// l'utilisateur et permet au mode Auto de changer de serveur une seule fois.
-private struct CloudflareSpeedtestFailure: LocalizedError {
+private struct CloudflareSpeedtestFailure: LocalizedError, CloudflareEngineFailure {
     let message: String
+    /// Cause d'origine (hors ligne, TLS…), pour le code d'échec SPEEDTEST-FAIL-1.
+    var underlying: Error? = nil
 
     var errorDescription: String? { message }
 }
@@ -450,6 +460,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let api: APIClient
     private let markets: MarketRegistryServicing
     private let networkOperator: NetworkOperatorServicing
+    /// Dernière clé d'opérateur résolue par IP hors VPN : un test raté la reprend sans
+    /// nouvel appel réseau (SPEEDTEST-FAIL-1, « opérateur s'il est déjà connu »).
+    private let lastResolvedOperatorKey = OSAllocatedUnfairLock<(key: String, at: Date)?>(initialState: nil)
     private let historyCache: DiskCache
     private let pendingCache: DiskCache
     private let legacyHistoryCache = DiskCache(folderName: "SignalQuestSpeedtestHistory")
@@ -552,11 +565,51 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 networkType: IPerfAttemptReporter.networkType(pathStatus.connection, viaVpn: vpnIsActive())
             )
         }
-        return try await IPerfAttemptScope.$current.withValue(attempts) {
-            try await SpeedtestTraceScope.$current.withValue(recorder) {
-                try await runScoped(pathStatus: pathStatus, location: location, settings: settings, progress: progress)
-            }
+        // SPEEDTEST-FAIL-1 : l'étape atteinte suit la progression, que l'écran l'écoute ou non.
+        let probe = SpeedtestFailureProbe()
+        let tracked: SpeedtestProgressHandler = { update in
+            probe.reach(update.phase)
+            progress?(update)
         }
+        SpeedtestFailureReporter.noteRunStarted()
+        do {
+            let result = try await SpeedtestFailureProbe.$current.withValue(probe) {
+                try await IPerfAttemptScope.$current.withValue(attempts) {
+                    try await SpeedtestTraceScope.$current.withValue(recorder) {
+                        try await runScoped(pathStatus: pathStatus, location: location, settings: settings, progress: tracked)
+                    }
+                }
+            }
+            _ = SpeedtestFailureReporter.noteRunEnded()
+            return result
+        } catch {
+            let stop = SpeedtestFailureReporter.noteRunEnded()
+            recordFailure(error, cancelled: Task.isCancelled, stop: stop, probe: probe, pathStatus: pathStatus)
+            throw error
+        }
+    }
+
+    /// Une ligne anonyme par test raté (SPEEDTEST-FAIL-1), mise en file : l'envoi vient plus tard.
+    /// L'opérateur n'est que celui déjà résolu par IP dans ce lancement, sans nouvel appel.
+    private func recordFailure(_ error: Error, cancelled: Bool, stop: SpeedtestFailure.Stop?,
+                               probe: SpeedtestFailureProbe, pathStatus: NetworkPathStatus) {
+        guard SpeedtestFailureReporter.isLiveEnvironment,
+              let code = SpeedtestFailure.code(for: error, cancelled: cancelled, stop: stop) else { return }
+        let viaVpn = vpnIsActive()
+        let reached = probe.snapshot
+        let known = lastResolvedOperatorKey.withLock { value -> String? in
+            guard let value, Date().timeIntervalSince(value.at) < 30 * 60 else { return nil }
+            return value.key
+        }
+        let line = SpeedtestFailure.Line(
+            code: code,
+            phase: reached.phase,
+            engine: reached.engine,
+            technology: SpeedtestFailure.technology(pathStatus, viaVpn: viaVpn),
+            operatorKey: SpeedtestFailure.operatorKey(known, status: pathStatus, viaVpn: viaVpn),
+            quarterStart: SpeedtestFailure.quarterStart(Date())
+        )
+        Task { await SpeedtestFailureReporter.shared.record(line) }
     }
 
     private func runScoped(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings,
@@ -1577,6 +1630,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         fallbackReason: String? = nil,
         requestedServerId: String? = nil
     ) async throws -> SpeedtestRunResult {
+        SpeedtestFailureProbe.current?.use(engine: "cloudflare")
         do {
             return try await runCloudflareTestAttempt(
                 pathStatus: pathStatus,
@@ -1592,7 +1646,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            throw CloudflareSpeedtestFailure(message: error.localizedDescription)
+            throw CloudflareSpeedtestFailure(message: error.localizedDescription, underlying: error)
         }
     }
 
@@ -1974,6 +2028,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         preferredHost: String? = nil,
         progress: SpeedtestProgressHandler?
     ) async throws -> SpeedtestRunResult {
+        SpeedtestFailureProbe.current?.use(engine: "librespeed")
         // Serveur choisi manuellement (par hostname) sinon le plus proche.
         let server = (preferredHost.flatMap { host in libreSpeedServers.first { $0.hostname == host } })
             ?? nearestLibreSpeedServer(to: location)
@@ -2308,6 +2363,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil,
         onPortAttempt: (@Sendable (_ port: UInt16, _ attempt: Int) -> Void)? = nil
     ) async throws -> (IPerf3Result, UInt16) {
+        SpeedtestFailureProbe.current?.use(engine: "iperf3")
         let lo = min(portMin, portMax)
         let hi = max(portMin, portMax)
         let siblingPorts = iperfSiblingCandidatePorts(
@@ -2468,6 +2524,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 market = registry.markets.first { $0.operatorEntry(forKey: key) != nil }
                 operatorEntry = market?.operatorEntry(forKey: key)
             }
+        }
+        if let key = trusted?.operatorKey ?? operatorEntry?.key {
+            lastResolvedOperatorKey.withLock { $0 = (key, Date()) }
         }
         return CellularOperatorContext(
             // Le réseau utilisé vient de la résolution IP ; le nom CoreTelephony
@@ -2815,6 +2874,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let endpoint = APIEndpoint(path: "/api/speedtests", method: .post,
             headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(payload),
             authenticated: false, idempotencyKey: pending.id)
+        // Jamais d'envoi d'échecs dans la même minute qu'un speedtest réussi (SPEEDTEST-FAIL-1).
+        SpeedtestFailureReporter.noteSpeedtestPost()
         let (data, http) = try await api.performSingleAttempt(endpoint, fixedAuthToken: token, expectedSession: session)
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode == 429 {

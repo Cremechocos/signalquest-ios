@@ -1710,6 +1710,9 @@ struct SpeedtestView: View {
     }
 
     private func stop() {
+        // Arrêt par le membre : si le test en cours échoue de ce fait, il compte comme
+        // `CANCELLED` (SPEEDTEST-FAIL-1). Un arrêt par l'app ne laisse aucune ligne.
+        if isRunning { SpeedtestFailureReporter.noteMemberStop() }
         keepPartialBurstSummary()
         runSessionID = nil
         runTask?.cancel()

@@ -370,6 +370,8 @@ struct AppRootView: View {
                     services.routing.activate(windowRouter)
                     // Badge de l'icône : le nombre de conversations non lues connu, et non 0 (M16).
                     services.syncIconBadge()
+                    // Échecs de speedtest en attente : l'envoi part si son heure est venue (SPEEDTEST-FAIL-1).
+                    Task { await SpeedtestFailureReporter.shared.flushIfDue() }
                     // Jeton illisible au lancement (Keychain pas encore déverrouillé) :
                     // on relance l'amorçage au retour au premier plan.
                     if case .offline = session.state, session.credentialsAreUnreadable {

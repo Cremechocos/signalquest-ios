@@ -85,6 +85,7 @@
 		11212542CAB05EE14B4DE4F3 /* PhotoBlurTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393D6270FEE97B4716E3BED8 /* PhotoBlurTests.swift */; };
 		11C64CBAF87EBE6915652C0B /* SentinelleListOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42B46F01A99508A96172EE09 /* SentinelleListOrder.swift */; };
 		1234F1B035A6A4539442AF80 /* ForcedUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A07829DA27967AD22385C1 /* ForcedUpdateView.swift */; };
+		126607AD9DE544C3E53FADD8 /* SpeedtestFailureReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029242AABDC7AEA1544B1EFA /* SpeedtestFailureReporter.swift */; };
 		127B726895103D5F61859659 /* ExperienceResultTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D875A321180FB71301837D5 /* ExperienceResultTextTests.swift */; };
 		129767B0543910858ADE3D56 /* MemberIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3055124624D9783189685A19 /* MemberIdentity.swift */; };
 		13135940288C095189022C0B /* MapViewportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEAF7F0495FE8D2DDDA7419C /* MapViewportServiceTests.swift */; };
@@ -400,6 +401,7 @@
 		6487B42BE6FAE8031462A8A6 /* AntennaSightOriginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A82FDDDBCE3DAE2BB286C11 /* AntennaSightOriginTests.swift */; };
 		64ED0D522FBEACC4E8B0CDD1 /* ExperienceTestsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F8765D024ADFB20FDF2E17 /* ExperienceTestsService.swift */; };
 		658A7AFE3AE3E2DBF9E452F2 /* MessageNotificationCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2B6F4A6B5D82D43D85F763 /* MessageNotificationCategory.swift */; };
+		66593144C599C4ED55E51BC9 /* SpeedtestFailureReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0229C39BD5E32397A493BBF /* SpeedtestFailureReporterTests.swift */; };
 		669A95D9E954E5641284B736 /* QualityScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */; };
 		66CF67A62105B8047EEED4B5 /* ExperienceUseRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A431EC09B58D4AB1AAC3FB8 /* ExperienceUseRow.swift */; };
 		672183DACBB6AB9BEE7D08E2 /* MediaLocationScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67041DF58C8856842D09A83F /* MediaLocationScrubber.swift */; };
@@ -1043,6 +1045,7 @@
 		01FE02A0F087D4A16982BBDA /* CallDiscretionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallDiscretionTests.swift; sourceTree = "<group>"; };
 		02157A71BB1824BEF2B916FE /* SupportedNetworkRequiredTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedNetworkRequiredTests.swift; sourceTree = "<group>"; };
 		0228C7CFC678C0828EB7493B /* SpeedtestBackendInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestBackendInteropTests.swift; sourceTree = "<group>"; };
+		029242AABDC7AEA1544B1EFA /* SpeedtestFailureReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestFailureReporter.swift; sourceTree = "<group>"; };
 		02B8E44000E7F6CDC6104D82 /* NearbyNetworkQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyNetworkQualityService.swift; sourceTree = "<group>"; };
 		032235535FD3F83D7CD6CFBF /* E2EEV2ReportSenderV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2ReportSenderV2Tests.swift; sourceTree = "<group>"; };
 		0372B71199E513FF758E6BEA /* E2EEAutoHistoryKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryKeyStoreTests.swift; sourceTree = "<group>"; };
@@ -1765,6 +1768,7 @@
 		BFE8FE2CEE60ECD0C8EE8109 /* ExperienceSharePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperienceSharePreviewSheet.swift; sourceTree = "<group>"; };
 		BFFDE5301B27871440AFD669 /* MapPartialTilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPartialTilesTests.swift; sourceTree = "<group>"; };
 		C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareImageRenderer.swift; sourceTree = "<group>"; };
+		C0229C39BD5E32397A493BBF /* SpeedtestFailureReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestFailureReporterTests.swift; sourceTree = "<group>"; };
 		C026837131445322AC2E550D /* SpeedtestWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestWidget.swift; sourceTree = "<group>"; };
 		C07ACC9D1192AB45142AE044 /* DriveTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestView.swift; sourceTree = "<group>"; };
 		C0990B1A078A21371068E114 /* RadioLogSiteMapPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogSiteMapPicker.swift; sourceTree = "<group>"; };
@@ -3056,6 +3060,7 @@
 				1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */,
 				413FB8DE8180198C52ED7167 /* SessionsService.swift */,
 				109A301B55F7538F8267E4DB /* SocialFeedService.swift */,
+				029242AABDC7AEA1544B1EFA /* SpeedtestFailureReporter.swift */,
 				2A7E285B40002E79EA8CC1BB /* SpeedtestService.swift */,
 				852D72B0FCA155AD0410D50F /* StoriesService.swift */,
 				B65D805E20FB169DD0A865C6 /* TerrainService.swift */,
@@ -3343,6 +3348,7 @@
 				3CE5FE39B84901A58588DC3B /* SpeedtestAccountHistoryTests.swift */,
 				0228C7CFC678C0828EB7493B /* SpeedtestBackendInteropTests.swift */,
 				E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */,
+				C0229C39BD5E32397A493BBF /* SpeedtestFailureReporterTests.swift */,
 				F8E5F3734600F0C6CC5DEEFF /* SpeedtestIcmpLiveProgressTests.swift */,
 				70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */,
 				E25A183BF33413186E939C05 /* SpeedtestPublicationDefaultsTests.swift */,
@@ -4376,6 +4382,7 @@
 				FB57CD4C24B26102CCD880A0 /* SpeedtestBurstSummary.swift in Sources */,
 				25A9273C05443640E74D3A52 /* SpeedtestCardView.swift in Sources */,
 				ED9476A999CCD805CDEBF75B /* SpeedtestDetailSheet.swift in Sources */,
+				126607AD9DE544C3E53FADD8 /* SpeedtestFailureReporter.swift in Sources */,
 				88DC8CD2D438DEA6784D2D7E /* SpeedtestHistoryRow.swift in Sources */,
 				7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */,
 				41CCD76BD13F09EF27F0904C /* SpeedtestLiveActivityController.swift in Sources */,
@@ -4783,6 +4790,7 @@
 				6ACAAACFFB0EEABE30B6BA99 /* SpeedtestAccountHistoryTests.swift in Sources */,
 				5FE0C8D3097B332BF85068D7 /* SpeedtestBackendInteropTests.swift in Sources */,
 				4865973FD58147AC8822EADD /* SpeedtestDetailSheetTests.swift in Sources */,
+				66593144C599C4ED55E51BC9 /* SpeedtestFailureReporterTests.swift in Sources */,
 				AF5BAD69202B5C4F35BE1864 /* SpeedtestIcmpLiveProgressTests.swift in Sources */,
 				3D3F1BC367322F152B209083 /* SpeedtestPeakWindowTests.swift in Sources */,
 				C75435201188EE874D2166D2 /* SpeedtestPublicationDefaultsTests.swift in Sources */,
