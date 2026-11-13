@@ -499,8 +499,12 @@ struct MessageSearchUser: Decodable, Identifiable, Equatable {
     /// s'afficher, même tronquée (SOC-09).
     var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 
-    /// Ce qu'on montre sous le nom dans une recherche : le @pseudo, jamais l'e-mail.
-    var publicSubtitle: String? { handle.map { "@\($0)" } }
+    /// Ce qu'on montre sous le nom dans une recherche : le @pseudo, jamais l'e-mail. Sans nom
+    /// affiché, le titre est déjà « @pseudo » (identité v1) : pas de seconde ligne identique.
+    var publicSubtitle: String? {
+        guard MemberIdentity.name(name, handle: nil) != nil else { return nil }
+        return MemberIdentity.name(nil, handle: handle)
+    }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, email, avatarUrl, isFriend, hasPendingRequest, blockedByMe, blockedMe }
 

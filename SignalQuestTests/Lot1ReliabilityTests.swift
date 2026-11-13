@@ -176,8 +176,13 @@ final class Lot1ReliabilityTests: XCTestCase {
     func testMemberSearchShowsTheHandleAndNeverTheEmail() throws {
         let json = Data(#"{"id":"u1","name":null,"handle":"alex","email":"alex@example.com"}"#.utf8)
         let user = try JSONDecoder().decode(MessageSearchUser.self, from: json)
-        XCTAssertEqual(user.displayName, "alex")
-        XCTAssertEqual(user.publicSubtitle, "@alex")
+        // Identité v1 : sans nom affiché, le titre est « @alex », et la ligne du dessous ne le répète pas.
+        XCTAssertEqual(user.displayName, "@alex")
+        XCTAssertNil(user.publicSubtitle)
+        let named = try JSONDecoder().decode(MessageSearchUser.self,
+            from: Data(#"{"id":"u3","name":"Alex G.","handle":"alex","email":"alex@example.com"}"#.utf8))
+        XCTAssertEqual(named.displayName, "Alex G.")
+        XCTAssertEqual(named.publicSubtitle, "@alex")
         let anonymous = try JSONDecoder().decode(MessageSearchUser.self,
             from: Data(#"{"id":"u2","email":"hidden@example.com"}"#.utf8))
         XCTAssertFalse(anonymous.displayName.contains("hidden"))
