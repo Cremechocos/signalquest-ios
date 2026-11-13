@@ -230,4 +230,27 @@ final class SessionDetailProgressiveLoadingTests: XCTestCase {
                        String(localized: "Trop de sessions ouvertes aujourd’hui. Réessaie plus tard."))
         XCTAssertNotEqual(notPublic, seconds)
     }
+
+    /// CV8 (#1228, 13/11) : pays traversés lus dans la liste ou repris de `marketCode`, puis
+    /// « France · Suisse » à partir de deux pays distincts, codes réservés ou inconnus masqués.
+    func testCrossedCountriesFollowTheSharedRules() throws {
+        let decoder = JSONDecoder()
+        let crossing = try decoder.decode(CoverageSession.self, from: Data(#"{"id":"s1","marketCodes":["FR","CH"],"marketCode":"FR"}"#.utf8))
+        XCTAssertEqual(crossing.marketCodes, ["FR", "CH"])
+        let older = try decoder.decode(CoverageSession.self, from: Data(#"{"id":"s2","marketCodes":[],"marketCode":"FR"}"#.utf8))
+        XCTAssertEqual(older.marketCodes, ["FR"])
+        let none = try decoder.decode(CoverageSession.self, from: Data(#"{"id":"s3"}"#.utf8))
+        XCTAssertEqual(none.marketCodes, [])
+
+        let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
+        XCTAssertEqual(CoverageSession.crossedCountryNames(["FR", "CH"], locale: fr), ["France", "Suisse"])
+        XCTAssertEqual(CoverageSession.crossedCountryNames(["FR", "CH"], locale: en), ["France", "Switzerland"])
+        XCTAssertEqual(CoverageSession.crossedCountryNames(["FR"], locale: fr), [], "un seul pays : rien")
+        XCTAssertEqual(CoverageSession.crossedCountryNames([], locale: fr), [])
+        XCTAssertEqual(CoverageSession.crossedCountryNames(["FR", "fr", "CH", "FR"], locale: fr), ["France", "Suisse"])
+        XCTAssertEqual(CoverageSession.crossedCountryNames(["FR", "DROM"], locale: fr), ["France", "Outre-mer"])
+        for reserved in ["ZZ", "EU", "UN", "XA", "QO", "AA", "XY", "F", "FRA", ""] {
+            XCTAssertEqual(CoverageSession.crossedCountryNames(["FR", reserved], locale: fr), [], reserved)
+        }
+    }
 }

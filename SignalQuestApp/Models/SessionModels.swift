@@ -121,6 +121,9 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let seriesOperatorDisplay: [String: SessionSeriesOperatorDisplay]
     /// Modèle du téléphone qui a mesuré ; servi au seul propriétaire du trajet.
     let deviceModel: String?
+    /// CV8 (#1228) : pays traversés, dans l'ordre de première apparition ; `[marketCode]`
+    /// pour un trajet antérieur à la liste.
+    let marketCodes: [String]
 
     /// Trajet connu par son récap seulement : pas de points à montrer.
     var isSummaryOnly: Bool { driveSummary != nil && (totalPoints ?? 0) == 0 }
@@ -132,6 +135,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         case totalPoints, pointCount, distance
         case avgSignalStrength, minSignalStrength, maxSignalStrength
         case operators, technologies, technologiesDetected, showOnMap, seriesOperatorDisplay, deviceModel
+        case marketCodes, marketCode
     }
 
     init(from decoder: Decoder) throws {
@@ -169,7 +173,34 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
             let model = $0.trimmingCharacters(in: .whitespacesAndNewlines)
             return model.isEmpty ? nil : model
         }
+        let codes = c.decodeLossyArray([String].self, forKey: .marketCodes)
+        marketCodes = codes.isEmpty ? c.decodeFlexibleString(forKey: .marketCode).map { [$0] } ?? [] : codes
     }
+
+    /// CV8 (décision d'Alexandre, 13/11) : « France · Suisse » sous le titre d'un trajet, à partir
+    /// de deux pays distincts. Noms dans la langue de l'app, DROM = « Outre-mer » ; un code
+    /// réservé, qui n'est pas un pays ou que `locale` ne sait pas nommer est masqué.
+    static func crossedCountryNames(_ codes: [String], locale: Locale = .current) -> [String] {
+        var names: [String] = []
+        for raw in codes {
+            let code = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            let name: String?
+            if code == "DROM" {
+                name = String(localized: "session.countries.drom", defaultValue: "Outre-mer")
+            } else if code.count == 2, code.allSatisfy({ ("A"..."Z").contains($0) }),
+                      !nonCountryCodes.contains(code),
+                      let named = locale.localizedString(forRegionCode: code), named.uppercased() != code {
+                name = named
+            } else {
+                name = nil
+            }
+            if let name, !names.contains(name) { names.append(name) }
+        }
+        return names.count >= 2 ? names : []
+    }
+
+    /// Codes réservés ou sans pays, que `Locale` nomme pourtant (garde commune aux 3 apps).
+    private static let nonCountryCodes: Set<String> = ["ZZ", "EU", "UN", "XA", "QO", "AA"]
 
     private struct FailableSeriesDisplay: Decodable {
         let value: SessionSeriesOperatorDisplay?

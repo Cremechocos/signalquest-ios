@@ -490,6 +490,15 @@ struct SessionDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .sqHeader()
                     .accessibilityIdentifier("sessionDetail.title")
+                let countries = CoverageSession.crossedCountryNames((model.detail?.session ?? model.session).marketCodes)
+                if !countries.isEmpty {
+                    Text(verbatim: countries.joined(separator: " · "))
+                        .font(SQFont.body(14, .semibold, relativeTo: .callout))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(String(localized: "Pays traversés : \(countries.joined(separator: ", "))"))
+                        .accessibilityIdentifier("sessionDetail.countries")
+                }
                 Text(subtitle)
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
