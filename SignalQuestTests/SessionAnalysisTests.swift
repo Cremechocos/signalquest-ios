@@ -38,8 +38,8 @@ final class SessionAnalysisTests: XCTestCase {
         let free = analysis.operators[0]
         XCTAssertEqual(SessionAnalysisText.operatorLabel(free), "Free Mobile")
         XCTAssertEqual(free.quality?.score, 47)
-        XCTAssertEqual(SessionAnalysisText.headline(free), "Correct · 9 trous")
-        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[1]), "Correct · 1 trou")
+        XCTAssertEqual(SessionAnalysisText.headline(free), "Correct · 9 trous de couverture")
+        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[1]), "Correct · 1 trou de couverture")
         XCTAssertEqual(SessionAnalysisText.recordedLabel(free), "Mesuré sur 98 % du trajet")
         XCTAssertFalse(free.isUnreliable)
         XCTAssertEqual(analysis.noRecord?.source, "server_estimate")
@@ -67,8 +67,8 @@ final class SessionAnalysisTests: XCTestCase {
         let analysis = try decode(json)
         XCTAssertEqual(analysis.operators.map(SessionAnalysisText.operatorLabel), ["Orange (1)", "Orange (2)", "Réseau inconnu", "Réseau inconnu"])
         XCTAssertTrue(analysis.operators[0].isUnreliable)
-        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[0]), "Faible · aucun trou")
-        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[1]), "2 trous", "Niveau inconnu : on ne l'invente pas")
+        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[0]), "Faible · aucun trou de couverture")
+        XCTAssertEqual(SessionAnalysisText.headline(analysis.operators[1]), "2 trous de couverture", "Niveau inconnu : on ne l'invente pas")
         XCTAssertEqual(Set(analysis.operators.map(\.id)).count, 4, "Ids distincts, seriesKey jamais affiché")
     }
 

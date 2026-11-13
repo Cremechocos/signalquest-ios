@@ -24,11 +24,12 @@ enum SessionAnalysisText {
         }
     }
 
+    /// « 2 trous de couverture » : libellé commun aux trois apps (D8, validé le 12/11).
     static func holesLabel(_ holes: Int) -> String {
-        holes == 0 ? String(localized: "aucun trou") : String(localized: "\(holes) trou")
+        holes == 0 ? String(localized: "aucun trou de couverture") : String(localized: "\(holes) trou de couverture")
     }
 
-    /// « Correct · 2 trous » — la ligne d'un opérateur.
+    /// « Correct · 2 trous de couverture » — la ligne d'un opérateur.
     static func headline(_ series: SessionAnalysis.Series) -> String? {
         let level = levelLabel(series.verdict?.level ?? series.quality?.level)
         let holes = series.verdict?.holes.map(holesLabel)

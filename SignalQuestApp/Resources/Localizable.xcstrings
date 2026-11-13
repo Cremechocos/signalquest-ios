@@ -1,6 +1,64 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "aucun trou de couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no coverage holes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucun trou de couverture"
+          }
+        }
+      }
+    },
+    "%lld trou de couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld coverage hole"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld coverage holes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trou de couverture"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trous de couverture"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Ajoute un nom affiché" : {
       "localizations" : {
         "en" : {
@@ -113620,64 +113678,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réseau inconnu"
-          }
-        }
-      }
-    },
-    "aucun trou" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "no holes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "aucun trou"
-          }
-        }
-      }
-    },
-    "%lld trou" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld hole"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld holes"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld trou"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld trous"
-                }
-              }
-            }
           }
         }
       }

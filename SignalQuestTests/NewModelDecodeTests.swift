@@ -582,7 +582,7 @@ final class SessionPostBlockDecodeTests: XCTestCase {
         XCTAssertEqual(block.series.count, 2, "une série illisible ne fait pas tomber les autres")
         let orange = block.series[0]
         XCTAssertEqual(orange.operatorLabel, "Orange")
-        XCTAssertEqual(SessionPostText.headline(orange), "Bon · 1 trou")
+        XCTAssertEqual(SessionPostText.headline(orange), "Bon · 1 trou de couverture")
         XCTAssertEqual(SessionPostText.shares(orange).map(Self.plainSpaces),
                        "5G 34 % · couvert 98 % · bon signal 71 %")
         let sfr = block.series[1]
