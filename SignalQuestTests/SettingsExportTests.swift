@@ -11,6 +11,7 @@ private final class ExportUserService: UserServicing, @unchecked Sendable {
     func profile() async throws -> AuthUser { throw Unused.notImplemented }
     func updateProfile(_ patch: UserProfilePatch) async throws -> AuthUser { throw Unused.notImplemented }
     func checkHandleAvailability(_ handle: String) async throws -> HandleAvailability { throw Unused.notImplemented }
+    func checkPublicHandleAvailability(_ handle: String) async throws -> HandleAvailability { throw Unused.notImplemented }
     func uploadAvatar(data: Data, filename: String, mimeType: String) async throws -> AuthUser { throw Unused.notImplemented }
     func stats() async throws -> UserStats { throw Unused.notImplemented }
     func notificationPreferences() async throws -> NotificationPreferences { throw Unused.notImplemented }

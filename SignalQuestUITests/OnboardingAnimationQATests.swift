@@ -85,7 +85,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         for title in [locale == "fr" ? "Profil" : "Profile", locale == "fr" ? "Communauté" : "Community"] {
             SignalQuestUITestSupport.tab(named: title, in: app).tap()
             XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 15))
-            XCTAssertTrue(app.textFields["Email"].exists)
+            XCTAssertTrue(app.textFields["login.identifier"].exists)
             XCTAssertFalse(app.buttons["login.continueGuest"].exists)
         }
         SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app).tap()
@@ -291,7 +291,7 @@ final class OnboardingAnimationQATests: XCTestCase {
             let map = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app)
             XCTAssertTrue(map.waitForExistence(timeout: 20))
             XCTAssertTrue(map.isSelected)
-            XCTAssertFalse(app.textFields["Email"].isHittable)
+            XCTAssertFalse(app.textFields["login.identifier"].isHittable)
             XCTAssertFalse(app.buttons["guest.close"].exists)
             XCTAssertFalse(app.alerts.firstMatch.exists, "A destination must not request a permission by itself")
             let profile = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)

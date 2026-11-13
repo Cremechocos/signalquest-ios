@@ -165,12 +165,12 @@ enum LocalOfflineOwnership {
 }
 
 protocol AuthServicing: Sendable {
-    func login(email: String, password: String) async throws -> LoginResponse
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse>
+    func login(identifier: String, password: String) async throws -> LoginResponse
+    func signup(email: String, password: String, handle: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse>
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
-    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse
+    func signInWithApple(identityToken: String, fullName: String?, handle: String?, acceptedTerms: Bool) async throws -> LoginResponse
     /// Associe un Apple ID au compte authentifié courant (depuis les Réglages).
     func linkApple(identityToken: String) async throws
     /// Dissocie l'Apple ID du compte authentifié courant.
@@ -267,33 +267,36 @@ final class AuthService: AuthServicing {
     /// Révocation serveur d'une déconnexion : au mieux, jamais bloquante.
     private static let logoutDeadline: Duration = PushNotificationService.signOutDeadline
 
-    func login(email: String, password: String) async throws -> LoginResponse {
+    func login(identifier: String, password: String) async throws -> LoginResponse {
         try await api.requestJSON(
             "/api/auth/login",
-            body: LoginRequest(email: email, password: password),
+            body: LoginRequest(identifier: identifier, password: password),
             authenticated: false,
             responseDeadline: Self.interactiveDeadline
         )
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String? = nil) async throws -> CredentialResponse<LoginResponse> {
+    func signup(email: String, password: String, handle: String, acceptedTerms: Bool, turnstileToken: String? = nil) async throws -> CredentialResponse<LoginResponse> {
         try await api.requestJSONSingleAttemptWithCredentials(
             "/api/auth/signup",
-            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: turnstileToken),
+            body: SignupRequest(email: email, password: password, handle: handle, acceptedTerms: acceptedTerms, turnstileToken: turnstileToken),
             authenticated: false,
             responseDeadline: Self.interactiveDeadline
         )
     }
 
-    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse {
+    func signInWithApple(identityToken: String, fullName: String?, handle: String?, acceptedTerms: Bool) async throws -> LoginResponse {
         struct AppleSignInRequest: Encodable {
             let identityToken: String
             let fullName: String?
+            /// Nom d'utilisateur d'un NOUVEAU compte Apple, envoyé avec le consentement ; un compte
+            /// Apple existant l'ignore.
+            let handle: String?
             let acceptedTerms: Bool
         }
         return try await api.requestJSON(
             "/api/auth/apple",
-            body: AppleSignInRequest(identityToken: identityToken, fullName: fullName, acceptedTerms: acceptedTerms),
+            body: AppleSignInRequest(identityToken: identityToken, fullName: fullName, handle: handle, acceptedTerms: acceptedTerms),
             authenticated: false,
             responseDeadline: Self.interactiveDeadline
         )
@@ -604,6 +607,8 @@ final class AuthSessionViewModel: ObservableObject {
         didSet { if oldValue != state { stateID = UUID(); profileRevision = UUID() } }
     }
     @Published var errorMessage: String?
+    /// Refus du nom d'utilisateur à l'inscription (e-mail ou Apple) : affiché sous ce champ.
+    @Published var handleErrorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
 
@@ -851,13 +856,13 @@ final class AuthSessionViewModel: ObservableObject {
         state = .authenticated(updated)
     }
 
-    func login(email: String, password: String) async {
+    func login(identifier: String, password: String) async {
         isBusy = true
         errorMessage = nil
         infoMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.login(email: email, password: password)
+            let response = try await service.login(identifier: identifier, password: password)
             // Activation à la connexion (20/10) : le mot de passe, en mémoire
             // quelques minutes, établit le chiffrement du premier appareil.
             if response.user != nil || response.requires2FA == true { E2EEV2LoginActivation.offer(.password(password)) }
@@ -869,6 +874,10 @@ final class AuthSessionViewModel: ObservableObject {
             } else {
                 errorMessage = String(localized: "Réponse auth invalide")
             }
+        } catch APIError.http(401, "INVALID_CREDENTIALS", _, _, _) {
+            // Le serveur dit « Email ou mot de passe incorrect » pour les deux voies ;
+            // l'écran demande un e-mail OU un nom d'utilisateur.
+            errorMessage = String(localized: "Identifiant ou mot de passe incorrect.")
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -903,16 +912,17 @@ final class AuthSessionViewModel: ObservableObject {
         return !checkCredentials || context.credentialID == service.credentialSessionID()
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool,
+    func signup(email: String, password: String, handle: String, acceptedTerms: Bool,
                 proof: MobileChallengeProof, context: PublicFormContext) async {
         guard !isBusy, acceptsPublicForm(context) else { return }
         isBusy = true
         errorMessage = nil
+        handleErrorMessage = nil
         defer { isBusy = false }
         do {
             let token = try proof.consume(for: .signup)
             let received = try await service.signup(
-                email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: token
+                email: email, password: password, handle: handle, acceptedTerms: acceptedTerms, turnstileToken: token
             )
             // Le cookie peut ouvrir une nouvelle génération légitime ; vérifier
             // le reçu de cette réponse, jamais un snapshot relu après son await.
@@ -930,25 +940,46 @@ final class AuthSessionViewModel: ObservableObject {
             }
         } catch {
             guard acceptsPublicForm(context, checkCredentials: false) else { return }
-            errorMessage = error.userFacingMessage
+            if let handleError = Self.handleRefusal(error) {
+                handleErrorMessage = handleError
+            } else {
+                errorMessage = error.userFacingMessage
+            }
+        }
+    }
+
+    /// Nom d'utilisateur refusé à la création du compte (`HANDLE_INVALID`, 400, ou
+    /// `HANDLE_ALREADY_USED`, 409) : aucun compte n'a été créé.
+    static func handleRefusal(_ error: Error) -> String? {
+        guard case APIError.http(_, let code, _, _, _) = error else { return nil }
+        switch code {
+        case "HANDLE_ALREADY_USED": return String(localized: "Déjà pris : choisis-en un autre.")
+        case "HANDLE_INVALID", "INVALID_HANDLE", "EMPTY_HANDLE":
+            return String(localized: "2 caractères minimum (lettres, chiffres, « . », « _ » ou « - »).")
+        default: return nil
         }
     }
 
     enum AppleSignInOutcome: Equatable {
         case continued
         case requiresTerms
+        /// Nouveau compte Apple : nom d'utilisateur refusé, aucun compte créé. Le même jeton
+        /// Apple peut repartir avec un autre nom (`handleErrorMessage`).
+        case handleRejected
         case failed
     }
 
     @discardableResult
-    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool = false) async -> AppleSignInOutcome {
+    func signInWithApple(identityToken: String, fullName: String?, handle: String? = nil,
+                         acceptedTerms: Bool = false) async -> AppleSignInOutcome {
         guard case .loggedOut = state, !isBusy else { return .failed }
         isBusy = true
         errorMessage = nil
+        handleErrorMessage = nil
         defer { isBusy = false }
         do {
             let response = try await service.signInWithApple(identityToken: identityToken, fullName: fullName,
-                                                              acceptedTerms: acceptedTerms)
+                                                              handle: handle, acceptedTerms: acceptedTerms)
             if response.user != nil || response.requires2FA == true { E2EEV2LoginActivation.offer(.apple(identityToken: identityToken)) }
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
@@ -962,6 +993,9 @@ final class AuthSessionViewModel: ObservableObject {
             }
         } catch APIError.http(_, let code, _, _, _) where code == "APPLE_TERMS_REQUIRED" && !acceptedTerms {
             return .requiresTerms
+        } catch where handle != nil && Self.handleRefusal(error) != nil {
+            handleErrorMessage = Self.handleRefusal(error)
+            return .handleRejected
         } catch {
             errorMessage = error.userFacingMessage
             return .failed
@@ -1092,6 +1126,7 @@ extension AuthUser {
         name: "SignalQuest iOS",
         handle: "ios",
         handleChangedAt: nil,
+        handleConfirmedAt: "2026-11-13T00:00:00.000Z",
         avatarUrl: nil,
         bio: nil,
         role: "user",

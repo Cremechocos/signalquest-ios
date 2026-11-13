@@ -27,6 +27,8 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     var signupReplacementBeforeReturn: UUID?
     var appleResponses: [Result<LoginResponse, Error>] = []
     private(set) var appleTermsSent: [Bool] = []
+    private(set) var appleHandlesSent: [String?] = []
+    var loginError: Error?
     var wipeIdentity: (@Sendable () async -> Void)?
     private(set) var identityWipeCalls = 0
     private(set) var cached: AuthUser?
@@ -50,15 +52,18 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     }
 
     // Non exercées.
-    func login(email: String, password: String) async throws -> LoginResponse { throw Unused.notImplemented }
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse> {
+    func login(identifier: String, password: String) async throws -> LoginResponse {
+        throw loginError ?? Unused.notImplemented
+    }
+    func signup(email: String, password: String, handle: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse> {
         guard let signupResponse, let signupCredentialID else { throw Unused.notImplemented }
         credentialID = signupReplacementBeforeReturn ?? signupCredentialID
         return CredentialResponse(value: signupResponse, credentialSessionID: signupCredentialID)
     }
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse { throw Unused.notImplemented }
-    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse {
+    func signInWithApple(identityToken: String, fullName: String?, handle: String?, acceptedTerms: Bool) async throws -> LoginResponse {
         appleTermsSent.append(acceptedTerms)
+        appleHandlesSent.append(handle)
         guard !appleResponses.isEmpty else { throw Unused.notImplemented }
         return try appleResponses.removeFirst().get()
     }
@@ -184,6 +189,40 @@ final class AuthSessionTests: XCTestCase {
         XCTAssertEqual(accepted, .continued)
         XCTAssertEqual(session.state, .authenticated(.mock))
         XCTAssertEqual(service.appleTermsSent, [false, true])
+    }
+
+    /// Identité membre v1 : un nom d'utilisateur refusé ne crée aucun compte ; le même jeton
+    /// Apple repart avec un autre nom.
+    func testAppleHandleRefusalKeepsTheConsentSheetOpen() async {
+        let service = MockAuthService()
+        service.appleResponses = [
+            .failure(APIError.http(status: 409, code: "HANDLE_ALREADY_USED", message: "",
+                                    requestId: nil, retryAfter: nil)),
+            .success(LoginResponse(user: .mock, requires2FA: false, tempToken: nil)),
+        ]
+        let session = AuthSessionViewModel(service: service)
+        await session.bootstrap()
+
+        let refused = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex",
+                                                    acceptedTerms: true)
+        XCTAssertEqual(refused, .handleRejected)
+        XCTAssertEqual(session.state, .loggedOut)
+        XCTAssertNil(session.errorMessage)
+        XCTAssertEqual(session.handleErrorMessage, String(localized: "Déjà pris : choisis-en un autre."))
+        let accepted = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex38",
+                                                     acceptedTerms: true)
+        XCTAssertEqual(accepted, .continued)
+        XCTAssertNil(session.handleErrorMessage)
+        XCTAssertEqual(service.appleHandlesSent, ["alex", "alex38"])
+    }
+
+    func testWrongCredentialsNameBothWaysOfSigningIn() async {
+        let service = MockAuthService()
+        service.loginError = APIError.http(status: 401, code: "INVALID_CREDENTIALS",
+                                           message: "Email ou mot de passe incorrect", requestId: nil, retryAfter: nil)
+        let session = AuthSessionViewModel(service: service)
+        await session.login(identifier: "alex38", password: "synthetic-password")
+        XCTAssertEqual(session.errorMessage, String(localized: "Identifiant ou mot de passe incorrect."))
     }
 
     func testExistingAppleAccountSignsInWithoutInventingAcceptance() async {
@@ -351,7 +390,7 @@ final class AuthSessionTests: XCTestCase {
         let vm = AuthSessionViewModel(service: mock)
         await vm.bootstrap()
         let context = try vm.beginPublicForm()
-        await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", name: "Test",
+        await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", handle: "test",
                         acceptedTerms: true, proof: MobileChallengeProof(action: .signup, token: "synthetic-proof"),
                         context: context)
         XCTAssertEqual(vm.state, .loggedOut)
@@ -383,7 +422,7 @@ final class AuthSessionTests: XCTestCase {
         await vm.bootstrap()
         let context = try vm.beginPublicForm()
         let submission = Task {
-            await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", name: "Test",
+            await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", handle: "test",
                             acceptedTerms: true, proof: MobileChallengeProof(action: .signup, token: "synthetic-proof"),
                             context: context)
         }
@@ -782,7 +821,7 @@ extension AuthSessionTests {
         let mock = MockAuthService()
         let vm = AuthSessionViewModel(service: mock)
         vm.infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
-        await vm.login(email: "qa@example.test", password: "synthetic-password")
+        await vm.login(identifier: "qa@example.test", password: "synthetic-password")
         XCTAssertNil(vm.infoMessage)
     }
 }

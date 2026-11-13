@@ -780,7 +780,7 @@ final class SignalQuestUITests: XCTestCase {
     }
 
     private func login(_ user: AccountSwitchFixture.User, in app: XCUIApplication) {
-        let email = app.textFields["Email"]
+        let email = app.textFields["login.identifier"]
         let password = app.secureTextFields["Mot de passe"]
         XCTAssertTrue(email.waitForExistence(timeout: 15), "Champ e-mail absent")
         XCTAssertTrue(password.waitForExistence(timeout: 5), "Champ mot de passe absent")

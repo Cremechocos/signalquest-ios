@@ -3,6 +3,7 @@ import AuthenticationServices
 
 struct SignupView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var locale
@@ -12,14 +13,14 @@ struct SignupView: View {
     @State private var challengeError: String?
 
     @State private var email = ""
-    @State private var name = ""
+    @StateObject private var username = UsernameAvailabilityModel()
     @State private var password = ""
     @State private var acceptedTerms = false
     @State private var appeared = false
     @State private var pendingAppleConsent: PendingAppleConsent?
     @FocusState private var focus: Field?
 
-    private enum Field { case name, email, password }
+    private enum Field { case username, email, password }
 
     private struct PendingAppleConsent: Identifiable {
         let id = UUID()
@@ -56,15 +57,35 @@ struct SignupView: View {
                     AuthOrDivider()
 
                     AuthFieldGroup {
-                        AuthFieldRow("Nom affiché", isFocused: focus == .name) {
-                            TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ex. Alex Martin"))
-                                .textContentType(.name)
+                        // Identité membre v1 : le nom d'utilisateur est obligatoire, sans « @ » ;
+                        // le nom affiché, facultatif, se propose plus tard.
+                        AuthFieldRow("Nom d’utilisateur", isFocused: focus == .username,
+                                     isError: username.isNegative || session.handleErrorMessage != nil) {
+                            UsernameTextField(text: $username.input, identifier: "auth.signup.username", contentType: nil)
                                 .submitLabel(.next)
-                                .focused($focus, equals: .name)
+                                .focused($focus, equals: .username)
                                 .onSubmit { focus = .email }
-                                .accessibilityLabel("Nom affiché")
-                                .accessibilityIdentifier("auth.signup.name")
-                        } onTap: { focus = .name }
+                        } onTap: { focus = .username }
+                        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                            if let refusal = session.handleErrorMessage {
+                                Label(refusal, systemImage: "xmark")
+                                    .font(SQType.caption(.semibold))
+                                    .foregroundStyle(SQColor.dangerInk)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier("auth.signup.usernameRefusal")
+                                    .sqAnnounce(refusal)
+                            } else {
+                                UsernameStatusLine(model: username)
+                            }
+                            Text("Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : \(UserHandle.profileLink(previewHandle))")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, SQSpace.md2)
+                        .padding(.bottom, SQSpace.sm2)
                         AuthFieldDivider()
                         AuthFieldRow("Email", isFocused: focus == .email) {
                             TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
@@ -113,6 +134,12 @@ struct SignupView: View {
 
                     AuthConsentCheckbox(isOn: $acceptedTerms, identifier: "auth.signup.terms")
 
+                    Text("Tu pourras ajouter un nom affiché dans tes réglages.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                     GradientButton("Créer mon compte", isBusy: session.isBusy || submissionID != nil) {
                         // `canSubmit` exige déjà `acceptedTerms` : on transmet
                         // la valeur réelle plutôt qu'un `true` littéral, pour
@@ -144,7 +171,11 @@ struct SignupView: View {
             // L'erreur est globale à la session : sans cela, celle d'une connexion
             // ratée s'afficherait déjà sous le champ Email à l'ouverture.
             session.errorMessage = nil
+            session.handleErrorMessage = nil
+            // Sans compte : la route publique, qui ne dit rien d'un éventuel titulaire.
+            username.check = { [users = services.users] in try await users.checkPublicHandleAvailability($0) }
         }
+        .onChangeCompat(of: username.input) { _, _ in session.handleErrorMessage = nil }
         .mobileChallenge(using: challenge)
         .onDisappear { cancelSubmission() }
         .onChangeCompat(of: session.state) { _, state in
@@ -177,7 +208,7 @@ struct SignupView: View {
 
     private func submit() {
         guard canSubmit else { return }
-        let id = UUID(), email = trimmedEmail, name = trimmedName, password = password, terms = acceptedTerms
+        let id = UUID(), email = trimmedEmail, handle = username.normalized, password = password, terms = acceptedTerms
         submissionID = id
         challengeError = nil
         submission = Task {
@@ -187,7 +218,7 @@ struct SignupView: View {
                 let proof = try await challenge.request(origin: AppConfig.current.appBaseURL, action: .signup,
                     language: locale.language.languageCode?.identifier ?? "en", theme: colorScheme == .dark ? "dark" : "light")
                 guard !Task.isCancelled, submissionID == id else { return }
-                await session.signup(email: email, password: password, name: name, acceptedTerms: terms,
+                await session.signup(email: email, password: password, handle: handle, acceptedTerms: terms,
                                      proof: proof, context: context)
             } catch {
                 guard !Task.isCancelled, submissionID == id else { return }
@@ -204,7 +235,11 @@ struct SignupView: View {
     }
 
     private var trimmedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// Aperçu du lien de profil sous le champ, avant toute saisie valide.
+    private var previewHandle: String {
+        let value = username.normalized
+        return value.isEmpty ? String(localized: "ton-nom") : value
+    }
 
     /// « S'inscrire avec Apple » : Apple crée le compte à la 1re autorisation
     /// (ou connecte si l'identité existe déjà). Même flux que sur l'écran de login.
@@ -220,12 +255,17 @@ struct SignupView: View {
             let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }
                 .joined(separator: " ")
+            // Un nouveau compte naît avec son nom d'utilisateur : sans nom valide saisi ici, le
+            // consentement n'est pas transmis et l'étape « Une dernière étape » le demande.
+            let handle = username.canSubmit ? username.normalized : nil
             Task {
                 let outcome = await session.signInWithApple(
                     identityToken: identityToken,
                     fullName: fullName.isEmpty ? nil : fullName,
-                    acceptedTerms: acceptedTerms
+                    handle: handle,
+                    acceptedTerms: acceptedTerms && handle != nil
                 )
+                // Nom refusé : le message s'affiche sous le champ de cette page.
                 if case .requiresTerms = outcome {
                     pendingAppleConsent = PendingAppleConsent(identityToken: identityToken,
                                                               fullName: fullName.isEmpty ? nil : fullName)
@@ -239,7 +279,7 @@ struct SignupView: View {
 
     private var canSubmit: Bool {
         !trimmedEmail.isEmpty &&
-        !trimmedName.isEmpty &&
+        username.canSubmit && session.handleErrorMessage == nil &&
         password.count >= 8 &&
         acceptedTerms &&
         !session.isBusy && submissionID == nil && !challenge.isBusy

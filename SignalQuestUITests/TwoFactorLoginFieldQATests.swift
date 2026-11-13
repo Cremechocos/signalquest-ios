@@ -66,7 +66,7 @@ final class TwoFactorLoginFieldQATests: XCTestCase {
         let app = XCUIApplication()
         defer { app.terminate() }
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--reset-onboarding"], locale: locale)
-        let email = app.textFields["Email"]
+        let email = app.textFields["login.identifier"]
         XCTAssertTrue(email.waitForExistence(timeout: 15))
         email.tap(); email.typeText("twofactor-login@example.invalid")
         let password = app.secureTextFields[locale == "fr" ? "Mot de passe" : "Password"]

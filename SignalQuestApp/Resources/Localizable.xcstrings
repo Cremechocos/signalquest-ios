@@ -1,6 +1,286 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Identifiant ou mot de passe incorrect." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incorrect email, username or password."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiant ou mot de passe incorrect."
+          }
+        }
+      }
+    },
+    "Déjà pris : choisis-en un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already taken: choose another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déjà pris : choisis-en un autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Déjà pris : choisis-en un autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déjà pris : choisissez-en un autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "2 caractères minimum (lettres, chiffres, « . », « _ » ou « - »)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least 2 characters (letters, numbers, “.”, “_” or “-”)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 caractères minimum (lettres, chiffres, « . », « _ » ou « - »)."
+          }
+        }
+      }
+    },
+    "Disponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible"
+          }
+        }
+      }
+    },
+    "Disponible, enregistré comme %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available, saved as %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible, enregistré comme %@"
+          }
+        }
+      }
+    },
+    "C’est déjà ton nom d’utilisateur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That’s already your username."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est déjà ton nom d’utilisateur."
+          }
+        }
+      }
+    },
+    "SQFormal|C’est déjà ton nom d’utilisateur." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est déjà votre nom d’utilisateur."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unique and public: it’s how people find and mention you. Your profile: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : %@"
+          }
+        }
+      }
+    },
+    "SQFormal|Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unique et public : c’est par lui qu’on vous trouve et qu’on vous mentionne. Votre profil : %@"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "ton-nom" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "your-name"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ton-nom"
+          }
+        }
+      }
+    },
+    "SQFormal|ton-nom" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "votre-nom"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu pourras ajouter un nom affiché dans tes réglages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can add a display name in your settings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras ajouter un nom affiché dans tes réglages."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu pourras ajouter un nom affiché dans tes réglages." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pourrez ajouter un nom affiché dans vos réglages."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ex. alex38" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E.g. alex38"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. alex38"
+          }
+        }
+      }
+    },
+    "E-mail ou nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Email or username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-mail ou nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "nom@exemple.fr ou alex38" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "name@example.com or alex38"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nom@exemple.fr ou alex38"
+          }
+        }
+      }
+    },
+    "Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, choisis ton nom d’utilisateur et accepte les conditions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No SignalQuest account is linked to this Apple ID yet. To create it, choose your username and accept the terms."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, choisis ton nom d’utilisateur et accepte les conditions."
+          }
+        }
+      }
+    },
+    "SQFormal|Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, choisis ton nom d’utilisateur et accepte les conditions." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, choisissez votre nom d’utilisateur et acceptez les conditions."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Quelqu’un" : {
       "localizations" : {
         "en" : {

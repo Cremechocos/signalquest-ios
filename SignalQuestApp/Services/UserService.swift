@@ -1,14 +1,19 @@
 import Foundation
 
 struct UserProfilePatch: Codable {
+    /// `""` vide le nom affiché (le serveur l'enregistre à `null`) ; `nil` n'y touche pas.
     let name: String?
     let handle: String?
     let bio: String?
     let avatarUrl: String?
+    /// Identité membre v1 : garde le nom d'utilisateur actuel et remplit `handleConfirmedAt`.
+    var confirmHandle: Bool? = nil
 }
 
-/// Réponse de `GET /api/user/profile/handle-availability`.
+/// Réponse de `GET /api/user/profile/handle-availability`, et de sa version publique
+/// `GET /api/auth/handle-availability` (sans compte : `handle` normalisé, `available`, `code`).
 struct HandleAvailability: Codable {
+    var handle: String? = nil
     let available: Bool
     let current: Bool?
     let cooldownActive: Bool?
@@ -195,6 +200,8 @@ protocol UserServicing: Sendable {
     func profile() async throws -> AuthUser
     func updateProfile(_ patch: UserProfilePatch) async throws -> AuthUser
     func checkHandleAvailability(_ handle: String) async throws -> HandleAvailability
+    /// Sans compte, pour l'inscription : aucune information sur un éventuel titulaire.
+    func checkPublicHandleAvailability(_ handle: String) async throws -> HandleAvailability
     func uploadAvatar(data: Data, filename: String, mimeType: String) async throws -> AuthUser
     func stats() async throws -> UserStats
     func notificationPreferences() async throws -> NotificationPreferences
@@ -240,6 +247,17 @@ final class UserService: UserServicing {
             APIEndpoint(
                 path: "/api/user/profile/handle-availability",
                 query: [URLQueryItem(name: "handle", value: handle)]
+            ),
+            as: HandleAvailability.self
+        )
+    }
+
+    func checkPublicHandleAvailability(_ handle: String) async throws -> HandleAvailability {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/auth/handle-availability",
+                query: [URLQueryItem(name: "handle", value: handle)],
+                authenticated: false
             ),
             as: HandleAvailability.self
         )

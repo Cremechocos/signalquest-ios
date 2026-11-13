@@ -208,7 +208,7 @@ final class MobileChallengePresenterTests: XCTestCase {
         let context = try session.beginPublicForm()
         let proof = MobileChallengeProof(action: .signup, token: "synthetic-unused")
         session.enterDemoMode()
-        await session.signup(email: "synthetic@example.invalid", password: "synthetic-password", name: "Test",
+        await session.signup(email: "synthetic@example.invalid", password: "synthetic-password", handle: "test",
                              acceptedTerms: true, proof: proof, context: context)
         XCTAssertEqual(session.state, .authenticated(.mock))
         XCTAssertEqual(try proof.consume(for: .signup), "synthetic-unused")

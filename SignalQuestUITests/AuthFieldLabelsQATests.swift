@@ -39,11 +39,11 @@ final class AuthFieldLabelsQATests: XCTestCase {
         let app = launch(locale: "fr")
         defer { app.terminate() }
 
-        let email = app.textFields["Email"]
+        let email = app.textFields["login.identifier"]
         XCTAssertTrue(email.waitForExistence(timeout: 10))
         email.tap()
         email.typeText("alex@example.invalid")
-        XCTAssertEqual(email.label, "Email", "Nom accessible Email perdu après saisie")
+        XCTAssertEqual(email.label, "E-mail ou nom d’utilisateur", "Nom accessible perdu après saisie")
         let loginShot = XCTAttachment(screenshot: app.screenshot())
         loginShot.name = "login-persistent-labels-fr"
         loginShot.lifetime = .keepAlways
@@ -52,11 +52,11 @@ final class AuthFieldLabelsQATests: XCTestCase {
         let signup = app.buttons["login.signup"]
         XCTAssertTrue(signup.waitForExistence(timeout: 10))
         signup.tap()
-        let name = app.textFields["auth.signup.name"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10))
-        name.tap()
-        name.typeText("Alex")
-        XCTAssertEqual(name.label, "Nom affiché", "Nom accessible perdu après saisie")
+        let username = app.textFields["auth.signup.username"]
+        XCTAssertTrue(username.waitForExistence(timeout: 10))
+        username.tap()
+        username.typeText("alex")
+        XCTAssertEqual(username.label, "Nom d’utilisateur", "Nom accessible perdu après saisie")
     }
 
     func testEnglishRecoveryKeepsEmailLabelAfterTyping() {
@@ -87,12 +87,12 @@ final class AuthFieldLabelsQATests: XCTestCase {
             SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
             defer { app.terminate() }
 
-            let email = app.textFields["Email"]
+            let email = app.textFields["login.identifier"]
             XCTAssertTrue(email.waitForExistence(timeout: 15))
             XCTAssertLessThan(email.frame.width, 600, "Login field stretches across the iPad")
             email.tap()
             email.typeText("ipad-\(locale)@example.invalid")
-            XCTAssertEqual(email.label, "Email")
+            XCTAssertEqual(email.label, locale == "fr" ? "E-mail ou nom d’utilisateur" : "Email or username")
             XCTAssertEqual(email.value as? String, "ipad-\(locale)@example.invalid")
             XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(app.buttons["login.submit"], in: app),
                           "Submit action remains reachable while editing at maximum text size")
@@ -123,7 +123,7 @@ final class AuthFieldLabelsQATests: XCTestCase {
         }
     }
 
-    func testIPadTabMovesSignupInputFromNameToEmailInFrenchAndEnglish() {
+    func testIPadTabMovesSignupInputFromUsernameToEmailInFrenchAndEnglish() {
         continueAfterFailure = false
         for locale in ["fr", "en"] {
             let app = launch(locale: locale)
@@ -133,12 +133,12 @@ final class AuthFieldLabelsQATests: XCTestCase {
             let signup = app.buttons["login.signup"]
             XCTAssertTrue(signup.waitForExistence(timeout: 10))
             signup.tap()
-            let name = app.textFields["auth.signup.name"]
+            let name = app.textFields["auth.signup.username"]
             let email = app.textFields["auth.signup.email"]
             XCTAssertTrue(name.waitForExistence(timeout: 10))
             XCTAssertTrue(email.exists)
             name.tap()
-            name.typeText("QA")
+            name.typeText("qa")
 
             name.typeKey(.tab, modifierFlags: [])
             let focus = XCTAttachment(string: email.debugDescription)
@@ -147,7 +147,7 @@ final class AuthFieldLabelsQATests: XCTestCase {
             add(focus)
             // typeText requires keyboard focus; it does not tap the Email field.
             email.typeText("ipad-\(locale)@example.invalid")
-            XCTAssertEqual(name.value as? String, "QA")
+            XCTAssertEqual(name.value as? String, "qa")
             XCTAssertEqual(email.value as? String, "ipad-\(locale)@example.invalid")
             XCTAssertEqual(email.label, "Email")
 

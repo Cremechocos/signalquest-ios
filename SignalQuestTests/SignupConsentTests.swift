@@ -39,14 +39,15 @@ final class SignupConsentTests: XCTestCase {
     func testSignupTransmitsConsent() async throws {
         let (service, box) = makeService()
         _ = try? await service.signup(
-            email: "a@b.fr", password: "motdepasse", name: "Alex", acceptedTerms: true
+            email: "a@b.fr", password: "motdepasse", handle: "alex", acceptedTerms: true
         )
         XCTAssertEqual(box.path, "/api/auth/signup")
         let json = try XCTUnwrap((try? JSONSerialization.jsonObject(with: box.body ?? Data())) as? [String: Any])
         XCTAssertEqual(json["acceptedTerms"] as? Bool, true,
                        "Sans ce champ, le backend n'enregistre aucune preuve de consentement")
         XCTAssertEqual(json["email"] as? String, "a@b.fr")
-        XCTAssertEqual(json["name"] as? String, "Alex")
+        XCTAssertEqual(json["handle"] as? String, "alex")
+        XCTAssertNil(json["name"], "Le nom affiché, facultatif, ne part plus avec l'inscription")
     }
 
     /// La valeur transmise est la valeur RÉELLE, pas un `true` littéral : un
@@ -55,7 +56,7 @@ final class SignupConsentTests: XCTestCase {
     func testSignupTransmitsRefusalFaithfully() async throws {
         let (service, box) = makeService()
         _ = try? await service.signup(
-            email: "a@b.fr", password: "motdepasse", name: "Alex", acceptedTerms: false
+            email: "a@b.fr", password: "motdepasse", handle: "alex", acceptedTerms: false
         )
         let json = try XCTUnwrap((try? JSONSerialization.jsonObject(with: box.body ?? Data())) as? [String: Any])
         XCTAssertEqual(json["acceptedTerms"] as? Bool, false)
@@ -66,7 +67,7 @@ final class SignupConsentTests: XCTestCase {
     func testEncodedRequestAlwaysCarriesTheKey() throws {
         for accepted in [true, false] {
             let data = try JSONEncoder.signalQuest.encode(
-                SignupRequest(email: "a@b.fr", password: "x", name: "A", acceptedTerms: accepted)
+                SignupRequest(email: "a@b.fr", password: "x", handle: "ab", acceptedTerms: accepted)
             )
             let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
             XCTAssertNotNil(json["acceptedTerms"], "La clé doit toujours être présente")

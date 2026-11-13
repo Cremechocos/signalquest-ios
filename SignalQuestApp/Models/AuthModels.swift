@@ -12,6 +12,9 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     /// cooldown de 30 j côté UI. Décodé en String pour rester indépendant de la stratégie
     /// de dates du décodeur.
     let handleChangedAt: String?
+    /// Identité membre v1 : `nil` tant que le membre n'a ni gardé ni choisi son nom
+    /// d'utilisateur depuis l'écran d'explication. Le changement est alors gratuit.
+    var handleConfirmedAt: String? = nil
     let avatarUrl: URL?
     /// Bio de profil. Peut être absente de `/api/auth/me` ; rechargée via
     /// `/api/user/profile` pour préremplir l'édition sans l'écraser (EDITPROFILE-BUG-01).
@@ -39,11 +42,16 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     var displayName: String { MemberIdentity.displayName(name, handle: handle) }
 
     var isEmailVerificationPending: Bool { emailVerified == false }
+
+    /// L'écran « Ton nom d'utilisateur » est dû : nom d'utilisateur ni gardé ni choisi.
+    var needsHandleConfirmation: Bool {
+        handleConfirmedAt?.isEmpty != false || (handle ?? "").isEmpty
+    }
 }
 
 extension AuthUser {
     private enum Keys: String, CodingKey {
-        case id, email, emailVerified, name, handle, handleChangedAt, avatarUrl, bio, role
+        case id, email, emailVerified, name, handle, handleChangedAt, handleConfirmedAt, avatarUrl, bio, role
         case twoFactorEnabled, notifyMessagesPush, notifySocialPush, notifyMessagesInApp
         case callsDoNotDisturb, appleLinked
     }
@@ -61,6 +69,7 @@ extension AuthUser {
         name = optional(String.self, .name)
         handle = optional(String.self, .handle)
         handleChangedAt = optional(String.self, .handleChangedAt)
+        handleConfirmedAt = optional(String.self, .handleConfirmedAt)
         avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
         bio = optional(String.self, .bio)
         role = optional(String.self, .role) ?? "user"
@@ -75,15 +84,19 @@ extension AuthUser {
 
 // MARK: - Login / signup
 
+/// Identité membre v1 : `identifier` est un e-mail ou un nom d'utilisateur (`email` reste un
+/// alias côté serveur, pour les anciennes versions).
 struct LoginRequest: Codable {
-    let email: String
+    let identifier: String
     let password: String
 }
 
 struct SignupRequest: Codable {
     let email: String
     let password: String
-    let name: String
+    /// Nom d'utilisateur, obligatoire dans l'app ; le serveur le vérifie libre avant de créer le
+    /// compte. Le nom affiché, facultatif, se propose plus tard.
+    let handle: String
     /// Consentement clickwrap aux CGU et à la politique de confidentialité.
     ///
     /// Le backend n'écrit `acceptedTermsVersion` / `acceptedTermsAt` QUE si ce

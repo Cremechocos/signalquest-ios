@@ -34,7 +34,8 @@ struct LoginView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var email = ""
+    /// E-mail ou nom d'utilisateur (identité membre v1).
+    @State private var identifier = ""
     @State private var password = ""
     @State private var code = ""
     @State private var showSignup = false
@@ -43,7 +44,7 @@ struct LoginView: View {
     @State private var appeared = false
     @FocusState private var focus: Field?
 
-    private enum Field { case email, password, code }
+    private enum Field { case identifier, password, code }
 
     private struct PendingAppleConsent: Identifiable {
         let id = UUID()
@@ -78,6 +79,13 @@ struct LoginView: View {
                 // « Créer un compte » en fin d'onboarding : l'inscription s'ouvre
                 // directement, la connexion reste derrière si on la referme.
                 if onboardingEntry.consumeSignupRequest() { showSignup = true }
+                #if DEBUG
+                // Banc : l'étape « Une dernière étape » d'un nouveau compte Apple, avec un jeton
+                // synthétique que le serveur refuserait (rien n'est envoyé sans un toucher).
+                if AppEnvironment.hasQAFlag("apple-terms") {
+                    pendingAppleConsent = PendingAppleConsent(identityToken: "qa-synthetic", fullName: nil)
+                }
+                #endif
             }
             .onChangeCompat(of: code) { _, value in
                 // Six chiffres saisis : le code part seul, le bouton reste pour réessayer.
@@ -89,7 +97,9 @@ struct LoginView: View {
                 NavigationStack { SignupView() }
             }
             .sheet(isPresented: $showForgotPassword) {
-                NavigationStack { ForgotPasswordView(email: email.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                // La réinitialisation passe toujours par l'e-mail : un nom d'utilisateur saisi
+                // ne préremplit rien.
+                NavigationStack { ForgotPasswordView(email: identifierIsEmail ? trimmedIdentifier : "") }
             }
             .sheet(item: $pendingAppleConsent) { credential in
                 AppleTermsConsentSheet(identityToken: credential.identityToken, fullName: credential.fullName) {
@@ -154,17 +164,19 @@ struct LoginView: View {
                 AuthOrDivider()
 
                 AuthFieldGroup {
-                    AuthFieldRow("Email", isFocused: focus == .email) {
-                        TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
+                    AuthFieldRow("E-mail ou nom d’utilisateur", isFocused: focus == .identifier) {
+                        TextField("E-mail ou nom d’utilisateur", text: $identifier,
+                                  prompt: SQFormPrompt.text("nom@exemple.fr ou alex38"))
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .textContentType(.username)
                             .autocorrectionDisabled()
                             .submitLabel(.next)
-                            .focused($focus, equals: .email)
+                            .focused($focus, equals: .identifier)
                             .onSubmit { focus = .password }
-                            .accessibilityLabel("Email")
-                    } onTap: { focus = .email }
+                            .accessibilityLabel("E-mail ou nom d’utilisateur")
+                            .accessibilityIdentifier("login.identifier")
+                    } onTap: { focus = .identifier }
                     AuthFieldDivider()
                     AuthFieldRow("Mot de passe", isFocused: focus == .password) {
                         AuthPasswordInput(label: "Mot de passe", text: $password, contentType: .password)
@@ -205,7 +217,15 @@ struct LoginView: View {
     private func login() {
         guard !session.isBusy else { return }
         focus = nil
-        Task { await session.login(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password) }
+        Task { await session.login(identifier: trimmedIdentifier, password: password) }
+    }
+
+    private var trimmedIdentifier: String { identifier.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Même règle que le serveur : un « @ » après le premier caractère désigne un e-mail.
+    private var identifierIsEmail: Bool {
+        guard let at = trimmedIdentifier.firstIndex(of: "@") else { return false }
+        return at != trimmedIdentifier.startIndex
     }
 
     private var recoveryButton: some View {
@@ -362,7 +382,11 @@ struct AppleTermsConsentSheet: View {
     let onFinish: () -> Void
 
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
     @State private var acceptedTerms = false
+    /// Identité membre v1 : le nom d'utilisateur part dans le même envoi que le consentement.
+    @StateObject private var username = UsernameAvailabilityModel()
+    @FocusState private var usernameFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -379,22 +403,47 @@ struct AppleTermsConsentSheet: View {
                     MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "login.apple.close", action: onFinish)
                         .disabled(session.isBusy)
                 }
-                Text("Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, accepte les conditions.")
+                Text("Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, choisis ton nom d’utilisateur et accepte les conditions.")
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    AuthFieldGroup {
+                        AuthFieldRow("Nom d’utilisateur", isFocused: usernameFocused,
+                                     isError: username.isNegative || session.handleErrorMessage != nil) {
+                            UsernameTextField(text: $username.input, identifier: "login.apple.username")
+                                .submitLabel(.done)
+                                .focused($usernameFocused)
+                        } onTap: { usernameFocused = true }
+                    }
+                    if let refusal = session.handleErrorMessage {
+                        Label(refusal, systemImage: "xmark")
+                            .font(SQType.caption(.semibold))
+                            .foregroundStyle(SQColor.dangerInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("login.apple.usernameRefusal")
+                            .sqAnnounce(refusal)
+                    } else {
+                        UsernameStatusLine(model: username)
+                    }
+                    Text("Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : \(UserHandle.profileLink(username.normalized.isEmpty ? String(localized: "ton-nom") : username.normalized))")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 AuthConsentCheckbox(isOn: $acceptedTerms, identifier: "login.apple.terms")
                 if let error = session.errorMessage {
                     SQNotice(message: error, systemImage: "exclamationmark.triangle", tone: .danger)
                 }
                 GradientButton("Créer mon compte", systemImage: "apple.logo", isBusy: session.isBusy) {
+                    let handle = username.normalized
                     Task {
                         let outcome = await session.signInWithApple(identityToken: identityToken, fullName: fullName,
-                                                                    acceptedTerms: acceptedTerms)
+                                                                    handle: handle, acceptedTerms: acceptedTerms)
                         if case .continued = outcome { onFinish() }
                     }
                 }
-                .disabled(!acceptedTerms || session.isBusy)
+                .disabled(!acceptedTerms || !username.canSubmit || session.handleErrorMessage != nil || session.isBusy)
                 .accessibilityIdentifier("login.apple.accept")
                 Button("Annuler", action: onFinish)
                     .font(SQType.callout(.semibold))
@@ -406,9 +455,14 @@ struct AppleTermsConsentSheet: View {
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .sqSheet(background: SQColor.surface)
         .interactiveDismissDisabled(session.isBusy)
+        .onAppear {
+            session.handleErrorMessage = nil
+            username.check = { [users = services.users] in try await users.checkPublicHandleAvailability($0) }
+        }
+        .onChangeCompat(of: username.input) { _, _ in session.handleErrorMessage = nil }
     }
 }
 

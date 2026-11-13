@@ -102,7 +102,8 @@ final class AuthFormsQATests: XCTestCase {
         try await configure("disabled")
         let app = launch(locale)
         try tap(app.buttons["login.signup"], in: app)
-        try fill(app.textFields["auth.signup.name"], "Synthetic QA", in: app)
+        // Le banc doit servir aussi GET /api/auth/handle-availability (identité membre v1).
+        try fill(app.textFields["auth.signup.username"], "synthetic-qa", in: app)
         try fill(app.textFields["auth.signup.email"], "signup@example.invalid", in: app)
         try fill(app.secureTextFields["auth.signup.password"], "Synthetic-Only-2026!", in: app)
         let submit = app.buttons["auth.signup.submit"]
@@ -121,7 +122,7 @@ final class AuthFormsQATests: XCTestCase {
         XCTAssertEqual(first.signup, 1)
         XCTAssertTrue(first.acceptedTerms && first.hasEmail && first.hasPassword)
         XCTAssertFalse(first.tokenInURL)
-        XCTAssertEqual(app.textFields["auth.signup.name"].value as? String, "Synthetic QA")
+        XCTAssertEqual(app.textFields["auth.signup.username"].value as? String, "synthetic-qa")
         XCTAssertEqual(app.textFields["auth.signup.email"].value as? String, "signup@example.invalid")
         XCTAssertTrue(submit.isEnabled, "Password and consent must remain valid after rejection")
         capture("auth-signup-\(locale)-error-preserved")

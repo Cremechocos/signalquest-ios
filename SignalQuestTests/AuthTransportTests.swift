@@ -88,7 +88,7 @@ final class AuthTransportTests: XCTestCase {
         }
         let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
         let received = try await service.signup(email: "synthetic@example.invalid", password: "synthetic-password",
-                                                name: "Test", acceptedTerms: true)
+                                                handle: "test", acceptedTerms: true)
         XCTAssertNotEqual(received.credentialSessionID, before)
         XCTAssertEqual(received.credentialSessionID, service.credentialSessionID())
         let accepted = client.credentials.snapshot()
@@ -138,6 +138,9 @@ final class AuthTransportTests: XCTestCase {
             XCTAssertEqual(payload["turnstileToken"] as? String, "synthetic-signup-challenge")
             XCTAssertEqual(payload["email"] as? String, "signup@example.invalid")
             XCTAssertEqual(payload["acceptedTerms"] as? Bool, true)
+            // Identité membre v1 : le nom d'utilisateur part avec l'inscription, sans nom affiché.
+            XCTAssertEqual(payload["handle"] as? String, "test")
+            XCTAssertNil(payload["name"])
             XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
             XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
             XCTAssertNil(request.url?.query)
@@ -145,9 +148,33 @@ final class AuthTransportTests: XCTestCase {
                 headerFields: ["Content-Type": "application/json"])!, Data("{\"requires2FA\":false}".utf8))
         }
         let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
-        _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", name: "Test",
+        _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", handle: "test",
                                      acceptedTerms: true, turnstileToken: "synthetic-signup-challenge")
         XCTAssertEqual(log.count, 1)
+    }
+
+    /// Identité membre v1 : la connexion envoie `identifier` (e-mail ou nom d'utilisateur), et Apple
+    /// envoie le nom d'utilisateur d'un nouveau compte avec le consentement.
+    func testLoginSendsTheIdentifierAndAppleSendsTheHandle() async throws {
+        let (client, log) = makeClient(token: nil)
+        MockURLProtocol.requestHandler = { request in
+            log.append(request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.bodyData(request)) as? [String: Any])
+            if request.url?.path == "/api/auth/login" {
+                XCTAssertEqual(payload["identifier"] as? String, "alex38")
+                XCTAssertNil(payload["email"])
+            } else {
+                XCTAssertEqual(request.url?.path, "/api/auth/apple")
+                XCTAssertEqual(payload["handle"] as? String, "alex38")
+                XCTAssertEqual(payload["acceptedTerms"] as? Bool, true)
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"])!, Data("{\"requires2FA\":false}".utf8))
+        }
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        _ = try await service.login(identifier: "alex38", password: "synthetic-password")
+        _ = try await service.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex38", acceptedTerms: true)
+        XCTAssertEqual(log.count, 2)
     }
 
     func testForgotPasswordSendsTheChallengeOnlyInItsRequestBody() async throws {
@@ -186,7 +213,7 @@ final class AuthTransportTests: XCTestCase {
         rejectEveryAttempt(log: log, status: 503)
         let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
         do {
-            _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", name: "Test", acceptedTerms: true)
+            _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", handle: "test", acceptedTerms: true)
             XCTFail("A failed signup must not be reported as success")
         } catch { XCTAssertTrue(error is APIError) }
         XCTAssertEqual(log.count, 1, "A challenge token or account creation must not be replayed automatically")
