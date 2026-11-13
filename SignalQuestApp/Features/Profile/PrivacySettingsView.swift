@@ -109,10 +109,10 @@ struct PrivacySettingsView: View {
                     get: { model.preferences.showHandleOnLeaderboard },
                     set: { value in Task { await model.setShowHandleOnLeaderboard(value) } }
                 )) {
-                    SQSettingsRowLabel("Afficher mon @", systemImage: "trophy",
-                                       subtitle: String(localized: "Au lieu de ton nom dans les classements"))
+                    SQSettingsRowLabel("Afficher mon nom d’utilisateur", systemImage: "trophy",
+                                       subtitle: String(localized: "Au lieu de ton nom affiché dans les classements"))
                 }
-                .accessibilityHint("Les classements sont publics. Ce réglage y remplace ton nom par ton @, sans te retirer du classement.")
+                .accessibilityHint("Les classements sont publics. Ce réglage y remplace ton nom affiché par ton nom d’utilisateur, sans te retirer du classement.")
                 .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
                 SQSettingsMenuRow("Dernière activité visible", systemImage: "clock",
                                   selection: committing($model.lastSeenVisibility),

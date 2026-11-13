@@ -50,8 +50,8 @@ struct EditProfileView: View {
                 avatarEditor
 
                 AuthFieldGroup {
-                    AuthFieldRow("Nom affiché", isFocused: focus == .name) {
-                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ton nom"))
+                    AuthFieldRow("Nom affiché (facultatif)", isFocused: focus == .name) {
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Par exemple : Alexandre G."))
                             .textContentType(.name)
                             .submitLabel(.next)
                             .focused($focus, equals: .name)
@@ -66,7 +66,8 @@ struct EditProfileView: View {
                                 Text("Nom d’utilisateur")
                                     .font(SQType.caption(.bold))
                                     .foregroundStyle(SQColor.labelSecondary)
-                                Text(currentHandle.isEmpty ? String(localized: "Choisir un nom d’utilisateur") : "@\(currentHandle)")
+                                // Sans « @ » dans les formulaires (identité membre v1).
+                                Text(currentHandle.isEmpty ? String(localized: "Choisir un nom d’utilisateur") : currentHandle)
                                     .font(SQType.body)
                                     .foregroundStyle(SQColor.label)
                             }
@@ -145,7 +146,7 @@ struct EditProfileView: View {
             }
         }
         .sheet(isPresented: $showHandleSheet) {
-            // Le @pseudo est déjà enregistré côté serveur : l'en-tête du profil
+            // Le nom d'utilisateur est déjà enregistré côté serveur : l'en-tête du profil
             // le relit sans attendre « Enregistrer » (qui peut ne jamais venir).
             ChooseHandleSheet(onSuccess: { newHandle in
                 currentHandle = newHandle
@@ -155,8 +156,8 @@ struct EditProfileView: View {
         .task { await loadProfileBio() }
     }
 
-    /// Le @pseudo s'enregistre dans sa propre feuille : seuls le nom, la bio et
-    /// la photo attendent « Enregistrer ».
+    /// Le nom d'utilisateur s'enregistre dans sa propre feuille : seuls le nom affiché, la bio
+    /// et la photo attendent « Enregistrer ».
     private var hasChanges: Bool {
         avatarPreview != nil
             || name.trimmingCharacters(in: .whitespacesAndNewlines) != (user.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -204,17 +205,13 @@ struct EditProfileView: View {
     private func save() async {
         isBusy = true
         defer { isBusy = false }
+        // Identité membre v1 : le nom affiché est facultatif. Vidé, il part en `""` (jamais
+        // omis, ce qui ne changeait rien en silence, EDITPROFILE-NAME-EMPTY-06) et le serveur
+        // l'enregistre à `null` : le profil montre alors le nom d'utilisateur.
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Vider le nom était ignoré en silence (nilIfEmpty → clé omise) : l'action
-        // « réussissait » sans rien changer. On refuse un nom vide explicitement
-        // plutôt que de laisser croire à un enregistrement (EDITPROFILE-NAME-EMPTY-06).
-        guard !trimmedName.isEmpty else {
-            error = String(localized: "Le nom ne peut pas être vide.")
-            return
-        }
         do {
-            // Le @handle se choisit/modifie via ChooseHandleSheet (vérif live + cooldown 30 j).
-            // Ici on n'enregistre que le nom (partageable) et la bio.
+            // Le nom d'utilisateur se change dans ChooseHandleSheet (vérification pendant la
+            // saisie, délai de 30 jours). Ici, seuls le nom affiché et la bio.
             // EDITPROFILE-BUG-01 : n'envoyer la bio que si elle a changé. Le backend
             // fait un PUT ; envoyer une bio non rechargée l'écraserait à vide. `nil`
             // est omis par l'encodeur (encodeIfPresent) → la bio existante est préservée.
@@ -253,8 +250,4 @@ struct EditProfileView: View {
             self.error = error.userFacingMessage
         }
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

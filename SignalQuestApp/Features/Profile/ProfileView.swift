@@ -47,7 +47,7 @@ struct ProfileView: View {
         MainThreadHangProbe.mark("profile.push.\(destination)")
         pushed = destination
     }
-    /// Choix du @pseudo depuis l'en-tête quand le compte n'en a pas encore.
+    /// Choix du nom d'utilisateur depuis l'en-tête quand le compte n'en a pas encore.
     @State private var showHandleSheet = false
     @State private var stats: UserStats?
     @State private var statsError: String?
@@ -374,11 +374,14 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.displayName")
                     .sqHeader()
                 if let handle = user.handle, !handle.isEmpty {
-                    Text("@\(handle)")
-                        .font(SQType.callout)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    // Sans nom affiché, le titre montre déjà « @nom d'utilisateur ».
+                    if MemberIdentity.name(user.name, handle: nil) != nil {
+                        Text("@\(handle)")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 } else {
                     Button {
                         showHandleSheet = true

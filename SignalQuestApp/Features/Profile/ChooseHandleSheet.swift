@@ -1,194 +1,123 @@
 import SwiftUI
 
-/// Feuille de choix / changement du @handle (identifiant unique de mention), avec
-/// vérification de disponibilité en temps réel et gestion du cooldown 30 j. Réutilisée
-/// à l'entrée dans Communauté si aucun handle (`HandleGatePolicy`) et par l'édition
-/// de profil.
+/// Feuille de choix ou de changement du nom d'utilisateur (identité membre v1), ouverte depuis
+/// le profil et son édition : saisie sans « @ », vérifiée sur la route du profil, qui répond
+/// aussi le délai de 30 jours entre deux changements.
 struct ChooseHandleSheet: View {
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
 
-    /// Appelé après un enregistrement réussi avec le nouveau handle normalisé
-    /// (l'appelant rafraîchit la session et/ou son affichage local).
+    /// Appelé après un enregistrement réussi avec le nouveau nom d'utilisateur normalisé
+    /// (la session a déjà repris le profil renvoyé).
     var onSuccess: (String) -> Void
 
-    private enum Status { case idle, checking, available, taken, invalid, error, cooldown }
-
-    @State private var input = ""
-    @State private var status: Status = .idle
-    @State private var message = ""
+    @StateObject private var username = UsernameAvailabilityModel()
     @State private var errorText: String?
     @State private var isBusy = false
-    @State private var checkTask: Task<Void, Never>?
+    @FocusState private var focused: Bool
 
-    private var normalized: String { Self.normalizeHandle(input) }
-    private var isNegative: Bool {
-        status == .taken || status == .invalid || status == .error || status == .cooldown
+    private var user: AuthUser? {
+        if case .authenticated(let user) = session.state { return user }
+        return nil
+    }
+
+    private var current: String? {
+        guard let handle = user?.handle?.trimmingCharacters(in: .whitespacesAndNewlines), !handle.isEmpty else { return nil }
+        return handle
+    }
+
+    /// Aperçu du lien public : le nom saisi s'il est valide, sinon le nom actuel.
+    private var previewHandle: String {
+        if UserHandle.isValid(normalized: username.normalized) { return username.normalized }
+        return current ?? String(localized: "ton-nom")
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    Text("C’est ton identifiant unique (@pseudo) pour être mentionné dans le fil et la messagerie ; il s’affiche sur ton profil. Modifiable une fois tous les 30 jours.")
+                    Text("Unique et public : c’est par lui qu’on te trouve et qu’on te mentionne. Ton profil : \(UserHandle.profileLink(previewHandle))")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .sqFadeUp()
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    HStack(spacing: SQSpace.sm) {
-                        Text("@")
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        TextField("pseudo", text: $input)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textContentType(.username)
-                            .onChangeCompat(of: input) { _, _ in scheduleCheck() }
-                        statusIcon
+                    AuthFieldGroup {
+                        AuthFieldRow(current == nil ? "Nom d’utilisateur" : "Nouveau nom d’utilisateur",
+                                     isFocused: focused, isError: username.isNegative) {
+                            UsernameTextField(text: $username.input, identifier: "profile.handle.field")
+                                .submitLabel(.done)
+                                .focused($focused)
+                                .onSubmit { Task { await submit() } }
+                        } onTap: { focused = true }
+                        UsernameStatusLine(model: username)
+                            .padding(.horizontal, SQSpace.md2)
+                            .padding(.bottom, SQSpace.sm2)
                     }
-                    .padding(.horizontal, SQSpace.lg)
-                    .frame(minHeight: 48)
-                    .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .sqFadeUp()
 
-                    Text(message.isEmpty
-                        ? String(localized: "Lettres, chiffres, « . », « _ » et « - ». 2 à 32 caractères.")
-                        : (normalized.isEmpty ? message : "@\(normalized) · \(message)"))
-                        .font(SQType.caption)
-                        .foregroundStyle(messageColor)
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        if let current {
+                            Text("L’ancien lien \(UserHandle.profileLink(current)) mènera toujours à ton profil.")
+                        }
+                        Text(user?.needsHandleConfirmation == true && current != nil
+                             ? String(localized: "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre 30 jours entre deux changements.")
+                             : String(localized: "Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements."))
+                    }
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                     if let errorText {
-                        Text(errorText)
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
+                        SQNotice(message: errorText, systemImage: "exclamationmark.triangle", tone: .danger)
+                            .sqAnnounce(errorText)
                     }
 
-                    GradientButton("Continuer", systemImage: "checkmark.circle.fill", isBusy: isBusy) {
+                    GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: isBusy) {
                         Task { await submit() }
                     }
-                    .disabled(status != .available || isBusy)
+                    .disabled(!username.canSubmit || isBusy)
+                    .accessibilityIdentifier("profile.handle.save")
                 }
                 .padding(SQSpace.lg)
+                .sqReadableWidth(560)
             }
+            .scrollDismissesKeyboard(.interactively)
             .signalQuestBackground()
             .navigationTitle("Nom d’utilisateur")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Plus tard") { dismiss() }.tint(SQColor.labelSecondary)
+                    Button("Annuler") { dismiss() }.tint(SQColor.labelSecondary)
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private var statusIcon: some View {
-        switch status {
-        case .checking:
-            SQSpinner()
-        case .available:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(SQColor.success)
-        case .taken, .invalid, .error, .cooldown:
-            Image(systemName: "xmark.circle.fill").foregroundStyle(SQColor.danger)
-        case .idle:
-            EmptyView()
-        }
-    }
-
-    private var messageColor: Color {
-        if status == .available { return SQColor.success }
-        if isNegative { return SQColor.dangerInk }
-        return SQColor.labelSecondary
-    }
-
-    private func scheduleCheck() {
-        checkTask?.cancel()
-        errorText = nil
-        let candidate = normalized
-        if candidate.isEmpty {
-            status = .idle; message = ""
-            return
-        }
-        if candidate.count < 2 {
-            status = .invalid; message = String(localized: "Minimum 2 caractères.")
-            return
-        }
-        let raw = input
-        checkTask = Task {
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if Task.isCancelled { return }
-            await MainActor.run { status = .checking; message = String(localized: "Vérification de la disponibilité…") }
-            do {
-                let a = try await services.users.checkHandleAvailability(raw)
-                if Task.isCancelled { return }
-                await MainActor.run {
-                    if a.code == "HANDLE_COOLDOWN" || (a.cooldownActive ?? false) {
-                        status = .cooldown
-                        message = Self.cooldownMessage(a.remainingDays ?? 0)
-                    } else if a.available {
-                        status = .available; message = String(localized: "Disponible.")
-                    } else {
-                        status = .taken; message = String(localized: "Déjà pris par un autre membre.")
-                    }
-                }
-            } catch {
-                if Task.isCancelled { return }
-                await MainActor.run { status = .error; message = String(localized: "Impossible de vérifier pour le moment.") }
-            }
+        .interactiveDismissDisabled(isBusy)
+        .onAppear {
+            username.current = current
+            username.check = { [users = services.users] in try await users.checkHandleAvailability($0) }
+            focused = true
         }
     }
 
     private func submit() async {
-        guard status == .available, !isBusy else { return }
+        guard username.canSubmit, !isBusy else { return }
         isBusy = true
         errorText = nil
         defer { isBusy = false }
+        let handle = username.normalized
         do {
-            _ = try await services.users.updateProfile(UserProfilePatch(
-                name: nil, handle: normalized, bio: nil, avatarUrl: nil
+            let updated = try await services.users.updateProfile(UserProfilePatch(
+                name: nil, handle: handle, bio: nil, avatarUrl: nil
             ))
+            session.applyProfileIdentity(updated)
             Haptics.success()
-            onSuccess(normalized)
+            onSuccess(handle)
             dismiss()
-        } catch let APIError.http(_, code, serverMessage, _, _) {
-            let msg = serverMessage.isEmpty ? String(localized: "Échec de l’enregistrement.") : serverMessage
-            switch code {
-            case "HANDLE_COOLDOWN": status = .cooldown; message = msg
-            case "HANDLE_ALREADY_USED": status = .taken; message = msg
-            default: errorText = msg
-            }
+        } catch let APIError.http(_, code, _, _, _) where code == "HANDLE_ALREADY_USED" || code == "HANDLE_INVALID" {
+            username.reject(code: code)
         } catch {
+            Haptics.error()
             errorText = error.userFacingMessage
         }
     }
-
-    private static func cooldownMessage(_ days: Int) -> String {
-        days <= 1
-            ? String(localized: "Tu pourras changer de nom d’utilisateur dans 1 jour.")
-            : String(localized: "Tu pourras changer de nom d’utilisateur dans \(days) jours.")
-    }
-
-    /// Normalisation du serveur, vérifiée sur les vecteurs partagés (`UserHandle`).
-    static func normalizeHandle(_ value: String) -> String { UserHandle.normalize(value) }
-}
-
-/// Quand proposer de choisir un @pseudo : en entrant dans Communauté, où il sert
-/// aux mentions, et non dès l'arrivée, où la feuille s'empilait sur la demande de
-/// notifications et la confirmation d'e-mail (TRX-20). Refermée sans choix, elle
-/// attend une semaine au lieu de revenir à chaque lancement.
-enum HandleGatePolicy {
-    static let interval: TimeInterval = 7 * 24 * 3600
-
-    static func shouldPresent(handle: String?, userID: String, now: Date = Date(),
-                              defaults: UserDefaults = .standard) -> Bool {
-        guard (handle ?? "").isEmpty else { return false }
-        guard let last = defaults.object(forKey: key(for: userID)) as? Date else { return true }
-        return now.timeIntervalSince(last) >= interval
-    }
-
-    static func markPresented(userID: String, now: Date = Date(), defaults: UserDefaults = .standard) {
-        defaults.set(now, forKey: key(for: userID))
-    }
-
-    private static func key(for userID: String) -> String { "sq.handleGate.lastShown.\(userID)" }
 }

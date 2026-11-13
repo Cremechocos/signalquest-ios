@@ -364,7 +364,7 @@ struct GroupSettingsView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityHidden(true)
-                TextField("Nom, handle ou email", text: $searchQuery)
+                TextField("Nom, nom d’utilisateur ou e-mail", text: $searchQuery)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
                     .textInputAutocapitalization(.never)

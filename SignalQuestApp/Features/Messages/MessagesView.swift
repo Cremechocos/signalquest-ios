@@ -2496,7 +2496,7 @@ private struct NewConversationSheet: View {
                     .accessibilityAddTraits(.isHeader)
 
                 // La recherche d'abord : c'est par elle qu'on commence.
-                SQSearchField(text: $query, placeholder: "Nom, handle ou email", onSubmit: { Task { await search() } })
+                SQSearchField(text: $query, placeholder: "Nom, nom d’utilisateur ou e-mail", onSubmit: { Task { await search() } })
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("newConversation.search")

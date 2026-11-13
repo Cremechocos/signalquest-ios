@@ -6,12 +6,12 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     /// `nil` = ancienne API sans ce champ ; ne jamais l'interpréter comme un
     /// compte non confirmé pendant le déploiement progressif du backend.
     var emailVerified: Bool? = nil
-    let name: String?
-    let handle: String?
+    private(set) var name: String?
+    private(set) var handle: String?
     /// Horodatage ISO du dernier changement de @handle (null = jamais changé). Sert au
     /// cooldown de 30 j côté UI. Décodé en String pour rester indépendant de la stratégie
     /// de dates du décodeur.
-    let handleChangedAt: String?
+    private(set) var handleChangedAt: String?
     /// Identité membre v1 : `nil` tant que le membre n'a ni gardé ni choisi son nom
     /// d'utilisateur depuis l'écran d'explication. Le changement est alors gratuit.
     var handleConfirmedAt: String? = nil
@@ -34,6 +34,18 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     func withConfirmedTwoFactor(enabled: Bool) -> AuthUser {
         var copy = self
         copy.twoFactorEnabled = enabled
+        return copy
+    }
+
+    /// Identité renvoyée par `PUT /api/user/profile` : nom affiché, nom d'utilisateur et
+    /// confirmation repris ; le reste (2FA, e-mail vérifié) gardé, cette réponse pouvant ne pas
+    /// le porter.
+    func withIdentity(of updated: AuthUser) -> AuthUser {
+        var copy = self
+        copy.name = updated.name
+        copy.handle = updated.handle
+        copy.handleChangedAt = updated.handleChangedAt
+        copy.handleConfirmedAt = updated.handleConfirmedAt
         return copy
     }
 

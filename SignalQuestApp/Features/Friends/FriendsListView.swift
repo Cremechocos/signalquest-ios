@@ -565,7 +565,7 @@ private struct AddFriendSheet: View {
         NavigationStack {
             List {
                 Section {
-                    TextField("Nom, handle ou email", text: $query)
+                    TextField("Nom, nom d’utilisateur ou e-mail", text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .font(SQType.body)

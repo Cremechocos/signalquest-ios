@@ -1,6 +1,490 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton nom d’utilisateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre nom d’utilisateur"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SignalQuest distingue désormais deux noms. Le **nom d’utilisateur** est unique : on te trouve et on te mentionne avec lui. Le **nom affiché**, facultatif, est celui que les autres lisent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest now keeps two names apart. Your **username** is unique: it’s how people find and mention you. Your **display name**, optional, is the one others read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest distingue désormais deux noms. Le **nom d’utilisateur** est unique : on te trouve et on te mentionne avec lui. Le **nom affiché**, facultatif, est celui que les autres lisent."
+          }
+        }
+      }
+    },
+    "SQFormal|SignalQuest distingue désormais deux noms. Le **nom d’utilisateur** est unique : on te trouve et on te mentionne avec lui. Le **nom affiché**, facultatif, est celui que les autres lisent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest distingue désormais deux noms. Le **nom d’utilisateur** est unique : on vous trouve et on vous mentionne avec lui. Le **nom affiché**, facultatif, est celui que les autres lisent."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Nouveau nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "L’ancien lien %@ mènera toujours à ton profil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The old link %@ will still lead to your profile."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ancien lien %@ mènera toujours à ton profil."
+          }
+        }
+      }
+    },
+    "SQFormal|L’ancien lien %@ mènera toujours à ton profil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ancien lien %@ mènera toujours à votre profil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change it later, with 30 days between two changes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pourrez le changer ensuite, avec 30 jours d’attente entre deux changements."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre 30 jours entre deux changements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing it is free this time. After that, you’ll have to wait 30 days between two changes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre 30 jours entre deux changements."
+          }
+        }
+      }
+    },
+    "Nom affiché (facultatif)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display name (optional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom affiché (facultatif)"
+          }
+        }
+      }
+    },
+    "Par exemple : Alexandre G." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example: Alexandre G."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par exemple : Alexandre G."
+          }
+        }
+      }
+    },
+    "Nom affiché, facultatif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display name, optional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom affiché, facultatif"
+          }
+        }
+      }
+    },
+    "Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique. Laissé vide, c’est ton nom d’utilisateur, %@, qui s’affiche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It appears on your profile, in the feed and in messages. It doesn’t need to be unique. Left empty, your username, %@, is shown."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique. Laissé vide, c’est ton nom d’utilisateur, %@, qui s’affiche."
+          }
+        }
+      }
+    },
+    "SQFormal|Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique. Laissé vide, c’est ton nom d’utilisateur, %@, qui s’affiche." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il apparaît sur votre profil, dans le fil et les messages. Il n’a pas besoin d’être unique. Laissé vide, c’est votre nom d’utilisateur, %@, qui s’affiche."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It appears on your profile, in the feed and in messages. It doesn’t need to be unique."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique."
+          }
+        }
+      }
+    },
+    "SQFormal|Il apparaît sur ton profil, dans le fil et les messages. Il n’a pas besoin d’être unique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il apparaît sur votre profil, dans le fil et les messages. Il n’a pas besoin d’être unique."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Enregistrer %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer %@"
+          }
+        }
+      }
+    },
+    "Garder %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder %@"
+          }
+        }
+      }
+    },
+    "Garder ce nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep this username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder ce nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "Choisir un autre nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose another username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un autre nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "Nom, nom d’utilisateur ou e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name, username or email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom, nom d’utilisateur ou e-mail"
+          }
+        }
+      }
+    },
+    "Afficher mon nom d’utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show my username"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher mon nom d’utilisateur"
+          }
+        }
+      }
+    },
+    "Au lieu de ton nom affiché dans les classements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instead of your display name in leaderboards"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au lieu de ton nom affiché dans les classements"
+          }
+        }
+      }
+    },
+    "SQFormal|Au lieu de ton nom affiché dans les classements" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au lieu de votre nom affiché dans les classements"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les classements sont publics. Ce réglage y remplace ton nom affiché par ton nom d’utilisateur, sans te retirer du classement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leaderboards are public. This setting replaces your display name with your username without removing you from the ranking."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les classements sont publics. Ce réglage y remplace ton nom affiché par ton nom d’utilisateur, sans te retirer du classement."
+          }
+        }
+      }
+    },
+    "SQFormal|Les classements sont publics. Ce réglage y remplace ton nom affiché par ton nom d’utilisateur, sans te retirer du classement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les classements sont publics. Ce réglage y remplace votre nom affiché par votre nom d’utilisateur, sans vous retirer du classement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Rien d’autre n’est envoyé. L’équipe voit ton nom d’utilisateur, jamais ta position exacte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing else is sent. The team sees your username, never your exact location."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien d’autre n’est envoyé. L’équipe voit ton nom d’utilisateur, jamais ta position exacte."
+          }
+        }
+      }
+    },
+    "SQFormal|Rien d’autre n’est envoyé. L’équipe voit ton nom d’utilisateur, jamais ta position exacte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien d’autre n’est envoyé. L’équipe voit votre nom d’utilisateur, jamais votre position exacte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton nom d’utilisateur ne peut pas encore être modifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your username can’t be changed yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton nom d’utilisateur ne peut pas encore être modifié."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton nom d’utilisateur ne peut pas encore être modifié." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre nom d’utilisateur ne peut pas encore être modifié."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Identifiant ou mot de passe incorrect." : {
       "localizations" : {
         "en" : {

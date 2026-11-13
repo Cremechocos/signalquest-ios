@@ -611,6 +611,9 @@ final class AuthSessionViewModel: ObservableObject {
     @Published var handleErrorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
+    /// Compte dont le profil a été relu sur le serveur depuis ce lancement (pas seulement
+    /// le cache) : l'écran « Ton nom d'utilisateur » n'apparaît qu'après, donc jamais hors ligne.
+    @Published private(set) var serverProfileUserID: String?
 
     private let service: AuthServicing
     private var stateID = UUID()
@@ -708,6 +711,7 @@ final class AuthSessionViewModel: ObservableObject {
         // tous voir le nouveau propriétaire, jamais le précédent.
         service.cacheUser(user)
         infoMessage = nil
+        serverProfileUserID = user.id
         state = .authenticated(user)
     }
 
@@ -834,7 +838,19 @@ final class AuthSessionViewModel: ObservableObject {
               case .authenticated(let latest) = state, latest.id == expectedUserID else { throw APIError.cancelled }
         profileRevision = UUID()
         service.cacheUser(user)
+        serverProfileUserID = user.id
         state = .authenticated(user)
+    }
+
+    /// Profil renvoyé par `PUT /api/user/profile` : son identité s'applique tout de suite,
+    /// sans attendre une relecture de /me (qui peut échouer et laisser l'écran affiché).
+    func applyProfileIdentity(_ updated: AuthUser) {
+        guard case .authenticated(let current) = state, current.id == updated.id else { return }
+        let merged = current.withIdentity(of: updated)
+        profileRevision = UUID()
+        service.cacheUser(merged)
+        serverProfileUserID = merged.id
+        state = .authenticated(merged)
     }
 
     /// La réponse de connexion ne contient qu'une partie du profil (ni

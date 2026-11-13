@@ -147,7 +147,7 @@ enum APIError: Error, LocalizedError, Equatable {
     /// (Le backend renvoie le plus souvent déjà un message FR ; cette table couvre
     /// les cas où il n'expose qu'un code.)
     private static let localizedMessages: [String: String] = [
-        "HANDLE_LOCKED": String(localized: "Ton identifiant ne peut pas encore être modifié."),
+        "HANDLE_LOCKED": String(localized: "Ton nom d’utilisateur ne peut pas encore être modifié."),
         "NAME_TOO_LONG": String(localized: "Ce nom est trop long."),
         "EMPTY_NAME": String(localized: "Le nom ne peut pas être vide."),
         "INVALID_OPERATOR": String(localized: "Opérateur invalide."),

@@ -817,7 +817,7 @@ struct BugReportComposerSheet: View {
             .tint(SQColor.brandRed)
             .padding(SQSpace.lg)
             .sqCardBackground()
-            Label("Rien d'autre n'est envoyé. L'équipe voit ton pseudo, jamais ta position exacte.", systemImage: "lock")
+            Label("Rien d’autre n’est envoyé. L’équipe voit ton nom d’utilisateur, jamais ta position exacte.", systemImage: "lock")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)

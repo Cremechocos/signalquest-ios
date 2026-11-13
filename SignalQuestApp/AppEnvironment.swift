@@ -262,6 +262,14 @@ enum AppEnvironment {
         #endif
     }
 
+    static var showsUsernameConfirmationQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-username-confirmation") || hasArgument("--qa-username-confirmation-none")
+        #else
+        false
+        #endif
+    }
+
     static var showsAccountKeyQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-account-key") || hasArgument("--qa-account-key-verified")

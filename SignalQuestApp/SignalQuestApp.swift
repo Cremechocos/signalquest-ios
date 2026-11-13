@@ -525,6 +525,8 @@ struct RootView: View {
     @State private var showsV2Activation = false
     /// Question du ton (tutoiement ou vouvoiement), au plus une fois par jour.
     @State private var showsAddressPrompt = false
+    /// Identité membre v1 : « Ton nom d'utilisateur », à garder ou changer, non repoussable.
+    @State private var showsUsernameConfirmation = false
     /// Appareils ajoutés à son compte, tirés du journal vérifié (E2EE-AUTO §4.2).
     @StateObject private var newDeviceAlerts = E2EEAutoNewDeviceAlertCoordinator()
     /// Fourche ou retour en arrière du journal gardé ici (E2EE-AUTO §3.5) : passe avant les autres invites.
@@ -562,6 +564,29 @@ struct RootView: View {
         else { return }
         SQAddress.markAsked()
         showsAddressPrompt = true
+    }
+
+    /// L'écran ne se repousse pas : il attend un profil relu sur le serveur depuis ce
+    /// lancement (jamais sur le seul cache, donc jamais hors ligne) et laisse passer un lien
+    /// vers un contenu, puis il se décide au prochain changement d'onglet ou retour dans l'app.
+    private func refreshUsernameConfirmation() {
+        guard !showsUsernameConfirmation, !AppEnvironment.usesDemoData, !router.hasPendingContentRoute,
+              let user = authenticatedUser, user.needsHandleConfirmation,
+              session.serverProfileUserID == user.id else { return }
+        #if DEBUG
+        // Les tours de tests UI injectent le jeton d'un compte de test : l'écran, non repoussable,
+        // les bloquerait. `--qa-username-confirmation-live` le remet pour l'essayer avec ce compte.
+        if AppEnvironment.injectedAuthToken != nil, !AppEnvironment.hasQAFlag("username-confirmation-live") { return }
+        #endif
+        showsUsernameConfirmation = true
+    }
+
+    /// Caché, sans être fermé, tant qu'une autre invite ou une alerte de sécurité est à l'écran.
+    private var presentsUsernameConfirmation: Bool {
+        guard showsUsernameConfirmation, let user = authenticatedUser, user.needsHandleConfirmation,
+              session.serverProfileUserID == user.id else { return false }
+        return !showsAddressPrompt && !showsV2Activation && newDeviceAlerts.presented == nil && !logAlerts.isPresented
+            && !showsHistoryApproval && !showsHistoryRequester
     }
 
     /// Comme les autres invites : jamais pendant un appel ni par-dessus l'une d'elles.
@@ -636,6 +661,8 @@ struct RootView: View {
                 E2EEAutoAttachmentsQAScreen()
             } else if AppEnvironment.showsAutoDevicesQA {
                 E2EEAutoDevicesQAScreen()
+            } else if AppEnvironment.showsUsernameConfirmationQA {
+                UsernameConfirmationQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {
                 E2EEV2AccountKeyQAScreen()
             } else if AppEnvironment.showsApprovalScannerQA {
@@ -659,12 +686,17 @@ struct RootView: View {
                         refreshAddressPrompt()
                         refreshNewDeviceAlert()
                         refreshHistoryRequests(active: true)
+                        refreshUsernameConfirmation()
                     }
                     .onDisappear { mainApplicationAppeared = false; historyRequests.resignedActive() }
+                    .onChangeCompat(of: session.serverProfileUserID) { _, _ in refreshUsernameConfirmation() }
                     .onChangeCompat(of: addressStore.chosen) { _, _ in refreshAddressPrompt() }
                     // Un ton choisi dans Réglages s'applique au changement d'onglet : l'écran
                     // qu'on quitte n'a plus rien à perdre.
-                    .onChangeCompat(of: router.selectedTab) { _, _ in addressStore.applyTone() }
+                    .onChangeCompat(of: router.selectedTab) { _, _ in
+                        addressStore.applyTone()
+                        refreshUsernameConfirmation()
+                    }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
                         refreshV2ActivationPrompt()
                     }
@@ -675,6 +707,7 @@ struct RootView: View {
                         if phase == .active {
                             refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert()
                             readOwnDevicesAfterAddedPush()
+                            refreshUsernameConfirmation()
                         }
                         refreshHistoryRequests(active: phase == .active)
                     }
@@ -709,7 +742,7 @@ struct RootView: View {
                     // plus haut, doit pouvoir passer devant. Deux présentations
                     // modales concurrentes, et l'appel entrant restait invisible.
                     .accessibilityHidden(showsV2Activation || showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
-                                         || showsHistoryApproval || showsHistoryRequester)
+                                         || showsHistoryApproval || showsHistoryRequester || presentsUsernameConfirmation)
                     .overlay {
                         if showsAddressPrompt {
                             SQAddressFormPrompt(onClose: {
@@ -722,6 +755,25 @@ struct RootView: View {
                             .transition(.move(edge: .bottom))
                         }
                     }
+                    .overlay {
+                        // Sous les alertes de sécurité, qui se dessinent par-dessus.
+                        if presentsUsernameConfirmation, let user = authenticatedUser {
+                            UsernameConfirmationView(
+                                user: user,
+                                check: { [users = services.users] in try await users.checkHandleAvailability($0) },
+                                save: { [users = services.users] in try await users.updateProfile($0) },
+                                onSaved: { updated in
+                                    session.applyProfileIdentity(updated)
+                                    showsUsernameConfirmation = false
+                                    Task { await session.refreshUser() }
+                                }
+                            )
+                            .id(user.id)
+                            .accessibilityAddTraits(.isModal)
+                            .transition(.move(edge: .bottom))
+                        }
+                    }
+                    .sqAnimation(SQMotion.smooth, value: presentsUsernameConfirmation)
                     .overlay {
                         if showsV2Activation {
                             E2EEV2ActivationScreen(
@@ -1054,7 +1106,6 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let user: AuthUser?
-    @State private var showHandleGate = false
     @State private var showGuestReceipts = false
     /// Partage déposé par l'extension « Partager vers SignalQuest », proposé à
     /// l'utilisateur. Chaque dépôt n'est présenté qu'une fois par session : fermer
@@ -1092,9 +1143,6 @@ struct MainTabView: View {
             guard let user else { return }
             await services.refreshInboxBadge()
             await services.refreshNotificationBadge()
-        }
-        .sheet(isPresented: $showHandleGate) {
-            ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
         }
         .sheet(isPresented: $showGuestReceipts) {
             NavigationStack { GuestSpeedtestReceiptsView() }
@@ -1144,14 +1192,6 @@ struct MainTabView: View {
             lastTab = tab.rawValue
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { router.isDockMinimized = false }
-            // Le @pseudo sert aux mentions : il se propose en entrant dans
-            // Communauté, pas à l'arrivée (TRX-20). Un lien vers un contenu passe
-            // avant la feuille.
-            if tab == .community, let user, !router.hasPendingContentRoute,
-               HandleGatePolicy.shouldPresent(handle: user.handle, userID: user.id) {
-                HandleGatePolicy.markPresented(userID: user.id)
-                showHandleGate = true
-            }
             if user != nil {
                 Task {
                     await services.refreshInboxBadge()
@@ -1352,7 +1392,7 @@ struct MainTabView: View {
         guard let inbox = ShareInbox.appGroup() else { return }
         inbox.purgeExpired()
         guard user != nil, !appLock.isLocked, receivedShare == nil,
-              !showHandleGate, !showGuestReceipts, !router.showsCommandPalette,
+              !showGuestReceipts, !router.showsCommandPalette,
               let entry = inbox.pending(), !presentedShareIds.contains(entry.id) else { return }
         presentedShareIds.insert(entry.id)
         receivedShare = entry
