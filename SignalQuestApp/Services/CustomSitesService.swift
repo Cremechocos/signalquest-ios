@@ -287,8 +287,13 @@ struct CustomSiteCreationResult: Decodable, Sendable {
     let id: String?
     let slug: String?
     let isPending: Bool
+    /// OFFICIAL-NEARBY r1 §2 : distance (m) de la position officielle la plus proche, du même
+    /// opérateur, que le serveur signale dans `warnings.nearbyOfficial` ; nil sans avertissement.
+    var nearestOfficialMeters: Int? = nil
 
-    enum CodingKeys: String, CodingKey { case id, slug, site }
+    enum CodingKeys: String, CodingKey { case id, slug, site, warnings }
+    private enum WarningKeys: String, CodingKey { case nearbyOfficial }
+    private struct NearbyOfficialRow: Decodable { let distanceMeters: Double? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -301,12 +306,26 @@ struct CustomSiteCreationResult: Decodable, Sendable {
             slug = c.decodeFlexibleString(forKey: .slug)
         }
         isPending = false
+        let rows = (try? c.nestedContainer(keyedBy: WarningKeys.self, forKey: .warnings))
+            .flatMap { try? $0.decode([NearbyOfficialRow].self, forKey: .nearbyOfficial) } ?? []
+        nearestOfficialMeters = rows.compactMap(\.distanceMeters)
+            .filter { $0.isFinite && $0 >= 0 && $0 <= 300 }
+            .min()
+            .map { Int($0.rounded()) }
     }
 
     private init(id: String?, slug: String?, isPending: Bool) {
         self.id = id
         self.slug = slug
         self.isPending = isPending
+    }
+
+    /// « Site créé. Une position officielle est à 40 m : c’est peut-être la même antenne. »
+    var nearbyOfficialNotice: String? {
+        nearestOfficialMeters.map { meters in
+            let distance = SQUnits.distance(meters: Double(meters))
+            return String(localized: "Site créé. Une position officielle est à \(distance) : c’est peut-être la même antenne.")
+        }
     }
 
     static let pending = CustomSiteCreationResult(id: nil, slug: nil, isPending: true)

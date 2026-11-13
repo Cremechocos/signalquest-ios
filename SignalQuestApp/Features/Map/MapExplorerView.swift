@@ -1877,6 +1877,7 @@ struct MapExplorerView: View {
                     // Laisser la feuille se fermer avant d'en présenter une autre (iOS 16).
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openLinkedSite(check) }
                 },
+                onNotice: { model.showMarketNotice($0) },
                 onCreated: { Task { await reloadCurrentRegion() } }
             )
         }
@@ -5483,6 +5484,7 @@ struct MapExplorerView: View {
             if result.isPending {
                 model.showMarketNotice(String(localized: "Proposition enregistrée. Elle sera envoyée automatiquement dès que la connexion le permettra."))
             } else {
+                if let notice = result.nearbyOfficialNotice { model.showMarketNotice(notice) }
                 await reloadCurrentRegion()
             }
         } catch is CustomSiteAlreadyLinkedError {

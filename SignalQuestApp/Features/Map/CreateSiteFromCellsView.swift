@@ -23,6 +23,8 @@ struct CreateSiteFromCellsView: View {
     /// la carte avec la contestation (nil pour son propre site). Sans hôte, la contestation
     /// s'ouvre ici, dans le formulaire, et son propre site ne se corrige pas d'ici.
     let onWrongSite: ((CustomSiteDispute?) -> Void)?
+    /// Message à montrer une fois la feuille fermée (position officielle proche du site créé).
+    let onNotice: ((String) -> Void)?
 
     @State private var name = ""
     @State private var type = "PYLONE"
@@ -57,6 +59,7 @@ struct CreateSiteFromCellsView: View {
         initialDispute: CustomSiteDispute? = nil,
         onViewSite: ((CustomSiteRadioCheck) -> Void)? = nil,
         onWrongSite: ((CustomSiteDispute?) -> Void)? = nil,
+        onNotice: ((String) -> Void)? = nil,
         onCreated: @escaping () -> Void
     ) {
         self.cells = cells
@@ -65,6 +68,7 @@ struct CreateSiteFromCellsView: View {
         self.initialDispute = initialDispute
         self.onViewSite = onViewSite
         self.onWrongSite = onWrongSite
+        self.onNotice = onNotice
         self.onCreated = onCreated
         // Centroïde des cellules retenues : le meilleur point de départ dont on
         // dispose, même s'il n'est pas le bon.
@@ -333,6 +337,7 @@ struct CreateSiteFromCellsView: View {
             } else {
                 onCreated()
                 dismiss()
+                if let notice = result.nearbyOfficialNotice { onNotice?(notice) }
             }
         } catch let refusal as CustomSiteAlreadyLinkedError {
             Haptics.error()

@@ -872,6 +872,14 @@ struct AntennaDetailSheet: View {
                             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                     }
                 }
+                // OFFICIAL-NEARBY r1 §3 : la Suisse sert sa classe de puissance, sa limite et son
+                // type d'installation ; Bruxelles, le nombre d'opérateurs. Une ligne par champ servi.
+                if let official = details.officialDetails, !official.isEmpty {
+                    section(official.title) {
+                        factCard { officialContent(official) }
+                    }
+                    .accessibilityIdentifier("antenna.detail.official")
+                }
             } else if let error = model.error {
                 ErrorStateView(title: "Détails indisponibles", message: error) {
                     Task {
@@ -1590,6 +1598,25 @@ struct AntennaDetailSheet: View {
         .background(SQColor.bg.ignoresSafeArea())
         .navigationTitle(Text("Porteuses"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func officialContent(_ official: OfficialSiteDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            detailRow("Classe de puissance", official.powerClassText())
+            detailRow("Limite de l’installation", official.installationLimitText())
+            detailRow("Installation", official.installationText)
+            if official.adaptivePartial {
+                detailRow("Exploitation", String(localized: "Partiellement adaptative"))
+            }
+            detailRow("Opérateurs sur cette position", official.operatorCount.map { $0.formatted() })
+            if !official.isBrussels {
+                Text("Une classe et une limite réglementaire, pas une mesure du champ.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .foregroundStyle(SQColor.label)
     }
 
     private func factCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

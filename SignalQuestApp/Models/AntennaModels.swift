@@ -335,6 +335,9 @@ struct AntennaDetails: Decodable {
     /// Règle A (public-map-tiles v1.1) : heures des speedtests voisins tronquées à l'heure.
     let nearbySpeedtestsHourPrecision: Bool
     let photos: [AntennaPhotoSummary]
+    /// OFFICIAL-NEARBY r1 §3 : faits officiels d'une position suisse (OFCOM) ou bruxelloise ;
+    /// absent ailleurs, Flandre comprise.
+    let officialDetails: OfficialSiteDetails?
 
     init(from decoder: Decoder) throws {
         let root = try decoder.container(keyedBy: WrapperKeys.self)
@@ -371,6 +374,7 @@ struct AntennaDetails: Decodable {
             nearbySpeedtests = decodedSpeedtests
             nearbySpeedtestsHourPrecision = (try? root.decodeIfPresent(String.self, forKey: .timestampPrecision)) == "hour"
             photos = decodedPhotos
+            officialDetails = (try? root.decodeIfPresent(OfficialSiteDetails.self, forKey: .officialDetails)) ?? nil
             return
         }
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -404,6 +408,7 @@ struct AntennaDetails: Decodable {
         nearbySpeedtests = []
         nearbySpeedtestsHourPrecision = false
         photos = []
+        officialDetails = nil
     }
 
     enum CodingKeys: String, CodingKey {
@@ -412,7 +417,60 @@ struct AntennaDetails: Decodable {
     }
 
     enum WrapperKeys: String, CodingKey {
-        case details, antenna, signalStats, nearbySpeedtests, photos, timestampPrecision
+        case details, antenna, signalStats, nearbySpeedtests, photos, timestampPrecision, officialDetails
+    }
+}
+
+/// `officialDetails` de la fiche d'une position BE/CH. Les valeurs sont des listes fermées : une
+/// valeur inconnue donne nil, jamais une valeur inventée. Un champ non servi est absent.
+struct OfficialSiteDetails: Decodable, Equatable, Sendable {
+    enum PowerClass: String, Sendable { case veryLow = "very_low", low, medium, high }
+    enum InstallationType: String, Sendable { case outdoorHigh = "outdoor_high", outdoorLow = "outdoor_low", indoorLow = "indoor_low", tunnel, temporary }
+
+    var powerClass: PowerClass?
+    var powerClassMaxW: Int?
+    var powerClassMinW: Int?
+    /// Limite de l'installation, en V/m.
+    var installationLimitVm: Double?
+    var installationType: InstallationType?
+    var adaptivePartial = false
+    /// Bruxelles : opérateurs qui partagent la position.
+    var operatorCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case powerClass, powerClassMaxW, powerClassMinW, installationLimitVm, installationType, adaptiveMode, operatorCount
+    }
+
+    init(powerClass: PowerClass? = nil, powerClassMaxW: Int? = nil, powerClassMinW: Int? = nil, installationLimitVm: Double? = nil,
+         installationType: InstallationType? = nil, adaptivePartial: Bool = false, operatorCount: Int? = nil) {
+        self.powerClass = powerClass
+        self.powerClassMaxW = powerClassMaxW
+        self.powerClassMinW = powerClassMinW
+        self.installationLimitVm = installationLimitVm
+        self.installationType = installationType
+        self.adaptivePartial = adaptivePartial
+        self.operatorCount = operatorCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        powerClass = (try? c.decodeIfPresent(String.self, forKey: .powerClass)).flatMap { $0.flatMap(PowerClass.init(rawValue:)) }
+        powerClassMaxW = (try? c.decodeIfPresent(Double.self, forKey: .powerClassMaxW)).flatMap { $0 }.flatMap { $0.isFinite ? Int($0.rounded()) : nil }
+        powerClassMinW = (try? c.decodeIfPresent(Double.self, forKey: .powerClassMinW)).flatMap { $0 }.flatMap { $0.isFinite ? Int($0.rounded()) : nil }
+        installationLimitVm = (try? c.decodeIfPresent(Double.self, forKey: .installationLimitVm)).flatMap { $0 }.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        installationType = (try? c.decodeIfPresent(String.self, forKey: .installationType)).flatMap { $0.flatMap(InstallationType.init(rawValue:)) }
+        // `adaptiveMode: null` est servi PRÉSENT quand le registre ne dit pas « partiellement adaptative ».
+        adaptivePartial = (try? c.decodeIfPresent(String.self, forKey: .adaptiveMode)) == "partial"
+        operatorCount = (try? c.decodeIfPresent(Int.self, forKey: .operatorCount)).flatMap { $0 }.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// Bruxelles ne sert que le nombre d'opérateurs : la carte prend son nom, sans la note suisse.
+    var isBrussels: Bool {
+        operatorCount != nil && powerClass == nil && installationLimitVm == nil && installationType == nil && !adaptivePartial
+    }
+
+    var isEmpty: Bool {
+        powerClass == nil && installationLimitVm == nil && installationType == nil && !adaptivePartial && operatorCount == nil
     }
 }
 
@@ -1053,5 +1111,61 @@ struct GenerationBands: Equatable, Identifiable {
         guard let range = label.range(of: #"\d{3,4}"#, options: .regularExpression),
               let mhz = Int(label[range]) else { return nil }
         return (gen, mhz)
+    }
+}
+
+extension OfficialSiteDetails {
+    /// « Moyenne, jusqu’à 5 000 W » : une classe, jamais une puissance mesurée ; la borne la situe.
+    func powerClassText(locale: Locale = .current) -> String? {
+        guard let powerClass else { return nil }
+        let name: String
+        switch powerClass {
+        // Clés dédiées : « Faible », « Moyenne »… existent déjà dans le catalogue, au sens d'une
+        // qualité de signal (« Poor », « Average ») et non d'une classe de puissance.
+        case .veryLow: name = String(localized: "official.power.veryLow", defaultValue: "Très faible")
+        case .low: name = String(localized: "official.power.low", defaultValue: "Faible")
+        case .medium: name = String(localized: "official.power.medium", defaultValue: "Moyenne")
+        case .high: name = String(localized: "official.power.high", defaultValue: "Forte")
+        }
+        let bound: String? = if let max = powerClassMaxW {
+            String(localized: "jusqu’à \(max.formatted(.number.grouping(.automatic).locale(locale))) W")
+        } else if let min = powerClassMinW {
+            String(localized: "plus de \(min.formatted(.number.grouping(.automatic).locale(locale))) W")
+        } else {
+            nil
+        }
+        guard let bound else { return name }
+        return Self.keepingUnitsTogether(String(localized: "\(name), \(bound)"))
+    }
+
+    /// « 5,0 V/m » : toujours une décimale, comme le registre.
+    func installationLimitText(locale: Locale = .current) -> String? {
+        guard let installationLimitVm else { return nil }
+        let value = installationLimitVm.formatted(.number.precision(.fractionLength(1)).locale(locale))
+        return Self.keepingUnitsTogether(String(localized: "\(value) V/m"))
+    }
+
+    var installationText: String? {
+        let text: String
+        switch installationType {
+        case .outdoorHigh: text = String(localized: "Extérieure, plus de 6 W ERP")
+        case .outdoorLow: text = String(localized: "Extérieure, 6 W ERP ou moins")
+        case .indoorLow: text = String(localized: "Intérieure, 6 W ERP ou moins")
+        case .tunnel: text = String(localized: "Tunnel")
+        case .temporary: text = String(localized: "Station temporaire")
+        case nil: return nil
+        }
+        return Self.keepingUnitsTogether(text)
+    }
+
+    /// « plus de 6 / W ERP » coupait l'unité de son nombre en fin de ligne : espaces insécables
+    /// entre le nombre et l'unité, à l'affichage seulement (les clés restent celles d'Android).
+    static func keepingUnitsTogether(_ text: String) -> String {
+        text.replacingOccurrences(of: #"(\d) (W|V/m)\b"#, with: "$1\u{00A0}$2", options: .regularExpression)
+            .replacingOccurrences(of: "W ERP", with: "W\u{00A0}ERP")
+    }
+
+    var title: String {
+        isBrussels ? String(localized: "Données officielles Bruxelles Environnement") : String(localized: "Données officielles OFCOM")
     }
 }
