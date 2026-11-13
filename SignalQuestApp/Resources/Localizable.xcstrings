@@ -1906,7 +1906,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Masts and operators nearby"
+            "value" : "Sites and operators nearby"
           }
         },
         "fr" : {
@@ -6062,7 +6062,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Photo of a mast"
+            "value" : "Photo of a site"
           }
         }
       }
@@ -86453,7 +86453,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deployed masts"
+            "value" : "Deployed sites"
           }
         },
         "fr" : {
@@ -86469,7 +86469,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Operational masts, %@"
+            "value" : "Operational sites, %@"
           }
         },
         "fr" : {
@@ -112354,7 +112354,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Photos, measurements and reviews of this mast"
+            "value" : "Photos, measurements and reviews of this site"
           }
         },
         "fr" : {
@@ -114270,7 +114270,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "masts in service"
+            "value" : "sites in service"
           }
         },
         "fr" : {
@@ -115929,7 +115929,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Address of the nearest ANFR mast, %@ away: to be checked."
+            "value" : "Address of the nearest ANFR site, %@ away: to be checked."
           }
         },
         "fr" : {
@@ -115946,7 +115946,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Address of this station’s ANFR mast."
+            "value" : "Address of this station’s ANFR site."
           }
         },
         "fr" : {
@@ -115963,7 +115963,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ANFR mast"
+            "value" : "ANFR site"
           }
         },
         "fr" : {
@@ -116031,7 +116031,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mast owner"
+            "value" : "Site owner"
           }
         },
         "fr" : {
@@ -116082,7 +116082,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nearest mast"
+            "value" : "Nearest site"
           }
         },
         "fr" : {
