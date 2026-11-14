@@ -72,19 +72,9 @@ enum ClientProtocolContract {
     }
 }
 
-enum E2EEV2ActivationDecision: Equatable, Sendable {
-    enum Reason: Equatable, Sendable {
-        /// Critères de sortie du jalon A non remplis (spec §17) : vecteurs,
-        /// tests croisés, tests d'attaque et relectures indépendantes.
-        case milestoneACriteriaRequired
-        case protocolVersionRequired
-        case capabilityMissing
-    }
-
-    case enabled
-    case disabled(reason: Reason, missingCapabilities: Set<String>)
-}
-
+/// Version du protocole et capacités v2 que l'app annonce dans ses en-têtes : le
+/// serveur les lit encore à chaque requête signée. L'ouverture de la messagerie
+/// chiffrée ne dépend plus d'elles mais de l'interrupteur auto (E2EE-AUTO §7).
 enum E2EEV2ActivationPolicy {
     static let protocolVersion = E2EEV2ProtocolWire.version
     static let contractPreviewCapability = E2EEV2ProtocolWire.contractPreviewCapability
@@ -93,38 +83,6 @@ enum E2EEV2ActivationPolicy {
     static let encryptedMediaCapability = "e2ee_encrypted_media_v2"
     static let historyMigrationCapability = "e2ee_history_migration_v2"
     static let verifiedCallsCapability = "e2ee_verified_calls_v2"
-
-    static let requiredWriteCapabilities: Set<String> = [
-        deviceIdentityCapability,
-        messageEnvelopeCapability,
-    ]
-    static let requiredFullCapabilities = requiredWriteCapabilities.union([
-        encryptedMediaCapability,
-        historyMigrationCapability,
-        verifiedCallsCapability,
-    ])
-
-    static func evaluate(
-        policy: ClientProtocolPolicy,
-        milestoneACriteriaMet: Bool,
-        requiredCapabilities: Set<String> = requiredWriteCapabilities,
-        clientProtocolVersion: Int = ClientProtocolContract.currentProtocolVersion,
-        clientCapabilities: Set<String> = ClientProtocolContract.capabilities
-    ) -> E2EEV2ActivationDecision {
-        guard milestoneACriteriaMet else {
-            return .disabled(reason: .milestoneACriteriaRequired, missingCapabilities: [])
-        }
-        guard clientProtocolVersion >= protocolVersion,
-              policy.serverProtocolVersion >= protocolVersion else {
-            return .disabled(reason: .protocolVersionRequired, missingCapabilities: [])
-        }
-        let missing = Set(requiredCapabilities.filter { capability in
-            !clientCapabilities.contains(capability) || !policy.serverCapabilities.contains(capability)
-        })
-        return missing.isEmpty
-            ? .enabled
-            : .disabled(reason: .capabilityMissing, missingCapabilities: missing)
-    }
 }
 
 struct AppVersionPolicy: Decodable, Equatable, Sendable {

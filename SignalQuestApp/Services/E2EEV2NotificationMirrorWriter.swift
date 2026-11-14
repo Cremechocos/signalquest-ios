@@ -130,7 +130,7 @@ struct E2EEV2NotificationMirrorWriter: Sendable {
         session: LocalAccountSession,
         generation: UInt64
     ) -> Bool {
-        guard contractPreview || E2EEV2RuntimeReadGate.enabled,
+        guard contractPreview || E2EEV2ServerGate.autoActive,
               Self.generations.current(conversationId) == generation else { return false }
         do {
             guard session.isCurrent, session.ownerScopeId.hasPrefix("user:"),
@@ -167,13 +167,13 @@ struct E2EEV2NotificationMirrorWriter: Sendable {
     /// Retire l'entrée. Une entrée qui ne part pas rend tout le miroir muet :
     /// la prochaine activation efface les entrées avant tout.
     func remove(_ conversationId: String) {
-        guard contractPreview || E2EEV2RuntimeReadGate.enabled else { return }
+        guard contractPreview || E2EEV2ServerGate.autoActive else { return }
         do { try contextStore.removeConversation(conversationId) } catch { try? contextStore.revoke() }
     }
 
     /// Conversation quittée : l'entrée et ce que l'extension en a montré.
     func forget(_ conversationId: String) {
-        guard contractPreview || E2EEV2RuntimeReadGate.enabled else { return }
+        guard contractPreview || E2EEV2ServerGate.autoActive else { return }
         _ = Self.generations.next(conversationId)
         do { try contextStore.forgetConversation(conversationId) } catch { try? contextStore.revoke() }
     }

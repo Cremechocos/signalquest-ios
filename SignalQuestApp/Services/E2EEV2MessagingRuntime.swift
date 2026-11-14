@@ -95,8 +95,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         self.ignoresGates = ignoresGates
     }
 
-    var writesEnabled: Bool { ignoresGates || E2EEV2RuntimeWriteGate.enabled }
-    var readsEnabled: Bool { ignoresGates || E2EEV2RuntimeReadGate.enabled }
+    var writesEnabled: Bool { ignoresGates || E2EEV2ServerGate.autoActive }
+    var readsEnabled: Bool { ignoresGates || E2EEV2ServerGate.autoActive }
 
     /// Cet appareil n'est pas encore entré en v2 : pas d'identité d'appareil,
     /// ou pas de clé de compte, qui n'arrive qu'avec l'approbation (ou un

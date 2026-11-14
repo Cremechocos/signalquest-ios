@@ -1866,13 +1866,6 @@ final class E2EEV2APITransport: @unchecked Sendable {
     }
 }
 
-/// L'écriture s'ouvre quand le serveur publie les capacités du jalon A : les
-/// critères de sortie (spec §17 : vecteurs, tests croisés, tests d'attaque,
-/// relectures indépendantes) sont réunis et sa porte est levée.
-enum E2EEV2RuntimeWriteGate {
-    static var enabled: Bool { E2EEV2ServerGate.messagingOpen }
-}
-
 /// Appels chiffrés : ouverts quand le serveur publie la capacité des appels
 /// vérifiés, médias en `wss` seulement. En Debug, la recette strictement
 /// locale les ouvre aussi, sans rien ouvrir d'autre.
@@ -4037,7 +4030,7 @@ enum E2EEV2MessageComposer {
         nonceProvider: () throws -> Data,
         localStateLoader: () throws -> E2EEV2MessageLocalState?
     ) -> E2EEV2MessagePreparationResult {
-        guard E2EEV2RuntimeWriteGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .blocked(reason: "e2ee-v2-security-review-required")
         }
         do {
@@ -4783,7 +4776,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         conversationId: String,
         body: Data
     ) async -> E2EEV2LiveShareLifecycleResult {
-        guard E2EEV2RuntimeWriteGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .failure(Self.activationFailure())
         }
         guard Self.matches(ownerScopeId, Self.ownerPattern),
@@ -4815,7 +4808,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         ownerScopeId: String,
         sessionId: String
     ) async -> E2EEV2LiveShareLifecycleResult {
-        guard E2EEV2RuntimeWriteGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .failure(Self.activationFailure())
         }
         guard Self.matches(ownerScopeId, Self.ownerPattern),
@@ -4848,7 +4841,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         ownerScopeId: String,
         claimCounter: () throws -> Int64
     ) -> Result<E2EEV2LiveSharePreparedEnvelope, E2EEV2LiveShareRuntimeError> {
-        guard E2EEV2RuntimeWriteGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .failure(.preparationBlocked("e2ee-v2-security-review-required"))
         }
         guard LocalAccountScope.currentUserId != nil,
@@ -4905,7 +4898,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         sessionId: String,
         envelope prepared: E2EEV2LiveSharePreparedEnvelope
     ) async -> E2EEV2LiveSharePublishResult {
-        guard E2EEV2RuntimeWriteGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .failure(Self.activationFailure())
         }
         let body: Data?
@@ -5023,7 +5016,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         _ input: E2EEV2LiveSharePublishInput,
         dependencies: E2EEV2LiveSharePublishDependencies
     ) async -> E2EEV2LiveSharePublishResult {
-        guard E2EEV2RuntimeWriteGate.enabled else { return .failure(activationFailure()) }
+        guard E2EEV2ServerGate.autoActive else { return .failure(activationFailure()) }
         guard matches(input.ownerScopeId, ownerPattern),
               validPrivatePublishScope(input) else {
             return .failure(localFailure("invalid-e2ee-v2-live-share-publish-scope"))
@@ -5056,7 +5049,7 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
         _ input: E2EEV2LiveShareFetchInput,
         dependencies: E2EEV2LiveShareFetchDependencies
     ) async -> E2EEV2LiveShareFetchResult {
-        guard E2EEV2RuntimeReadGate.enabled else { return .failure(activationFailure()) }
+        guard E2EEV2ServerGate.autoActive else { return .failure(activationFailure()) }
         guard matches(input.ownerScopeId, ownerPattern),
               matches(input.conversationId, opaquePattern),
               matches(input.sessionId, opaquePattern) else {
@@ -5504,7 +5497,7 @@ final class E2EEV2LiveShareEventClient: @unchecked Sendable {
         AsyncThrowingStream { continuation in
             let task = Task { [api, identityStore, session] in
                 do {
-                    guard E2EEV2RuntimeReadGate.enabled,
+                    guard E2EEV2ServerGate.autoActive,
                           LocalAccountScope.currentUserId != nil,
                           LocalAccountScope.currentOwnerScopeId == ownerScopeId,
                           ownerScopeId.range(
@@ -5625,7 +5618,7 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
         ownerScopeId: String,
         now: Date = Date()
     ) async throws {
-        guard E2EEV2RuntimeWriteGate.enabled,
+        guard E2EEV2ServerGate.autoActive,
               session.e2eeV2Required == true,
               session.status == "active",
               let expiresAt = session.expiresAt,
@@ -5742,7 +5735,7 @@ final class E2EEV2LiveShareRuntimeCoordinator: @unchecked Sendable {
         session: LiveShareSession,
         ownerScopeId: String
     ) async throws -> E2EEV2FetchedLiveSharePayload? {
-        guard E2EEV2RuntimeReadGate.enabled,
+        guard E2EEV2ServerGate.autoActive,
               session.e2eeV2Required == true else {
             throw E2EEV2LiveShareRuntimeError.invalidSession
         }

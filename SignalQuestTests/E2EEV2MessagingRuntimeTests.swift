@@ -130,7 +130,7 @@ extension E2EEV2MessagingRuntimeTests {
         XCTAssertTrue(E2EEV2MessagingQAGate.allows(config: local, qaArgumentEnabled: true))
         XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: local, qaArgumentEnabled: false))
         XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: remote, qaArgumentEnabled: true))
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled, "Les verrous globaux restent fermés")
+        XCTAssertFalse(E2EEV2ServerGate.autoActive, "Le chiffrement automatique reste éteint dans l'hôte de test")
     }
 }
 

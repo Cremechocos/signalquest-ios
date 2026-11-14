@@ -236,9 +236,9 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.apple")
-                // Masqué tant que la v2 dort : l'écran créait une identité locale
-                // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
-                if E2EEV2RuntimeWriteGate.enabled {
+                // Masqué tant que le chiffrement automatique n'est pas vu actif :
+                // l'écran n'a rien à montrer avant (E2E-03).
+                if E2EEV2ServerGate.autoActive {
                     Button { push(SettingsDestination.devices) } label: {
                         SQSettingsRowLabel("Appareils", systemImage: "lock.shield", showsChevron: true)
                     }

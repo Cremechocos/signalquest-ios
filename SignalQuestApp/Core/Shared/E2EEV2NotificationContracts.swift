@@ -1281,17 +1281,14 @@ enum E2EEV2ContentContract {
     }
 }
 
-/// Porte E2EE v2 du serveur, lue dans `/api/app/version-policy` : il ne
-/// publie les capacités ouvertes qu'une fois sa porte levée. Une app installée
-/// avant reste dormante ; aucune requête v2 ne part pour la découvrir. Gardée
-/// dans l'App Group : l'extension de notification lit le même état.
+/// Porte E2EE du serveur, lue dans `/api/app/version-policy`. Depuis la bascule,
+/// l'interrupteur `e2eeAutoActive` ouvre seul la messagerie chiffrée (lecture,
+/// écriture, réactions) : toute app au-dessus de la version minimale sait tout
+/// faire (E2EE-AUTO §7). Seuls les appels gardent la capacité serveur
+/// `e2ee_verified_calls_v2` (§7.3, révision 16). Gardée dans l'App Group :
+/// l'extension de notification lit le même état.
 enum E2EEV2ServerGate {
-    static let messagingCapabilities: Set<String> = [
-        E2EEV2ProtocolWire.deviceIdentityCapability, E2EEV2ProtocolWire.messageEnvelopeCapability,
-    ]
-    static let callCapabilities = messagingCapabilities.union([verifiedCallsCapability])
-    /// Réactions chiffrées (D.16) : publiée quand le serveur accepte l'enveloppe v3.
-    static let reactionsCapability = "e2ee_message_envelope_v3"
+    static let verifiedCallsCapability = "e2ee_verified_calls_v2"
 
     /// Posté quand la porte s'ouvre ou se referme : l'app relance ce qui en dépend.
     static let didChange = Notification.Name("SignalQuest.E2EEV2ServerGate.didChange")
@@ -1302,32 +1299,16 @@ enum E2EEV2ServerGate {
     private static let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     #endif
 
-    // Une fois la bascule faite, la version minimale tient lieu de capacités :
-    // toute app à jour sait tout faire (E2EE-AUTO §7). Sauf la porte des appels,
-    // qui garde la capacité serveur `e2ee_verified_calls_v2` (§7.3, révision 16).
-    static let verifiedCallsCapability = "e2ee_verified_calls_v2"
-    static var messagingOpen: Bool { autoActive || messagingCapabilities.isSubset(of: published) }
-    static var callsOpen: Bool {
-        published.contains(verifiedCallsCapability) && (autoActive || callCapabilities.isSubset(of: published))
-    }
-    static var reactionsOpen: Bool { autoActive || messagingCapabilities.union([reactionsCapability]).isSubset(of: published) }
-    /// Une fois la lecture ouverte, les conversations déjà v2 restent lisibles
-    /// même si le serveur referme sa porte : elles ne repassent jamais en v1.
-    static var readsOpen: Bool {
-        if messagingOpen { return true }
-        guard let store = Store.current else { return false }
-        return store.defaults.bool(forKey: store.readsOpenedKey)
-    }
+    static var callsOpen: Bool { autoActive && published.contains(verifiedCallsCapability) }
 
     /// Liste publiée par le serveur `host`, telle quelle ; remplacée à chaque
-    /// lecture. Vrai si l'ouverture des messages, des appels ou des réactions a changé.
+    /// lecture. Vrai si l'ouverture des appels a changé.
     @discardableResult
     static func record(serverCapabilities: Set<String>, host: String?) -> Bool {
         guard let store = Store.current, let host, host.lowercased() == store.host else { return false }
-        let before = (messagingOpen, callsOpen, reactionsOpen)
+        let before = callsOpen
         store.defaults.set(serverCapabilities.sorted(), forKey: store.publishedKey)
-        if messagingCapabilities.isSubset(of: serverCapabilities) { store.defaults.set(true, forKey: store.readsOpenedKey) }
-        return before != (messagingOpen, callsOpen, reactionsOpen)
+        return before != callsOpen
     }
 
     #if DEBUG
@@ -1378,7 +1359,6 @@ enum E2EEV2ServerGate {
         let defaults: UserDefaults
         let host: String
         var publishedKey: String { "sq.e2ee.v2.server-capabilities.\(host)" }
-        var readsOpenedKey: String { "sq.e2ee.v2.reads-opened.\(host)" }
         var autoActiveKey: String { "sq.e2ee.auto.active.\(host)" }
 
         static let shared: Store? = {
@@ -1398,10 +1378,6 @@ enum E2EEV2ServerGate {
             return shared
         }
     }
-}
-
-enum E2EEV2RuntimeReadGate {
-    static var enabled: Bool { E2EEV2ServerGate.readsOpen }
 }
 
 struct E2EEV2IncomingMessageInput: Sendable {
@@ -1444,7 +1420,7 @@ enum E2EEV2MessageReceiver {
         input: E2EEV2IncomingMessageInput,
         epochLoader: (Int) throws -> E2EEV2StoredEpochKey?
     ) -> E2EEV2MessageDecryptionResult {
-        guard E2EEV2RuntimeReadGate.enabled else {
+        guard E2EEV2ServerGate.autoActive else {
             return .blocked(reason: "e2ee-v2-security-review-required")
         }
         guard let envelope = parseEnvelope(input.envelopeData) else {

@@ -244,7 +244,7 @@ final class E2EETests: XCTestCase {
             fixture.clientRequestId
         )
 
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
     }
 
     func testV2DeviceIdentityIsStableScopedAndUsesP256X963() throws {
@@ -460,7 +460,7 @@ final class E2EETests: XCTestCase {
             E2EEV2TransportFailurePolicy.classify(statusCode: 400, code: "INVALID_ENVELOPE"),
             .permanent
         )
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
     }
 
     func testV2MediaOutboxPersistsOnlyOpaqueCiphertextAndPurgesByAccount() throws {
@@ -1779,7 +1779,7 @@ final class E2EEV2MessageComposerTests: XCTestCase {
         )
 
         XCTAssertEqual(result, .blocked(reason: "e2ee-v2-security-review-required"))
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
         XCTAssertEqual(localStateReads, 0)
         XCTAssertEqual(nonceReads, 0)
     }
@@ -1964,7 +1964,7 @@ final class E2EEV2MessageReceiverTests: XCTestCase {
             }
         )
 
-        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
         guard case .blocked(let reason) = result else {
             return XCTFail("Le verrou de lecture doit bloquer le runtime")
         }
@@ -2197,8 +2197,7 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
         } else {
             XCTFail("Live Share read gate must remain closed")
         }
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
-        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
         XCTAssertEqual(preparations, 0)
         XCTAssertEqual(identityReads, 0)
         XCTAssertEqual(epochReads, 0)
@@ -2365,7 +2364,7 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
             received.append(event)
         }
         XCTAssertTrue(received.isEmpty)
-        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
     }
 
     /// Le flux réel passe par le lecteur d'octets : les lignes vides ferment les
@@ -3443,8 +3442,7 @@ extension E2EETests {
         XCTAssertEqual(try reopened.snapshot(session).pending, before.pending)
         XCTAssertEqual(try reopened.snapshot(session).phase, .waitingAuthorization)
         XCTAssertEqual(try reopened.snapshot(session).attempts, 0)
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
-        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
     }
 
     func testV2RotationRetryBudgetAndDeadlineSurviveReopening() async throws {

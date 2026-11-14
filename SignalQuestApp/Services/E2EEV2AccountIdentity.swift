@@ -165,9 +165,9 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
     /// Ce qu'iOS sait lire en v2 : texte, modification, suppression ; « appels
     /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
     /// médias chiffrés au jalon B. Les réactions (D.16) s'annoncent ensemble,
-    /// enveloppe v3, `REACTION` et `reactions`, derrière leur verrou et la
-    /// porte du serveur : le document est republié quand elle s'ouvre.
-    static var announcesReactions: Bool { SQFeatures.e2eeReactionsEnabled && E2EEV2ServerGate.reactionsOpen }
+    /// enveloppe v3, `REACTION` et `reactions`, une fois le chiffrement
+    /// automatique actif : le document est republié quand il s'allume.
+    static var announcesReactions: Bool { SQFeatures.e2eeReactionsEnabled && E2EEV2ServerGate.autoActive }
     static var envelopeVersions: [String] { announcesReactions ? ["2", "3"] : ["2"] }
     static var kinds: [String] {
         announcesReactions ? ["DELETE", "EDIT", "REACTION", "TEXT"] : ["DELETE", "EDIT", "TEXT"]

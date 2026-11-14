@@ -500,7 +500,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             playSound: true
         )
         guard scope.isCurrent else { return false }
-        guard E2EEV2RuntimeReadGate.enabled,
+        guard E2EEV2ServerGate.autoActive,
               let request = E2EEV2OpaqueNotificationRequest(envelopeId: envelopeId, recipientOwnerScope: scope.ownerScopeId),
               let contextStore = E2EEV2NotificationContextStore.configured() else { return placeholderPosted }
         // Le même processeur que l'extension : enveloppe lue par la route servie

@@ -77,7 +77,7 @@ actor E2EEV2NotificationContextCoordinator {
         reason: E2EEV2NotificationContextRefreshReason,
         dependencies: E2EEV2NotificationContextBridgeDependencies
     ) async -> E2EEV2NotificationContextRefreshResult {
-        guard E2EEV2RuntimeReadGate.enabled else { return .dormant }
+        guard E2EEV2ServerGate.autoActive else { return .dormant }
         return await refreshContractPreview(reason: reason, dependencies: dependencies)
     }
 
@@ -187,14 +187,14 @@ final class E2EEV2NotificationContextBridge: @unchecked Sendable {
     }
 
     func refreshRuntime(reason: E2EEV2NotificationContextRefreshReason) async -> E2EEV2NotificationContextRefreshResult {
-        guard E2EEV2RuntimeReadGate.enabled else { return .dormant }
+        guard E2EEV2ServerGate.autoActive else { return .dormant }
         guard let store = E2EEV2NotificationContextStore.configured() else { return .unavailable }
         let result = await coordinator.refreshRuntime(reason: reason, dependencies: .init(
             snapshot: { [self] in snapshot() },
             approval: { [self] in await approvedDevice(for: $0) },
             senderNames: { [self] in await senderNames(for: $0) },
             prepare: { account, descriptor, names in
-                guard E2EEV2RuntimeReadGate.enabled,
+                guard E2EEV2ServerGate.autoActive,
                       PushOwnerScope.current == account.ownerScopeId,
                       LocalAccountScope.currentOwnerScopeId == account.localOwnerScopeId,
                       LocalAccountScope.storageNamespace == account.ownerNamespace,

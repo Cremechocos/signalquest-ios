@@ -36,26 +36,21 @@ final class E2EEAutoNewDeviceTests: XCTestCase {
         XCTAssertEqual(creation.epoch.recipients.count, 2, "Les deux appareils, sans regarder leurs capacités")
     }
 
-    func testOnceSwitchedOnTheGatesNoLongerWaitForCapabilities() {
-        E2EEV2ServerGate.overrideForTesting = []
+    /// Lot 10.6 : l'interrupteur auto ouvre seul la messagerie chiffrée ; les capacités
+    /// publiées n'ouvrent plus rien, sauf celle des appels, qui s'y ajoute (§7.3, révision 16).
+    func testTheAutoSwitchAloneOpensMessagingAndCallsKeepTheirCapability() {
+        E2EEV2ServerGate.overrideForTesting = [
+            E2EEV2ProtocolWire.deviceIdentityCapability, E2EEV2ProtocolWire.messageEnvelopeCapability,
+            E2EEV2ServerGate.verifiedCallsCapability,
+        ]
         E2EEV2ServerGate.autoActiveOverrideForTesting = false
-        XCTAssertFalse(E2EEV2ServerGate.messagingOpen)
-        XCTAssertFalse(E2EEV2ServerGate.callsOpen)
-        XCTAssertFalse(E2EEV2ServerGate.reactionsOpen)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive, "Les capacités v2 seules n'ouvrent plus la messagerie")
+        XCTAssertFalse(E2EEV2ServerGate.callsOpen, "Ni les appels")
         E2EEV2ServerGate.autoActiveOverrideForTesting = true
-        XCTAssertTrue(E2EEV2ServerGate.messagingOpen)
-        XCTAssertFalse(E2EEV2ServerGate.callsOpen, "Les appels gardent la capacité serveur (§7.3, révision 16)")
-        XCTAssertTrue(E2EEV2ServerGate.reactionsOpen)
+        E2EEV2ServerGate.overrideForTesting = []
+        XCTAssertTrue(E2EEV2ServerGate.autoActive)
+        XCTAssertFalse(E2EEV2ServerGate.callsOpen, "Les appels gardent la capacité serveur")
         E2EEV2ServerGate.overrideForTesting = [E2EEV2ServerGate.verifiedCallsCapability]
-        XCTAssertTrue(E2EEV2ServerGate.callsOpen)
-    }
-
-    /// Avant la bascule, la porte des appels reste l'ensemble des capacités v2.
-    func testBeforeTheSwitchCallsNeedEveryV2Capability() {
-        E2EEV2ServerGate.autoActiveOverrideForTesting = false
-        E2EEV2ServerGate.overrideForTesting = [E2EEV2ServerGate.verifiedCallsCapability]
-        XCTAssertFalse(E2EEV2ServerGate.callsOpen)
-        E2EEV2ServerGate.overrideForTesting = E2EEV2ServerGate.callCapabilities
         XCTAssertTrue(E2EEV2ServerGate.callsOpen)
     }
 

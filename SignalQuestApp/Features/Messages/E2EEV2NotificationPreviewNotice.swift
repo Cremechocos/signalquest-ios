@@ -49,7 +49,7 @@ struct E2EEV2NotificationPreviewNotice: View {
 
     /// Seulement une fois cet appareil entré en v2 : avant, aucun aperçu chiffré.
     private static func needsNotice(ownerScopeId: String?, selected: E2EEV2NotificationPrivacy) -> Bool {
-        E2EEV2RuntimeReadGate.enabled && ownerScopeId != nil && selected != .hidden && deviceIsInV2 &&
+        E2EEV2ServerGate.autoActive && ownerScopeId != nil && selected != .hidden && deviceIsInV2 &&
             !E2EEV2NotificationPrivacyStore.isNoticeAcknowledged(ownerScopeId: ownerScopeId)
     }
 

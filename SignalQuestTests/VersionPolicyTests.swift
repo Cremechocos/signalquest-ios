@@ -206,63 +206,6 @@ final class VersionPolicyTests: XCTestCase {
         XCTAssertEqual(ClientProtocolContract.currentProtocolVersion, 1)
         XCTAssertFalse(ClientProtocolContract.capabilities.contains { $0.contains("e2ee_v2") })
     }
-
-    func testE2EEV2PreviewAndUnauditedContractsRemainDisabled() {
-        let policy = ClientProtocolPolicy(
-            serverProtocolVersion: 2,
-            minWriteProtocol: 1,
-            legacyWriteDeadline: nil,
-            serverCapabilities: [E2EEV2ActivationPolicy.contractPreviewCapability],
-            writeStatus: .current
-        )
-        XCTAssertEqual(
-            E2EEV2ActivationPolicy.evaluate(policy: policy, milestoneACriteriaMet: false),
-            .disabled(reason: .milestoneACriteriaRequired, missingCapabilities: [])
-        )
-        XCTAssertFalse(
-            ClientProtocolContract.capabilities.contains(E2EEV2ActivationPolicy.contractPreviewCapability)
-        )
-    }
-
-    func testE2EEV2RequiresSymmetricReviewedCapabilities() {
-        let required = E2EEV2ActivationPolicy.requiredFullCapabilities
-        let incompletePolicy = ClientProtocolPolicy(
-            serverProtocolVersion: 2,
-            minWriteProtocol: 1,
-            legacyWriteDeadline: nil,
-            serverCapabilities: [E2EEV2ActivationPolicy.deviceIdentityCapability],
-            writeStatus: .current
-        )
-        guard case let .disabled(reason, missing) = E2EEV2ActivationPolicy.evaluate(
-            policy: incompletePolicy,
-            milestoneACriteriaMet: true,
-            requiredCapabilities: required,
-            clientProtocolVersion: 2,
-            clientCapabilities: required
-        ) else {
-            return XCTFail("Une capacité serveur partielle ne doit jamais activer E2EE v2")
-        }
-        XCTAssertEqual(reason, .capabilityMissing)
-        XCTAssertFalse(missing.isEmpty)
-
-        let completePolicy = ClientProtocolPolicy(
-            serverProtocolVersion: 2,
-            minWriteProtocol: 2,
-            legacyWriteDeadline: nil,
-            serverCapabilities: required,
-            writeStatus: .current
-        )
-        XCTAssertEqual(
-            E2EEV2ActivationPolicy.evaluate(
-                policy: completePolicy,
-                milestoneACriteriaMet: true,
-                requiredCapabilities: required,
-                clientProtocolVersion: 2,
-                clientCapabilities: required
-            ),
-            .enabled
-        )
-    }
 }
 
 /// Au lancement, la lecture de la politique part pendant que la session se

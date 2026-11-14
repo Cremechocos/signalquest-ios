@@ -60,7 +60,7 @@ enum SQFeatures {
 
     /// Réactions chiffrées (spec E2EE D.16) : l'appareil annonce l'enveloppe
     /// v3, `REACTION` et `reactions` quand ce verrou est ouvert ET que le
-    /// serveur publie `e2ee_message_envelope_v3` (`E2EEV2ServerGate.reactionsOpen`).
+    /// chiffrement automatique est actif (`E2EEV2ServerGate.autoActive`).
     /// Sans l'annonce, le bouton de réaction reste masqué dans une conversation
     /// chiffrée. Le verrou ne sert plus qu'à couper la fonction par une build.
     static let e2eeReactionsEnabled = true

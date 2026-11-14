@@ -139,7 +139,7 @@ final class E2EEV2NotificationContextStore: @unchecked Sendable {
 
     @discardableResult
     func saveRuntime(_ context: E2EEV2NotificationContext, now: Date = Date()) throws -> Bool {
-        guard E2EEV2RuntimeReadGate.enabled else { return false }
+        guard E2EEV2ServerGate.autoActive else { return false }
         try saveContractPreview(context, now: now)
         return true
     }
@@ -173,7 +173,7 @@ final class E2EEV2NotificationContextStore: @unchecked Sendable {
     /// contexte est actif : jamais en mode « aucun aperçu ».
     @discardableResult
     func saveConversationRuntime(_ entry: E2EEV2NotificationConversation, now: Date = Date()) throws -> Bool {
-        guard E2EEV2RuntimeReadGate.enabled else { return false }
+        guard E2EEV2ServerGate.autoActive else { return false }
         try saveConversationContractPreview(entry, now: now)
         return true
     }

@@ -1165,7 +1165,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     private func syncStreams() {
         let desired = Set(sessionsByID.values.filter { session in
             session.isOpen && (
-                session.e2eeV2Required != true || E2EEV2RuntimeReadGate.enabled
+                session.e2eeV2Required != true || E2EEV2ServerGate.autoActive
             )
         }.map(\.id))
         for id in Array(streamTasks.keys) where !desired.contains(id) {
@@ -1245,7 +1245,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         return sessionsByID.values.filter {
             $0.status == "active" &&
             $0.sharerId == currentUserId &&
-            ($0.e2eeV2Required != true || E2EEV2RuntimeWriteGate.enabled) &&
+            ($0.e2eeV2Required != true || E2EEV2ServerGate.autoActive) &&
             !terminalPublishFailures.contains($0.id)
         }
     }

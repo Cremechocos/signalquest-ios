@@ -228,10 +228,13 @@ final class CallReliabilityTests: XCTestCase {
     }
 
     #if DEBUG
-    /// Les verrous de Release s'ouvrent avec les capacités que le serveur
-    /// publie dans `/api/app/version-policy`, et seulement avec elles.
-    func testServerPublishedCapabilitiesOpenTheReleaseGates() throws {
-        defer { E2EEV2ServerGate.overrideForTesting = nil }
+    /// Les appels chiffrés s'ouvrent avec le chiffrement automatique et la
+    /// capacité d'appels que le serveur publie (§7.3, révision 16), médias en `wss`.
+    func testCallsOpenWithTheAutoSwitchAndTheServerCallCapability() throws {
+        defer {
+            E2EEV2ServerGate.overrideForTesting = nil
+            E2EEV2ServerGate.autoActiveOverrideForTesting = nil
+        }
         let production = AppConfig(
             environment: .production,
             appBaseURL: try XCTUnwrap(URL(string: "https://signalquest.fr")),
@@ -241,20 +244,16 @@ final class CallReliabilityTests: XCTestCase {
         let secureMedia = try XCTUnwrap(URL(string: "wss://livekit.signalquest.fr"))
         let clearMedia = try XCTUnwrap(URL(string: "ws://livekit.signalquest.fr"))
 
-        E2EEV2ServerGate.overrideForTesting = ["e2ee_v2_contract_preview"]
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
-        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
+        E2EEV2ServerGate.overrideForTesting = ["e2ee_verified_calls_v2"]
         XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
         XCTAssertFalse(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: secureMedia, config: production, qaArgumentEnabled: false))
 
-        E2EEV2ServerGate.overrideForTesting = ["e2ee_v2_contract_preview", "e2ee_device_identity_v2", "e2ee_message_envelope_v2"]
-        XCTAssertTrue(E2EEV2RuntimeWriteGate.enabled)
-        XCTAssertTrue(E2EEV2RuntimeReadGate.enabled)
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
+        E2EEV2ServerGate.overrideForTesting = []
         XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
 
-        E2EEV2ServerGate.overrideForTesting = [
-            "e2ee_device_identity_v2", "e2ee_message_envelope_v2", "e2ee_verified_calls_v2",
-        ]
+        E2EEV2ServerGate.overrideForTesting = ["e2ee_verified_calls_v2"]
         XCTAssertTrue(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
         XCTAssertTrue(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: secureMedia, config: production, qaArgumentEnabled: false))
         XCTAssertFalse(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: clearMedia, config: production, qaArgumentEnabled: false))
@@ -263,22 +262,16 @@ final class CallReliabilityTests: XCTestCase {
     }
 
     /// D.16 : l'appareil n'annonce les réactions chiffrées (enveloppe v3,
-    /// `REACTION`, `reactions`) que lorsque le serveur publie l'enveloppe v3,
-    /// et jamais sans la messagerie v2 ouverte.
-    func testEncryptedReactionsFollowTheServerGate() {
-        defer { E2EEV2ServerGate.overrideForTesting = nil }
-        E2EEV2ServerGate.overrideForTesting = ["e2ee_device_identity_v2", "e2ee_message_envelope_v2"]
+    /// `REACTION`, `reactions`) qu'une fois le chiffrement automatique actif.
+    func testEncryptedReactionsFollowTheAutoSwitch() {
+        defer { E2EEV2ServerGate.autoActiveOverrideForTesting = nil }
+        E2EEV2ServerGate.autoActiveOverrideForTesting = false
         XCTAssertFalse(E2EEV2CapabilitiesPublicationStore.announcesReactions)
         XCTAssertEqual(E2EEV2CapabilitiesPublicationStore.envelopeVersions, ["2"])
         XCTAssertEqual(E2EEV2CapabilitiesPublicationStore.kinds, ["DELETE", "EDIT", "TEXT"])
         XCTAssertFalse(E2EEV2CapabilitiesPublicationStore.features.contains("reactions"))
 
-        E2EEV2ServerGate.overrideForTesting = ["e2ee_message_envelope_v3"]
-        XCTAssertFalse(E2EEV2CapabilitiesPublicationStore.announcesReactions)
-
-        E2EEV2ServerGate.overrideForTesting = [
-            "e2ee_device_identity_v2", "e2ee_message_envelope_v2", "e2ee_message_envelope_v3",
-        ]
+        E2EEV2ServerGate.autoActiveOverrideForTesting = true
         XCTAssertEqual(E2EEV2CapabilitiesPublicationStore.announcesReactions, SQFeatures.e2eeReactionsEnabled)
         if SQFeatures.e2eeReactionsEnabled {
             XCTAssertEqual(E2EEV2CapabilitiesPublicationStore.envelopeVersions, ["2", "3"])
@@ -302,7 +295,7 @@ final class CallReliabilityTests: XCTestCase {
             debugLogsEnabled: false
         )
 
-        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertFalse(E2EEV2ServerGate.autoActive)
         XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(
             config: local,
             qaArgumentEnabled: false

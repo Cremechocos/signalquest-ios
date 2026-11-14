@@ -913,7 +913,7 @@ final class MessagesService: MessagesServicing {
         if !e2eeEnabled {
             return try await api.requestJSON("/api/live-share/requests", body: request)
         }
-        guard E2EEV2RuntimeWriteGate.enabled,
+        guard E2EEV2ServerGate.autoActive,
               LocalAccountScope.currentUserId != nil else {
             throw E2EEError.unsupported(Self.v2WritesClosedMessage)
         }
@@ -950,7 +950,7 @@ final class MessagesService: MessagesServicing {
         e2eeV2Required: Bool
     ) async throws -> LiveShareSession {
         if e2eeV2Required {
-            guard E2EEV2RuntimeWriteGate.enabled,
+            guard E2EEV2ServerGate.autoActive,
                   LocalAccountScope.currentUserId != nil else {
                 throw E2EEError.unsupported(Self.v2WritesClosedMessage)
             }

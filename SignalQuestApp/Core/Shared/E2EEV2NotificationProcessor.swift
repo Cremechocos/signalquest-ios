@@ -206,7 +206,7 @@ enum E2EEV2NotificationProcessor {
         dependencies: E2EEV2NotificationProcessorDependencies
     ) async -> E2EEV2NotificationProcessingResult {
         // No account, token, key or network access before the independent review gate.
-        guard E2EEV2RuntimeReadGate.enabled else { return .generic(.activationBlocked) }
+        guard E2EEV2ServerGate.autoActive else { return .generic(.activationBlocked) }
         return await processContractPreview(
             request: request,
             apiBaseURL: apiBaseURL,
