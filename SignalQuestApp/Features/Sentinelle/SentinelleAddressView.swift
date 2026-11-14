@@ -303,7 +303,8 @@ struct SentinelleAddressView: View {
         if model.tierQuotas?.incidentFastMode == false {
             return String(localized: "Nos serveurs envoient cinq « pings » d’un coup, \(cadence). IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
         }
-        return String(localized: "Nos serveurs envoient cinq « pings » d’un coup, \(cadence), et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
+        // 5 s : `incidentIntervalSec` par défaut du serveur et contrat v1 §1.
+        return String(localized: "Nos serveurs envoient cinq « pings » d’un coup, \(cadence), et toutes les cinq secondes dès qu’un paquet manque, pour dater une coupure à cinq secondes près. IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
     }
 
     private func emptyMessage(_ series: SentinelleLatencySeries, _ address: SentinelleAddress) -> String {

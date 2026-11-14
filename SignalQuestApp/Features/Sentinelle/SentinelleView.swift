@@ -668,6 +668,13 @@ struct SentinelleView: View {
                 }
                 }
 
+                // Hors Premium, l'offre vient sous ses propres box (maquette R10, D27).
+                if !model.targets.isEmpty {
+                    SentinellePremiumOffer(store: services.entitlements, style: .card) {
+                        await model.load()
+                    }
+                }
+
                 // Les connexions suivies viennent APRÈS les siennes : on regarde
                 // d'abord ce dont on est responsable.
                 if !model.following.isEmpty {
@@ -855,7 +862,7 @@ struct SentinelleSuspendedNote: View {
             // `plan` : le palier a mis la connexion en pause (D14) ; elle reprend
             // seule (contrat abonnements v1.12). Aucune mesure n'est gardée d'ici là.
             Text(target.isPausedByPlan
-                ? String(localized: "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium.")
+                ? String(localized: "En pause : hors Premium, le nombre de connexions surveillées est limité. Rien n’a été effacé, et elle reprendra seule dès qu’une place se libère ou au retour de Premium.")
                 : String(localized: "En pause : plus aucune mesure n’est prise."))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)

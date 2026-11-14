@@ -16,6 +16,7 @@ struct SentinelleBoxView: View {
     var rootActions: AnyView? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var services: AppServices
     @State private var openedFamily: SentinelleFamily?
     @State private var editing: EditingAddress?
     @State private var confirmDelete = false
@@ -170,6 +171,17 @@ struct SentinelleBoxView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 SentinelleSuspendedNote(target: target)
+                // Hors Premium, l'offre se dit là où se lit la cadence (maquette R10, D27).
+                if target.suspendedReason == nil, !target.isPaused || target.isPausedByPlan {
+                    SentinellePremiumOffer(
+                        store: services.entitlements,
+                        style: .link(target.isPausedByPlan
+                            ? String(localized: "Tout surveiller avec Premium")
+                            : String(localized: "Mesurer chaque minute avec Premium"))
+                    ) {
+                        await model.load()
+                    }
+                }
                 SentinelleOutagesLine(incidents: incidents)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -40841,6 +40841,114 @@
         }
       }
     },
+    "Surveille plusieurs box, chaque minute" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitor several boxes, every minute"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surveille plusieurs box, chaque minute"
+          }
+        }
+      }
+    },
+    "SQFormal|Surveille plusieurs box, chaque minute" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surveillez plusieurs box, chaque minute"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Plusieurs connexions, une mesure chaque minute, le mode rapide pendant une coupure, tout l’historique et un rapport chaque semaine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several connections, a measurement every minute, fast mode during an outage, the full history and a weekly report."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs connexions, une mesure chaque minute, le mode rapide pendant une coupure, tout l’historique et un rapport chaque semaine."
+          }
+        }
+      }
+    },
+    "Mesurer chaque minute avec Premium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measure every minute with Premium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesurer chaque minute avec Premium"
+          }
+        }
+      }
+    },
+    "Tout surveiller avec Premium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitor everything with Premium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout surveiller avec Premium"
+          }
+        }
+      }
+    },
+    "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les cinq secondes dès qu’un paquet manque, pour dater une coupure à cinq secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Our servers send five pings at once, %@, and every five seconds as soon as a packet is missing, to date an outage to within five seconds. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les cinq secondes dès qu’un paquet manque, pour dater une coupure à cinq secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
+          }
+        }
+      }
+    },
+    "En pause : hors Premium, le nombre de connexions surveillées est limité. Rien n’a été effacé, et elle reprendra seule dès qu’une place se libère ou au retour de Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused: without Premium, the number of monitored connections is limited. Nothing has been deleted, and it will resume on its own as soon as a slot frees up or when Premium is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause : hors Premium, le nombre de connexions surveillées est limité. Rien n’a été effacé, et elle reprendra seule dès qu’une place se libère ou au retour de Premium."
+          }
+        }
+      }
+    },
     "Supprimer ton compte ne résilie pas ton abonnement App Store : SignalQuest ne peut pas le faire à ta place. Résilie-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple." : {
       "localizations" : {
         "en" : {
@@ -41237,22 +41345,6 @@
         }
       }
     },
-    "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Our servers send five pings at once, %@, and every ten seconds as soon as a packet is missing, to date an outage to within ten seconds. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
-          }
-        }
-      }
-    },
     "%@ · en pause" : {
       "localizations" : {
         "en" : {
@@ -41265,22 +41357,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · en pause"
-          }
-        }
-      }
-    },
-    "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paused: without Premium, the number of monitored connections is limited. It will resume on its own as soon as a slot frees up, or when Premium is back."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium."
           }
         }
       }
@@ -73050,22 +73126,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non, ça marche"
-          }
-        }
-      }
-    },
-    "Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Our servers send five pings at once, once a minute, and every ten seconds as soon as a packet is missing, to date an outage to within ten seconds. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
           }
         }
       }

@@ -607,6 +607,78 @@ enum SentinelleWording {
     }
 }
 
+/// Entrée vers Premium d'un compte à la Sentinelle allégée (maquette R10 validée, D27) :
+/// une carte sous la liste, un lien dans la fiche d'une box. Elle ouvre le paywall
+/// natif, jamais le web (3.1.1), et ne chiffre aucun nombre de box (3.1.2(a)).
+struct SentinellePremiumOffer: View {
+    enum Style {
+        case card
+        case link(String)
+    }
+
+    @ObservedObject var store: EntitlementsStore
+    let style: Style
+    /// Relit Sentinelle à la fermeture du paywall : un achat change les quotas servis.
+    let onClose: () async -> Void
+    @State private var showsPaywall = false
+
+    /// Seulement quand le serveur sert Sentinelle complète parmi les avantages Premium
+    /// en ligne (§3 `benefits`) et que le compte n'est pas Premium. Sans §3, rien :
+    /// l'écran du 403 vend déjà Premium.
+    static func isOffered(_ snapshot: EntitlementSnapshot?, tier: SupporterTier) -> Bool {
+        guard tier != .premium, let premium = snapshot?.benefits?.premium else { return false }
+        return premium.contains("sentinelle.full")
+    }
+
+    var body: some View {
+        if Self.isOffered(store.serverState.snapshot, tier: store.confirmedServerTier) {
+            content
+                .sheet(isPresented: $showsPaywall, onDismiss: { Task { await onClose() } }) {
+                    NavigationStack {
+                        PaywallView(store: store, entryPoint: .premiumFeature("Sentinelle"))
+                    }
+                    .presentationDetents([.large])
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch style {
+        case .card:
+            GlassCard {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Label("Premium", systemImage: "crown.fill")
+                        .font(SQType.caption.weight(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                    Text("Surveille plusieurs box, chaque minute")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Plusieurs connexions, une mesure chaque minute, le mode rapide pendant une coupure, tout l’historique et un rapport chaque semaine.")
+                        .font(SQFont.body(13))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    GradientButton("Découvrir Premium", systemImage: "crown.fill") { showsPaywall = true }
+                        .padding(.top, SQSpace.xxs)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityIdentifier("sentinelle.premiumOffer")
+        case .link(let title):
+            Button { showsPaywall = true } label: {
+                Text(title)
+                    .font(SQFont.body(14))
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(SQColor.accentInk)
+            .accessibilityIdentifier("sentinelle.premiumLink")
+        }
+    }
+}
+
 private extension Double {
     func clamped(to range: ClosedRange<Double>) -> Double {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)

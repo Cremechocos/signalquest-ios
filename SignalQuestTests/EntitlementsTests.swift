@@ -882,6 +882,20 @@ final class PaywallRenderingHarness: XCTestCase {
                 try await write(AccountDeletionSubscriptionNotice(store: store).padding(16).frame(maxHeight: .infinity, alignment: .top),
                                 to: directory, name: "suppression-\(name)")
             }
+            // Entrées Premium de Sentinelle (maquette R10, D27) : visibles en gratuit,
+            // absentes pour un Premium.
+            if name == "1-gratuit" || name == "2-essai-app-store" {
+                let paused = try JSONDecoder.signalQuest.decode(SentinelleTarget.self, from: Data(
+                    #"{"id":"t2","label":"Bureau","status":"up","isActive":false,"intervalSec":60,"pausedReason":"plan"}"#.utf8))
+                let offers = VStack(alignment: .leading, spacing: 16) {
+                    SentinellePremiumOffer(store: store, style: .card) {}
+                    SentinellePremiumOffer(store: store, style: .link(String(localized: "Mesurer chaque minute avec Premium"))) {}
+                    SentinelleSuspendedNote(target: paused)
+                    SentinellePremiumOffer(store: store, style: .link(String(localized: "Tout surveiller avec Premium"))) {}
+                }
+                try await write(offers.padding(16).frame(maxHeight: .infinity, alignment: .top),
+                                to: directory, name: "sentinelle-\(name)")
+            }
         }
     }
 

@@ -126,6 +126,25 @@ final class SentinelleTierTests: XCTestCase {
             XCTAssertFalse(message.contains("Vous surveillez"), code)
         }
     }
+
+    /// L'entrée vers Premium (maquette R10, D27) n'apparaît que si le serveur sert
+    /// Sentinelle complète parmi les avantages Premium, et jamais à un Premium.
+    func testThePremiumOfferFollowsTheServedBenefits() {
+        func snapshot(tier: SupporterTier, premium: [String]?) -> EntitlementSnapshot {
+            EntitlementSnapshot(
+                tier: tier, source: .unknown, period: nil, status: tier == .free ? .inactive : .active, expiresAt: nil,
+                benefits: premium.map { EntitlementBenefits(free: ["sentinelle.lite"], premium: $0) }
+            )
+        }
+        let served = ["sentinelle.full", "stories.duration"]
+        XCTAssertTrue(SentinellePremiumOffer.isOffered(snapshot(tier: .free, premium: served), tier: .free))
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(snapshot(tier: .premium, premium: served), tier: .premium))
+        // Ancienne route, sans §3 : l'écran du 403 vend déjà Premium.
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(snapshot(tier: .free, premium: nil), tier: .free))
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(nil, tier: .free))
+        // Avantage retiré au serveur : plus d'offre, sans nouvelle build.
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(snapshot(tier: .free, premium: ["stories.duration"]), tier: .free))
+    }
 }
 
 /// AF-RAD-02, AF-RAD-03, AF-RAD-05 : la personne invitée par un lien est
