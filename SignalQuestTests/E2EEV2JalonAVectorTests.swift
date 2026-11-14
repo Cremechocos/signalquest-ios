@@ -45,7 +45,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             ("call-descriptor-v1", try buildCallDescriptor()),
             ("call-frame-key-v2", try buildCallFrameKey()),
             ("call-join-proof-v1", try buildJoinProof()),
-            ("safety-number-v1", try buildSafetyNumber()),
             ("identity-reset-v1", try buildIdentityReset()),
             ("capability-intersection-v1", buildCapabilityIntersection()),
         ]
@@ -486,19 +485,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
                 _ = try E2EEV2CallJoinProof.parse(candidate.canonical)
             }(), caseName(neg))
         }
-    }
-
-    func testSafetyNumberVector() throws {
-        let v = try load("safety-number-v1")
-        let uikA = try b64(v, "uikAPublicX963B64")
-        let uikB = try b64(v, "uikBPublicX963B64")
-        XCTAssertEqual(E2EEV2SafetyNumber.digits(uikX963: uikA, userId: try str(v, "userA")), try str(v, "digitsA"))
-        XCTAssertEqual(E2EEV2SafetyNumber.digits(uikX963: uikB, userId: try str(v, "userB")), try str(v, "digitsB"))
-        let pair = E2EEV2SafetyNumber.pair(userA: try str(v, "userA"), uikA: uikA, userB: try str(v, "userB"), uikB: uikB)
-        XCTAssertEqual(pair, try str(v, "safetyNumber"))
-        XCTAssertEqual(E2EEV2SafetyNumber.pair(userA: try str(v, "userB"), uikA: uikB, userB: try str(v, "userA"), uikB: uikA), pair)
-        XCTAssertEqual(E2EEV2SafetyNumber.grouped(pair), try strings(v, "groups"))
-        XCTAssertEqual(E2EEV2SafetyNumber.qrPayload(pair), try str(v, "qrPayload"))
     }
 
     func testIdentityResetVector() throws {
@@ -1214,21 +1200,6 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("identityIsNotTheDevice")), ("messageUtf8", .s(String(decoding: E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(accountIdentity, with: signing)), as: UTF8.self)))]),
                 .o([("case", .s("extraKey")), ("messageUtf8", .s(message.replacingOccurrences(of: "{\"proof\"", with: "{\"a\":null,\"proof\"")))]),
             ])),
-        ])
-    }
-
-    func buildSafetyNumber() throws -> VJ {
-        let uikA = try signingKey(0x11).publicKey.x963Representation
-        let uikB = try signingKey(0x13).publicKey.x963Representation
-        let pair = E2EEV2SafetyNumber.pair(userA: userA, uikA: uikA, userB: userB, uikB: uikB)
-        return .o([
-            ("fixtureVersion", .s("1")), ("iterations", .s(String(E2EEV2SafetyNumber.iterations))),
-            ("userA", .s(userA)), ("uikAPublicX963B64", .s(uikA.base64EncodedString())),
-            ("userB", .s(userB)), ("uikBPublicX963B64", .s(uikB.base64EncodedString())),
-            ("digitsA", .s(E2EEV2SafetyNumber.digits(uikX963: uikA, userId: userA))),
-            ("digitsB", .s(E2EEV2SafetyNumber.digits(uikX963: uikB, userId: userB))),
-            ("safetyNumber", .s(pair)), ("groups", .a(E2EEV2SafetyNumber.grouped(pair).map(VJ.s))),
-            ("qrPayload", .s(E2EEV2SafetyNumber.qrPayload(pair))),
         ])
     }
 

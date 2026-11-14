@@ -1,3 +1,4 @@
+import CoreImage.CIFilterBuiltins
 import CryptoKit
 import SwiftUI
 import UIKit
@@ -122,7 +123,7 @@ final class E2EEAutoSafetyCodeViewModel: ObservableObject {
     private func content(_ code: E2EEAutoSafetyCode.Code) -> Content {
         let verified = dependencies.verifications.verifiedDigits(peerUserId: peerUserId, ownerNamespace: dependencies.ownerNamespace)
         let status: Status = verified == nil ? .unverified : verified == code.digits ? .verified : .changed
-        return Content(code: code, status: status, qrImage: E2EEV2SafetyNumberQR.image(for: code.qr))
+        return Content(code: code, status: status, qrImage: E2EEAutoSafetyCodeQR.image(for: code.qr))
     }
 }
 
@@ -447,5 +448,20 @@ struct E2EEAutoSafetyCodeQAScreen: View {
         #else
         EmptyView()
         #endif
+    }
+}
+
+/// QR du code de sécurité, à scanner par l'autre appareil.
+enum E2EEAutoSafetyCodeQR {
+    @MainActor private static let context = CIContext()
+
+    @MainActor
+    static func image(for payload: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(payload.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
+              let image = context.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: image)
     }
 }

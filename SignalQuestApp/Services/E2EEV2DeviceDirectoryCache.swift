@@ -4,8 +4,8 @@ import Foundation
 /// Appareils certifiés des comptes d'une session (§2.2), gardés quelques
 /// minutes. L'annuaire de confiance vérifie et épingle chaque paquet ; ce cache
 /// évite seulement de le relire à chaque relève ou envoi. Il s'invalide après
-/// une approbation, une révocation, un numéro de sécurité accepté ou un
-/// `E2EE_DEVICE_LIST_STALE` (E.0), qui nomme les comptes à relire.
+/// une révocation ou un `E2EE_DEVICE_LIST_STALE` (E.0), qui nomme les comptes
+/// à relire.
 actor E2EEV2DeviceDirectoryCache {
     static let lifetime: TimeInterval = 5 * 60
 
@@ -22,7 +22,8 @@ actor E2EEV2DeviceDirectoryCache {
     let session: LocalAccountSession
     private let directory: E2EEV2TrustDirectory
     /// Source auto (E2EE-AUTO §4.2) : quand elle est là, les appareils viennent
-    /// du journal vérifié ; l'annuaire v2 ne sert plus qu'au numéro de sécurité.
+    /// du journal vérifié ; l'annuaire v2 ne sert plus qu'aux signataires
+    /// d'avant la bascule (`legacySigners`).
     private let autoRead: (@Sendable ([String]) async throws -> E2EEV2CertifiedDeviceSet)?
     private let now: @Sendable () -> Date
     private var entries: [String: Entry] = [:]
@@ -31,7 +32,7 @@ actor E2EEV2DeviceDirectoryCache {
     /// Dernier écart d'horloge mesuré par le journal (§7.1).
     private var logClockOffsetMs: Int64?
     /// Invalidations par compte : une lecture commencée avant une invalidation
-    /// (révocation, numéro accepté) n'écrit pas son résultat après elle, ce
+    /// (révocation) n'écrit pas son résultat après elle, ce
     /// que la réentrance de l'acteur permettrait pendant l'`await`.
     private var generations: [String: Int] = [:]
     private var generation = 0
@@ -201,24 +202,5 @@ actor E2EEV2DeviceDirectoryCache {
             entries[user] = nil
             generations[user, default: 0] += 1
         }
-    }
-}
-
-/// Numéro de sécurité d'un membre (§2.4), lu et accepté dans l'annuaire de la
-/// session : un choix fait ici relit aussitôt les appareils de ce compte, au
-/// lieu d'attendre la fin des 5 minutes.
-extension E2EEV2DeviceDirectoryCache: E2EEV2SafetyNumberTrusting {
-    func safetyNumberIdentity(userId: String) async throws -> E2EEV2SafetyNumberIdentity {
-        try await directory.safetyNumberIdentity(userId: userId)
-    }
-
-    func setVerified(_ verified: Bool, userId: String, uikX963B64: String) async throws {
-        try await directory.setVerified(verified, userId: userId, uikX963B64: uikX963B64)
-        invalidate([userId])
-    }
-
-    func acceptChangedIdentity(userId: String, uikX963B64: String, verified: Bool) async throws {
-        try await directory.acceptChangedIdentity(userId: userId, uikX963B64: uikX963B64, verified: verified)
-        invalidate([userId])
     }
 }

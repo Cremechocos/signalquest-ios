@@ -762,24 +762,6 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         SQDiagnostics.recordReport(operation, area: .e2eeV2, info: info)
     }
 
-    /// De quoi montrer le numéro de sécurité d'un membre (§2.4) : l'annuaire de
-    /// la session, son propre compte et sa clé de compte détenue ici.
-    struct SafetyNumberAccess {
-        let trust: any E2EEV2SafetyNumberTrusting
-        let ownUserId: String
-        let ownAccountKey: () -> P256.Signing.PublicKey?
-    }
-
-    func safetyNumberAccess() -> SafetyNumberAccess? {
-        guard readsEnabled, let parts = current() else { return nil }
-        let namespace = parts.session.ownerNamespace
-        return SafetyNumberAccess(
-            trust: parts.directory,
-            ownUserId: String(parts.session.ownerScopeId.dropFirst("user:".count)),
-            ownAccountKey: { [accountIdentityStore] in (try? accountIdentityStore.load(ownerNamespace: namespace))?.publicKey }
-        )
-    }
-
     /// Dernier message affichable gardé ici, pour l'aperçu de la liste : son
     /// enveloppe (comparée à `e2eeV2.lastMessage` du serveur) et son texte en
     /// clair, ou la nature d'un message sans texte. Un import n'est jamais un

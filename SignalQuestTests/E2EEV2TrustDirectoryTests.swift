@@ -259,124 +259,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         XCTAssertFalse(set([browser]).supportsVerifiedCalls(nowMs: now, excludesWeb: true), "Il reste au moins un appareil")
     }
 
-    // MARK: - Numéro de sécurité (§2.4, D.12)
-
-    func testTheSafetyNumberStatusFollowsTheUsersChoices() async throws {
-        let bruno = Account("bruno")
-        let server = Server()
-        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
-        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins, ownUserId: alice) { userId, _ in
-            try server.response(for: userId)
-        }
-        let uik = bruno.uik.publicKey.x963Representation.base64EncodedString()
-
-        let first = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(first, E2EEV2SafetyNumberIdentity(userId: bruno.userId, uikX963B64: uik, status: .unverified))
-        XCTAssertNotNil(try pins.pin(userId: bruno.userId, ownerNamespace: namespace), "Épinglé au premier contact")
-
-        try await directory.setVerified(true, userId: bruno.userId, uikX963B64: uik)
-        let verified = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(verified.status, .verified)
-        _ = try await directory.certifiedDevices(for: [bruno.userId])
-        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.verified, true,
-                       "Une relecture garde la vérification")
-
-        try await directory.setVerified(false, userId: bruno.userId, uikX963B64: uik)
-        let cleared = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(cleared.status, .unverified)
-
-        let other = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
-        await XCTAssertThrowsAsync(try await directory.setVerified(true, userId: bruno.userId, uikX963B64: other),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.numberChanged)
-        await XCTAssertThrowsAsync(try await directory.safetyNumberIdentity(userId: alice),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.ownAccount)
-    }
-
-    func testAChangedKeyIsShownButNotBelievedUntilAccepted() async throws {
-        let bruno = Account("bruno")
-        let reset = Account(userId: bruno.userId, deviceId: "device_bruno_new_01J7ABCD")
-        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let pages = SincePages()
-        pages.serve(try bundle(bruno, version: 3, features: ["calls"]), since: nil)
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins, ownUserId: alice) { _, since in
-            try pages.response(since: since)
-        }
-        _ = try await directory.certifiedDevices(for: [bruno.userId])
-
-        // Nouvelle identité : sa liste repart de 1 (D.14). Le serveur ignore la
-        // version épinglée, plus grande que la sienne (E.1, v0.4.9).
-        let renewed = try bundle(reset, version: 1, features: ["calls"])
-        pages.serve(renewed, since: 3)
-        pages.serve(renewed, since: nil)
-        let newUIK = reset.uik.publicKey.x963Representation.base64EncodedString()
-        let changed = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(changed, E2EEV2SafetyNumberIdentity(userId: bruno.userId, uikX963B64: newUIK, status: .changed(wasVerified: false)))
-        let refused = try await directory.certifiedDevices(for: [bruno.userId])
-        XCTAssertEqual(refused.refusals, [bruno.userId: .uikChanged], "Montrée, mais pas crue")
-
-        let unseen = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
-        await XCTAssertThrowsAsync(
-            try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: unseen, verified: false),
-            E2EEV2TrustDirectory.SafetyNumberFailure.numberChanged, "Seule l'UIK dont le numéro a été vu s'accepte"
-        )
-        // L'acceptation relit sans `sinceVersion` : la réponse à la version
-        // épinglée ne sert plus.
-        pages.serve(Data("{}".utf8), since: 3)
-        try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: newUIK, verified: false)
-        pages.serve(renewed, since: 1)
-        let accepted = try await directory.certifiedDevices(for: [bruno.userId])
-        XCTAssertEqual(accepted.refusals, [:])
-        XCTAssertNotNil(accepted.device(userId: bruno.userId, deviceId: reset.deviceId))
-        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.listVersion, 1)
-        let now = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(now.status, .unverified)
-    }
-
-    func testAVerifiedKeyIsReplacedOnlyByANewVerification() async throws {
-        let bruno = Account("bruno")
-        let reset = Account(userId: bruno.userId, deviceId: "device_bruno_new_01J7ABCD")
-        let server = Server()
-        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
-        let directory = E2EEV2TrustDirectory(
-            ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()), ownUserId: alice
-        ) { userId, _ in try server.response(for: userId) }
-        _ = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        try await directory.setVerified(true, userId: bruno.userId, uikX963B64: bruno.uik.publicKey.x963Representation.base64EncodedString())
-
-        server.serve(try bundle(reset, version: 1, features: ["calls"]), for: bruno.userId)
-        let newUIK = reset.uik.publicKey.x963Representation.base64EncodedString()
-        let changed = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(changed.status, .changed(wasVerified: true))
-        await XCTAssertThrowsAsync(
-            try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: newUIK, verified: false),
-            E2EEV2TrustDirectory.SafetyNumberFailure.verificationRequired
-        )
-        try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: newUIK, verified: true)
-        let verified = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(verified, E2EEV2SafetyNumberIdentity(userId: bruno.userId, uikX963B64: newUIK, status: .verified))
-    }
-
-    func testAReadInFlightKeepsAVerificationMadeMeanwhile() async throws {
-        let bruno = Account("bruno")
-        let served = try bundle(bruno, version: 1, features: ["calls"])
-        let gate = Gate()
-        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins, ownUserId: alice) { _, _ in
-            await gate.pass()
-            return served
-        }
-        _ = try await directory.certifiedDevices(for: [bruno.userId])
-
-        gate.closeNext()
-        let inFlight = Task { try await directory.certifiedDevices(for: [bruno.userId]) }
-        await gate.waitForArrival()
-        try await directory.setVerified(true, userId: bruno.userId, uikX963B64: bruno.uik.publicKey.x963Representation.base64EncodedString())
-        gate.open()
-        _ = try await inFlight.value
-        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.verified, true,
-                       "La lecture partie avant la vérification ne l'efface pas")
-    }
+    // MARK: - Pins (§2.4)
 
     func testAnOlderReadNeverRollsTheListBack() async throws {
         let bruno = Account("bruno")
@@ -426,14 +309,14 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         gate.closeNext()
         let first = Task { try await directory.certifiedDevices(for: [bruno.userId]) }
         await gate.waitForArrival()
-        let shown = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        XCTAssertEqual(shown.uikX963B64, bruno.uik.publicKey.x963Representation.base64EncodedString())
+        let shown = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertNotNil(shown.device(userId: bruno.userId, deviceId: bruno.deviceId))
         gate.open()
         let set = try await first.value
         XCTAssertNil(set.device(deviceId: forged.deviceId), "Rien n'est cru d'un paquet lu contre un pin périmé")
         XCTAssertEqual(set.refusals, [bruno.userId: .uikChanged], "Relu contre la clé épinglée, l'autre clé est refusée")
         XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.uikX963B64,
-                       bruno.uik.publicKey.x963Representation.base64EncodedString(), "La clé montrée reste épinglée")
+                       bruno.uik.publicKey.x963Representation.base64EncodedString(), "La clé lue au premier contact reste épinglée")
     }
 
     func testCapabilitySequencesNeverGoBack() async throws {
@@ -460,66 +343,6 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         _ = try await older.value
         XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.capabilitySequences[bruno.deviceId], 2,
                        "Une lecture plus ancienne ne fait pas reculer les capacités")
-    }
-
-    func testSafetyNumberChoicesNeedAKnownOwnAccountAndAContact() async throws {
-        let bruno = Account("bruno")
-        let server = Server()
-        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
-        let uik = bruno.uik.publicKey.x963Representation.base64EncodedString()
-        let anonymous = E2EEV2TrustDirectory(
-            ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        ) { userId, _ in try server.response(for: userId) }
-        await XCTAssertThrowsAsync(try await anonymous.safetyNumberIdentity(userId: bruno.userId),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.ownAccount, "Fermé sans son propre identifiant")
-
-        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins, ownUserId: alice) { userId, _ in
-            try server.response(for: userId)
-        }
-        await XCTAssertThrowsAsync(try await directory.setVerified(true, userId: alice, uikX963B64: uik),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.ownAccount)
-        await XCTAssertThrowsAsync(try await directory.acceptChangedIdentity(userId: alice, uikX963B64: uik, verified: true),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.ownAccount)
-        await XCTAssertThrowsAsync(try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: uik, verified: true),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.numberChanged, "Rien d'épinglé : rien à remplacer")
-        await XCTAssertThrowsAsync(try await directory.setVerified(true, userId: bruno.userId, uikX963B64: uik),
-                                   E2EEV2TrustDirectory.SafetyNumberFailure.numberChanged, "Rien d'épinglé : rien à vérifier")
-    }
-
-    func testAcceptingAChangeRefusesAnInvalidNewIdentityOrAPinThatMoved() async throws {
-        let bruno = Account("bruno"), reset = Account(userId: bruno.userId, deviceId: "device_bruno_new_01J7ABCD")
-        let gate = Gate()
-        let responses = LockedValue(try bundle(bruno, version: 1, features: ["calls"]))
-        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins, ownUserId: alice) { _, _ in
-            await gate.pass()
-            return responses.value
-        }
-        _ = try await directory.safetyNumberIdentity(userId: bruno.userId)
-        let newUIK = reset.uik.publicKey.x963Representation.base64EncodedString()
-
-        // Nouvelle liste signée par une autre clé que la nouvelle UIK : refusée.
-        responses.value = try bundle(reset, version: 1, features: ["calls"], listSigner: P256.Signing.PrivateKey())
-        await XCTAssertThrowsAsync(
-            try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: newUIK, verified: false),
-            E2EEV2TrustDirectory.SafetyNumberFailure.refused(.invalidDeviceList)
-        )
-        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.uikX963B64,
-                       bruno.uik.publicKey.x963Representation.base64EncodedString())
-
-        // Le pin change pendant la lecture de l'acceptation : rien n'est écrasé.
-        responses.value = try bundle(reset, version: 1, features: ["calls"])
-        gate.closeNext()
-        let accepting = Task {
-            try await directory.acceptChangedIdentity(userId: bruno.userId, uikX963B64: newUIK, verified: false)
-        }
-        await gate.waitForArrival()
-        try await directory.setVerified(true, userId: bruno.userId, uikX963B64: bruno.uik.publicKey.x963Representation.base64EncodedString())
-        gate.open()
-        await XCTAssertThrowsAsync(try await accepting.value, E2EEV2TrustDirectory.SafetyNumberFailure.numberChanged)
-        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.uikX963B64,
-                       bruno.uik.publicKey.x963Representation.base64EncodedString())
     }
 
     /// Retient le prochain passage jusqu'à `open()`.

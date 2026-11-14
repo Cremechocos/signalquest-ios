@@ -661,8 +661,6 @@ struct RootView: View {
                 SentinelleAlertSettingsQAScreen()
             } else if AppEnvironment.showsRemoteImageQA {
                 RemoteImageQAScreen()
-            } else if AppEnvironment.showsSafetyNumberQA {
-                E2EEV2SafetyNumberQAScreen()
             } else if AppEnvironment.showsE2EEReportQA {
                 E2EEV2MessageReportQAScreen()
             } else if AppEnvironment.showsAutoLogAlertQA {

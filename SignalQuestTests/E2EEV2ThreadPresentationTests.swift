@@ -158,7 +158,7 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
             refusals: [carla.id: .deviceListRollback, bruno.id: .uikChanged]
         )
         XCTAssertEqual(thread.notices, [
-            .identityChanged(userId: bruno.id, name: "Bruno"),
+            .identityUnverified(userId: bruno.id, name: "Bruno"),
             .identityUnverified(userId: carla.id, name: nil),
             .waitingForEpoch,
         ], "L'envoi les attend : ils passent en tête")

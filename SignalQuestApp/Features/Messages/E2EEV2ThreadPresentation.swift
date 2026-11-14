@@ -6,11 +6,8 @@ import Foundation
 /// vérification sont faites avant, par la messagerie v2.
 struct E2EEV2ThreadPresentation: Equatable {
     enum Notice: Equatable {
-        /// Un membre a un nouveau numéro de sécurité : rien ne lui est envoyé
-        /// tant que l'utilisateur ne l'a pas vu (§2.4). L'avis mène à son numéro.
-        case identityChanged(userId: String, name: String?)
         /// Le paquet de confiance d'un membre est refusé (liste en recul,
-        /// lacune, signature invalide) : rien ne lui est envoyé non plus.
+        /// lacune, signature invalide) : rien ne lui est envoyé.
         case identityUnverified(userId: String, name: String?)
         /// Deux versions d'un même message : aucune n'est affichée (§4.2).
         case equivocation(count: Int)
@@ -34,10 +31,6 @@ struct E2EEV2ThreadPresentation: Equatable {
 
         var text: String {
             switch self {
-            case .identityChanged(_, let name?):
-                return String(localized: "\(name) a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu.")
-            case .identityChanged(_, nil):
-                return String(localized: "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu.")
             case .identityUnverified(_, let name?):
                 return String(localized: "Le chiffrement avec \(name) n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard.")
             case .identityUnverified(_, nil):
@@ -237,7 +230,6 @@ enum E2EEV2ThreadPresenter {
         var notices: [E2EEV2ThreadPresentation.Notice] = refusals.keys.sorted().map { userId in
             let name = members[userId]?.displayName
             switch refusals[userId] {
-            case .uikChanged?: return .identityChanged(userId: userId, name: name)
             case .logEntryMissing?: return .logMismatch(userId: userId, name: name)
             default: return .identityUnverified(userId: userId, name: name)
             }

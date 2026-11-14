@@ -127,8 +127,6 @@ struct ConversationDetailView: View {
     @State private var showImportUnlock = false
     @State private var v2LoadInFlight = false
     @State private var v2LoadAgain = false
-    /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
-    @State private var safetyNumberPeer: SafetyNumberPeer?
     /// Code de sécurité du chiffrement automatique (E2EE-AUTO §7).
     @State private var safetyCodePeer: SafetyNumberPeer?
     @State private var showEncryptionInfo = false
@@ -568,16 +566,7 @@ struct ConversationDetailView: View {
                                 .padding(.vertical, SQSpace.sm)
                         }
                         ForEach(Array(v2Notices.enumerated()), id: \.offset) { _, notice in
-                            if case .identityChanged(let userId, let name) = notice {
-                                // L'envoi attend ce membre : l'avis mène à son numéro.
-                                Button {
-                                    safetyNumberPeer = SafetyNumberPeer(userId: userId, name: name)
-                                } label: {
-                                    v2NoticeLabel(notice, detail: String(localized: "Voir le numéro de sécurité"))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("conversation.v2Notice.safetyNumber")
-                            } else if case .logMismatch(let userId, _) = notice {
+                            if case .logMismatch(let userId, _) = notice {
                                 E2EEAutoAccountAlertReportRow(notice: notice, userId: userId)
                             } else {
                                 v2NoticeLabel(notice, detail: nil)
@@ -1031,38 +1020,6 @@ struct ConversationDetailView: View {
                     peerName: peer.name ?? String(localized: "Ce membre"),
                     onClose: { safetyCodePeer = nil }
                 )
-            }
-        }
-        .sheet(item: $safetyNumberPeer, onDismiss: { Task { await loadV2() } }) { peer in
-            NavigationStack {
-                Group {
-                    if let access = services.e2eeV2Messaging.safetyNumberAccess() {
-                        E2EEV2SafetyNumberView(
-                            peerUserId: peer.userId,
-                            peerName: peer.name ?? String(localized: "Ce membre"),
-                            ownUserId: access.ownUserId,
-                            ownAccountKey: access.ownAccountKey,
-                            trust: access.trust,
-                            onClose: { safetyNumberPeer = nil }
-                        )
-                    } else {
-                        // Sans accès aux clés, la feuille dit pourquoi elle est vide.
-                        Text("Le numéro de sécurité n’est pas disponible pour le moment.")
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(SQSpace.lg)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .signalQuestBackground()
-                            .navigationTitle(Text("Numéro de sécurité"))
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Fermer") { safetyNumberPeer = nil }
-                    }
-                }
             }
         }
         .sheet(item: $reportTarget) { message in

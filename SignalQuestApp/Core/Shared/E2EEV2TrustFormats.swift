@@ -748,51 +748,6 @@ enum E2EEV2EpochBinding {
     }
 }
 
-// MARK: D.12 Numéro de sécurité
-
-enum E2EEV2SafetyNumber {
-    static let iterations = 5_200
-
-    /// Les 30 chiffres d'une personne.
-    static func digits(uikX963: Data, userId: String) -> String {
-        var hash = Data(SHA512.hash(data: Data("SQ-E2EE-V2-SAFETY\n1\n".utf8) + uikX963 + Data(userId.utf8)))
-        for _ in 0..<iterations {
-            hash = Data(SHA512.hash(data: hash + uikX963))
-        }
-        let bytes = Array(hash.prefix(30))
-        return stride(from: 0, to: 30, by: 5).map { start -> String in
-            let chunk = bytes[start..<(start + 5)].reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
-            let value = chunk % 100_000
-            let text = String(value)
-            return String(repeating: "0", count: 5 - text.count) + text
-        }.joined()
-    }
-
-    /// Les 60 chiffres affichés pour deux personnes, dans l'ordre des `userId`.
-    static func pair(
-        userA: String, uikA: Data,
-        userB: String, uikB: Data
-    ) -> String {
-        let first = (userId: userA, digits: digits(uikX963: uikA, userId: userA))
-        let second = (userId: userB, digits: digits(uikX963: uikB, userId: userB))
-        let ordered = Array(first.userId.utf8).lexicographicallyPrecedes(Array(second.userId.utf8))
-            ? [first, second] : [second, first]
-        return ordered.map(\.digits).joined()
-    }
-
-    static func grouped(_ sixtyDigits: String) -> [String] {
-        stride(from: 0, to: sixtyDigits.count, by: 5).map { start in
-            let begin = sixtyDigits.index(sixtyDigits.startIndex, offsetBy: start)
-            let end = sixtyDigits.index(begin, offsetBy: 5)
-            return String(sixtyDigits[begin..<end])
-        }
-    }
-
-    static func qrPayload(_ sixtyDigits: String) -> String {
-        "SQSN1|" + sixtyDigits
-    }
-}
-
 // MARK: D.13 Approbation v2
 
 enum E2EEV2ApprovalV2 {
