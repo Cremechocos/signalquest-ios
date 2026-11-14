@@ -443,11 +443,16 @@ struct EntitlementSnapshot: Equatable, Sendable {
     /// Vrai si le serveur sert déjà l'abonnement App Store qui se termine à cette
     /// date (contrat v1 §5 : pas de renvoi dans ce cas). Une seconde d'écart est
     /// tolérée : Apple date à la milliseconde, le serveur peut arrondir.
-    func knowsAppStoreSubscription(expiringAt date: Date?) -> Bool {
+    ///
+    /// Avec le renouvellement lu dans StoreKit, le serveur doit aussi servir le
+    /// même `autoRenew` (contrat v1.14 §5) : une résiliation faite dans la
+    /// feuille d'Apple, ou un `autoRenew` encore inconnu (null), appelle le renvoi.
+    func knowsAppStoreSubscription(expiringAt date: Date?, willAutoRenew: Bool? = nil) -> Bool {
         guard let date else { return false }
         return subscriptions.contains { subscription in
-            guard subscription.channel == .appStore, let end = subscription.currentPeriodEnd else { return false }
-            return abs(end.timeIntervalSince(date)) < 1
+            guard subscription.channel == .appStore, let end = subscription.currentPeriodEnd,
+                  abs(end.timeIntervalSince(date)) < 1 else { return false }
+            return willAutoRenew.map { subscription.autoRenew == $0 } ?? true
         }
     }
 }
@@ -734,6 +739,11 @@ struct AppStoreTransactionProof: Encodable, Sendable {
     let productId: String
     let transactionId: String
     let originalTransactionId: String
+    /// `renewalInfo` signé d'Apple pour cet abonnement (contrat v1.14 §5) : le
+    /// serveur y lit le renouvellement automatique, l'essai, le délai de grâce
+    /// et le prix suivant. Absent (omis du JSON) si StoreKit ne l'a pas donné ;
+    /// le serveur l'ignore aussi s'il le refuse, sans jamais refuser l'achat.
+    var signedRenewalInfo: String? = nil
 }
 
 protocol AppStoreTransactionSyncing: Sendable {
@@ -832,7 +842,8 @@ final class EntitlementsStore: ObservableObject {
     /// jusqu'au prochain lancement, sans un appel perdu à chaque lecture.
     private var contractRouteMissing = false
     /// Transactions d'origine déjà envoyées ou reconnues pendant ce lancement,
-    /// par session (contrat v1 §5 : un seul envoi par lancement).
+    /// par session et par état de renouvellement (contrat v1 §5 : un seul envoi
+    /// par lancement ; v1.14 : un de plus si le renouvellement change).
     private var reconciledThisLaunch: Set<String> = []
     private var isReconciling = false
 
@@ -1027,7 +1038,6 @@ final class EntitlementsStore: ObservableObject {
                 guard SignalQuestSubscriptionProduct(rawValue: transaction.productID) != nil else {
                     throw EntitlementsError.unexpectedProduct
                 }
-                reconciledThisLaunch.insert(Self.reconciliationKey(accountSession, transaction))
                 let outcome = await deliver(verification, transaction: transaction, session: accountSession)
                 await refreshLocalEntitlements()
                 publishOperation(Self.operationState(after: outcome), for: accountSession)
@@ -1075,7 +1085,6 @@ final class EntitlementsStore: ObservableObject {
 
         var outcomes: [DeliveryOutcome] = []
         for candidate in candidates {
-            reconciledThisLaunch.insert(Self.reconciliationKey(accountSession, candidate.latest.transaction))
             outcomes.append(await deliver(candidate.latest.result, transaction: candidate.latest.transaction,
                                           alsoFinishing: candidate.unfinished, session: accountSession))
         }
@@ -1095,29 +1104,38 @@ final class EntitlementsStore: ObservableObject {
 
     /// Renvoie au serveur les transactions App Store en cours (contrat v1 §5),
     /// au lancement et au retour au premier plan : avec une session ouverte, une
-    /// seule fois par lancement et par transaction d'origine, et jamais quand le
-    /// serveur sert déjà cet abonnement avec la même échéance. Rattrape l'achat
-    /// simplifié, l'achat fait sur un autre appareil et un achat payé pendant
-    /// une panne du serveur. Silencieux : un échec reste dans les journaux, ne
-    /// déconnecte jamais et sera retenté au prochain lancement.
-    func reconcileAppStoreTransactions() async {
+    /// seule fois par lancement, par transaction d'origine et par état de
+    /// renouvellement, et jamais quand le serveur sert déjà cet abonnement avec
+    /// la même échéance et le même renouvellement (v1.14). Rattrape l'achat
+    /// simplifié, l'achat fait sur un autre appareil, un achat payé pendant une
+    /// panne du serveur et une résiliation faite dans la feuille d'Apple.
+    /// Silencieux : un échec reste dans les journaux, ne déconnecte jamais et
+    /// sera retenté au prochain lancement. Vrai si les droits ont été relus.
+    @discardableResult
+    func reconcileAppStoreTransactions() async -> Bool {
         guard serverVerificationReady, !isReconciling,
-              let session = LocalAccountScope.sessionSnapshot() else { return }
+              let session = LocalAccountScope.sessionSnapshot() else { return false }
         isReconciling = true
         defer { isReconciling = false }
 
-        let candidates = await currentAppStoreTransactions().filter {
-            !reconciledThisLaunch.contains(Self.reconciliationKey(session, $0.latest.transaction))
+        let current = await currentAppStoreTransactions()
+        let renewals = await Self.appStoreRenewals(for: current.map(\.latest.transaction))
+        let candidates = current.filter {
+            let transaction = $0.latest.transaction
+            return !reconciledThisLaunch.contains(
+                Self.reconciliationKey(session, transaction, renewals[transaction.originalID]))
         }
-        guard !candidates.isEmpty, LocalAccountScope.sessionSnapshot() == session else { return }
+        guard !candidates.isEmpty, LocalAccountScope.sessionSnapshot() == session else { return false }
 
         await refreshBackendSnapshot()
-        guard LocalAccountScope.sessionSnapshot() == session else { return }
+        guard LocalAccountScope.sessionSnapshot() == session else { return true }
         let snapshot = serverState.snapshot
         for candidate in candidates {
             let transaction = candidate.latest.transaction
-            reconciledThisLaunch.insert(Self.reconciliationKey(session, transaction))
-            if snapshot?.knowsAppStoreSubscription(expiringAt: transaction.expirationDate) == true {
+            let renewal = renewals[transaction.originalID]
+            reconciledThisLaunch.insert(Self.reconciliationKey(session, transaction, renewal))
+            if snapshot?.knowsAppStoreSubscription(expiringAt: transaction.expirationDate,
+                                                   willAutoRenew: renewal?.willAutoRenew) == true {
                 // Déjà livré (notification Apple ou lancement précédent) : seules
                 // les transactions restées ouvertes sont à terminer.
                 for pending in candidate.unfinished { await pending.finish() }
@@ -1130,6 +1148,16 @@ final class EntitlementsStore: ObservableObject {
             }
         }
         await refreshLocalEntitlements()
+        return true
+    }
+
+    /// À la fermeture de la feuille de gestion d'Apple : renvoie l'abonnement
+    /// dont le renouvellement vient de changer (contrat v1.14 §5), sinon relit
+    /// simplement les droits servis.
+    func refreshAfterManagingSubscriptions() async {
+        let reread = await reconcileAppStoreTransactions()
+        if !reread { await refreshBackendSnapshot() }
+        await refreshStoreKitState()
     }
 
     func clearOperationMessage() {
@@ -1205,7 +1233,6 @@ final class EntitlementsStore: ObservableObject {
         guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
         // Seul un achat en attente d'approbation attend une réponse à l'écran.
         let awaitingApproval = operation == .pending
-        reconciledThisLaunch.insert(Self.reconciliationKey(accountSession, transaction))
         let outcome = await deliver(result, transaction: transaction, session: accountSession)
         if case .retryLater(let error) = outcome {
             logger.notice("Livraison App Store reportée : \(String(describing: error), privacy: .public)")
@@ -1236,8 +1263,11 @@ final class EntitlementsStore: ObservableObject {
         guard let synchronizer, serverVerificationEnabled else {
             return .retryLater(EntitlementsError.transactionDeliveryUnavailable)
         }
+        let renewal = await Self.appStoreRenewals(for: [transaction])[transaction.originalID]
+        reconciledThisLaunch.insert(Self.reconciliationKey(session, transaction, renewal))
         do {
-            let snapshot = try await synchronizer.synchronize(Self.proof(for: result, transaction: transaction))
+            let snapshot = try await synchronizer.synchronize(
+                Self.proof(for: result, transaction: transaction, renewal: renewal))
             // Le serveur a enregistré l'achat : il est terminé même si la session
             // a changé entre-temps ; seul l'affichage suit la session.
             publishServerState(.available(snapshot), for: session)
@@ -1299,8 +1329,35 @@ final class EntitlementsStore: ObservableObject {
         return Array(byOriginal.values)
     }
 
-    nonisolated private static func reconciliationKey(_ session: LocalAccountSession, _ transaction: Transaction) -> String {
-        "\(session.ownerScopeId)|\(session.sessionId)|\(transaction.originalID)"
+    /// Renouvellement Apple d'un abonnement, tel que StoreKit l'a vérifié.
+    private struct AppStoreRenewal {
+        let signedRenewalInfo: String
+        let willAutoRenew: Bool
+    }
+
+    /// Renouvellement de chaque abonnement, par transaction d'origine (contrat
+    /// v1.14 §5). Seul un `renewalInfo` vérifié par StoreKit est gardé ; une
+    /// erreur StoreKit laisse l'abonnement sans renouvellement connu.
+    private static func appStoreRenewals(for transactions: [Transaction]) async -> [UInt64: AppStoreRenewal] {
+        var renewals: [UInt64: AppStoreRenewal] = [:]
+        for group in Set(transactions.compactMap(\.subscriptionGroupID)) {
+            guard let statuses = try? await Product.SubscriptionInfo.status(for: group) else { continue }
+            for status in statuses {
+                guard case .verified(let info) = status.renewalInfo else { continue }
+                renewals[info.originalTransactionID] = AppStoreRenewal(
+                    signedRenewalInfo: status.renewalInfo.jwsRepresentation, willAutoRenew: info.willAutoRenew)
+            }
+        }
+        return renewals
+    }
+
+    nonisolated private static func reconciliationKey(
+        _ session: LocalAccountSession,
+        _ transaction: Transaction,
+        _ renewal: AppStoreRenewal?
+    ) -> String {
+        let renewalState = renewal.map { $0.willAutoRenew ? "renews" : "stops" } ?? "unknown"
+        return "\(session.ownerScopeId)|\(session.sessionId)|\(transaction.originalID)|\(renewalState)"
     }
 
     nonisolated private static func verified<T>(_ result: VerificationResult<T>) throws -> T {
@@ -1312,13 +1369,15 @@ final class EntitlementsStore: ObservableObject {
 
     nonisolated private static func proof(
         for result: VerificationResult<Transaction>,
-        transaction: Transaction
+        transaction: Transaction,
+        renewal: AppStoreRenewal?
     ) -> AppStoreTransactionProof {
         AppStoreTransactionProof(
             signedTransaction: result.jwsRepresentation,
             productId: transaction.productID,
             transactionId: String(transaction.id),
-            originalTransactionId: String(transaction.originalID)
+            originalTransactionId: String(transaction.originalID),
+            signedRenewalInfo: renewal?.signedRenewalInfo
         )
     }
 }

@@ -326,7 +326,7 @@ struct AccountDeletionSubscriptionNotice: View {
             }
             .manageSubscriptionsSheet(isPresented: $showsManageSubscriptions)
             .onChangeCompat(of: showsManageSubscriptions) { _, shown in
-                if !shown { Task { await store.refreshBackendSnapshot() } }
+                if !shown { Task { await store.refreshAfterManagingSubscriptions() } }
             }
         }
     }
@@ -373,7 +373,7 @@ struct PaywallView: View {
         // Résilier, reprendre ou modifier : la feuille d'Apple, sans quitter l'app (D5).
         .manageSubscriptionsSheet(isPresented: $showsManageSubscriptions)
         .onChangeCompat(of: showsManageSubscriptions) { _, shown in
-            if !shown { Task { await store.prepare() } }
+            if !shown { Task { await store.refreshAfterManagingSubscriptions() } }
         }
         .background { refundSheetHost }
         .alert("Abonnement", isPresented: operationAlertBinding) {

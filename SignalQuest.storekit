@@ -22,7 +22,7 @@
           "codeOffers" : [],
           "displayPrice" : "7.99",
           "familyShareable" : false,
-          "groupLevel" : 1,
+          "groupNumber" : 1,
           "internalID" : "5C9F1A20-0002-4000-A000-000000000003",
           "introductoryOffer" : {
             "internalID" : "5C9F1A20-0003-4000-A000-000000000003",
@@ -47,7 +47,7 @@
           "codeOffers" : [],
           "displayPrice" : "79.99",
           "familyShareable" : false,
-          "groupLevel" : 1,
+          "groupNumber" : 1,
           "internalID" : "5C9F1A20-0002-4000-A000-000000000004",
           "introductoryOffer" : {
             "internalID" : "5C9F1A20-0003-4000-A000-000000000004",

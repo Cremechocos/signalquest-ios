@@ -78,6 +78,22 @@ final class AppStoreSyncTests: XCTestCase {
 
     /// Un échec serveur (JWS rejeté, 4xx) doit se propager en erreur — jamais
     /// octroyer un droit silencieusement.
+    /// Contrat v1.14 §5 : le `renewalInfo` signé part avec la preuve, et n'apparaît
+    /// pas du tout quand StoreKit ne l'a pas donné (jamais de `null` envoyé).
+    func testProofCarriesTheSignedRenewalInfoOnlyWhenKnown() throws {
+        var proof = AppStoreTransactionProof(
+            signedTransaction: "jws", productId: SignalQuestSubscriptionProduct.premiumMonthly.rawValue,
+            transactionId: "txn-1", originalTransactionId: "orig-1"
+        )
+        let without = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(proof)) as? [String: Any])
+        XCTAssertEqual(Set(without.keys), ["signedTransaction", "productId", "transactionId", "originalTransactionId"])
+
+        proof.signedRenewalInfo = "renewal.payload.signature"
+        let with = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(proof)) as? [String: Any])
+        XCTAssertEqual(with["signedRenewalInfo"] as? String, "renewal.payload.signature")
+        XCTAssertEqual(with["signedTransaction"] as? String, "jws")
+    }
+
     func testSynchronizePropagatesBackendFailure() async {
         let client = APIClient(
             config: .test,

@@ -352,6 +352,31 @@ final class EntitlementsTests: XCTestCase {
         XCTAssertFalse(snapshot.knowsAppStoreSubscription(expiringAt: nil))
     }
 
+    /// Contrat v1.14 §5 : même échéance, mais un renouvellement StoreKit différent
+    /// de celui servi (résiliation dans la feuille d'Apple, ou `autoRenew` encore
+    /// inconnu du serveur) appelle un renvoi.
+    func testKnowsAppStoreSubscriptionComparesTheServedRenewal() throws {
+        func snapshot(autoRenew: String) throws -> EntitlementSnapshot {
+            EntitlementSnapshot(response: try decodeResponse("""
+            { "version": 1, "tier": "premium",
+              "subscription": { "channel": "app_store", "state": "active", "tier": "premium",
+                                "autoRenew": \(autoRenew), "currentPeriodEnd": "2026-12-14T01:05:00Z" } }
+            """))
+        }
+        let end = try XCTUnwrap(SQDateParsing.parse("2026-12-14T01:05:00Z"))
+        let renewing = try snapshot(autoRenew: "true")
+        XCTAssertTrue(renewing.knowsAppStoreSubscription(expiringAt: end, willAutoRenew: true))
+        XCTAssertFalse(renewing.knowsAppStoreSubscription(expiringAt: end, willAutoRenew: false),
+                       "Une résiliation faite chez Apple doit être renvoyée")
+        XCTAssertTrue(try snapshot(autoRenew: "false").knowsAppStoreSubscription(expiringAt: end, willAutoRenew: false))
+
+        let unknown = try snapshot(autoRenew: "null")
+        XCTAssertFalse(unknown.knowsAppStoreSubscription(expiringAt: end, willAutoRenew: true),
+                       "Un renouvellement inconnu du serveur doit lui être envoyé")
+        XCTAssertTrue(unknown.knowsAppStoreSubscription(expiringAt: end),
+                      "Sans renouvellement lu dans StoreKit, l'échéance suffit, comme avant")
+    }
+
     // MARK: - Livraison des transactions (codes des routes d'achat)
 
     func testOnlyALinkToAnotherAccountFinishesAFailedDelivery() {
