@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Activer un nouvel appareil ?": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activate a new device?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer un nouvel appareil ?"
+          }
+        }
+      }
+    },
+    "Un appareil de ce compte attend d’être activé. Confirmation dans SignalQuest.": {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device on this account is waiting to be activated. Confirm in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil de ce compte attend d’être activé. Confirmation dans SignalQuest."
+          }
+        }
+      }
+    },
     "Speedtest %@ Mbit/s": {
       "extractionState" : "manual",
       "localizations" : {

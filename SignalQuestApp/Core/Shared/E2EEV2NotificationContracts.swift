@@ -2098,3 +2098,16 @@ enum E2EEV2MessageDeliveryContract {
         return Data(base64Encoded: normalized)
     }
 }
+
+/// Push `e2ee_history_request` (E2EE-AUTO §5.3) : une demande d'activation d'un appareil
+/// en attente porte `activate` (booléen JSON sur APNs, « 1 » ou « true » en chaîne) ;
+/// absente, c'est une demande d'historique. Toute autre valeur n'active rien.
+enum E2EEAutoHistoryRequestPush {
+    static func isActivation(_ userInfo: [AnyHashable: Any]) -> Bool {
+        switch userInfo["activate"] {
+        case let value as Bool: return value
+        case let value as String: return ["true", "1"].contains(value.trimmingCharacters(in: .whitespaces).lowercased())
+        default: return false
+        }
+    }
+}

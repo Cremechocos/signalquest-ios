@@ -292,6 +292,25 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         XCTAssertFalse(fake.calls.contains("POST \(fulfilPath)"))
     }
 
+    /// Push d'activation (14/11) : booléen sur APNs, « 1 » sur FCM, « true » accepté ; sans
+    /// la clé ou avec toute autre valeur, c'est une demande d'historique. L'extension la lit.
+    func testActivationPushIsReadInEveryForm() throws {
+        XCTAssertTrue(E2EEAutoHistoryRequestPush.isActivation(["activate": true]))
+        XCTAssertTrue(E2EEAutoHistoryRequestPush.isActivation(["activate": "1"]))
+        XCTAssertTrue(E2EEAutoHistoryRequestPush.isActivation(["activate": "true"]))
+        XCTAssertTrue(E2EEAutoHistoryRequestPush.isActivation(["activate": NSNumber(value: true)]))
+        XCTAssertFalse(E2EEAutoHistoryRequestPush.isActivation([:]))
+        XCTAssertFalse(E2EEAutoHistoryRequestPush.isActivation(["activate": false]))
+        XCTAssertFalse(E2EEAutoHistoryRequestPush.isActivation(["activate": "0"]))
+        XCTAssertFalse(E2EEAutoHistoryRequestPush.isActivation(["activate": "false"]))
+        XCTAssertFalse(E2EEAutoHistoryRequestPush.isActivation(["activate": "yes"]))
+
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("SignalQuestNotificationService/NotificationService.swift"))
+        XCTAssertTrue(source.contains("E2EEAutoHistoryRequestPush.isActivation(original.userInfo)"))
+        XCTAssertTrue(source.contains("String(localized: \"Activer un nouvel appareil ?\")"))
+    }
+
     /// Sans HK, l'appareil ne pourrait rien servir : aucune liste, aucune lecture.
     func testApproverWithoutTheHistoryKeyListsNothing() async {
         let fake = Fake(reads: [.verified(account())])

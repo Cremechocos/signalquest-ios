@@ -139,10 +139,15 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     /// « C'est moi » (E2EE-AUTO §5.3) : le texte de l'app pour le compte connecté,
     /// sans tutoiement ni vouvoiement (le ton n'est pas lu ici). Un push d'un autre
     /// compte devient neutre ; sans compte connu, le texte constant du serveur reste.
+    /// Une demande d'activation (`activate`, mode renforcé §6) a son propre texte :
+    /// elle part aussi vers les appareils sans historique (Alexandre, 14/11).
     private static func historyRequestContent(_ original: UNNotificationContent) -> UNNotificationContent {
         guard let content = original.mutableCopy() as? UNMutableNotificationContent,
               let current = try? E2EEV2NotificationContextStore.configured()?.load()?.ownerScopeId else { return original }
-        if original.userInfo["recipientOwnerScope"] as? String == current {
+        if original.userInfo["recipientOwnerScope"] as? String == current, E2EEAutoHistoryRequestPush.isActivation(original.userInfo) {
+            content.title = String(localized: "Activer un nouvel appareil ?")
+            content.body = String(localized: "Un appareil de ce compte attend d’être activé. Confirmation dans SignalQuest.")
+        } else if original.userInfo["recipientOwnerScope"] as? String == current {
             content.title = String(localized: "Ouvrir l’historique sur un nouvel appareil ?")
             content.body = String(localized: "Un appareil de ce compte demande l’historique des messages chiffrés. Confirmation dans SignalQuest.")
         } else {
