@@ -845,6 +845,14 @@ final class FeedPhotoSiteLinkTests: XCTestCase {
 
 /// Carte de session de couverture : règles communes aux trois apps (relayées le 02/11).
 final class CoverageCardRulesTests: XCTestCase {
+    /// Q4 (14/11) : sans techno par point, le tracé est gris « pas de mesure », jamais la
+    /// couleur de la génération la plus haute ; un point sans techno l'est déjà.
+    func testTraceWithoutTechnologyStaysNeutral() {
+        XCTAssertEqual(CoverageCardView.traceFallbackState, .unknown)
+        XCTAssertEqual(SessionSignalTrace.states([.init(technology: nil, signalStrength: -85)]), [.unknown])
+        XCTAssertEqual(CoverageCardView.traceFallbackState.hex, SQQualityScale.unknownHex)
+    }
+
     func testDistanceHasThreeStates() {
         let measured = CoverageCardView.distanceMetric(meters: 1250, hasTrace: true)
         XCTAssertEqual(measured?.highlight, true)

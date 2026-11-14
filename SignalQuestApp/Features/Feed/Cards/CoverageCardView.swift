@@ -37,6 +37,11 @@ struct CoverageCardView: View {
         return points.map { SessionSignalTrace.Point(technology: $0.technology, signalStrength: $0.signalStrength) }
     }
 
+    /// Tracé dont aucun point ne porte sa techno : gris « pas de mesure », comme un point
+    /// sans techno, jamais la couleur de `signal.technology`, qui est la génération la plus
+    /// haute rencontrée (Q4 du contrat des posts automatiques, Alexandre 14/11 : tracé seul).
+    static let traceFallbackState: SQQualityScale.Signal = .unknown
+
     /// Meilleure génération détectée (5G > 4G > 3G > 2G) plutôt que le premier élément
     /// du tableau (ordre arbitraire) : une session 5G NSA détecte « 4G » ET « 5G » — il ne
     /// faut pas afficher « 4G ». Sert de repli quand le backend n'expose pas `technology`.
@@ -85,7 +90,7 @@ struct CoverageCardView: View {
             // Trajet privé (D2) : pas de tracé servi, la carte commence aux tuiles.
             if let trace, !trace.isEmpty {
                 CoverageRouteThumbnail(
-                    postId: item.id, coordinates: trace, lineColor: accent,
+                    postId: item.id, coordinates: trace, lineColor: Self.traceFallbackState.color,
                     states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
                     spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
                 )
@@ -127,7 +132,7 @@ struct CoverageCardView: View {
                     FeedKindLine(symbol: "point.topleft.down.curvedto.point.bottomright.up",
                                  title: String(localized: "Session de couverture"), points: item.earnedPoints)
                     CoverageRouteThumbnail(
-                        postId: item.id, coordinates: trace, lineColor: accent,
+                        postId: item.id, coordinates: trace, lineColor: Self.traceFallbackState.color,
                         states: tracePoints.isEmpty ? nil : SessionSignalTrace.states(tracePoints),
                         spokenSummary: tracePoints.isEmpty ? nil : SessionSignalTrace.spokenSummary(tracePoints)
                     )
