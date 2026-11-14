@@ -340,6 +340,9 @@ final class FeedActivityTests: XCTestCase {
             "an exploration follows siteId alone (§2.2): no operator is ever served for it")
         XCTAssertNil(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_department","dept":"38""#))?.link, "private zone: siteId withheld, no link")
+        XCTAssertNil(try FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","siteId":"\#(String(repeating: "c", count: 25))""#))?.link,
+            "a community site never opens an antenna sheet")
         XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_site_visited","firstDiscovery":false"#))?.family, .siteVisited)
 
@@ -841,15 +844,27 @@ final class FeedPhotoSiteLinkTests: XCTestCase {
         XCTAssertEqual(key.operatorKey, "ORANGE")
     }
 
-    /// Lot 5 : la même clé pour toutes les cartes (identification, photo, exploration).
-    func testEveryCardUsesTheSameCompleteKey() throws {
-        let validation = try photo(#""siteId":"802123","marketCode":"FR","operatorKey":"SFR","enb":"81234""#, kind: "validation")
-        XCTAssertEqual(validation.siteKey?.siteId, "802123")
-        XCTAssertEqual(validation.siteKey?.operatorKey, "SFR")
-        XCTAssertNil(try photo(#""siteId":"802123","marketCode":"FR""#, kind: "validation").siteKey)
-        XCTAssertNil(try photo(#""siteId":"802123","operatorKey":"SFR""#, kind: "validation").siteKey)
-        XCTAssertNil(try photo(#""marketCode":"FR","operatorKey":"SFR""#, kind: "validation").siteKey, "private zone: siteId withheld")
-        XCTAssertNil(try photo(#""siteId":" ","marketCode":"FR","operatorKey":"SFR""#, kind: "validation").siteKey)
+    /// Lot 5, règle d'Alexandre du 14/11 (« Numéro ANFR seul suffit ») : un numéro de support
+    /// ANFR s'ouvre seul ; tout autre identifiant exige la clé complète ; un site communautaire
+    /// (25 caractères) jamais ; sans siteId, rien.
+    func testAnANFRNumberOpensAloneAndOtherIdsNeedTheFullKey() throws {
+        let anfr = try XCTUnwrap(try photo(#""siteId":"802123","enb":"81234""#, kind: "validation").antennaLink)
+        XCTAssertEqual(anfr.siteId, "802123")
+        XCTAssertNil(anfr.market)
+        XCTAssertNil(anfr.operatorKey)
+        let served = try XCTUnwrap(try photo(#""siteId":"0381234","marketCode":"FR","operatorKey":"SFR""#, kind: "validation").antennaLink)
+        XCTAssertEqual(served.market, "FR")
+        XCTAssertEqual(served.operatorKey, "SFR")
+
+        let canada = #""siteId":"M1229-ab","marketCode":"CA","operatorKey":"BELL""#
+        XCTAssertEqual(try photo(canada).antennaLink?.siteId, "M1229-ab")
+        XCTAssertNil(try photo(#""siteId":"M1229-ab","marketCode":"CA""#).antennaLink, "not an ANFR number: full key required")
+        XCTAssertNil(try photo(#""siteId":"12","marketCode":"FR""#).antennaLink, "too short for an ANFR number")
+
+        let community = String(repeating: "c", count: 25)
+        XCTAssertNil(try photo(#""siteId":"\#(community)","marketCode":"FR","operatorKey":"SFR""#).antennaLink)
+        XCTAssertNil(try photo(#""marketCode":"FR","operatorKey":"SFR""#, kind: "validation").antennaLink, "private zone: siteId withheld")
+        XCTAssertNil(try photo(#""siteId":" ","marketCode":"FR","operatorKey":"SFR""#, kind: "validation").antennaLink)
     }
 
     func testAnIncompleteKeyShowsNoLink() throws {

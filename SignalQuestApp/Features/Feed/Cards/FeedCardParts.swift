@@ -76,13 +76,26 @@ extension UnifiedSocialFeedItem {
         }
     }
 
-    /// Clé SITE-1 d'une fiche d'antenne (contrat des posts automatiques v1 §1.6) : le support,
-    /// son marché et la clé d'opérateur, servis ensemble. L'un manque : pas de lien, rien de deviné.
-    var siteKey: (siteId: String, market: String, operatorKey: String)? {
-        guard let siteId = metadataString("siteId"), let market = metadataString("marketCode"),
-              let operatorKey = metadataString("operatorKey") else { return nil }
+    /// Fiche d'antenne d'une identification ou d'une photo (contrat des posts automatiques v1,
+    /// règle d'Alexandre du 14/11 « Numéro ANFR seul suffit ») : un numéro de support ANFR
+    /// (3 à 10 chiffres, France et outre-mer) est unique et s'ouvre seul, avec le marché et
+    /// l'opérateur s'ils sont servis ; tout autre identifiant (Canada…) exige la clé SITE-1
+    /// complète ; un id de 25 caractères est un site communautaire, jamais une fiche d'antenne.
+    /// Sans `siteId` (zone privée), pas de lien. Rien n'est deviné.
+    var antennaLink: (siteId: String, market: String?, operatorKey: String?)? {
+        guard let siteId = metadataString("siteId") else { return nil }
+        let market = metadataString("marketCode"), operatorKey = metadataString("operatorKey")
+        if Self.isANFRSupportNumber(siteId) { return (siteId, market, operatorKey) }
+        guard !Self.isCommunitySiteId(siteId), let market, let operatorKey else { return nil }
         return (siteId, market, operatorKey)
     }
+
+    static func isANFRSupportNumber(_ id: String) -> Bool {
+        (3...10).contains(id.count) && id.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
+    /// Identifiant de site communautaire (25 caractères) : il n'ouvre jamais une fiche d'antenne.
+    static func isCommunitySiteId(_ id: String) -> Bool { id.count == 25 }
 
     func metadataString(_ key: String) -> String? {
         switch metadata?[key] {

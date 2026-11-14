@@ -375,9 +375,9 @@ struct SignalDetailSheet: View {
     /// Clé de la fiche d'antenne d'un post photo (contrat social-photo-post v1, #827) : le
     /// support, son marché et la clé d'opérateur enregistrés avec la photo. Sans marché ou
     /// sans clé d'opérateur, pas de lien : on ne devine jamais la clé depuis le libellé.
-    static func photoSiteKey(of item: UnifiedSocialFeedItem) -> (siteId: String, market: String, operatorKey: String)? {
+    static func photoSiteKey(of item: UnifiedSocialFeedItem) -> (siteId: String, market: String?, operatorKey: String?)? {
         guard ["photo", "antenna_photo"].contains(item.kind.lowercased()) else { return nil }
-        return item.siteKey
+        return item.antennaLink
     }
 
     @ViewBuilder
