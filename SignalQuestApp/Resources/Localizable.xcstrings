@@ -7250,22 +7250,6 @@
         }
       }
     },
-    "Activer le nouveau chiffrement sur cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on the new encryption on this device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activer le nouveau chiffrement sur cet appareil"
-          }
-        }
-      }
-    },
     "Activité réseau" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11613,34 +11597,6 @@
         }
       }
     },
-    "Active le chiffrement sur cet appareil pour créer une conversation chiffrée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on encryption on this device to create an encrypted conversation."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Active le chiffrement sur cet appareil pour créer une conversation chiffrée."
-          }
-        }
-      }
-    },
-    "SQFormal|Active le chiffrement sur cet appareil pour créer une conversation chiffrée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez le chiffrement sur cet appareil pour créer une conversation chiffrée."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Activer le mode focus" : {
       "localizations" : {
         "en" : {
@@ -12048,22 +12004,6 @@
         }
       }
     },
-    "Annuler cette demande" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel this request"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Annuler cette demande"
-          }
-        }
-      }
-    },
     "Annuler l’envoi" : {
       "localizations" : {
         "en" : {
@@ -12190,56 +12130,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appareil approuvé. La rotation de clés requise a été enregistrée."
-          }
-        }
-      }
-    },
-    "Appareil approuvé. Les clés des conversations concernées seront renouvelées." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device approved. Keys of the affected conversations will be renewed."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appareil approuvé. Les clés des conversations concernées seront renouvelées."
-          }
-        }
-      }
-    },
-    "Appareil préparé. Une approbation reste nécessaire." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device prepared. It still needs to be approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appareil préparé. Une approbation reste nécessaire."
-          }
-        }
-      }
-    },
-    "Appareil révoqué. Les conversations concernées devront renouveler leurs clés." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device revoked. The affected conversations will need to renew their keys."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appareil révoqué. Les conversations concernées devront renouveler leurs clés."
           }
         }
       }
@@ -14186,23 +14076,6 @@
       },
       "shouldTranslate" : false
     },
-    "Cet appareil est déjà approuvé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device is already approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil est déjà approuvé."
-          }
-        }
-      }
-    },
     "Cet appareil n’a ni Face ID ni code : le verrouillage n’est pas disponible." : {
       "localizations" : {
         "en" : {
@@ -14215,22 +14088,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’a ni Face ID ni code : le verrouillage n’est pas disponible."
-          }
-        }
-      }
-    },
-    "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device is not ready for end-to-end encryption yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout."
           }
         }
       }
@@ -14986,84 +14843,6 @@
         }
       }
     },
-    "Clé copiée localement. Le presse-papiers l’effacera après 60 secondes." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key copied on this device only. The clipboard will clear it after 60 seconds."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé copiée localement. Le presse-papiers l’effacera après 60 secondes."
-          }
-        }
-      }
-    },
-    "Clé créée : %lld clé(s) d’historique sauvegardée(s), %lld participant(s) sans clé disponible." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key created: %lld history key(s) backed up, %lld participant(s) with no key available."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé créée : %lld clé(s) d’historique sauvegardée(s), %lld participant(s) sans clé disponible."
-          }
-        }
-      }
-    },
-    "Clé du compte · version %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account key · version %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé du compte · version %lld"
-          }
-        }
-      }
-    },
-    "Clé invalide : saisis la clé de récupération complète." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid key: enter the full recovery key."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé invalide : saisis la clé de récupération complète."
-          }
-        }
-      }
-    },
-    "SQFormal|Clé invalide : saisis la clé de récupération complète." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé invalide : saisissez la clé de récupération complète."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Clôturer" : {
       "localizations" : {
         "en" : {
@@ -15112,62 +14891,6 @@
           }
         }
       }
-    },
-    "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code »." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Incorrect or expired code. Each code works only once: tap “Resend the code”."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code »."
-          }
-        }
-      }
-    },
-    "SQFormal|Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code »." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touchez « Renvoyer le code »."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Code indisponible. Crée une nouvelle demande." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code unavailable. Create a new request."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code indisponible. Crée une nouvelle demande."
-          }
-        }
-      }
-    },
-    "SQFormal|Code indisponible. Crée une nouvelle demande." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code indisponible. Créez une nouvelle demande."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Coller" : {
       "localizations" : {
@@ -15282,34 +15005,6 @@
         }
       }
     },
-    "Compare cette empreinte sur le nouvel appareil avant d’approuver." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compare this fingerprint on the new device before approving."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compare cette empreinte sur le nouvel appareil avant d’approuver."
-          }
-        }
-      }
-    },
-    "SQFormal|Compare cette empreinte sur le nouvel appareil avant d’approuver." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comparez cette empreinte sur le nouvel appareil avant d’approuver."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Comparer deux relevés" : {
       "localizations" : {
         "en" : {
@@ -15341,34 +15036,6 @@
           }
         }
       }
-    },
-    "Compte créé avec Apple ? Confirme plutôt avec Apple." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account created with Apple? Confirm with Apple instead."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compte créé avec Apple ? Confirme plutôt avec Apple."
-          }
-        }
-      }
-    },
-    "SQFormal|Compte créé avec Apple ? Confirme plutôt avec Apple." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compte créé avec Apple ? Confirmez plutôt avec Apple."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Compte récent" : {
       "localizations" : {
@@ -15514,34 +15181,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confirmez pour protéger cette conversation."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Confirme ton compte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm your account"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirme ton compte"
-          }
-        }
-      }
-    },
-    "SQFormal|Confirme ton compte" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirmez votre compte"
           }
         }
       },
@@ -16230,23 +15869,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demande de message"
-          }
-        }
-      }
-    },
-    "Demande invalide, expirée ou incohérente avec le serveur." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The request is invalid, has expired or doesn’t match the server."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demande invalide, expirée ou incohérente avec le serveur."
           }
         }
       }
@@ -18823,23 +18445,6 @@
       },
       "shouldTranslate" : false
     },
-    "Impossible de charger l’état de récupération." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t load the recovery status."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de charger l’état de récupération."
-          }
-        }
-      }
-    },
     "Impossible de charger ta progression pour l’instant. Vérifie ta connexion, puis réessaie." : {
       "localizations" : {
         "en" : {
@@ -18867,23 +18472,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Impossible de créer la clé de récupération." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t create the recovery key."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer la clé de récupération."
-          }
-        }
-      }
     },
     "Impossible de déchiffrer — réessaie" : {
       "localizations" : {
@@ -18929,40 +18517,6 @@
       },
       "shouldTranslate" : false
     },
-    "Impossible de préparer cet appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t prepare this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de préparer cet appareil."
-          }
-        }
-      }
-    },
-    "Impossible de préparer la nouvelle identité." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t prepare the new identity."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de préparer la nouvelle identité."
-          }
-        }
-      }
-    },
     "Impossible de préparer l’image du bilan. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -18986,68 +18540,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de préparer l’image du bilan. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Impossible de révoquer cet appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t revoke this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de révoquer cet appareil."
-          }
-        }
-      }
-    },
-    "Impossible d’approuver cet appareil avec cette clé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t approve this device with this key."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’approuver cet appareil avec cette clé."
-          }
-        }
-      }
-    },
-    "Impossible d’approuver cet appareil. Actualise puis réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device could not be approved. Refresh and try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’approuver cet appareil. Actualise puis réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible d’approuver cet appareil. Actualise puis réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’approuver cet appareil. Actualisez puis réessayez."
           }
         }
       },
@@ -19080,40 +18572,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Impossible d’envoyer le code de réinitialisation." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t send the reset code."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’envoyer le code de réinitialisation."
-          }
-        }
-      }
-    },
-    "Impossible d’envoyer le code de vérification." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t send the verification code."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’envoyer le code de vérification."
-          }
-        }
-      }
     },
     "Inconnue" : {
       "localizations" : {
@@ -19257,57 +18715,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Jamais observée"
-          }
-        }
-      }
-    },
-    "Je comprends que l’ancienne clé sera remplacée et ne fonctionnera plus." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I understand that the old key will be replaced and will no longer work."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je comprends que l’ancienne clé sera remplacée et ne fonctionnera plus."
-          }
-        }
-      }
-    },
-    "Je comprends que l’historique non récupéré pourra être perdu définitivement." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I understand that history that isn’t recovered may be lost for good."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je comprends que l’historique non récupéré pourra être perdu définitivement."
-          }
-        }
-      }
-    },
-    "Je comprends que tous les appareils actuellement approuvés seront révoqués." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I understand that all currently approved devices will be revoked."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je comprends que tous les appareils actuellement approuvés seront révoqués."
           }
         }
       }
@@ -19470,22 +18877,6 @@
         }
       }
     },
-    "J’ai retrouvé mon mot de passe" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I found my password"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "J’ai retrouvé mon mot de passe"
-          }
-        }
-      }
-    },
     "L'équipe te répond ici et par notification. Un bug confirmé te rapporte des points." : {
       "localizations" : {
         "en" : {
@@ -19529,51 +18920,6 @@
           }
         }
       }
-    },
-    "La clé est créée, mais la sauvegarde de l’historique reste partielle." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The key was created, but the history backup is still incomplete."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé est créée, mais la sauvegarde de l’historique reste partielle."
-          }
-        }
-      }
-    },
-    "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your account could not be confirmed. Check your account password, or try again with Apple."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple."
-          }
-        }
-      }
-    },
-    "SQFormal|La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La confirmation de votre compte a échoué. Vérifiez le mot de passe du compte, ou reprenez avec Apple."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "La conversation n’a pas pu être archivée." : {
       "localizations" : {
@@ -19698,39 +19044,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "La restauration de l’historique a échoué." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t restore the history."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La restauration de l’historique a échoué."
-          }
-        }
-      }
-    },
-    "La réinitialisation a échoué ; l’identité actuelle reste inchangée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The reset failed; your current identity is unchanged."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La réinitialisation a échoué ; l’identité actuelle reste inchangée."
-          }
-        }
-      }
     },
     "La semaine dernière" : {
       "localizations" : {
@@ -19916,55 +19229,6 @@
         }
       }
     },
-    "Le bundle de récupération actif est indisponible." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The active recovery bundle is unavailable."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le bundle de récupération actif est indisponible."
-          }
-        }
-      }
-    },
-    "Le chiffrement de bout en bout est activé pour ce compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "End-to-end encryption is on for this account."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le chiffrement de bout en bout est activé pour ce compte."
-          }
-        }
-      }
-    },
-    "Le chiffrement des appareils n’est pas encore disponible sur ce compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device encryption is not available on this account yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le chiffrement des appareils n’est pas encore disponible sur ce compte."
-          }
-        }
-      }
-    },
     "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -19992,23 +19256,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Le code est invalide, expiré ou ne correspond plus à cet appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The code is invalid, has expired or no longer matches this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le code est invalide, expiré ou ne correspond plus à cet appareil."
-          }
-        }
-      }
     },
     "Le comparatif des antennes couvre la France métropolitaine et l’outre-mer. Cette position est en dehors." : {
       "localizations" : {
@@ -20315,22 +19562,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le mode focus n’a pas pu être désactivé."
-          }
-        }
-      }
-    },
-    "Le numéro de sécurité n’est pas disponible pour le moment." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The safety number isn’t available right now."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le numéro de sécurité n’est pas disponible pour le moment."
           }
         }
       }
@@ -22453,22 +21684,6 @@
         }
       }
     },
-    "Mot de passe du compte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account password"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mot de passe du compte"
-          }
-        }
-      }
-    },
     "Moyenne" : {
       "localizations" : {
         "en" : {
@@ -22673,22 +21888,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau dossier…"
-          }
-        }
-      }
-    },
-    "Nouveau mot de passe de chiffrement" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New encryption password"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouveau mot de passe de chiffrement"
           }
         }
       }
@@ -24416,23 +23615,6 @@
         }
       }
     },
-    "Premier appareil approuvé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "First device approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premier appareil approuvé."
-          }
-        }
-      }
-    },
     "Première mesure" : {
       "localizations" : {
         "en" : {
@@ -24760,34 +23942,6 @@
           }
         }
       }
-    },
-    "QR indisponible. Crée une nouvelle demande." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR code unavailable. Create a new request."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR indisponible. Crée une nouvelle demande."
-          }
-        }
-      }
-    },
-    "SQFormal|QR indisponible. Crée une nouvelle demande." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR indisponible. Créez une nouvelle demande."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Quand une personne qui n’est pas dans tes amis t’écrit pour la première fois, sa demande arrive ici." : {
       "localizations" : {
@@ -25323,22 +24477,6 @@
         }
       }
     },
-    "Remplacer ma clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Replace my key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplacer ma clé"
-          }
-        }
-      }
-    },
     "Renommer" : {
       "localizations" : {
         "en" : {
@@ -25399,23 +24537,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reprendre la lecture"
-          }
-        }
-      }
-    },
-    "Restauration terminée : %lld clé(s) restaurée(s), %lld indisponible(s)." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore complete: %lld key(s) restored, %lld unavailable."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restauration terminée : %lld clé(s) restaurée(s), %lld indisponible(s)."
           }
         }
       }
@@ -26310,34 +25431,6 @@
           }
         }
       }
-    },
-    "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If the camera is not available, copy the QR code contents from the other device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil."
-          }
-        }
-      }
-    },
-    "SQFormal|Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si la caméra n’est pas disponible, copiez le contenu du QR depuis l’autre appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Signal %@" : {
       "extractionState" : "manual",
@@ -27819,34 +26912,6 @@
       },
       "shouldTranslate" : false
     },
-    "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your devices are listed here. The new end-to-end encryption will turn on once it is available on iPhone, Android and the web."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web."
-          }
-        }
-      }
-    },
-    "SQFormal|Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vos appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Tes dossiers" : {
       "localizations" : {
         "en" : {
@@ -28132,34 +27197,6 @@
           }
         }
       }
-    },
-    "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your old password cannot be recovered. A new key replaces the old one: each encrypted conversation becomes readable again when another participant reopens it, as their app sends you the key again. Your other devices will unlock with the new password."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe."
-          }
-        }
-      }
-    },
-    "SQFormal|Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app vous renvoyant la clé. Vos autres appareils se déverrouilleront avec le nouveau mot de passe."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Ton choix" : {
       "localizations" : {
@@ -28730,23 +27767,6 @@
         }
       }
     },
-    "Toutes les clés d’historique n’ont pas pu être sauvegardées." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not all history keys could be backed up."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toutes les clés d’historique n’ont pas pu être sauvegardées."
-          }
-        }
-      }
-    },
     "Toutes les sources" : {
       "localizations" : {
         "en" : {
@@ -28891,34 +27911,6 @@
           }
         }
       }
-    },
-    "Trop d’essais. Réessaie dans quelques minutes." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Too many attempts. Try again in a few minutes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trop d’essais. Réessaie dans quelques minutes."
-          }
-        }
-      }
-    },
-    "SQFormal|Trop d’essais. Réessaie dans quelques minutes." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trop d’essais. Réessayez dans quelques minutes."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre." : {
       "localizations" : {
@@ -29541,22 +28533,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "An encrypted conversation only accepts text: no photos, files, voice notes, polls or reactions."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction."
-          }
-        }
-      }
     },
     "Une idée" : {
       "localizations" : {
@@ -30689,23 +29665,6 @@
         }
       }
     },
-    "date inconnue" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "unknown date"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "date inconnue"
-          }
-        }
-      }
-    },
     "d’un ping au suivant" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -30982,23 +29941,6 @@
         }
       }
     },
-    "jamais" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "never"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "jamais"
-          }
-        }
-      }
-    },
     "km %@" : {
       "localizations" : {
         "en" : {
@@ -31158,54 +30100,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ouverture %lld°"
-          }
-        }
-      }
-    },
-    "par QR" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by QR code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "par QR"
-          }
-        }
-      }
-    },
-    "par code" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "par code"
-          }
-        }
-      }
-    },
-    "par notification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "by notification"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "par notification"
           }
         }
       }
@@ -32064,23 +30958,6 @@
         }
       }
     },
-    "à une date inconnue" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "at an unknown time"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "à une date inconnue"
-          }
-        }
-      }
-    },
     "Suivi" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -32840,214 +31717,6 @@
         }
       }
     },
-    "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Request saved. Your identity will be replaced when the waiting period ends, unless one of your devices objects."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose."
-          }
-        }
-      }
-    },
-    "SQFormal|Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demande enregistrée. Votre identité sera remplacée à l’échéance, sauf si l’un de vos appareils s’y oppose."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Réinitialisation refusée. Ton identité actuelle est conservée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset refused. Your current identity is kept."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialisation refusée. Ton identité actuelle est conservée."
-          }
-        }
-      }
-    },
-    "SQFormal|Réinitialisation refusée. Ton identité actuelle est conservée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialisation refusée. Votre identité actuelle est conservée."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Impossible de refuser cette réinitialisation." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t refuse this reset."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de refuser cette réinitialisation."
-          }
-        }
-      }
-    },
-    "Impossible de vérifier la réinitialisation en attente." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t check the pending reset."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de vérifier la réinitialisation en attente."
-          }
-        }
-      }
-    },
-    "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identity reset. A new recovery key is being created now."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération."
-          }
-        }
-      }
-    },
-    "La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The reset was refused from another of your devices. Your current identity is unchanged."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée."
-          }
-        }
-      }
-    },
-    "SQFormal|La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La réinitialisation a été refusée depuis un autre de vos appareils. L’identité actuelle reste inchangée."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La réinitialisation a été annulée, car l’état du compte a changé entre-temps." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The reset was cancelled because the account changed in the meantime."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La réinitialisation a été annulée, car l’état du compte a changé entre-temps."
-          }
-        }
-      }
-    },
-    "Réinitialisation en attente" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset pending"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialisation en attente"
-          }
-        }
-      }
-    },
-    "Ton identité sera remplacée le %@. D’ici là, chacun de tes appareils actuels peut s’y opposer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your identity will be replaced on %@. Until then, any of your current devices can object."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton identité sera remplacée le %@. D’ici là, chacun de tes appareils actuels peut s’y opposer."
-          }
-        }
-      }
-    },
-    "SQFormal|Ton identité sera remplacée le %@. D’ici là, chacun de tes appareils actuels peut s’y opposer." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre identité sera remplacée le %@. D’ici là, chacun de vos appareils actuels peut s’y opposer."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Trop tard : l’échéance de cette réinitialisation est passée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Too late: this reset’s deadline has passed."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trop tard : l’échéance de cette réinitialisation est passée."
-          }
-        }
-      }
-    },
     "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre." : {
       "localizations" : {
         "en" : {
@@ -33075,98 +31744,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Vérifier l’état" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check status"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifier l’état"
-          }
-        }
-      }
-    },
-    "Réinitialisation demandée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset requested"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialisation demandée"
-          }
-        }
-      }
-    },
-    "Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le %@ et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A device asked to replace your account’s encryption identity. Unless refused, this will happen on %@ and all your current devices will be revoked. If this wasn’t you, refuse it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le %@ et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la."
-          }
-        }
-      }
-    },
-    "SQFormal|Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le %@ et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un appareil a demandé à remplacer l’identité de chiffrement de votre compte. Sans refus, ce remplacement aura lieu le %@ et tous vos appareils actuels seront révoqués. Si ce n’est pas vous, refusez-la."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Refuser cette réinitialisation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refuse this reset"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refuser cette réinitialisation"
-          }
-        }
-      }
-    },
-    "Sécurité du compte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account security"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sécurité du compte"
-          }
-        }
-      }
     },
     "« %@ »" : {
       "localizations" : {
@@ -33420,50 +31997,6 @@
         }
       }
     },
-    "%@ a un nouveau numéro de sécurité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ has a new safety number"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ a un nouveau numéro de sécurité"
-          }
-        }
-      }
-    },
-    "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ has a new safety number. Nothing is sent to them until you’ve seen it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
-          }
-        }
-      }
-    },
-    "SQFormal|%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que vous ne l’avez pas vu."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "%@ en projet" : {
       "localizations" : {
         "en" : {
@@ -33683,50 +32216,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ vous a retiré le rôle d’admin."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Appareil approuvé. La clé du compte est installée sur cet appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Device approved. The account key is now on this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appareil approuvé. La clé du compte est installée sur cet appareil."
-          }
-        }
-      }
-    },
-    "Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show a temporary QR code and scan it from a device that is already approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé."
-          }
-        }
-      }
-    },
-    "SQFormal|Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affichez un QR temporaire et scannez-le depuis un appareil déjà approuvé."
           }
         }
       },
@@ -33960,90 +32449,6 @@
       },
       "shouldTranslate" : false
     },
-    "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This number isn’t available yet: this device doesn’t have your account key."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte."
-          }
-        }
-      }
-    },
-    "SQFormal|Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de votre compte."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Ce numéro se compare avec un contact, pas avec ton propre compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This number is compared with a contact, not with your own account."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce numéro se compare avec un contact, pas avec ton propre compte."
-          }
-        }
-      }
-    },
-    "SQFormal|Ce numéro se compare avec un contact, pas avec ton propre compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce numéro se compare avec un contact, pas avec votre propre compte."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Ce réglage ne peut plus être changé depuis ton compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This setting can no longer be changed from your account."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce réglage ne peut plus être changé depuis ton compte."
-          }
-        }
-      }
-    },
-    "SQFormal|Ce réglage ne peut plus être changé depuis ton compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce réglage ne peut plus être changé depuis votre compte."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Ce signalement est trop volumineux : choisis moins de messages." : {
       "localizations" : {
         "en" : {
@@ -34071,22 +32476,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device does not have the account key, so it cannot approve another device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre."
-          }
-        }
-      }
     },
     "Cette conversation chiffrée n’a pas pu être lue pour l’instant." : {
       "localizations" : {
@@ -34164,190 +32553,6 @@
         }
       }
     },
-    "Clé de ton compte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your account key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de ton compte"
-          }
-        }
-      }
-    },
-    "SQFormal|Clé de ton compte" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de votre compte"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Chargement de la clé de ton compte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading your account key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement de la clé de ton compte"
-          }
-        }
-      }
-    },
-    "SQFormal|Chargement de la clé de ton compte" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement de la clé de votre compte"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Cet appareil n’a pas encore la clé de ton compte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device doesn’t have your account key yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’a pas encore la clé de ton compte."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil n’a pas encore la clé de ton compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’a pas encore la clé de votre compte."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Clé du compte vérifiée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Account key verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé du compte vérifiée"
-          }
-        }
-      }
-    },
-    "Ces 30 chiffres identifient la clé de ton compte : ils sont les mêmes sur tous tes appareils. Compare-les quand tu en ajoutes un." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These 30 digits identify your account key: they’re the same on all your devices. Compare them when you add one."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ces 30 chiffres identifient la clé de ton compte : ils sont les mêmes sur tous tes appareils. Compare-les quand tu en ajoutes un."
-          }
-        }
-      }
-    },
-    "SQFormal|Ces 30 chiffres identifient la clé de ton compte : ils sont les mêmes sur tous tes appareils. Compare-les quand tu en ajoutes un." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ces 30 chiffres identifient la clé de votre compte : ils sont les mêmes sur tous vos appareils. Comparez-les quand vous en ajoutez un."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Cet appareil a reçu la clé de ton compte à son approbation, sans pouvoir la vérifier seul. Compare ces 30 chiffres avec ceux de la même page sur un autre de tes appareils." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device received your account key when it was approved, without being able to check it on its own. Compare these 30 digits with the same page on another of your devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a reçu la clé de ton compte à son approbation, sans pouvoir la vérifier seul. Compare ces 30 chiffres avec ceux de la même page sur un autre de tes appareils."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil a reçu la clé de ton compte à son approbation, sans pouvoir la vérifier seul. Compare ces 30 chiffres avec ceux de la même page sur un autre de tes appareils." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a reçu la clé de votre compte à son approbation, sans pouvoir la vérifier seul. Comparez ces 30 chiffres avec ceux de la même page sur un autre de vos appareils."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compare these digits with the ones %@ sees, in person or on a call. If they match, no one is standing between you. If they differ, don’t mark this number as verified: someone could be reading your conversation."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges."
-          }
-        }
-      }
-    },
-    "SQFormal|Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comparez ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marquez pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Connexion instable. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -34388,22 +32593,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion instable. La conversation chiffrée se mettra à jour dès que possible."
-          }
-        }
-      }
-    },
-    "Contenu du QR SignalQuest" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest QR code contents"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contenu du QR SignalQuest"
           }
         }
       }
@@ -34576,50 +32765,6 @@
         }
       }
     },
-    "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t save this setting. Check your connection and try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’enregistrer ce réglage. Vérifiez votre connexion et réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Exclure les navigateurs" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exclude web browsers"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exclure les navigateurs"
-          }
-        }
-      }
-    },
     "Impossible d’envoyer le signalement. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -34648,62 +32793,6 @@
       },
       "shouldTranslate" : false
     },
-    "Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t load the safety number. Check your connection and try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de charger le numéro de sécurité. Vérifiez votre connexion et réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Impossible de lire la clé de ton compte sur cet appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t read your account key on this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de lire la clé de ton compte sur cet appareil."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible de lire la clé de ton compte sur cet appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de lire la clé de votre compte sur cet appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "L’appel a déjà été pris sur un autre appareil." : {
       "localizations" : {
         "en" : {
@@ -34719,62 +32808,6 @@
           }
         }
       }
-    },
-    "La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your account key changed on this device. Compare the new digits."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres."
-          }
-        }
-      }
-    },
-    "SQFormal|La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé de votre compte a changé sur cet appareil. Comparez les nouveaux chiffres."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account key could not be received. Show a new QR code and have it scanned again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau."
-          }
-        }
-      }
-    },
-    "SQFormal|La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’a pas pu être reçue. Affichez un nouveau QR et faites-le scanner de nouveau."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "La conversation chiffrée n’a pas pu être créée." : {
       "localizations" : {
@@ -34848,78 +32881,6 @@
       },
       "shouldTranslate" : false
     },
-    "La conversation vient de changer. Réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The conversation just changed. Try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La conversation vient de changer. Réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|La conversation vient de changer. Réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La conversation vient de changer. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La demande a expiré ou a été refusée. Affiche un nouveau QR." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The request expired or was declined. Show a new QR code."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La demande a expiré ou a été refusée. Affiche un nouveau QR."
-          }
-        }
-      }
-    },
-    "SQFormal|La demande a expiré ou a été refusée. Affiche un nouveau QR." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La demande a expiré ou a été refusée. Affichez un nouveau QR."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La liste des appareils du compte n’a pas pu être vérifiée. Approbation refusée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account’s device list could not be verified. Approval declined."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La liste des appareils du compte n’a pas pu être vérifiée. Approbation refusée."
-          }
-        }
-      }
-    },
     "Le chiffrement avec %@ n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard." : {
       "localizations" : {
         "en" : {
@@ -34976,110 +32937,6 @@
       },
       "shouldTranslate" : false
     },
-    "Le chiffrement de bout en bout est activé sur cet appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "End-to-end encryption is on for this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le chiffrement de bout en bout est activé sur cet appareil."
-          }
-        }
-      }
-    },
-    "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encryption for this account must be reset before a device can be approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil."
-          }
-        }
-      }
-    },
-    "Le numéro vient de changer. Compare le nouveau numéro avant de continuer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The number just changed. Compare the new number before continuing."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le numéro vient de changer. Compare le nouveau numéro avant de continuer."
-          }
-        }
-      }
-    },
-    "SQFormal|Le numéro vient de changer. Compare le nouveau numéro avant de continuer." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le numéro vient de changer. Comparez le nouveau numéro avant de continuer."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Impossible d’enregistrer ce choix. Réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t save this choice. Try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’enregistrer ce choix. Réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible d’enregistrer ce choix. Réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’enregistrer ce choix. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Chargement du numéro de sécurité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading the safety number"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement du numéro de sécurité"
-          }
-        }
-      }
-    },
     "Le signalement chiffré n’est pas encore disponible." : {
       "localizations" : {
         "en" : {
@@ -35112,162 +32969,6 @@
         }
       }
     },
-    "Les chiffres sont identiques : marquer comme vérifiée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The digits match: mark as verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les chiffres sont identiques : marquer comme vérifiée"
-          }
-        }
-      }
-    },
-    "Navigateurs exclus" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Web browsers excluded"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Navigateurs exclus"
-          }
-        }
-      }
-    },
-    "Navigateurs de nouveau autorisés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Web browsers allowed again"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Navigateurs de nouveau autorisés"
-          }
-        }
-      }
-    },
-    "Les navigateurs web ne pourront plus lire les nouveaux messages de cette conversation ni rejoindre ses appels. Ce qu’ils ont déjà reçu y reste lisible. Tous les membres sont prévenus." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Web browsers will no longer be able to read new messages in this conversation or join its calls. What they already received stays readable there. All members are notified."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les navigateurs web ne pourront plus lire les nouveaux messages de cette conversation ni rejoindre ses appels. Ce qu’ils ont déjà reçu y reste lisible. Tous les membres sont prévenus."
-          }
-        }
-      }
-    },
-    "Non vérifiée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non vérifiée"
-          }
-        }
-      }
-    },
-    "Nouveau numéro accepté" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New number accepted"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouveau numéro accepté"
-          }
-        }
-      }
-    },
-    "Numéro de sécurité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Safety number"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Numéro de sécurité"
-          }
-        }
-      }
-    },
-    "Ce numéro ne change pas quand l’un de vous ajoute un appareil. Il change seulement si l’un de vous réinitialise son chiffrement." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This number doesn’t change when one of you adds a device. It only changes if one of you resets their encryption."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce numéro ne change pas quand l’un de vous ajoute un appareil. Il change seulement si l’un de vous réinitialise son chiffrement."
-          }
-        }
-      }
-    },
-    "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This happens when %1$@ resets their encryption, for example after losing all their devices. It can also signal an interception attempt: compare the new number with %2$@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@."
-          }
-        }
-      }
-    },
-    "SQFormal|Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : comparez le nouveau numéro avec %@."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Par génération" : {
       "localizations" : {
         "en" : {
@@ -35283,34 +32984,6 @@
           }
         }
       }
-    },
-    "Pour approuver cet appareil, scanne le QR qu’il affiche." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "To approve this device, scan the QR code it shows."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour approuver cet appareil, scanne le QR qu’il affiche."
-          }
-        }
-      }
-    },
-    "SQFormal|Pour approuver cet appareil, scanne le QR qu’il affiche." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour approuver cet appareil, scannez le QR qu’il affiche."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Rattrapage en cours côté serveur : ces chiffres peuvent encore bouger." : {
       "localizations" : {
@@ -35356,34 +33029,6 @@
       },
       "shouldTranslate" : false
     },
-    "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If they differ, don’t mark anything: remove this device from your other device, then have it approved again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau."
-          }
-        }
-      }
-    },
-    "SQFormal|S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "S’ils diffèrent, ne marquez rien : retirez cet appareil depuis votre autre appareil, puis faites-le approuver de nouveau."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Sans réseau constaté" : {
       "localizations" : {
         "en" : {
@@ -35412,94 +33057,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas de mesure"
-          }
-        }
-      }
-    },
-    "Scanne le QR affiché sur l’appareil à approuver." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scan the QR code shown on the device to approve."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scanne le QR affiché sur l’appareil à approuver."
-          }
-        }
-      }
-    },
-    "SQFormal|Scanne le QR affiché sur l’appareil à approuver." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scannez le QR affiché sur l’appareil à approuver."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scan the QR code shown on the device to approve, browsers included. Without a camera, paste its contents below."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous."
-          }
-        }
-      }
-    },
-    "SQFormal|Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scannez le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, collez son contenu ci-dessous."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Scanner le code" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scan the code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scanner le code"
-          }
-        }
-      }
-    },
-    "Seul un admin du groupe peut changer ce réglage." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only a group admin can change this setting."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seul un admin du groupe peut changer ce réglage."
           }
         }
       }
@@ -35904,122 +33461,6 @@
       },
       "shouldTranslate" : false
     },
-    "Tu avais vérifié l’ancien numéro : compare le nouveau avant de l’accepter." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You had verified the previous number: compare the new one before accepting it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu avais vérifié l’ancien numéro : compare le nouveau avant de l’accepter."
-          }
-        }
-      }
-    },
-    "SQFormal|Tu avais vérifié l’ancien numéro : compare le nouveau avant de l’accepter." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous aviez vérifié l’ancien numéro : comparez le nouveau avant de l’accepter."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Numéro marqué comme vérifié" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Number marked as verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Numéro marqué comme vérifié"
-          }
-        }
-      }
-    },
-    "Tu avais vérifié l’ancien numéro : rien n’est envoyé à %@ tant que tu n’as pas vérifié le nouveau." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You had verified the previous number: nothing is sent to %@ until you verify the new one."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu avais vérifié l’ancien numéro : rien n’est envoyé à %@ tant que tu n’as pas vérifié le nouveau."
-          }
-        }
-      }
-    },
-    "SQFormal|Tu avais vérifié l’ancien numéro : rien n’est envoyé à %@ tant que tu n’as pas vérifié le nouveau." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous aviez vérifié l’ancien numéro : rien n’est envoyé à %@ tant que vous n’avez pas vérifié le nouveau."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Rien n’est envoyé à %@ tant que tu n’as pas accepté ce nouveau numéro." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nothing is sent to %@ until you accept this new number."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien n’est envoyé à %@ tant que tu n’as pas accepté ce nouveau numéro."
-          }
-        }
-      }
-    },
-    "SQFormal|Rien n’est envoyé à %@ tant que tu n’as pas accepté ce nouveau numéro." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien n’est envoyé à %@ tant que vous n’avez pas accepté ce nouveau numéro."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Code QR du numéro de sécurité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Safety number QR code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code QR du numéro de sécurité"
-          }
-        }
-      }
-    },
     "Non vérifié" : {
       "localizations" : {
         "en" : {
@@ -36068,66 +33509,6 @@
         }
       }
     },
-    "J’ai comparé : marquer comme vérifié" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I compared: mark as verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "J’ai comparé : marquer comme vérifié"
-          }
-        }
-      }
-    },
-    "Accepter sans vérifier" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accept without verifying"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accepter sans vérifier"
-          }
-        }
-      }
-    },
-    "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Another device has already set up encryption for this account. Get this one approved by scanning its QR code."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR."
-          }
-        }
-      }
-    },
-    "SQFormal|Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un autre appareil a déjà établi le chiffrement de ce compte. Faites approuver celui-ci en scannant son QR."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Un membre" : {
       "localizations" : {
         "en" : {
@@ -36159,34 +33540,6 @@
           }
         }
       }
-    },
-    "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A member has a new safety number. Nothing is sent to them until you’ve seen it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
-          }
-        }
-      }
-    },
-    "SQFormal|Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que vous ne l’avez pas vu."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Un membre doit mettre à jour SignalQuest pour les appels chiffrés." : {
       "localizations" : {
@@ -40316,34 +37669,6 @@
         }
       }
     },
-    "6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "6 characters minimum. This password never leaves your device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil."
-          }
-        }
-      }
-    },
-    "SQFormal|6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "6 caractères minimum. Ce mot de passe ne quitte jamais votre appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "7 derniers jours" : {
       "localizations" : {
         "en" : {
@@ -43058,22 +40383,6 @@
         }
       }
     },
-    "Action irréversible" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Irreversible action"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Action irréversible"
-          }
-        }
-      }
-    },
     "Action non autorisée." : {
       "localizations" : {
         "en" : {
@@ -43174,62 +40483,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activez la localisation pour signaler une panne ici."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Active le chiffrement de bout en bout" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on end-to-end encryption"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Active le chiffrement de bout en bout"
-          }
-        }
-      }
-    },
-    "SQFormal|Active le chiffrement de bout en bout" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez le chiffrement de bout en bout"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on end-to-end encryption on this device to message and call privately."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé."
-          }
-        }
-      }
-    },
-    "SQFormal|Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé."
           }
         }
       },
@@ -43371,38 +40624,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer l’image dans l’image"
-          }
-        }
-      }
-    },
-    "Activer maintenant" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on now"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activer maintenant"
-          }
-        }
-      }
-    },
-    "Activer sur cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on for this device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activer sur cet appareil"
           }
         }
       }
@@ -43857,22 +41078,6 @@
       },
       "shouldTranslate" : false
     },
-    "Afficher la clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher la clé"
-          }
-        }
-      }
-    },
     "Afficher la légende" : {
       "localizations" : {
         "en" : {
@@ -43901,22 +41106,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la transcription"
-          }
-        }
-      }
-    },
-    "Afficher le QR" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show the QR"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher le QR"
           }
         }
       }
@@ -44013,22 +41202,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher tous les amis"
-          }
-        }
-      }
-    },
-    "Afficher un QR temporaire" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show a temporary QR code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher un QR temporaire"
           }
         }
       }
@@ -44612,22 +41785,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Ajouté %@ · vu %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Added %@ · seen %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouté %1$@ · vu %2$@"
-          }
-        }
-      }
     },
     "Ajouté le %@" : {
       "localizations" : {
@@ -45943,38 +43100,6 @@
       },
       "shouldTranslate" : false
     },
-    "Approuver avec ma clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approve with my key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approuver avec ma clé"
-          }
-        }
-      }
-    },
-    "Approuver cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approve this device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approuver cet appareil"
-          }
-        }
-      }
-    },
     "Approuver un nouvel appareil" : {
       "localizations" : {
         "en" : {
@@ -45987,22 +43112,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Approuver un nouvel appareil"
-          }
-        }
-      }
-    },
-    "Approuvé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approved"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approuvé"
           }
         }
       }
@@ -46435,38 +43544,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun ami ne partage de position récente."
-          }
-        }
-      }
-    },
-    "Aucun appareil n’est encore approuvé. Un code e-mail à usage unique établit la première identité ; aucune clé privée ne quitte cet appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No device is approved yet. A one-time email code establishes the first identity; no private key leaves this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun appareil n’est encore approuvé. Un code e-mail à usage unique établit la première identité ; aucune clé privée ne quitte cet appareil."
-          }
-        }
-      }
-    },
-    "Aucun appareil v2 enregistré." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No v2 device registered."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun appareil v2 enregistré."
           }
         }
       }
@@ -49557,22 +46634,6 @@
         }
       }
     },
-    "Cet appareil ne correspond pas au code affiché, approbation refusée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device doesn't match the code displayed. Approval refused."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil ne correspond pas au code affiché, approbation refusée."
-          }
-        }
-      }
-    },
     "Ce lien de partage n’est plus valide. Demandes-en un nouveau à la personne qui te l’a envoyé." : {
       "localizations" : {
         "en" : {
@@ -50819,22 +47880,6 @@
         }
       }
     },
-    "Ces actions restent verrouillées jusqu’à la fin de la revue de sécurité." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These actions stay locked until the security review is complete."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ces actions restent verrouillées jusqu’à la fin de la revue de sécurité."
-          }
-        }
-      }
-    },
     "Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever." : {
       "localizations" : {
         "en" : {
@@ -50884,22 +47929,6 @@
         }
       }
     },
-    "Cet appareil ne peut pas utiliser la récupération." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device can’t use recovery."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil ne peut pas utiliser la récupération."
-          }
-        }
-      }
-    },
     "Cet appareil n’a pas encore d’identité locale E2EE v2." : {
       "localizations" : {
         "en" : {
@@ -50915,97 +47944,6 @@
           }
         }
       }
-    },
-    "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device isn’t registered for end-to-end encryption yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout."
-          }
-        }
-      }
-    },
-    "Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device was revoked from another of your devices: it can’t be approved again as is."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil a été révoqué depuis un autre de vos appareils : il ne peut plus être approuvé tel quel."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Étape %lld sur 3 : %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Step %lld of 3: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Étape %lld sur 3 : %@"
-          }
-        }
-      }
-    },
-    "N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only approve if this device is in front of you and you just displayed this QR code yourself."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même."
-          }
-        }
-      }
-    },
-    "SQFormal|N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "N’approuvez que si cet appareil est devant vous et que vous venez d’afficher ce QR vous-même."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Mettre en sourdine" : {
       "extractionState" : "manual",
@@ -51425,22 +48363,6 @@
       },
       "shouldTranslate" : false
     },
-    "Cet appareil se prépare" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device gets ready"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil se prépare"
-          }
-        }
-      }
-    },
     "Cette action est définitive." : {
       "localizations" : {
         "en" : {
@@ -51657,22 +48579,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Cette identité ne pourra pas être réactivée. Les conversations concernées devront renouveler leurs clés." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This identity cannot be reactivated. The affected conversations will need to renew their keys."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette identité ne pourra pas être réactivée. Les conversations concernées devront renouveler leurs clés."
-          }
-        }
-      }
     },
     "Cette lecture n’est pas encore disponible sur ce serveur." : {
       "localizations" : {
@@ -52167,22 +49073,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement de la publication partagée"
-          }
-        }
-      }
-    },
-    "Chargement de l’état…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading status…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement de l’état…"
           }
         }
       }
@@ -52868,34 +49758,6 @@
       },
       "shouldTranslate" : false
     },
-    "Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose an encryption password, different from your account password. It alone opens your encrypted conversations: if it is lost, nobody can recover it, not even SignalQuest, and encrypted messages become unreadable."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles."
-          }
-        }
-      }
-    },
-    "SQFormal|Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisissez un mot de passe de chiffrement, différent de celui de votre compte. Lui seul ouvre vos conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Choisis un opérateur pour afficher la couverture." : {
       "localizations" : {
         "en" : {
@@ -53123,34 +49985,6 @@
         }
       }
     },
-    "Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "256-bit recovery key displayed. Use the Copy button to save it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder."
-          }
-        }
-      }
-    },
-    "SQFormal|Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Clocher" : {
       "localizations" : {
         "en" : {
@@ -53200,22 +50034,6 @@
         }
       }
     },
-    "Clé Base64" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base64 key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé Base64"
-          }
-        }
-      }
-    },
     "Clé de chiffrement" : {
       "localizations" : {
         "en" : {
@@ -53248,22 +50066,6 @@
         }
       }
     },
-    "Clé de récupération" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recovery key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de récupération"
-          }
-        }
-      }
-    },
     "Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder." : {
       "localizations" : {
         "en" : {
@@ -53276,22 +50078,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder."
-          }
-        }
-      }
-    },
-    "Clé de signature · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signing key · %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé de signature · %@"
           }
         }
       }
@@ -53453,22 +50239,6 @@
         }
       }
     },
-    "Code de proximité %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proximity code %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code de proximité %@"
-          }
-        }
-      }
-    },
     "Code de vérification" : {
       "localizations" : {
         "en" : {
@@ -53481,22 +50251,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code de vérification"
-          }
-        }
-      }
-    },
-    "Code envoyé à %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code sent to %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code envoyé à %@"
           }
         }
       }
@@ -53562,22 +50316,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code opérateur (MCC-MNC)"
-          }
-        }
-      }
-    },
-    "Code reçu" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code received"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code reçu"
           }
         }
       }
@@ -54348,50 +51086,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confirmation encore en attente. Ouvrez le lien reçu puis actualisez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Confirmation. %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirmation. %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirmation. %@"
-          }
-        }
-      }
-    },
-    "Confirme ce mot de passe" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm this password"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirme ce mot de passe"
-          }
-        }
-      }
-    },
-    "SQFormal|Confirme ce mot de passe" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirmez ce mot de passe"
           }
         }
       },
@@ -55178,23 +51872,6 @@
         }
       }
     },
-    "Continuer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer"
-          }
-        }
-      }
-    },
     "Continuer avec Apple" : {
       "localizations" : {
         "en" : {
@@ -55417,22 +52094,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copier le secret"
-          }
-        }
-      }
-    },
-    "Copier pendant 60 secondes" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy for 60 seconds"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copier pendant 60 secondes"
           }
         }
       }
@@ -56010,22 +52671,6 @@
         }
       }
     },
-    "Création, récupération et reset restent désactivés jusqu’à la validation de la revue cryptographique externe." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creation, recovery and reset remain disabled until the external cryptographic review is approved."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Création, récupération et reset restent désactivés jusqu’à la validation de la revue cryptographique externe."
-          }
-        }
-      }
-    },
     "Création…" : {
       "localizations" : {
         "en" : {
@@ -56054,23 +52699,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Créer"
-          }
-        }
-      }
-    },
-    "Créer et activer" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create and enable"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer et activer"
           }
         }
       }
@@ -56157,50 +52785,6 @@
         }
       }
     },
-    "Créer ou remplacer la clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create or replace the key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer ou remplacer la clé"
-          }
-        }
-      }
-    },
-    "Créer ta clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create your key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer ta clé"
-          }
-        }
-      }
-    },
-    "SQFormal|Créer ta clé" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer votre clé"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Créer un compte" : {
       "localizations" : {
         "en" : {
@@ -56229,38 +52813,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Créer un sondage"
-          }
-        }
-      }
-    },
-    "Créer une clé hors ligne, restaurer l’historique ou réinitialiser irréversiblement l’identité E2EE." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create an offline key, restore history or irreversibly reset the E2EE identity."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer une clé hors ligne, restaurer l’historique ou réinitialiser irréversiblement l’identité E2EE."
-          }
-        }
-      }
-    },
-    "Créer une nouvelle clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create a new key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Créer une nouvelle clé"
           }
         }
       }
@@ -56315,34 +52867,6 @@
           }
         }
       }
-    },
-    "C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This is your account’s first encrypted device: a one-time code sent by email confirms it. No private key ever leaves this device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil."
-          }
-        }
-      }
-    },
-    "SQFormal|C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C’est le premier appareil chiffré de votre compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "C’est prêt" : {
       "localizations" : {
@@ -56723,22 +53247,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Date et heure"
-          }
-        }
-      }
-    },
-    "Demande %@ · expire %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Request %@ · expires %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demande %1$@ · expire %2$@"
           }
         }
       }
@@ -59329,22 +55837,6 @@
         }
       }
     },
-    "Effacer la clé de cet écran" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clear the key from this screen"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Effacer la clé de cet écran"
-          }
-        }
-      }
-    },
     "Effacer la recherche" : {
       "localizations" : {
         "en" : {
@@ -59674,22 +56166,6 @@
         }
       }
     },
-    "En attente de l’approbation…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Waiting for approval…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente de l’approbation…"
-          }
-        }
-      }
-    },
     "En attente de mesure" : {
       "localizations" : {
         "en" : {
@@ -59718,22 +56194,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente de réponse"
-          }
-        }
-      }
-    },
-    "En attente d’approbation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Awaiting approval"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente d’approbation"
           }
         }
       }
@@ -60506,22 +56966,6 @@
         }
       }
     },
-    "Envoyer le code de confirmation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send confirmation code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoyer le code de confirmation"
-          }
-        }
-      }
-    },
     "Envoyer le commentaire" : {
       "localizations" : {
         "en" : {
@@ -60716,38 +57160,6 @@
         }
       }
     },
-    "Erreur d’approbation. %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approval error. %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erreur d’approbation. %@"
-          }
-        }
-      }
-    },
-    "Erreur. %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Error. %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erreur. %@"
-          }
-        }
-      }
-    },
     "Espace de stockage faible" : {
       "localizations" : {
         "en" : {
@@ -60897,22 +57309,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exclusivement"
-          }
-        }
-      }
-    },
-    "Expire %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expires %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expire %@"
           }
         }
       }
@@ -61078,22 +57474,6 @@
         }
       }
     },
-    "Faire approuver cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get this device approved"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faire approuver cet appareil"
-          }
-        }
-      }
-    },
     "Faisceau hertzien" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -61107,22 +57487,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Faisceau hertzien"
-          }
-        }
-      }
-    },
-    "Fait" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Done"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fait"
           }
         }
       }
@@ -63162,40 +59526,6 @@
         }
       }
     },
-    "Identité requise pour planifier un message chiffré" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identity required to schedule an encrypted message"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identité requise pour planifier un message chiffré"
-          }
-        }
-      }
-    },
-    "Identité réinitialisée côté compte. La configuration locale reste en attente." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account identity was reset. Local setup is still pending."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identité réinitialisée côté compte. La configuration locale reste en attente."
-          }
-        }
-      }
-    },
     "Il disparaîtra pour tout le monde." : {
       "localizations" : {
         "en" : {
@@ -63564,34 +59894,6 @@
       },
       "shouldTranslate" : false
     },
-    "Impossible de créer la demande d’approbation. Réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t create the approval request. Try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer la demande d’approbation. Réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible de créer la demande d’approbation. Réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer la demande d’approbation. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -63616,34 +59918,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Impossible de créer ta clé de chiffrement. Réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Couldn’t create your encryption key. Try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer ta clé de chiffrement. Réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Impossible de créer ta clé de chiffrement. Réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer votre clé de chiffrement. Réessayez."
           }
         }
       },
@@ -64178,22 +60452,6 @@
         }
       }
     },
-    "Je quitte en sachant que l’historique sera irrécupérable sans clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I understand that leaving without a key will make the history unrecoverable"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je quitte en sachant que l’historique sera irrécupérable sans clé"
-          }
-        }
-      }
-    },
     "Jeton Apple manquant. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -64458,22 +60716,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "J’ai déjà un compte"
-          }
-        }
-      }
-    },
-    "J’ai sauvegardé cette clé dans un endroit sûr" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I saved this key somewhere safe"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "J’ai sauvegardé cette clé dans un endroit sûr"
           }
         }
       }
@@ -64772,22 +61014,6 @@
         }
       }
     },
-    "La clé approuvera cet appareil puis restaurera les clés d’historique disponibles." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The key will approve this device, then restore the available history keys."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé approuvera cet appareil puis restaurera les clés d’historique disponibles."
-          }
-        }
-      }
-    },
     "La clé de cette conversation a changé. Elle sera mise à jour à la prochaine ouverture." : {
       "localizations" : {
         "en" : {
@@ -64803,78 +61029,6 @@
           }
         }
       }
-    },
-    "La clé de récupération est créée sur cet appareil et n’est jamais conservée en clair par SignalQuest." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The recovery key is created on this device and is never stored in plain text by SignalQuest."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé de récupération est créée sur cet appareil et n’est jamais conservée en clair par SignalQuest."
-          }
-        }
-      }
-    },
-    "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account key didn’t reach this device. Enter your recovery key below, or have this device revoked from another one and approve it again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau."
-          }
-        }
-      }
-    },
-    "SQFormal|La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisissez votre clé de récupération plus bas, ou faites révoquer cet appareil depuis un autre puis approuvez-le à nouveau."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account key didn’t reach this device. Enter your recovery key, or have this device revoked from another one and approve it again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau."
-          }
-        }
-      }
-    },
-    "SQFormal|La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisissez votre clé de récupération, ou faites révoquer cet appareil depuis un autre puis approuvez-le à nouveau."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "La clé privée qui ouvre tes conversations chiffrées. Elle est protégée par un mot de passe distinct de celui de ton compte : s’il est perdu, les anciens messages chiffrés ne peuvent plus être lus." : {
       "localizations" : {
@@ -64903,22 +61057,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "La clé restaure les clés d’historique disponibles sur cet appareil approuvé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The key restores the available history keys on this approved device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La clé restaure les clés d’historique disponibles sur cet appareil approuvé."
-          }
-        }
-      }
     },
     "La communauté n'a pas encore assez mesuré cette zone." : {
       "extractionState" : "manual",
@@ -65702,34 +61840,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La session a changé. Reconnectez-vous avant de gérer les appareils."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "La session a changé. Reconnecte-toi puis réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your session has changed. Sign in again, then retry."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La session a changé. Reconnecte-toi puis réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|La session a changé. Reconnecte-toi puis réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La session a changé. Reconnectez-vous puis réessayez."
           }
         }
       },
@@ -67856,34 +63966,6 @@
         }
       }
     },
-    "Le service est temporairement indisponible. Réessaie." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The service is temporarily unavailable. Try again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le service est temporairement indisponible. Réessaie."
-          }
-        }
-      }
-    },
-    "SQFormal|Le service est temporairement indisponible. Réessaie." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le service est temporairement indisponible. Réessayez."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Le service est temporairement indisponible. Réessayez." : {
       "localizations" : {
         "en" : {
@@ -68279,22 +64361,6 @@
         }
       }
     },
-    "Les actions de récupération sont disponibles." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recovery actions are available."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les actions de récupération sont disponibles."
-          }
-        }
-      }
-    },
     "Les anciennes sessions de couverture, y compris depuis Android, apparaîtront ici." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -68432,23 +64498,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Les clés des conversations sont à jour." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conversation keys are up to date."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les clés des conversations sont à jour."
-          }
-        }
-      }
     },
     "Les derniers changements n’ont pas pu être enregistrés sur cet appareil. Réessaie avant de fermer l’app." : {
       "localizations" : {
@@ -69866,54 +65915,6 @@
         }
       }
     },
-    "L’identité est réinitialisée, mais aucune nouvelle clé n’a encore été créée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The identity has been reset, but no new key has been created yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’identité est réinitialisée, mais aucune nouvelle clé n’a encore été créée."
-          }
-        }
-      }
-    },
-    "L’identité locale E2EE v2 est illisible." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The local E2EE v2 identity can’t be read."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’identité locale E2EE v2 est illisible."
-          }
-        }
-      }
-    },
-    "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The local E2EE v2 identity can’t be read. It was not replaced automatically."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement."
-          }
-        }
-      }
-    },
     "L’inclinaison d’une antenne vers le bas. Elle concentre le signal sur la zone à couvrir au lieu de l’envoyer vers l’horizon." : {
       "localizations" : {
         "en" : {
@@ -70291,22 +66292,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer de la carte"
-          }
-        }
-      }
-    },
-    "Masquer la clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hide key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Masquer la clé"
           }
         }
       }
@@ -71342,22 +67327,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Messages et appels"
-          }
-        }
-      }
-    },
-    "Messages et appels chiffrés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypted messages and calls"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Messages et appels chiffrés"
           }
         }
       }
@@ -72634,22 +68603,6 @@
         }
       }
     },
-    "Navigateur" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Browser"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Navigateur"
-          }
-        }
-      }
-    },
     "Navigateur web" : {
       "localizations" : {
         "en" : {
@@ -73554,22 +69507,6 @@
         }
       }
     },
-    "Nouvelle clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouvelle clé"
-          }
-        }
-      }
-    },
     "Nouvelle connexion" : {
       "localizations" : {
         "en" : {
@@ -74367,22 +70304,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opérateurs inconnus"
-          }
-        }
-      }
-    },
-    "Opération sécurisée en cours…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secure operation in progress…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opération sécurisée en cours…"
           }
         }
       }
@@ -75520,22 +71441,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo de %@, %@"
-          }
-        }
-      }
-    },
-    "Plateforme différente de celle affichée, approbation refusée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The platform differs from the one displayed. Approval refused."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plateforme différente de celle affichée, approbation refusée."
           }
         }
       }
@@ -77442,22 +73347,6 @@
         }
       }
     },
-    "Perte totale d’accès" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Complete loss of access"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perte totale d’accès"
-          }
-        }
-      }
-    },
     "Photo" : {
       "localizations" : {
         "en" : {
@@ -78029,22 +73918,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plan Apple"
-          }
-        }
-      }
-    },
-    "Plateforme · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Platform · %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plateforme · %@"
           }
         }
       }
@@ -79034,22 +74907,6 @@
         }
       }
     },
-    "Premier appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "First device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premier appareil"
-          }
-        }
-      }
-    },
     "Premium" : {
       "localizations" : {
         "en" : {
@@ -79780,22 +75637,6 @@
         }
       }
     },
-    "Préparer cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prepare this device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Préparer cet appareil"
-          }
-        }
-      }
-    },
     "Présence" : {
       "localizations" : {
         "en" : {
@@ -80231,22 +76072,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QR indisponible. Créez une nouvelle demande."
-          }
-        }
-      }
-    },
-    "QR temporaire d’approbation SignalQuest" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temporary SignalQuest approval QR code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR temporaire d’approbation SignalQuest"
           }
         }
       }
@@ -80856,34 +76681,6 @@
         }
       }
     },
-    "Renouvellement des clés différé. Réessaie à la reconnexion." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key renewal is postponed. Retry after reconnecting."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renouvellement des clés différé. Réessaie à la reconnexion."
-          }
-        }
-      }
-    },
-    "SQFormal|Renouvellement des clés différé. Réessaie à la reconnexion." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renouvellement des clés différé. Réessayez à la reconnexion."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Retirer la zone %lld" : {
       "localizations" : {
         "en" : {
@@ -81257,22 +77054,6 @@
         }
       }
     },
-    "Recevoir le code par e-mail" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get the code by email"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recevoir le code par e-mail"
-          }
-        }
-      }
-    },
     "Recevoir l’alerte de panne ?" : {
       "localizations" : {
         "en" : {
@@ -81285,22 +77066,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recevoir l’alerte de panne ?"
-          }
-        }
-      }
-    },
-    "Recevoir un code par e-mail" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get a code by email"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recevoir un code par e-mail"
           }
         }
       }
@@ -81918,40 +77683,6 @@
         }
       }
     },
-    "Renouvellement des clés en attente de l’autorisation de sécurité." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key renewal is waiting for security authorization."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renouvellement des clés en attente de l’autorisation de sécurité."
-          }
-        }
-      }
-    },
-    "Renouvellement des clés en attente." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key renewal is pending."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renouvellement des clés en attente."
-          }
-        }
-      }
-    },
     "Renvoyer le lien" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -82126,38 +77857,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Requête invalide."
-          }
-        }
-      }
-    },
-    "Restaurer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurer"
-          }
-        }
-      }
-    },
-    "Restaurer l’historique" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore history"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurer l’historique"
           }
         }
       }
@@ -82532,22 +78231,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retour"
-          }
-        }
-      }
-    },
-    "Retour aux actions" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back to actions"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retour aux actions"
           }
         }
       }
@@ -83309,38 +78992,6 @@
         }
       }
     },
-    "Récupération" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recovery"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Récupération"
-          }
-        }
-      }
-    },
-    "Récupération E2EE" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "E2EE recovery"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Récupération E2EE"
-          }
-        }
-      }
-    },
     "Récupération du journal" : {
       "localizations" : {
         "en" : {
@@ -83353,22 +79004,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Récupération du journal"
-          }
-        }
-      }
-    },
-    "Récupération et perte d’accès" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recovery and loss of access"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Récupération et perte d’accès"
           }
         }
       }
@@ -83519,22 +79154,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer"
-          }
-        }
-      }
-    },
-    "Réessayer de créer la clé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retry key creation"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réessayer de créer la clé"
           }
         }
       }
@@ -83728,22 +79347,6 @@
         }
       }
     },
-    "Réinitialiser définitivement" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset permanently"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialiser définitivement"
-          }
-        }
-      }
-    },
     "Réinitialiser le mot de passe" : {
       "localizations" : {
         "en" : {
@@ -83773,22 +79376,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réinitialiser les filtres"
-          }
-        }
-      }
-    },
-    "Réinitialiser l’identité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset identity"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réinitialiser l’identité"
           }
         }
       }
@@ -84748,70 +80335,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rétrograder"
-          }
-        }
-      }
-    },
-    "Révoquer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoke"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Révoquer"
-          }
-        }
-      }
-    },
-    "Révoquer %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoke %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Révoquer %@"
-          }
-        }
-      }
-    },
-    "Révoquer cet appareil ?" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoke this device?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Révoquer cet appareil ?"
-          }
-        }
-      }
-    },
-    "Révoqué" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoked"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Révoqué"
           }
         }
       }
@@ -86772,22 +82295,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "SignalQuest ne pourra pas réafficher cette clé. Sans appareil approuvé ni cette clé, l’ancien historique chiffré sera perdu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest cannot show this key again. Without an approved device or this key, your previous encrypted history will be lost."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest ne pourra pas réafficher cette clé. Sans appareil approuvé ni cette clé, l’ancien historique chiffré sera perdu."
-          }
-        }
-      }
     },
     "SignalQuest n’a pas pu vérifier cette installation. Relance l’app puis réessaie." : {
       "localizations" : {
@@ -90451,34 +85958,6 @@
       },
       "shouldTranslate" : false
     },
-    "Tes messages et tes appels ne seront lisibles que sur tes appareils." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your messages and calls will only be readable on your devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tes messages et tes appels ne seront lisibles que sur tes appareils."
-          }
-        }
-      }
-    },
-    "SQFormal|Tes messages et tes appels ne seront lisibles que sur tes appareils." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vos messages et vos appels ne seront lisibles que sur vos appareils."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Tes messages sont chiffrés sur ton téléphone et déchiffrés sur celui de tes correspondants : nos serveurs ne stockent que du texte illisible. Deux limites pour l’instant : seul le texte est chiffré, et la clé de chaque conversation est créée par nos serveurs à son ouverture, puis remise chiffrée à chaque membre." : {
       "localizations" : {
         "en" : {
@@ -90933,34 +86412,6 @@
       },
       "shouldTranslate" : false
     },
-    "Ton autre appareil l’approuve" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your other device approves it"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton autre appareil l’approuve"
-          }
-        }
-      }
-    },
-    "SQFormal|Ton autre appareil l’approuve" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre autre appareil l’approuve"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "Ton bilan de la semaine est déjà en story." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -90985,34 +86436,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre bilan de la semaine est déjà en story."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your account is already encrypted on another device. On that device, open Profile › Settings › Account and security › Devices, then “Scan the code”, and point it at this QR."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR."
-          }
-        }
-      }
-    },
-    "SQFormal|Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvrez Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et visez ce QR."
           }
         }
       },
@@ -91819,22 +87242,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Tous les appareils actuels seront révoqués. L’historique non récupéré sera définitivement perdu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All current devices will be revoked. Any history that has not been recovered will be permanently lost."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tous les appareils actuels seront révoqués. L’historique non récupéré sera définitivement perdu."
-          }
-        }
-      }
     },
     "Tous les opérateurs" : {
       "localizations" : {
@@ -94182,38 +89589,6 @@
         }
       }
     },
-    "Une notification a été envoyée aux appareils déjà approuvés." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A notification has been sent to the already approved devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une notification a été envoyée aux appareils déjà approuvés."
-          }
-        }
-      }
-    },
-    "Une nouvelle clé aléatoire de 256 bits remplacera l’ancienne. Elle ne sera affichée qu’une fois." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A new random 256-bit key will replace the old one. It will only be shown once."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une nouvelle clé aléatoire de 256 bits remplacera l’ancienne. Elle ne sera affichée qu’une fois."
-          }
-        }
-      }
-    },
     "Une onde n'emprunte pas seulement la droite entre les deux points : elle occupe un fuseau autour d'elle, la première zone de Fresnel. Tant que ce fuseau reste libre, la liaison se comporte comme en visibilité directe. Le chiffre indique quelle part en reste dégagée." : {
       "localizations" : {
         "en" : {
@@ -94307,22 +89682,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une position arrondie à environ 50 mètres"
-          }
-        }
-      }
-    },
-    "Une révocation est définitive pour cette identité et impose une rotation des clés des conversations concernées." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revocation is permanent for this identity and requires key rotation in the affected conversations."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une révocation est définitive pour cette identité et impose une rotation des clés des conversations concernées."
           }
         }
       }
@@ -94489,22 +89848,6 @@
         }
       }
     },
-    "Utiliser ma clé de récupération" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use my recovery key"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser ma clé de récupération"
-          }
-        }
-      }
-    },
     "Utiliser ma connexion actuelle" : {
       "localizations" : {
         "en" : {
@@ -94570,22 +89913,6 @@
         }
       }
     },
-    "Vérifiée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifiée"
-          }
-        }
-      }
-    },
     "Vise le code affiché sur l’appareil à approuver." : {
       "localizations" : {
         "en" : {
@@ -94613,22 +89940,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Voir le numéro de sécurité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View safety number"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voir le numéro de sécurité"
-          }
-        }
-      }
     },
     "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte." : {
       "extractionState" : "stale",
@@ -94892,22 +90203,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Valider"
-          }
-        }
-      }
-    },
-    "Valider ce premier appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify this first device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valider ce premier appareil"
           }
         }
       }
@@ -95803,38 +91098,6 @@
         }
       },
       "shouldTranslate" : false
-    },
-    "Vérifier et restaurer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify and restore"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifier et restaurer"
-          }
-        }
-      }
-    },
-    "Vérifier la demande" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify request"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifier la demande"
-          }
-        }
-      }
     },
     "Vérifier la visibilité" : {
       "extractionState" : "manual",
@@ -99796,22 +95059,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À rafraîchir"
-          }
-        }
-      }
-    },
-    "À sauvegarder maintenant" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back up now"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "À sauvegarder maintenant"
           }
         }
       }
@@ -106113,34 +101360,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce mot de passe ne quitte jamais votre appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unlock encryption to read and write. Your messages stay unreadable outside your devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils."
-          }
-        }
-      }
-    },
-    "SQFormal|Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déverrouillez le chiffrement pour lire et écrire. Vos messages restent illisibles en dehors de vos appareils."
           }
         }
       },
