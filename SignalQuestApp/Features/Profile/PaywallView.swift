@@ -191,10 +191,16 @@ struct SubscriptionStatusPresentation: Equatable {
                 tone = .neutral
             } else {
                 tag = String(localized: "Actif")
-                if let end = subscription.currentPeriodEnd, let price = subscription.price.map(formattedPrice) {
+                // `autoRenew` à null : le serveur ne sait pas encore si l'abonnement se
+                // renouvellera (Apple, `renewalInfo` non lu). On ne promet alors aucun
+                // renouvellement, qui serait faux après une résiliation.
+                if subscription.autoRenew == true, let end = subscription.currentPeriodEnd,
+                   let price = subscription.price.map(formattedPrice) {
                     details.append(String(localized: "Prochain renouvellement le \(day(end)), pour \(price)."))
-                } else if let end = subscription.currentPeriodEnd {
+                } else if subscription.autoRenew == true, let end = subscription.currentPeriodEnd {
                     details.append(String(localized: "Prochain renouvellement le \(day(end))."))
+                } else if let end = subscription.currentPeriodEnd {
+                    details.append(String(localized: "Période en cours jusqu’au \(day(end))."))
                 }
                 tone = .positive
             }

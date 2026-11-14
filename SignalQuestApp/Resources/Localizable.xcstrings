@@ -38250,6 +38250,22 @@
         }
       }
     },
+    "Période en cours jusqu’au %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current period until %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Période en cours jusqu’au %@."
+          }
+        }
+      }
+    },
     "Surveille plusieurs box, chaque minute" : {
       "localizations" : {
         "en" : {

@@ -636,6 +636,18 @@ final class SubscriptionStatusPresentationTests: XCTestCase {
         ])
     }
 
+    /// Le serveur sert `autoRenew: null` pour Apple tant qu'il ne lit pas `renewalInfo` :
+    /// aucun renouvellement n'est alors promis, puisqu'il serait faux après une résiliation.
+    func testUnknownRenewalPromisesNoRenewal() {
+        let presentation = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: nil, currentPeriodEnd: end
+        ))
+        XCTAssertEqual(presentation.tag, String(localized: "Actif"))
+        XCTAssertEqual(presentation.details, [
+            String(localized: "Période en cours jusqu’au \(SubscriptionStatusPresentation.day(end)).")
+        ])
+    }
+
     func testSandboxPurchaseIsLabelled() {
         let presentation = present(EntitlementSubscription(
             channel: .appStore, state: .active, tier: .premium, autoRenew: true, currentPeriodEnd: end, isSandbox: true
@@ -851,6 +863,94 @@ private final class RecordingEntitlementsAPIStub: APIClientProtocol, @unchecked 
 /// Rendus de l'écran Premium et de l'avertissement de suppression, pour une
 /// relecture à l'œil (lot E). Écrits seulement si `SQ_PAYWALL_RENDER_OUT` est
 /// donné (`TEST_RUNNER_SQ_PAYWALL_RENDER_OUT` à xcodebuild) ; sinon ignorés.
+/// La charge §3 telle que le serveur la sert depuis le 14/11 à 12:54 (lot 1b,
+/// `buildEntitlementsV1`) : champs inconnus de l'app (`serverTime`, `tierSource`,
+/// `id`, `manage.kind`, `quotas`, `features`, `flagTiers`) et champs encore à
+/// null (`autoRenew` Apple, `price`, `trialEndsAt`) compris.
+@MainActor
+final class ServedEntitlementsPayloadTests: XCTestCase {
+    private static let premiumAppStore = #"""
+    {"version":1,"serverTime":"2026-11-14T12:00:00.000Z","tier":"premium","tierSource":"subscription",
+     "subscription":{"id":"cm1","channel":"app_store","productKey":"premium_monthly","tier":"premium","period":"month",
+       "state":"active","entitled":true,"autoRenew":null,"currentPeriodEnd":"2026-12-14T11:00:00.000Z",
+       "graceEndsAt":null,"resumesAt":null,"trialEndsAt":null,"pendingChange":null,"price":null,"environment":"sandbox",
+       "manage":{"kind":"app_store","url":"https://apps.apple.com/account/subscriptions","canCancel":true,"canResume":false}},
+     "otherSubscriptions":[],"warnings":[],"grant":null,"trial":{"eligible":false,"days":7},
+     "purchaseAccountToken":"0b6f8f62-5a0e-4c62-9d36-8a4f1f4a7c11",
+     "quotas":{"radioLogCells":{"used":120,"max":null},"sentinelle":{"usedTargets":1,"maxTargets":5,"defaultIntervalSec":60,
+       "allowedIntervalsSec":[60,30,10],"maxFastTargets":1,"detailDays":14,"rollupDays":400,"incidentFastMode":true,"weeklyReport":true}},
+     "benefits":{"free":["radio.kpi_history","exports.nsg_market","radio_log.sync"],
+                 "premium":["sentinelle.full","stories.duration","radio_log.unlimited","reports.logo"]},
+     "features":{"pro.sentinelle.enabled":true},"flagTiers":{"pro.sentinelle.enabled":"premium"}}
+    """#
+
+    private static let free = #"""
+    {"version":1,"serverTime":"2026-11-14T12:00:00.000Z","tier":"free","tierSource":"none","subscription":null,
+     "otherSubscriptions":[],"warnings":[],"grant":null,"trial":{"eligible":true,"days":7},
+     "purchaseAccountToken":"0b6f8f62-5a0e-4c62-9d36-8a4f1f4a7c12",
+     "quotas":{"radioLogCells":{"used":0,"max":10000},"sentinelle":{"usedTargets":0,"maxTargets":1,"defaultIntervalSec":300,
+       "allowedIntervalsSec":[300],"maxFastTargets":0,"detailDays":7,"rollupDays":90,"incidentFastMode":false,"weeklyReport":false}},
+     "benefits":{"free":["radio.kpi_history"],"premium":["sentinelle.full","stories.duration"]},
+     "features":{},"flagTiers":{"pro.sentinelle.enabled":"premium"}}
+    """#
+
+    private var previousUserID: String?
+
+    override func setUp() async throws {
+        previousUserID = LocalAccountScope.currentUserId
+        LocalAccountScope.deactivate()
+        LocalAccountScope.activate(userId: "served-entitlements-\(UUID().uuidString)")
+    }
+
+    override func tearDown() async throws {
+        LocalAccountScope.deactivate()
+        if let previousUserID { LocalAccountScope.activate(userId: previousUserID) }
+    }
+
+    private func snapshot(_ payload: String) async throws -> EntitlementSnapshot {
+        let store = EntitlementsStore(api: FixedEntitlementsAPIStub(payload: payload), observesTransactions: false)
+        await store.refreshBackendSnapshot()
+        return try XCTUnwrap(store.serverState.snapshot)
+    }
+
+    func testAServedAppStoreSubscriptionIsReadAsIs() async throws {
+        let snapshot = try await snapshot(Self.premiumAppStore)
+        XCTAssertEqual(snapshot.tier, .premium)
+        XCTAssertEqual(snapshot.source, .appStore)
+        XCTAssertTrue(snapshot.status.grantsAccess)
+        XCTAssertEqual(snapshot.subscription?.state, .active)
+        XCTAssertNil(snapshot.subscription?.autoRenew)
+        XCTAssertNil(snapshot.subscription?.price)
+        XCTAssertEqual(snapshot.subscription?.isSandbox, true)
+        XCTAssertNotNil(snapshot.subscription?.currentPeriodEnd)
+        XCTAssertNotNil(snapshot.purchaseAccountToken)
+        XCTAssertEqual(snapshot.trial?.eligible, false)
+        XCTAssertEqual(snapshot.benefits?.premium.contains("sentinelle.full"), true)
+        // Un abonnement en cours bloque un second achat (M1), même sans `autoRenew`.
+        XCTAssertNotNil(snapshot.blockingSubscription)
+
+        let presentation = SubscriptionStatusPresentation.make(serverState: .available(snapshot))
+        let end = try XCTUnwrap(snapshot.subscription?.currentPeriodEnd)
+        XCTAssertEqual(presentation.tag, String(localized: "Actif"))
+        XCTAssertEqual(presentation.details, [
+            String(localized: "Période en cours jusqu’au \(SubscriptionStatusPresentation.day(end))."),
+            String(localized: "Achat de test : aucun paiement réel."),
+        ])
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(snapshot, tier: snapshot.tier))
+        // Suppression : l'avertissement App Store et le bouton de gestion restent.
+        XCTAssertEqual(AccountDeletionSubscriptionNotice.running(in: snapshot).count, 1)
+    }
+
+    func testAServedFreeAccountGetsTheOffers() async throws {
+        let snapshot = try await snapshot(Self.free)
+        XCTAssertEqual(snapshot.tier, .free)
+        XCTAssertNil(snapshot.subscription)
+        XCTAssertEqual(snapshot.trial?.eligible, true)
+        XCTAssertTrue(SentinellePremiumOffer.isOffered(snapshot, tier: snapshot.tier))
+        XCTAssertTrue(AccountDeletionSubscriptionNotice.running(in: snapshot).isEmpty)
+    }
+}
+
 @MainActor
 final class PaywallRenderingHarness: XCTestCase {
     private static let states: [(String, String)] = [
