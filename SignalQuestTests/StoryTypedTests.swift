@@ -192,24 +192,7 @@ final class StoryReplySubmissionTests: XCTestCase {
         XCTAssertEqual(submission.sentStoryID, "story-1")
     }
 
-    func testUnencryptedReplyRequiresConsentForTheCurrentStory() {
-        var channel = StoryReplyChannelConsent()
-        XCTAssertFalse(channel.request(storyID: "story-1", text: "Bonjour", clearDraftOnSuccess: true))
-        XCTAssertEqual(channel.pending?.text, "Bonjour")
-        XCTAssertNil(channel.confirm(currentStoryID: "story-2"), "Une story suivante ne doit pas recevoir le brouillon précédent")
-        XCTAssertNil(channel.pending)
-
-        XCTAssertFalse(channel.request(storyID: "story-1", text: "❤️", clearDraftOnSuccess: false))
-        let approved = channel.confirm(currentStoryID: "story-1")
-        XCTAssertEqual(approved?.text, "❤️")
-        XCTAssertEqual(approved?.clearDraftOnSuccess, false)
-        XCTAssertTrue(channel.request(storyID: "story-1", text: "Encore", clearDraftOnSuccess: true))
-        XCTAssertFalse(channel.request(storyID: "story-2", text: "Nouvelle", clearDraftOnSuccess: true))
-        channel.cancelPending()
-        XCTAssertNil(channel.pending)
-    }
-
-    func testStoryReplyAcceptsOnlyTheExactUnencryptedDirectConversation() {
+    func testStoryReplyAcceptsOnlyTheExactDirectConversation() {
         func conversation(ids: [String], encrypted: Bool, group: Bool) -> MessageConversation {
             MessageConversation(
                 id: "conversation-1", title: "Fixture", isGroup: group,
@@ -230,10 +213,14 @@ final class StoryReplySubmissionTests: XCTestCase {
             conversation(ids: ["me", "author"], encrypted: false, group: false),
             authorID: "author", currentUserID: "me"
         ))
-        XCTAssertFalse(StoryReplyChannelPolicy.accepts(
+        XCTAssertTrue(StoryReplyChannelPolicy.accepts(
             conversation(ids: ["me", "author"], encrypted: true, group: false),
             authorID: "author", currentUserID: "me"
-        ))
+        ), "Le tête-à-tête chiffré est le canal de la réponse depuis la bascule")
+        XCTAssertFalse(StoryReplyChannelPolicy.accepts(
+            conversation(ids: ["me"], encrypted: true, group: false),
+            authorID: "me", currentUserID: "me"
+        ), "Jamais de réponse à sa propre story")
         XCTAssertFalse(StoryReplyChannelPolicy.accepts(
             conversation(ids: ["me", "other"], encrypted: false, group: false),
             authorID: "author", currentUserID: "me"

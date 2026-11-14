@@ -479,7 +479,9 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Video call"].exists)
     }
 
-    func testStoryReplyRequiresChannelConsentWithoutSendingOnCancel() {
+    /// Depuis la bascule, la réponse part chiffrée dans le tête-à-tête : plus de
+    /// dialogue « sans chiffrement ». Un échec (données de démo) garde le brouillon.
+    func testStoryReplyIsEncryptedAndKeepsDraftOnFailure() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
         defer { app.terminate() }
@@ -490,29 +492,20 @@ final class SignalQuestUITests: XCTestCase {
 
         let channel = app.staticTexts["story.reply.channel"]
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertEqual(channel.label, "Réponse privée, chiffrée de bout en bout")
         let input = app.textFields["story.reply.input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("Bonjour")
         app.buttons["story.reply.send"].tap()
 
-        let consent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
-        XCTAssertTrue(consent.waitForExistence(timeout: 5))
-        XCTAssertTrue(consent.buttons["Envoyer sans chiffrement de bout en bout"].exists)
-        consent.buttons["Annuler"].tap()
-        XCTAssertEqual(input.value as? String, "Bonjour")
-        XCTAssertFalse(app.staticTexts["Envoyé"].exists)
-
-        app.buttons["story.reply.send"].tap()
-        let retryConsent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
-        XCTAssertTrue(retryConsent.waitForExistence(timeout: 5))
-        retryConsent.buttons["Envoyer sans chiffrement de bout en bout"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["story.reply.error"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.alerts.firstMatch.exists, "Aucun dialogue de canal non chiffré")
         XCTAssertEqual(input.value as? String, "Bonjour")
         XCTAssertFalse(app.staticTexts["Envoyé"].exists)
     }
 
-    func testEnglishStoryReplyKeepsDraftWhenChannelConsentIsCancelled() {
+    func testEnglishStoryReplyIsEncryptedAndKeepsDraftOnFailure() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
         defer { app.terminate() }
@@ -523,17 +516,15 @@ final class SignalQuestUITests: XCTestCase {
 
         let channel = app.staticTexts["story.reply.channel"]
         XCTAssertTrue(channel.waitForExistence(timeout: 5))
-        XCTAssertEqual(channel.label, "Private reply without end-to-end encryption")
+        XCTAssertEqual(channel.label, "Private reply, end-to-end encrypted")
         let input = app.textFields["story.reply.input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("Hello")
         app.buttons["story.reply.send"].tap()
 
-        let consent = app.alerts["Private reply without end-to-end encryption"]
-        XCTAssertTrue(consent.waitForExistence(timeout: 5))
-        XCTAssertTrue(consent.buttons["Send without end-to-end encryption"].exists)
-        consent.buttons["Cancel"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["story.reply.error"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.alerts.firstMatch.exists)
         XCTAssertEqual(input.value as? String, "Hello")
         XCTAssertFalse(app.staticTexts["Sent"].exists)
     }

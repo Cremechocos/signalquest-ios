@@ -1242,31 +1242,73 @@ struct FeedView: View {
         }
     }
 
-    /// Répondre / réagir à une story = message privé à l'auteur (façon Instagram).
-    /// Il n'existe pas d'endpoint de réaction de story : on résout/crée la
-    /// conversation directe puis on envoie le texte (ou l'emoji). Le viewer
-    /// annonce et fait confirmer le canal non E2EE avant cet appel.
-    /// Le viewer ne confirme qu'après le reçu du serveur de messagerie.
+    /// Répondre / réagir à une story = message privé à l'auteur (façon Instagram),
+    /// chiffré de bout en bout dans le tête-à-tête avec lui, créé s'il n'existe pas.
+    /// Depuis la bascule du 08/11, le serveur ne crée plus de conversation en
+    /// clair et refuse d'y écrire (E2EE-AUTO §7.2) : un ancien tête-à-tête en
+    /// clair ou v1 passe d'abord au chiffrement automatique, sans qu'aucun texte
+    /// en clair ne parte. Le même identifiant de requête à chaque réessai : le
+    /// serveur ne garde qu'un message. Le viewer ne confirme qu'après le reçu.
     private func sendStoryReply(_ story: SocialStory, text: String, requestID: String) async throws {
         guard !AppEnvironment.usesDemoData else { throw StoryReplyDeliveryError.unavailable }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw StoryReplyDeliveryError.unavailable }
-        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let currentUserID = LocalAccountScope.currentUserId else {
             throw CancellationError()
         }
-        let created = try await services.messages.createConversation(
-            participantIds: [story.author.id], title: nil, e2ee: false
-        )
+        let messaging = services.e2eeV2Messaging
+        guard story.author.id != currentUserID, messaging.writesEnabled, !messaging.lacksV2Readiness(session) else {
+            throw StoryReplyDeliveryError.unavailable
+        }
+        let conversationId = try await storyReplyConversationId(authorID: story.author.id, currentUserID: currentUserID)
         guard session.isCurrent else { throw CancellationError() }
-        let conversation = try await services.messages.conversation(id: created.conversationId)
+        var conversation = try await services.messages.conversation(id: conversationId)
         guard session.isCurrent else { throw CancellationError() }
-        guard let currentUserID = LocalAccountScope.currentUserId,
-              StoryReplyChannelPolicy.accepts(conversation, authorID: story.author.id, currentUserID: currentUserID) else {
+        guard StoryReplyChannelPolicy.accepts(conversation, authorID: story.author.id, currentUserID: currentUserID) else {
             throw StoryReplyDeliveryError.conversationUnavailable
         }
-        _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil,
-            idempotencyKey: requestID, ttlSeconds: 0)
+        if !EncryptedConversationSurfaces.isV2(conversation) {
+            guard await messaging.migrateIfReady(conversation, trigger: .firstSend) == .v2 else {
+                throw StoryReplyDeliveryError.conversationUnavailable
+            }
+            conversation = try await services.messages.conversation(id: conversationId)
+            guard session.isCurrent else { throw CancellationError() }
+        }
+        // Une conversation éphémère garde sa durée.
+        let policy = await ConversationSecretPolicyCache.resolved(conversationId: conversationId, service: services.messages)
+        let result = await services.sendV2TextOutsideThread(
+            trimmed, to: conversation, ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0, clientRequestId: requestID
+        )
         guard session.isCurrent else { throw CancellationError() }
+        if EncryptedConversationSurfaces.v2SendFailureMessage(result) != nil {
+            throw StoryReplyDeliveryError.notSent
+        }
+    }
+
+    /// Le tête-à-tête avec l'auteur : celui qui existe, sinon un nouveau, chiffré.
+    private func storyReplyConversationId(authorID: String, currentUserID: String) async throws -> String {
+        let conversations = try await services.messages.conversations()
+        if let existing = conversations.first(where: {
+            !$0.isGroup && ($0.directPeerUserId == authorID
+                || Set($0.participants.map(\.userId)) == Set([authorID, currentUserID]))
+        }) {
+            return existing.id
+        }
+        switch await services.e2eeV2Messaging.create(
+            participantIds: [authorID], isGroup: false, title: nil, excludesWeb: false
+        ) {
+        case .created(let conversationId, _):
+            return conversationId
+        case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
+            // Créé entre-temps ailleurs.
+            guard case .string(let existing)? = failure.details?["conversationId"] else {
+                throw StoryReplyDeliveryError.conversationUnavailable
+            }
+            return existing
+        case .failure:
+            throw StoryReplyDeliveryError.conversationUnavailable
+        }
     }
 
     // MARK: Header custom — titre, actions rondes, menu secondaire

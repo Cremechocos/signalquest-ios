@@ -1,38 +1,6 @@
 import AVFoundation
 import SwiftUI
 
-struct PendingUnencryptedStoryReply: Equatable {
-    let storyID: String
-    let text: String
-    let clearDraftOnSuccess: Bool
-}
-
-struct StoryReplyChannelConsent {
-    private var acceptedStoryIDs: Set<String> = []
-    private(set) var pending: PendingUnencryptedStoryReply?
-
-    mutating func request(storyID: String, text: String, clearDraftOnSuccess: Bool) -> Bool {
-        guard pending == nil else { return false }
-        if acceptedStoryIDs.contains(storyID) { return true }
-        pending = PendingUnencryptedStoryReply(
-            storyID: storyID, text: text, clearDraftOnSuccess: clearDraftOnSuccess
-        )
-        return false
-    }
-
-    mutating func confirm(currentStoryID: String?) -> PendingUnencryptedStoryReply? {
-        guard let pending, pending.storyID == currentStoryID else {
-            self.pending = nil
-            return nil
-        }
-        acceptedStoryIDs.insert(pending.storyID)
-        self.pending = nil
-        return pending
-    }
-
-    mutating func cancelPending() { pending = nil }
-}
-
 struct StoryViewer: View {
     let stories: [SocialStory]
     @State private var index: Int = 0
@@ -75,8 +43,6 @@ struct StoryViewer: View {
     @State private var loadingViewers = false
     /// Nombre de vues de ta story, chargé à l'ouverture (« Vu par N »).
     @State private var viewersCount: Int?
-    @State private var showUnencryptedConfirm = false
-    @State private var channelConsent = StoryReplyChannelConsent()
     @State private var reportedStory: SocialStory?
     @State private var showStoryActions = false
     /// Doigt posé sur la story : le minuteur s'arrête, comme partout ailleurs
@@ -141,12 +107,6 @@ struct StoryViewer: View {
                 ReportSheet(target: .story(story.id), service: reports)
             }
         }
-        .alert("Réponse privée sans chiffrement de bout en bout", isPresented: $showUnencryptedConfirm) {
-            Button("Envoyer sans chiffrement de bout en bout") { confirmUnencryptedReply() }
-            Button("Annuler", role: .cancel) { channelConsent.cancelPending() }
-        } message: {
-            Text("Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout.")
-        }
         .background {
             GeometryReader { proxy in
                 Color.clear
@@ -188,8 +148,6 @@ struct StoryViewer: View {
         .onAppear { startStory() }
         .task(id: currentStory?.id) { await loadViewersCount() }
         .onChangeCompat(of: index) { _, _ in
-            channelConsent.cancelPending()
-            showUnencryptedConfirm = false
             replySubmission.clearFeedback()
             startStory()
         }
@@ -450,7 +408,7 @@ struct StoryViewer: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            Text("Réponse privée sans chiffrement de bout en bout")
+            Text("Réponse privée, chiffrée de bout en bout")
                 .font(SQFont.body(11, .regular, relativeTo: .caption2))
                 .foregroundStyle(SQColor.onGlass.opacity(0.72))
                 .multilineTextAlignment(.center)
@@ -526,17 +484,7 @@ struct StoryViewer: View {
     private func submitReply(_ rawText: String, clearDraftOnSuccess: Bool) {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let story = currentStory, !replySubmission.isSending else { return }
-        if !channelConsent.request(storyID: story.id, text: text, clearDraftOnSuccess: clearDraftOnSuccess) {
-            showUnencryptedConfirm = true
-            return
-        }
         performReply(story, text: text, clearDraftOnSuccess: clearDraftOnSuccess)
-    }
-
-    private func confirmUnencryptedReply() {
-        guard let story = currentStory,
-              let pending = channelConsent.confirm(currentStoryID: story.id) else { return }
-        performReply(story, text: pending.text, clearDraftOnSuccess: pending.clearDraftOnSuccess)
     }
 
     private func performReply(_ story: SocialStory, text: String, clearDraftOnSuccess: Bool) {
@@ -573,7 +521,7 @@ struct StoryViewer: View {
     private var contentPaused: Bool {
         replyFocused || replySubmission.isSending
             || replySubmission.failedStoryID == currentStory?.id
-            || showViewers || showUnencryptedConfirm
+            || showViewers
             || isHolding || reportedStory != nil || showStoryActions
     }
 
@@ -866,13 +814,15 @@ private struct StoryViewersSheet: View {
 enum StoryReplyDeliveryError: Error {
     case unavailable
     case conversationUnavailable
+    case notSent
 }
 
+/// La réponse ne part que dans le tête-à-tête avec l'auteur, jamais dans un
+/// groupe ni chez un tiers. Chiffré ou non : un tête-à-tête d'avant la bascule
+/// passe au chiffrement automatique avant l'envoi.
 enum StoryReplyChannelPolicy {
     static func accepts(_ conversation: MessageConversation, authorID: String, currentUserID: String) -> Bool {
-        guard authorID != currentUserID,
-              !conversation.isGroup,
-              conversation.e2eeEnabled == false else { return false }
+        guard authorID != currentUserID, !conversation.isGroup else { return false }
         let participants = Set(conversation.participants.map(\.userId))
         return participants == Set([authorID, currentUserID])
     }

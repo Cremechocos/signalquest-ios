@@ -409,18 +409,19 @@ final class AppServices: ObservableObject {
         await outbox.drainPurges(ownerScopeId: ownerScopeId, client: client)
     }
 
-    /// Texte chiffré v2 écrit hors du fil (réponse depuis une notification, Siri) : gardé dans la
-    /// file durable avant l'envoi, comme depuis le fil (B02). Un échec passager repart avec la
-    /// reprise et revient en bulle « Non envoyé » ; rien ne part jamais en clair.
+    /// Texte chiffré v2 écrit hors du fil (réponse depuis une notification, Siri, réponse à une
+    /// story) : gardé dans la file durable avant l'envoi, comme depuis le fil (B02). Un échec
+    /// passager repart avec la reprise et revient en bulle « Non envoyé » ; rien ne part jamais
+    /// en clair. Un réessai qui garde son `clientRequestId` ne crée pas de second message.
     func sendV2TextOutsideThread(
         _ text: String, to conversation: MessageConversation, ttlSeconds: Int,
-        store: MessageDraftStore = .shared
+        clientRequestId: String = UUID().uuidString, store: MessageDraftStore = .shared
     ) async -> E2EEV2MessageSendResultV2 {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent, e2eeV2Messaging.writesEnabled else {
             return .failure(E2EEV2TransportFailure(kind: .activationBlocked, message: "e2ee-v2-outside-thread-unavailable"))
         }
         let pending = MessageDraftStore.PendingV2Send(
-            clientRequestId: UUID().uuidString, conversationId: conversation.id, isGroup: conversation.isGroup,
+            clientRequestId: clientRequestId, conversationId: conversation.id, isGroup: conversation.isGroup,
             participantIds: conversation.participants.map(\.userId), text: text, replyToRef: nil,
             ttlSeconds: ttlSeconds, createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
         )
