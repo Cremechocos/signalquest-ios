@@ -118,8 +118,6 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         // Hors du chemin v2 (verrous fermés), rien ne s'affiche en clair.
         XCTAssertEqual(EncryptedConversationSurfaces.displayedText(for: thread.messages[0], usesV2: false, decrypted: [:]),
                        String(localized: "🔒 Message chiffré"))
-        XCTAssertTrue(EncryptedConversationSurfaces.canSend(isEncrypted: true, usesV2: true, legacyUnlocked: false))
-        XCTAssertFalse(EncryptedConversationSurfaces.canSend(isEncrypted: true, usesV2: false, legacyUnlocked: false))
         XCTAssertFalse(EncryptedConversationSurfaces.showsLegacyUnlockBanner(isEncrypted: true, v2Resolved: true, isV2: true, legacyUnlocked: false))
         XCTAssertFalse(EncryptedConversationSurfaces.showsLegacyUnlockBanner(isEncrypted: true, v2Resolved: false, isV2: false, legacyUnlocked: false),
                        "Pas de bandeau v1 tant que la nature de la conversation n'est pas établie")

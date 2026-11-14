@@ -301,7 +301,9 @@ extension Error {
     /// 429 (trop tôt, trop de requêtes), et toute erreur réseau ou 5xx.
     /// `409 E2EE_AUTO_REQUIRED` : après la bascule, le serveur refuse un texte en clair
     /// ou v1. La conversation doit passer en auto et le texte repartir en v2 (E2EE-AUTO §7.2).
+    /// Une conversation encore v1 est refusée dès l'appareil, avec le même traitement.
     var isAutoEncryptionRequired: Bool {
+        if (self as? E2EEError) == .autoEncryptionRequired { return true }
         guard let api = self as? APIError, case .http(409, let code, _, _, _) = api else { return false }
         return code == "E2EE_AUTO_REQUIRED"
     }

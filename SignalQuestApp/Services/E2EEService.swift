@@ -16,9 +16,14 @@ enum E2EEError: Error, LocalizedError, Equatable {
     case wrongPassword
     case decryptFailed
     case staleKey
+    /// Écriture dans une conversation encore v1 : refusée sur l'appareil, comme le
+    /// serveur la refuserait (409 E2EE_AUTO_REQUIRED). La conversation passe d'abord en auto.
+    case autoEncryptionRequired
 
     var errorDescription: String? {
         switch self {
+        case .autoEncryptionRequired:
+            return String(localized: "Rien n’a été envoyé : cette conversation passe d’abord au nouveau chiffrement. Envoie un message depuis la conversation, puis réessaie.")
         case .locked:
             return String(localized: "Déverrouille tes messages chiffrés pour continuer.")
         case .unsupported(let value):
@@ -44,17 +49,6 @@ protocol E2EEServicing: Sendable {
     func shareConversationKeyIfNeeded(conversationId: String) async
     func isUnlocked() async -> Bool
     func isConversationUnlocked(conversationId: String) async -> Bool
-    func encryptText(conversationId: String, text: String) async throws -> E2EEPayload
-    func encryptText(
-        conversationId: String,
-        text: String,
-        contentType: EncryptedMessageContentType,
-        operationId: String?
-    ) async throws -> E2EEPayload
-    /// Chiffre avec une AAD explicite (payload v2). Utilisé pour les messages
-    /// planifiés E2EE (le backend exige `aadB64` non vide + un `nonce`). L'AAD est
-    /// renvoyée dans le payload et utilisée telle quelle au déchiffrement.
-    func encryptText(conversationId: String, text: String, aad: Data) async throws -> E2EEPayload
     func decryptText(conversationId: String, message: MessageItem) async throws -> String
     /// Pièce jointe v1 chiffrée par le site (E2EE-AUTO §8) : AES-256-GCM par la clé de
     /// conversation, IV de 12 octets, sans AAD, étiquette en fin. `E2EEError.locked` si
@@ -69,51 +63,10 @@ protocol E2EEServicing: Sendable {
     func eraseLocalVault(ownerScopeId: String) async
 }
 
-enum EncryptedMessageContentType: String, Codable, Sendable {
-    case text
-    case edit
-    case scheduled
-    case threadReply = "thread_reply"
-    case poll
-    case attachmentCaption = "attachment_caption"
-}
-
-/// Métadonnées authentifiées mais non secrètes de l'enveloppe V2. Toute
-/// modification de conversation, type ou appareil fait échouer AES-GCM.
-struct EncryptedMessageEnvelopeV2AAD: Codable, Equatable, Sendable {
-    let schema: String
-    let cryptoVersion: Int
-    let conversationId: String
-    let contentType: EncryptedMessageContentType
-    let senderDeviceId: String
-    let operationId: String?
-
-    init(
-        conversationId: String,
-        contentType: EncryptedMessageContentType,
-        senderDeviceId: String,
-        operationId: String? = nil
-    ) {
-        schema = "signalquest.encrypted-message"
-        cryptoVersion = 2
-        self.conversationId = conversationId
-        self.contentType = contentType
-        self.senderDeviceId = senderDeviceId
-        self.operationId = operationId
-    }
-
-    func encoded() throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(self)
-    }
-}
-
 final class E2EEService: E2EEServicing, @unchecked Sendable {
     private static let legacyLockedKey = "SignalQuest.E2EE.LegacyCacheLocked.v1"
     private let api: APIClient
     private let tokenStore: TokenStore
-    private let senderDeviceId: String
     private let privacyLock: @Sendable () -> Void
     private let stateLock = NSLock()
     private var unlockedPrivateJwk: String?
@@ -125,7 +78,6 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     init(
         api: APIClient,
         tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
-        senderDeviceId: String = InstallationIdentity().deviceID(),
         privacyLock: @escaping @Sendable () -> Void = {
             E2EEV2NotificationContextEvents.revoke()
             E2EEBiometric.clear()
@@ -133,7 +85,6 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     ) {
         self.api = api
         self.tokenStore = tokenStore
-        self.senderDeviceId = senderDeviceId
         self.privacyLock = privacyLock
     }
 
@@ -267,44 +218,6 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
             MessageSyncLog.logger.error("conversationKey \(conversationId, privacy: .public) erreur: \(String(describing: error), privacy: .private)")
             return false
         }
-    }
-
-    func encryptText(conversationId: String, text: String) async throws -> E2EEPayload {
-        try await encryptText(
-            conversationId: conversationId,
-            text: text,
-            contentType: .text,
-            operationId: nil
-        )
-    }
-
-    func encryptText(
-        conversationId: String,
-        text: String,
-        contentType: EncryptedMessageContentType,
-        operationId: String?
-    ) async throws -> E2EEPayload {
-        let aad = try EncryptedMessageEnvelopeV2AAD(
-            conversationId: conversationId,
-            contentType: contentType,
-            senderDeviceId: senderDeviceId,
-            operationId: operationId
-        ).encoded()
-        return try await encryptText(conversationId: conversationId, text: text, aad: aad)
-    }
-
-    func encryptText(conversationId: String, text: String, aad: Data) async throws -> E2EEPayload {
-        let key = try await conversationKey(conversationId: conversationId)
-        let nonce = AES.GCM.Nonce()
-        let sealed = try AES.GCM.seal(Data(text.utf8), using: key, nonce: nonce, authenticating: aad)
-        var ciphertextAndTag = Data(sealed.ciphertext)
-        ciphertextAndTag.append(sealed.tag)
-        return E2EEPayload(
-            v: 2,
-            ivB64: nonce.data.base64EncodedNoPadding(),
-            ciphertextB64: ciphertextAndTag.base64EncodedNoPadding(),
-            aadB64: aad.base64EncodedNoPadding()
-        )
     }
 
     func decryptText(conversationId: String, message: MessageItem) async throws -> String {

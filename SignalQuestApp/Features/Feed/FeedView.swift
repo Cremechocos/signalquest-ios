@@ -1265,7 +1265,7 @@ struct FeedView: View {
             throw StoryReplyDeliveryError.conversationUnavailable
         }
         _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil,
-            e2ee: services.e2ee, idempotencyKey: requestID, ttlSeconds: 0)
+            idempotencyKey: requestID, ttlSeconds: 0)
         guard session.isCurrent else { throw CancellationError() }
     }
 

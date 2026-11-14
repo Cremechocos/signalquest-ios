@@ -430,10 +430,9 @@ struct ConversationDetailView: View {
     /// Réactions en clair hors chiffrement ; chiffrées en v2 quand tous les
     /// appareils les lisent (D.16) ; jamais dans une conversation v1 (SOC-07).
     private var reactionsAllowed: Bool { !isE2EE || (usesV2 && v2ReactionsAvailable) }
-    private var canSend: Bool {
-        !noLongerMember
-            && EncryptedConversationSurfaces.canSend(isEncrypted: isE2EE, usesV2: usesV2, legacyUnlocked: isE2EEUnlocked)
-    }
+    /// Une conversation encore v1 s'écrit aussi sans sa clé : le premier envoi la fait
+    /// passer au nouveau chiffrement (E2EE-AUTO §7.2, §8).
+    private var canSend: Bool { !noLongerMember }
     /// Les médias d'une conversation sont privés même si leur URL ressemble à
     /// une URL CDN ordinaire. La session est capturée avant chaque rendu afin
     /// qu'un résultat tardif ne traverse jamais un changement de compte.
@@ -505,7 +504,7 @@ struct ConversationDetailView: View {
                     Text("Conversation chiffrée")
                         .font(SQType.body(.semibold))
                         .foregroundStyle(SQColor.label)
-                    Text("Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils.")
+                    Text("Déverrouille l’ancien chiffrement pour lire les messages précédents. Tu peux déjà écrire : tes messages partent avec le nouveau chiffrement.")
                         .font(SQType.subhead(.regular))
                         .foregroundStyle(SQColor.labelSecondary)
                         .multilineTextAlignment(.center)
@@ -948,7 +947,6 @@ struct ConversationDetailView: View {
             ScheduleMessageSheet(
                 conversation: conversation,
                 service: service,
-                e2ee: e2ee,
                 initialText: seed.text,
                 subtitle: conversation.isGroup ? sheetSubtitle : String(localized: "À \(conversationTitle)"),
                 usesV2: usesV2
@@ -966,7 +964,7 @@ struct ConversationDetailView: View {
         }
         .sheet(isPresented: $showNewPoll) {
             NewPollView(
-                conversation: conversation, service: service, e2ee: e2ee, subtitle: sheetSubtitle,
+                conversation: conversation, service: service, subtitle: sheetSubtitle,
                 encryptedCreate: usesV2 ? { question, labels, multiSelect, endsAt in
                     await createE2EEPoll(question: question, labels: labels, multiSelect: multiSelect, endsAt: endsAt)
                 } : nil
@@ -1003,7 +1001,6 @@ struct ConversationDetailView: View {
                 sourceIsEncrypted: payload.sourceIsEncrypted,
                 media: payload.media,
                 service: service,
-                e2ee: e2ee,
                 currentUserId: currentUserId,
                 excludedConversationId: conversation.id
             ) {
@@ -2539,11 +2536,14 @@ struct ConversationDetailView: View {
                 messageInfoTarget = message
                 Task { await refreshReceipts() }
             })
-            secondary.append(MessageMenuAction(id: "edit", title: Text("Modifier"), systemImage: "pencil") {
-                replyTarget = nil
-                editTarget = message
-                seedComposer(displayedContent(for: message))
-            })
+            // Un message v1 ne se modifie plus : le serveur refuse toute écriture v1 (E2EE-AUTO §7.2).
+            if !isE2EE || usesV2 {
+                secondary.append(MessageMenuAction(id: "edit", title: Text("Modifier"), systemImage: "pencil") {
+                    replyTarget = nil
+                    editTarget = message
+                    seedComposer(displayedContent(for: message))
+                })
+            }
             destructive.append(MessageMenuAction(id: "delete-all", title: Text("Supprimer pour tous"), systemImage: "trash", destructive: true) {
                 pendingDeletion = PendingMessageDeletion(message: message, forEveryone: true)
             })
@@ -4379,7 +4379,7 @@ struct ConversationDetailView: View {
             isSending = true
             defer { isSending = false }
             do {
-                try await service.editMessage(messageId: editTarget.id, text: text, in: conversation, e2ee: e2ee)
+                try await service.editMessage(messageId: editTarget.id, text: text, in: conversation)
                 decryptedMessages[editTarget.id] = text
                 let edited = editTarget
                 self.editTarget = nil
@@ -4457,7 +4457,6 @@ struct ConversationDetailView: View {
                     pending.text,
                     in: conversation,
                     replyToId: pending.replyToId,
-                    e2ee: e2ee,
                     idempotencyKey: pending.idempotencyKey,
                     ttlSeconds: pending.ttlSeconds
                 )
@@ -4477,11 +4476,11 @@ struct ConversationDetailView: View {
             // prévenu des réponses (TRX-01), une seule fois par appareil.
             Task { await services.notificationPriming.considerPriming(after: .messageSent) }
         } catch {
-            // Après la bascule, une écriture en clair ou v1 est refusée : la
-            // conversation passe en auto, puis le texte repart une fois en v2,
-            // sans la réponse, qui citait un message v1 (E2EE-AUTO §7.2, §8).
-            if case APIError.http(409, "E2EE_AUTO_REQUIRED"?, _, _, _) = error, !pending.text.isEmpty,
-               await adoptAutoEncryption() {
+            // Après la bascule, une écriture en clair ou v1 est refusée, par le
+            // serveur ou dès l'appareil pour une conversation v1 : elle passe en
+            // auto, puis le texte repart une fois en v2, sans la réponse, qui
+            // citait un message v1 (E2EE-AUTO §7.2, §8).
+            if error.isAutoEncryptionRequired, !pending.text.isEmpty, await adoptAutoEncryption() {
                 await service.discardPendingText(clientRequestId: pending.idempotencyKey)
                 pendingSends[localId] = PendingSend(
                     text: pending.text, replyToId: nil, idempotencyKey: pending.idempotencyKey, ttlSeconds: pending.ttlSeconds
@@ -4640,9 +4639,8 @@ struct ConversationDetailView: View {
 
     private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {
         do {
-            guard !isE2EE || usesV2 else {
-                throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
-            }
+            // Conversation encore v1 : elle passe d'abord au nouveau chiffrement (E2EE-AUTO §7.2).
+            guard !isE2EE || usesV2 else { throw E2EEError.autoEncryptionRequired }
             if usesV2 {
                 await sendE2EEPicked([item], caption: rawCaption)
                 return
@@ -4771,7 +4769,9 @@ struct ConversationDetailView: View {
             return
         }
         guard !isE2EE else {
-            showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            // Conversation encore v1 : les pièces restent prêtes pour après le premier message.
+            stagedAttachments = items
+            showActionError(E2EEError.autoEncryptionRequired.userFacingMessage)
             Haptics.error()
             return
         }
@@ -4796,7 +4796,7 @@ struct ConversationDetailView: View {
         let isImage = type?.conforms(to: .image) == true
         guard !isE2EE || usesV2 else {
             if isImage {
-                showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+                showActionError(E2EEError.autoEncryptionRequired.userFacingMessage)
             } else {
                 showFilesUnavailable()
             }
@@ -4915,7 +4915,7 @@ struct ConversationDetailView: View {
     /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
     private func sendCapturedPhoto(_ data: Data, caption: String) async {
         guard !isE2EE || usesV2 else {
-            showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            showActionError(E2EEError.autoEncryptionRequired.userFacingMessage)
             Haptics.error()
             return
         }
@@ -5181,7 +5181,6 @@ struct ConversationDetailView: View {
                 height: attachment.height,
                 in: conversation,
                 replyToId: attachment.replyToId,
-                e2ee: e2ee,
                 ttlSeconds: attachment.ttlSeconds
             )
             var next = messages.filter { $0.id != localId }
@@ -6989,14 +6988,14 @@ private struct EmojiReactionSheet: View {
 /// Transfert d'un texte vers une autre conversation. Une cible chiffrée est toujours permise (l'envoi
 /// y chiffre) ; depuis une conversation chiffrée, seules les cibles chiffrées sont proposées, car un
 /// texte déchiffré ne part jamais en clair. Chaque cible reçoit le texte par son propre chemin d'envoi :
-/// ordinaire, chiffré v1 ou messagerie v2. Rien ne passe par le presse-papiers.
+/// ordinaire, ou messagerie v2, après la genèse auto pour une cible en clair ou v1 que le serveur refuse.
+/// Rien ne passe par le presse-papiers.
 private struct ForwardMessageSheet: View {
     let text: String
     let sourceIsEncrypted: Bool
     /// Pièces chiffrées : seules les conversations v2 peuvent citer leurs blobs.
     let media: E2EEAutoContentR17.Body?
     let service: MessagesServicing
-    let e2ee: E2EEServicing?
     let currentUserId: String?
     let excludedConversationId: String
     let onSent: () -> Void
@@ -7124,16 +7123,22 @@ private struct ForwardMessageSheet: View {
         sendError = nil
         do {
             switch routes[target.id] ?? .plain {
-            case .plain:
-                _ = try await service.sendText(
-                    text, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: 0
-                )
-            case .legacyEncrypted:
-                // Le service chiffre avec la clé v1 ; verrouillée, il refuse et rien ne part en clair.
-                _ = try await service.sendText(
-                    text, in: target, replyToId: nil, e2ee: e2ee ?? services.e2ee,
-                    idempotencyKey: UUID().uuidString, ttlSeconds: 0
-                )
+            case .plain, .legacyEncrypted:
+                // Après la bascule, une cible en clair ou v1 refuse le texte (409, ou dès l'appareil
+                // pour une v1) : elle passe en auto, puis le texte part une fois en v2 (E2EE-AUTO §7.2, §8).
+                let clientRequestId = UUID().uuidString
+                do {
+                    _ = try await service.sendText(
+                        text, in: target, replyToId: nil, idempotencyKey: clientRequestId, ttlSeconds: 0
+                    )
+                } catch where error.isAutoEncryptionRequired {
+                    guard let result = await services.resendAfterAutoEncryption(
+                        text, conversationId: target.id, ttlSeconds: 0, clientRequestId: clientRequestId
+                    ) else { throw E2EEError.autoEncryptionRequired }
+                    if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result) {
+                        throw ForwardFailure(message: failure)
+                    }
+                }
             case .v2:
                 let result = await services.e2eeV2Messaging.send(
                     .init(body: media.map { .r17($0) } ?? .text(text), replyToRef: nil, mentions: [], ttlSeconds: 0),

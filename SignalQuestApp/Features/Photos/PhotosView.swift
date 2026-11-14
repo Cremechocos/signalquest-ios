@@ -255,8 +255,7 @@ final class PhotosViewModel: ObservableObject {
         _ photo: Photo,
         to conversation: MessageConversation,
         messagesService: MessagesServicing,
-        feedService: SocialFeedServicing,
-        e2ee: E2EEServicing?
+        feedService: SocialFeedServicing
     ) async -> Bool {
         do {
             if AppEnvironment.usesDemoData {
@@ -279,7 +278,6 @@ final class PhotosViewModel: ObservableObject {
                     caption: photo.displayCaption,
                     in: conversation,
                     replyToId: nil,
-                    e2ee: e2ee,
                     ttlSeconds: 0
                 )
             }
@@ -450,8 +448,7 @@ struct PhotosView: View {
                             model.selectedPhoto ?? selected,
                             to: conversation,
                             messagesService: services.messages,
-                            feedService: services.feed,
-                            e2ee: services.e2ee
+                            feedService: services.feed
                         )
                     },
                     onChangeOperator: { photo, networkOperator in

@@ -1,6 +1,62 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Rien n’a été envoyé : cette conversation passe d’abord au nouveau chiffrement. Envoie un message depuis la conversation, puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was sent: this conversation first needs to move to the new encryption. Send a message from the conversation, then try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été envoyé : cette conversation passe d’abord au nouveau chiffrement. Envoie un message depuis la conversation, puis réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Rien n’a été envoyé : cette conversation passe d’abord au nouveau chiffrement. Envoie un message depuis la conversation, puis réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été envoyé : cette conversation passe d’abord au nouveau chiffrement. Envoyez un message depuis la conversation, puis réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Déverrouille l’ancien chiffrement pour lire les messages précédents. Tu peux déjà écrire : tes messages partent avec le nouveau chiffrement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock the old encryption to read earlier messages. You can already write: your messages are sent with the new encryption."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouille l’ancien chiffrement pour lire les messages précédents. Tu peux déjà écrire : tes messages partent avec le nouveau chiffrement."
+          }
+        }
+      }
+    },
+    "SQFormal|Déverrouille l’ancien chiffrement pour lire les messages précédents. Tu peux déjà écrire : tes messages partent avec le nouveau chiffrement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouillez l’ancien chiffrement pour lire les messages précédents. Vous pouvez déjà écrire : vos messages partent avec le nouveau chiffrement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Ton compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés." : {
       "localizations" : {
         "en" : {

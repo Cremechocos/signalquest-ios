@@ -33,12 +33,6 @@ enum EncryptedConversationSurfaces {
         return message.content ?? ""
     }
 
-    /// En v2, le fil est lu et écrit par la messagerie v2 : le mot de passe ne
-    /// déverrouille que le v1 (§12).
-    static func canSend(isEncrypted: Bool, usesV2: Bool, legacyUnlocked: Bool) -> Bool {
-        !isEncrypted || usesV2 || legacyUnlocked
-    }
-
     /// Bandeau « déverrouille pour lire » : v1 seulement, et jamais avant de
     /// savoir si la conversation est v2.
     static func showsLegacyUnlockBanner(isEncrypted: Bool, v2Resolved: Bool, isV2: Bool, legacyUnlocked: Bool) -> Bool {
@@ -73,9 +67,9 @@ enum EncryptedConversationSurfaces {
 
     /// Par où le texte transféré part, selon la cible. Jamais par le presse-papiers.
     enum ForwardRoute: Equatable {
-        /// Conversation non chiffrée : l'envoi de texte ordinaire.
+        /// Conversation non chiffrée : l'envoi de texte ordinaire, puis la genèse auto si le serveur le refuse.
         case plain
-        /// Chiffrée v1 : `sendText` avec le service E2EE (déverrouillé).
+        /// Chiffrée v1 : refusée dès l'appareil, elle passe en auto et le texte part en v2 (E2EE-AUTO §7.2).
         case legacyEncrypted
         /// Chiffrée v2 : la messagerie v2.
         case v2

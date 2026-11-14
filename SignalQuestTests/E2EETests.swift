@@ -5,31 +5,19 @@ import XCTest
 @testable import SignalQuest
 
 final class E2EETests: XCTestCase {
-    func testLegacyE2EEWritePolicyAllowsOnlyTextUntilV2RuntimeIsVerified() {
+    /// Depuis la bascule, rien ne s'écrit plus en v1 (E2EE-AUTO §7.2) : texte compris,
+    /// refusé sur l'appareil avec l'erreur que le fil traite comme le 409 du serveur.
+    func testLegacyE2EEWritePolicyRefusesEveryV1Write() {
         for feature in LegacyE2EEWriteFeature.allCases {
-            XCTAssertEqual(
-                LegacyE2EEWritePolicy.isAllowed(e2eeEnabled: true, feature: feature),
-                feature == .text,
-                "Le runtime E2EE hérité ne doit accepter que le texte chiffré"
-            )
+            XCTAssertFalse(LegacyE2EEWritePolicy.isAllowed(e2eeEnabled: true, feature: feature))
             XCTAssertTrue(
                 LegacyE2EEWritePolicy.isAllowed(e2eeEnabled: false, feature: feature),
                 "Une conversation non E2EE conserve ses fonctions existantes"
             )
-        }
-    }
-
-    func testLegacyE2EEWritePolicyFailsClosedWithExplicitReason() {
-        XCTAssertThrowsError(
-            try LegacyE2EEWritePolicy.requireAllowed(
-                e2eeEnabled: true,
-                feature: .location
-            )
-        ) { error in
-            XCTAssertEqual(
-                error as? E2EEError,
-                .unsupported(LegacyE2EEWritePolicy.v2RequiredMessage)
-            )
+            XCTAssertThrowsError(try LegacyE2EEWritePolicy.requireAllowed(e2eeEnabled: true, feature: feature)) { error in
+                XCTAssertEqual(error as? E2EEError, .autoEncryptionRequired)
+                XCTAssertTrue(error.isAutoEncryptionRequired, "Le fil passe en auto puis renvoie en v2")
+            }
         }
     }
 
@@ -1296,26 +1284,6 @@ final class E2EETests: XCTestCase {
         XCTAssertEqual(try keychain.string(for: key), "corrupt")
     }
 
-    func testV2AADBindsConversationContentTypeAndDevice() throws {
-        let context = EncryptedMessageEnvelopeV2AAD(
-            conversationId: "conversation-42",
-            contentType: .poll,
-            senderDeviceId: "device-ios-1",
-            operationId: "poll-create-1"
-        )
-        let decoded = try JSONDecoder().decode(
-            EncryptedMessageEnvelopeV2AAD.self,
-            from: context.encoded()
-        )
-
-        XCTAssertEqual(decoded.cryptoVersion, 2)
-        XCTAssertEqual(decoded.schema, "signalquest.encrypted-message")
-        XCTAssertEqual(decoded.conversationId, "conversation-42")
-        XCTAssertEqual(decoded.contentType, .poll)
-        XCTAssertEqual(decoded.senderDeviceId, "device-ios-1")
-        XCTAssertEqual(decoded.operationId, "poll-create-1")
-    }
-
     func testAESGCMV1RoundtripPayloadShape() throws {
         let key = SymmetricKey(size: .bits256)
         let nonce = AES.GCM.Nonce()
@@ -1432,7 +1400,9 @@ final class E2EETests: XCTestCase {
         XCTAssertNil(try store.string(for: "privateJwk:current"))
     }
 
-    func testE2EECleartextSendBlockedWithoutKey() async {
+    /// Une conversation encore v1 ne reçoit jamais de texte en clair ni chiffré en v1 :
+    /// refus sur l'appareil, avant toute requête, que le fil traite comme le 409 du serveur.
+    func testV1ConversationTextIsRefusedOnTheDevice() async {
         let conversation = MessageConversation(
             id: "c1",
             title: "Secure",
@@ -1448,13 +1418,21 @@ final class E2EETests: XCTestCase {
             lastMessage: nil
         )
         let service = MessagesService(api: APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore())))
-        do {
-            _ = try await service.sendText("hello", in: conversation, e2ee: nil)
-            XCTFail("Expected locked E2EE error")
-        } catch let error as E2EEError {
-            XCTAssertEqual(error, .locked)
-        } catch {
-            XCTFail("Unexpected error \(error)")
+        let writes: [(String, () async throws -> Void)] = [
+            ("texte", { _ = try await service.sendText("hello", in: conversation) }),
+            ("modification", { try await service.editMessage(messageId: "m1", text: "hello", in: conversation) }),
+            ("fil", { _ = try await service.sendThreadReply(parentMessageId: "m1", text: "hello", in: conversation) }),
+            ("planifié", { _ = try await service.createScheduledMessage(sendAt: Date().addingTimeInterval(3_600), text: "hello", in: conversation) }),
+        ]
+        for (name, write) in writes {
+            do {
+                try await write()
+                XCTFail("\(name) : refus attendu")
+            } catch let error as E2EEError {
+                XCTAssertEqual(error, .autoEncryptionRequired, name)
+            } catch {
+                XCTFail("\(name) : erreur inattendue \(error)")
+            }
         }
     }
 
@@ -3933,7 +3911,6 @@ final class MessageTextOutboxTests: XCTestCase {
                 "durable",
                 in: conversation,
                 replyToId: "parent-service",
-                e2ee: nil,
                 idempotencyKey: requestId,
                 ttlSeconds: 120
             )
@@ -3997,7 +3974,7 @@ final class MessageTextOutboxTests: XCTestCase {
         }
         for id in ["conversation-removed", "conversation-kept"] {
             do {
-                _ = try await service.sendText(id, in: conversation(id), e2ee: nil,
+                _ = try await service.sendText(id, in: conversation(id),
                                                idempotencyKey: "local-\(id)-0123456789abcdef")
                 XCTFail("Hors ligne, l'envoi doit rester en file")
             } catch {}
@@ -4080,7 +4057,7 @@ final class MessageTextOutboxTests: XCTestCase {
             return (response, Data(#"{"error":"Conversation chiffrée","code":"E2EE_AUTO_REQUIRED"}"#.utf8))
         }
         do {
-            _ = try await service.sendText("bonjour", in: conversation, e2ee: nil,
+            _ = try await service.sendText("bonjour", in: conversation,
                                            idempotencyKey: "local-auto-0123456789abcdef")
             XCTFail("Hors ligne, l'envoi doit rester en file")
         } catch {}
@@ -4112,7 +4089,7 @@ final class MessageTextOutboxTests: XCTestCase {
             return (response, Data(#"{"error":"Ta demande de message n'a pas encore été acceptée.","code":"MESSAGE_REQUEST_PENDING"}"#.utf8))
         }
         do {
-            _ = try await fixture.service.sendText("Salut", in: plainConversation("conversation-pending"), e2ee: nil,
+            _ = try await fixture.service.sendText("Salut", in: plainConversation("conversation-pending"),
                                                    idempotencyKey: "local-conversation-pending-0123456789abcdef")
             XCTFail("Un 403 n'est pas un envoi")
         } catch {
@@ -4141,7 +4118,7 @@ final class MessageTextOutboxTests: XCTestCase {
             let json = #"{"message":{"id":"server-first","conversationId":"conversation-first","senderId":"message-request-receipt-user","kind":"TEXT","content":"Salut","attachments":[],"reactions":[]},"request":{"role":"sender","status":"pending","remaining":0}}"#
             return (response, Data(json.utf8))
         }
-        let sent = try await fixture.service.sendText("Salut", in: plainConversation("conversation-first"), e2ee: nil,
+        let sent = try await fixture.service.sendText("Salut", in: plainConversation("conversation-first"),
                                                       idempotencyKey: "local-conversation-first-0123456789abcdef")
         XCTAssertEqual(sent.id, "server-first")
         XCTAssertEqual(MessageRequestEvents.recentRequest(conversationId: "conversation-first"), MessageRequest.senderSent)
@@ -4564,7 +4541,6 @@ final class MessageAttachmentOutboxTests: XCTestCase {
                 height: 8,
                 in: conversation,
                 replyToId: "parent-attachment",
-                e2ee: nil,
                 ttlSeconds: 86_400
             )
             XCTFail("Le premier upload synthetique doit echouer")

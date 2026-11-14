@@ -226,9 +226,21 @@ struct SendMessageIntent: AppIntent {
                 throw SendMessageIntentError.notSent(failure)
             }
         } else {
-            _ = try await service.sendText(
-                trimmed, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: ttlSeconds
-            )
+            let clientRequestId = UUID().uuidString
+            do {
+                _ = try await service.sendText(
+                    trimmed, in: target, replyToId: nil, idempotencyKey: clientRequestId, ttlSeconds: ttlSeconds
+                )
+            } catch where error.isAutoEncryptionRequired {
+                // Après la bascule, le serveur refuse le texte en clair : la conversation passe
+                // en auto, puis le message part une fois en v2 (E2EE-AUTO §7.2, §8).
+                guard let result = await AppServicesHolder.services.resendAfterAutoEncryption(
+                    trimmed, conversationId: target.id, ttlSeconds: ttlSeconds, clientRequestId: clientRequestId
+                ) else { throw SendMessageIntentError.notSent(E2EEError.autoEncryptionRequired.userFacingMessage) }
+                if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result) {
+                    throw SendMessageIntentError.notSent(failure)
+                }
+            }
         }
         return .result(dialog: IntentDialog(stringLiteral: String(localized: "Message envoyé à \(conversation.name).")))
     }

@@ -1,12 +1,11 @@
 import SwiftUI
 
 /// Création d'un sondage : question + 2..N options + choix multiple + échéance
-/// optionnelle. Pour une conversation chiffrée, le contenu part chiffré (géré par
-/// MessagesService.createPoll).
+/// optionnelle. Pour une conversation chiffrée automatiquement, le contenu part
+/// chiffré par `encryptedCreate`.
 struct NewPollView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
-    let e2ee: E2EEServicing?
     /// « Dans Équipe terrain » sous le titre.
     var subtitle: String? = nil
     /// Conversation chiffrée v2 (E2EE-AUTO §7.7) : le sondage part chiffré par ce
@@ -179,8 +178,7 @@ struct NewPollView: View {
                 options: trimmedOptions,
                 multiSelect: multiSelect,
                 endsAt: hasDeadline ? deadline : nil,
-                in: conversation,
-                e2ee: e2ee
+                in: conversation
             )
             Haptics.success()
             if let message = response.message {

@@ -1038,7 +1038,7 @@ extension PushNotificationService {
             let ttlSeconds = policy?.backgroundSendTTLSeconds ?? 0
             do {
                 _ = try await messages.sendText(
-                    text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: clientRequestId,
+                    text, in: conversation, replyToId: nil, idempotencyKey: clientRequestId,
                     ttlSeconds: ttlSeconds
                 )
             } catch where error.isAutoEncryptionRequired {

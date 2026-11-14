@@ -248,7 +248,7 @@ struct ThreadView: View {
         sendError = nil
         defer { isSending = false }
         do {
-            let sent = try await service.sendThreadReply(parentMessageId: parentMessage.id, text: text, in: conversation, e2ee: e2ee)
+            let sent = try await service.sendThreadReply(parentMessageId: parentMessage.id, text: text, in: conversation)
             if sent.isEncrypted { decrypted[sent.id] = text }
             replies.append(sent)
             sentHere.insert(sent.id)

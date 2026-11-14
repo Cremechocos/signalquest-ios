@@ -40,7 +40,7 @@ protocol MessagesServicing: Sendable {
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
     /// Les textes refusés parce que la conversation doit passer en auto, gardés « non envoyés ».
     @discardableResult
     func retryPendingTextMessages() async -> [MessageTextOutboxRecord]
@@ -85,7 +85,6 @@ protocol MessagesServicing: Sendable {
         caption: String,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?,
         ttlSeconds: Int
     ) async throws -> MessageItem
     func sendAttachmentData(
@@ -98,7 +97,6 @@ protocol MessagesServicing: Sendable {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?,
         ttlSeconds: Int
     ) async throws -> MessageItem
     func retryPendingAttachments() async
@@ -125,7 +123,7 @@ protocol MessagesServicing: Sendable {
     func setConversationMuted(_ muted: Bool, mentionsMuted: Bool?, conversationId: String) async throws -> (muted: Bool, mentionsMuted: Bool)
     func react(messageId: String, emoji: String, in conversation: MessageConversation) async throws
     func removeReaction(messageId: String, emoji: String, in conversation: MessageConversation) async throws
-    func editMessage(messageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws
+    func editMessage(messageId: String, text: String, in conversation: MessageConversation) async throws
     func deleteMessage(messageId: String, forEveryone: Bool) async throws
     func setTyping(conversationId: String) async
     func setConversationActive(conversationId: String, active: Bool) async
@@ -142,7 +140,7 @@ protocol MessagesServicing: Sendable {
     /// Amis mentionnables dont le nom ou le pseudo commence par `prefix`.
     func mentionSuggestions(prefix: String) async throws -> [MentionCandidate]
     func scheduledMessages(conversationId: String) async throws -> [ScheduledMessage]
-    func createScheduledMessage(sendAt: Date, text: String, in conversation: MessageConversation, replyToId: String?, senderId: String?, e2ee: E2EEServicing?) async throws -> ScheduledMessage
+    func createScheduledMessage(sendAt: Date, text: String, in conversation: MessageConversation, replyToId: String?) async throws -> ScheduledMessage
     func deleteScheduledMessage(conversationId: String, scheduledId: String) async throws
     /// Change l'heure et/ou le texte d'un envoi programmé (`PATCH`). En conversation
     /// chiffrée, le serveur n'accepte que l'heure.
@@ -154,8 +152,8 @@ protocol MessagesServicing: Sendable {
     func createReminder(conversationId: String, messageId: String, reason: String?, remindAt: Date) async throws -> MessageReminder
     func deleteReminder(conversationId: String, reminderId: String) async throws
     func thread(parentMessageId: String, take: Int, cursor: String?) async throws -> ThreadPage
-    func sendThreadReply(parentMessageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws -> MessageItem
-    func createPoll(conversationId: String, question: String, options: [String], multiSelect: Bool, endsAt: Date?, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws -> PollCreateResponse
+    func sendThreadReply(parentMessageId: String, text: String, in conversation: MessageConversation) async throws -> MessageItem
+    func createPoll(conversationId: String, question: String, options: [String], multiSelect: Bool, endsAt: Date?, in conversation: MessageConversation) async throws -> PollCreateResponse
     func votePoll(pollId: String, optionIds: [String], in conversation: MessageConversation) async throws -> MessagePoll
     func closePoll(pollId: String, in conversation: MessageConversation) async throws -> MessagePoll
     func transcription(messageId: String) async throws -> VoiceTranscription?
@@ -215,7 +213,6 @@ extension MessagesServicing {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?,
         ttlSeconds: Int
     ) async throws -> MessageItem {
         let uploaded = try await uploadAttachment(
@@ -238,7 +235,6 @@ extension MessagesServicing {
             caption: caption,
             in: conversation,
             replyToId: replyToId,
-            e2ee: e2ee,
             ttlSeconds: ttlSeconds
         )
     }
@@ -297,15 +293,13 @@ enum LegacyE2EEWriteFeature: CaseIterable, Sendable {
     case reaction
 }
 
+/// Une conversation encore chiffrée en v1 ne reçoit plus rien par les routes
+/// historiques : depuis la bascule, le serveur refuse toute écriture v1
+/// (409 E2EE_AUTO_REQUIRED). Elle passe d'abord en auto (genèse au premier
+/// envoi, E2EE-AUTO §7.2 et §8) ; l'app ne chiffre plus jamais en v1.
 enum LegacyE2EEWritePolicy {
-    /// Dit sans jargon (« E2EE v2 ») et traduit : la chaîne brute s'affichait
-    /// en français dans l'app anglaise (SOC-29).
-    static let v2RequiredMessage = String(
-        localized: "Dans une conversation chiffrée, seul le texte peut être envoyé pour l’instant. Rien n’a été envoyé."
-    )
-
     static func isAllowed(e2eeEnabled: Bool, feature: LegacyE2EEWriteFeature) -> Bool {
-        !e2eeEnabled || feature == .text
+        !e2eeEnabled
     }
 
     static func requireAllowed(
@@ -313,7 +307,7 @@ enum LegacyE2EEWritePolicy {
         feature: LegacyE2EEWriteFeature
     ) throws {
         guard isAllowed(e2eeEnabled: e2eeEnabled, feature: feature) else {
-            throw E2EEError.unsupported(v2RequiredMessage)
+            throw E2EEError.autoEncryptionRequired
         }
     }
 }
@@ -331,6 +325,10 @@ struct UploadedAttachment: Codable, Equatable, Sendable {
 }
 
 final class MessagesService: MessagesServicing {
+    /// Partage en direct chiffré quand la porte d'écriture v2 est fermée (retirée au lot 10.6).
+    private static let v2WritesClosedMessage = String(
+        localized: "Dans une conversation chiffrée, seul le texte peut être envoyé pour l’instant. Rien n’a été envoyé."
+    )
     private let api: APIClient
     private let sse: SSEClient
     private let e2eeV2LiveShare: E2EEV2LiveShareTransportClient
@@ -672,8 +670,8 @@ final class MessagesService: MessagesServicing {
         ).messages
     }
 
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, e2ee: E2EEServicing?, idempotencyKey: String? = nil, ttlSeconds: Int = 0) async throws -> MessageItem {
-        if conversation.e2eeEnabled == true, e2ee == nil { throw E2EEError.locked }
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, idempotencyKey: String? = nil, ttlSeconds: Int = 0) async throws -> MessageItem {
+        try LegacyE2EEWritePolicy.requireAllowed(e2eeEnabled: conversation.e2eeEnabled == true, feature: .text)
         guard let accountSession = LocalAccountScope.sessionSnapshot() else {
             throw CancellationError()
         }
@@ -695,37 +693,15 @@ final class MessagesService: MessagesServicing {
         // Messages éphémères : ttlSeconds > 0 → le backend pose expiresAt (le TTL
         // s'applique aussi en E2EE, c'est une métadonnée, pas le contenu).
         let ttl: Int? = ttlSeconds > 0 ? ttlSeconds : nil
-        let payload: SendMessageRequest
-        var shareConversationKey = false
-        if conversation.e2eeEnabled == true {
-            guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(
-                conversationId: conversation.id,
-                text: text,
-                contentType: .text,
-                operationId: clientRequestId
-            )
-            shareConversationKey = true
-            payload = SendMessageRequest(
-                kind: "TEXT",
-                content: nil,
-                e2ee: encrypted,
-                replyToId: replyToId,
-                attachments: nil,
-                ttlSeconds: ttl,
-                clientRequestId: clientRequestId
-            )
-        } else {
-            payload = SendMessageRequest(
-                kind: "TEXT",
-                content: text,
-                e2ee: nil,
-                replyToId: replyToId,
-                attachments: nil,
-                ttlSeconds: ttl,
-                clientRequestId: clientRequestId
-            )
-        }
+        let payload = SendMessageRequest(
+            kind: "TEXT",
+            content: text,
+            e2ee: nil,
+            replyToId: replyToId,
+            attachments: nil,
+            ttlSeconds: ttl,
+            clientRequestId: clientRequestId
+        )
         let record = MessageTextOutboxRecord(
             ownerScopeId: accountSession.ownerScopeId,
             sessionId: accountSession.sessionId,
@@ -735,12 +711,6 @@ final class MessagesService: MessagesServicing {
             createdAt: Date()
         )
         try await textOutbox.stage(record, session: accountSession)
-
-        if shareConversationKey, let e2ee {
-            // Best effort APRES la persistance : un kill pendant le partage de cle ne perd plus
-            // l'intention de message ni son ciphertext exact.
-            await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
-        }
         return try await submitPreparedText(record, session: accountSession)
     }
 
@@ -945,7 +915,7 @@ final class MessagesService: MessagesServicing {
         }
         guard E2EEV2RuntimeWriteGate.enabled,
               LocalAccountScope.currentUserId != nil else {
-            throw E2EEError.unsupported(LegacyE2EEWritePolicy.v2RequiredMessage)
+            throw E2EEError.unsupported(Self.v2WritesClosedMessage)
         }
         let ownerScopeId = LocalAccountScope.currentOwnerScopeId
         let body = try JSONEncoder().encode(request)
@@ -982,7 +952,7 @@ final class MessagesService: MessagesServicing {
         if e2eeV2Required {
             guard E2EEV2RuntimeWriteGate.enabled,
                   LocalAccountScope.currentUserId != nil else {
-                throw E2EEError.unsupported(LegacyE2EEWritePolicy.v2RequiredMessage)
+                throw E2EEError.unsupported(Self.v2WritesClosedMessage)
             }
             switch await e2eeV2LiveShare.acceptSessionRuntime(
                 ownerScopeId: LocalAccountScope.currentOwnerScopeId,
@@ -1172,7 +1142,6 @@ final class MessagesService: MessagesServicing {
         caption: String,
         in conversation: MessageConversation,
         replyToId: String? = nil,
-        e2ee: E2EEServicing?,
         ttlSeconds: Int
     ) async throws -> MessageItem {
         // Ne jamais joindre une URL/métadonnée en clair à une conversation E2EE.
@@ -1218,7 +1187,6 @@ final class MessagesService: MessagesServicing {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?,
         ttlSeconds: Int
     ) async throws -> MessageItem {
         try LegacyE2EEWritePolicy.requireAllowed(
@@ -1510,25 +1478,13 @@ final class MessagesService: MessagesServicing {
         )
     }
 
-    func editMessage(messageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws {
+    func editMessage(messageId: String, text: String, in conversation: MessageConversation) async throws {
+        try LegacyE2EEWritePolicy.requireAllowed(e2eeEnabled: conversation.e2eeEnabled == true, feature: .text)
         struct EditRequest: Encodable {
             let action = "edit"
-            let content: String?
-            let e2ee: E2EEPayload?
+            let content: String
         }
-        let body: EditRequest
-        if conversation.e2eeEnabled == true {
-            guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(
-                conversationId: conversation.id,
-                text: text,
-                contentType: .edit,
-                operationId: messageId
-            )
-            body = EditRequest(content: nil, e2ee: encrypted)
-        } else {
-            body = EditRequest(content: text, e2ee: nil)
-        }
+        let body = EditRequest(content: text)
         let _: SuccessResponse = try await api.requestJSON(
             "/api/messages/messages/\(messageId)",
             method: .patch,
@@ -1710,48 +1666,10 @@ final class MessagesService: MessagesServicing {
         sendAt: Date,
         text: String,
         in conversation: MessageConversation,
-        replyToId: String? = nil,
-        senderId: String? = nil,
-        e2ee: E2EEServicing?
+        replyToId: String? = nil
     ) async throws -> ScheduledMessage {
+        try LegacyE2EEWritePolicy.requireAllowed(e2eeEnabled: conversation.e2eeEnabled == true, feature: .text)
         let sendAtISO = Self.iso(sendAt)
-        if conversation.e2eeEnabled == true {
-            // Planifié E2EE : le backend valide à la livraison une AAD = JSON
-            // base64 portant {conversationId, senderId, scheduleId, kind, nonce,
-            // sendAt, replyToId}. On génère donc l'id (scheduleId) côté client et
-            // on chiffre en authentifiant exactement ce JSON.
-            guard let e2ee else { throw E2EEError.locked }
-            guard let senderId else { throw E2EEError.unsupported("Identité requise pour planifier un message chiffré") }
-            let scheduleId = UUID().uuidString
-            let nonce = UUID().uuidString
-            struct ScheduledAAD: Encodable {
-                let conversationId: String
-                let senderId: String
-                let scheduleId: String
-                let kind: String
-                let nonce: String
-                let sendAt: String
-                let replyToId: String?
-            }
-            let aadData = try JSONEncoder().encode(ScheduledAAD(
-                conversationId: conversation.id, senderId: senderId, scheduleId: scheduleId,
-                kind: "TEXT", nonce: nonce, sendAt: sendAtISO, replyToId: replyToId
-            ))
-            let encrypted = try await e2ee.encryptText(conversationId: conversation.id, text: text, aad: aadData)
-            struct E2EEScheduledRequest: Encodable {
-                let id: String
-                let sendAt: String
-                let kind = "TEXT"
-                let replyToId: String?
-                let nonce: String
-                let e2ee: E2EEPayload
-            }
-            let response: ScheduledMessageResponse = try await api.requestJSON(
-                "/api/messages/conversations/\(conversation.id)/scheduled",
-                body: E2EEScheduledRequest(id: scheduleId, sendAt: sendAtISO, replyToId: replyToId, nonce: nonce, e2ee: encrypted)
-            )
-            return response.scheduledMessage
-        }
         struct ScheduledRequest: Encodable {
             let sendAt: String
             let kind = "TEXT"
@@ -1851,25 +1769,13 @@ final class MessagesService: MessagesServicing {
         )
     }
 
-    func sendThreadReply(parentMessageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws -> MessageItem {
+    func sendThreadReply(parentMessageId: String, text: String, in conversation: MessageConversation) async throws -> MessageItem {
+        try LegacyE2EEWritePolicy.requireAllowed(e2eeEnabled: conversation.e2eeEnabled == true, feature: .text)
         struct ThreadReplyRequest: Encodable {
             let kind = "TEXT"
-            let content: String?
-            let e2ee: E2EEPayload?
+            let content: String
         }
-        let body: ThreadReplyRequest
-        if conversation.e2eeEnabled == true {
-            guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(
-                conversationId: conversation.id,
-                text: text,
-                contentType: .threadReply,
-                operationId: parentMessageId
-            )
-            body = ThreadReplyRequest(content: nil, e2ee: encrypted)
-        } else {
-            body = ThreadReplyRequest(content: text, e2ee: nil)
-        }
+        let body = ThreadReplyRequest(content: text)
         let response: CreatedMessageResponse = try await api.requestJSON(
             "/api/messages/messages/\(parentMessageId)/thread-replies",
             body: body
@@ -1883,8 +1789,7 @@ final class MessagesService: MessagesServicing {
         options: [String],
         multiSelect: Bool,
         endsAt: Date?,
-        in conversation: MessageConversation,
-        e2ee: E2EEServicing?
+        in conversation: MessageConversation
     ) async throws -> PollCreateResponse {
         try LegacyE2EEWritePolicy.requireAllowed(
             e2eeEnabled: conversation.e2eeEnabled == true,
@@ -1894,61 +1799,16 @@ final class MessagesService: MessagesServicing {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         let endsAtISO = endsAt.map(Self.iso)
-
-        if conversation.e2eeEnabled == true {
-            // Cas E2EE : on n'envoie que les identifiants d'options en clair
-            // (opt_1, opt_2, …) ; la question et les textes d'options voyagent
-            // chiffrés dans `e2ee` sous forme d'un JSON `poll_v1`, déchiffré
-            // ensuite côté client (même format que le web).
-            guard let e2ee else { throw E2EEError.locked }
-            let optionIds = cleanOptions.indices.map { "opt_\($0 + 1)" }
-            let encoded = PollEncryptedPayload(
-                type: "poll_v1",
-                question: question,
-                options: zip(optionIds, cleanOptions).map { PollEncryptedPayload.Option(id: $0.0, text: $0.1) },
-                multiSelect: multiSelect
-            )
-            let json = String(decoding: try JSONEncoder.signalQuest.encode(encoded), as: UTF8.self)
-            let encrypted = try await e2ee.encryptText(
-                conversationId: conversationId,
-                text: json,
-                contentType: .poll,
-                operationId: nil
-            )
-            struct E2EEPollRequest: Encodable {
-                let optionIds: [String]
-                let multiSelect: Bool
-                let content: String
-                let endsAt: String?
-                let e2ee: E2EEPayload
-            }
-            let response: PollCreateResponse = try await api.requestJSON(
-                "/api/messages/conversations/\(conversationId)/polls",
-                body: E2EEPollRequest(
-                    optionIds: optionIds,
-                    multiSelect: multiSelect,
-                    content: "📊 Sondage",
-                    endsAt: endsAtISO,
-                    e2ee: encrypted
-                )
-            )
-            // Le serveur ne stocke que les identifiants d'options (E2EE) : on
-            // réinjecte localement la question + les textes connus pour un
-            // affichage immédiat et correct du sondage créé.
-            return PollCreateResponse(poll: response.poll.mergingDecryptedTexts(json), message: response.message)
-        } else {
-            struct PollRequest: Encodable {
-                let question: String
-                let options: [String]
-                let multiSelect: Bool
-                let endsAt: String?
-            }
-            let response: PollCreateResponse = try await api.requestJSON(
-                "/api/messages/conversations/\(conversationId)/polls",
-                body: PollRequest(question: question, options: cleanOptions, multiSelect: multiSelect, endsAt: endsAtISO)
-            )
-            return response
+        struct PollRequest: Encodable {
+            let question: String
+            let options: [String]
+            let multiSelect: Bool
+            let endsAt: String?
         }
+        return try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/polls",
+            body: PollRequest(question: question, options: cleanOptions, multiSelect: multiSelect, endsAt: endsAtISO)
+        )
     }
 
     func votePoll(pollId: String, optionIds: [String], in conversation: MessageConversation) async throws -> MessagePoll {
@@ -2033,20 +1893,6 @@ final class MessagesService: MessagesServicing {
                 moderationWrappedKeyB64: moderationWrappedKeyB64
             )
         )
-    }
-}
-
-/// Payload chiffré d'un sondage E2EE (question + textes d'options), sérialisé en
-/// JSON puis chiffré via `encryptText`. Décodé côté client après déchiffrement.
-private struct PollEncryptedPayload: Encodable {
-    let type: String
-    let question: String
-    let options: [Option]
-    let multiSelect: Bool
-
-    struct Option: Encodable {
-        let id: String
-        let text: String
     }
 }
 

@@ -1,13 +1,11 @@
 import SwiftUI
 
 /// Feuille de programmation d'un envoi : saisie du texte (pré-rempli avec le
-/// brouillon) + date future. Fonctionne aussi en conversation chiffrée : le
-/// texte est chiffré en payload v2 (AAD + nonce) — voir
-/// MessagesService.createScheduledMessage.
+/// brouillon) + date future. En conversation chiffrée automatiquement, le texte
+/// part en enveloppe v3 programmée ; une conversation encore v1 n'en reçoit plus.
 struct ScheduleMessageSheet: View {
     let conversation: MessageConversation
     let service: MessagesServicing
-    let e2ee: E2EEServicing?
     let initialText: String
     /// « À Léa Martin » sous le titre.
     let subtitle: String?
@@ -16,7 +14,6 @@ struct ScheduleMessageSheet: View {
     var usesV2 = false
 
     @EnvironmentObject private var services: AppServices
-    @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var text: String
@@ -27,7 +24,6 @@ struct ScheduleMessageSheet: View {
     init(
         conversation: MessageConversation,
         service: MessagesServicing,
-        e2ee: E2EEServicing?,
         initialText: String,
         subtitle: String? = nil,
         usesV2: Bool = false,
@@ -36,7 +32,6 @@ struct ScheduleMessageSheet: View {
         self.usesV2 = usesV2
         self.conversation = conversation
         self.service = service
-        self.e2ee = e2ee
         self.initialText = initialText
         self.subtitle = subtitle
         self.onScheduled = onScheduled
@@ -101,17 +96,11 @@ struct ScheduleMessageSheet: View {
             return
         }
         do {
-            let senderId: String? = {
-                if case .authenticated(let user) = session.state { return user.id }
-                return nil
-            }()
             _ = try await service.createScheduledMessage(
                 sendAt: sendAt,
                 text: text.trimmingCharacters(in: .whitespacesAndNewlines),
                 in: conversation,
-                replyToId: nil,
-                senderId: senderId,
-                e2ee: e2ee
+                replyToId: nil
             )
             Haptics.success()
             onScheduled()
