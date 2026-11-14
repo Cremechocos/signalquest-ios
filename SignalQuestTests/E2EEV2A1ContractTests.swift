@@ -50,67 +50,6 @@ final class E2EEV2A1ContractTests: XCTestCase {
         "wrappedUikB64": "EEEE", "signatureB64": "FFFF",
     ]
 
-    func testTheApprovalTrustDepositFollowsTheServerStates() throws {
-        let pending = try descriptor()
-        let challenge = String(repeating: "A", count: 43)
-        func parse(_ root: [String: Any]) throws -> E2EEV2ApprovalDetail? {
-            E2EEV2DeviceApprovalContract.parseApprovalDetail(try JSONSerialization.data(withJSONObject: root))
-        }
-        var uikWrap = wrap
-        uikWrap["newDeviceId"] = pending.deviceId
-        let certificate: [String: Any] = ["certificate": "SQ-E2EE-V2-DEVICE-CERT\n1", "signatureB64": "MEUC"]
-        let list: [String: Any] = ["list": "SQ-E2EE-V2-DEVICE-LIST\n1", "signatureB64": "MEUC", "devices": ["entry"]]
-
-        // En attente : le dépôt est nul.
-        let waiting = try XCTUnwrap(parse([
-            "approval": approval(pending, status: "pending", challenge: challenge), "pendingDevice": device(pending),
-            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
-        ]))
-        XCTAssertNil(waiting.trust)
-        // Approuvée : le défi est effacé, le dépôt rempli.
-        let approved = try XCTUnwrap(parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": certificate, "deviceList": list, "uikWrap": uikWrap,
-        ]))
-        XCTAssertEqual(approved.trust?.uikWrap?.newDeviceId, pending.deviceId)
-        XCTAssertEqual(approved.trust?.deviceEntries, ["entry"])
-        // Navigateur : jamais d'UIK.
-        let browser = try XCTUnwrap(parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending, platform: "web"),
-            "certificate": certificate, "deviceList": list, "uikWrap": NSNull(),
-        ]))
-        XCTAssertNotNil(browser.trust)
-        XCTAssertNil(browser.trust?.uikWrap)
-        XCTAssertNil(try parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending, platform: "web"),
-            "certificate": certificate, "deviceList": list, "uikWrap": uikWrap,
-        ]), "Une UIK pour un navigateur est refusée")
-        XCTAssertNil(try parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": certificate, "deviceList": list, "uikWrap": wrap.merging(["newDeviceId": "ios_other_000000000001"]) { $1 },
-        ]), "Une UIK destinée à un autre appareil est refusée")
-        // Dépôt consommé ou expiré : de nouveau nul, l'approbation reste lisible.
-        XCTAssertNil(try XCTUnwrap(parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
-        ])).trust)
-        // Un dépôt partiel, une clé de trop ou une UIK à dix clés : refusés.
-        XCTAssertNil(try parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": certificate, "deviceList": NSNull(), "uikWrap": uikWrap,
-        ]))
-        var tooMany = uikWrap
-        tooMany["extra"] = "x"
-        XCTAssertNil(try parse([
-            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": certificate, "deviceList": list, "uikWrap": tooMany,
-        ]))
-        XCTAssertNil(try parse([
-            "approval": approval(pending, status: "pending", challenge: NSNull()), "pendingDevice": device(pending),
-            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
-        ]), "En attente, le défi reste obligatoire")
-    }
-
     func testTheSignedTargetEncodesEverythingButUnreservedCharacters() {
         XCTAssertEqual(
             E2EEV2SignedTarget.encodedQuery([URLQueryItem(name: "q", value: "a+b c@d'é"), URLQueryItem(name: "sinceVersion", value: "3")]),

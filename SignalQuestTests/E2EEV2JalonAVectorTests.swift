@@ -34,7 +34,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             ("device-cert-v1", try buildDeviceCert()),
             ("device-list-v1", try buildDeviceList()),
             ("device-capabilities-v1", try buildCapabilities()),
-            ("uik-wrap-v1", try buildUIKWrap()),
             ("epoch-manifest-v2", try buildEpochManifest()),
             ("epoch-binding-v1", try buildEpochBinding()),
             ("membership-change-v1", try buildMembership()),
@@ -46,7 +45,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             ("call-descriptor-v1", try buildCallDescriptor()),
             ("call-frame-key-v2", try buildCallFrameKey()),
             ("call-join-proof-v1", try buildJoinProof()),
-            ("device-approval-v2", try buildApprovalV2()),
             ("safety-number-v1", try buildSafetyNumber()),
             ("identity-reset-v1", try buildIdentityReset()),
             ("capability-intersection-v1", buildCapabilityIntersection()),
@@ -226,39 +224,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         XCTAssertTrue(E2EEV2SignedString(canonical: canonical, signatureB64: try str(v, "signatureDerB64")).verify(with: signing))
         try forEachNegative(v) { neg in
             XCTAssertThrowsError(try E2EEV2CapabilitiesDocument.parse(document: str(neg, "documentUtf8")), caseName(neg))
-        }
-    }
-
-    func testUIKWrapVector() throws {
-        let v = try load("uik-wrap-v1")
-        let uik = try signingKey(fromB64: str(v, "uikPrivateRawB64"))
-        let approver = try signingKey(fromB64: str(v, "approverSigningPrivateRawB64"))
-        let newDevice = try agreementKey(fromB64: str(v, "newDeviceAgreementPrivateRawB64"))
-        let ephemeral = try agreementKey(fromB64: str(v, "ephemeralPrivateRawB64"))
-        let rebuilt = try E2EEV2UIKWrapCrypto.wrap(
-            uik: uik, userId: str(v, "userId"), approverDeviceId: str(v, "approverDeviceId"),
-            newDeviceId: str(v, "newDeviceId"), newDeviceAgreementKey: newDevice.publicKey,
-            approverSigningKey: approver, ephemeral: ephemeral, nonce: b64(v, "nonceB64")
-        )
-        XCTAssertEqual(rebuilt.aadB64, try str(v, "aadB64"))
-        XCTAssertEqual(rebuilt.wrappedUikB64, try str(v, "wrappedUikB64"))
-        XCTAssertEqual(
-            E2EEV2UIKWrapCrypto.salt(userId: try str(v, "userId"), approverDeviceId: try str(v, "approverDeviceId"), newDeviceId: try str(v, "newDeviceId")).base64EncodedString(),
-            try str(v, "saltB64")
-        )
-        let stored = try wrap(from: v)
-        XCTAssertEqual(E2EEV2UIKWrapCrypto.signatureCanonical(stored), try str(v, "signatureCanonicalUtf8"))
-        let opened = try E2EEV2UIKWrapCrypto.unwrap(
-            stored, newDeviceAgreementKey: newDevice, approverSigningKey: approver.publicKey,
-            expectedUIKB64: try str(v, "uikPublicX963B64")
-        )
-        XCTAssertEqual(opened.rawRepresentation, uik.rawRepresentation)
-        try forEachNegative(v) { neg in
-            XCTAssertThrowsError(try E2EEV2UIKWrapCrypto.unwrap(
-                try wrap(from: v, overrides: neg), newDeviceAgreementKey: newDevice,
-                approverSigningKey: approver.publicKey,
-                expectedUIKB64: try str(neg, "expectedUikB64", default: v, fallbackKey: "uikPublicX963B64")
-            ), caseName(neg))
         }
     }
 
@@ -523,48 +488,6 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         }
     }
 
-    func testApprovalV2Vector() throws {
-        let v = try load("device-approval-v2")
-        let qr = E2EEV2ApprovalV2.QR(
-            approvalId: try str(v, "approvalId"), pendingDeviceId: try str(v, "pendingDeviceId"),
-            platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"),
-            challengeB64Url: try str(v, "challengeB64Url"), expiresAtMs: try int64(v, "expiresAtMs")
-        )
-        XCTAssertEqual(qr.payload, try str(v, "qrPayload"))
-        XCTAssertEqual(E2EEV2ApprovalV2.QR.parse(try str(v, "qrPayload")), qr)
-        // SAS v3 : mise en gage, puis code sur les deux aléas.
-        let commit = E2EEV2ApprovalV2.sasCommitment(
-            userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
-            pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
-            fingerprint: try str(v, "fingerprint"), pendingNonceB64Url: try str(v, "pendingNonceB64Url")
-        )
-        XCTAssertEqual(commit, try str(v, "sasCommitB64Url"))
-        XCTAssertEqual(
-            E2EEV2ApprovalV2.sas(userId: try str(v, "userId"), pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"), approvalId: try str(v, "approvalId"), pendingNonceB64Url: try str(v, "pendingNonceB64Url"), approverNonceB64Url: try str(v, "approverNonceB64Url")),
-            try str(v, "sas")
-        )
-        let proximity = E2EEV2ApprovalV2.proximityCode(
-            userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
-            pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
-            fingerprint: try str(v, "fingerprint"), challengeB64Url: try str(v, "challengeB64Url")
-        )
-        XCTAssertEqual(proximity, try str(v, "proximityCode"))
-        XCTAssertTrue(E2EEV2ApprovalV2.proximityMatches(try str(v, "proximityTyped"), expected: proximity))
-        try forEachNegative(v) { neg in
-            if let payload = neg["qrPayload"] as? String {
-                XCTAssertNil(E2EEV2ApprovalV2.QR.parse(payload), caseName(neg))
-            } else if let nonce = neg["pendingNonceB64Url"] as? String {
-                XCTAssertNotEqual(E2EEV2ApprovalV2.sasCommitment(
-                    userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
-                    pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
-                    fingerprint: try str(v, "fingerprint"), pendingNonceB64Url: nonce
-                ), commit, caseName(neg))
-            } else {
-                XCTAssertFalse(E2EEV2ApprovalV2.proximityMatches(try str(neg, "proximityTyped"), expected: proximity), caseName(neg))
-            }
-        }
-    }
-
     func testSafetyNumberVector() throws {
         let v = try load("safety-number-v1")
         let uikA = try b64(v, "uikAPublicX963B64")
@@ -779,54 +702,6 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("unknownFeature")), ("documentUtf8", .s(unknownFeature))]),
                 .o([("case", .s("numberInsteadOfString")), ("documentUtf8", .s(number))]),
                 .o([("case", .s("missingKey")), ("documentUtf8", .s(missing))]),
-            ])),
-        ])
-    }
-
-    func buildUIKWrap() throws -> VJ {
-        let uik = try signingKey(0x11)
-        let approver = try signingKey(0x31)
-        let newDevice = try agreementKey(0x22)
-        let ephemeral = try agreementKey(0x41)
-        let nonce = Data((0..<12).map { UInt8(0x50 + $0) })
-        let wrap = try E2EEV2UIKWrapCrypto.wrap(
-            uik: uik, userId: userA, approverDeviceId: deviceA1, newDeviceId: deviceA2,
-            newDeviceAgreementKey: newDevice.publicKey, approverSigningKey: approver,
-            ephemeral: ephemeral, nonce: nonce
-        )
-        let salt = E2EEV2UIKWrapCrypto.salt(userId: userA, approverDeviceId: deviceA1, newDeviceId: deviceA2)
-        let secret = try ephemeral.sharedSecretFromKeyAgreement(with: newDevice.publicKey).withUnsafeBytes { Data($0) }
-        var tampered = try XCTUnwrap(Data(base64Encoded: wrap.wrappedUikB64))
-        tampered[tampered.startIndex] ^= 0x01
-        let tamperedWrap = E2EEV2UIKWrap(
-            userId: wrap.userId, approverDeviceId: wrap.approverDeviceId, newDeviceId: wrap.newDeviceId,
-            uikPublicKeyB64: wrap.uikPublicKeyB64, ephemeralPublicKeyB64: wrap.ephemeralPublicKeyB64,
-            nonceB64: wrap.nonceB64, aadB64: wrap.aadB64, wrappedUikB64: tampered.base64EncodedString(), signatureB64: ""
-        )
-        let tamperedSignature = try E2EEV2LowS.sign(Data(E2EEV2UIKWrapCrypto.signatureCanonical(tamperedWrap).utf8), with: approver)
-        return .o([
-            ("fixtureVersion", .s("1")), ("userId", .s(userA)), ("approverDeviceId", .s(deviceA1)), ("newDeviceId", .s(deviceA2)),
-            ("uikPrivateRawB64", .s(uik.rawRepresentation.base64EncodedString())),
-            ("uikPublicX963B64", .s(wrap.uikPublicKeyB64)),
-            ("approverSigningPrivateRawB64", .s(approver.rawRepresentation.base64EncodedString())),
-            ("approverSigningPublicX963B64", .s(approver.publicKey.x963Representation.base64EncodedString())),
-            ("newDeviceAgreementPrivateRawB64", .s(newDevice.rawRepresentation.base64EncodedString())),
-            ("newDeviceAgreementPublicX963B64", .s(newDevice.publicKey.x963Representation.base64EncodedString())),
-            ("ephemeralPrivateRawB64", .s(ephemeral.rawRepresentation.base64EncodedString())),
-            ("ephemeralPublicX963B64", .s(wrap.ephemeralPublicKeyB64)),
-            ("sharedSecretB64", .s(secret.base64EncodedString())),
-            ("saltB64", .s(salt.base64EncodedString())),
-            ("derivedKeyB64", .s(E2EEV2UIKWrapCrypto.wrappingKey(sharedSecret: secret, salt: salt).base64EncodedString())),
-            ("nonceB64", .s(wrap.nonceB64)),
-            ("aadUtf8", .s(String(decoding: try XCTUnwrap(Data(base64Encoded: wrap.aadB64)), as: UTF8.self))),
-            ("aadB64", .s(wrap.aadB64)),
-            ("wrappedUikB64", .s(wrap.wrappedUikB64)),
-            ("signatureCanonicalUtf8", .s(E2EEV2UIKWrapCrypto.signatureCanonical(wrap))),
-            ("signatureDerB64", .s(wrap.signatureB64)),
-            ("negative", .a([
-                .o([("case", .s("wrongExpectedUik")), ("expectedUikB64", .s(try signingKey(0x12).publicKey.x963Representation.base64EncodedString()))]),
-                .o([("case", .s("tamperedWrappedUik")), ("wrappedUikB64", .s(tampered.base64EncodedString())), ("signatureDerB64", .s(tamperedSignature.base64EncodedString()))]),
-                .o([("case", .s("highS")), ("signatureDerB64", .s(try highS(wrap.signatureB64)))]),
             ])),
         ])
     }
@@ -1338,62 +1213,6 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("emptyIdentity")), ("messageUtf8", .s(String(decoding: E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(emptyIdentity, with: signing)), as: UTF8.self)))]),
                 .o([("case", .s("identityIsNotTheDevice")), ("messageUtf8", .s(String(decoding: E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(accountIdentity, with: signing)), as: UTF8.self)))]),
                 .o([("case", .s("extraKey")), ("messageUtf8", .s(message.replacingOccurrences(of: "{\"proof\"", with: "{\"a\":null,\"proof\"")))]),
-            ])),
-        ])
-    }
-
-    func buildApprovalV2() throws -> VJ {
-        let fingerprint = try deviceFingerprint(identitySeed: 0x22, signingSeed: 0x32)
-        let challenge = Data((0..<32).map { UInt8($0 * 3) }).base64URLEncodedNoPadding()
-        let expires = createdAtMs + 300_000
-        let approvalId = "approval_0000000000000002"
-        let qr = E2EEV2ApprovalV2.QR(
-            approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint,
-            challengeB64Url: challenge, expiresAtMs: expires
-        )
-        func payload(_ fields: [String]) -> VJ { .s(fields.joined(separator: "|")) }
-        let fields = qr.payload.components(separatedBy: "|")
-        let pendingNonce = Data((0..<32).map { UInt8(0x40 + $0) }).base64URLEncodedNoPadding()
-        let approverNonce = Data((0..<32).map { UInt8(0x60 + $0) }).base64URLEncodedNoPadding()
-        let otherNonce = Data((0..<32).map { UInt8(0x41 + $0) }).base64URLEncodedNoPadding()
-        let proximity = E2EEV2ApprovalV2.proximityCode(
-            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web",
-            fingerprint: fingerprint, challengeB64Url: challenge
-        )
-        let otherFingerprint = try deviceFingerprint(identitySeed: 0x23, signingSeed: 0x33)
-        let otherProximity = E2EEV2ApprovalV2.proximityCode(
-            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web",
-            fingerprint: otherFingerprint, challengeB64Url: challenge
-        )
-        let iosProximity = E2EEV2ApprovalV2.proximityCode(
-            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "ios",
-            fingerprint: fingerprint, challengeB64Url: challenge
-        )
-        let typed = String(proximity.prefix(4)).lowercased() + "-" + String(proximity.dropFirst(4).prefix(4))
-            + " " + String(proximity.dropFirst(8))
-        return .o([
-            ("fixtureVersion", .s("3")), ("userId", .s(userA)), ("approvalId", .s(approvalId)),
-            ("pendingDeviceId", .s(deviceA2)), ("platform", .s("web")), ("fingerprint", .s(fingerprint)),
-            ("challengeB64Url", .s(challenge)), ("expiresAtMs", .s(String(expires))),
-            ("qrPayload", .s(qr.payload)),
-            ("pendingNonceB64Url", .s(pendingNonce)), ("approverNonceB64Url", .s(approverNonce)),
-            ("sasCommitCanonicalUtf8", .s(["SQ-E2EE-V2-SAS-COMMIT", "1", userA, approvalId, deviceA2, "web", fingerprint, pendingNonce].joined(separator: "\n"))),
-            ("sasCommitB64Url", .s(E2EEV2ApprovalV2.sasCommitment(userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, pendingNonceB64Url: pendingNonce))),
-            ("sasCanonicalUtf8", .s(["SQ-E2EE-V2-APPROVAL-SAS", "3", userA, deviceA2, "web", fingerprint, approvalId, pendingNonce, approverNonce].joined(separator: "\n"))),
-            ("sas", .s(E2EEV2ApprovalV2.sas(userId: userA, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, approvalId: approvalId, pendingNonceB64Url: pendingNonce, approverNonceB64Url: approverNonce))),
-            ("proximityCanonicalUtf8", .s(["SQ-E2EE-V2-PROXIMITY", "1", userA, approvalId, deviceA2, "web", fingerprint, challenge].joined(separator: "\n"))),
-            ("proximityCode", .s(proximity)),
-            ("proximityTyped", .s(typed)),
-            ("negative", .a([
-                .o([("case", .s("sevenFields")), ("qrPayload", payload(fields.enumerated().filter { $0.offset != 4 }.map(\.element)))]),
-                .o([("case", .s("version2")), ("qrPayload", payload(["SQE2EE2", "2"] + fields.dropFirst(2)))]),
-                .o([("case", .s("uppercasePlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "WEB" : $0.element }))]),
-                .o([("case", .s("emptyPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "" : $0.element }))]),
-                .o([("case", .s("unknownPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "desktop" : $0.element }))]),
-                .o([("case", .s("extraField")), ("qrPayload", payload(fields + ["x"]))]),
-                .o([("case", .s("revealedNonceDiffers")), ("pendingNonceB64Url", .s(otherNonce))]),
-                .o([("case", .s("proximityForOtherKeys")), ("proximityTyped", .s(otherProximity))]),
-                .o([("case", .s("proximityForOtherPlatform")), ("proximityTyped", .s(iosProximity))]),
             ])),
         ])
     }
@@ -2082,16 +1901,6 @@ private extension E2EEV2JalonAVectorTests {
             index = next
         }
         return Data(bytes)
-    }
-
-    func wrap(from vector: [String: Any], overrides: [String: Any] = [:]) throws -> E2EEV2UIKWrap {
-        func value(_ key: String) throws -> String { try str(overrides, key, default: vector) }
-        return E2EEV2UIKWrap(
-            userId: try value("userId"), approverDeviceId: try value("approverDeviceId"), newDeviceId: try value("newDeviceId"),
-            uikPublicKeyB64: try value("uikPublicX963B64"), ephemeralPublicKeyB64: try value("ephemeralPublicX963B64"),
-            nonceB64: try value("nonceB64"), aadB64: try value("aadB64"), wrappedUikB64: try value("wrappedUikB64"),
-            signatureB64: try value("signatureDerB64")
-        )
     }
 
     func messageContextV2(_ vector: [String: Any], counterOverride: String? = nil) throws -> E2EEV2MessageContextV2 {

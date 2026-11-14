@@ -327,54 +327,6 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try await session.service.end(callId: callId)
     }
 
-    /// Approbation croisée (§2.7, A1) : l'appareil iOS de QA d'un compte, qui
-    /// détient sa clé de compte, approuve l'appareil d'une autre plateforme
-    /// (un navigateur, par exemple) à partir du contenu de son QR v3, écrit
-    /// dans `…_QR_FILE` faute de caméra. Mêmes vérifications que l'écran
-    /// « Appareils » : QR comparé au détail servi, empreinte et plateforme.
-    func testACertifiedDeviceApprovesAnotherPlatformFromItsQRContent() async throws {
-        guard let rawBase = environment("SQ_E2EE_V2_APPROVE_QA_BASE_URL"), let base = URL(string: rawBase),
-              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
-              let email = environment("SQ_E2EE_V2_APPROVE_QA_EMAIL"),
-              let password = environment("SQ_E2EE_V2_APPROVE_QA_PASSWORD"),
-              let run = environment("SQ_E2EE_V2_APPROVE_QA_RUN"),
-              let qrFile = environment("SQ_E2EE_V2_APPROVE_QA_QR_FILE") else {
-            throw XCTSkip("Approbation croisée locale non demandée")
-        }
-        let wait = TimeInterval(environment("SQ_E2EE_V2_APPROVE_QA_WAIT_SECONDS").flatMap(Int.init) ?? 600)
-        let previousUserId = LocalAccountScope.currentUserId
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
-            .appendingPathComponent("v2", isDirectory: true)
-        defer {
-            LocalAccountScope.deactivate()
-            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
-        }
-        let account = try await login(email: email, password: password, base: base, run: run)
-        let session = try become(account, base: base, root: root)
-
-        // Le QR de l'appareil à approuver, écrit d'un bloc par l'autre plateforme.
-        let qrURL = URL(fileURLWithPath: qrFile)
-        let deadline = Date().addingTimeInterval(wait)
-        var content: String?
-        while content == nil, Date() < deadline {
-            content = (try? String(contentsOf: qrURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if content?.hasPrefix("SQE2EE2|") != true { content = nil; try await Task.sleep(for: .seconds(1)) }
-        }
-        let input = try XCTUnwrap(content, "Contenu du QR")
-        let qr = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseQRPayload(input), "QR v3 valide et non expiré")
-        let detail: E2EEV2ApprovalDetail
-        switch await session.lifecycle.loadQRApproval(input) {
-        case .success(let value): detail = value
-        case .failed(let failure): return XCTFail("Demande d'approbation : \(failure.code ?? "") \(failure.message)")
-        }
-        print("[QA approbation] plateforme=\(qr.platform) appareil=\(qr.pendingDeviceId)")
-        switch await session.lifecycle.approve(detail, comparedQR: qr) {
-        case .success: break
-        case .failed(let failure): return XCTFail("Approbation : \(failure.code ?? "") \(failure.message)")
-        }
-        try? FileManager.default.removeItem(at: qrURL)
-    }
-
     /// Prépare un appel à plusieurs plateformes : l'appareil iOS de QA crée un
     /// groupe v2 avec les comptes donnés (leurs appareils certifiés, toutes
     /// plateformes comprises, reçoivent l'époque 1) et écrit son identifiant

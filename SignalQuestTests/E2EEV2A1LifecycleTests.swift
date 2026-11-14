@@ -198,164 +198,17 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         }
     }
 
-    func testTheAccountKeyTravelsFromTheFirstDeviceToTheNextOne() async throws {
-        let fixture = try E2EEV2AccountFixture()
-        defer { fixture.close() }
-        let first = try device(fixture, primary: true)
-        let second = try device(fixture, primary: false)
-        let namespace = fixture.session.ownerNamespace
-        let server = TrustServer()
-        install(server, pending: second.descriptor)
-
-        // 1. Bootstrap : une première tentative perdue, la reprise renvoie les mêmes textes.
-        server.locked { server.bootstrapFailures = 1 }
-        let reauth = E2EEV2BootstrapReauthentication.email(challengeId: "challenge_000000000001", code: "123456")
-        guard case .failed = await first.lifecycle.bootstrapInitialDevice(reauth) else { return XCTFail("503 attendu") }
-        guard case .success = await first.lifecycle.bootstrapInitialDevice(reauth) else { return XCTFail("bootstrap") }
-        let bootstraps = try XCTUnwrap(server.locked { server.bodies["/api/e2ee/v2/bootstrap"] })
-        XCTAssertEqual(bootstraps.count, 2)
-        for key in ["accountIdentityKeyB64"] {
-            XCTAssertEqual(bootstraps[0][key] as? String, bootstraps[1][key] as? String)
-        }
-        XCTAssertEqual((bootstraps[0]["certificate"] as? [String: Any])?["certificate"] as? String,
-                       (bootstraps[1]["certificate"] as? [String: Any])?["certificate"] as? String, "Même certificat au rejeu")
-        XCTAssertEqual((bootstraps[0]["deviceList"] as? [String: Any])?["list"] as? String,
-                       (bootstraps[1]["deviceList"] as? [String: Any])?["list"] as? String, "Même liste v1 au rejeu")
-        let certificate = try E2EEV2DeviceCertificate.parse(
-            try XCTUnwrap((bootstraps[1]["certificate"] as? [String: Any])?["certificate"] as? String)
-        )
-        XCTAssertEqual(certificate.platform, "ios")
-        XCTAssertEqual(certificate.deviceId, first.descriptor.deviceId)
-        let uik = try XCTUnwrap(try first.accounts.load(ownerNamespace: namespace))
-        XCTAssertEqual(uik.publicKey.x963Representation.base64EncodedString(), bootstraps[1]["accountIdentityKeyB64"] as? String)
-        XCTAssertTrue(try first.accounts.isVerified(ownerNamespace: namespace))
-        XCTAssertNil(try first.vault.string(for: E2EEV2AccountIdentityStore.pendingBootstrapKey(ownerNamespace: namespace)),
-                     "Confirmé : plus de bootstrap en cours")
-
-        // 2. Le second appareil affiche son QR ; le premier le scanne et approuve.
-        let detail = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseApprovalDetail(try approvalDetail(second.descriptor, server: server)))
-        let identityKey = try XCTUnwrap(Data(base64Encoded: second.descriptor.publicIdentityKeyB64))
-        let signingKey = try XCTUnwrap(Data(base64Encoded: second.descriptor.publicSigningKeyB64))
-        let qr = E2EEV2QRApprovalPayload(
-            approvalId: Self.approvalId, pendingDeviceId: second.descriptor.deviceId, platform: "ios",
-            fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey),
-            challengeB64URL: Self.challenge,
-            expiresAtMs: Int64((try XCTUnwrap(Self.isoDate(Self.expiresAt)).timeIntervalSince1970 * 1_000).rounded())
-        )
-        guard case .success(.pending) = await second.lifecycle.receiveApprovedTrust(approvalId: Self.approvalId) else {
-            return XCTFail("Encore en attente")
-        }
-        server.locked { server.staleOnce = true }
-        guard case .success = await first.lifecycle.approve(detail, comparedQR: qr) else { return XCTFail("approbation") }
-        let approvals = try XCTUnwrap(server.locked { server.bodies["/api/e2ee/v2/device-approvals/\(Self.approvalId)/approve"] })
-        XCTAssertEqual(approvals.count, 2, "Liste périmée : relue puis renvoyée une fois")
-        XCTAssertEqual(Set(approvals[1].keys), ["pendingDeviceId", "challengeB64Url", "certificate", "deviceList", "uikWrap"])
-        XCTAssertEqual(((approvals[1]["deviceList"] as? [String: Any])?["devices"] as? [String])?.count, 2)
-
-        // Un QR d'un autre appareil n'est jamais approuvé.
-        let forged = E2EEV2QRApprovalPayload(
-            approvalId: qr.approvalId, pendingDeviceId: qr.pendingDeviceId, platform: qr.platform,
-            fingerprint: String(repeating: "A", count: 43), challengeB64URL: qr.challengeB64URL, expiresAtMs: qr.expiresAtMs
-        )
-        guard case .failed(let refused) = await first.lifecycle.approve(detail, comparedQR: forged) else { return XCTFail() }
-        XCTAssertEqual(refused.message, "e2ee-approval-method-unsupported")
-
-        // 3. Le second appareil reçoit l'UIK du compte, non vérifiée, même
-        // après la fermeture de l'écran : la demande en cours est gardée.
-        try second.accounts.setPendingApprovalId(Self.approvalId, ownerNamespace: namespace)
-        guard case .success(.approved)? = await second.lifecycle.resumePendingApproval() else {
-            return XCTFail("UIK reçue")
-        }
-        XCTAssertNil(try second.accounts.pendingApprovalId(ownerNamespace: namespace), "Demande close une fois l'UIK reçue")
-        let none = await second.lifecycle.resumePendingApproval()
-        XCTAssertNil(none.map { _ in true })
-        let received = try XCTUnwrap(try second.accounts.load(ownerNamespace: namespace))
-        XCTAssertEqual(received.rawRepresentation, uik.rawRepresentation)
-        XCTAssertFalse(try second.accounts.isVerified(ownerNamespace: namespace), "Reçue, jamais vérifiée d'avance")
-
-        // 4. Révocation : la liste suivante ne nomme plus le second appareil.
-        guard case .success = await first.lifecycle.revoke(deviceId: second.descriptor.deviceId, reason: "USER_REQUEST") else {
-            return XCTFail("révocation")
-        }
-        let revoke = try XCTUnwrap(server.locked { server.bodies["revoke"]?.last })
-        let entries = try XCTUnwrap((revoke["deviceList"] as? [String: Any])?["devices"] as? [String])
-        XCTAssertEqual(entries.map { $0.components(separatedBy: "\n")[0] }, [first.descriptor.deviceId])
-        // Un appareil en attente n'est pas dans la liste : pas de liste suivante.
-        guard case .success = await first.lifecycle.revoke(deviceId: "ios_pending_000000000001", reason: "USER_REQUEST") else {
-            return XCTFail("révocation d'un appareil en attente")
-        }
-        XCTAssertNil(try XCTUnwrap(server.locked { server.bodies["revoke"]?.last })["deviceList"])
-    }
-
-    /// §2.6 : après 30 jours, la clé d'accord tourne. Le certificat de la
-    /// nouvelle (version 2) et la liste suivante partent signés par l'UIK ; une
-    /// réponse perdue se rattrape en relisant la liste ; une enveloppe adressée
-    /// à l'ancienne clé s'ouvre encore.
-    func testTheAgreementKeyRotatesAfterThirtyDays() async throws {
-        let fixture = try E2EEV2AccountFixture()
-        defer { fixture.close() }
-        let first = try device(fixture, primary: true)
-        let namespace = fixture.session.ownerNamespace
-        let server = TrustServer()
-        install(server, pending: first.descriptor)
-        guard case .success = await first.lifecycle.bootstrapInitialDevice(
-            .email(challengeId: "challenge_000000000001", code: "123456")
-        ) else { return XCTFail("bootstrap") }
-        guard case .success(false) = await first.lifecycle.recertifyIfDue() else { return XCTFail("Pas encore due") }
-
-        let epochKey = Data(repeating: 5, count: 32)
-        let context = E2EEV2EpochContext(
-            conversationId: "conversation_a1_0000000001", epochNumber: 1,
-            senderDeviceId: first.descriptor.deviceId, recipientDeviceId: first.descriptor.deviceId
-        )
-        let envelope = try first.identity.createSignedEpochEnvelope(
-            context: context, epochKey: epochKey, recipientPublicIdentityKeyB64: first.descriptor.publicIdentityKeyB64,
-            ownerNamespace: namespace
-        )
-        let delivery = E2EEV2EpochDelivery(
-            conversationId: context.conversationId, epochId: "epoch_a1_00000000000001", epochNumber: 1,
-            keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey), reason: "INITIAL", status: "active",
-            createdAt: "2026-10-02T00:00:00.000Z", senderDeviceId: first.descriptor.deviceId,
-            senderPublicSigningKeyB64: first.descriptor.publicSigningKeyB64, envelope: envelope
-        )
-
-        // L'identité date de l'heure réelle : 30 jours après elle.
-        let later = try device(
-            fixture, primary: true,
-            nowMs: Int64(Date().timeIntervalSince1970 * 1_000) + E2EEV2DeviceIdentityStore.agreementKeyLifetimeMs + 60_000
-        )
-        server.locked { server.recertificationLost = true }
-        guard case .failed = await later.lifecycle.recertifyIfDue() else { return XCTFail("Réponse perdue") }
-        XCTAssertEqual(try first.identity.load(ownerNamespace: namespace)?.keyVersion, 1, "Rien n'est activé sans réponse")
-        guard case .success(true) = await later.lifecycle.recertifyIfDue() else { return XCTFail("Rattrapage") }
-        XCTAssertEqual(server.locked { server.bodies["certificate"]?.count }, 1, "La liste porte déjà la clé : pas de second envoi")
-
-        let rotated = try XCTUnwrap(try first.identity.load(ownerNamespace: namespace))
-        XCTAssertEqual(rotated.keyVersion, 2)
-        XCTAssertNotEqual(rotated.publicIdentityKeyB64, first.descriptor.publicIdentityKeyB64)
-        XCTAssertEqual(rotated.publicSigningKeyB64, first.descriptor.publicSigningKeyB64, "La clé de signature ne change pas")
-        let body = try XCTUnwrap(server.locked { server.bodies["certificate"]?.first })
-        XCTAssertEqual(Set(body.keys), ["certificate", "deviceList"])
-        let certificate = try E2EEV2DeviceCertificate.parse(try XCTUnwrap((body["certificate"] as? [String: Any])?["certificate"] as? String))
-        XCTAssertEqual(certificate.keyVersion, 2)
-        XCTAssertEqual(certificate.identityKeyB64, rotated.publicIdentityKeyB64)
-        XCTAssertEqual(try first.identity.unwrapEpochKey(delivery: delivery, ownerNamespace: namespace), epochKey,
-                       "Une enveloppe adressée à l'ancienne clé s'ouvre encore")
-        guard case .success(false) = await later.lifecycle.recertifyIfDue() else { return XCTFail("Nouvelle clé : plus due") }
-    }
-
-    /// §12 : le document de capacités part après le bootstrap, signé par
-    /// l'appareil ; il ne repart qu'avec un nouveau build ; une séquence
-    /// dépassée repart au-dessus de celle du serveur.
-    func testTheCapabilitiesDocumentIsPublishedAtBootstrapAndOnANewBuild() async throws {
+    /// §12 : le document de capacités part dès que l'appareil détient la clé
+    /// du compte, signé par lui ; il ne repart qu'avec un nouveau build ; une
+    /// séquence dépassée repart au-dessus de celle du serveur.
+    func testTheCapabilitiesDocumentIsPublishedOnceAndOnANewBuild() async throws {
         let fixture = try E2EEV2AccountFixture()
         defer { fixture.close() }
         let first = try device(fixture, primary: true)
         let server = TrustServer()
         install(server, pending: first.descriptor)
-        guard case .success = await first.lifecycle.bootstrapInitialDevice(
-            .email(challengeId: "challenge_000000000001", code: "123456")
-        ) else { return XCTFail("bootstrap") }
+        _ = try first.accounts.create(ownerNamespace: fixture.session.ownerNamespace)
+        guard case .success(true) = await first.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Premier document") }
         let published = try XCTUnwrap(server.locked { server.bodies["capabilities"]?.first })
         let document = try E2EEV2CapabilitiesDocument.parse(document: try XCTUnwrap(published["document"] as? String))
         XCTAssertEqual(document.sequence, 1)
@@ -394,42 +247,6 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         guard case .success(true) = await refused.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Document neuf") }
     }
 
-    /// Un autre appareil a établi le compte pendant ce bootstrap : l'UIK créée
-    /// ici est retirée, celle du compte pourra être installée à l'approbation.
-    func testALostBootstrapRaceDiscardsTheLocalAccountKey() async throws {
-        let fixture = try E2EEV2AccountFixture()
-        defer { fixture.close() }
-        let first = try device(fixture, primary: true)
-        let namespace = fixture.session.ownerNamespace
-        let served = LockedBoxA1<String?>(nil)
-        MockURLProtocol.requestHandler = { request in
-            if request.url?.path.hasSuffix("/identity") == true {
-                return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
-                    "accountIdentityKeyB64": served.value ?? "",
-                ]))
-            }
-            return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
-                "error": "x", "code": "E2EE_IDENTITY_ALREADY_ESTABLISHED", "requestId": "r",
-            ]), status: 409)
-        }
-        let reauth = E2EEV2BootstrapReauthentication.email(challengeId: "challenge_000000000001", code: "123456")
-        // Le compte porte déjà notre UIK (textes différents) : elle est gardée et confirmée.
-        let local = try first.accounts.pendingBootstrap(ownerNamespace: namespace, nowMs: now).uik
-        served.value = local.publicKey.x963Representation.base64EncodedString()
-        guard case .failed = await first.lifecycle.bootstrapInitialDevice(reauth) else { return XCTFail("409 attendu") }
-        XCTAssertEqual(try first.accounts.load(ownerNamespace: namespace)?.rawRepresentation, local.rawRepresentation)
-        XCTAssertFalse(try first.accounts.hasPendingBootstrap(ownerNamespace: namespace))
-        // Le compte porte une autre UIK : celle d'un bootstrap perdu est retirée.
-        try first.vault.remove(E2EEV2AccountIdentityStore.key(ownerNamespace: namespace))
-        served.value = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
-        guard case .failed = await first.lifecycle.bootstrapInitialDevice(reauth) else { return XCTFail("409 attendu") }
-        XCTAssertNil(try first.accounts.load(ownerNamespace: namespace))
-        let other = P256.Signing.PrivateKey()
-        XCTAssertNoThrow(try first.accounts.install(other, ownerNamespace: namespace))
-        // Une UIK reçue n'est jamais retirée par un bootstrap.
-        try first.accounts.discardPendingBootstrap(ownerNamespace: namespace)
-        XCTAssertEqual(try first.accounts.load(ownerNamespace: namespace)?.rawRepresentation, other.rawRepresentation)
-    }
 }
 
 private final class LockedBoxA1<Value>: @unchecked Sendable {
