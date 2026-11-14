@@ -54,7 +54,6 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     private let identityStore: E2EEV2DeviceIdentityStore
     private let keyStore: E2EEV2EpochKeyStore
     private let stateStore: E2EEV2ConversationStateStore
-    private let accountIdentityStore: E2EEV2AccountIdentityStore
     private let pins: E2EEV2TrustPinStore
     private let messageStoreFactory: () throws -> (E2EEV2MessageStoreV2, E2EEV2MessageLedgerStore)
     private let notificationContext: () -> E2EEV2NotificationContextStore?
@@ -88,7 +87,6 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         self.identityStore = identityStore
         self.keyStore = keyStore
         self.stateStore = stateStore
-        self.accountIdentityStore = accountIdentityStore
         self.pins = pins
         messageStoreFactory = messageStores
         self.notificationContext = notificationContext
@@ -98,19 +96,13 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     var writesEnabled: Bool { ignoresGates || E2EEV2ServerGate.autoActive }
     var readsEnabled: Bool { ignoresGates || E2EEV2ServerGate.autoActive }
 
-    /// Cet appareil n'est pas encore entré en v2 : pas d'identité d'appareil,
-    /// ou pas de clé de compte, qui n'arrive qu'avec l'approbation (ou un
-    /// premier appareil confirmé). Vrai seulement quand on le sait : un
-    /// trousseau verrouillé ou illisible n'en dit rien.
+    /// Cet appareil n'a pas encore d'identité d'appareil. Depuis la bascule
+    /// (E2EE-AUTO §7.2), l'appareil inscrit au journal suffit : ni clé de
+    /// compte ni certificat. Vrai seulement quand on le sait : un trousseau
+    /// verrouillé ou illisible n'en dit rien.
     func lacksV2Readiness(_ session: LocalAccountSession) -> Bool {
-        let namespace = session.ownerNamespace
         do {
-            // Une fois la bascule faite (E2EE-AUTO §7.2), l'appareil inscrit au
-            // journal suffit : ni clé de compte ni certificat.
-            if E2EEV2ServerGate.autoActive { return try identityStore.load(ownerNamespace: namespace) == nil }
-            return try identityStore.load(ownerNamespace: namespace) == nil
-                || accountIdentityStore.load(ownerNamespace: namespace) == nil
-                || accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace)
+            return try identityStore.load(ownerNamespace: session.ownerNamespace) == nil
         } catch {
             return false
         }

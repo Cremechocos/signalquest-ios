@@ -463,106 +463,6 @@ final class E2EETests: XCTestCase {
         XCTAssertFalse(E2EEV2ServerGate.autoActive)
     }
 
-    func testV2MediaOutboxPersistsOnlyOpaqueCiphertextAndPurgesByAccount() throws {
-        let message = try messageFixture()
-        let blob = try blobFixture()
-        let temporaryRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("sq-e2ee-outbox-test-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
-
-        let source = temporaryRoot.appendingPathComponent("encrypted-source.bin")
-        let ciphertext = try XCTUnwrap(Data(base64Encoded: blob.ciphertextB64))
-        try ciphertext.write(to: source, options: .atomic)
-
-        let envelope = E2EEV2MessageEnvelope(
-            envelopeVersion: 1,
-            epochNumber: message.epochNumber,
-            clientRequestId: message.clientRequestId,
-            algorithm: message.algorithm,
-            contentType: message.contentType,
-            keyCommitmentB64: message.keyCommitmentB64,
-            ttlSeconds: message.ttlSeconds,
-            encryptedBlobIds: [blob.blobId],
-            nonceB64: message.nonceB64,
-            aadB64: message.aadB64,
-            ciphertextB64: message.ciphertextB64
-        )
-        let signedEnvelope = E2EEV2SignedMessageEnvelope(
-            envelope: envelope,
-            senderSignatureB64: message.senderSignatureDerB64
-        )
-        let manifest = E2EEV2OutboxBlobManifest(
-            blobId: blob.blobId,
-            algorithm: blob.algorithm,
-            ciphertextSha256: blob.ciphertextSha256,
-            ciphertextSize: Int64(blob.ciphertextSize),
-            uploadChunkSize: E2EEV2MediaOutboxStore.uploadChunkBytes
-        )
-        let record = E2EEV2MediaOutboxRecord(
-            conversationId: message.conversationId,
-            envelope: signedEnvelope,
-            blobs: [manifest],
-            createdAtMs: 1_700_000_000_000
-        )
-        let ownerScope = "user:account-a"
-        let store = try E2EEV2MediaOutboxStore(baseDirectory: temporaryRoot.appendingPathComponent("outbox"))
-        try store.stage(
-            record: record,
-            ownerScopeId: ownerScope,
-            ciphertextSources: [blob.blobId: source]
-        )
-
-        XCTAssertEqual(try store.load(ownerScopeId: ownerScope, clientRequestId: record.clientRequestId), record)
-        let serialized = String(decoding: try E2EEV2MediaOutboxStore.encode(record), as: UTF8.self)
-        for forbidden in ["mediaKey", "sourceURI", "mimeType", "fileName", source.path] {
-            XCTAssertFalse(serialized.contains(forbidden), "Le manifeste ne doit pas persister \(forbidden)")
-        }
-        let stagedCiphertext = try store.ciphertextURL(ownerScopeId: ownerScope, blobId: blob.blobId)
-        XCTAssertEqual(try Data(contentsOf: stagedCiphertext), ciphertext)
-
-        try store.purge(ownerScopeId: ownerScope)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: stagedCiphertext.path))
-    }
-
-    func testV2MediaOutboxDecoderRejectsUnexpectedCleartextFields() throws {
-        let message = try messageFixture()
-        let blob = try blobFixture()
-        let envelope = E2EEV2MessageEnvelope(
-            envelopeVersion: 1,
-            epochNumber: message.epochNumber,
-            clientRequestId: message.clientRequestId,
-            algorithm: message.algorithm,
-            contentType: message.contentType,
-            keyCommitmentB64: message.keyCommitmentB64,
-            ttlSeconds: message.ttlSeconds,
-            encryptedBlobIds: [blob.blobId],
-            nonceB64: message.nonceB64,
-            aadB64: message.aadB64,
-            ciphertextB64: message.ciphertextB64
-        )
-        let record = E2EEV2MediaOutboxRecord(
-            conversationId: message.conversationId,
-            envelope: .init(envelope: envelope, senderSignatureB64: message.senderSignatureDerB64),
-            blobs: [.init(
-                blobId: blob.blobId,
-                algorithm: blob.algorithm,
-                ciphertextSha256: blob.ciphertextSha256,
-                ciphertextSize: Int64(blob.ciphertextSize),
-                uploadChunkSize: E2EEV2MediaOutboxStore.uploadChunkBytes
-            )]
-        )
-        var object = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: E2EEV2MediaOutboxStore.encode(record)) as? [String: Any]
-        )
-        object["mediaKey"] = Data(repeating: 7, count: 32).base64EncodedString()
-        let tampered = try JSONSerialization.data(withJSONObject: object)
-
-        XCTAssertThrowsError(try E2EEV2MediaOutboxStore.decode(tampered)) { error in
-            XCTAssertEqual(error as? E2EEV2MediaOutboxError, .invalidRecord)
-        }
-    }
-
     func testV2IOSVerifiesBackendFixtureDerSignature() throws {
         let fixture = try signedRequestFixture()
         let publicData = try XCTUnwrap(Data(base64Encoded: fixture.publicSigningKeyB64))
@@ -3645,8 +3545,6 @@ extension E2EETests {
         let api: APIClient
         let network: URLSession
         let context: LocalAccountSession
-        let outboxURL: URL
-        let outbox: E2EEV2MediaOutboxStore
         private let previous: [String: Any]
 
         init() throws {
@@ -3675,8 +3573,6 @@ extension E2EETests {
             configuration.protocolClasses = [MockURLProtocol.self]
             network = URLSession(configuration: configuration)
             api = APIClient(config: .test, credentials: credentials, session: network)
-            outboxURL = FileManager.default.temporaryDirectory.appendingPathComponent("rotation-outbox-\(UUID().uuidString)", isDirectory: true)
-            outbox = try E2EEV2MediaOutboxStore(baseDirectory: outboxURL)
         }
 
         func select(_ user: String) -> LocalAccountSession {
@@ -3695,9 +3591,6 @@ extension E2EETests {
             }
             if let legacy = previous[Self.legacyKey] { UserDefaults.standard.set(legacy, forKey: Self.legacyKey) }
             else { UserDefaults.standard.removeObject(forKey: Self.legacyKey) }
-            if FileManager.default.fileExists(atPath: outboxURL.path) {
-                try? FileManager.default.removeItem(at: outboxURL)
-            }
         }
 
         static func token(_ user: String) -> String {

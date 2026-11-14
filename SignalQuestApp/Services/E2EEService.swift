@@ -194,7 +194,7 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         // Chaque effacement est tenté, même si un autre a échoué.
         let erasures: [() throws -> Void] = [
             { [tokenStore] in try E2EEV2VaultBoundary.purge(store: tokenStore, ownerScopeId: ownerScopeId) },
-            { try E2EEV2MediaOutboxStore().purge(ownerScopeId: ownerScopeId) },
+            { try E2EEV2RetiredStorage.removeOutboxDirectory() },
             { try E2EEV2MessageLedgerStore().purge(ownerScopeId: ownerScopeId) },
             { try E2EEV2MessageStoreV2().purge(ownerScopeId: ownerScopeId) },
         ]
@@ -571,17 +571,13 @@ enum E2EEV2VaultBoundary {
         // en cours ne la réécrit pas après l'effacement.
         E2EEV2DeviceIdentityStore.signingCopyLock.withLock {
             for key in [E2EEV2DeviceIdentityStore.lockedSigningStorageKey(ownerNamespace: namespace),
-                        "device-v2:\(namespace)", "device-v2-reset-candidate:\(namespace)"] {
+                        "device-v2:\(namespace)"] {
                 attempt { try store.remove(key) }
             }
         }
         for key in ["epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
-                    E2EEV2AccountIdentityStore.key(ownerNamespace: namespace),
-                    E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace),
-                    E2EEV2AccountIdentityStore.pendingBootstrapKey(ownerNamespace: namespace),
-                    E2EEV2AccountIdentityStore.pendingApprovalKey(ownerNamespace: namespace),
-                    E2EEV2AccountIdentityStore.pendingResetKey(ownerNamespace: namespace),
-                    E2EEV2CapabilitiesPublicationStore.key(ownerNamespace: namespace)] {
+                    E2EEV2AccountIdentityStore.key(ownerNamespace: namespace)]
+            + E2EEV2RetiredStorage.keychainKeys(ownerNamespace: namespace) {
             attempt { try store.remove(key) }
         }
         for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
@@ -600,6 +596,55 @@ enum E2EEV2VaultBoundary {
             }
         }
         if let firstError { throw firstError }
+    }
+}
+
+/// Entrées et fichiers du chiffrement v2 que plus rien ne lit depuis le
+/// retrait (E2EE-AUTO lot 10) : marque de clé de compte vérifiée, bootstrap,
+/// approbation et réinitialisation en attente, document de capacités, candidat
+/// de réinitialisation d'appareil, médias v2 en attente d'envoi. Effacés une
+/// fois par compte sur cet appareil. La clé de compte `uik-v1` reste : la
+/// vérification des anciens signataires la lit tant que le serveur sert les
+/// routes v2 (§12, avant l'étape 5).
+enum E2EEV2RetiredStorage {
+    static func keychainKeys(ownerNamespace: String) -> [String] {
+        ["uik-verified-v1", "uik-bootstrap-v1", "uik-approval-v1", "uik-reset-v1", "capabilities-v1",
+         "device-v2-reset-candidate"].map { "\($0):\(ownerNamespace)" }
+    }
+
+    static func doneKey(ownerNamespace: String) -> String { "e2ee-v2-retired-storage-v1:\(ownerNamespace)" }
+
+    /// Médias chiffrés préparés par l'ancienne migration v1 vers v2, tous comptes confondus.
+    static func outboxDirectory(fileManager: FileManager = .default) -> URL? {
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("SignalQuestPrivate", isDirectory: true)
+            .appendingPathComponent("e2ee-v2-outbox", isDirectory: true)
+    }
+
+    static func removeOutboxDirectory(fileManager: FileManager = .default) throws {
+        guard let directory = outboxDirectory(fileManager: fileManager),
+              fileManager.fileExists(atPath: directory.path) else { return }
+        try fileManager.removeItem(at: directory)
+    }
+
+    /// Une seule fois par compte : un trousseau verrouillé ou un échec laisse
+    /// la marque absente, et l'effacement repart au prochain passage.
+    @discardableResult
+    static func purgeIfNeeded(
+        ownerNamespace: String,
+        store: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
+        defaults: UserDefaults = .standard,
+        removeOutbox: () throws -> Void = { try removeOutboxDirectory() }
+    ) -> Bool {
+        let done = doneKey(ownerNamespace: ownerNamespace)
+        guard !defaults.bool(forKey: done) else { return true }
+        var complete = true
+        for key in keychainKeys(ownerNamespace: ownerNamespace) {
+            do { try store.remove(key) } catch { complete = false }
+        }
+        do { try removeOutbox() } catch { complete = false }
+        if complete { defaults.set(true, forKey: done) }
+        return complete
     }
 }
 
@@ -742,7 +787,6 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         try Self.signingCopyLock.withLock {
             try tokenStore.remove(Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace))
             try tokenStore.remove(storageKey(ownerNamespace: ownerNamespace))
-            try tokenStore.remove(resetCandidateStorageKey(ownerNamespace: ownerNamespace))
         }
     }
 
@@ -1078,10 +1122,6 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
 
     func storageKey(ownerNamespace: String) -> String {
         "device-v2:\(ownerNamespace)"
-    }
-
-    func resetCandidateStorageKey(ownerNamespace: String) -> String {
-        "device-v2-reset-candidate:\(ownerNamespace)"
     }
 
     private func loadRecord(ownerNamespace: String) throws -> Record? {
@@ -3427,390 +3467,6 @@ enum E2EEV2BlobFileEncryptor {
         }
         guard result == errSecSuccess else { throw E2EEV2BlobCryptoError.invalidChunk }
         return data
-    }
-}
-
-// MARK: - E2EE v2 durable encrypted-media outbox
-
-struct E2EEV2OutboxBlobManifest: Codable, Equatable, Sendable {
-    let blobId: String
-    let algorithm: String
-    let ciphertextSha256: String
-    let ciphertextSize: Int64
-    let uploadChunkSize: Int
-}
-
-enum E2EEV2MediaOutboxDeliveryState: String, Codable, Equatable, Sendable {
-    case pending
-    case serverAcknowledged
-}
-
-enum E2EEV2MediaOutboxOperation: String, Codable, Equatable, Sendable {
-    case message = "MESSAGE"
-    case history = "HISTORY"
-}
-
-struct E2EEV2MediaOutboxRecord: Codable, Equatable, Sendable {
-    let version: Int
-    let requireAuth: Bool
-    let conversationId: String
-    let clientRequestId: String
-    let operation: E2EEV2MediaOutboxOperation
-    let sourceMessageId: String
-    let sourceHash: String
-    let envelope: E2EEV2SignedMessageEnvelope
-    let blobs: [E2EEV2OutboxBlobManifest]
-    let createdAtMs: Int64
-    let deliveryState: E2EEV2MediaOutboxDeliveryState
-
-    init(
-        conversationId: String,
-        envelope: E2EEV2SignedMessageEnvelope,
-        blobs: [E2EEV2OutboxBlobManifest],
-        operation: E2EEV2MediaOutboxOperation = .message,
-        sourceMessageId: String = "",
-        sourceHash: String = "",
-        createdAtMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000),
-        deliveryState: E2EEV2MediaOutboxDeliveryState = .pending
-    ) {
-        version = 2
-        requireAuth = true
-        self.conversationId = conversationId
-        clientRequestId = envelope.clientRequestId
-        self.operation = operation
-        self.sourceMessageId = sourceMessageId
-        self.sourceHash = sourceHash
-        self.envelope = envelope
-        self.blobs = blobs
-        self.createdAtMs = createdAtMs
-        self.deliveryState = deliveryState
-    }
-}
-
-enum E2EEV2MediaOutboxError: Error, Equatable {
-    case unauthenticated
-    case activationBlocked
-    case invalidRecord
-    case invalidCiphertext
-    case storageUnavailable
-}
-
-/// Persistance locale sans secret : un record JSON opaque et des fichiers de
-/// ciphertext. Aucun nom de média, MIME, URI source, clé ou chemin absolu n'est
-/// encodé dans le manifeste.
-final class E2EEV2MediaOutboxStore: @unchecked Sendable {
-    static let uploadChunkBytes = 5 * 1_024 * 1_024
-    static let maxCiphertextBytes: Int64 = 512 * 1_024 * 1_024
-    static let maxBlobs = 20
-
-    private let fileManager: FileManager
-    private let baseDirectory: URL
-
-    init(fileManager: FileManager = .default, baseDirectory: URL? = nil) throws {
-        self.fileManager = fileManager
-        if let baseDirectory {
-            self.baseDirectory = baseDirectory
-        } else if let applicationSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first {
-            self.baseDirectory = applicationSupport
-                .appendingPathComponent("SignalQuestPrivate", isDirectory: true)
-                .appendingPathComponent("e2ee-v2-outbox", isDirectory: true)
-        } else {
-            throw E2EEV2MediaOutboxError.storageUnavailable
-        }
-    }
-
-    func stage(
-        record: E2EEV2MediaOutboxRecord,
-        ownerScopeId: String,
-        ciphertextSources: [String: URL]
-    ) throws {
-        try Self.validate(record)
-        guard record.deliveryState == .pending,
-              validOwner(ownerScopeId),
-              Set(ciphertextSources.keys) == Set(record.blobs.map(\.blobId)) else {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-        let directory = try ownerDirectory(ownerScopeId: ownerScopeId, create: true)
-        let blobsDirectory = directory.appendingPathComponent("blobs", isDirectory: true)
-        let recordsDirectory = directory.appendingPathComponent("records", isDirectory: true)
-        try createProtectedDirectory(blobsDirectory)
-        try createProtectedDirectory(recordsDirectory)
-
-        var newlyStaged: [URL] = []
-        do {
-            for manifest in record.blobs {
-                guard let source = ciphertextSources[manifest.blobId] else {
-                    throw E2EEV2MediaOutboxError.invalidCiphertext
-                }
-                let destination = try ciphertextURL(
-                    ownerScopeId: ownerScopeId,
-                    blobId: manifest.blobId,
-                    createDirectory: true
-                )
-                if fileManager.fileExists(atPath: destination.path) {
-                    try verifyCiphertext(at: destination, manifest: manifest)
-                    continue
-                }
-                try verifyCiphertext(at: source, manifest: manifest)
-                let temporary = blobsDirectory.appendingPathComponent(".\(UUID().uuidString).tmp")
-                do {
-                    defer {
-                        if fileManager.fileExists(atPath: temporary.path) {
-                            try? fileManager.removeItem(at: temporary)
-                        }
-                    }
-                    try fileManager.copyItem(at: source, to: temporary)
-                    try applyProtection(to: temporary)
-                    try verifyCiphertext(at: temporary, manifest: manifest)
-                    try fileManager.moveItem(at: temporary, to: destination)
-                }
-                newlyStaged.append(destination)
-            }
-
-            let encoded = try Self.encode(record)
-            try encoded.write(
-                to: recordURL(ownerScopeId: ownerScopeId, clientRequestId: record.clientRequestId),
-                options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
-            )
-        } catch {
-            newlyStaged.forEach { try? fileManager.removeItem(at: $0) }
-            if let typed = error as? E2EEV2MediaOutboxError { throw typed }
-            throw E2EEV2MediaOutboxError.storageUnavailable
-        }
-    }
-
-    func load(ownerScopeId: String, clientRequestId: String) throws -> E2EEV2MediaOutboxRecord {
-        guard validOwner(ownerScopeId), Self.validRequestId(clientRequestId) else {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-        do {
-            let data = try Data(contentsOf: recordURL(
-                ownerScopeId: ownerScopeId,
-                clientRequestId: clientRequestId
-            ), options: [.mappedIfSafe])
-            return try Self.decode(data)
-        } catch let error as E2EEV2MediaOutboxError {
-            throw error
-        } catch {
-            throw E2EEV2MediaOutboxError.storageUnavailable
-        }
-    }
-
-    func ciphertextURL(ownerScopeId: String, blobId: String) throws -> URL {
-        try ciphertextURL(ownerScopeId: ownerScopeId, blobId: blobId, createDirectory: false)
-    }
-
-    func complete(record: E2EEV2MediaOutboxRecord, ownerScopeId: String) throws {
-        guard record.deliveryState == .serverAcknowledged else {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-        for blob in record.blobs {
-            let url = try ciphertextURL(ownerScopeId: ownerScopeId, blobId: blob.blobId)
-            if fileManager.fileExists(atPath: url.path) {
-                try fileManager.removeItem(at: url)
-            }
-        }
-        let recordURL = recordURL(ownerScopeId: ownerScopeId, clientRequestId: record.clientRequestId)
-        if fileManager.fileExists(atPath: recordURL.path) {
-            try fileManager.removeItem(at: recordURL)
-        }
-    }
-
-    func purge(ownerScopeId: String, expectedSession: LocalAccountSession? = nil) throws {
-        guard validOwner(ownerScopeId) else { return }
-        let target = try ownerDirectory(ownerScopeId: ownerScopeId, create: false)
-        if let expectedSession {
-            guard expectedSession.ownerScopeId == ownerScopeId else { throw CancellationError() }
-            let retired = baseDirectory.appendingPathComponent(".reset-purge-\(UUID().uuidString)", isDirectory: true)
-            try LocalAccountScope.publish(for: expectedSession) {
-                if fileManager.fileExists(atPath: target.path) { try fileManager.moveItem(at: target, to: retired) }
-            }
-            // La suppression potentiellement longue ne tient aucun verrou Auth.
-            if fileManager.fileExists(atPath: retired.path) { try fileManager.removeItem(at: retired) }
-            return
-        }
-        if fileManager.fileExists(atPath: target.path) {
-            try fileManager.removeItem(at: target)
-        }
-    }
-
-    static func encode(_ record: E2EEV2MediaOutboxRecord) throws -> Data {
-        try validate(record)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(record)
-    }
-
-    static func decode(_ data: Data) throws -> E2EEV2MediaOutboxRecord {
-        guard data.count <= 512 * 1_024,
-              let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              Set(root.keys) == [
-                "version", "requireAuth", "conversationId", "clientRequestId",
-                "operation", "sourceMessageId", "sourceHash", "envelope", "blobs",
-                "createdAtMs", "deliveryState",
-              ],
-              let envelope = root["envelope"] as? [String: Any],
-              Set(envelope.keys) == [
-                "envelopeVersion", "epochNumber", "clientRequestId", "algorithm",
-                "contentType", "keyCommitmentB64", "ttlSeconds", "encryptedBlobIds",
-                "nonceB64", "aadB64", "ciphertextB64", "senderSignatureB64",
-              ],
-              let blobs = root["blobs"] as? [[String: Any]],
-              blobs.allSatisfy({ Set($0.keys) == [
-                "blobId", "algorithm", "ciphertextSha256", "ciphertextSize", "uploadChunkSize",
-              ] }) else {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-        do {
-            let record = try JSONDecoder().decode(E2EEV2MediaOutboxRecord.self, from: data)
-            try validate(record)
-            return record
-        } catch let error as E2EEV2MediaOutboxError {
-            throw error
-        } catch {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-    }
-
-    static func validate(_ record: E2EEV2MediaOutboxRecord) throws {
-        let envelope = record.envelope
-        let validTarget = switch record.operation {
-        case .message:
-            record.sourceMessageId.isEmpty && record.sourceHash.isEmpty
-        case .history:
-            validOpaqueId(record.sourceMessageId)
-                && record.sourceHash.range(
-                    of: #"^[a-f0-9]{64}\z"#,
-                    options: .regularExpression
-                ) != nil
-                && record.clientRequestId == (try? E2EEV2HistoryMigrationContract.clientRequestId(
-                    messageId: record.sourceMessageId,
-                    sourceHash: record.sourceHash
-                ))
-        }
-        guard record.version == 2,
-              record.requireAuth,
-              validTarget,
-              validOpaqueId(record.conversationId),
-              validRequestId(record.clientRequestId),
-              record.clientRequestId == envelope.clientRequestId,
-              record.createdAtMs >= 0,
-              record.blobs.count <= maxBlobs,
-              envelope.envelopeVersion == E2EEV2MessageCrypto.envelopeVersion,
-              envelope.epochNumber > 0,
-              envelope.algorithm == E2EEV2MessageCrypto.algorithm,
-              envelope.contentType == E2EEV2MessageCrypto.contentType,
-              (0...(30 * 24 * 60 * 60)).contains(envelope.ttlSeconds),
-              envelope.encryptedBlobIds == record.blobs.map(\.blobId),
-              Set(envelope.encryptedBlobIds).count == envelope.encryptedBlobIds.count,
-              validBase64(envelope.keyCommitmentB64, max: 128),
-              validBase64(envelope.nonceB64, max: 64),
-              validBase64(envelope.aadB64, max: 4_096),
-              validBase64(envelope.ciphertextB64, max: 400_000),
-              validBase64(envelope.senderSignatureB64, max: 256) else {
-            throw E2EEV2MediaOutboxError.invalidRecord
-        }
-        for blob in record.blobs {
-            guard validOpaqueId(blob.blobId),
-                  blob.algorithm == E2EEV2BlobCrypto.algorithm,
-                  blob.ciphertextSha256.range(
-                    of: #"^[a-f0-9]{64}\z"#,
-                    options: .regularExpression
-                  ) != nil,
-                  (1...maxCiphertextBytes).contains(blob.ciphertextSize),
-                  blob.uploadChunkSize == uploadChunkBytes else {
-                throw E2EEV2MediaOutboxError.invalidRecord
-            }
-        }
-    }
-
-    private func ownerDirectory(ownerScopeId: String, create: Bool) throws -> URL {
-        guard validOwner(ownerScopeId) else { throw E2EEV2MediaOutboxError.invalidRecord }
-        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
-        let directory = baseDirectory.appendingPathComponent(namespace, isDirectory: true)
-        if create { try createProtectedDirectory(directory) }
-        return directory
-    }
-
-    private func ciphertextURL(
-        ownerScopeId: String,
-        blobId: String,
-        createDirectory: Bool
-    ) throws -> URL {
-        guard Self.validOpaqueId(blobId) else { throw E2EEV2MediaOutboxError.invalidRecord }
-        let directory = try ownerDirectory(ownerScopeId: ownerScopeId, create: createDirectory)
-            .appendingPathComponent("blobs", isDirectory: true)
-        if createDirectory { try createProtectedDirectory(directory) }
-        return directory.appendingPathComponent("\(blobId).bin", isDirectory: false)
-    }
-
-    private func recordURL(ownerScopeId: String, clientRequestId: String) -> URL {
-        let namespace = LocalAccountScope.storageNamespace(for: clientRequestId)
-        return baseDirectory
-            .appendingPathComponent(LocalAccountScope.storageNamespace(for: ownerScopeId), isDirectory: true)
-            .appendingPathComponent("records", isDirectory: true)
-            .appendingPathComponent("\(namespace).json", isDirectory: false)
-    }
-
-    private func verifyCiphertext(at url: URL, manifest: E2EEV2OutboxBlobManifest) throws {
-        guard url.isFileURL,
-              let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
-              values.isRegularFile == true,
-              Int64(values.fileSize ?? -1) == manifest.ciphertextSize,
-              (try? Self.sha256Hex(url)) == manifest.ciphertextSha256 else {
-            throw E2EEV2MediaOutboxError.invalidCiphertext
-        }
-    }
-
-    private func createProtectedDirectory(_ url: URL) throws {
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var mutable = url
-        try mutable.setResourceValues(values)
-        try fileManager.setAttributes(
-            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-            ofItemAtPath: url.path
-        )
-    }
-
-    private func applyProtection(to url: URL) throws {
-        try fileManager.setAttributes(
-            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-            ofItemAtPath: url.path
-        )
-    }
-
-    private func validOwner(_ ownerScopeId: String) -> Bool {
-        ownerScopeId.hasPrefix("user:") && ownerScopeId.count > "user:".count
-    }
-
-    private static func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
-    }
-
-    private static func validRequestId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#, options: .regularExpression) != nil
-    }
-
-    private static func validBase64(_ value: String, max: Int) -> Bool {
-        (4...max).contains(value.count)
-            && value.range(of: #"^[A-Za-z0-9+/_-]+={0,2}\z"#, options: .regularExpression) != nil
-    }
-
-    static func sha256Hex(_ url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while true {
-            let data = try handle.read(upToCount: 64 * 1_024) ?? Data()
-            if data.isEmpty { break }
-            hasher.update(data: data)
-        }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
 

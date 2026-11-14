@@ -537,6 +537,10 @@ final class AppServices: ObservableObject {
               autoEnrollmentNotBefore.map({ Date() >= $0 }) ?? true else { return }
         autoEnrollmentRunning = true
         defer { autoEnrollmentRunning = false }
+        // Entrées v2 que plus rien ne lit (lot 10) : effacées une fois par compte.
+        if let session = LocalAccountScope.sessionSnapshot() {
+            E2EEV2RetiredStorage.purgeIfNeeded(ownerNamespace: session.ownerNamespace)
+        }
         guard let outcome = await E2EEAutoEnrollment.runLive(
             api: api, label: E2EEAutoEnrollmentContract.label(isPad: UIDevice.current.userInterfaceIdiom == .pad)
         ) else { return }
