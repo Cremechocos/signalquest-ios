@@ -526,25 +526,6 @@ final class AppServices: ObservableObject {
         SharedSessionMemory.shared.removeAll()
     }
 
-    /// Activation à la connexion (20/10) : la preuve tout juste donnée établit le
-    /// chiffrement du premier appareil, puis les conversations prêtes migrent.
-    func activateE2EEAfterLogin() async {
-        // Mode automatique : l'appareil s'inscrit seul, aucune preuve n'est gardée (E2EE-AUTO §4.1).
-        if SQFeatures.e2eeAutoLogEnabled {
-            E2EEV2LoginActivation.discard()
-            await enrollE2EEAutoDevice()
-            return
-        }
-        guard e2eeV2Messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot(),
-              e2eeV2Messaging.lacksV2Readiness(session) else {
-            E2EEV2LoginActivation.discard()
-            return
-        }
-        guard let outcome = await E2EEV2LoginActivation.run(api: api, label: UIDevice.current.model) else { return }
-        E2EEV2MessagingRuntime.traceV2("activation", outcome.rawValue)
-        if outcome == .activated { await migrateReadyConversations() }
-    }
-
     private var autoEnrollmentRunning = false
     /// Journal fermé (`503`, révision 8) : aucun passage avant `Retry-After`.
     private var autoEnrollmentNotBefore: Date?

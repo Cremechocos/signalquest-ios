@@ -541,9 +541,6 @@ struct MessagesView: View {
     }
     /// Brouillons par conversation, lus sur l'appareil (plan 3, vague 1).
     @State private var drafts: [String: String] = [:]
-    /// Porte E2EE v2 ouverte côté serveur, mais cet appareil n'y est pas encore entré.
-    @State private var needsV2Activation = false
-    @State private var showV2Activation = false
     /// Recherche et filtre de la liste, appliqués sur l'appareil.
     @State private var query = ""
     @State private var filter: InboxFilter = .all
@@ -597,49 +594,6 @@ struct MessagesView: View {
 
     /// Relecture périodique de la liste : app au premier plan, aucune conversation ouverte.
     private var listIsPolling: Bool { scenePhase == .active && (usesSplitLayout || routedConversationId == nil) }
-
-    private func refreshV2Activation() {
-        guard E2EEV2ActivationPrompt.isGuided, services.e2eeV2Messaging.writesEnabled,
-              let current = LocalAccountScope.sessionSnapshot() else {
-            needsV2Activation = false
-            return
-        }
-        needsV2Activation = services.e2eeV2Messaging.lacksV2Readiness(current)
-            && !E2EEV2ActivationPrompt.isSnoozed(current) && !E2EEV2LoginActivation.isPending()
-    }
-
-    /// « Plus tard » : la carte revient au bout d'une semaine ; l'activation
-    /// reste à portée dans Réglages › Appareils.
-    private func snoozeV2Activation() {
-        E2EEV2ActivationPrompt.snooze()
-        needsV2Activation = false
-    }
-
-    /// Activation guidée : l'enregistrement de l'appareil et l'approbation
-    /// demandent un geste (code e-mail du premier appareil, ou un appareil déjà
-    /// approuvé), jamais faits en silence.
-    private var v2ActivationCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Label("Messages et appels chiffrés", systemImage: "lock.shield")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-                .accessibilityAddTraits(.isHeader)
-            Text("Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé.")
-                .font(SQType.body)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Activer sur cet appareil"), style: .primary, allowsMultiline: true) {
-                showV2Activation = true
-            }
-            .accessibilityIdentifier("e2ee-v2-activation-open")
-            GradientButton(String(localized: "Plus tard"), style: .ghost, allowsMultiline: true) {
-                snoozeV2Activation()
-            }
-            .accessibilityIdentifier("e2ee-v2-activation-later")
-        }
-        .padding(.vertical, SQSpace.md)
-        .accessibilityElement(children: .contain)
-    }
 
     /// iPad en largeur régulière : la liste à gauche, la conversation à droite.
     /// L'iPhone, même large en paysage, garde la pile.
@@ -727,9 +681,6 @@ struct MessagesView: View {
                 }
                 if offersE2EEUnlock, !showingShelved, !showingRequests {
                     e2eeUnlockBanner
-                }
-                if needsV2Activation {
-                    v2ActivationCard
                 }
                 if let focus = model.focus, !showingShelved, !showingRequests {
                     focusBanner(focus)
@@ -1070,31 +1021,11 @@ struct MessagesView: View {
         .onChangeCompat(of: router.openMessageRequests) { _, requested in
             if requested { openRequestsIfRequested() }
         }
-        .task(id: PushOwnerScope.current) { refreshV2Activation() }
         // Les appels se décrochent souvent écran verrouillé, où iOS ne peut pas
         // demander l'accès au micro : une carte explique pourquoi avant de le demander.
         // Plus de carte « Répondre aux appels écran verrouillé » (choix d'Alexandre,
         // 09/11) : la demande système directement, une fois, à l'ouverture.
         .task { await CallManager.requestMicrophoneAccessIfUndetermined() }
-        .onAppear { refreshV2Activation() }
-        .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
-            refreshV2Activation()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: E2EEV2LoginActivation.didFinish).receive(on: RunLoop.main)) { _ in
-            refreshV2Activation()
-        }
-        // L'écran guidé, comme à l'ouverture de l'app, et non la liste technique
-        // des appareils (qui reste dans Réglages › Appareils).
-        .sheet(isPresented: $showV2Activation, onDismiss: refreshV2Activation) {
-            E2EEV2ActivationScreen(
-                api: services.api,
-                onFinish: { showV2Activation = false },
-                onLater: {
-                    snoozeV2Activation()
-                    showV2Activation = false
-                }
-            )
-        }
         .sheet(isPresented: $showNewConversation) {
             NewConversationSheet(
                 service: service,
@@ -2457,10 +2388,6 @@ private struct NewConversationSheet: View {
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
-    /// Parcours d'activation v2 (celui de Messages et de Réglages › Appareils),
-    /// ouvert quand une conversation chiffrée est demandée sans identité v2 prête.
-    @State private var showV2Activation = false
-    @State private var createAfterActivation = false
     @State private var showUnlock = false
     @State private var createAfterUnlock = false
     @State private var query = ""
@@ -2584,27 +2511,10 @@ private struct NewConversationSheet: View {
         } message: {
             Text("Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire à \(selected.first?.displayName ?? "") demain, ou dès maintenant s’il t’ajoute en ami.")
         }
-        .sheet(isPresented: $showV2Activation, onDismiss: {
-            guard createAfterActivation else { return }
-            createAfterActivation = false
-            Task { await create(afterActivation: true) }
-        }) {
-            E2EEV2ActivationScreen(
-                api: services.api,
-                onFinish: {
-                    createAfterActivation = true
-                    showV2Activation = false
-                },
-                onLater: {
-                    errorMessage = String(localized: "Active le chiffrement sur cet appareil pour créer une conversation chiffrée.")
-                    showV2Activation = false
-                }
-            )
-        }
         .sheet(isPresented: $showUnlock, onDismiss: {
             guard createAfterUnlock else { return }
             createAfterUnlock = false
-            Task { await create(afterActivation: true) }
+            Task { await create(afterUnlock: true) }
         }) {
             if let unlockUserId, let unlockService {
                 E2EEUnlockSheet(userId: unlockUserId, service: unlockService) {
@@ -2734,9 +2644,8 @@ private struct NewConversationSheet: View {
         isSearching = false
     }
 
-    /// `afterActivation` : relance après l'activation v2 ou le déverrouillage ;
-    /// si l'identité v2 n'est toujours pas prête, on le dit au lieu de reboucler.
-    private func create(afterActivation: Bool = false) async {
+    /// `afterUnlock` : relance après le déverrouillage, sans reboucler dessus.
+    private func create(afterUnlock: Bool = false) async {
         isBusy = true
         defer { isBusy = false }
         do {
@@ -2749,20 +2658,14 @@ private struct NewConversationSheet: View {
             }
             // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
             // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
-            // Appareil pas encore entré en v2 : on déroule d'abord l'activation
-            // guidée (le serveur refuse la v1 à un compte sans mot de passe de
-            // chiffrement), puis la création repart en v2. Une porte serveur
-            // refermée, elle, crée en v1.
+            // Appareil pas encore inscrit (E2EE-AUTO §4.1) : on le dit et
+            // l'inscription automatique repart. Une porte serveur refermée,
+            // elle, crée en v1.
             if e2ee, services.e2eeV2Messaging.writesEnabled,
                let session = LocalAccountScope.sessionSnapshot(),
                services.e2eeV2Messaging.lacksV2Readiness(session) {
-                if afterActivation || !E2EEV2ActivationPrompt.isGuided {
-                    errorMessage = String(localized: "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie.")
-                    // Inscription automatique pas encore aboutie : elle repart.
-                    if !E2EEV2ActivationPrompt.isGuided { Task { await services.enrollE2EEAutoDevice() } }
-                } else {
-                    showV2Activation = true
-                }
+                errorMessage = String(localized: "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie.")
+                Task { await services.enrollE2EEAutoDevice() }
                 return
             }
             if e2ee, services.e2eeV2Messaging.writesEnabled,
@@ -2815,7 +2718,7 @@ private struct NewConversationSheet: View {
         } catch {
             // Création v1 refusée faute de mot de passe de chiffrement : la feuille
             // de création de clé, puis la création repart (au lieu de l'erreur brute).
-            if e2ee, !afterActivation, unlockUserId != nil, unlockService != nil,
+            if e2ee, !afterUnlock, unlockUserId != nil, unlockService != nil,
                case APIError.http(let status, _, let message, _, _) = error,
                status == 400, message.localizedCaseInsensitiveContains("mot de passe de chiffrement") {
                 showUnlock = true

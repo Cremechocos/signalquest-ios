@@ -278,8 +278,8 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = newState {
-                    // Activation à la connexion : la preuve tout juste donnée sert une fois.
-                    Task { await services.activateE2EEAfterLogin() }
+                    // E2EE-AUTO §4.1 : l'appareil s'inscrit seul à la connexion.
+                    Task { await services.enrollE2EEAutoDevice() }
                     refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
@@ -523,8 +523,6 @@ struct RootView: View {
     @State private var guestLease: OnboardingGuestLease?
     @State private var guestEntryInFlight = false
     @State private var mainApplicationAppeared = false
-    /// Activation guidée du chiffrement au lancement (1.0 (164)).
-    @State private var showsV2Activation = false
     /// Question du ton (tutoiement ou vouvoiement), au plus une fois par jour.
     @State private var showsAddressPrompt = false
     /// Identité membre v1 : « Ton nom d'utilisateur », à garder ou changer, non repoussable.
@@ -547,21 +545,10 @@ struct RootView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var versionPolicy: VersionPolicyService
 
-    /// Seulement pour un compte connecté, jamais pendant un appel, et tant que
-    /// cet appareil n'est pas entré en v2 sans « Plus tard » en cours.
-    private func refreshV2ActivationPrompt() {
-        guard isAuthenticated, !callManager.showCallScreen, callManager.activeCall == nil, !showsV2Activation,
-              !showsAddressPrompt, newDeviceAlerts.presented == nil, !logAlerts.isPresented,
-              !AppEnvironment.usesDemoData else { return }
-        // Une activation à la connexion est en cours : pas de code à demander pour rien.
-        guard !E2EEV2LoginActivation.isPending() else { return }
-        if E2EEV2ActivationPrompt.shouldPrompt(messaging: services.e2eeV2Messaging) { showsV2Activation = true }
-    }
-
-    /// Jamais pendant un appel ni par-dessus l'activation du chiffrement ; jamais
+    /// Jamais pendant un appel ni par-dessus une autre invite ; jamais
     /// avant la fin de l'onboarding (RootView n'existe pas avant) ni pour un invité.
     private func refreshAddressPrompt() {
-        guard !showsAddressPrompt, !showsV2Activation, newDeviceAlerts.presented == nil, !logAlerts.isPresented,
+        guard !showsAddressPrompt, newDeviceAlerts.presented == nil, !logAlerts.isPresented,
               !callManager.showCallScreen, callManager.activeCall == nil,
               SQAddress.shouldAsk(isAuthenticated: isAuthenticated, chosen: addressStore.chosen,
                                   appIsFrench: SQAddress.appIsFrench, lastAsked: SQAddress.lastAsked)
@@ -600,7 +587,7 @@ struct RootView: View {
     }
 
     private var showsOtherLaunchPrompt: Bool {
-        showsAddressPrompt || showsV2Activation || newDeviceAlerts.presented != nil || logAlerts.isPresented
+        showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
             || showsHistoryApproval || showsHistoryRequester
     }
 
@@ -628,7 +615,7 @@ struct RootView: View {
     /// L'alerte de fourche, lue dans le trousseau sans réseau, passe la première.
     private func refreshNewDeviceAlert() {
         guard SQFeatures.e2eeAutoLogEnabled, isAuthenticated, !callManager.showCallScreen, callManager.activeCall == nil,
-              !showsV2Activation, !showsAddressPrompt, !AppEnvironment.usesDemoData, newDeviceAlerts.presented == nil,
+              !showsAddressPrompt, !AppEnvironment.usesDemoData, newDeviceAlerts.presented == nil,
               let session = LocalAccountScope.sessionSnapshot() else { return }
         let services = services
         logAlerts.refresh(ownerScopeId: session.ownerScopeId) {
@@ -678,8 +665,6 @@ struct RootView: View {
                 E2EEV2SafetyNumberQAScreen()
             } else if AppEnvironment.showsE2EEReportQA {
                 E2EEV2MessageReportQAScreen()
-            } else if AppEnvironment.showsActivationQA {
-                E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
             } else if AppEnvironment.showsAutoLogAlertQA {
                 E2EEAutoLogAlertQAScreen()
             } else if AppEnvironment.showsAutoLogMismatchQA {
@@ -715,7 +700,6 @@ struct RootView: View {
                     .onAppear {
                         mainApplicationAppeared = true
                         acknowledgeGuestPresentation()
-                        refreshV2ActivationPrompt()
                         refreshAddressPrompt()
                         refreshNewDeviceAlert()
                         refreshHistoryRequests(active: true)
@@ -732,15 +716,9 @@ struct RootView: View {
                         refreshUsernameConfirmation()
                         refreshDisplayNamePrompt()
                     }
-                    .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
-                        refreshV2ActivationPrompt()
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: E2EEV2LoginActivation.didFinish).receive(on: RunLoop.main)) { _ in
-                        refreshV2ActivationPrompt()
-                    }
                     .onChangeCompat(of: scenePhase) { _, phase in
                         if phase == .active {
-                            refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert()
+                            refreshAddressPrompt(); refreshNewDeviceAlert()
                             readOwnDevicesAfterAddedPush()
                             refreshUsernameConfirmation()
                             reconcileAppStoreTransactions()
@@ -762,7 +740,7 @@ struct RootView: View {
                         }
                     }
                     .onChangeCompat(of: callManager.showCallScreen) { _, shown in
-                        if !shown { refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert() }
+                        if !shown { refreshAddressPrompt(); refreshNewDeviceAlert() }
                     }
                     .onReceive(NotificationCenter.default.publisher(for: E2EEAutoNewDeviceAlerts.didChange).receive(on: RunLoop.main)) { _ in
                         refreshNewDeviceAlert()
@@ -777,7 +755,7 @@ struct RootView: View {
                     // Calque plutôt que `fullScreenCover` : l'écran d'appel, présenté
                     // plus haut, doit pouvoir passer devant. Deux présentations
                     // modales concurrentes, et l'appel entrant restait invisible.
-                    .accessibilityHidden(showsV2Activation || showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
+                    .accessibilityHidden(showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
                                          || showsHistoryApproval || showsHistoryRequester || presentsUsernameConfirmation
                                          || presentsDisplayNamePrompt)
                     .overlay {
@@ -785,7 +763,6 @@ struct RootView: View {
                             SQAddressFormPrompt(onClose: {
                                 showsAddressPrompt = false
                                 addressStore.applyTone()
-                                refreshV2ActivationPrompt()
                                 refreshNewDeviceAlert()
                             })
                             .accessibilityAddTraits(.isModal)
@@ -831,21 +808,6 @@ struct RootView: View {
                     }
                     .sqAnimation(SQMotion.smooth, value: presentsDisplayNamePrompt)
                     .overlay {
-                        if showsV2Activation {
-                            E2EEV2ActivationScreen(
-                                api: services.api,
-                                onFinish: { showsV2Activation = false; refreshNewDeviceAlert() },
-                                onLater: {
-                                    E2EEV2ActivationPrompt.snooze()
-                                    showsV2Activation = false
-                                    refreshNewDeviceAlert()
-                                }
-                            )
-                            .accessibilityAddTraits(.isModal)
-                            .transition(.move(edge: .bottom))
-                        }
-                    }
-                    .overlay {
                         if let presented = newDeviceAlerts.presented, let model = newDeviceAlerts.model {
                             E2EEAutoNewDeviceAlertView(deviceId: presented.deviceId, model: model) { resolved in
                                 newDeviceAlerts.close(resolved: resolved)
@@ -856,14 +818,12 @@ struct RootView: View {
                             .transition(.move(edge: .bottom))
                         }
                     }
-                    .sqAnimation(SQMotion.smooth, value: showsV2Activation)
                     .sqAnimation(SQMotion.smooth, value: showsAddressPrompt)
                     .overlay {
                         if let model = logAlerts.model {
                             E2EEAutoLogAlertView(model: model) {
                                 logAlerts.close(ownerScopeId: LocalAccountScope.sessionSnapshot()?.ownerScopeId)
                                 refreshNewDeviceAlert()
-                                refreshV2ActivationPrompt()
                                 refreshAddressPrompt()
                             }
                             .accessibilityAddTraits(.isModal)

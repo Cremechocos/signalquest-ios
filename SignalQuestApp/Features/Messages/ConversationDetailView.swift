@@ -96,9 +96,6 @@ struct ConversationDetailView: View {
     @State private var conversationIsV2 = false
     /// Membres sans chiffrement v2 activé : la conversation reste v1 à cause d'eux.
     @State private var membersNotActivated: [String] = []
-    /// Cet appareil n'a pas encore activé le chiffrement v2.
-    @State private var ownV2ActivationNeeded = false
-    @State private var showV2Activation = false
     /// Nom donné au groupe depuis ses réglages pendant cette ouverture.
     @State private var renamedTitle: String?
     /// Nombre de membres après un ajout ou un retrait depuis les réglages.
@@ -1223,7 +1220,6 @@ struct ConversationDetailView: View {
                 case .v1: break
                 }
             }
-            refreshOwnV2Activation()
             // L'état de déverrouillage v1 est connu avant de lever `v2Resolved` :
             // sans cela, la carte « Conversation chiffrée » s'affichait une
             // fraction de seconde à chaque ouverture, le temps du chargement.
@@ -1308,15 +1304,6 @@ struct ConversationDetailView: View {
                     dismissContentPresentations()
                 }
             }
-        }
-        .sheet(isPresented: $showV2Activation, onDismiss: refreshOwnV2Activation) {
-            // L'écran guidé de la Messagerie ; la conversation passera au
-            // nouveau chiffrement à sa prochaine ouverture.
-            E2EEV2ActivationScreen(
-                api: services.api,
-                onFinish: { showV2Activation = false },
-                onLater: { showV2Activation = false }
-            )
         }
         .sheet(isPresented: $showImportUnlock) {
             if case .authenticated(let user) = session.state {
@@ -2839,28 +2826,12 @@ struct ConversationDetailView: View {
 
     // MARK: Nouveau chiffrement
 
-    /// Conversation restée sur l'ancien chiffrement : une ligne dit pourquoi.
-    /// Cet appareil d'abord, puisqu'il peut agir, puis les membres qui n'ont
-    /// pas encore activé le nouveau.
+    /// Conversation restée sur l'ancien chiffrement : une ligne nomme les
+    /// membres qui n'ont pas encore le nouveau. Cet appareil, lui, s'inscrit
+    /// seul (E2EE-AUTO §4.1).
     @ViewBuilder
     private var v2UpgradeNotice: some View {
-        if ownV2ActivationNeeded {
-            Button {
-                Haptics.selection()
-                showV2Activation = true
-            } label: {
-                Label("Activer le nouveau chiffrement sur cet appareil", systemImage: "lock.shield")
-                    .font(SQType.subhead(.semibold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .padding(.horizontal, SQSpace.md)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, SQSpace.md)
-            .padding(.top, SQSpace.sm)
-            .accessibilityIdentifier("conversation.v2-activate")
-        } else if let text = notActivatedText {
+        if let text = notActivatedText {
             Label(text, systemImage: "hourglass")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -2879,15 +2850,6 @@ struct ConversationDetailView: View {
             return String(localized: "\(name) n’a pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même.")
         }
         return String(localized: "\(membersNotActivated.count) membres n’ont pas encore activé le nouveau chiffrement. La conversation y passera d’elle-même.")
-    }
-
-    private func refreshOwnV2Activation() {
-        guard E2EEV2ActivationPrompt.isGuided, services.e2eeV2Messaging.writesEnabled,
-              let session = LocalAccountScope.sessionSnapshot() else {
-            ownV2ActivationNeeded = false
-            return
-        }
-        ownV2ActivationNeeded = services.e2eeV2Messaging.lacksV2Readiness(session)
     }
 
     // MARK: Barre d'épinglés

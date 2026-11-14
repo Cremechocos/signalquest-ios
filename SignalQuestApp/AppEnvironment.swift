@@ -176,13 +176,6 @@ enum AppEnvironment {
         false
         #endif
     }
-    static var showsActivationQA: Bool {
-        #if DEBUG && targetEnvironment(simulator)
-        hasArgument("--qa-e2ee-activation")
-        #else
-        false
-        #endif
-    }
     /// « C'est moi », côté demandeur (E2EE-AUTO §5.3).
     static var showsAutoHistoryRequestQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
