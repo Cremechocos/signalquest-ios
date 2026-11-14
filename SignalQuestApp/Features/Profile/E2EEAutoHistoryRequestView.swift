@@ -732,7 +732,7 @@ struct E2EEAutoHistoryApprovalView: View {
         case .tooRecent:
             return String(localized: "Cet appareil a été ajouté il y a moins de 24 h : confirme depuis un appareil plus ancien.")
         case .closed: return String(localized: "Cette demande n’est plus ouverte.")
-        case .noHistoryKey: return String(localized: "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils.")
+        case .noHistoryKey: return String(localized: "Cet appareil n’a pas l’historique. Ouvre SignalQuest sur un appareil où tes conversations sont déjà là.")
         case .unknownDevice: return String(localized: "Cet appareil n’est plus sur ton compte.")
         }
     }

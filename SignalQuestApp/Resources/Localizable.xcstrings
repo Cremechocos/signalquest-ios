@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Cet appareil n’a pas l’historique. Ouvre SignalQuest sur un appareil où tes conversations sont déjà là." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn’t have the history. Open SignalQuest on a device that already has your conversations."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas l’historique. Ouvre SignalQuest sur un appareil où tes conversations sont déjà là."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil n’a pas l’historique. Ouvre SignalQuest sur un appareil où tes conversations sont déjà là." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas l’historique. Ouvrez SignalQuest sur un appareil où vos conversations sont déjà là."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "%lld eNB posés" : {
       "localizations" : {
         "en" : {
@@ -113228,34 +113256,6 @@
           }
         }
       }
-    },
-    "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device doesn’t have the history yet. Confirm from another of your devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils."
-          }
-        }
-      }
-    },
-    "SQFormal|Cet appareil n’a pas encore l’historique. Confirme depuis un autre de tes appareils." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n’a pas encore l’historique. Confirmez depuis un autre de vos appareils."
-          }
-        }
-      },
-      "shouldTranslate" : false
     },
     "Cet appareil n’est plus sur ton compte." : {
       "localizations" : {
