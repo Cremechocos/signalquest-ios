@@ -97,60 +97,6 @@ final class E2EEV2DeviceLockedSigningTests: XCTestCase {
         XCTAssertNotNil(try tokens.string(for: copyKey), "La copie s'écrit à la lecture suivante")
     }
 
-    func testAReplacementIdentityNeverLeavesTheOldKeyInTheLockedCopy() throws {
-        let tokens = LockableTokenStore()
-        let store = makeStore(tokens)
-        let old = try store.loadOrCreate(ownerNamespace: namespace)
-        let candidate = try store.prepareResetCandidate(ownerNamespace: namespace)
-        try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId)
-
-        tokens.locked = true
-        let signed = try store.signWithDeviceId(canonicalRequest: message, ownerNamespace: namespace)
-        XCTAssertEqual(signed.deviceId, candidate.deviceId)
-        XCTAssertTrue(try verify(signed.signature, by: candidate))
-        XCTAssertFalse(try verify(signed.signature, by: old))
-    }
-
-    /// Une signature qui a lu l'ancienne clé juste avant le remplacement ne la
-    /// recopie pas ensuite dans la copie lisible verrouillé.
-    func testASignatureThatReadTheOldKeyDuringAReplacementNeverCopiesIt() throws {
-        let tokens = LockableTokenStore()
-        let store = makeStore(tokens)
-        let old = try store.loadOrCreate(ownerNamespace: namespace)
-        let candidate = try store.prepareResetCandidate(ownerNamespace: namespace)
-        tokens.afterNextRead(of: store.storageKey(ownerNamespace: namespace)) { [namespace] in
-            do {
-                try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId)
-            } catch {
-                XCTFail("Remplacement refusé : \(error)")
-            }
-        }
-        XCTAssertTrue(try verify(store.sign(canonicalRequest: message, ownerNamespace: namespace), by: old),
-                      "La signature en cours garde la clé qu'elle a lue")
-
-        tokens.locked = true
-        let signed = try store.signWithDeviceId(canonicalRequest: message, ownerNamespace: namespace)
-        XCTAssertEqual(signed.deviceId, candidate.deviceId)
-        XCTAssertTrue(try verify(signed.signature, by: candidate))
-    }
-
-    /// Tant que l'ancienne clé ne peut pas quitter la copie, rien ne change.
-    func testAReplacementWaitsUntilTheOldKeyLeavesTheLockedCopy() throws {
-        let tokens = LockableTokenStore()
-        let store = makeStore(tokens)
-        let old = try store.loadOrCreate(ownerNamespace: namespace)
-        let candidate = try store.prepareResetCandidate(ownerNamespace: namespace)
-        tokens.failingRemovals = [E2EEV2DeviceIdentityStore.lockedSigningStorageKey(ownerNamespace: namespace)]
-        XCTAssertThrowsError(try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId))
-        XCTAssertEqual(try store.load(ownerNamespace: namespace)?.deviceId, old.deviceId)
-        XCTAssertEqual(try store.loadResetCandidate(ownerNamespace: namespace)?.deviceId, candidate.deviceId, "Reprise possible")
-
-        tokens.failingRemovals = []
-        try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId)
-        tokens.locked = true
-        XCTAssertEqual(try store.signWithDeviceId(canonicalRequest: message, ownerNamespace: namespace).deviceId, candidate.deviceId)
-    }
-
     /// Deux enregistrements simultanés (seul chemin qui crée l'identité) :
     /// une seule identité.
     func testConcurrentFirstUsesCreateASingleIdentity() {
@@ -314,22 +260,4 @@ final class E2EEV2DeviceLockedSigningTests: XCTestCase {
         }
     }
 
-    /// Blob de Secure Enclave inutilisable (appareil effacé puis restauré) :
-    /// l'identité est illisible, mais la remplacer reste possible.
-    func testAnUnusableEnclaveKeyCanStillBeReplaced() throws {
-        try XCTSkipUnless(E2EEV2DeviceIdentityStore.createsSecureEnclaveKeys, "Pas de Secure Enclave sur cette machine")
-        let tokens = LockableTokenStore()
-        let store = makeStore(tokens)
-        let old = try store.loadOrCreate(ownerNamespace: namespace)
-        let key = store.storageKey(ownerNamespace: namespace)
-        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(XCTUnwrap(tokens.string(for: key)).utf8)) as? [String: Any])
-        json["signingPrivateRawB64"] = Data(repeating: 7, count: 120).base64EncodedString()
-        try tokens.set(String(decoding: try JSONSerialization.data(withJSONObject: json), as: UTF8.self),
-                       for: key, accessibility: .whenUnlocked)
-        XCTAssertThrowsError(try store.load(ownerNamespace: namespace))
-        let candidate = try store.prepareResetCandidate(ownerNamespace: namespace)
-        XCTAssertNotEqual(candidate.deviceId, old.deviceId)
-        try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId)
-        XCTAssertEqual(try store.load(ownerNamespace: namespace)?.deviceId, candidate.deviceId)
-    }
 }

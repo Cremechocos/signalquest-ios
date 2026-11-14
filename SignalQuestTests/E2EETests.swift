@@ -44,35 +44,6 @@ final class E2EETests: XCTestCase {
         let signatureDerB64: String
     }
 
-    private struct RecoveryFixture: Decodable {
-        let ownerNamespace: String
-        let recoveryKeyB64: String
-        let identityRootKeyB64: String
-        let saltB64: String
-        let nonceB64: String
-        let aadUtf8: String
-        let derivedKeyB64: String
-        let wrappedIdentityRootKeyB64: String
-        let recoveryKeyVerifierHash: String
-    }
-
-    private struct RecoveryV2Fixture: Decodable {
-        struct Challenge: Decodable {
-            let challengeId: String
-            let pendingDeviceId: String
-            let bundleHash: String
-            let challengeB64Url: String
-            let expiresAtMs: Int64
-        }
-
-        let ownerNamespace: String
-        let recoveryKeyB64: String
-        let bundle: E2EEV2RecoveryBundleV2
-        let bundleHash: String
-        let challenge: Challenge
-        let recoverySignatureB64: String
-    }
-
     private struct EpochFixture: Decodable {
         let conversationId: String
         let epochNumber: Int
@@ -96,33 +67,6 @@ final class E2EETests: XCTestCase {
         let signatureCanonicalUtf8: String
         let senderPublicSigningKeyB64: String
         let signatureDerB64: String
-    }
-
-    private struct RecoveryEpochFixture: Decodable {
-        let fixtureVersion: Int
-        let conversationId: String
-        let epochId: String
-        let epochNumber: Int
-        let algorithm: String
-        let keyCommitmentB64: String
-        let reason: String
-        let status: String
-        let createdAt: String
-        let epochKeyB64: String
-        let senderDeviceId: String
-        let senderPublicSigningKeyB64: String
-        let recipientUserId: String
-        let recoveryBundleHash: String
-        let recoveryPublicIdentityKeyB64: String
-        let recoveryPrivateIdentityRawB64: String
-        let ephemeralPrivateRawB64: String
-        let saltCanonicalUtf8: String
-        let saltB64: String
-        let sharedSecretB64: String
-        let derivedKeyB64: String
-        let aadUtf8: String
-        let signatureCanonicalUtf8: String
-        let envelope: E2EEV2RecoveryEpochEnvelope
     }
 
     private struct MessageFixture: Decodable {
@@ -236,70 +180,12 @@ final class E2EETests: XCTestCase {
         return try JSONDecoder().decode(SignedRequestFixture.self, from: Data(contentsOf: url))
     }
 
-    private func recoveryFixture() throws -> RecoveryFixture {
-        let repository = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let url = repository.appendingPathComponent("contracts/e2ee-v2/recovery-bundle-v1.json")
-        return try JSONDecoder().decode(RecoveryFixture.self, from: Data(contentsOf: url))
-    }
-
-    private func recoveryV2Fixture() throws -> RecoveryV2Fixture {
-        let repository = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let url = repository.appendingPathComponent("contracts/e2ee-v2/recovery-proof-v2.json")
-        return try JSONDecoder().decode(RecoveryV2Fixture.self, from: Data(contentsOf: url))
-    }
-
     private func epochFixture() throws -> EpochFixture {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let url = repository.appendingPathComponent("contracts/e2ee-v2/epoch-envelope-v1.json")
         return try JSONDecoder().decode(EpochFixture.self, from: Data(contentsOf: url))
-    }
-
-    private func recoveryEpochFixture() throws -> RecoveryEpochFixture {
-        let repository = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let url = repository.appendingPathComponent("contracts/e2ee-v2/recovery-epoch-envelope-v1.json")
-        return try JSONDecoder().decode(RecoveryEpochFixture.self, from: Data(contentsOf: url))
-    }
-
-    private func recoveryEpochDeliveryData(
-        _ fixture: RecoveryEpochFixture,
-        envelope: E2EEV2RecoveryEpochEnvelope? = nil
-    ) throws -> Data {
-        let value = envelope ?? fixture.envelope
-        return try JSONSerialization.data(withJSONObject: [
-            "recoveryEnvelopeId": "recovery_envelope_fixture_01",
-            "conversationId": fixture.conversationId,
-            "epoch": [
-                "epochId": fixture.epochId,
-                "epochNumber": fixture.epochNumber,
-                "algorithm": fixture.algorithm,
-                "keyCommitmentB64": fixture.keyCommitmentB64,
-                "reason": fixture.reason,
-                "status": fixture.status,
-                "createdAt": fixture.createdAt,
-            ],
-            "senderDevice": [
-                "deviceId": fixture.senderDeviceId,
-                "publicSigningKeyB64": fixture.senderPublicSigningKeyB64,
-            ],
-            "envelope": [
-                "recipientUserId": value.recipientUserId,
-                "recoveryBundleHash": value.recoveryBundleHash,
-                "wrapAlgorithm": value.wrapAlgorithm,
-                "ephemeralPublicKeyB64": value.ephemeralPublicKeyB64,
-                "wrappedEpochKeyB64": value.wrappedEpochKeyB64,
-                "nonceB64": value.nonceB64,
-                "aadB64": value.aadB64,
-                "signatureB64": value.signatureB64,
-            ],
-        ])
     }
 
     private func epochDeliveryData(_ fixture: EpochFixture) throws -> Data {
@@ -495,137 +381,6 @@ final class E2EETests: XCTestCase {
         let parsed = try P256.Signing.ECDSASignature(derRepresentation: signature)
 
         XCTAssertTrue(publicKey.isValidSignature(parsed, for: payload))
-    }
-
-    func testV2IdentityResetCandidateDoesNotReplaceActiveIdentityBeforeActivation() throws {
-        let keychain = InMemoryTokenStore()
-        let store = E2EEV2DeviceIdentityStore(tokenStore: keychain, allowsOwner: { _ in true })
-        let owner = "account-reset-a"
-        let active = try store.loadOrCreate(ownerNamespace: owner, label: "iPhone actif")
-        let candidate = try store.prepareResetCandidate(ownerNamespace: owner, label: "iPhone remplacé")
-
-        XCTAssertNotEqual(active.deviceId, candidate.deviceId)
-        XCTAssertEqual(try store.load(ownerNamespace: owner)?.deviceId, active.deviceId)
-        XCTAssertEqual(
-            try store.prepareResetCandidate(ownerNamespace: owner).deviceId,
-            candidate.deviceId,
-            "Le candidat doit survivre à une reprise sans régénérer les clés"
-        )
-
-        let canonical = try E2EEV2SignedRequest.canonicalRequest(
-            method: "POST",
-            path: "/api/e2ee/v2/identity/reset",
-            timestampMs: 1_777_000_000_000,
-            nonce: "reset_candidate_nonce_0001",
-            body: Data("{}".utf8)
-        )
-        let signature = try store.signResetCandidate(
-            canonicalRequest: canonical,
-            ownerNamespace: owner
-        )
-        let publicKey = try P256.Signing.PublicKey(
-            x963Representation: XCTUnwrap(Data(base64Encoded: candidate.publicSigningKeyB64))
-        )
-        XCTAssertTrue(publicKey.isValidSignature(
-            try P256.Signing.ECDSASignature(derRepresentation: signature),
-            for: canonical
-        ))
-
-        try store.activateResetCandidate(ownerNamespace: owner, expectedDeviceId: candidate.deviceId)
-        XCTAssertEqual(try store.load(ownerNamespace: owner)?.deviceId, candidate.deviceId)
-        XCTAssertNil(try store.loadResetCandidate(ownerNamespace: owner))
-    }
-
-    func testV2IdentityResetContractBindsGenerationDeviceAndIrreversibleAcknowledgements() throws {
-        let store = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
-        let candidate = try store.prepareResetCandidate(ownerNamespace: "account-reset-contract")
-        let userId = "user_reset_contract_0001"
-        let newUik = P256.Signing.PrivateKey(), oldUik = P256.Signing.PrivateKey()
-        let requestedAtMs: Int64 = 1_790_000_000_000
-        let trust = try E2EEV2IdentityResetTrust.make(
-            userId: userId, device: candidate, newUik: newUik,
-            previousUikX963: oldUik.publicKey.x963Representation, requestedAtMs: requestedAtMs
-        )
-        let request = try E2EEV2DeviceApprovalContract.identityResetData(
-            expectedGeneration: 3,
-            replacementDevice: candidate,
-            reauthentication: .email(
-                challengeId: "challenge_0000000000000001",
-                code: "123456"
-            ),
-            trust: trust
-        )
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: request) as? [String: Any])
-        let acknowledgements = try XCTUnwrap(object["acknowledgements"] as? [String: Bool])
-        XCTAssertEqual(object["confirmation"] as? String, "RESET_E2EE_IDENTITY")
-        XCTAssertEqual(object["expectedGeneration"] as? Int, 3)
-        XCTAssertEqual(
-            (object["replacementDevice"] as? [String: Any])?["deviceId"] as? String,
-            candidate.deviceId
-        )
-        XCTAssertEqual(Set(acknowledgements.keys), [
-            "historicalContentUnrecoverable",
-            "otherDevicesWillBeRevoked",
-            "recoveryWillBeReplaced",
-        ])
-        XCTAssertTrue(acknowledgements.values.allSatisfy { $0 })
-
-        // D.14 : le document, le certificat et la liste v1, signés par la nouvelle UIK.
-        let reset = try XCTUnwrap(object["reset"] as? [String: String])
-        XCTAssertEqual(Set(reset.keys), ["reset", "signatureB64"])
-        let document = try E2EEV2IdentityReset.verify(.init(canonical: reset["reset"]!, signatureB64: reset["signatureB64"]!))
-        XCTAssertEqual(document.userId, userId)
-        XCTAssertEqual(document.newUikB64, newUik.publicKey.x963Representation.base64EncodedString())
-        XCTAssertEqual(document.previousUikFingerprint,
-                       E2EEV2Canonical.sha256B64URL(oldUik.publicKey.x963Representation))
-        XCTAssertEqual(document.effectiveAtMs, requestedAtMs + 259_200_000)
-        let certificate = try XCTUnwrap(object["certificate"] as? [String: String])
-        let parsedCertificate = try E2EEV2DeviceCertificate.verify(
-            .init(canonical: certificate["certificate"]!, signatureB64: certificate["signatureB64"]!), uik: newUik.publicKey
-        )
-        XCTAssertEqual(parsedCertificate.deviceId, candidate.deviceId)
-        let list = try XCTUnwrap(object["deviceList"] as? [String: Any])
-        XCTAssertEqual(Set(list.keys), ["list", "signatureB64", "devices"])
-        XCTAssertEqual((list["devices"] as? [String])?.count, 1)
-        XCTAssertTrue(E2EEV2SignedString(canonical: list["list"] as! String, signatureB64: list["signatureB64"] as! String)
-            .verify(with: newUik.publicKey))
-        XCTAssertThrowsError(try E2EEV2IdentityReset.verify(.init(
-            canonical: trust.reset.canonical.replacingOccurrences(of: document.previousUikFingerprint, with: "not-a-digest"),
-            signatureB64: trust.reset.signatureB64
-        )), "La ligne d'empreinte est un condensat ou « - »")
-
-        func view(_ status: String, overrides: [String: Any] = [:]) throws -> Data {
-            var value: [String: Any] = [
-                "resetId": "reset_contract_00000001", "status": status, "replacementDeviceId": candidate.deviceId,
-                "reset": ["reset": trust.reset.canonical, "signatureB64": trust.reset.signatureB64],
-                "effectiveAtMs": String(requestedAtMs + 259_200_000), "objection": NSNull(),
-                "objectingDeviceId": NSNull(), "resolvedAt": status == "pending" ? NSNull() : "2026-10-08T12:00:00.000Z",
-                "abortReason": NSNull(),
-            ]
-            value.merge(overrides) { _, new in new }
-            return try JSONSerialization.data(withJSONObject: value)
-        }
-        let pending = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseIdentityResetView(
-            try view("pending"), expectedReplacementDeviceId: candidate.deviceId
-        ))
-        XCTAssertEqual(pending.state, .pending)
-        XCTAssertEqual(pending.effectiveAtMs, document.effectiveAtMs)
-        XCTAssertEqual(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("completed"))?.state, .completed)
-        // Refus : autre appareil, échéance différente, statut inconnu, clé en trop, entier non textuel.
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
-            try view("pending"), expectedReplacementDeviceId: "device_other_0000000001"
-        ))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
-            try view("pending", overrides: ["effectiveAtMs": String(requestedAtMs)])
-        ))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("switched")))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("pending", overrides: ["extra": true])))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
-            try view("pending", overrides: ["effectiveAtMs": requestedAtMs + 259_200_000])
-        ))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
-            try view("objected"), expectedReplacementDeviceId: candidate.deviceId
-        ), "Une opposition nomme l'appareil qui s'oppose")
     }
 
     func testV2DeviceInventoryRequiresIdentityBoundToListedDevice() throws {
@@ -1151,491 +906,6 @@ final class E2EETests: XCTestCase {
         XCTAssertFalse(E2EEV2LowS.verify(derSignature: highS, message: canonical, publicKey: publicKey))
     }
 
-    func testV2RecoveryHKDFAndAESGCMMatchCrossPlatformFixture() throws {
-        let fixture = try recoveryFixture()
-        let recoveryKey = try XCTUnwrap(Data(base64Encoded: fixture.recoveryKeyB64))
-        let identityRoot = try XCTUnwrap(Data(base64Encoded: fixture.identityRootKeyB64))
-        let salt = try XCTUnwrap(Data(base64Encoded: fixture.saltB64))
-        let nonce = try XCTUnwrap(Data(base64Encoded: fixture.nonceB64))
-
-        XCTAssertEqual(
-            try E2EEV2RecoveryCrypto.aad(ownerNamespace: fixture.ownerNamespace),
-            Data(fixture.aadUtf8.utf8)
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryCrypto.deriveWrappingKey(recoveryKey: recoveryKey, salt: salt)
-                .base64EncodedString(),
-            fixture.derivedKeyB64
-        )
-        let wrapped = try E2EEV2RecoveryCrypto.wrapIdentityRootKey(
-            identityRoot,
-            recoveryKey: recoveryKey,
-            salt: salt,
-            nonce: nonce,
-            ownerNamespace: fixture.ownerNamespace
-        )
-        XCTAssertEqual(wrapped.base64EncodedString(), fixture.wrappedIdentityRootKeyB64)
-        XCTAssertEqual(
-            try E2EEV2RecoveryCrypto.unwrapIdentityRootKey(
-                wrapped,
-                recoveryKey: recoveryKey,
-                salt: salt,
-                nonce: nonce,
-                ownerNamespace: fixture.ownerNamespace
-            ),
-            identityRoot
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryCrypto.recoveryKeyVerifierHash(recoveryKey),
-            fixture.recoveryKeyVerifierHash
-        )
-    }
-
-    func testV2RecoveryProofFixtureDecryptsPortableKeysAndVerifiesSignature() throws {
-        let fixture = try recoveryV2Fixture()
-        let recoveryKey = try XCTUnwrap(Data(base64Encoded: fixture.recoveryKeyB64))
-        XCTAssertEqual(E2EEV2RecoveryV2Crypto.bundleHash(fixture.bundle), fixture.bundleHash)
-        let challenge = E2EEV2RecoveryChallengeV2(
-            challengeId: fixture.challenge.challengeId,
-            pendingDeviceId: fixture.challenge.pendingDeviceId,
-            bundleHash: fixture.challenge.bundleHash,
-            challengeB64URL: fixture.challenge.challengeB64Url,
-            expiresAtMs: fixture.challenge.expiresAtMs,
-            bundle: fixture.bundle
-        )
-        let signingPrivate = try E2EEV2RecoveryV2Crypto.unwrapSigningPrivateKey(
-            bundle: fixture.bundle,
-            recoveryKey: recoveryKey,
-            ownerBinding: fixture.ownerNamespace
-        )
-        XCTAssertEqual(
-            signingPrivate.publicKey.x963Representation.base64EncodedString(),
-            fixture.bundle.recoveryPublicSigningKeyB64
-        )
-        let publicKey = try P256.Signing.PublicKey(
-            x963Representation: XCTUnwrap(Data(base64Encoded: fixture.bundle.recoveryPublicSigningKeyB64))
-        )
-        let fixtureSignature = try P256.Signing.ECDSASignature(
-            derRepresentation: XCTUnwrap(Data(base64Encoded: fixture.recoverySignatureB64))
-        )
-        XCTAssertTrue(publicKey.isValidSignature(
-            fixtureSignature,
-            for: try E2EEV2RecoveryV2Crypto.proofCanonical(challenge)
-        ))
-        XCTAssertTrue(publicKey.isValidSignature(
-            try P256.Signing.ECDSASignature(
-                derRepresentation: XCTUnwrap(Data(base64Encoded: E2EEV2RecoveryV2Crypto.signProof(
-                    privateSigningKey: signingPrivate,
-                    challenge: challenge
-                )))
-            ),
-            for: try E2EEV2RecoveryV2Crypto.proofCanonical(challenge)
-        ))
-        XCTAssertEqual(
-            try E2EEV2RecoveryV2Crypto.unwrapIdentityPrivateKey(
-                bundle: fixture.bundle,
-                recoveryKey: recoveryKey,
-                ownerBinding: fixture.ownerNamespace
-            ).publicKey.x963Representation.base64EncodedString(),
-            fixture.bundle.recoveryPublicIdentityKeyB64
-        )
-    }
-
-    func testV2RecoveryChallengeContractBindsBundleDeviceAndOwner() throws {
-        let fixture = try recoveryV2Fixture()
-        var bundle = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: E2EEV2RecoveryV2Contract.bundleData(fixture.bundle))
-                as? [String: Any]
-        )
-        bundle["createdAt"] = "2026-08-24T10:00:00.000Z"
-        bundle["rotatedAt"] = NSNull()
-        bundle["revokedAt"] = NSNull()
-        let response = try JSONSerialization.data(withJSONObject: [
-            "challenge": [
-                "challengeId": fixture.challenge.challengeId,
-                "pendingDeviceId": fixture.challenge.pendingDeviceId,
-                "bundleHash": fixture.challenge.bundleHash,
-                "challengeB64Url": fixture.challenge.challengeB64Url,
-                "expiresAt": ISO8601DateFormatter().string(
-                    from: Date(timeIntervalSince1970: Double(fixture.challenge.expiresAtMs) / 1_000)
-                ),
-                "expiresAtMs": String(fixture.challenge.expiresAtMs),
-            ],
-            "bundle": bundle,
-        ], options: [.sortedKeys])
-        XCTAssertNotNil(E2EEV2RecoveryV2Contract.parseChallenge(
-            response,
-            expectedPendingDeviceId: fixture.challenge.pendingDeviceId,
-            expectedOwnerBinding: fixture.ownerNamespace,
-            nowMs: 0
-        ))
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseChallenge(
-            response,
-            expectedPendingDeviceId: "device_wrong_123456789",
-            expectedOwnerBinding: fixture.ownerNamespace,
-            nowMs: 0
-        ))
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseChallenge(
-            response,
-            expectedPendingDeviceId: fixture.challenge.pendingDeviceId,
-            expectedOwnerBinding: "user:different-owner",
-            nowMs: 0
-        ))
-    }
-
-    func testV2GeneratedRecoveryBundleContainsNoClearSecretOrVerifier() throws {
-        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: "user:ios-recovery-test")
-        XCTAssertEqual(material.recoveryKey.count, 32)
-        XCTAssertTrue(E2EEV2RecoveryV2Contract.validate(
-            material.bundle,
-            ownerBinding: "user:ios-recovery-test"
-        ))
-        XCTAssertNoThrow(try E2EEV2RecoveryV2Crypto.unwrapSigningPrivateKey(
-            bundle: material.bundle,
-            recoveryKey: material.recoveryKey,
-            ownerBinding: "user:ios-recovery-test"
-        ))
-        XCTAssertNoThrow(try E2EEV2RecoveryV2Crypto.unwrapIdentityPrivateKey(
-            bundle: material.bundle,
-            recoveryKey: material.recoveryKey,
-            ownerBinding: "user:ios-recovery-test"
-        ))
-        let serialized = String(decoding: try E2EEV2RecoveryV2Contract.bundleData(material.bundle), as: UTF8.self)
-        XCTAssertFalse(serialized.contains("recoveryKeyVerifierHash"))
-        XCTAssertFalse(serialized.contains("recoveryKeyB64"))
-        XCTAssertFalse(serialized.contains("\"d\""))
-        material.zeroize()
-        XCTAssertEqual(material.recoveryKey, Data(repeating: 0, count: 32))
-    }
-
-    func testV2RecoveryCompletionRequiresExactDeviceAndRotationList() throws {
-        let valid = try JSONSerialization.data(withJSONObject: [
-            "recovered": true,
-            "device": [
-                "deviceId": "device_interop_1234567",
-                "status": "approved",
-                "approvedAt": "2026-08-24T10:00:00.000Z",
-            ],
-            "epochRotationRequired": true,
-            "affectedConversationIds": ["conversation_123456"],
-        ], options: [.sortedKeys])
-        XCTAssertNotNil(E2EEV2RecoveryV2Contract.parseCompletion(
-            valid,
-            expectedDeviceId: "device_interop_1234567"
-        ))
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseCompletion(
-            valid,
-            expectedDeviceId: "device_wrong_123456789"
-        ))
-    }
-
-    func testV2RecoveryBundleReceiptRejectsUnknownOrMalformedFields() throws {
-        let valid = try JSONSerialization.data(withJSONObject: [
-            "stored": true,
-            "unchanged": false,
-            "createdAt": "2026-08-24T10:00:00.000Z",
-            "rotatedAt": NSNull(),
-        ], options: [.sortedKeys])
-        XCTAssertTrue(E2EEV2RecoveryV2Contract.parseBundleReceipt(valid))
-
-        let unknown = try JSONSerialization.data(withJSONObject: [
-            "stored": true,
-            "unchanged": false,
-            "createdAt": "2026-08-24T10:00:00.000Z",
-            "rotatedAt": NSNull(),
-            "recoveryKeyVerifierHash": "forbidden",
-        ], options: [.sortedKeys])
-        XCTAssertFalse(E2EEV2RecoveryV2Contract.parseBundleReceipt(unknown))
-
-        let malformed = try JSONSerialization.data(withJSONObject: [
-            "stored": true,
-            "unchanged": false,
-            "createdAt": "2026-08-24T10:00:00.000Z",
-            "rotatedAt": "not-a-date",
-        ], options: [.sortedKeys])
-        XCTAssertFalse(E2EEV2RecoveryV2Contract.parseBundleReceipt(malformed))
-    }
-
-    func testV2ActiveRecoveryBundleIsStrictAvailableAndOwnerBound() throws {
-        let fixture = try recoveryV2Fixture()
-        var bundle = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: E2EEV2RecoveryV2Contract.bundleData(fixture.bundle))
-                as? [String: Any]
-        )
-        bundle["createdAt"] = "2026-08-24T10:00:00.000Z"
-        bundle["rotatedAt"] = NSNull()
-        bundle["revokedAt"] = NSNull()
-        let available = try JSONSerialization.data(withJSONObject: [
-            "state": "AVAILABLE",
-            "bundle": bundle,
-        ], options: [.sortedKeys])
-
-        XCTAssertEqual(
-            E2EEV2RecoveryV2Contract.parseActiveBundle(
-                available,
-                expectedOwnerBinding: fixture.ownerNamespace
-            ),
-            fixture.bundle
-        )
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseActiveBundle(
-            available,
-            expectedOwnerBinding: "user:different-owner"
-        ))
-
-        let missing = try JSONSerialization.data(withJSONObject: [
-            "state": "MISSING",
-            "bundle": bundle,
-        ], options: [.sortedKeys])
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseActiveBundle(
-            missing,
-            expectedOwnerBinding: fixture.ownerNamespace
-        ))
-
-        var polluted = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: available) as? [String: Any]
-        )
-        polluted["recoveryKeyB64"] = fixture.recoveryKeyB64
-        XCTAssertNil(E2EEV2RecoveryV2Contract.parseActiveBundle(
-            try JSONSerialization.data(withJSONObject: polluted),
-            expectedOwnerBinding: fixture.ownerNamespace
-        ))
-    }
-
-    func testV2RecoveryEpochEnvelopeMatchesCrossPlatformFixtureAndRestoresRetiredEpoch() throws {
-        let fixture = try recoveryEpochFixture()
-        XCTAssertEqual(fixture.fixtureVersion, 1)
-        let context = E2EEV2RecoveryEpochContext(
-            conversationId: fixture.conversationId,
-            epochNumber: fixture.epochNumber,
-            senderDeviceId: fixture.senderDeviceId,
-            recipientUserId: fixture.recipientUserId,
-            recoveryBundleHash: fixture.recoveryBundleHash
-        )
-        let recoveryPrivate = try P256.KeyAgreement.PrivateKey(
-            rawRepresentation: XCTUnwrap(Data(base64Encoded: fixture.recoveryPrivateIdentityRawB64))
-        )
-        let ephemeralPrivate = try P256.KeyAgreement.PrivateKey(
-            rawRepresentation: XCTUnwrap(Data(base64Encoded: fixture.ephemeralPrivateRawB64))
-        )
-        XCTAssertEqual(
-            recoveryPrivate.publicKey.x963Representation.base64EncodedString(),
-            fixture.recoveryPublicIdentityKeyB64
-        )
-        let shared = try ephemeralPrivate.sharedSecretFromKeyAgreement(with: recoveryPrivate.publicKey)
-        XCTAssertEqual(
-            shared.withUnsafeBytes { Data($0) }.base64EncodedString(),
-            fixture.sharedSecretB64
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.saltCanonical(context),
-            Data(fixture.saltCanonicalUtf8.utf8)
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.salt(context).base64EncodedString(),
-            fixture.saltB64
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.deriveWrappingKey(sharedSecret: shared, context: context)
-                .base64EncodedString(),
-            fixture.derivedKeyB64
-        )
-        let epochKey = try XCTUnwrap(Data(base64Encoded: fixture.epochKeyB64))
-        let generated = try E2EEV2RecoveryEpochCrypto.wrap(
-            epochKey: epochKey,
-            keyCommitmentB64: fixture.keyCommitmentB64,
-            recipientPublicKey: recoveryPrivate.publicKey,
-            ephemeralPrivateKey: ephemeralPrivate,
-            nonce: XCTUnwrap(Data(base64Encoded: fixture.envelope.nonceB64)),
-            context: context
-        )
-        XCTAssertEqual(generated.ephemeralPublicKeyB64, fixture.envelope.ephemeralPublicKeyB64)
-        XCTAssertEqual(generated.wrappedEpochKeyB64, fixture.envelope.wrappedEpochKeyB64)
-        XCTAssertEqual(generated.aadB64, fixture.envelope.aadB64)
-        XCTAssertEqual(Data(base64Encoded: generated.aadB64), Data(fixture.aadUtf8.utf8))
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.signatureCanonical(
-                context: context,
-                keyCommitmentB64: fixture.keyCommitmentB64,
-                envelope: fixture.envelope
-            ),
-            Data(fixture.signatureCanonicalUtf8.utf8)
-        )
-
-        let delivery = try XCTUnwrap(E2EEV2RecoveryEpochParser.parseAndVerify(
-            recoveryEpochDeliveryData(fixture),
-            expectedRecipientUserId: fixture.recipientUserId,
-            expectedRecoveryBundleHash: fixture.recoveryBundleHash
-        ))
-        XCTAssertEqual(delivery.metadata.status, "retired")
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.unwrap(
-                delivery: delivery,
-                recoveryPrivateIdentityKey: recoveryPrivate
-            ),
-            epochKey
-        )
-
-        var tamperedBytes = try XCTUnwrap(Data(base64Encoded: fixture.envelope.wrappedEpochKeyB64))
-        tamperedBytes[0] ^= 1
-        let tamperedEnvelope = E2EEV2RecoveryEpochEnvelope(
-            recipientUserId: fixture.envelope.recipientUserId,
-            recoveryBundleHash: fixture.envelope.recoveryBundleHash,
-            wrapAlgorithm: fixture.envelope.wrapAlgorithm,
-            ephemeralPublicKeyB64: fixture.envelope.ephemeralPublicKeyB64,
-            wrappedEpochKeyB64: tamperedBytes.base64EncodedString(),
-            nonceB64: fixture.envelope.nonceB64,
-            aadB64: fixture.envelope.aadB64,
-            signatureB64: fixture.envelope.signatureB64
-        )
-        XCTAssertNil(E2EEV2RecoveryEpochParser.parseAndVerify(
-            try recoveryEpochDeliveryData(fixture, envelope: tamperedEnvelope),
-            expectedRecipientUserId: fixture.recipientUserId,
-            expectedRecoveryBundleHash: fixture.recoveryBundleHash
-        ))
-    }
-
-    func testV2DeviceIdentityCreatesSignedRecoveryEpochForCurrentBackfillDevice() throws {
-        let fixture = try recoveryEpochFixture()
-        let identityStore = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
-        let owner = "recovery-backfill-owner"
-        let sender = try identityStore.loadOrCreate(ownerNamespace: owner, label: "Backfill")
-        let epochKey = try XCTUnwrap(Data(base64Encoded: fixture.epochKeyB64))
-        let context = E2EEV2RecoveryEpochContext(
-            conversationId: fixture.conversationId,
-            epochNumber: fixture.epochNumber,
-            senderDeviceId: sender.deviceId,
-            recipientUserId: fixture.recipientUserId,
-            recoveryBundleHash: fixture.recoveryBundleHash
-        )
-        let envelope = try identityStore.createSignedRecoveryEpochEnvelope(
-            context: context,
-            keyCommitmentB64: fixture.keyCommitmentB64,
-            epochKey: epochKey,
-            recipientPublicIdentityKeyB64: fixture.recoveryPublicIdentityKeyB64,
-            ownerNamespace: owner,
-            nonce: Data(repeating: 0, count: 12)
-        )
-        let signingPublic = try P256.Signing.PublicKey(
-            x963Representation: XCTUnwrap(Data(base64Encoded: sender.publicSigningKeyB64))
-        )
-        let signature = try P256.Signing.ECDSASignature(
-            derRepresentation: XCTUnwrap(Data(base64Encoded: envelope.signatureB64))
-        )
-        XCTAssertTrue(signingPublic.isValidSignature(
-            signature,
-            for: try E2EEV2RecoveryEpochCrypto.signatureCanonical(
-                context: context,
-                keyCommitmentB64: fixture.keyCommitmentB64,
-                envelope: envelope
-            )
-        ))
-        let recoveryPrivate = try P256.KeyAgreement.PrivateKey(
-            rawRepresentation: XCTUnwrap(Data(base64Encoded: fixture.recoveryPrivateIdentityRawB64))
-        )
-        let delivery = E2EEV2RecoveryEpochDelivery(
-            recoveryEnvelopeId: "recovery_generated_envelope_01",
-            metadata: .init(
-                conversationId: fixture.conversationId,
-                epochId: fixture.epochId,
-                epochNumber: fixture.epochNumber,
-                algorithm: fixture.algorithm,
-                keyCommitmentB64: fixture.keyCommitmentB64,
-                reason: fixture.reason,
-                status: fixture.status,
-                createdAt: fixture.createdAt,
-                senderDeviceId: sender.deviceId
-            ),
-            senderPublicSigningKeyB64: sender.publicSigningKeyB64,
-            envelope: envelope
-        )
-        XCTAssertEqual(
-            try E2EEV2RecoveryEpochCrypto.unwrap(
-                delivery: delivery,
-                recoveryPrivateIdentityKey: recoveryPrivate
-            ),
-            epochKey
-        )
-    }
-
-    func testV2RecoveryEpochPageAndUploadReceiptAreStrict() throws {
-        let fixture = try recoveryEpochFixture()
-        let item = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: recoveryEpochDeliveryData(fixture)) as? [String: Any]
-        )
-        let pageData = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "recoveryBundleHash": fixture.recoveryBundleHash,
-            "missingEpochCount": 3,
-            "nextCursor": "cursor_recovery_page_02",
-            "items": [item],
-        ])
-        let page = try XCTUnwrap(E2EEV2RecoveryEpochContract.parseRestorePage(
-            pageData,
-            expectedRecipientUserId: fixture.recipientUserId,
-            expectedRecoveryBundleHash: fixture.recoveryBundleHash
-        ))
-        XCTAssertEqual(page.deliveries.count, 1)
-        XCTAssertEqual(page.nextCursor, "cursor_recovery_page_02")
-
-        let deviceFixture = try epochFixture()
-        let deviceRoot = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: epochDeliveryData(deviceFixture)) as? [String: Any]
-        )
-        let backfillData = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "nextCursor": NSNull(),
-            "items": [[
-                "conversationId": deviceFixture.conversationId,
-                "epoch": try XCTUnwrap(deviceRoot["epoch"]),
-                "senderDevice": try XCTUnwrap(deviceRoot["senderDevice"]),
-                "deviceEnvelope": try XCTUnwrap(deviceRoot["envelope"]),
-                "recoveryRecipients": [[
-                    "recipientUserId": fixture.recipientUserId,
-                    "recoveryBundleHash": fixture.recoveryBundleHash,
-                    "recoveryPublicIdentityKeyB64": fixture.recoveryPublicIdentityKeyB64,
-                    "signatureB64": Data(repeating: 1, count: 70).base64EncodedString(),
-                    "deviceListVersion": "3",
-                ]],
-                "missingParticipantUserIds": ["user_missing_recipient_01"],
-            ]],
-        ])
-        let backfill = try XCTUnwrap(E2EEV2RecoveryEpochContract.parseBackfillPage(
-            backfillData,
-            expectedRecipientDeviceId: deviceFixture.recipientDeviceId
-        ))
-        XCTAssertEqual(backfill.items.first?.deviceDelivery.status, "active")
-        XCTAssertEqual(backfill.items.first?.recoveryRecipients.first?.recipientUserId, fixture.recipientUserId)
-
-        let uploadData = try E2EEV2RecoveryEpochContract.uploadData([fixture.envelope])
-        let upload = try XCTUnwrap(JSONSerialization.jsonObject(with: uploadData) as? [String: Any])
-        XCTAssertEqual((upload["recoveryEnvelopes"] as? [Any])?.count, 1)
-
-        let missing = ["user_missing_recipient_01"]
-        let receipt: [String: Any] = [
-            "stored": true,
-            "conversationId": fixture.conversationId,
-            "epochId": fixture.epochId,
-            "recipientCount": 1,
-            "missingParticipantUserIds": missing,
-        ]
-        XCTAssertTrue(E2EEV2RecoveryEpochContract.parseUploadReceipt(
-            try JSONSerialization.data(withJSONObject: receipt),
-            expectedConversationId: fixture.conversationId,
-            expectedEpochId: fixture.epochId,
-            expectedRecipientCount: 1,
-            expectedMissingParticipantUserIds: missing
-        ))
-        var receiptWithUnknownField = receipt
-        receiptWithUnknownField["debug"] = true
-        XCTAssertFalse(E2EEV2RecoveryEpochContract.parseUploadReceipt(
-            try JSONSerialization.data(withJSONObject: receiptWithUnknownField),
-            expectedConversationId: fixture.conversationId,
-            expectedEpochId: fixture.epochId,
-            expectedRecipientCount: 1,
-            expectedMissingParticipantUserIds: missing
-        ))
-    }
-
     func testV2EpochEnvelopeMatchesCrossPlatformFixtureAndUnwraps() throws {
         let fixture = try epochFixture()
         let context = E2EEV2EpochContext(
@@ -1792,7 +1062,7 @@ final class E2EETests: XCTestCase {
         ))
     }
 
-    func testV2IdentityResetReasonPreservesDeliveryRotationAndRecoveryContracts() throws {
+    func testV2IdentityResetReasonPreservesDeliveryAndRotationContracts() throws {
         let fixture = try epochFixture()
         var root = try XCTUnwrap(
             JSONSerialization.jsonObject(with: epochDeliveryData(fixture)) as? [String: Any]
@@ -1832,34 +1102,6 @@ final class E2EETests: XCTestCase {
             try JSONSerialization.data(withJSONObject: [
                 "protocolVersion": 2, "requirements": [requirement],
             ])
-        ))
-
-        let recovery = try recoveryEpochFixture()
-        var recoveryRoot = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: recoveryEpochDeliveryData(recovery)) as? [String: Any]
-        )
-        var recoveryEpoch = try XCTUnwrap(recoveryRoot["epoch"] as? [String: Any])
-        recoveryEpoch["reason"] = "IDENTITY_RESET"
-        recoveryRoot["epoch"] = recoveryEpoch
-        let restored = try XCTUnwrap(E2EEV2RecoveryEpochParser.parseAndVerify(
-            JSONSerialization.data(withJSONObject: recoveryRoot),
-            expectedRecipientUserId: recovery.recipientUserId,
-            expectedRecoveryBundleHash: recovery.recoveryBundleHash
-        ))
-        XCTAssertEqual(restored.metadata.reason, "IDENTITY_RESET")
-        XCTAssertEqual(restored.metadata.status, "retired")
-        let recoveryPrivate = try P256.KeyAgreement.PrivateKey(
-            rawRepresentation: XCTUnwrap(Data(base64Encoded: recovery.recoveryPrivateIdentityRawB64))
-        )
-        XCTAssertEqual(try E2EEV2RecoveryEpochCrypto.unwrap(
-            delivery: restored, recoveryPrivateIdentityKey: recoveryPrivate
-        ), Data(base64Encoded: recovery.epochKeyB64))
-        recoveryEpoch["reason"] = "RESET"
-        recoveryRoot["epoch"] = recoveryEpoch
-        XCTAssertNil(E2EEV2RecoveryEpochParser.parseAndVerify(
-            try JSONSerialization.data(withJSONObject: recoveryRoot),
-            expectedRecipientUserId: recovery.recipientUserId,
-            expectedRecoveryBundleHash: recovery.recoveryBundleHash
         ))
     }
 
@@ -5043,152 +4285,6 @@ extension E2EETests {
         }
     }
 
-    func testV2RecoveryEpochRuntimeRestoresSignedKeyAcrossPages() async throws {
-        let fixture = try RotationFixture(); defer { fixture.close() }
-        var recovery = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: fixture.context.ownerScopeId)
-        defer { recovery.zeroize() }
-        let bundleHash = E2EEV2RecoveryV2Crypto.bundleHash(recovery.bundle)
-        let epoch = try recoveryEpochFixture()
-        let epochKey = try XCTUnwrap(Data(base64Encoded: epoch.epochKeyB64))
-
-        let context = E2EEV2RecoveryEpochContext(
-            conversationId: epoch.conversationId,
-            epochNumber: epoch.epochNumber,
-            senderDeviceId: fixture.descriptor.deviceId,
-            recipientUserId: fixture.user,
-            recoveryBundleHash: bundleHash
-        )
-        let envelope = try fixture.identity.createSignedRecoveryEpochEnvelope(
-            context: context,
-            keyCommitmentB64: epoch.keyCommitmentB64,
-            epochKey: epochKey,
-            recipientPublicIdentityKeyB64: recovery.bundle.recoveryPublicIdentityKeyB64,
-            ownerNamespace: fixture.context.ownerNamespace,
-            nonce: Data(repeating: 0, count: 12)
-        )
-        var delivery = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: recoveryEpochDeliveryData(epoch, envelope: envelope)) as? [String: Any]
-        )
-        delivery["senderDevice"] = [
-            "deviceId": fixture.descriptor.deviceId,
-            "publicSigningKeyB64": fixture.descriptor.publicSigningKeyB64,
-        ]
-        let firstPage = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "recoveryBundleHash": bundleHash,
-            "missingEpochCount": 3,
-            "nextCursor": "cursor_recovery_page_02",
-            "items": [],
-        ])
-        let lastPage = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "recoveryBundleHash": bundleHash,
-            "missingEpochCount": 3,
-            "nextCursor": NSNull(),
-            "items": [delivery],
-        ])
-        let requestedQueries = LockedBox<[String?]>([])
-        MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/e2ee/v2/recovery-epochs")
-            XCTAssertEqual(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerDeviceId),
-                fixture.descriptor.deviceId)
-            let timestamp = try XCTUnwrap(Int64(XCTUnwrap(request.value(
-                forHTTPHeaderField: E2EEV2SignedRequest.headerTimestampMs))))
-            let nonce = try XCTUnwrap(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerNonce))
-            let signature = try P256.Signing.ECDSASignature(derRepresentation: XCTUnwrap(
-                Data(base64Encoded: XCTUnwrap(request.value(forHTTPHeaderField:
-                    E2EEV2SignedRequest.headerSignature)))))
-            let publicKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(
-                Data(base64Encoded: fixture.descriptor.publicSigningKeyB64)))
-            let wirePath = try XCTUnwrap(request.url?.path) +
-                (request.url?.query.map { "?\($0)" } ?? "")
-            XCTAssertTrue(publicKey.isValidSignature(signature, for: try E2EEV2SignedRequest.canonicalRequest(
-                method: "GET", path: wirePath, timestampMs: timestamp, nonce: nonce, body: Data())))
-            requestedQueries.value.append(request.url?.query)
-            let data = request.url?.query == nil ? firstPage : lastPage
-            return RotationFixture.response(request, data)
-        }
-
-        let coordinator = E2EEV2RecoveryEpochCoordinator(
-            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys)
-        switch await coordinator.restoreAll(bundle: recovery.bundle, recoveryKey: recovery.recoveryKey) {
-        case .success(let summary):
-            XCTAssertEqual(summary.restoredEpochCount, 1)
-            XCTAssertEqual(summary.missingEpochCount, 3)
-        case .failure(let failure):
-            XCTFail("Signed recovery failed: \(failure.kind)")
-        }
-        XCTAssertEqual(requestedQueries.value, [nil, "cursor=cursor_recovery_page_02"])
-        XCTAssertEqual(try fixture.keys.loadEpoch(
-            conversationId: epoch.conversationId,
-            epochNumber: epoch.epochNumber,
-            ownerNamespace: fixture.context.ownerNamespace,
-            includeRestored: true
-        )?.epochKey, epochKey)
-        XCTAssertNil(try fixture.keys.loadEpoch(
-            conversationId: epoch.conversationId, epochNumber: epoch.epochNumber, ownerNamespace: fixture.context.ownerNamespace
-        ), "Provisoire jusqu'à la confirmation par le manifeste de son époque")
-    }
-
-    func testV2RecoveryBackfillWrapsOnlyForTheOwnAccountRecoveryKey() throws {
-        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: "user:\(String(repeating: "a", count: 64))")
-        defer { material.zeroize() }
-        let hash = E2EEV2RecoveryV2Crypto.bundleHash(material.bundle)
-        let own = E2EEV2RecoveryEpochRecipient(
-            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: hash,
-            recoveryPublicIdentityKeyB64: material.bundle.recoveryPublicIdentityKeyB64
-        )
-        let other = E2EEV2RecoveryEpochRecipient(
-            recipientUserId: "user_bruno_01J7ABCD2345", recoveryBundleHash: "hash-bruno",
-            recoveryPublicIdentityKeyB64: "cle-bruno"
-        )
-        let substituted = E2EEV2RecoveryEpochRecipient(
-            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: hash,
-            recoveryPublicIdentityKeyB64: P256.KeyAgreement.PrivateKey().publicKey.x963Representation.base64EncodedString()
-        )
-        func kept(_ recipients: [E2EEV2RecoveryEpochRecipient]) -> [E2EEV2RecoveryEpochRecipient] {
-            E2EEV2RecoveryEpochContract.ownRecipients(recipients, userId: "user_alice_01J7ABCD2345", ownBundle: material.bundle)
-        }
-        XCTAssertEqual(kept([other, own]), [own],
-                       "La clé de récupération d'un autre membre, fournie par le serveur, n'est jamais utilisée")
-        XCTAssertEqual(kept([other]), [])
-        XCTAssertEqual(kept([substituted]), [], "Ni une clé glissée par le serveur au nom de son propre compte")
-    }
-
-    func testV2RecoveryEpochBackfillPaginatesWithARealQuery() async throws {
-        let fixture = try RotationFixture(); defer { fixture.close() }
-        let firstPage = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "items": [],
-            "nextCursor": "cursor_backfill_page_02",
-        ])
-        let lastPage = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "items": [],
-            "nextCursor": NSNull(),
-        ])
-        let requestedQueries = LockedBox<[String?]>([])
-        MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(request.url?.path, "/api/e2ee/v2/recovery-epochs/backfill")
-            requestedQueries.value.append(request.url?.query)
-            let data = request.url?.query == nil ? firstPage : lastPage
-            return RotationFixture.response(request, data)
-        }
-
-        let coordinator = E2EEV2RecoveryEpochCoordinator(
-            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys)
-        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: "user:\(String(repeating: "a", count: 64))")
-        defer { material.zeroize() }
-        switch await coordinator.backfillAll(ownBundle: material.bundle) {
-        case .success(let summary):
-            XCTAssertEqual(summary.backedUpEpochCount, 0)
-            XCTAssertEqual(summary.missingParticipantUserIds, [])
-        case .failure(let failure):
-            XCTFail("Empty backfill pagination failed: \(failure.kind)")
-        }
-        XCTAssertEqual(requestedQueries.value, [nil, "cursor=cursor_backfill_page_02"])
-    }
-
     func testV2VaultLogoutLocksBWithoutDestroyingApprovedIdentityOrHistoryOfA() async throws {
         let fixture = try RotationFixture(); defer { fixture.close() }
         let a = fixture.context, id = "conversation_rotation_0001"
@@ -5228,7 +4324,7 @@ extension E2EETests {
         XCTAssertEqual(try fixture.keys.load(conversationId: id, ownerNamespace: b.ownerNamespace)?.epochKey, bKey)
     }
 
-    func testV2DeviceMutationSuccessSchedulesBootstrapApprovalRevocationRecoveryAndReset() async throws {
+    func testV2DeviceMutationSuccessSchedulesBootstrapApprovalAndRevocation() async throws {
         let fixture = try RotationFixture(); defer { fixture.close() }
         let id = "conversation_rotation_0001", date = "2026-08-24T10:00:00Z"
         let target = "device_rotation_target_01"
@@ -5237,32 +4333,15 @@ extension E2EETests {
             events.value.append((session, ids, notify))
         }
         let accounts = E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
-        // Horloge du coordinateur : avancée au-delà de l'échéance pour la bascule.
-        let clock = LockedBox<Int64>(Int64(Date().timeIntervalSince1970 * 1_000))
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
             epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox,
             accountIdentityStore: accounts,
             trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
             capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
-            nowMs: { clock.value }, rotationCommitted: onCommitted)
-        // La récupération elle-même (appareil neuf, bundle v3) est éprouvée de
-        // bout en bout contre la pile de test ; ici, la publication du bundle.
-        let recovery = E2EEV2RecoveryCoordinatorV2(
-            api: fixture.api, identityStore: fixture.identity, accountIdentityStore: accounts, rotationCommitted: onCommitted
-        )
+            rotationCommitted: onCommitted)
         // Lot A1 : le compte tel que le bootstrap l'a déposé, servi à `…/identity`.
         let account = LockedBox<[String: Any]>([:])
-        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: fixture.context.ownerScopeId)
-        defer { material.zeroize() }
-        let bundle = material.bundle
-        var bundleObject = try JSONSerialization.jsonObject(with: E2EEV2RecoveryV2Contract.bundleData(bundle)) as! [String: Any]
-        bundleObject["createdAt"] = date
-        bundleObject["rotatedAt"] = NSNull()
-        bundleObject["revokedAt"] = NSNull()
-        let bundleData = try JSONSerialization.data(withJSONObject: bundleObject)
-        let replacement = try fixture.identity.prepareResetCandidate(ownerNamespace: fixture.context.ownerNamespace, label: "Synthetic reset")
         let expiry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
-        let resetDocument = LockedBox<[String: String]>([:])
         MockURLProtocol.requestHandler = { request in
             // Independent valid server receipts exercise each real client success branch.
             let path = request.url!.path
@@ -5288,26 +4367,6 @@ extension E2EETests {
             } else if path.hasSuffix("/revoke") {
                 value = ["revoked": true, "deviceId": target, "alreadyRevoked": false, "selfRevocation": false,
                     "rotationRequired": true, "affectedConversationIds": [id]]
-            } else if path.hasSuffix("/recovery-challenges") {
-                value = ["challenge": ["challengeId": "challenge_rotation_0001", "pendingDeviceId": fixture.descriptor.deviceId,
-                    "bundleHash": E2EEV2RecoveryV2Crypto.bundleHash(bundle), "challengeB64Url": String(repeating: "A", count: 43), "expiresAt": expiry],
-                    "bundle": try JSONSerialization.jsonObject(with: bundleData)]
-            } else if path.hasSuffix("/complete") {
-                value = ["recovered": true, "device": ["deviceId": fixture.descriptor.deviceId, "status": "approved", "approvedAt": date],
-                    "epochRotationRequired": true, "affectedConversationIds": [id]]
-            } else if path.hasSuffix("/recovery-bundle") {
-                value = ["stored": true, "unchanged": false, "createdAt": date, "rotatedAt": NSNull()]
-            } else if path.hasSuffix("/identity/reset") {
-                // Lot A2 : la demande reste en attente ; la lecture suivante la rend basculée.
-                let reset = try XCTUnwrap(try E2EEV2AccountFixture.body(request)["reset"] as? [String: String])
-                resetDocument.value = reset
-                value = Self.resetView(reset, status: "pending", replacementDeviceId: replacement.deviceId)
-            } else if path.hasSuffix("/identity/reset/reset_rotation_000000001"), request.httpMethod == "GET" {
-                value = Self.resetView(resetDocument.value, status: "completed", replacementDeviceId: replacement.deviceId)
-                // Basculé : le compte porte désormais la nouvelle UIK.
-                account.value["accountIdentityKeyB64"] = try E2EEV2IdentityReset.verify(.init(
-                    canonical: resetDocument.value["reset"] ?? "", signatureB64: resetDocument.value["signatureB64"] ?? ""
-                )).newUikB64
             } else {
                 XCTFail("A device action must enqueue, not synchronously call the rotation API: \(path)")
                 value = [:]
@@ -5332,170 +4391,9 @@ extension E2EETests {
         )
         guard case .success = await lifecycle.approve(detail, comparedQR: qr) else { return XCTFail("Approval receipt was lost") }
         guard case .success = await lifecycle.revoke(deviceId: target, reason: "USER_REQUEST") else { return XCTFail("Revocation receipt was lost") }
-        switch await recovery.createAndUploadBundle() {
-        case .success(var created): created.zeroize()
-        case .failed(let failure): return XCTFail("Bundle receipt was lost: \(failure)")
-        }
-        let beforeReset = LocalAccountScope.sessionSnapshot()!
-        guard case .success(let requested) = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")),
-              requested.state == .pending else {
-            return XCTFail("Reset receipt was lost")
-        }
-        XCTAssertEqual(events.value.count, 4, "Rien ne bascule à la demande")
-        XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, fixture.descriptor.deviceId)
-        guard case .failed? = await lifecycle.refreshIdentityReset() else {
-            return XCTFail("Une bascule annoncée avant l'échéance n'est jamais crue")
-        }
-        XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, fixture.descriptor.deviceId)
-        clock.value += E2EEV2IdentityReset.delayMs
-        guard case .success(let switched)? = await lifecycle.refreshIdentityReset(), switched.state == .completed else {
-            return XCTFail("Reset switch was lost")
-        }
-        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: fixture.context.ownerNamespace))
-        XCTAssertEqual(try accounts.load(ownerNamespace: fixture.context.ownerNamespace)?.publicKey.x963Representation.base64EncodedString(),
-                       try E2EEV2IdentityReset.verify(try XCTUnwrap(switched.reset)).newUikB64, "La nouvelle UIK remplace l'ancienne")
         let delivered = events.value
-        XCTAssertEqual(delivered.count, 6)
-        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id], [], [], []])
-        XCTAssertEqual(delivered.map { $0.2 }, [true, true, true, true, false, true])
-        XCTAssertEqual(delivered[4].0, beforeReset)
-        XCTAssertEqual(delivered[5].0, LocalAccountScope.sessionSnapshot())
-        XCTAssertNotEqual(delivered[5].0.sessionId, beforeReset.sessionId)
-        XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, replacement.deviceId)
-    }
-
-    /// Lot A2 : une demande envoyée garde sa nouvelle UIK et son appareil de
-    /// remplacement ; la purge du coffre l'efface ; la bascule locale se rejoue.
-    func testV2PendingIdentityResetKeepsItsKeysUntilClosedAndIsPurgedWithTheVault() throws {
-        let fixture = try RotationFixture(); defer { fixture.close() }
-        let namespace = fixture.context.ownerNamespace
-        let accounts = E2EEV2AccountIdentityStore(tokenStore: fixture.vault)
-        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
-            accountIdentityStore: accounts, trustPins: E2EEV2TrustPinStore(tokenStore: fixture.vault))
-        guard case .success(let candidate) = lifecycle.prepareIdentityReset(label: "Synthetic reset") else {
-            return XCTFail("Appareil de remplacement")
-        }
-        let first = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 1_000)
-        let again = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 9_000_000)
-        XCTAssertEqual(first, again, "Une reprise rend la même UIK et la même heure")
-        XCTAssertFalse(lifecycle.discardIdentityResetCandidate(), "Jamais jeté tant qu'une demande peut le nommer")
-        XCTAssertEqual(try fixture.identity.loadResetCandidate(ownerNamespace: namespace)?.deviceId, candidate.deviceId)
-
-        // Bascule locale : la nouvelle UIK s'installe, vérifiée ; rejouée, rien ne change.
-        try accounts.completePendingReset(ownerNamespace: namespace)
-        try accounts.completePendingReset(ownerNamespace: namespace)
-        XCTAssertEqual(try accounts.load(ownerNamespace: namespace)?.rawRepresentation, first.uik?.rawRepresentation)
-        XCTAssertTrue(try accounts.isVerified(ownerNamespace: namespace))
-        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-        XCTAssertTrue(lifecycle.discardIdentityResetCandidate())
-
-        // La purge du coffre efface une demande en cours.
-        _ = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 2_000)
-        try E2EEV2VaultBoundary.purge(store: fixture.vault, ownerScopeId: fixture.context.ownerScopeId)
-        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-    }
-
-    private static func resetView(_ reset: [String: String], status: String, replacementDeviceId: String,
-                                  resetId: String = "reset_rotation_000000001") -> [String: Any] {
-        let effective = (try? E2EEV2IdentityReset.verify(.init(canonical: reset["reset"] ?? "", signatureB64: reset["signatureB64"] ?? "")))?
-            .effectiveAtMs ?? 0
-        return ["resetId": resetId, "status": status, "replacementDeviceId": replacementDeviceId,
-                "reset": reset, "effectiveAtMs": String(effective), "objection": NSNull(),
-                "objectingDeviceId": status == "objected" ? "device_objecting_0000001" : NSNull(),
-                "resolvedAt": status == "pending" ? NSNull() : "2026-10-08T12:00:00.000Z", "abortReason": NSNull()]
-    }
-
-    /// Lot A2, reprise : un 409 garde la nouvelle UIK et l'appareil de
-    /// remplacement ; un reçu perdu se retrouve dans le paquet de confiance ;
-    /// une issue close n'est oubliée qu'après une lecture réussie du compte ;
-    /// une tentative jamais enregistrée est oubliée passé le délai du serveur.
-    func testV2IdentityResetResumeKeepsTheNewKeyAndOnlyForgetsOnProof() async throws {
-        let fixture = try RotationFixture(); defer { fixture.close() }
-        let namespace = fixture.context.ownerNamespace
-        let accounts = E2EEV2AccountIdentityStore(tokenStore: fixture.vault)
-        let oldUik = try accounts.create(ownerNamespace: namespace)
-        let clock = LockedBox<Int64>(Int64(Date().timeIntervalSince1970 * 1_000))
-        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
-            accountIdentityStore: accounts, trustPins: E2EEV2TrustPinStore(tokenStore: fixture.vault), nowMs: { clock.value })
-        guard case .success(let candidate) = lifecycle.prepareIdentityReset(label: "Synthetic reset") else {
-            return XCTFail("Appareil de remplacement")
-        }
-        let posted = LockedBox<[String: String]>([:]), mode = LockedBox("none")
-        let resetId = "reset_resume_000000001"
-        MockURLProtocol.requestHandler = { request in
-            let path = request.url!.path
-            if path.hasSuffix("/identity/reset"), request.httpMethod == "POST" {
-                posted.value = try XCTUnwrap(try E2EEV2AccountFixture.body(request)["reset"] as? [String: String])
-                let refusal = #"{"error":"pending","code":"E2EE_IDENTITY_RESET_PENDING"}"#
-                return RotationFixture.response(request, Data(refusal.utf8), status: 409)
-            }
-            if path.hasSuffix("/identity/reset/\(resetId)") {
-                let status = mode.value.hasPrefix("objected") ? "objected" : "pending"
-                return RotationFixture.response(request, try JSONSerialization.data(withJSONObject:
-                    Self.resetView(posted.value, status: status, replacementDeviceId: candidate.deviceId, resetId: resetId)))
-            }
-            if path.hasSuffix("/identity") {
-                if mode.value == "objected-unreadable" {
-                    return RotationFixture.response(request, Data(#"{"error":"down"}"#.utf8), status: 503)
-                }
-                let served: Any = mode.value == "served"
-                    ? ["resetId": resetId, "reset": posted.value["reset"] ?? "", "signatureB64": posted.value["signatureB64"] ?? ""]
-                    : NSNull()
-                return RotationFixture.response(request, try JSONSerialization.data(withJSONObject: [
-                    "accountIdentityKeyB64": oldUik.publicKey.x963Representation.base64EncodedString(),
-                    "deviceList": ["list": "SQ-E2EE-V2-DEVICE-LIST", "signatureB64": "AA==", "devices": [String]()],
-                    "certificates": [Any](), "capabilities": [Any](), "pendingIdentityReset": served,
-                ]))
-            }
-            XCTFail("Requête inattendue : \(path)")
-            return RotationFixture.response(request, Data("{}".utf8), status: 500)
-        }
-
-        // 1. Un 409 « déjà en attente » : rien n'est jeté.
-        guard case .failed(let refused) = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")) else {
-            return XCTFail("Le 409 doit remonter")
-        }
-        XCTAssertEqual(refused.code, "E2EE_IDENTITY_RESET_PENDING")
-        let kept = try XCTUnwrap(try accounts.loadPendingReset(ownerNamespace: namespace), "La nouvelle UIK reste")
-        XCTAssertNil(kept.resetId)
-        XCTAssertEqual(kept.replacementDeviceId, candidate.deviceId, "Appareil lié avant l'envoi")
-        XCTAssertFalse(lifecycle.discardIdentityResetCandidate())
-
-        // 2. Rien de servi, dans le délai : la demande reste.
-        let early = await lifecycle.refreshIdentityReset()
-        XCTAssertNil(early)
-        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-
-        // 3. Reçu retrouvé dans le paquet de confiance.
-        mode.value = "served"
-        guard case .success(let followed)? = await lifecycle.refreshIdentityReset() else { return XCTFail("Reçu retrouvé") }
-        XCTAssertEqual(followed.state, .pending)
-        XCTAssertEqual(try accounts.loadPendingReset(ownerNamespace: namespace)?.resetId, resetId)
-
-        // 4. Opposition annoncée mais compte illisible : rien n'est oublié.
-        mode.value = "objected-unreadable"
-        guard case .failed? = await lifecycle.refreshIdentityReset() else { return XCTFail("Sans preuve, pas d'oubli") }
-        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-        XCTAssertNotNil(try fixture.identity.loadResetCandidate(ownerNamespace: namespace))
-
-        // 5. Opposition, compte lisible sous l'ancienne UIK : la demande est oubliée.
-        mode.value = "objected"
-        guard case .success(let objected)? = await lifecycle.refreshIdentityReset() else { return XCTFail("Opposition lue") }
-        XCTAssertEqual(objected.state, .objected)
-        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-        XCTAssertNil(try fixture.identity.loadResetCandidate(ownerNamespace: namespace))
-        XCTAssertEqual(try accounts.load(ownerNamespace: namespace)?.rawRepresentation, oldUik.rawRepresentation)
-
-        // 6. Une tentative jamais enregistrée est oubliée passé le délai du serveur.
-        guard case .success = lifecycle.prepareIdentityReset(label: "Synthetic reset") else { return XCTFail("Appareil") }
-        mode.value = "none"
-        _ = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic"))
-        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-        clock.value += 20 * 60 * 1_000
-        let late = await lifecycle.refreshIdentityReset()
-        XCTAssertNil(late)
-        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
-        XCTAssertTrue(lifecycle.discardIdentityResetCandidate())
+        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id]])
+        XCTAssertEqual(delivered.map { $0.2 }, [true, true, true])
     }
 
     func testV2BoundAccountDeletionDiscardsLateCookieAndCannotAdoptARelogin() async throws {
@@ -5568,11 +4466,7 @@ private enum E2EEV2LocalQAPhase: String {
     case approveQR = "approve-qr"
     case approveCode = "approve-code"
     case approvePush = "approve-push"
-    case recoveryBundle = "recovery-bundle"
-    case recover
     case revoke
-    case prepareReset = "prepare-reset"
-    case reset
     case resume
     case inventory
     case cleanup
@@ -5790,12 +4684,6 @@ extension E2EETests {
             capabilities: capabilityDocuments,
             rotationCommitted: committed
         )
-        let recovery = E2EEV2RecoveryCoordinatorV2(
-            api: api,
-            identityStore: identity,
-            rotationCommitted: committed
-        )
-
         let payload: [String: Any]
         switch config.phase {
         case .enroll:
@@ -5856,34 +4744,6 @@ extension E2EETests {
                            "rotationRequired": value.epochRotationRequired,
                            "affectedConversationIds": value.affectedConversationIds]
             }
-        case .recoveryBundle:
-            switch await recovery.createAndUploadBundle() {
-            case .failed(let failure): throw localQAOperation("recovery-bundle", failure)
-            case .success(var material):
-                defer { material.zeroize() }
-                try artifacts.set(material.recoveryKey.base64EncodedString(),
-                                  for: "recovery-key-v2", accessibility: .whenUnlocked)
-                payload = ["bundleHash": E2EEV2RecoveryV2Crypto.bundleHash(material.bundle),
-                           "recoveryKeyStoredInRunKeychain": true]
-            }
-        case .recover:
-            let stored: String?
-            if let provided = localQAEnvironment("SQ_E2EE_V2_LOCAL_QA_RECOVERY_KEY_B64") {
-                stored = provided
-            } else {
-                stored = try artifacts.string(for: "recovery-key-v2")
-            }
-            guard let raw = stored, var key = Data(base64Encoded: raw), key.count == 32 else {
-                throw E2EEV2LocalQAError.missingInput("SQ_E2EE_V2_LOCAL_QA_RECOVERY_KEY_B64")
-            }
-            defer { key.resetBytes(in: 0..<key.count) }
-            switch await recovery.recover(recoveryKey: key) {
-            case .failed(let failure): throw localQAOperation("recover", failure)
-            case .success(let value):
-                payload = ["deviceId": value.deviceId,
-                           "rotationRequired": value.epochRotationRequired,
-                           "affectedConversationIds": value.affectedConversationIds]
-            }
         case .revoke:
             let deviceId = try localQARequired("SQ_E2EE_V2_LOCAL_QA_INPUT")
             let reason = localQAEnvironment("SQ_E2EE_V2_LOCAL_QA_REVOKE_REASON") ?? "USER_REQUEST"
@@ -5921,26 +4781,6 @@ extension E2EETests {
                                                                 "platform": $0.platform,
                                                                 "capabilitiesSequence": $0.capabilities?.sequence ?? 0,
                                                                 "kinds": $0.capabilities?.kinds ?? []] }]
-        case .prepareReset:
-            switch lifecycle.prepareIdentityReset(label: localQAEnvironment("SQ_E2EE_V2_LOCAL_QA_LABEL") ?? "SQ QA iOS reset") {
-            case .failed(let failure): throw localQAOperation("prepare-reset", failure)
-            case .success(let descriptor): payload = ["replacementDeviceId": descriptor.deviceId]
-            }
-        case .reset:
-            guard let generation = Int(try localQARequired("SQ_E2EE_V2_LOCAL_QA_GENERATION")), generation >= 1 else {
-                throw E2EEV2LocalQAError.invalidFixture("generation")
-            }
-            let password = try localQARequired("SQ_E2EE_V2_LOCAL_QA_PASSWORD")
-            let before = LocalAccountScope.sessionSnapshot()
-            switch await lifecycle.resetIdentity(expectedGeneration: generation, reauthentication: .password(password)) {
-            case .failed(let failure): throw localQAOperation("reset", failure)
-            case .success(let value):
-                payload = ["resetId": value.resetId ?? "",
-                           "state": value.state.rawValue,
-                           "replacementDeviceId": value.replacementDeviceId,
-                           "effectiveAtMs": String(value.effectiveAtMs),
-                           "localSessionRenewed": before != LocalAccountScope.sessionSnapshot()]
-            }
         case .resume:
             let requirements = E2EEV2RotationRequirementsClient(api: api, identityStore: identity, expectedSession: session)
             let folder = try config.outboxDirectory().deletingLastPathComponent().appendingPathComponent("v2-messaging", isDirectory: true)

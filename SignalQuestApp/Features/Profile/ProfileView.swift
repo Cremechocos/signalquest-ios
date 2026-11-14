@@ -72,7 +72,6 @@ struct ProfileView: View {
     /// Nouvel appareil à examiner après un tap sur une notification E2EE v2.
     @State private var deepLinkE2EEApproval: E2EEDeviceApprovalDeepLink?
     @State private var deepLinkE2EEApprovalQR: E2EEApprovalQRDeepLink?
-    @State private var showE2EEIdentityReset = false
     /// Écran Notifications ouvert depuis les Réglages d'iOS (TRX-21).
     @State private var showNotificationSettings = false
     /// La déconnexion se confirme : un appui accidentel coupait la session (TRX-31).
@@ -241,13 +240,6 @@ struct ProfileView: View {
                     }
             }
         }
-        .sheet(isPresented: $showE2EEIdentityReset) {
-            NavigationStack {
-                // Ni « OK » ni glissement tant que la clé affichée n'est pas
-                // sauvegardée (AF-PROF-01).
-                E2EEV2RecoveryResetView(api: services.api) { showE2EEIdentityReset = false }
-            }
-        }
         .sheet(isPresented: $showNotificationSettings) {
             NavigationStack {
                 NotificationSettingsView(userService: services.users)
@@ -266,10 +258,8 @@ struct ProfileView: View {
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
             consumeE2EEApprovalQRDeepLink()
-            consumeE2EEIdentityResetDeepLink()
             consumeNotificationSettingsDeepLink()
         }
-        .onChangeCompat(of: router.openE2EEIdentityReset) { _, _ in consumeE2EEIdentityResetDeepLink() }
         .onChangeCompat(of: router.openNotificationSettings) { _, _ in consumeNotificationSettingsDeepLink() }
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
@@ -345,13 +335,6 @@ struct ProfileView: View {
         router.openE2EEApprovalQR = nil
         guard E2EEV2RuntimeWriteGate.enabled else { return }
         deepLinkE2EEApprovalQR = E2EEApprovalQRDeepLink(id: payload)
-    }
-
-    private func consumeE2EEIdentityResetDeepLink() {
-        guard router.openE2EEIdentityReset else { return }
-        router.openE2EEIdentityReset = false
-        guard E2EEV2RuntimeWriteGate.enabled else { return }
-        showE2EEIdentityReset = true
     }
 
     // MARK: - En-tête
