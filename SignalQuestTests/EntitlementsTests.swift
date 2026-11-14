@@ -1,5 +1,7 @@
 import XCTest
 import StoreKit
+import SwiftUI
+import UIKit
 @testable import SignalQuest
 
 final class SubscriptionPriceCopyTests: XCTestCase {
@@ -836,6 +838,88 @@ private final class RecordingEntitlementsAPIStub: APIClientProtocol, @unchecked 
         default:
             throw URLError(.badURL)
         }
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw URLError(.badURL) }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw URLError(.badURL) }
+}
+
+/// Rendus de l'écran Premium et de l'avertissement de suppression, pour une
+/// relecture à l'œil (lot E). Écrits seulement si `SQ_PAYWALL_RENDER_OUT` est
+/// donné (`TEST_RUNNER_SQ_PAYWALL_RENDER_OUT` à xcodebuild) ; sinon ignorés.
+@MainActor
+final class PaywallRenderingHarness: XCTestCase {
+    private static let states: [(String, String)] = [
+        ("1-gratuit", #"{"version":1,"tier":"free","subscription":null,"trial":{"eligible":true,"days":7},"benefits":{"free":[],"premium":["sentinelle.full","stories.duration"]}}"#),
+        ("2-essai-app-store", #"{"version":1,"tier":"premium","subscription":{"channel":"app_store","state":"trialing","tier":"premium","period":"year","autoRenew":true,"currentPeriodEnd":"2026-11-21T10:00:00Z","trialEndsAt":"2026-11-21T10:00:00Z","price":{"unitAmount":7999,"currency":"EUR"},"environment":"sandbox"}}"#),
+        ("3-resilie-app-store", #"{"version":1,"tier":"premium","subscription":{"channel":"app_store","state":"active","tier":"premium","period":"month","autoRenew":false,"currentPeriodEnd":"2026-12-14T10:00:00Z","price":{"unitAmount":799,"currency":"EUR"}}}"#),
+        ("4-paiement-a-regulariser", #"{"version":1,"tier":"premium","subscription":{"channel":"app_store","state":"grace","tier":"premium","period":"month","autoRenew":true,"currentPeriodEnd":"2026-11-10T10:00:00Z","graceEndsAt":"2026-11-26T10:00:00Z"}}"#),
+        ("5-autre-canal-doublon", #"{"version":1,"tier":"premium","subscription":{"channel":"stripe","state":"active","tier":"premium","period":"month","autoRenew":true,"currentPeriodEnd":"2026-12-01T10:00:00Z"},"otherSubscriptions":[{"channel":"google_play","state":"active","tier":"premium","period":"year","autoRenew":true}],"warnings":["DUPLICATE_PAID_SUBSCRIPTION"]}"#),
+    ]
+
+    func testRenderPaywallStates() async throws {
+        guard let directory = ProcessInfo.processInfo.environment["SQ_PAYWALL_RENDER_OUT"] else {
+            throw XCTSkip("SQ_PAYWALL_RENDER_OUT absent : rendus non demandés")
+        }
+        let previousUserID = LocalAccountScope.currentUserId
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserID { LocalAccountScope.activate(userId: previousUserID) }
+        }
+        LocalAccountScope.deactivate()
+        LocalAccountScope.activate(userId: "paywall-render-\(UUID().uuidString)")
+
+        for (name, payload) in Self.states {
+            let store = EntitlementsStore(api: FixedEntitlementsAPIStub(payload: payload), observesTransactions: false)
+            await store.refreshBackendSnapshot()
+            XCTAssertNotNil(store.serverState.snapshot, name)
+            try await write(NavigationStack { PaywallView(store: store) }, to: directory, name: "paywall-\(name)")
+            if name == "5-autre-canal-doublon" || name == "3-resilie-app-store" {
+                try await write(AccountDeletionSubscriptionNotice(store: store).padding(16).frame(maxHeight: .infinity, alignment: .top),
+                                to: directory, name: "suppression-\(name)")
+            }
+        }
+    }
+
+    /// Une fenêtre réelle : `ImageRenderer` ne dessine pas le contenu d'une `ScrollView`.
+    /// À la taille de l'écran : une fenêtre plus haute décale le contenu d'une `ScrollView`.
+    private func write<V: View>(_ view: V, to directory: String, name: String) async throws {
+        // Une fenêtre sans scène ne dessine rien : on emprunte celle de l'app hôte.
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Une scène UIKit active est nécessaire pour les rendus")
+        }
+        let previousKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let controller = UIHostingController(rootView: view.environment(\.locale, Locale(identifier: "fr_FR")))
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.view.frame = window.bounds
+        controller.view.layoutIfNeeded()
+        // Rend la main : le `.task` de l'écran relit les droits, puis les
+        // animations d'apparition se terminent.
+        try await Task.sleep(for: .seconds(2))
+        let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        }
+        window.isHidden = true
+        previousKeyWindow?.makeKey()
+        let data = try XCTUnwrap(image.pngData())
+        try data.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+    }
+}
+
+private final class FixedEntitlementsAPIStub: APIClientProtocol, @unchecked Sendable {
+    let payload: String
+    init(payload: String) { self.payload = payload }
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == EntitlementsStore.entitlementsEndpoint else { throw URLError(.badURL) }
+        return try JSONDecoder.signalQuest.decode(type, from: Data(payload.utf8))
     }
 
     func request(_ endpoint: APIEndpoint) async throws { throw URLError(.badURL) }
