@@ -2158,50 +2158,16 @@ enum E2EEV2DeviceLifecycleResult<Value: Sendable>: Sendable {
     case failed(E2EEV2TransportFailure)
 }
 
+/// Ce qui reste du cycle de vie v2 : la liste des appareils du compte, que
+/// l'extension de notification lit pour savoir si cet appareil est approuvé
+/// (le serveur y reflète un appareil auto actif). Approbations, révocation,
+/// récupération et publication des capacités sont parties avec le chiffrement
+/// automatique (E2EE-AUTO lot 10).
 final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     private let transport: E2EEV2APITransport
-    private let identityStore: E2EEV2DeviceIdentityStore
-    private let epochKeyStore: E2EEV2EpochKeyStore
-    private let conversationStateStore: E2EEV2ConversationStateStore
-    private let mediaOutboxStore: E2EEV2MediaOutboxStore?
-    private let accountIdentityStore: E2EEV2AccountIdentityStore
-    private let trustPins: E2EEV2TrustPinStore
-    private let capabilities: E2EEV2CapabilitiesPublicationStore
-    private let appBuild: String
-    private let nowMs: @Sendable () -> Int64
-    private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
-    /// Après une approbation ou une révocation réussie : le bundle de
-    /// récupération est re-signé à la nouvelle liste (§2.8, v0.4.22).
-    private let deviceListChanged: (@Sendable () async -> Void)?
 
-    init(
-        api: APIClient,
-        identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        epochKeyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        conversationStateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
-        mediaOutboxStore: E2EEV2MediaOutboxStore? = nil,
-        accountIdentityStore: E2EEV2AccountIdentityStore = E2EEV2AccountIdentityStore(),
-        trustPins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
-        capabilities: E2EEV2CapabilitiesPublicationStore = E2EEV2CapabilitiesPublicationStore(),
-        appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0",
-        nowMs: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) },
-        rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
-            E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
-        },
-        deviceListChanged: (@Sendable () async -> Void)? = nil
-    ) {
+    init(api: APIClient, identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore()) {
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
-        self.deviceListChanged = deviceListChanged
-        self.identityStore = identityStore
-        self.epochKeyStore = epochKeyStore
-        self.conversationStateStore = conversationStateStore
-        self.mediaOutboxStore = mediaOutboxStore ?? (try? E2EEV2MediaOutboxStore())
-        self.accountIdentityStore = accountIdentityStore
-        self.trustPins = trustPins
-        self.capabilities = capabilities
-        self.appBuild = appBuild
-        self.nowMs = nowMs
-        self.rotationCommitted = rotationCommitted
     }
 
     func listDeviceInventory() async -> E2EEV2DeviceLifecycleResult<E2EEV2DeviceInventory> {
@@ -2217,136 +2183,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         )
     }
 
-
-    /// §12 et E.1 : publie le document de capacités de cet appareil, signé par
-    /// lui, quand il n'en a pas encore, à chaque nouveau build et au moins tous
-    /// les 30 jours. Le document est gardé avant l'envoi : une reprise renvoie
-    /// le même. Une séquence dépassée (`E2EE_CAPABILITIES_STALE`) repart une
-    /// fois au-dessus de celle du serveur. Rend vrai quand un document a été publié.
-    func publishCapabilitiesIfNeeded() async -> E2EEV2DeviceLifecycleResult<Bool> {
-        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
-              let userId = Self.userId(owner) else {
-            return localFailure("authenticated-account-required")
-        }
-        let transport = self.transport.bound(to: session)
-        let namespace = LocalAccountScope.storageNamespace(for: owner)
-        do {
-            guard let device = try identityStore.load(ownerNamespace: namespace) else { return .success(false) }
-            // Sans la clé du compte, l'appareil attend son approbation : le
-            // serveur refuserait le document (403 E2EE_DEVICE_NOT_APPROVED) à
-            // chaque lancement. Il part dès l'approbation (premier appareil, QR).
-            guard try accountIdentityStore.load(ownerNamespace: namespace) != nil,
-                  try !accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace) else { return .success(false) }
-            let stored = try capabilities.load(ownerNamespace: namespace)
-            if let stored, E2EEV2CapabilitiesPublicationStore.isCurrent(
-                stored, deviceId: device.deviceId, appBuild: appBuild, nowMs: nowMs()
-            ) {
-                return .success(false)
-            }
-            var pending: E2EEV2CapabilitiesPublicationStore.State
-            if let stored, E2EEV2CapabilitiesPublicationStore.isReplayable(
-                stored, deviceId: device.deviceId, appBuild: appBuild, nowMs: nowMs()
-            ) {
-                // Envoi récent resté sans réponse : le même document repart.
-                pending = stored
-            } else {
-                let previous = stored?.deviceId == device.deviceId ? stored?.sequence ?? 0 : 0
-                pending = try makeCapabilities(
-                    userId: userId, device: device, sequence: previous + 1, nowMs: nowMs(), namespace: namespace
-                )
-            }
-            for attempt in 0..<2 {
-                let response = await transport.putJSON(
-                    path: "/api/e2ee/v2/devices/\(device.deviceId)/capabilities",
-                    body: try JSONSerialization.data(
-                        withJSONObject: ["document": pending.document, "signatureB64": pending.signatureB64],
-                        options: [.sortedKeys]
-                    ),
-                    expectedOwnerScopeId: owner,
-                    capabilitySet: .deviceLifecycle
-                )
-                switch response {
-                case .failure(let failure) where failure.code == "E2EE_CAPABILITIES_STALE" && attempt == 0:
-                    var serverSequence = 0
-                    if case .string(let text)? = failure.details?["currentSequence"] {
-                        serverSequence = E2EEV2Canonical.sequenceNumber(text) ?? 0
-                    }
-                    // Une séquence très en avance ne se croit pas : la signer
-                    // bloquerait toute publication suivante (épinglée chez les autres).
-                    guard serverSequence <= pending.sequence + E2EEV2CapabilitiesPublicationStore.maxServerSequenceLead else {
-                        return localFailure("e2ee-capabilities-sequence-implausible")
-                    }
-                    pending = try makeCapabilities(
-                        userId: userId, device: device, sequence: max(serverSequence, pending.sequence) + 1,
-                        nowMs: nowMs(), namespace: namespace
-                    )
-                case .failure(let failure):
-                    // Refus définitif (document invalide, horloge en avance…) : il
-                    // ne repart pas ; la prochaine fois, un document neuf.
-                    if failure.kind == .permanent { try? capabilities.remove(ownerNamespace: namespace) }
-                    return .failed(failure)
-                case .success(let data, _, _):
-                    guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                          root["deviceId"] as? String == device.deviceId,
-                          root["sequence"] as? String == String(pending.sequence) else {
-                        return localFailure("invalid-e2ee-capabilities-response")
-                    }
-                    guard session.isCurrent else { return localFailure("e2ee-session-changed") }
-                    pending.publishedAtMs = nowMs()
-                    try capabilities.save(pending, ownerNamespace: namespace)
-                    return .success(true)
-                }
-            }
-            return localFailure("e2ee-capabilities-stale")
-        } catch {
-            return trustFailure(error, fallback: "e2ee-capabilities-unavailable")
-        }
-    }
-
-    /// Document signé par l'appareil, gardé (non publié) avant l'envoi.
-    private func makeCapabilities(
-        userId: String, device: E2EEV2DeviceDescriptor, sequence: Int, nowMs: Int64, namespace: String
-    ) throws -> E2EEV2CapabilitiesPublicationStore.State {
-        let document = E2EEV2CapabilitiesDocument(
-            userId: userId, deviceId: device.deviceId, sequence: sequence, issuedAtMs: nowMs,
-            envelopeVersions: E2EEV2CapabilitiesPublicationStore.envelopeVersions, payloadVersions: ["2"],
-            kinds: E2EEV2CapabilitiesPublicationStore.kinds, features: E2EEV2CapabilitiesPublicationStore.features
-        ).document
-        guard (try? E2EEV2CapabilitiesDocument.parse(document: document)) != nil else {
-            throw E2EEV2TrustFormatError.invalidField
-        }
-        let signature = try identityStore.signWithDeviceId(
-            canonicalRequest: Data(E2EEV2CapabilitiesDocument.signatureCanonical(document: document).utf8),
-            ownerNamespace: namespace
-        ).signature
-        let state = E2EEV2CapabilitiesPublicationStore.State(
-            deviceId: device.deviceId, sequence: sequence, document: document,
-            signatureB64: signature.base64EncodedString(), appBuild: appBuild, publishedAtMs: nil
-        )
-        try capabilities.save(state, ownerNamespace: namespace)
-        return state
-    }
-
     private func ownerScope() -> String? {
         LocalAccountScope.currentUserId == nil ? nil : LocalAccountScope.currentOwnerScopeId
-    }
-
-    private static func userId(_ ownerScopeId: String) -> String? {
-        guard ownerScopeId.hasPrefix("user:") else { return nil }
-        let userId = String(ownerScopeId.dropFirst(5))
-        return E2EEV2Canonical.isOpaque(userId) ? userId : nil
-    }
-
-    /// Une erreur réseau garde sa forme serveur ; un compte refusé ou illisible
-    /// devient un état local.
-    private func trustFailure<Value: Sendable>(_ error: Error, fallback: String) -> E2EEV2DeviceLifecycleResult<Value> {
-        switch error {
-        case let failure as E2EEV2TransportFailure: return .failed(failure)
-        case is E2EEV2TrustDirectory.IdentityNotFound: return localFailure("e2ee-account-identity-unavailable")
-        case is E2EEV2IdentityVerification.Failure:
-            return localFailure("e2ee-account-trust-refused")
-        default: return localFailure(fallback)
-        }
     }
 
     private func map<Value: Sendable>(

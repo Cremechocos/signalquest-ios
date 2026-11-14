@@ -25,7 +25,6 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let messaging: E2EEV2MessagingRuntime
         let calls: E2EEV2CallRuntime
         let service: CallsService
-        let lifecycle: E2EEV2DeviceLifecycleCoordinator
         /// Lie la session à l'appareil par une requête signée qui consomme sa
         /// preuve, comme l'app au démarrage : sans cela, un appel chiffré ne
         /// sonne pas dans `pending`.
@@ -88,11 +87,6 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         return Session(
             api: api, messaging: messaging, calls: calls,
             service: CallsService(api: api, e2eeTransport: E2EEV2APITransport(api: api, identityStore: identity)),
-            lifecycle: E2EEV2DeviceLifecycleCoordinator(
-                api: api, identityStore: identity, epochKeyStore: keys, conversationStateStore: states,
-                accountIdentityStore: accounts, trustPins: pins,
-                capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: vault), rotationCommitted: { _, _, _ in }
-            ),
             bind: {
                 if case .success = await requirements.pending(expectedOwnerScopeId: ownerScopeId) { return true }
                 return false
@@ -120,12 +114,11 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let caller = try await login(email: emails[0], password: password, base: base, run: run)
         let callee = try await login(email: emails[1], password: password, base: base, run: run)
 
-        // 1. Chacun annonce « appels » ; sa requête signée lie aussi la session.
+        // 1. Chacun lie sa session à son appareil par une requête signée ; le
+        //    serveur fait sonner les appareils actifs du journal (E2EE-AUTO §7.3).
         for person in [callee, caller] {
             let session = try become(person, base: base, root: root)
-            guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
-                return XCTFail("Capacités de \(person.email)")
-            }
+            guard await session.bind() else { return XCTFail("Session de \(person.email)") }
         }
 
         // 2. L'appelant crée un groupe v2 et signe son descripteur.
@@ -205,9 +198,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let calleeUserId = try await login(email: calleeEmail, password: password, base: base, run: run).userId
 
         let session = try become(caller, base: base, root: root)
-        guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
-            return XCTFail("Capacités de l'appelant")
-        }
+        guard await session.bind() else { return XCTFail("Session de l'appelant") }
         // Une conversation v2 existante (`…_CONVERSATION`), synchronisée, ou un groupe neuf.
         let conversationId: String
         if let existing = environment("SQ_E2EE_V2_CROSS_CALL_CONVERSATION"), !existing.isEmpty {
@@ -282,9 +273,6 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let callee = try await login(email: calleeEmail, password: password, base: base, run: run)
         let callerUserId = try await login(email: callerEmail, password: password, base: base, run: run).userId
         let session = try become(callee, base: base, root: root)
-        guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
-            return XCTFail("Capacités de l'appelé")
-        }
         let bound = await session.bind()
         XCTAssertTrue(bound, "Session liée à l'appareil")
         // Prêt : l'autre plateforme peut appeler.

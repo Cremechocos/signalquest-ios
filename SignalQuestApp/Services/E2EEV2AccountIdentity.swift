@@ -148,25 +148,16 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     }
 }
 
-/// §12 : le dernier document de capacités de cet appareil, gardé avant l'envoi
-/// pour qu'une reprise renvoie le même, et sa date de publication. Republié à
-/// chaque nouveau build et au moins tous les 30 jours.
-final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
-    struct State: Codable, Equatable {
-        let deviceId: String
-        let sequence: Int
-        let document: String
-        let signatureB64: String
-        let appBuild: String
-        /// Absente : envoi en cours, sans réponse du serveur.
-        var publishedAtMs: Int64?
-    }
-
+/// Ce que sait faire cette app, tel que l'annuaire du chiffrement automatique
+/// le prête à chaque appareil actif du journal (E2EE-AUTO §7) et que les
+/// réactions lisent. Le document de capacités signé n'est plus publié : depuis
+/// la bascule, le serveur ne le lit plus (époques marquées, appels).
+enum E2EEV2CapabilitiesPublicationStore {
     /// Ce qu'iOS sait lire en v2 : texte, modification, suppression ; « appels
     /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
     /// médias chiffrés au jalon B. Les réactions (D.16) s'annoncent ensemble,
     /// enveloppe v3, `REACTION` et `reactions`, une fois le chiffrement
-    /// automatique actif : le document est republié quand il s'allume.
+    /// automatique actif.
     static var announcesReactions: Bool { SQFeatures.e2eeReactionsEnabled && E2EEV2ServerGate.autoActive }
     static var envelopeVersions: [String] { announcesReactions ? ["2", "3"] : ["2"] }
     static var kinds: [String] {
@@ -186,56 +177,7 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
     /// sans ouvrir le verrou global. N'existe pas en Release.
     nonisolated(unsafe) static var announcesCallsForLocalQA = false
     #endif
-    static let republishAfterMs: Int64 = 30 * 86_400_000
 
+    /// Ancienne entrée du trousseau (document publié), encore effacée avec le coffre.
     static func key(ownerNamespace: String) -> String { "capabilities-v1:\(ownerNamespace)" }
-
-    private let tokenStore: TokenStore
-    private let allowsOwner: @Sendable (String) -> Bool
-
-    init(tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
-         allowsOwner: @escaping @Sendable (String) -> Bool = { E2EEV2VaultBoundary.allows($0) }) {
-        self.tokenStore = tokenStore
-        self.allowsOwner = allowsOwner
-    }
-
-    func load(ownerNamespace: String) throws -> State? {
-        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
-        guard let raw = try tokenStore.string(for: Self.key(ownerNamespace: ownerNamespace)) else { return nil }
-        return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
-    }
-
-    func save(_ state: State, ownerNamespace: String) throws {
-        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
-        let value = String(decoding: try JSONEncoder().encode(state), as: UTF8.self)
-        try tokenStore.set(value, for: Self.key(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
-    }
-
-    func remove(ownerNamespace: String) throws {
-        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
-        try tokenStore.remove(Self.key(ownerNamespace: ownerNamespace))
-    }
-
-    /// Écart toléré entre l'horloge d'ici et `issuedAtMs` d'un document en attente.
-    static let pendingSkewMs = E2EEV2IdentityVerification.capabilityFutureSkewMs
-    /// Avance maximale acceptée d'une séquence annoncée par le serveur
-    /// (`currentSequence`) : au-delà, elle n'est pas crue.
-    static let maxServerSequenceLead = 1_000
-
-    /// À publier : rien encore, un autre appareil, un autre build, une autre
-    /// liste, ou 30 jours passés depuis son émission (horloge qui recule
-    /// comprise).
-    static func isCurrent(_ state: State, deviceId: String, appBuild: String, nowMs: Int64) -> Bool {
-        guard state.deviceId == deviceId, state.appBuild == appBuild, state.publishedAtMs != nil,
-              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document),
-              (0..<republishAfterMs).contains(nowMs - document.issuedAtMs) else { return false }
-        return document.envelopeVersions == envelopeVersions && document.kinds == kinds && document.features == features
-    }
-
-    /// Un document envoyé sans réponse ne repart tel quel que s'il est récent.
-    static func isReplayable(_ state: State, deviceId: String, appBuild: String, nowMs: Int64) -> Bool {
-        guard state.publishedAtMs == nil, state.deviceId == deviceId, state.appBuild == appBuild,
-              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document) else { return false }
-        return abs(nowMs - document.issuedAtMs) <= pendingSkewMs
-    }
 }

@@ -315,15 +315,14 @@ enum E2EEV2CallPushTokens {
 }
 
 /// Publie, à chaque connexion et à chaque nouveau jeton, ce qu'il faut à un
-/// appareil iOS pour sonner : son document de capacités (« appels »), puis
-/// ses jetons APNs. Un seul envoi à la fois, toujours avec le dernier état
-/// connu des deux jetons, puisque chaque envoi remplace l'ensemble. Rien tant
-/// que le verrou d'appels est fermé, sinon retirer « appels » s'il avait été
-/// annoncé.
+/// appareil iOS pour sonner : ses jetons APNs. Un seul envoi à la fois,
+/// toujours avec le dernier état connu des deux jetons, puisque chaque envoi
+/// remplace l'ensemble. Rien tant que le verrou d'appels est fermé. Le serveur
+/// fait sonner les appareils actifs du journal, sans document de capacités
+/// (E2EE-AUTO §7.3).
 final class E2EEV2CallPushRegistrar: @unchecked Sendable {
     private let api: APIClient
     private let identityStore: E2EEV2DeviceIdentityStore
-    private let capabilities: E2EEV2CapabilitiesPublicationStore
     private let open: @Sendable () -> Bool
     private let lock = NSLock()
     private var latestVoipToken: String?
@@ -332,12 +331,10 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        capabilities: E2EEV2CapabilitiesPublicationStore = E2EEV2CapabilitiesPublicationStore(),
         open: @escaping @Sendable () -> Bool = { E2EEV2CallRuntimeGate.allowsControlPlane() }
     ) {
         self.api = api
         self.identityStore = identityStore
-        self.capabilities = capabilities
         self.open = open
     }
 
@@ -358,26 +355,12 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
     }
 
     private func send() async -> Bool {
-        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return false }
-        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore)
-        guard open() else {
-            // Verrou refermé après une annonce : « appels » est retiré.
-            if let stored = try? capabilities.load(ownerNamespace: session.ownerNamespace),
-               let document = try? E2EEV2CapabilitiesDocument.parse(document: stored.document),
-               document.features.contains("calls") {
-                _ = await lifecycle.publishCapabilitiesIfNeeded()
-            }
-            return false
-        }
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent, open() else { return false }
         guard let deviceId = try? identityStore.signingDeviceId(ownerNamespace: session.ownerNamespace) else { return false }
         // Le chiffrement automatique (E2EE-AUTO) n'a plus de clé de compte :
         // l'exiger empêchait tout appareil inscrit seul d'enregistrer ses jetons
         // (4 iPhone approuvés sans jeton en prod le 09/11). Un appareil encore en
         // attente reçoit 403 E2EE_DEVICE_NOT_APPROVED, sans autre effet.
-        // « Appels vérifiés » publié d'abord : l'intersection du serveur le lit
-        // pour choisir les appareils qui sonnent.
-        _ = await lifecycle.publishCapabilitiesIfNeeded()
-        guard session.isCurrent else { return false }
         let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
         let voip = lock.withLock { latestVoipToken }
         guard let body = E2EEV2CallPushTokens.body(voipToken: voip, apnsToken: E2EEV2CallPushTokens.apnsToken) else {

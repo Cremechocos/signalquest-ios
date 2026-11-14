@@ -340,16 +340,6 @@ struct AppRootView: View {
                 if case .authenticated = session.state {
                     Task { await services.callManager.registerVoIPTokenForSession() }
                 }
-                // Capacités (appels, réactions D.16) republiées selon la nouvelle porte.
-                if case .authenticated = session.state, services.e2eeV2Messaging.writesEnabled,
-                   let account = LocalAccountScope.sessionSnapshot(),
-                   !services.e2eeV2Messaging.lacksV2Readiness(account) {
-                    let api = services.api
-                    Task {
-                        _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: E2EEV2DeviceIdentityStore())
-                            .publishCapabilitiesIfNeeded()
-                    }
-                }
             }
             .onReceive(NotificationCenter.default.publisher(for: E2EEV2NotificationContextEvents.refresh).receive(on: RunLoop.main)) { note in
                 guard let reason = note.userInfo?["reason"] as? String,
@@ -378,9 +368,7 @@ struct AppRootView: View {
                         Task { await session.retryBootstrap() }
                     }
                     // Verrouillage / déconnexion par inactivité au retour au 1er plan.
-                    var locksOut = false
                     if case .authenticated = session.state, appLock.willEnterForeground() {
-                        locksOut = true
                         Task { await session.logout() }
                     }
                     // Le ton a pu changer depuis un autre appareil.
@@ -406,17 +394,6 @@ struct AppRootView: View {
                     services.enterForeground()
                     services.callManager.sceneDidBecomeActive()
                     Task { await services.versionPolicy.refreshIfStale() }
-                    // Capacités v2 restées sans réponse (500, réseau) : republiées ici,
-                    // sans requête quand le document publié est à jour.
-                    if case .authenticated = session.state, !locksOut, services.e2eeV2Messaging.writesEnabled,
-                       let account = LocalAccountScope.sessionSnapshot(),
-                       !services.e2eeV2Messaging.lacksV2Readiness(account) {
-                        let api = services.api
-                        Task {
-                            _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: E2EEV2DeviceIdentityStore())
-                                .publishCapabilitiesIfNeeded()
-                        }
-                    }
                 case .background:
                     // Badge de l'icône recalculé à la mise en arrière-plan (M16).
                     services.syncIconBadge()
