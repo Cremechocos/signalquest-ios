@@ -290,6 +290,82 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         XCTAssertEqual(logRefused, .logRefused)
     }
 
+    // MARK: HK inattendue (§5.1)
+
+    /// Entrées `HISTORY_KEY` du journal dans l'ordre : `previous` vaut la HK d'avant,
+    /// sauf `previous` donné ; `afterRevokeSeq` non nul = forme d'une rotation.
+    private func chain(_ keys: [(hk: String, afterRevokeSeq: Int64?, previous: String?)]) -> E2EEAutoLog.AccountState {
+        var state = account(hk: keys.last?.hk)
+        for (index, key) in keys.enumerated() {
+            state.historyKeys.append(.init(
+                seq: Int64(10 + index), entryHash: E2EEAutoLog.digest("hk\(index)"), hkPubB64: key.hk,
+                previousHkPubB64: key.previous ?? (index > 0 ? keys[index - 1].hk : nil), signerDeviceId: ownId,
+                signerAddedAtMs: 1, createdAtMs: Int64(index + 1), afterRevokeSeq: key.afterRevokeSeq
+            ))
+        }
+        return state
+    }
+
+    /// Une HK écrite hors rotation par-dessus celle que l'appareil détient : aucune
+    /// demande ne part seule (ni « C'est moi », ni absent déclaré), rien n'est publié.
+    func testKeyWrittenOutsideARotationOverAHeldOneIsUnexpected() async {
+        let held = Self.newKey(), intruder = Self.newKey()
+        let fake = Fake(reads: [.verified(chain([(held, nil, nil), (intruder, nil, nil)]))])
+        fake.held = [held]
+        fake.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        let outcome = await publication(fake).run()
+        XCTAssertEqual(outcome, .unexpected(hkPubB64: intruder))
+        XCTAssertEqual(outcome.traceStep, "unexpected")
+        XCTAssertTrue(fake.created.isEmpty)
+        XCTAssertTrue(fake.posts.isEmpty)
+        XCTAssertTrue(fake.puts.isEmpty)
+
+        let rotating = Fake(reads: [.verified(chain([(held, nil, nil), (intruder, nil, nil)]))])
+        rotating.held = [held]
+        rotating.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        let rotated = await publication(rotating).rotate()
+        XCTAssertEqual(rotated, .unexpected(hkPubB64: intruder), "la rotation ne demande rien non plus")
+        XCTAssertTrue(rotating.posts.isEmpty)
+    }
+
+    /// Une rotation après un REVOKE, par-dessus la HK détenue, reste attendue :
+    /// l'appareil reçoit HK′ par un transfert, ou la demande comme avant.
+    func testRotationOverTheHeldKeyStaysMissing() async {
+        let held = Self.newKey(), next = Self.newKey()
+        let fake = Fake(reads: [.verified(chain([(held, nil, nil), (next, 40, nil)]))])
+        fake.held = [held]
+        let outcome = await publication(fake).run()
+        XCTAssertEqual(outcome, .missing(hkPubB64: next))
+        XCTAssertTrue(fake.posts.isEmpty)
+    }
+
+    /// Un appareil qui n'a jamais eu de HK du compte la demande comme avant (§5.3).
+    func testDeviceThatNeverHeldAKeyStaysMissing() async {
+        let first = Self.newKey(), second = Self.newKey()
+        let fake = Fake(reads: [.verified(chain([(first, nil, nil), (second, nil, nil)]))])
+        let outcome = await publication(fake).run()
+        XCTAssertEqual(outcome, .missing(hkPubB64: second))
+    }
+
+    /// La règle porte sur toutes les HK écrites après la plus récente détenue :
+    /// une rotation venue après une HK inattendue ne la blanchit pas.
+    func testUnexpectedKeyIsJudgedAfterTheLatestHeldOne() {
+        let a = Self.newKey(), b = Self.newKey(), c = Self.newKey()
+        let holdsA: (String) -> Bool = { $0 == a }
+        XCTAssertTrue(E2EEAutoHistoryKeyPublication.isUnexpected(chain([(a, nil, nil), (b, nil, nil), (c, 41, nil)]), holds: holdsA))
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.isUnexpected(chain([(a, nil, nil), (b, 40, nil), (c, 41, nil)]), holds: holdsA))
+        XCTAssertTrue(
+            E2EEAutoHistoryKeyPublication.isUnexpected(chain([(a, nil, nil), (b, 40, c)]), holds: holdsA),
+            "une rotation qui ne part pas de la HK d'avant n'en est pas une"
+        )
+        // Détenir une HK plus récente que la HK inattendue : rien à signaler.
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.isUnexpected(
+            chain([(a, nil, nil), (b, nil, nil), (c, 41, nil)]), holds: { $0 == a || $0 == b }
+        ))
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.isUnexpected(chain([(a, nil, nil)]), holds: holdsA))
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.isUnexpected(chain([]), holds: holdsA))
+    }
+
     func testFailedStatusReportIsRetriedNextTime() async {
         let hk = Self.newKey()
         let fake = Fake(reads: [.verified(account(hk: hk))])

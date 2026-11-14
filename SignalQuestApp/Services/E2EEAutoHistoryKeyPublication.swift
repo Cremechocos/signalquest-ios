@@ -81,6 +81,9 @@ actor E2EEAutoHistoryKeyPublication {
         case present(hkPubB64: String)
         /// Le compte a une HK que l'appareil n'a pas : synchro, passkey ou « C'est moi » (§5.3).
         case missing(hkPubB64: String)
+        /// HK publiée hors rotation alors que l'appareil en détenait une plus ancienne
+        /// (§5.1, HK inattendue) : aucune demande ne part seule, la personne confirme d'abord.
+        case unexpected(hkPubB64: String)
         /// Appareil en attente (mode renforcé) : rien avant son activation.
         case notActive
         /// Garde des 24 h (§3.2) : remplacer une HK perdue attend l'ancienneté.
@@ -140,10 +143,10 @@ actor E2EEAutoHistoryKeyPublication {
                 case .rotate:
                     // Plus de rotation due (une autre a gagné) : rien à publier.
                     guard account.rotationDueRevokeSeq != nil, held else {
-                        return held ? await reportPresent(device: device, hkPubB64: current) : .missing(hkPubB64: current)
+                        return held ? await reportPresent(device: device, hkPubB64: current) : absent(account, current)
                     }
                 case .first:
-                    return held ? await reportPresent(device: device, hkPubB64: current) : .missing(hkPubB64: current)
+                    return held ? await reportPresent(device: device, hkPubB64: current) : absent(account, current)
                 case .replaceLost:
                     if held { return await reportPresent(device: device, hkPubB64: current) }
                 }
@@ -219,6 +222,22 @@ actor E2EEAutoHistoryKeyPublication {
     /// La HK tirée ici est au journal, ou une autre a gagné : le marqueur tombe,
     /// et une clé jamais publiée quitte le trousseau. Sans HK au journal, elle
     /// reste pour être renvoyée telle quelle.
+    private func absent(_ account: E2EEAutoLog.AccountState, _ current: String) -> Outcome {
+        Self.isUnexpected(account, holds: dependencies.holds) ? .unexpected(hkPubB64: current) : .missing(hkPubB64: current)
+    }
+
+    /// §5.1 : l'appareil détient une HK du compte, mais une HK écrite après la plus récente
+    /// qu'il détient n'a pas la forme d'une rotation (après un `REVOKE`, par-dessus la
+    /// précédente). Un appareil qui n'a jamais eu de HK n'est pas concerné.
+    static func isUnexpected(_ account: E2EEAutoLog.AccountState, holds: (String) -> Bool) -> Bool {
+        let keys = account.historyKeys
+        guard let lastHeld = keys.lastIndex(where: { holds($0.hkPubB64) }) else { return false }
+        return keys.indices.contains { index in
+            index > lastHeld
+                && (keys[index].afterRevokeSeq == nil || keys[index].previousHkPubB64 != keys[index - 1].hkPubB64)
+        }
+    }
+
     private func settlePendingKey(current: String?) {
         guard let pending = dependencies.pendingKey(), let current else { return }
         if pending != current { try? dependencies.discard(pending) }
@@ -319,6 +338,7 @@ extension E2EEAutoHistoryKeyPublication.Outcome {
         switch self {
         case .present: return "present"
         case .missing: return "missing"
+        case .unexpected: return "unexpected"
         case .notActive: return "not-active"
         case .tooRecent: return "too-recent"
         case .retryLater: return "retry-later"
