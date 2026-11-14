@@ -1059,13 +1059,14 @@ final class FeedLiveMapsHarness: XCTestCase {
     }
 }
 
-/// Post de panne (contrat des posts automatiques v1 §2.9) : le repli vers la fiche ne suit
-/// `siteId` que si la cible est un site.
+/// Post de panne (contrat des posts automatiques v1 §2.9) : le repli vers la fiche d'antenne
+/// ne suit `siteId` que si la cible est un support ANFR.
 final class OutagePostLinkTests: XCTestCase {
-    func testGeoTargetNeverFallsBackToASite() {
+    func testOnlyAnANFRTargetFallsBackToTheAntennaSheet() {
         XCTAssertEqual(OutageFeedBadge.fallbackSiteId("802123", targetKind: "anfr"), "802123")
-        XCTAssertEqual(OutageFeedBadge.fallbackSiteId("custom-1", targetKind: "custom"), "custom-1")
-        XCTAssertEqual(OutageFeedBadge.fallbackSiteId("c-1", targetKind: "COMMUNITY"), "c-1")
+        XCTAssertEqual(OutageFeedBadge.fallbackSiteId("802123", targetKind: "ANFR"), "802123")
+        XCTAssertNil(OutageFeedBadge.fallbackSiteId("custom-1", targetKind: "custom"), "site communautaire : pas une antenne")
+        XCTAssertNil(OutageFeedBadge.fallbackSiteId("c-1", targetKind: "community"))
         XCTAssertNil(OutageFeedBadge.fallbackSiteId("geo:45.19:5.72", targetKind: "geo"))
         XCTAssertEqual(OutageFeedBadge.fallbackSiteId("802123", targetKind: nil), "802123", "anciens posts, tous anfr")
     }
