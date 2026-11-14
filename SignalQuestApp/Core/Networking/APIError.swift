@@ -199,6 +199,21 @@ enum APIError: Error, LocalizedError, Equatable {
         // message reste neutre, chaque écran nomme sa fonction s'il le peut.
         "PREMIUM_REQUIRED": String(localized: "Cette fonction est réservée aux membres Premium."),
 
+        // Routes d'achat (contrat abonnements v1 §3). Un libellé local par code,
+        // car un 5xx n'affiche jamais le texte du serveur : sans lui, un achat payé
+        // mais pas encore activé ne disait que « Service momentanément indisponible ».
+        "PURCHASE_ALREADY_LINKED": String(localized: "Cet abonnement App Store est déjà rattaché à un autre compte SignalQuest. Connecte-toi avec le compte qui l’a souscrit."),
+        "SUBSCRIPTION_ALREADY_ACTIVE": String(localized: "Un abonnement est déjà actif sur ton compte : aucun nouvel achat n’est nécessaire."),
+        "BILLING_TESTERS_ONLY": String(localized: "Pendant la phase de test, les achats sont réservés aux testeurs. Ton achat sera activé dès l’ouverture des achats, sans nouveau paiement."),
+        "BILLING_UNCONFIGURED": String(localized: "Ton achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement."),
+        // Ancien nom du même refus, servi par la production jusqu'au lot 1b de Backend.
+        "APPLE_BILLING_UNCONFIGURED": String(localized: "Ton achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement."),
+        "STORE_UNAVAILABLE": String(localized: "L’App Store ne répond pas pour le moment. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement."),
+        "PURCHASE_PROOF_INVALID": String(localized: "L’App Store n’a pas pu confirmer cet achat. Il sera vérifié de nouveau automatiquement, sans nouveau paiement."),
+        // Ancien nom de la preuve refusée (avec un 401 avant le lot 1b de Backend).
+        "APPLE_VERIFY_FAILED": String(localized: "L’App Store n’a pas pu confirmer cet achat. Il sera vérifié de nouveau automatiquement, sans nouveau paiement."),
+        "UNKNOWN_PRODUCT": String(localized: "Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement."),
+
         // Journal radio synchronisé.
         "TOO_MANY_ITEMS": String(localized: "Trop d'éléments envoyés d'un coup. Réessaie."),
 

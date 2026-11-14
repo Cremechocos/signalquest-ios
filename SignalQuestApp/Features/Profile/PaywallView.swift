@@ -437,7 +437,7 @@ struct PaywallView: View {
 
     private func purchaseButtonTitle(tier: SupporterTier, isCurrentOrLower: Bool) -> String {
         if isCurrentOrLower { return String(localized: "Déjà inclus dans ton offre") }
-        if case .existingBackendEntitlement = store.eligibility { return String(localized: "Déjà abonné ailleurs") }
+        if case .managedElsewhere = store.eligibility { return String(localized: "Déjà abonné ailleurs") }
         if !store.eligibility.canPurchase { return String(localized: "Bientôt disponible sur iOS") }
         return String(localized: "Choisir \(tier.displayName)")
     }

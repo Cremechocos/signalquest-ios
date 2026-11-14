@@ -42,6 +42,13 @@ enum SQFeatures {
     /// synchroniseur présent) pour qu'un achat soit éligible.
     static let storeKitServerVerificationEnabled = true
 
+    /// Passage de `purchaseAccountToken` en `appAccountToken` à chaque achat
+    /// (contrat abonnements v1 §4). Fermé tant que le serveur ne rattache pas
+    /// encore un achat par ce jeton : Backend demande de ne l'écrire dans les
+    /// transactions Apple qu'une fois ce rattachement codé (14/11). Un jeton
+    /// écrit dans une transaction y reste à vie.
+    static let storeKitAppAccountTokenEnabled = false
+
     /// Lecture du fil de site en `?v=2` (#833) : réponses, messages anonymisés,
     /// messages privés de l'auteur. Fermé tant qu'aucune build publiée ne porte
     /// le décodeur tolérant et l'auteur facultatif : la v2 peut servir

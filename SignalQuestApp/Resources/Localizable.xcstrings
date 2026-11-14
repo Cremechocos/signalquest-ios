@@ -40841,6 +40841,426 @@
         }
       }
     },
+    "un autre appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "another device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un autre appareil"
+          }
+        }
+      }
+    },
+    "le web" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the web"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le web"
+          }
+        }
+      }
+    },
+    "Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour garder Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The last payment didn’t go through. Update your payment method in your Apple subscriptions to keep Premium."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour garder Premium."
+          }
+        }
+      }
+    },
+    "SQFormal|Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour garder Premium." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Mettez à jour votre moyen de paiement dans vos abonnements Apple pour garder Premium."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Premium est suspendu : le paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour le rétablir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium is on hold: the payment didn’t go through. Update your payment method in your Apple subscriptions to restore it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium est suspendu : le paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour le rétablir."
+          }
+        }
+      }
+    },
+    "SQFormal|Premium est suspendu : le paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour le rétablir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium est suspendu : le paiement n’est pas passé. Mettez à jour votre moyen de paiement dans vos abonnements Apple pour le rétablir."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton abonnement est géré par Apple : tu peux le modifier ou le résilier dans tes abonnements Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription is managed by Apple: you can change or cancel it in your Apple subscriptions."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement est géré par Apple : tu peux le modifier ou le résilier dans tes abonnements Apple."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement est géré par Apple : tu peux le modifier ou le résilier dans tes abonnements Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement est géré par Apple : vous pouvez le modifier ou le résilier dans vos abonnements Apple."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Abonnement géré sur le web. Aucun achat n’est proposé ici, pour éviter un double paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription managed on the web. No purchase is offered here, to avoid paying twice."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement géré sur le web. Aucun achat n’est proposé ici, pour éviter un double paiement."
+          }
+        }
+      }
+    },
+    "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit. Aucun achat n’est proposé ici, pour éviter un double paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription taken out on another device: it’s managed where it was taken out. No purchase is offered here, to avoid paying twice."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit. Aucun achat n’est proposé ici, pour éviter un double paiement."
+          }
+        }
+      }
+    },
+    "Un abonnement App Store est actif sur cet identifiant Apple, mais pas encore sur ce compte. Touche « Restaurer mes achats » pour le rattacher." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An App Store subscription is active on this Apple Account, but not yet on this account. Tap “Restore purchases” to link it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement App Store est actif sur cet identifiant Apple, mais pas encore sur ce compte. Touche « Restaurer mes achats » pour le rattacher."
+          }
+        }
+      }
+    },
+    "SQFormal|Un abonnement App Store est actif sur cet identifiant Apple, mais pas encore sur ce compte. Touche « Restaurer mes achats » pour le rattacher." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement App Store est actif sur cet identifiant Apple, mais pas encore sur ce compte. Touchez « Restaurer mes achats » pour le rattacher."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les achats ne sont pas disponibles dans cette version de l’app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchases aren’t available in this version of the app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les achats ne sont pas disponibles dans cette version de l’app."
+          }
+        }
+      }
+    },
+    "Ton paiement est bien enregistré par Apple, mais son activation n’a pas encore abouti. Elle sera retentée automatiquement, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple has recorded your payment, but activating it hasn’t worked yet. It will be retried automatically, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton paiement est bien enregistré par Apple, mais son activation n’a pas encore abouti. Elle sera retentée automatiquement, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton paiement est bien enregistré par Apple, mais son activation n’a pas encore abouti. Elle sera retentée automatiquement, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre paiement est bien enregistré par Apple, mais son activation n’a pas encore abouti. Elle sera retentée automatiquement, sans nouveau paiement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucun abonnement App Store en cours n’a été trouvé pour cet identifiant Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No current App Store subscription was found for this Apple Account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun abonnement App Store en cours n’a été trouvé pour cet identifiant Apple."
+          }
+        }
+      }
+    },
+    "Cet abonnement App Store est déjà rattaché à un autre compte SignalQuest. Connecte-toi avec le compte qui l’a souscrit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This App Store subscription is already linked to another SignalQuest account. Sign in with the account that took it out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet abonnement App Store est déjà rattaché à un autre compte SignalQuest. Connecte-toi avec le compte qui l’a souscrit."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet abonnement App Store est déjà rattaché à un autre compte SignalQuest. Connecte-toi avec le compte qui l’a souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet abonnement App Store est déjà rattaché à un autre compte SignalQuest. Connectez-vous avec le compte qui l’a souscrit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Un abonnement est déjà actif sur ton compte : aucun nouvel achat n’est nécessaire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A subscription is already active on your account: no new purchase is needed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement est déjà actif sur ton compte : aucun nouvel achat n’est nécessaire."
+          }
+        }
+      }
+    },
+    "SQFormal|Un abonnement est déjà actif sur ton compte : aucun nouvel achat n’est nécessaire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement est déjà actif sur votre compte : aucun nouvel achat n’est nécessaire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Pendant la phase de test, les achats sont réservés aux testeurs. Ton achat sera activé dès l’ouverture des achats, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During the test phase, purchases are limited to testers. Your purchase will be activated as soon as purchases open, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant la phase de test, les achats sont réservés aux testeurs. Ton achat sera activé dès l’ouverture des achats, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "SQFormal|Pendant la phase de test, les achats sont réservés aux testeurs. Ton achat sera activé dès l’ouverture des achats, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant la phase de test, les achats sont réservés aux testeurs. Votre achat sera activé dès l’ouverture des achats, sans nouveau paiement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple has recorded your purchase, but it can’t be activated right now. It will be retried automatically, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre achat est bien enregistré par Apple, mais son activation est momentanément impossible. Elle sera retentée automatiquement, sans nouveau paiement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "L’App Store ne répond pas pour le moment. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The App Store isn’t responding right now. Your purchase will be checked again automatically, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’App Store ne répond pas pour le moment. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "SQFormal|L’App Store ne répond pas pour le moment. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’App Store ne répond pas pour le moment. Votre achat sera vérifié de nouveau automatiquement, sans nouveau paiement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "L’App Store n’a pas pu confirmer cet achat. Il sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The App Store couldn’t confirm this purchase. It will be checked again automatically, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’App Store n’a pas pu confirmer cet achat. Il sera vérifié de nouveau automatiquement, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest doesn’t recognise this offer yet. Your purchase will be checked again automatically, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette offre n’est pas encore reconnue par SignalQuest. Votre achat sera vérifié de nouveau automatiquement, sans nouveau paiement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Acquittés TCP (en-têtes inclus)" : {
       "localizations" : {
         "en" : {

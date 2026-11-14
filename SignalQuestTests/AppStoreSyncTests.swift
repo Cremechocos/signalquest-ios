@@ -92,7 +92,7 @@ final class AppStoreSyncTests: XCTestCase {
         let synchronizer = AppStoreTransactionSynchronizer(api: client)
         let proof = AppStoreTransactionProof(
             signedTransaction: "bad",
-            productId: SignalQuestSubscriptionProduct.basicMonthly.rawValue,
+            productId: SignalQuestSubscriptionProduct.premiumAnnual.rawValue,
             transactionId: "txn-2",
             originalTransactionId: "txn-2"
         )
@@ -103,6 +103,83 @@ final class AppStoreSyncTests: XCTestCase {
         } catch {
             // Attendu : APIError.http(400, …)
         }
+    }
+
+    /// C2 : une preuve refusée répondait 401, que le client lisait comme une
+    /// session expirée (rafraîchissement, nouvel essai, puis déconnexion de
+    /// l'acheteur). La route ne déclenche plus aucun rafraîchissement : un seul
+    /// appel part, et l'erreur remonte telle quelle à l'`EntitlementsStore`, qui
+    /// garde la transaction ouverte.
+    func testVerifyRefusalNeverTriggersASessionRefresh() async {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        let paths = LockedPaths()
+        MockURLProtocol.requestHandler = { request in
+            paths.append(request.url?.path ?? "")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"Transaction refusée","code":"APPLE_VERIFY_FAILED"}"#.utf8))
+        }
+
+        let synchronizer = AppStoreTransactionSynchronizer(api: client)
+        let proof = AppStoreTransactionProof(
+            signedTransaction: "jws", productId: SignalQuestSubscriptionProduct.premiumMonthly.rawValue,
+            transactionId: "txn-401", originalTransactionId: "txn-401"
+        )
+        do {
+            _ = try await synchronizer.synchronize(proof)
+            XCTFail("Un refus doit lever une erreur")
+        } catch APIError.http(let status, let code, _, _, _) {
+            XCTAssertEqual(status, 401)
+            XCTAssertEqual(code, "APPLE_VERIFY_FAILED")
+            XCTAssertEqual(AppStoreDeliveryFailure(APIError.http(status: status, code: code, message: "", requestId: nil, retryAfter: nil)),
+                           .keepForRetry)
+        } catch {
+            XCTFail("Erreur inattendue : \(error)")
+        }
+        XCTAssertEqual(paths.values, ["/api/billing/apple/verify"], "Aucun rafraîchissement de session ne doit partir")
+    }
+
+    /// Dès le lot 1b de Backend, `/verify` sert la charge §3 en plus de l'ancienne
+    /// forme : le snapshot la lit.
+    func testSynchronizeReadsTheContractPayload() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let json = #"""
+            {
+              "version": 1,
+              "tier": "premium",
+              "purchases": [{ "id": "p1", "provider": "app_store", "tier": "premium", "status": "active",
+                              "cancelAtPeriodEnd": false, "currentPeriodEnd": "2026-12-21T10:00:00Z",
+                              "expiresAt": null, "startsAt": null }],
+              "subscription": { "channel": "app_store", "state": "trialing", "tier": "premium", "period": "year",
+                                "autoRenew": true, "currentPeriodEnd": "2026-12-21T10:00:00Z",
+                                "trialEndsAt": "2026-11-21T10:00:00Z", "environment": "sandbox" },
+              "trial": { "eligible": false, "days": 7 },
+              "purchaseAccountToken": "0b6f8f62-5a0e-4c62-9d36-8a4f1f4a7c11"
+            }
+            """#
+            return (response, Data(json.utf8))
+        }
+
+        let snapshot = try await AppStoreTransactionSynchronizer(api: client).synchronize(AppStoreTransactionProof(
+            signedTransaction: "jws", productId: SignalQuestSubscriptionProduct.premiumAnnual.rawValue,
+            transactionId: "txn-3", originalTransactionId: "txn-3"
+        ))
+        XCTAssertEqual(snapshot.tier, .premium)
+        XCTAssertEqual(snapshot.source, .appStore)
+        XCTAssertEqual(snapshot.period, .annual)
+        XCTAssertEqual(snapshot.subscription?.state, .trialing)
+        XCTAssertEqual(snapshot.subscription?.isSandbox, true)
+        XCTAssertNotNil(snapshot.subscription?.trialEndsAt)
+        XCTAssertNotNil(snapshot.purchaseAccountToken)
     }
 
     private static func mockSession() -> URLSession {
@@ -125,4 +202,12 @@ final class AppStoreSyncTests: XCTestCase {
         }
         return result
     }
+}
+
+/// Chemins reçus par `MockURLProtocol`, appelé hors du fil du test.
+private final class LockedPaths: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+    func append(_ path: String) { lock.withLock { stored.append(path) } }
+    var values: [String] { lock.withLock { stored } }
 }

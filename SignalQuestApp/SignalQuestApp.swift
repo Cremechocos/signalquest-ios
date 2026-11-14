@@ -570,6 +570,13 @@ struct RootView: View {
         showsAddressPrompt = true
     }
 
+    /// Achats App Store à livrer au serveur (contrat abonnements v1 §5) : au
+    /// lancement et au retour au premier plan, silencieusement.
+    private func reconcileAppStoreTransactions() {
+        guard isAuthenticated else { return }
+        Task { await services.entitlements.reconcileAppStoreTransactions() }
+    }
+
     /// L'écran ne se repousse pas : il attend un profil relu sur le serveur depuis ce
     /// lancement (jamais sur le seul cache, donc jamais hors ligne) et laisse passer un lien
     /// vers un contenu, puis il se décide au prochain changement d'onglet ou retour dans l'app.
@@ -717,6 +724,7 @@ struct RootView: View {
                         refreshNewDeviceAlert()
                         refreshHistoryRequests(active: true)
                         refreshUsernameConfirmation()
+                        reconcileAppStoreTransactions()
                     }
                     .onDisappear { mainApplicationAppeared = false; historyRequests.resignedActive() }
                     .onChangeCompat(of: session.serverProfileUserID) { _, _ in refreshUsernameConfirmation() }
@@ -739,6 +747,7 @@ struct RootView: View {
                             refreshV2ActivationPrompt(); refreshAddressPrompt(); refreshNewDeviceAlert()
                             readOwnDevicesAfterAddedPush()
                             refreshUsernameConfirmation()
+                            reconcileAppStoreTransactions()
                         }
                         refreshHistoryRequests(active: phase == .active)
                     }

@@ -20,56 +20,18 @@
         {
           "adHocOffers" : [],
           "codeOffers" : [],
-          "displayPrice" : "2.99",
-          "familyShareable" : false,
-          "groupLevel" : 2,
-          "internalID" : "5C9F1A20-0002-4000-A000-000000000001",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "Badge Basic acier ; soutient le développement.",
-              "displayName" : "Basic mensuel",
-              "locale" : "fr_FR"
-            }
-          ],
-          "productID" : "fr.signalquest.ios.basic.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Basic mensuel",
-          "subscriptionGroupID" : "21491001",
-          "type" : "RecurringSubscription"
-        },
-        {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "29.99",
-          "familyShareable" : false,
-          "groupLevel" : 2,
-          "internalID" : "5C9F1A20-0002-4000-A000-000000000002",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "Badge Basic acier, facturé annuellement.",
-              "displayName" : "Basic annuel",
-              "locale" : "fr_FR"
-            }
-          ],
-          "productID" : "fr.signalquest.ios.basic.annual",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Basic annuel",
-          "subscriptionGroupID" : "21491001",
-          "type" : "RecurringSubscription"
-        },
-        {
-          "adHocOffers" : [],
-          "codeOffers" : [],
           "displayPrice" : "7.99",
           "familyShareable" : false,
           "groupLevel" : 1,
           "internalID" : "5C9F1A20-0002-4000-A000-000000000003",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "5C9F1A20-0003-4000-A000-000000000003",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
           "localizations" : [
             {
-              "description" : "Journal radio, Sentinelle, stories et badge or.",
+              "description" : "Sentinelle complète, stories sur mesure et badge or.",
               "displayName" : "Premium mensuel",
               "locale" : "fr_FR"
             }
@@ -87,10 +49,14 @@
           "familyShareable" : false,
           "groupLevel" : 1,
           "internalID" : "5C9F1A20-0002-4000-A000-000000000004",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "5C9F1A20-0003-4000-A000-000000000004",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
           "localizations" : [
             {
-              "description" : "Journal radio, Sentinelle, stories, facturé à l'année.",
+              "description" : "Sentinelle complète, stories sur mesure, à l'année.",
               "displayName" : "Premium annuel",
               "locale" : "fr_FR"
             }

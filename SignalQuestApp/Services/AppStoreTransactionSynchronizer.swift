@@ -11,13 +11,12 @@ import Foundation
 /// reste par ailleurs gardé par les flags `SQFeatures.storeKit*`, si bien que la
 /// simple présence de ce synchroniseur n'ouvre pas les achats à elle seule.
 struct AppStoreTransactionSynchronizer: AppStoreTransactionSyncing {
-    /// Endpoint backend de validation Apple. Contrat attendu (ticket `map-nextjs`,
-    /// additif/idempotent) : reçoit un `AppStoreTransactionProof` (JWS
-    /// `signedTransaction` + identifiants), vérifie le JWS avec l'App Store Server
-    /// API, met à jour l'entitlement `apple_appstore`, et répond avec le MÊME
-    /// format que le GET `/api/billing/subscription` (`BillingSubscriptionResponse`).
-    /// L'idempotence est portée par `transactionId` : rejouer une transaction ne
-    /// doit jamais octroyer un droit en double.
+    /// Endpoint backend de validation Apple : reçoit un `AppStoreTransactionProof`
+    /// (JWS `signedTransaction` + identifiants), vérifie le JWS, met à jour le
+    /// droit `apple_appstore` et répond avec la charge de droits (contrat v1 §3,
+    /// ancienne forme `tier` + `purchases[]` gardée en parallèle), décodée par
+    /// `BillingSubscriptionResponse`. L'idempotence est portée par `transactionId` :
+    /// rejouer une transaction ne doit jamais octroyer un droit en double.
     static let verifyEndpoint = "/api/billing/apple/verify"
 
     private let api: APIClientProtocol
@@ -34,8 +33,14 @@ struct AppStoreTransactionSynchronizer: AppStoreTransactionSyncing {
                 method: .post,
                 headers: ["Content-Type": "application/json"],
                 body: body,
+                // Un refus de cette route ne déconnecte jamais (C2, contrat v1 §5) :
+                // l'ancien serveur répondait 401 à une preuve refusée, que le client
+                // lisait comme une session expirée. Sans rafraîchissement automatique,
+                // un 401 remonte tel quel et la transaction reste ouverte, rejouée
+                // plus tard par StoreKit et par le renvoi au lancement.
+                skipsAutoRefresh: true,
                 // Idempotence forte : le backend déduplique sur la transaction Apple,
-                // et un rejeu automatique (refresh 401, backoff 429) réutilise la même clé.
+                // et un rejeu automatique (backoff 429/503) réutilise la même clé.
                 idempotencyKey: proof.transactionId
             ),
             as: BillingSubscriptionResponse.self
