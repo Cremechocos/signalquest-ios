@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Ton compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account has no key for the previous encryption, so these older messages can’t be opened here. They’ll appear once another member has imported them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Cet appareil n’a pas l’historique. Ouvre SignalQuest sur un appareil où tes conversations sont déjà là." : {
       "localizations" : {
         "en" : {

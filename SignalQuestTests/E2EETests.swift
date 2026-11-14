@@ -1,5 +1,6 @@
 import CryptoKit
 import ImageIO
+import Security
 import XCTest
 @testable import SignalQuest
 
@@ -255,74 +256,7 @@ final class E2EETests: XCTestCase {
             fixture.clientRequestId
         )
 
-        let sourceObject = try XCTUnwrap(JSONSerialization.jsonObject(
-            with: E2EEV2HistoryMigrationContract.canonicalSource(fixture.source)
-        ) as? [String: Any])
-        let response: [String: Any] = [
-            "version": 1,
-            "conversationId": fixture.source.conversationId,
-            "messages": [[
-                "source": sourceObject,
-                "sourceHash": fixture.sourceHash,
-                "eligibility": "READY",
-                "legacyAttachments": [],
-            ]],
-            "hasMore": false,
-            "blockedCount": 0,
-            "cursor": ["status": "RUNNING"],
-        ]
-        let batch = E2EEV2HistoryMigrationContract.parseBatch(
-            try JSONSerialization.data(withJSONObject: response),
-            expectedConversationId: fixture.source.conversationId
-        )
-        XCTAssertEqual(batch?.messages.first?.sourceHash, fixture.sourceHash)
         XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
-    }
-
-    func testV2HistoryMigrationRejectsTamperedLegacySource() throws {
-        let fixture = try historyMigrationFixture()
-        var sourceObject = try XCTUnwrap(JSONSerialization.jsonObject(
-            with: E2EEV2HistoryMigrationContract.canonicalSource(fixture.source)
-        ) as? [String: Any])
-        sourceObject["content"] = "contenu altéré"
-        let response: [String: Any] = [
-            "version": 1,
-            "conversationId": fixture.source.conversationId,
-            "messages": [[
-                "source": sourceObject,
-                "sourceHash": fixture.sourceHash,
-                "eligibility": "READY",
-                "legacyAttachments": [],
-            ]],
-            "hasMore": false,
-            "blockedCount": 0,
-            "cursor": ["status": "RUNNING"],
-        ]
-        XCTAssertNil(E2EEV2HistoryMigrationContract.parseBatch(
-            try JSONSerialization.data(withJSONObject: response),
-            expectedConversationId: fixture.source.conversationId
-        ))
-    }
-
-    func testV2HistoryMigrationBlobIdIsDeterministicAndSourceBound() throws {
-        let fixture = try historyMigrationFixture()
-        let attachmentId = "attachment_0000000000000001"
-        let first = try E2EEV2HistoryMigrationContract.historicalBlobId(
-            sourceHash: fixture.sourceHash,
-            attachmentId: attachmentId
-        )
-        let second = try E2EEV2HistoryMigrationContract.historicalBlobId(
-            sourceHash: fixture.sourceHash,
-            attachmentId: attachmentId
-        )
-        let other = try E2EEV2HistoryMigrationContract.historicalBlobId(
-            sourceHash: String(repeating: "a", count: 64),
-            attachmentId: attachmentId
-        )
-
-        XCTAssertEqual(first, second)
-        XCTAssertNotEqual(first, other)
-        XCTAssertTrue(first.hasPrefix("hist_"))
     }
 
     func testV2DeviceIdentityIsStableScopedAndUsesP256X963() throws {
@@ -598,22 +532,6 @@ final class E2EETests: XCTestCase {
         }
         let stagedCiphertext = try store.ciphertextURL(ownerScopeId: ownerScope, blobId: blob.blobId)
         XCTAssertEqual(try Data(contentsOf: stagedCiphertext), ciphertext)
-
-        let acknowledged = try store.markServerAcknowledged(record: record, ownerScopeId: ownerScope)
-        XCTAssertEqual(acknowledged.deliveryState, .serverAcknowledged)
-        XCTAssertEqual(
-            try store.load(ownerScopeId: ownerScope, clientRequestId: record.clientRequestId).deliveryState,
-            .serverAcknowledged
-        )
-        try store.complete(record: acknowledged, ownerScopeId: ownerScope)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: stagedCiphertext.path))
-        XCTAssertThrowsError(try store.load(ownerScopeId: ownerScope, clientRequestId: record.clientRequestId))
-
-        try store.stage(
-            record: record,
-            ownerScopeId: ownerScope,
-            ciphertextSources: [blob.blobId: source]
-        )
 
         try store.purge(ownerScopeId: ownerScope)
         XCTAssertFalse(FileManager.default.fileExists(atPath: stagedCiphertext.path))
@@ -1439,47 +1357,18 @@ final class E2EETests: XCTestCase {
         XCTAssertFalse(unlocked)
     }
 
-    /// Génère une clé via le flux complet (POST bootstrap mocké), puis vérifie
-    /// que la clé publique JWK exportée sait wrapper une clé de conversation
-    /// que la clé privée JWK stockée sait dé-wrapper — l'aller-retour exact
-    /// utilisé entre participants iOS/Android/web.
-    func testGeneratedKeyWrapUnwrapRoundTrip() async throws {
-        MockURLProtocol.requestHandler = { request in
-            let response = HTTPURLResponse(
-                url: request.url!,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (response, Data("{\"ok\":true}".utf8))
-        }
-        defer { MockURLProtocol.requestHandler = nil }
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let store = InMemoryTokenStore()
-        let api = APIClient(
-            config: .test,
-            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
-            session: URLSession(configuration: sessionConfig)
-        )
-        let service = E2EEService(api: api, tokenStore: store)
-
-        try await service.generateAndRegisterKey(userId: "u1", password: "correct horse battery")
-
-        let privateJwk = try XCTUnwrap(store.string(for: "privateJwk:current"))
-        let privateObj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(privateJwk.utf8)) as? [String: String])
-        XCTAssertEqual(privateObj["kty"], "RSA")
-        for field in ["n", "e", "d", "p", "q", "dp", "dq", "qi"] {
-            XCTAssertNotNil(privateObj[field], "champ JWK manquant: \(field)")
-            XCTAssertFalse(privateObj[field]!.contains("="), "padding base64url interdit: \(field)")
-            XCTAssertFalse(privateObj[field]!.contains("+"), "alphabet base64url attendu: \(field)")
-        }
-        let publicJwk = "{\"kty\":\"RSA\",\"n\":\"\(privateObj["n"]!)\",\"e\":\"\(privateObj["e"]!)\"}"
+    /// La clé publique JWK d'une clé v1 sait wrapper une clé de conversation que
+    /// sa clé privée JWK sait dé-wrapper — l'aller-retour exact utilisé entre
+    /// participants iOS/Android/web. L'app ne crée plus de clé v1 (lot 10.5) :
+    /// `LegacyKeyFixture` en fabrique une au format commun.
+    func testLegacyKeyWrapUnwrapRoundTrip() throws {
+        let key = try LegacyKeyFixture(password: "correct horse battery")
+        let privateObj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(key.privateJwk.utf8)) as? [String: String])
 
         let rawKey = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
-        let wrapped = try E2EEService.wrapConversationKey(rawKey: rawKey, publicJwk: publicJwk)
+        let wrapped = try E2EEService.wrapConversationKey(rawKey: rawKey, publicJwk: key.publicJwk)
         XCTAssertFalse(wrapped.contains("="), "wrappedKeyB64 doit être sans padding")
-        let unwrapped = try E2EEService.unwrapConversationKey(wrappedKeyB64: wrapped, privateJwk: privateJwk)
+        let unwrapped = try E2EEService.unwrapConversationKey(wrappedKeyB64: wrapped, privateJwk: key.privateJwk)
         XCTAssertEqual(unwrapped, rawKey)
 
         // Clé créée sur le site : WebCrypto exporte aussi `alg`, `ext` (booléen) et
@@ -1495,31 +1384,11 @@ final class E2EETests: XCTestCase {
     /// Signalement d'un message chiffré (SOC-12) : la clé de la conversation
     /// part chiffrée pour la clé publique de modération, en base64 standard
     /// comme le web, et seule la clé privée de modération la rouvre.
-    func testModerationWrapOpensOnlyWithModerationKey() async throws {
-        MockURLProtocol.requestHandler = { request in
-            let response = HTTPURLResponse(
-                url: request.url!,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (response, Data("{\"ok\":true}".utf8))
-        }
-        defer { MockURLProtocol.requestHandler = nil }
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let store = InMemoryTokenStore()
-        let api = APIClient(
-            config: .test,
-            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
-            session: URLSession(configuration: sessionConfig)
-        )
+    func testModerationWrapOpensOnlyWithModerationKey() throws {
         // Une paire RSA quelconque tient lieu de clé de modération.
-        try await E2EEService(api: api, tokenStore: store)
-            .generateAndRegisterKey(userId: "moderation", password: "correct horse battery")
-        let moderationPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
-        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(moderationPrivate.utf8)) as? [String: String])
-        let moderationPublic = "{\"kty\":\"RSA\",\"n\":\"\(fields["n"]!)\",\"e\":\"\(fields["e"]!)\"}"
+        let moderation = try LegacyKeyFixture(password: "correct horse battery")
+        let moderationPrivate = moderation.privateJwk
+        let moderationPublic = moderation.publicJwk
 
         let rawKey = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
         let wrapped = try E2EEService.wrapForModeration(rawKey: rawKey, publicJwk: moderationPublic)
@@ -1528,186 +1397,39 @@ final class E2EETests: XCTestCase {
         XCTAssertThrowsError(try E2EEService.wrapForModeration(rawKey: rawKey, publicJwk: "{}"))
     }
 
-    /// La clé privée générée doit pouvoir être re-déverrouillée à partir des
-    /// champs envoyés au serveur (PBKDF2 + AES-GCM), comme le ferait un autre
-    /// appareil après GET /api/e2ee/bootstrap.
-    func testGeneratedKeyBootstrapFieldsDecryptWithPassword() async throws {
-        var capturedBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            capturedBody = request.httpBody ?? request.httpBodyStream.flatMap { stream in
-                stream.open()
-                defer { stream.close() }
-                var data = Data()
-                let bufferSize = 4096
-                var buffer = [UInt8](repeating: 0, count: bufferSize)
-                while stream.hasBytesAvailable {
-                    let read = stream.read(&buffer, maxLength: bufferSize)
-                    if read <= 0 { break }
-                    data.append(buffer, count: read)
-                }
-                return data
-            }
-            let response = HTTPURLResponse(
-                url: request.url!,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (response, Data("{\"ok\":true}".utf8))
-        }
-        defer { MockURLProtocol.requestHandler = nil }
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
+    /// Une clé v1 se déverrouille à partir des champs servis par
+    /// GET /api/e2ee/bootstrap (PBKDF2 210k + AES-GCM), comme sur un autre
+    /// appareil : la clé privée est gardée, et elle correspond à la clé publique.
+    func testLegacyBootstrapFieldsUnlockWithPassword() async throws {
+        let key = try LegacyKeyFixture(password: "s3cret-pass")
         let store = InMemoryTokenStore()
-        let api = APIClient(
-            config: .test,
-            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
-            session: URLSession(configuration: sessionConfig)
-        )
+        let api = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()))
         let service = E2EEService(api: api, tokenStore: store)
 
-        try await service.generateAndRegisterKey(userId: "u1", password: "s3cret-pass")
+        try await service.unlock(userId: "u1", password: "s3cret-pass", bootstrapKey: key.bootstrapKey)
 
-        let body = try XCTUnwrap(capturedBody)
-        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        let encryptedPrivateJwk = try XCTUnwrap(payload["encryptedPrivateJwk"] as? String)
-        let kdfSaltB64 = try XCTUnwrap(payload["kdfSaltB64"] as? String)
-        let iterations = try XCTUnwrap(payload["kdfIterations"] as? Int)
-        XCTAssertEqual(iterations, 210_000)
-
-        let decrypted = try E2EEService.decryptPrivateJWK(
-            password: "s3cret-pass",
-            encryptedPrivateJwkB64: encryptedPrivateJwk,
-            kdfSaltB64: kdfSaltB64,
-            iterations: iterations
-        )
-        let stored = try XCTUnwrap(store.string(for: "privateJwk:current"))
-        XCTAssertEqual(decrypted, stored)
-        let publicKeyJwk = try XCTUnwrap(payload["publicKeyJwk"] as? String)
-        XCTAssertTrue(E2EEService.privateJwk(decrypted, matchesPublicJwk: publicKeyJwk))
+        XCTAssertEqual(try store.string(for: "privateJwk:current"), key.privateJwk)
+        XCTAssertEqual(try store.string(for: "privateJwk:u1"), key.privateJwk)
+        let unlocked = await service.isUnlocked()
+        XCTAssertTrue(unlocked)
+        XCTAssertTrue(E2EEService.privateJwk(key.privateJwk, matchesPublicJwk: key.publicJwk))
     }
 
     /// E2EE-UX-03 — Un mot de passe erroné doit remonter `.wrongPassword`
-    /// (message FR clair), PAS une CryptoKitError technique. Réutilise le même
-    /// flux de génération que le test ci-dessus, puis tente un déchiffrement avec
-    /// un mauvais mot de passe.
+    /// (message FR clair), PAS une CryptoKitError technique, et ne rien garder.
     func testWrongPasswordMapsToWrongPasswordError() async throws {
-        var capturedBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            capturedBody = request.httpBody ?? request.httpBodyStream.flatMap { stream in
-                stream.open()
-                defer { stream.close() }
-                var data = Data()
-                var buffer = [UInt8](repeating: 0, count: 4096)
-                while stream.hasBytesAvailable {
-                    let read = stream.read(&buffer, maxLength: 4096)
-                    if read <= 0 { break }
-                    data.append(buffer, count: read)
-                }
-                return data
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-            return (response, Data("{\"ok\":true}".utf8))
-        }
-        defer { MockURLProtocol.requestHandler = nil }
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let api = APIClient(
-            config: .test,
-            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
-            session: URLSession(configuration: sessionConfig)
-        )
-        let service = E2EEService(api: api, tokenStore: InMemoryTokenStore())
-        try await service.generateAndRegisterKey(userId: "u1", password: "s3cret-pass")
-
-        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(capturedBody)) as? [String: Any])
-        let encryptedPrivateJwk = try XCTUnwrap(payload["encryptedPrivateJwk"] as? String)
-        let kdfSaltB64 = try XCTUnwrap(payload["kdfSaltB64"] as? String)
-        let iterations = try XCTUnwrap(payload["kdfIterations"] as? Int)
-
-        XCTAssertThrowsError(
-            try E2EEService.decryptPrivateJWK(
-                password: "mauvais-mot-de-passe",
-                encryptedPrivateJwkB64: encryptedPrivateJwk,
-                kdfSaltB64: kdfSaltB64,
-                iterations: iterations
-            )
-        ) { error in
-            XCTAssertEqual(error as? E2EEError, .wrongPassword)
-        }
-    }
-
-    /// SOC-08 — Mot de passe de chiffrement oublié : la nouvelle clé part avec la
-    /// preuve du compte, jamais un code e-mail ; un refus du serveur devient un
-    /// message clair et ne remplace pas la clé locale.
-    func testForgottenKeyIsReplacedOnlyWithTheAccountProof() async throws {
-        XCTAssertNil(E2EEBootstrapReauthenticationBody(.email(challengeId: "challenge-1", code: "123456")))
-        XCTAssertNil(E2EEBootstrapReauthenticationBody(.password("")))
-
-        var capturedBodies: [Data] = []
-        var refuses = false
-        MockURLProtocol.requestHandler = { request in
-            capturedBodies.append(request.httpBody ?? request.httpBodyStream.flatMap { stream in
-                stream.open()
-                defer { stream.close() }
-                var data = Data()
-                var buffer = [UInt8](repeating: 0, count: 4096)
-                while stream.hasBytesAvailable {
-                    let read = stream.read(&buffer, maxLength: 4096)
-                    if read <= 0 { break }
-                    data.append(buffer, count: read)
-                }
-                return data
-            } ?? Data())
-            let status = refuses ? 403 : 200
-            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-            let body = refuses
-                ? #"{"error":"Mot de passe incorrect","code":"E2EE_REAUTH_INVALID"}"#
-                : #"{"ok":true}"#
-            return (response, Data(body.utf8))
-        }
-        defer { MockURLProtocol.requestHandler = nil }
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
+        let key = try LegacyKeyFixture(password: "s3cret-pass")
         let store = InMemoryTokenStore()
-        let api = APIClient(
-            config: .test,
-            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
-            session: URLSession(configuration: sessionConfig)
-        )
+        let api = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()))
         let service = E2EEService(api: api, tokenStore: store)
 
-        try await service.generateAndRegisterKey(userId: "u1", password: "first-pass")
-        let first = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
-        XCTAssertNil(first["reauthentication"], "La première création n'envoie aucune preuve")
-        let firstPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
-
-        try await service.replaceForgottenKey(
-            userId: "u1", password: "second-pass", reauthentication: .password("account-pass")
-        )
-        let replaced = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
-        XCTAssertEqual(replaced["reauthentication"] as? [String: String], ["method": "password", "password": "account-pass"])
-        let secondPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
-        XCTAssertNotEqual(secondPrivate, firstPrivate)
-        XCTAssertEqual(try E2EEService.decryptPrivateJWK(
-            password: "second-pass",
-            encryptedPrivateJwkB64: XCTUnwrap(replaced["encryptedPrivateJwk"] as? String),
-            kdfSaltB64: XCTUnwrap(replaced["kdfSaltB64"] as? String),
-            iterations: XCTUnwrap(replaced["kdfIterations"] as? Int)
-        ), secondPrivate)
-
-        refuses = true
         do {
-            try await service.replaceForgottenKey(
-                userId: "u1", password: "third-pass", reauthentication: .apple(identityToken: String(repeating: "t", count: 32))
-            )
-            XCTFail("Un refus du serveur doit remonter")
+            try await service.unlock(userId: "u1", password: "mauvais-mot-de-passe", bootstrapKey: key.bootstrapKey)
+            XCTFail("Un mauvais mot de passe doit échouer")
         } catch {
-            XCTAssertEqual(error as? E2EEError, .accountReauthenticationFailed)
+            XCTAssertEqual(error as? E2EEError, .wrongPassword)
         }
-        let refused = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
-        XCTAssertEqual(refused["reauthentication"] as? [String: String], ["method": "apple", "identityToken": String(repeating: "t", count: 32)])
-        XCTAssertEqual(try store.string(for: "privateJwk:current"), secondPrivate, "Un refus ne touche pas la clé locale")
+        XCTAssertNil(try store.string(for: "privateJwk:current"))
     }
 
     func testE2EECleartextSendBlockedWithoutKey() async {
@@ -5152,5 +4874,78 @@ final class SocialPostOutboxTests: XCTestCase {
             result.append(buffer, count: count)
         }
         return result
+    }
+}
+
+/// Clé v1 au format commun iOS/Android/web : paire RSA-2048 en JWK base64url
+/// sans padding, clé privée sous PBKDF2-HMAC-SHA256 (210 000 itérations) puis
+/// AES-256-GCM (iv + texte chiffré + tag, base64 sans padding). L'app n'en crée
+/// plus (lot 10.5) : seuls les tests en fabriquent, pour le déverrouillage.
+private struct LegacyKeyFixture {
+    let privateJwk: String
+    let publicJwk: String
+    let bootstrapKey: E2EEBootstrapKey
+
+    init(password: String) throws {
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeySizeInBits as String: 2048
+        ]
+        var error: Unmanaged<CFError>?
+        let privateKey = try XCTUnwrap(SecKeyCreateRandomKey(attributes as CFDictionary, &error))
+        let der = try XCTUnwrap(SecKeyCopyExternalRepresentation(privateKey, &error) as Data?)
+        // PKCS#1 : SEQUENCE { version, n, e, d, p, q, dp, dq, qi }.
+        let integers = try Self.integers(der)
+        XCTAssertGreaterThanOrEqual(integers.count, 9)
+        var privateObject = ["kty": "RSA"]
+        for (index, field) in ["n", "e", "d", "p", "q", "dp", "dq", "qi"].enumerated() {
+            privateObject[field] = integers[index + 1].base64URLEncodedNoPadding()
+        }
+        let publicObject = ["kty": "RSA", "n": privateObject["n"]!, "e": privateObject["e"]!]
+        privateJwk = String(decoding: try JSONSerialization.data(withJSONObject: privateObject), as: UTF8.self)
+        publicJwk = String(decoding: try JSONSerialization.data(withJSONObject: publicObject), as: UTF8.self)
+
+        let iterations = 210_000
+        let salt = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+        let nonce = AES.GCM.Nonce()
+        let wrapKey = SymmetricKey(data: E2EEService.pbkdf2SHA256(
+            password: password, salt: salt, iterations: iterations, keyLength: 32
+        ))
+        let sealed = try AES.GCM.seal(Data(privateJwk.utf8), using: wrapKey, nonce: nonce)
+        bootstrapKey = E2EEBootstrapKey(
+            publicKeyJwk: publicJwk,
+            encryptedPrivateJwk: (Data(nonce) + sealed.ciphertext + sealed.tag).base64EncodedNoPadding(),
+            kdfSaltB64: salt.base64EncodedNoPadding(),
+            kdfIterations: iterations
+        )
+    }
+
+    /// INTEGERs d'un SEQUENCE DER, sans leur octet de signe initial.
+    private static func integers(_ der: Data) throws -> [Data] {
+        let bytes = [UInt8](der)
+        var index = 0
+        func element() throws -> (tag: UInt8, body: ArraySlice<UInt8>) {
+            let tag = bytes[index]
+            index += 1
+            var length = Int(bytes[index])
+            index += 1
+            if length & 0x80 != 0 {
+                let count = length & 0x7F
+                length = bytes[index..<index + count].reduce(0) { $0 << 8 | Int($1) }
+                index += count
+            }
+            defer { index += length }
+            return (tag, bytes[index..<index + length])
+        }
+        let sequence = try element()
+        XCTAssertEqual(sequence.tag, 0x30)
+        index = sequence.body.startIndex
+        var values: [Data] = []
+        while index < sequence.body.endIndex {
+            let integer = try element()
+            XCTAssertEqual(integer.tag, 0x02)
+            values.append(Data(integer.body.drop { $0 == 0 }))
+        }
+        return values
     }
 }

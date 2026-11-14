@@ -1,28 +1,19 @@
 import SwiftUI
-import AuthenticationServices
 
-/// Déverrouillage (ou première création) de la clé E2EE. Si le compte n'a pas
-/// encore de clé côté serveur, le même mot de passe sert à en générer une —
-/// parité avec le flux Android `createBootstrap`.
+/// Déverrouillage de la clé de l'ancien chiffrement (v1), pour lire les
+/// anciens messages et les importer (E2EE-AUTO §8). Aucune clé v1 ne se crée
+/// ni ne se remplace : le chiffrement automatique n'en écrit plus.
 struct E2EEUnlockSheet: View {
     let userId: String
     let service: E2EEServicing
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var passwordFocused: Bool
-    @FocusState private var confirmationFocused: Bool
     @State private var password = ""
-    /// Création : la clé ne se récupère pas, une faute de frappe la rendrait
-    /// inutilisable (SOC-08).
-    @State private var confirmation = ""
     @State private var isBusy = false
     @State private var error: String?
-    @State private var needsCreation = false
-    /// Mot de passe oublié : une nouvelle clé remplace l'ancienne, sur preuve du
-    /// compte (SOC-08).
-    @State private var isReplacing = false
-    @State private var accountPassword = ""
+    /// Le compte n'a pas de clé v1 : il n'y a rien à ouvrir ici.
+    @State private var hasNoKey = false
     /// Proposer de mémoriser le mot de passe E2EE derrière Face ID / Touch ID.
     @State private var rememberWithBiometric = false
     @State private var revealsPassword = false
@@ -30,24 +21,11 @@ struct E2EEUnlockSheet: View {
     /// Apparition douce du badge cadenas (scale 0.9 → 1, SQMotion.emphasized).
     @State private var badgeAppeared = false
     /// Import des anciens messages (E2EE-AUTO §8) : la clé v1 s'ouvre une
-    /// dernière fois, sans création ni remplacement, et rien n'est mémorisé.
+    /// dernière fois, et rien n'est mémorisé.
     var importsHistory = false
     var onUnlock: () -> Void
 
-    /// Création ou remplacement : un nouveau mot de passe, saisi deux fois.
-    private var choosesNewPassword: Bool { needsCreation || isReplacing }
-
-    private var newPasswordIsValid: Bool { password.count >= 6 && password == confirmation }
-
-    private var canSubmit: Bool {
-        guard !isBusy else { return false }
-        if isReplacing { return newPasswordIsValid && !accountPassword.isEmpty }
-        return needsCreation ? newPasswordIsValid : !password.isEmpty
-    }
-
-    private var confirmationMismatch: Bool {
-        choosesNewPassword && !confirmation.isEmpty && confirmation != password
-    }
+    private var canSubmit: Bool { !isBusy && !hasNoKey && !password.isEmpty }
 
     var body: some View {
         ScrollView {
@@ -56,19 +34,17 @@ struct E2EEUnlockSheet: View {
 
                 VStack(spacing: SQSpace.sm) {
                     badge
-                    Text(importsHistory ? "Importer l’ancien historique" : isReplacing ? "Nouvelle clé" : needsCreation ? "Créer ta clé" : "Déverrouiller")
+                    Text(importsHistory ? "Importer l’ancien historique" : "Déverrouiller")
                         .font(SQFont.display(26, .bold, relativeTo: .title))
                         .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.center)
                         .accessibilityAddTraits(.isHeader)
                     // Deux mots de passe distincts : celui du compte et celui du
                     // chiffrement. Le texte le dit, pour qu'on ne les confonde pas.
-                    Text(importsHistory
+                    Text(hasNoKey
+                         ? "Ton compte n’a pas de clé de l’ancien chiffrement : ces anciens messages ne peuvent pas s’ouvrir ici. Ils apparaîtront dès qu’un autre membre les aura importés."
+                         : importsHistory
                          ? "Ton mot de passe de chiffrement, différent de celui de ton compte, ouvre une dernière fois tes anciens messages chiffrés pour les passer au nouveau chiffrement. Il ne sera plus demandé."
-                         : isReplacing
-                         ? "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe."
-                         : needsCreation
-                         ? "Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles."
                          : "Ton mot de passe de chiffrement, choisi à la création de ta clé et différent de celui de ton compte, ouvre tes conversations chiffrées le temps de la session.")
                         .font(SQType.callout)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -77,70 +53,22 @@ struct E2EEUnlockSheet: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    passwordField
+                if !hasNoKey {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        passwordField
 
-                    if choosesNewPassword {
-                        SecureField("Confirme ce mot de passe", text: $confirmation)
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .padding(.horizontal, SQSpace.lg)
-                            .padding(.vertical, SQSpace.sm2)
-                            .frame(minHeight: 50)
-                            .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                            .focused($confirmationFocused)
-                            .submitLabel(.done)
-                            .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }
-                            .accessibilityIdentifier("e2ee.key.confirmation")
-                        if confirmationMismatch {
-                            Label("Les deux mots de passe ne correspondent pas.", systemImage: "exclamationmark.circle")
+                        if let error {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.dangerInk)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .transition(.opacity)
                         }
-                    }
-
-                    if choosesNewPassword {
-                        Label("6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil.", systemImage: "info.circle")
-                            .font(SQType.caption)
-                            // `Label` porte du texte : `labelTertiary` est
-                            // désormais réservé aux éléments graphiques (3:1),
-                            // pas au texte courant (4,5:1).
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    if isReplacing {
-                        accountConfirmation
-                    }
-
-                    if let error {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(.opacity)
-                    }
-
-                    if !needsCreation, !importsHistory {
-                        Button {
-                            Haptics.selection()
-                            startReplacing(!isReplacing)
-                        } label: {
-                            Text(isReplacing ? "J’ai retrouvé mon mot de passe" : "Mot de passe oublié ?")
-                                .font(SQType.subhead(.semibold))
-                                .foregroundStyle(SQColor.accentInk)
-                                .padding(.horizontal, SQSpace.xs)
-                                .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isBusy)
-                        .accessibilityIdentifier("e2ee.key.forgot")
                     }
                 }
 
-                // Proposer la mémorisation biométrique (1re fois, pas en création).
-                if !choosesNewPassword, !importsHistory, BiometricAuth.isAvailable, !E2EEBiometric.isEnabled {
+                // Proposer la mémorisation biométrique (1re fois, pas à l'import).
+                if !hasNoKey, !importsHistory, BiometricAuth.isAvailable, !E2EEBiometric.isEnabled {
                     Toggle(isOn: $rememberWithBiometric) {
                         HStack(spacing: SQSpace.md) {
                             Image(systemName: BiometricAuth.kind.systemImage)
@@ -160,7 +88,7 @@ struct E2EEUnlockSheet: View {
                     .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
 
-                if !choosesNewPassword {
+                if !hasNoKey {
                     Text("Ce mot de passe ne quitte jamais ton appareil.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -175,20 +103,19 @@ struct E2EEUnlockSheet: View {
         // détent medium + clavier masquait l'action quand elle était dans le scroll).
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: SQSpace.sm) {
-                GradientButton(
-                    importsHistory ? "Importer" : isReplacing ? "Remplacer ma clé" : needsCreation ? "Créer et activer" : "Déverrouiller",
-                    systemImage: "key.fill",
-                    isBusy: isBusy
-                ) {
-                    Task {
-                        if isReplacing { await replaceKey(using: .password(accountPassword)) }
-                        else { await unlockOrCreate() }
+                if !hasNoKey {
+                    GradientButton(
+                        importsHistory ? "Importer" : "Déverrouiller",
+                        systemImage: "key.fill",
+                        isBusy: isBusy
+                    ) {
+                        Task { await unlock() }
                     }
+                    .disabled(!canSubmit)
                 }
-                .disabled(!canSubmit)
 
                 // Déverrouillage biométrique direct (déjà mémorisé).
-                if !choosesNewPassword, E2EEBiometric.isEnabled, E2EEBiometric.hasStored {
+                if !hasNoKey, E2EEBiometric.isEnabled, E2EEBiometric.hasStored {
                     GradientButton(
                         String(localized: "Déverrouiller avec \(BiometricAuth.kind.label)"),
                         systemImage: BiometricAuth.kind.systemImage,
@@ -206,10 +133,10 @@ struct E2EEUnlockSheet: View {
         .task {
             await checkExistingKey()
             // Déverrouillage biométrique automatique si déjà mémorisé.
-            if !needsCreation, E2EEBiometric.isEnabled, E2EEBiometric.hasStored, !didAttemptBiometric {
+            if !hasNoKey, E2EEBiometric.isEnabled, E2EEBiometric.hasStored, !didAttemptBiometric {
                 didAttemptBiometric = true
                 await biometricUnlock()
-            } else {
+            } else if !hasNoKey {
                 passwordFocused = true
             }
         }
@@ -217,7 +144,7 @@ struct E2EEUnlockSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .sqAnimation(.snappy(duration: 0.25), value: error)
-        .sqAnimation(.snappy(duration: 0.25), value: needsCreation)
+        .sqAnimation(.snappy(duration: 0.25), value: hasNoKey)
     }
 
     /// Champ du mot de passe de chiffrement : clé à gauche, œil pour l'afficher.
@@ -231,21 +158,18 @@ struct E2EEUnlockSheet: View {
             // passe fort et l'enregistrait pour le compte SignalQuest.
             Group {
                 if revealsPassword {
-                    TextField(isReplacing ? "Nouveau mot de passe de chiffrement" : "Mot de passe de chiffrement", text: $password)
+                    TextField("Mot de passe de chiffrement", text: $password)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 } else {
-                    SecureField(isReplacing ? "Nouveau mot de passe de chiffrement" : "Mot de passe de chiffrement", text: $password)
+                    SecureField("Mot de passe de chiffrement", text: $password)
                 }
             }
             .font(SQType.body)
             .foregroundStyle(SQColor.label)
             .focused($passwordFocused)
-            .submitLabel(choosesNewPassword ? .next : .go)
-            .onSubmit {
-                if choosesNewPassword { confirmationFocused = true }
-                else if canSubmit { Task { await unlockOrCreate() } }
-            }
+            .submitLabel(.go)
+            .onSubmit { if canSubmit { Task { await unlock() } } }
             Button {
                 revealsPassword.toggle()
                 passwordFocused = true
@@ -267,7 +191,7 @@ struct E2EEUnlockSheet: View {
 
     /// Bouclier vert sur pastille douce : la clé protège, elle n'alerte pas.
     private var badge: some View {
-        Image(systemName: choosesNewPassword ? "lock.badge.clock" : "lock.shield")
+        Image(systemName: "lock.shield")
             .font(.system(size: 26, weight: .semibold))
             .foregroundStyle(SQColor.success)
             .frame(width: 60, height: 60)
@@ -282,112 +206,26 @@ struct E2EEUnlockSheet: View {
             .accessibilityHidden(true)
     }
 
-    /// Preuve du compte pour le remplacement : son mot de passe, ou Apple pour
-    /// un compte créé avec Apple. Le serveur refuse un code reçu par e-mail ici.
-    private var accountConfirmation: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Confirme ton compte")
-                .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.label)
-            SecureField("Mot de passe du compte", text: $accountPassword)
-                .textContentType(.password)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.lg)
-                .padding(.vertical, SQSpace.sm2)
-                .frame(minHeight: 44)
-                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .submitLabel(.go)
-                .onSubmit { if canSubmit { Task { await replaceKey(using: .password(accountPassword)) } } }
-                .accessibilityIdentifier("e2ee.key.accountPassword")
-            Text("Compte créé avec Apple ? Confirme plutôt avec Apple.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            SignInWithAppleButton(.continue) { request in
-                request.requestedScopes = []
-            } onCompletion: { result in
-                handleAppleConfirmation(result)
-            }
-            .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
-            .frame(height: 44)
-            .clipShape(Capsule())
-            .disabled(!newPasswordIsValid || isBusy)
-            .opacity(newPasswordIsValid && !isBusy ? 1 : 0.5)
-        }
-    }
-
-    private func startReplacing(_ replacing: Bool) {
-        isReplacing = replacing
-        password = ""
-        confirmation = ""
-        accountPassword = ""
-        error = nil
-        passwordFocused = true
-    }
-
-    private func handleAppleConfirmation(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                  let tokenData = credential.identityToken,
-                  let identityToken = String(data: tokenData, encoding: .utf8) else {
-                error = String(localized: "Jeton Apple manquant. Réessaie.")
-                return
-            }
-            Task { await replaceKey(using: .apple(identityToken: identityToken)) }
-        case .failure(let failure):
-            if (failure as? ASAuthorizationError)?.code == .canceled { return }
-            error = String(localized: "Réauthentification Apple impossible. Réessaie.")
-        }
-    }
-
-    private func replaceKey(using reauthentication: E2EEV2BootstrapReauthentication) async {
-        guard newPasswordIsValid, !isBusy else { return }
-        passwordFocused = false
-        confirmationFocused = false
-        isBusy = true
-        defer { isBusy = false }
-        do {
-            try await service.replaceForgottenKey(
-                userId: userId, password: password, reauthentication: reauthentication
-            )
-            // L'ancien mot de passe mémorisé n'ouvre plus rien : on garde le nouveau.
-            if E2EEBiometric.isEnabled { E2EEBiometric.store(password: password) }
-            Haptics.success()
-            onUnlock()
-            dismiss()
-        } catch {
-            self.error = error.userFacingMessage
-            Haptics.error()
-        }
-    }
-
     private func checkExistingKey() async {
         if let bootstrap = try? await service.bootstrap() {
-            needsCreation = !bootstrap.hasKey || bootstrap.key == nil
-            // Sans clé v1, il n'y a rien à importer : aucune clé ne se crée ici.
-            if importsHistory, needsCreation { dismiss() }
+            // Sans clé v1, il n'y a rien à ouvrir : aucune clé ne se crée ici.
+            let noKey = !bootstrap.hasKey || bootstrap.key == nil
+            if importsHistory, noKey { dismiss() }
+            hasNoKey = noKey
         }
     }
 
-    private func unlockOrCreate() async {
+    private func unlock() async {
         passwordFocused = false
-        confirmationFocused = false
         isBusy = true
         defer { isBusy = false }
         do {
             let bootstrap = try await service.bootstrap()
-            if let key = bootstrap.key, bootstrap.hasKey {
-                try await service.unlock(userId: userId, password: password, bootstrapKey: key)
-            } else if importsHistory {
-                dismiss()
+            guard let key = bootstrap.key, bootstrap.hasKey else {
+                if importsHistory { dismiss() } else { hasNoKey = true }
                 return
-            } else {
-                try await service.generateAndRegisterKey(userId: userId, password: password)
             }
+            try await service.unlock(userId: userId, password: password, bootstrapKey: key)
             // Mémorise le mot de passe derrière la biométrie si demandé (unlock réussi).
             if rememberWithBiometric, BiometricAuth.isAvailable {
                 E2EEBiometric.store(password: password)
@@ -409,6 +247,6 @@ struct E2EEUnlockSheet: View {
             return
         }
         password = stored
-        await unlockOrCreate()
+        await unlock()
     }
 }

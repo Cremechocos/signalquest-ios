@@ -1042,9 +1042,7 @@ struct MessagesView: View {
                         await model.ensureLoaded(id: id)
                         routedConversationId = id
                     }
-                },
-                unlockUserId: currentUserId,
-                unlockService: e2ee
+                }
             )
         }
         .sheet(item: $folderSheet) { request in
@@ -1083,13 +1081,16 @@ struct MessagesView: View {
     private func refreshE2EEUnlockOffer() async {
         guard let e2ee else { offersE2EEUnlock = false; return }
         // Le mot de passe v1 n'ouvre que les conversations v1 : un compte qui
-        // n'a que des conversations v2 n'a rien à créer ni à déverrouiller.
+        // n'a que des conversations v2 n'a rien à déverrouiller.
         // Une conversation que le serveur sert en v2 n'est jamais v1, même sans
         // état local (appareil neuf) : le mot de passe v1 ne l'ouvrirait pas.
         guard model.conversations.contains(where: {
             $0.e2eeEnabled == true && $0.e2eeProtocolVersion != 2 && !EncryptedConversationSurfaces.isV2($0)
         }) else { offersE2EEUnlock = false; return }
-        offersE2EEUnlock = !(await e2ee.isUnlocked())
+        guard !(await e2ee.isUnlocked()) else { offersE2EEUnlock = false; return }
+        // Un compte sans clé v1 n'a rien à ouvrir : aucune clé ne se crée plus.
+        // Un échec de lecture garde le bandeau, comme avant.
+        offersE2EEUnlock = (try? await e2ee.bootstrap()).map { $0.hasKey && $0.key != nil } ?? true
     }
 
     /// Historique chiffré absent de cet appareil (E2EE-AUTO §5.3) : un bandeau
@@ -2382,14 +2383,9 @@ private struct NewConversationSheet: View {
     /// d'en créer un second (v1 comme v2).
     var existingDirect: (String) -> String? = { _ in nil }
     var onOpenExisting: (String) -> Void = { _ in }
-    /// Repli quand l'activation v2 est impossible : le mot de passe v1 existant.
-    var unlockUserId: String? = nil
-    var unlockService: E2EEServicing? = nil
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
-    @State private var showUnlock = false
-    @State private var createAfterUnlock = false
     @State private var query = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var title = ""
@@ -2456,16 +2452,6 @@ private struct NewConversationSheet: View {
                         }
                     }
                     .sqSurface(SQColor.surface, in: cardShape)
-                    // La limite se dit AVANT de créer : on la découvrait au premier
-                    // envoi de photo refusé (SOC-07). Seule la v1 la garde : la v2
-                    // envoie photos, fichiers, vocaux et sondages (§7.7).
-                    if e2ee, !services.e2eeV2Messaging.writesEnabled {
-                        Text("Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, SQSpace.xs)
-                    }
                 }
 
                 if isSearching || showsNoResult || !results.isEmpty {
@@ -2510,17 +2496,6 @@ private struct NewConversationSheet: View {
             Button("OK", role: .cancel) { requestLimit = nil }
         } message: {
             Text("Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire à \(selected.first?.displayName ?? "") demain, ou dès maintenant s’il t’ajoute en ami.")
-        }
-        .sheet(isPresented: $showUnlock, onDismiss: {
-            guard createAfterUnlock else { return }
-            createAfterUnlock = false
-            Task { await create(afterUnlock: true) }
-        }) {
-            if let unlockUserId, let unlockService {
-                E2EEUnlockSheet(userId: unlockUserId, service: unlockService) {
-                    createAfterUnlock = true
-                }
-            }
         }
         .onChangeCompat(of: query) { _, _ in
             // Debounce annulable : annule la requête précédente avant d'en relancer
@@ -2644,8 +2619,7 @@ private struct NewConversationSheet: View {
         isSearching = false
     }
 
-    /// `afterUnlock` : relance après le déverrouillage, sans reboucler dessus.
-    private func create(afterUnlock: Bool = false) async {
+    private func create() async {
         isBusy = true
         defer { isBusy = false }
         do {
@@ -2656,11 +2630,8 @@ private struct NewConversationSheet: View {
                 onOpenExisting(existing)
                 return
             }
-            // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
-            // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
-            // Appareil pas encore inscrit (E2EE-AUTO §4.1) : on le dit et
-            // l'inscription automatique repart. Une porte serveur refermée,
-            // elle, crée en v1.
+            // Chiffrée : naît en v2, jamais en v1 (E2EE-AUTO §7). Appareil pas
+            // encore inscrit (§4.1) : on le dit et l'inscription automatique repart.
             if e2ee, services.e2eeV2Messaging.writesEnabled,
                let session = LocalAccountScope.sessionSnapshot(),
                services.e2eeV2Messaging.lacksV2Readiness(session) {
@@ -2681,10 +2652,6 @@ private struct NewConversationSheet: View {
                     dismiss()
                     onOpenExisting(conversationId)
                     return
-                // Une fois la bascule faite, jamais de repli v1 (E2EE-AUTO §7).
-                case .failure(let failure) where !E2EEV2ServerGate.autoActive
-                    && (failure.message == "e2ee-v2-capability-missing" || failure.kind == .activationBlocked):
-                    E2EEV2MessagingRuntime.traceV2("creation", "fallback_v1", failure)
                 // Créé entre-temps ailleurs (autre appareil, autre plateforme) : on l'ouvre.
                 case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
                     if case .string(let existing)? = failure.details?["conversationId"] {
@@ -2705,10 +2672,14 @@ private struct NewConversationSheet: View {
                         : String(localized: "La conversation chiffrée n’a pas pu être créée."))
                 }
             }
+            // Plus de création en v1 : le serveur la refuserait (409 E2EE_REQUIRED).
+            guard !e2ee else {
+                throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
+            }
             let created = try await service.createConversation(
                 participantIds: selected.map(\.id),
                 title: normalizedTitle.isEmpty ? nil : normalizedTitle,
-                e2ee: e2ee
+                e2ee: false
             )
             Haptics.success()
             await onCreated()
@@ -2716,14 +2687,6 @@ private struct NewConversationSheet: View {
             // « Démarrer » ouvre la conversation créée, comme une conversation existante.
             onOpenExisting(created.conversationId)
         } catch {
-            // Création v1 refusée faute de mot de passe de chiffrement : la feuille
-            // de création de clé, puis la création repart (au lieu de l'erreur brute).
-            if e2ee, !afterUnlock, unlockUserId != nil, unlockService != nil,
-               case APIError.http(let status, _, let message, _, _) = error,
-               status == 400, message.localizedCaseInsensitiveContains("mot de passe de chiffrement") {
-                showUnlock = true
-                return
-            }
             if let limit = error.messageRequestLimit {
                 requestLimit = limit
                 Haptics.error()
