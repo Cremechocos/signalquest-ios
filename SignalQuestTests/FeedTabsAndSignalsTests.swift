@@ -334,9 +334,12 @@ final class FeedActivityTests: XCTestCase {
             #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR","operatorKey":"ORANGE""#)))
         XCTAssertEqual(discovery.family, .siteDiscovered)
         XCTAssertEqual(discovery.link, .site(id: "ANFR-0381234", market: "FR", operatorKey: "ORANGE"))
+        XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234""#))?.link,
+            .site(id: "ANFR-0381234", market: nil, operatorKey: nil),
+            "an exploration follows siteId alone (§2.2): no operator is ever served for it")
         XCTAssertNil(try FeedActivity(item: item(kind: "badge",
-            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR""#))?.link,
-            "SITE-1 incomplete: no link, the operator is never guessed")
+            #""activityType":"new_department","dept":"38""#))?.link, "private zone: siteId withheld, no link")
         XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_site_visited","firstDiscovery":false"#))?.family, .siteVisited)
 

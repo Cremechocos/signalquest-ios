@@ -12,8 +12,9 @@ struct FeedActivity: Equatable {
 
     /// Où mène le post dans l'app, depuis son détail.
     enum Link: Equatable {
-        /// Fiche d'antenne par sa clé SITE-1 complète, jamais devinée.
-        case site(id: String, market: String, operatorKey: String)
+        /// Fiche d'antenne : clé SITE-1 complète pour une identification ou une photo ; une
+        /// exploration n'a que son support (contrat des posts automatiques v1 §2.2).
+        case site(id: String, market: String?, operatorKey: String?)
         case progression
         case bug(id: String)
         /// La feuille de la panne, sinon son site.
@@ -100,7 +101,9 @@ struct FeedActivity: Equatable {
         self.previousLevel = family == .level ? int("oldLevel") : nil
         let text = (key?.text ?? item.text).trimmingCharacters(in: .whitespacesAndNewlines)
         let quoted = Self.quotedName(in: item.text)
-        let siteLink = item.siteKey.map { Link.site(id: $0.siteId, market: $0.market, operatorKey: $0.operatorKey) }
+        // Exploration (§2.2) : le lien suit `siteId` seul ; aucun opérateur n'est servi, un support
+        // en porte plusieurs. Retiré en zone privée : pas de lien.
+        let siteLink = string("siteId").map { Link.site(id: $0, market: string("marketCode"), operatorKey: string("operatorKey")) }
         let isMine = item.isMine == true
         switch family {
         case .quest:
