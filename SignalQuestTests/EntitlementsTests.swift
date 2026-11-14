@@ -542,6 +542,145 @@ final class EntitlementsTests: XCTestCase {
     }
 }
 
+
+/// Lot B : ce que l'écran Premium affiche de l'abonnement servi (contrat v1 §3).
+final class SubscriptionStatusPresentationTests: XCTestCase {
+    private let end = Date(timeIntervalSince1970: 1_798_000_000)
+
+    private func present(_ subscription: EntitlementSubscription, warnings: [String] = []) -> SubscriptionStatusPresentation {
+        let snapshot = EntitlementSnapshot(
+            tier: subscription.entitled ? subscription.tier : .free,
+            source: subscription.channel.source, period: subscription.period,
+            status: subscription.entitled ? .active : .inactive, expiresAt: subscription.currentPeriodEnd,
+            subscription: subscription, warnings: warnings
+        )
+        return SubscriptionStatusPresentation.make(serverState: .available(snapshot))
+    }
+
+    func testEveryStateHasAStatusLine() {
+        let states: [EntitlementSubscription.State] = [.pending, .trialing, .active, .grace, .onHold, .paused, .expired, .revoked]
+        for state in states {
+            let presentation = present(EntitlementSubscription(
+                channel: .appStore, state: state, tier: .premium, autoRenew: true, currentPeriodEnd: end
+            ))
+            XCTAssertNotNil(presentation.tag, "\(state)")
+            XCTAssertFalse(presentation.details.isEmpty, "\(state)")
+        }
+    }
+
+    /// D5 et D8 : la feuille Apple gère tout abonnement App Store en cours ;
+    /// un abonnement terminé ou remboursé n'offre plus rien à gérer.
+    func testAppStoreManagementFollowsTheState() {
+        func management(_ state: EntitlementSubscription.State, autoRenew: Bool = true) -> SubscriptionStatusPresentation.Management {
+            present(EntitlementSubscription(channel: .appStore, state: state, tier: .premium,
+                                            autoRenew: autoRenew, currentPeriodEnd: end)).management
+        }
+        XCTAssertEqual(management(.active), .appStore(canResume: false, canRequestRefund: true))
+        XCTAssertEqual(management(.active, autoRenew: false), .appStore(canResume: true, canRequestRefund: true))
+        XCTAssertEqual(management(.trialing), .appStore(canResume: false, canRequestRefund: false))
+        XCTAssertEqual(management(.trialing, autoRenew: false), .appStore(canResume: true, canRequestRefund: false))
+        XCTAssertEqual(management(.grace), .appStore(canResume: false, canRequestRefund: true))
+        XCTAssertEqual(management(.onHold), .appStore(canResume: false, canRequestRefund: true))
+        XCTAssertEqual(management(.expired), .none)
+        XCTAssertEqual(management(.revoked), .none)
+    }
+
+    /// 2.3.10 et 3.1.1 : un abonnement pris ailleurs se décrit en texte seul,
+    /// sans nommer de plateforme.
+    func testOtherChannelsAreTextOnlyAndNameNoPlatform() {
+        let forbidden = ["Google", "Android", "Play", "Stripe"]
+        for channel in [EntitlementSubscription.Channel.stripe, .googlePlay, .unknown] {
+            let presentation = present(EntitlementSubscription(
+                channel: channel, state: .active, tier: .premium, autoRenew: true, currentPeriodEnd: end
+            ), warnings: ["DUPLICATE_PAID_SUBSCRIPTION"])
+            guard case .elsewhere(let line) = presentation.management else {
+                return XCTFail("\(channel) doit rester en texte seul")
+            }
+            for text in [line, presentation.title] + presentation.details + [presentation.tag ?? ""] {
+                for word in forbidden {
+                    XCTAssertFalse(text.contains(word), "« \(text) » nomme \(word)")
+                }
+            }
+        }
+    }
+
+    func testDuplicateSubscriptionWarningTurnsTheCardIntoAWarning() {
+        let presentation = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: true, currentPeriodEnd: end
+        ), warnings: ["DUPLICATE_PAID_SUBSCRIPTION"])
+        XCTAssertEqual(presentation.tone, .warning)
+        XCTAssertEqual(presentation.details.count, 2)
+    }
+
+    func testCancelledSubscriptionSaysItStopsWithoutPayment() {
+        let presentation = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: false, currentPeriodEnd: end
+        ))
+        XCTAssertEqual(presentation.tag, String(localized: "Résilié"))
+        XCTAssertEqual(presentation.details, [
+            String(localized: "Premium reste actif jusqu’au \(SubscriptionStatusPresentation.day(end)), puis s’arrête sans nouveau paiement.")
+        ])
+    }
+
+    func testTrialLineNamesTheBillingPeriod() {
+        let price = EntitlementSubscription.Price(unitAmount: 7_999, currency: "EUR")
+        let annual = present(EntitlementSubscription(
+            channel: .appStore, state: .trialing, tier: .premium, period: .annual, autoRenew: true,
+            currentPeriodEnd: end, trialEndsAt: end, price: price
+        ))
+        let formatted = SubscriptionStatusPresentation.formattedPrice(price)
+        XCTAssertEqual(annual.details, [
+            String(localized: "Essai gratuit jusqu’au \(SubscriptionStatusPresentation.day(end)), puis \(formatted) par an.")
+        ])
+    }
+
+    func testSandboxPurchaseIsLabelled() {
+        let presentation = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: true, currentPeriodEnd: end, isSandbox: true
+        ))
+        XCTAssertEqual(presentation.details.last, String(localized: "Achat de test : aucun paiement réel."))
+    }
+
+    func testGrantAndFreeTierWithoutSubscription() {
+        let granted = SubscriptionStatusPresentation.make(serverState: .available(EntitlementSnapshot(
+            tier: .premium, source: .manual, period: nil, status: .active, expiresAt: end,
+            grant: EntitlementGrant(tier: .premium, expiresAt: end)
+        )))
+        XCTAssertEqual(granted.tag, String(localized: "Offert"))
+        XCTAssertEqual(granted.management, .none)
+
+        let free = SubscriptionStatusPresentation.make(serverState: .available(EntitlementSnapshot(
+            tier: .free, source: .backend, period: nil, status: .inactive, expiresAt: nil
+        )))
+        XCTAssertNil(free.tag)
+        XCTAssertEqual(free.management, .none)
+
+        let down = SubscriptionStatusPresentation.make(serverState: .unavailable("x"))
+        XCTAssertEqual(down.tone, .warning)
+        XCTAssertEqual(down.management, .none)
+    }
+
+    /// Unité mineure (contrat v1.8) : 799 centimes d'euro, 1 200 yens sans décimale.
+    func testPriceUsesTheCurrencyMinorUnit() {
+        let euros = SubscriptionStatusPresentation.formattedPrice(.init(unitAmount: 799, currency: "EUR"))
+        XCTAssertTrue(euros.contains("7") && euros.contains("99"), euros)
+        let yens = SubscriptionStatusPresentation.formattedPrice(.init(unitAmount: 1_200, currency: "JPY"))
+        XCTAssertTrue(yens.filter(\.isNumber) == "1200", yens)
+    }
+
+    /// D3 : l'essai ne s'annonce que si le serveur et l'App Store le permettent
+    /// tous deux, et que l'offre est bien gratuite.
+    func testFreeTrialNeedsServerAndStoreKitAgreement() {
+        let eligible = EntitlementTrial(eligible: true, days: 7)
+        XCTAssertTrue(FreeTrialRule.shows(serverTrial: eligible, storeKitEligible: true, offerIsFreeTrial: true))
+        XCTAssertFalse(FreeTrialRule.shows(serverTrial: nil, storeKitEligible: true, offerIsFreeTrial: true))
+        XCTAssertFalse(FreeTrialRule.shows(serverTrial: EntitlementTrial(eligible: false, days: 7),
+                                           storeKitEligible: true, offerIsFreeTrial: true))
+        XCTAssertFalse(FreeTrialRule.shows(serverTrial: eligible, storeKitEligible: false, offerIsFreeTrial: true))
+        XCTAssertFalse(FreeTrialRule.shows(serverTrial: eligible, storeKitEligible: true, offerIsFreeTrial: false))
+    }
+}
+
 private final class AccountScopedSubscriptionAPIStub: APIClientProtocol, @unchecked Sendable {
     private let lock = NSLock()
     private var reads = 0

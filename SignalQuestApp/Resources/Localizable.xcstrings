@@ -40841,6 +40841,1054 @@
         }
       }
     },
+    "Premium ajoute du confort et des bonus. Toutes les fonctions Telecom restent gratuites." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium adds comfort and extras. Every telecom feature stays free."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium ajoute du confort et des bonus. Toutes les fonctions Telecom restent gratuites."
+          }
+        }
+      }
+    },
+    "« %@ » fait partie de Premium. Découvre l’offre sans perdre ce que tu étais en train de faire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is part of Premium. Have a look at the offer without losing what you were doing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » fait partie de Premium. Découvre l’offre sans perdre ce que tu étais en train de faire."
+          }
+        }
+      }
+    },
+    "SQFormal|« %@ » fait partie de Premium. Découvre l’offre sans perdre ce que tu étais en train de faire." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » fait partie de Premium. Découvrez l’offre sans perdre ce que vous étiez en train de faire."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ d’essai gratuit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ free trial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ d’essai gratuit"
+          }
+        }
+      }
+    },
+    "Ton abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Vérification de ton abonnement…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking your subscription…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification de ton abonnement…"
+          }
+        }
+      }
+    },
+    "SQFormal|Vérification de ton abonnement…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification de votre abonnement…"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le serveur des abonnements ne répond pas. Les nouveaux achats sont bloqués par sécurité." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The subscription server isn’t responding. New purchases are blocked to be safe."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur des abonnements ne répond pas. Les nouveaux achats sont bloqués par sécurité."
+          }
+        }
+      }
+    },
+    "Deux abonnements payés sont en cours sur ton compte : résilies-en un pour ne pas payer deux fois. Chacun se gère là où il a été souscrit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two paid subscriptions are running on your account: cancel one so you don’t pay twice. Each is managed where it was taken out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deux abonnements payés sont en cours sur ton compte : résilies-en un pour ne pas payer deux fois. Chacun se gère là où il a été souscrit."
+          }
+        }
+      }
+    },
+    "SQFormal|Deux abonnements payés sont en cours sur ton compte : résilies-en un pour ne pas payer deux fois. Chacun se gère là où il a été souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deux abonnements payés sont en cours sur votre compte : résiliez-en un pour ne pas payer deux fois. Chacun se gère là où il a été souscrit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Accès offert jusqu’au %@. Tu peux t’abonner pour continuer ensuite." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free access until %@. You can subscribe to carry on afterwards."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès offert jusqu’au %@. Tu peux t’abonner pour continuer ensuite."
+          }
+        }
+      }
+    },
+    "SQFormal|Accès offert jusqu’au %@. Tu peux t’abonner pour continuer ensuite." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès offert jusqu’au %@. Vous pouvez vous abonner pour continuer ensuite."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Accès offert, sans date de fin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free access, with no end date."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès offert, sans date de fin."
+          }
+        }
+      }
+    },
+    "Offert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free access"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offert"
+          }
+        }
+      }
+    },
+    "Aucun abonnement en cours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No current subscription."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun abonnement en cours."
+          }
+        }
+      }
+    },
+    "Essai résilié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial cancelled"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai résilié"
+          }
+        }
+      }
+    },
+    "Essai gratuit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai gratuit"
+          }
+        }
+      }
+    },
+    "Premium reste actif jusqu’au %@, sans aucun paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium stays active until %@, with no payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium reste actif jusqu’au %@, sans aucun paiement."
+          }
+        }
+      }
+    },
+    "L’essai s’arrêtera à son terme, sans aucun paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The trial will end on its own, with no payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’essai s’arrêtera à son terme, sans aucun paiement."
+          }
+        }
+      }
+    },
+    "Essai gratuit jusqu’au %@, puis %@ par an." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial until %@, then %@ a year."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai gratuit jusqu’au %@, puis %@ par an."
+          }
+        }
+      }
+    },
+    "Essai gratuit jusqu’au %@, puis %@ par mois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial until %@, then %@ a month."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai gratuit jusqu’au %@, puis %@ par mois."
+          }
+        }
+      }
+    },
+    "Essai gratuit jusqu’au %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial until %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essai gratuit jusqu’au %@."
+          }
+        }
+      }
+    },
+    "Résilié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résilié"
+          }
+        }
+      }
+    },
+    "Premium reste actif jusqu’au %@, puis s’arrête sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium stays active until %@, then stops with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium reste actif jusqu’au %@, puis s’arrête sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "Premium s’arrêtera à la fin de la période en cours, sans nouveau paiement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium will stop at the end of the current period, with no new payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium s’arrêtera à la fin de la période en cours, sans nouveau paiement."
+          }
+        }
+      }
+    },
+    "Prochain renouvellement le %@, pour %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next renewal on %@, for %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochain renouvellement le %@, pour %@."
+          }
+        }
+      }
+    },
+    "Prochain renouvellement le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next renewal on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochain renouvellement le %@."
+          }
+        }
+      }
+    },
+    "Changement d’offre prévu le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan change scheduled for %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changement d’offre prévu le %@."
+          }
+        }
+      }
+    },
+    "Paiement à régulariser" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payment issue"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paiement à régulariser"
+          }
+        }
+      }
+    },
+    "Le dernier paiement n’est pas passé. Premium reste actif jusqu’au %@ : mets à jour ton moyen de paiement d’ici là." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The last payment didn’t go through. Premium stays active until %@: update your payment method before then."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Premium reste actif jusqu’au %@ : mets à jour ton moyen de paiement d’ici là."
+          }
+        }
+      }
+    },
+    "SQFormal|Le dernier paiement n’est pas passé. Premium reste actif jusqu’au %@ : mets à jour ton moyen de paiement d’ici là." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Premium reste actif jusqu’au %@ : mettez à jour votre moyen de paiement d’ici là."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement pour garder Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The last payment didn’t go through. Update your payment method to keep Premium."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement pour garder Premium."
+          }
+        }
+      }
+    },
+    "SQFormal|Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement pour garder Premium." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier paiement n’est pas passé. Mettez à jour votre moyen de paiement pour garder Premium."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Suspendu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On hold"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspendu"
+          }
+        }
+      }
+    },
+    "Le paiement n’est pas passé : Premium est suspendu. Mets à jour ton moyen de paiement pour le rétablir." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The payment didn’t go through: Premium is on hold. Update your payment method to restore it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le paiement n’est pas passé : Premium est suspendu. Mets à jour ton moyen de paiement pour le rétablir."
+          }
+        }
+      }
+    },
+    "SQFormal|Le paiement n’est pas passé : Premium est suspendu. Mets à jour ton moyen de paiement pour le rétablir." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le paiement n’est pas passé : Premium est suspendu. Mettez à jour votre moyen de paiement pour le rétablir."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "En pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause"
+          }
+        }
+      }
+    },
+    "Reprise prévue le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumes on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise prévue le %@."
+          }
+        }
+      }
+    },
+    "Abonnement en pause." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription paused."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement en pause."
+          }
+        }
+      }
+    },
+    "Le paiement n’est pas encore confirmé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The payment isn’t confirmed yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le paiement n’est pas encore confirmé."
+          }
+        }
+      }
+    },
+    "Abonnement terminé le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription ended on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement terminé le %@."
+          }
+        }
+      }
+    },
+    "Abonnement terminé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription ended."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement terminé."
+          }
+        }
+      }
+    },
+    "Remboursé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refunded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remboursé"
+          }
+        }
+      }
+    },
+    "Cet abonnement a été remboursé : Premium n’est plus actif." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This subscription was refunded: Premium is no longer active."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet abonnement a été remboursé : Premium n’est plus actif."
+          }
+        }
+      }
+    },
+    "Achat de test : aucun paiement réel." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test purchase: no real payment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achat de test : aucun paiement réel."
+          }
+        }
+      }
+    },
+    "Abonnement géré sur le web." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription managed on the web."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement géré sur le web."
+          }
+        }
+      }
+    },
+    "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription taken out on another device: it’s managed where it was taken out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit."
+          }
+        }
+      }
+    },
+    "Remboursement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refund"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remboursement"
+          }
+        }
+      }
+    },
+    "SignalQuest Premium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest Premium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest Premium"
+          }
+        }
+      }
+    },
+    "Reprendre mon abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume my subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre mon abonnement"
+          }
+        }
+      }
+    },
+    "SQFormal|Reprendre mon abonnement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre votre abonnement"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Gérer ou résilier mon abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage or cancel my subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer ou résilier mon abonnement"
+          }
+        }
+      }
+    },
+    "SQFormal|Gérer ou résilier mon abonnement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer ou résilier votre abonnement"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Demander un remboursement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request a refund"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demander un remboursement"
+          }
+        }
+      }
+    },
+    "Restent gratuits pour tous : la carte, le speedtest, les relevés radio, l’identification des sites, les signalements et le partage." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free for everyone: the map, the speed test, radio readings, site identification, reports and sharing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restent gratuits pour tous : la carte, le speedtest, les relevés radio, l’identification des sites, les signalements et le partage."
+          }
+        }
+      }
+    },
+    "S’abonner à Premium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscribe to Premium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’abonner à Premium"
+          }
+        }
+      }
+    },
+    "Commencer l’essai gratuit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start the free trial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commencer l’essai gratuit"
+          }
+        }
+      }
+    },
+    "Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium is a monthly or yearly auto-renewing subscription, charged to your Apple Account when you confirm the purchase. It renews at the same price unless cancelled at least 24 hours before the end of the current period, in your Apple Account settings. No Family Sharing. The price Apple shows at the time of purchase applies."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi."
+          }
+        }
+      }
+    },
+    "SQFormal|Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec votre identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de votre compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Pendant l’essai gratuit, rien n’est prélevé. Sans résiliation au moins 24 heures avant sa fin, l’abonnement démarre et le premier paiement est prélevé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is charged during the free trial. Unless you cancel at least 24 hours before it ends, the subscription starts and the first payment is charged."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant l’essai gratuit, rien n’est prélevé. Sans résiliation au moins 24 heures avant sa fin, l’abonnement démarre et le premier paiement est prélevé."
+          }
+        }
+      }
+    },
+    "Ta demande est transmise à Apple, qui te répondra par e-mail. Si elle est acceptée, Premium s’arrête à la date du remboursement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your request has been sent to Apple, who will reply by email. If it’s accepted, Premium stops on the refund date."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta demande est transmise à Apple, qui te répondra par e-mail. Si elle est acceptée, Premium s’arrête à la date du remboursement."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta demande est transmise à Apple, qui te répondra par e-mail. Si elle est acceptée, Premium s’arrête à la date du remboursement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre demande est transmise à Apple, qui vous répondra par e-mail. Si elle est acceptée, Premium s’arrête à la date du remboursement."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "La demande de remboursement n’a pas pu s’ouvrir. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The refund request couldn’t open. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande de remboursement n’a pas pu s’ouvrir. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "SQFormal|La demande de remboursement n’a pas pu s’ouvrir. Réessaie plus tard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande de remboursement n’a pas pu s’ouvrir. Réessayez plus tard."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucun achat App Store n’a été trouvé sur cet appareil pour cet abonnement. Connecte-toi à l’App Store avec l’identifiant Apple qui l’a souscrit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No App Store purchase for this subscription was found on this device. Sign in to the App Store with the Apple Account that took it out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun achat App Store n’a été trouvé sur cet appareil pour cet abonnement. Connecte-toi à l’App Store avec l’identifiant Apple qui l’a souscrit."
+          }
+        }
+      }
+    },
+    "SQFormal|Aucun achat App Store n’a été trouvé sur cet appareil pour cet abonnement. Connecte-toi à l’App Store avec l’identifiant Apple qui l’a souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun achat App Store n’a été trouvé sur cet appareil pour cet abonnement. Connectez-vous à l’App Store avec l’identifiant Apple qui l’a souscrit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "L’achat attend une approbation, par exemple celle d’un parent. Premium s’activera dès qu’il sera accepté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The purchase is waiting for approval, for example from a parent. Premium will activate as soon as it’s accepted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’achat attend une approbation, par exemple celle d’un parent. Premium s’activera dès qu’il sera accepté."
+          }
+        }
+      }
+    },
+    "Sentinelle complète : plus de connexions surveillées, mesurées plus souvent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Sentinelle: more connections watched, measured more often"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle complète : plus de connexions surveillées, mesurées plus souvent"
+          }
+        }
+      }
+    },
     "un autre appareil" : {
       "localizations" : {
         "en" : {

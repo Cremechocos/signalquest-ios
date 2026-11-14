@@ -8,9 +8,9 @@ enum PaywallEntryPoint: Equatable, Sendable {
     var introduction: String {
         switch self {
         case .profile:
-            return String(localized: "Soutiens SignalQuest et débloque des outils avancés. Les mesures réseau essentielles restent gratuites.")
+            return String(localized: "Premium ajoute du confort et des bonus. Toutes les fonctions Telecom restent gratuites.")
         case .premiumFeature(let name):
-            return String(localized: "« \(name) » fait partie de Premium. Compare les offres sans perdre ce que tu étais en train de faire.")
+            return String(localized: "« \(name) » fait partie de Premium. Découvre l’offre sans perdre ce que tu étais en train de faire.")
         }
     }
 }
@@ -68,6 +68,15 @@ enum SubscriptionPriceCopy {
         }
     }
 
+    /// « 1 semaine d’essai gratuit » : la durée vient de l'offre StoreKit.
+    static func trialLine(offer: Product.SubscriptionOffer, product: Product) -> String {
+        let period = offer.period.formatted(
+            product.subscriptionPeriodFormatStyle.locale(Locale.current),
+            referenceDate: Date(timeIntervalSince1970: 0)
+        )
+        return String(localized: "\(period) d’essai gratuit")
+    }
+
     private static func periodDescription(_ product: Product) -> String? {
         guard let period = product.subscription?.subscriptionPeriod, period.value > 0 else { return nil }
         return period.formatted(
@@ -77,10 +86,200 @@ enum SubscriptionPriceCopy {
     }
 }
 
+/// Ce que l'écran dit de l'abonnement, d'après la seule réponse du serveur
+/// (contrat v1 §2 et §3) : une ligne par état, sans aucun droit recalculé ici.
+struct SubscriptionStatusPresentation: Equatable {
+    enum Tone: Equatable { case neutral, positive, warning }
+
+    /// Où se gère l'abonnement (contrat v1 §3, D5).
+    enum Management: Equatable {
+        case none
+        /// Feuille Apple native : modifier, résilier, reprendre. Le
+        /// remboursement se demande à Apple (D8).
+        case appStore(canResume: Bool, canRequestRefund: Bool)
+        /// Texte seul : aucun lien ni appel vers un autre paiement (3.1.1),
+        /// aucune autre plateforme nommée (2.3.10).
+        case elsewhere(String)
+    }
+
+    let title: String
+    let tag: String?
+    let details: [String]
+    let tone: Tone
+    let management: Management
+
+    static func make(serverState: ServerEntitlementState) -> SubscriptionStatusPresentation {
+        switch serverState {
+        case .idle, .loading:
+            return SubscriptionStatusPresentation(
+                title: String(localized: "Ton abonnement"), tag: nil,
+                details: [String(localized: "Vérification de ton abonnement…")],
+                tone: .neutral, management: .none
+            )
+        case .unavailable:
+            return SubscriptionStatusPresentation(
+                title: String(localized: "Ton abonnement"), tag: nil,
+                details: [String(localized: "Le serveur des abonnements ne répond pas. Les nouveaux achats sont bloqués par sécurité.")],
+                tone: .warning, management: .none
+            )
+        case .available(let snapshot):
+            var presentation = make(snapshot: snapshot)
+            if snapshot.warnings.contains("DUPLICATE_PAID_SUBSCRIPTION") {
+                presentation = SubscriptionStatusPresentation(
+                    title: presentation.title, tag: presentation.tag,
+                    details: presentation.details + [String(localized: "Deux abonnements payés sont en cours sur ton compte : résilies-en un pour ne pas payer deux fois. Chacun se gère là où il a été souscrit.")],
+                    tone: .warning, management: presentation.management
+                )
+            }
+            return presentation
+        }
+    }
+
+    private static func make(snapshot: EntitlementSnapshot) -> SubscriptionStatusPresentation {
+        if let subscription = snapshot.subscription ?? snapshot.blockingSubscription {
+            return make(subscription: subscription)
+        }
+        if let grant = snapshot.grant, grant.tier != .free {
+            let detail = grant.expiresAt.map {
+                String(localized: "Accès offert jusqu’au \(day($0)). Tu peux t’abonner pour continuer ensuite.")
+            } ?? String(localized: "Accès offert, sans date de fin.")
+            return SubscriptionStatusPresentation(
+                title: grant.tier.displayName, tag: String(localized: "Offert"),
+                details: [detail], tone: .positive, management: .none
+            )
+        }
+        if snapshot.tier != .free {
+            return SubscriptionStatusPresentation(
+                title: snapshot.tier.displayName, tag: String(localized: "Actif"),
+                details: [], tone: .positive, management: .none
+            )
+        }
+        return SubscriptionStatusPresentation(
+            title: SupporterTier.free.displayName, tag: nil,
+            details: [String(localized: "Aucun abonnement en cours.")],
+            tone: .neutral, management: .none
+        )
+    }
+
+    private static func make(subscription: EntitlementSubscription) -> SubscriptionStatusPresentation {
+        let tag: String?
+        var details: [String] = []
+        let tone: Tone
+        let cancelled = subscription.autoRenew == false
+
+        switch subscription.state {
+        case .trialing:
+            tag = cancelled ? String(localized: "Essai résilié") : String(localized: "Essai gratuit")
+            let end = subscription.trialEndsAt ?? subscription.currentPeriodEnd
+            if cancelled {
+                details.append(end.map { String(localized: "Premium reste actif jusqu’au \(day($0)), sans aucun paiement.") }
+                               ?? String(localized: "L’essai s’arrêtera à son terme, sans aucun paiement."))
+            } else if let end, let price = subscription.price.map(formattedPrice), let period = subscription.period {
+                details.append(period == .annual
+                    ? String(localized: "Essai gratuit jusqu’au \(day(end)), puis \(price) par an.")
+                    : String(localized: "Essai gratuit jusqu’au \(day(end)), puis \(price) par mois."))
+            } else if let end {
+                details.append(String(localized: "Essai gratuit jusqu’au \(day(end))."))
+            }
+            tone = .positive
+        case .active:
+            if cancelled {
+                tag = String(localized: "Résilié")
+                details.append(subscription.currentPeriodEnd.map {
+                    String(localized: "Premium reste actif jusqu’au \(day($0)), puis s’arrête sans nouveau paiement.")
+                } ?? String(localized: "Premium s’arrêtera à la fin de la période en cours, sans nouveau paiement."))
+                tone = .neutral
+            } else {
+                tag = String(localized: "Actif")
+                if let end = subscription.currentPeriodEnd, let price = subscription.price.map(formattedPrice) {
+                    details.append(String(localized: "Prochain renouvellement le \(day(end)), pour \(price)."))
+                } else if let end = subscription.currentPeriodEnd {
+                    details.append(String(localized: "Prochain renouvellement le \(day(end))."))
+                }
+                tone = .positive
+            }
+            if let effectiveAt = subscription.pendingChange?.effectiveAt {
+                details.append(String(localized: "Changement d’offre prévu le \(day(effectiveAt))."))
+            }
+        case .grace:
+            tag = String(localized: "Paiement à régulariser")
+            details.append(subscription.accessEndsAt.map {
+                String(localized: "Le dernier paiement n’est pas passé. Premium reste actif jusqu’au \(day($0)) : mets à jour ton moyen de paiement d’ici là.")
+            } ?? String(localized: "Le dernier paiement n’est pas passé. Mets à jour ton moyen de paiement pour garder Premium."))
+            tone = .warning
+        case .onHold:
+            tag = String(localized: "Suspendu")
+            details.append(String(localized: "Le paiement n’est pas passé : Premium est suspendu. Mets à jour ton moyen de paiement pour le rétablir."))
+            tone = .warning
+        case .paused:
+            tag = String(localized: "En pause")
+            details.append(subscription.resumesAt.map { String(localized: "Reprise prévue le \(day($0)).") }
+                           ?? String(localized: "Abonnement en pause."))
+            tone = .neutral
+        case .pending:
+            tag = String(localized: "En attente")
+            details.append(String(localized: "Le paiement n’est pas encore confirmé."))
+            tone = .neutral
+        case .expired:
+            tag = String(localized: "Terminé")
+            details.append(subscription.currentPeriodEnd.map { String(localized: "Abonnement terminé le \(day($0)).") }
+                           ?? String(localized: "Abonnement terminé."))
+            tone = .neutral
+        case .revoked:
+            tag = String(localized: "Remboursé")
+            details.append(String(localized: "Cet abonnement a été remboursé : Premium n’est plus actif."))
+            tone = .neutral
+        case .unknown:
+            tag = nil
+            tone = .neutral
+        }
+        if subscription.isSandbox {
+            details.append(String(localized: "Achat de test : aucun paiement réel."))
+        }
+
+        let management: Management
+        switch subscription.channel {
+        case .appStore:
+            let running = subscription.state.blocksNewPurchase
+            management = running
+                ? .appStore(canResume: cancelled && subscription.state.grantsAccess,
+                            canRequestRefund: [.active, .grace, .onHold].contains(subscription.state))
+                : .none
+        case .stripe:
+            management = .elsewhere(String(localized: "Abonnement géré sur le web."))
+        case .googlePlay, .unknown:
+            management = .elsewhere(String(localized: "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit."))
+        }
+
+        return SubscriptionStatusPresentation(
+            title: subscription.tier.displayName, tag: tag, details: details, tone: tone, management: management
+        )
+    }
+
+    static func day(_ date: Date) -> String {
+        date.formatted(date: .long, time: .omitted)
+    }
+
+    /// Prix servi en unité mineure (contrat v1.8), avec les décimales de sa devise.
+    static func formattedPrice(_ price: EntitlementSubscription.Price) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = price.currency
+        var divisor = Decimal(1)
+        for _ in 0..<formatter.maximumFractionDigits { divisor *= 10 }
+        let amount = Decimal(price.unitAmount) / divisor
+        return formatter.string(from: amount as NSDecimalNumber) ?? amount.formatted(.currency(code: price.currency))
+    }
+}
+
 struct PaywallView: View {
     @ObservedObject private var store: EntitlementsStore
     private let entryPoint: PaywallEntryPoint
     @State private var selectedPeriod = SubscriptionBillingPeriod.monthly
+    @State private var showsManageSubscriptions = false
+    @State private var refundTransactionID: StoreKit.Transaction.ID?
+    @State private var showsRefundRequest = false
+    @State private var refundMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     init(store: EntitlementsStore, entryPoint: PaywallEntryPoint = .profile) {
@@ -92,10 +291,11 @@ struct PaywallView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header
-                entitlementStatusCard
-                periodPicker
-                planCard(tier: .basic)
-                planCard(tier: .premium)
+                subscriptionCard
+                if showsOffer {
+                    periodPicker
+                    premiumCard
+                }
                 restorationSection
                 legalFooter
             }
@@ -110,10 +310,21 @@ struct PaywallView: View {
         .sqKeepsSwipeBack()
         .task { await store.prepare() }
         .refreshable { await store.prepare() }
+        // Résilier, reprendre ou modifier : la feuille d'Apple, sans quitter l'app (D5).
+        .manageSubscriptionsSheet(isPresented: $showsManageSubscriptions)
+        .onChangeCompat(of: showsManageSubscriptions) { _, shown in
+            if !shown { Task { await store.prepare() } }
+        }
+        .background { refundSheetHost }
         .alert("Abonnement", isPresented: operationAlertBinding) {
             Button("OK") { store.clearOperationMessage() }
         } message: {
             Text(operationMessage ?? "")
+        }
+        .alert("Remboursement", isPresented: refundAlertBinding) {
+            Button("OK") { refundMessage = nil }
+        } message: {
+            Text(refundMessage ?? "")
         }
     }
 
@@ -127,7 +338,7 @@ struct PaywallView: View {
                 MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "paywall.close") { dismiss() }
             }
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Choisis ton niveau d’exploration")
+                Text("SignalQuest Premium")
                     .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
@@ -141,45 +352,92 @@ struct PaywallView: View {
         }
     }
 
-    @ViewBuilder
-    private var entitlementStatusCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: entitlementStatusIcon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(entitlementStatusColor)
-                    .frame(width: 40, height: 40)
-                    .background(entitlementStatusSoftColor, in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                    Text("Ton offre : \(store.activeTier.displayName)")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text(entitlementStatusMessage)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                if store.activeTier != .free {
-                    SQEditorialTag(
-                        text: store.activeTier.displayName,
-                        color: store.activeTier == .premium ? SQColor.brandRed : SQColor.labelSecondary
-                    )
-                }
-            }
+    // MARK: Mon abonnement
 
-            if let expiration = store.serverState.snapshot?.expiresAt {
-                Text("Échéance : \(expiration.formatted(date: .abbreviated, time: .omitted))")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+    private var presentation: SubscriptionStatusPresentation {
+        SubscriptionStatusPresentation.make(serverState: store.serverState)
+    }
+
+    /// Une offre en cours se gère, elle ne se rachète pas : la carte d'achat
+    /// disparaît tant qu'un abonnement court (contrat v1 §6, double abonnement).
+    private var showsOffer: Bool {
+        switch store.eligibility {
+        case .managedByAppStore, .managedElsewhere: return false
+        default: return true
+        }
+    }
+
+    private var subscriptionCard: some View {
+        let presentation = presentation
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: statusIcon(presentation.tone))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(statusColor(presentation.tone))
+                    .frame(width: 40, height: 40)
+                    .background(statusSoftColor(presentation.tone), in: Circle())
+                    .accessibilityHidden(true)
+                Text(verbatim: presentation.title)
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                Spacer(minLength: 0)
+                if let tag = presentation.tag {
+                    SQEditorialTag(text: tag, color: statusColor(presentation.tone))
+                }
             }
+            ForEach(presentation.details, id: \.self) { detail in
+                Text(verbatim: detail)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            management(presentation.management)
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paywall.subscription")
     }
+
+    @ViewBuilder
+    private func management(_ management: SubscriptionStatusPresentation.Management) -> some View {
+        switch management {
+        case .none:
+            EmptyView()
+        case .elsewhere(let text):
+            Label(text, systemImage: "info.circle")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        case .appStore(let canResume, let canRequestRefund):
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                GradientButton(
+                    canResume ? String(localized: "Reprendre mon abonnement") : String(localized: "Gérer ou résilier mon abonnement"),
+                    systemImage: canResume ? "arrow.uturn.backward.circle" : "creditcard",
+                    style: canResume ? .primary : .secondary
+                ) {
+                    showsManageSubscriptions = true
+                }
+                .accessibilityIdentifier("paywall.manage")
+                if canRequestRefund {
+                    Button {
+                        Task { await openRefundRequest() }
+                    } label: {
+                        Text("Demander un remboursement")
+                            .font(SQType.button)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(SQColor.brandRed)
+                    .accessibilityIdentifier("paywall.refund")
+                }
+            }
+        }
+    }
+
+    // MARK: Offre
 
     // Segments « Crème » : chips capsules partagées (actif brique / inactif surface).
     private var periodPicker: some View {
@@ -191,133 +449,97 @@ struct PaywallView: View {
         .accessibilityHint("Choisis une facturation mensuelle ou annuelle")
     }
 
-    /// Carte d'offre. Premium = l'unique grande surface brique de l'écran
-    /// (mise en avant de vente), Basic = carte crème classique. Zéro bordure.
-    private func planCard(tier: SupporterTier) -> some View {
-        let identifier = SignalQuestSubscriptionProduct.product(tier: tier, period: selectedPeriod)
-        let product = store.product(for: tier, period: selectedPeriod)
+    /// L'unique carte d'offre, la seule grande surface brique de l'écran.
+    private var premiumCard: some View {
+        let identifier = SignalQuestSubscriptionProduct.product(tier: .premium, period: selectedPeriod)
+        let product = store.product(for: .premium, period: selectedPeriod)
         let periodMatchesOffer = product.flatMap { product in
             product.subscription?.subscriptionPeriod
         }.map { SubscriptionPriceCopy.matchesSelection($0.unit, value: $0.value, selection: selectedPeriod) } ?? false
-        let isCurrentOrLower = store.activeTier.rank >= tier.rank
-        let isPremium = tier == .premium
+        let trial = identifier.flatMap { store.freeTrialOffer(for: $0) }
         // Encre pleine partout (TRX-13) : `onAccent` à 80 % sur brique tombait
-        // vers 3,7:1, et le gris secondaire en légende passait sous le contraste
-        // rendu. La hiérarchie tient à la taille des textes.
-        let primaryText = isPremium ? SQColor.onAccent : SQColor.label
+        // vers 3,7:1. La hiérarchie tient à la taille des textes.
+        let ink = SQColor.onAccent
 
-        let titleBlock = VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text(tier.displayName)
-                .font(SQType.title)
-                .sqHeader()
-                .foregroundStyle(primaryText)
-            Text(SubscriptionPriceCopy.priceLine(product: product))
-                .font(SQFont.display(18, .bold))
-                .foregroundStyle(primaryText)
-                // Plafonné à AX3 : en AX5, « indisponible » se coupait en fin de mot (DEV-01).
-                .dynamicTypeSize(...DynamicTypeSize.accessibility3)
-        }
-        // « L'essentiel + » promettait des fonctionnalités que Basic
-        // n'ouvre pas : c'est un palier de soutien, et le nommer ainsi
-        // est la seule formulation exacte.
-        let badge = Group {
-            if isPremium {
-                // Sur brique, l'étiquette standard (encre sombre sur teinte
-                // translucide) restait sous 3:1 : capsule claire, encre d'accent.
-                Text("Le plus complet")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .padding(.horizontal, SQSpace.sm2)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .background(SQColor.onAccent, in: Capsule(style: .continuous))
-            } else {
-                SQEditorialTag(text: String(localized: "Soutien"), color: SQColor.labelSecondary)
-            }
-        }
-
-        let card = VStack(alignment: .leading, spacing: SQSpace.md) {
-            // En très grand texte, l'étiquette passe sous le titre au lieu de
-            // se replier dans sa capsule à côté de lui.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline) {
-                    titleBlock
-                    Spacer()
-                    badge
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(SupporterTier.premium.displayName)
+                    .font(SQType.title)
+                    .sqHeader()
+                    .foregroundStyle(ink)
+                if let trial, let product {
+                    Text(verbatim: SubscriptionPriceCopy.trialLine(offer: trial, product: product))
+                        .font(SQFont.display(18, .bold))
+                        .foregroundStyle(ink)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
                 }
-                VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    titleBlock
-                    badge
-                }
+                Text(SubscriptionPriceCopy.priceLine(product: product))
+                    .font(trial == nil ? SQFont.display(18, .bold) : SQType.callout)
+                    .foregroundStyle(ink)
+                    // Plafonné à AX3 : en AX5, « indisponible » se coupait en fin de mot (DEV-01).
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility3)
             }
 
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                ForEach(benefits(for: tier), id: \.self) { benefit in
+                ForEach(premiumBenefits, id: \.self) { benefit in
                     Label(benefit, systemImage: "checkmark.circle.fill")
                         .font(SQType.callout)
-                        .foregroundStyle(primaryText)
+                        .foregroundStyle(ink)
                         .symbolRenderingMode(.hierarchical)
                 }
             }
-            // Basic est un soutien pur : un remerciement, hors de la liste des avantages.
-            if tier == .basic {
-                Text("Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste.")
-                    .font(SQType.caption)
-                    .foregroundStyle(primaryText)
-            }
+            // Le gratuit garde tout le Telecom : Premium n'en retire rien.
+            Text("Restent gratuits pour tous : la carte, le speedtest, les relevés radio, l’identification des sites, les signalements et le partage.")
+                .font(SQType.caption)
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let product, let equivalent = SubscriptionPriceCopy.monthlyEquivalent(product: product) {
                 Text(equivalent)
                     .font(SQType.caption)
-                    .foregroundStyle(primaryText)
+                    .foregroundStyle(ink)
             }
             if product != nil && !periodMatchesOffer {
                 Text("Période de l’App Store différente de l’offre choisie. Achat indisponible.")
                     .font(SQType.caption)
-                    .foregroundStyle(primaryText)
+                    .foregroundStyle(ink)
             }
 
             GradientButton(
-                purchaseButtonTitle(tier: tier, isCurrentOrLower: isCurrentOrLower),
-                systemImage: isCurrentOrLower ? "checkmark.seal.fill" : "sparkles",
-                isBusy: isPurchasing(tier),
-                style: isPremium ? .primary : .secondary
+                trial == nil ? String(localized: "S’abonner à Premium") : String(localized: "Commencer l’essai gratuit"),
+                systemImage: "sparkles",
+                isBusy: isPurchasing,
+                style: .primary
             ) {
                 guard let identifier else { return }
                 Task { await store.purchase(identifier) }
             }
-            // Pas d'opacité en plus : le bouton désactivé est déjà grisé, et
-            // l'estomper sur brique rendait « offre actuelle » illisible (TRX-13).
-            .disabled(isCurrentOrLower || identifier == nil || !store.eligibility.canPurchase || !periodMatchesOffer)
+            // Pas d'opacité en plus : le bouton désactivé est déjà grisé (TRX-13).
+            .disabled(identifier == nil || !store.eligibility.canPurchase || !periodMatchesOffer)
+            .accessibilityIdentifier("paywall.purchase")
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            isPremium ? SQColor.brandRed : SQColor.surface,
-            in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-        )
-
-        return Group {
-            if isPremium {
-                card.sqShadowAccent()
-            } else {
-                card.sqShadowCard()
-            }
-        }
+        .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowAccent()
         .accessibilityElement(children: .contain)
     }
 
     private var restorationSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            if let productLoadMessage = store.productLoadMessage {
+            if showsOffer, let productLoadMessage = store.productLoadMessage {
                 Label(productLoadMessage, systemImage: "info.circle")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
 
-            Label(store.eligibility.userMessage, systemImage: "shield.checkered")
-                .font(SQType.caption)
-                .foregroundStyle(store.eligibility.canPurchase ? SQColor.success : SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Les messages d'un abonnement en cours sont déjà dans sa carte.
+            if showsOffer, store.eligibility != .allowed {
+                Label(store.eligibility.userMessage, systemImage: "shield.checkered")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             GradientButton(
                 "Restaurer mes achats",
@@ -329,26 +551,37 @@ struct PaywallView: View {
             }
             .disabled(store.operation.isBusy)
 
-            if shouldShowManageSubscription,
-               let url = URL(string: "https://apps.apple.com/account/subscriptions") {
-                Link(destination: url) {
-                    Label("Gérer dans l’App Store", systemImage: "arrow.up.right.square")
+            // Achat Apple présent sur l'appareil mais inconnu du serveur : il se
+            // gère quand même dans la feuille d'Apple.
+            if case .existingLocalAppStoreEntitlement = store.eligibility {
+                Button {
+                    showsManageSubscriptions = true
+                } label: {
+                    Label("Gérer dans l’App Store", systemImage: "creditcard")
                         .font(SQType.button)
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(SQColor.brandRed)
-                .frame(minHeight: 44)
             }
         }
     }
 
+    /// Mentions de la règle App Review 3.1.2 : titre, durée, prix par période,
+    /// renouvellement automatique et sa résiliation, essai, liens vers les
+    /// conditions et la confidentialité.
     private var legalFooter: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Aucun essai gratuit et aucun partage familial. L’abonnement se renouvelle automatiquement et peut être résilié depuis les réglages App Store. Le prix affiché par Apple au moment de l’achat fait foi.")
+            Text("Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if showsOffer, SignalQuestSubscriptionProduct.allCases.contains(where: { store.freeTrialOffer(for: $0) != nil }) {
+                Text("Pendant l’essai gratuit, rien n’est prélevé. Sans résiliation au moins 24 heures avant sa fin, l’abonnement démarre et le premier paiement est prélevé.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: SQSpace.lg) {
                 Link("Conditions", destination: AppConfig.current.termsURL)
                 Link("Confidentialité", destination: AppConfig.current.privacyURL)
@@ -359,57 +592,65 @@ struct PaywallView: View {
         }
     }
 
-    private var entitlementStatusMessage: String {
-        switch store.serverState {
-        case .idle, .loading:
-            return String(localized: "Vérification des droits multiplateformes…")
-        case .unavailable:
-            return String(localized: "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité.")
-        case .available(let snapshot):
-            if snapshot.status == .paymentFailed {
-                return String(localized: "Paiement à régulariser auprès de \(snapshot.source.displayName).")
+    // MARK: Remboursement (D8)
+
+    @ViewBuilder
+    private var refundSheetHost: some View {
+        if let refundTransactionID {
+            Color.clear.refundRequestSheet(for: refundTransactionID, isPresented: $showsRefundRequest) { result in
+                switch result {
+                case .success(let status):
+                    if status == .success {
+                        refundMessage = String(localized: "Ta demande est transmise à Apple, qui te répondra par e-mail. Si elle est acceptée, Premium s’arrête à la date du remboursement.")
+                    }
+                case .failure:
+                    refundMessage = String(localized: "La demande de remboursement n’a pas pu s’ouvrir. Réessaie plus tard.")
+                }
             }
-            if snapshot.tier != .free {
-                return String(localized: "Géré par \(snapshot.source.displayName).")
-            }
-            if store.localEntitlementTier != .free {
-                return String(localized: "Achat Apple détecté localement, confirmation serveur en attente.")
-            }
-            return String(localized: "Aucun abonnement actif.")
         }
     }
 
-    private var entitlementStatusIcon: String {
-        switch store.serverState {
-        case .unavailable: return "exclamationmark.triangle.fill"
-        case .idle, .loading: return "hourglass"
-        case .available: return store.activeTier == .free ? "person.crop.circle" : "checkmark.seal.fill"
+    private func openRefundRequest() async {
+        guard let transactionID = await store.latestAppStoreTransactionID() else {
+            refundMessage = String(localized: "Aucun achat App Store n’a été trouvé sur cet appareil pour cet abonnement. Connecte-toi à l’App Store avec l’identifiant Apple qui l’a souscrit.")
+            return
+        }
+        refundTransactionID = transactionID
+        showsRefundRequest = true
+    }
+
+    private var refundAlertBinding: Binding<Bool> {
+        Binding(
+            get: { refundMessage != nil },
+            set: { presented in if !presented { refundMessage = nil } }
+        )
+    }
+
+    // MARK: Statut
+
+    private func statusIcon(_ tone: SubscriptionStatusPresentation.Tone) -> String {
+        switch tone {
+        case .neutral: return store.serverState.snapshot == nil ? "hourglass" : "person.crop.circle"
+        case .positive: return "checkmark.seal.fill"
+        case .warning: return "exclamationmark.triangle.fill"
         }
     }
 
-    private var entitlementStatusColor: Color {
-        switch store.serverState {
-        case .unavailable: return SQColor.warning
-        case .idle, .loading: return SQColor.labelSecondary
-        case .available(let snapshot):
-            if snapshot.status == .paymentFailed { return SQColor.warning }
-            return store.activeTier == .premium ? SQColor.brandRed : SQColor.success
+    private func statusColor(_ tone: SubscriptionStatusPresentation.Tone) -> Color {
+        switch tone {
+        case .neutral: return SQColor.labelSecondary
+        case .positive: return SQColor.brandRed
+        case .warning: return SQColor.warning
         }
     }
 
     /// Teinte douce de la pastille d'icône du statut (icône posée sur soft).
-    private var entitlementStatusSoftColor: Color {
-        switch store.serverState {
-        case .unavailable: return SQColor.warningSoft
-        case .idle, .loading: return SQColor.surfaceMuted
-        case .available(let snapshot):
-            if snapshot.status == .paymentFailed { return SQColor.warningSoft }
-            return store.activeTier == .premium ? SQColor.accentSoft : SQColor.successSoft
+    private func statusSoftColor(_ tone: SubscriptionStatusPresentation.Tone) -> Color {
+        switch tone {
+        case .neutral: return SQColor.surfaceMuted
+        case .positive: return SQColor.accentSoft
+        case .warning: return SQColor.warningSoft
         }
-    }
-
-    private var shouldShowManageSubscription: Bool {
-        store.serverState.snapshot?.source == .appStore || store.localEntitlementTier != .free
     }
 
     private var operationAlertBinding: Binding<Bool> {
@@ -422,7 +663,7 @@ struct PaywallView: View {
     private var operationMessage: String? {
         switch store.operation {
         case .pending:
-            return String(localized: "L’achat est en attente de validation par l’App Store.")
+            return String(localized: "L’achat attend une approbation, par exemple celle d’un parent. Premium s’activera dès qu’il sera accepté.")
         case .succeeded(let message), .failed(let message):
             return message
         case .idle, .purchasing, .restoring:
@@ -430,49 +671,35 @@ struct PaywallView: View {
         }
     }
 
-    private func isPurchasing(_ tier: SupporterTier) -> Bool {
-        guard case .purchasing(let product) = store.operation else { return false }
-        return product.tier == tier
-    }
-
-    private func purchaseButtonTitle(tier: SupporterTier, isCurrentOrLower: Bool) -> String {
-        if isCurrentOrLower { return String(localized: "Déjà inclus dans ton offre") }
-        if case .managedElsewhere = store.eligibility { return String(localized: "Déjà abonné ailleurs") }
-        if !store.eligibility.canPurchase { return String(localized: "Bientôt disponible sur iOS") }
-        return String(localized: "Choisir \(tier.displayName)")
+    private var isPurchasing: Bool {
+        if case .purchasing = store.operation { return true }
+        return false
     }
 
     /// Avantages annoncés.
     ///
-    /// RÈGLE : une ligne ici doit correspondre à un droit RÉELLEMENT gaté côté
-    /// serveur (`packages/core/supporter-features.ts`), jamais à une intention.
-    /// Sur les 84 entrées du catalogue, six seulement sont payantes — le badge
-    /// (`basic`), puis le journal radio, Sentinelle et la durée de story
-    /// (`premium`). Tout le reste est `free` : le comparateur de débits, les
-    /// graphes de signal et les alertes en font partie, et étaient vendus ici
-    /// alors qu'ils sont ouverts à tous. App Review souscrit pour vérifier, et
-    /// un avantage non livrable tombe sous la Guideline 2.3.1.
+    /// RÈGLE : une ligne ici doit correspondre à un avantage EN LIGNE. Avec le
+    /// contrat v1, le serveur sert la liste (`benefits.premium`, B9, D20) et
+    /// l'app n'en affiche que les clés qu'elle connaît : `radio_log.unlimited`
+    /// est ignoré (un iPhone ne fait que lire le journal, Q7), `reports.logo`
+    /// aussi (Android seul, D15), `recap.monthly` et `profile.spotlight`
+    /// attendent leur maquette (D13). Sans la liste (ancienne route), seul
+    /// l'existant s'affiche. App Review souscrit pour vérifier : un avantage
+    /// non livrable tombe sous la Guideline 2.3.1.
     ///
-    /// NE PAS chiffrer un quota ici : le nombre de cibles Sentinelle se règle
-    /// depuis /admin/monetization sans redéployer, donc un nombre en dur
-    /// deviendrait faux sans que personne ne touche à ce fichier.
-    private func benefits(for tier: SupporterTier) -> [String] {
-        switch tier {
-        case .free:
-            return []
-        case .basic:
-            // Basic n'ouvre AUCUNE fonctionnalité : `supporter.profile.badge`
-            // est son seul droit. Ne rien ajouter ici sans gater d'abord.
-            return [
-                String(localized: "Badge Basic acier sur ton profil et tes publications"),
-            ]
-        case .premium:
-            return [
-                String(localized: "Journal radio sauvegardé et synchronisé entre tes appareils"),
-                String(localized: "Sentinelle : surveillance continue de ta connexion (coupures, latence, incidents)"),
-                String(localized: "Durée de vie des stories personnalisable, de 1 h à 72 h au lieu de 24 h"),
-                String(localized: "Badge Premium or sur ton profil et tes publications"),
-            ]
+    /// NE PAS chiffrer un quota ici : il se règle au serveur sans redéployer.
+    private var premiumBenefits: [String] {
+        let known: [(key: String, text: String)] = [
+            ("sentinelle.full", String(localized: "Sentinelle complète : plus de connexions surveillées, mesurées plus souvent")),
+            ("stories.duration", String(localized: "Durée de vie des stories personnalisable, de 1 h à 72 h au lieu de 24 h")),
+        ]
+        let shown: [String]
+        if let served = store.serverState.snapshot?.benefits?.premium {
+            shown = known.filter { served.contains($0.key) }.map(\.text)
+        } else {
+            shown = known.map(\.text)
         }
+        // Le badge est attribué par le serveur à tout membre Premium.
+        return shown + [String(localized: "Badge Premium or sur ton profil et tes publications")]
     }
 }

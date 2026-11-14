@@ -714,6 +714,16 @@ struct PurchaseEligibilityPolicy {
     }
 }
 
+/// Essai gratuit (contrat v1 §6, D3) : affiché seulement si le serveur ET
+/// l'App Store le permettent. Le serveur garde un essai par compte SignalQuest,
+/// Apple un essai par identifiant Apple ; sans la réponse du serveur (ancienne
+/// route), l'app n'annonce rien plutôt que de promettre un essai refusé.
+enum FreeTrialRule {
+    static func shows(serverTrial: EntitlementTrial?, storeKitEligible: Bool, offerIsFreeTrial: Bool) -> Bool {
+        serverTrial?.eligible == true && storeKitEligible && offerIsFreeTrial
+    }
+}
+
 // MARK: - StoreKit delivery boundary
 
 /// Preuve minimale attendue par le futur endpoint de validation Apple. Le JWS
@@ -811,6 +821,8 @@ final class EntitlementsStore: ObservableObject {
 
     @Published private(set) var products: [SignalQuestSubscriptionProduct: Product] = [:]
     @Published private(set) var productLoadMessage: String?
+    /// Offres pour lesquelles l'identifiant Apple a encore droit à l'essai.
+    @Published private(set) var introOfferEligibleProducts: Set<SignalQuestSubscriptionProduct> = []
     @Published private var storedServerState: ServerEntitlementState = .idle
     @Published private(set) var localEntitlementTier: SupporterTier = .free
     @Published private var storedOperation: StoreKitOperationState = .idle
@@ -896,6 +908,31 @@ final class EntitlementsStore: ObservableObject {
     func product(for tier: SupporterTier, period: SubscriptionBillingPeriod) -> Product? {
         guard let identifier = SignalQuestSubscriptionProduct.product(tier: tier, period: period) else { return nil }
         return products[identifier]
+    }
+
+    /// Offre d'essai gratuit à annoncer pour ce produit, sinon `nil`.
+    func freeTrialOffer(for identifier: SignalQuestSubscriptionProduct) -> Product.SubscriptionOffer? {
+        guard let offer = products[identifier]?.subscription?.introductoryOffer,
+              FreeTrialRule.shows(
+                serverTrial: serverState.snapshot?.trial,
+                storeKitEligible: introOfferEligibleProducts.contains(identifier),
+                offerIsFreeTrial: offer.paymentMode == .freeTrial
+              ) else { return nil }
+        return offer
+    }
+
+    /// Dernière transaction de l'abonnement App Store en cours sur cet appareil,
+    /// pour la feuille de remboursement d'Apple (D8). C'est Apple qui décide ;
+    /// le serveur applique la notification REFUND qu'il reçoit ensuite.
+    func latestAppStoreTransactionID() async -> Transaction.ID? {
+        var latest: Transaction?
+        for await result in Transaction.currentEntitlements {
+            guard let transaction = try? Self.verified(result),
+                  SignalQuestSubscriptionProduct(rawValue: transaction.productID) != nil,
+                  transaction.revocationDate == nil else { continue }
+            if latest.map({ transaction.purchaseDate > $0.purchaseDate }) ?? true { latest = transaction }
+        }
+        return latest?.id
     }
 
     func prepare() async {
@@ -1108,6 +1145,13 @@ final class EntitlementsStore: ObservableObject {
                 guard let identifier = SignalQuestSubscriptionProduct(rawValue: product.id) else { return nil }
                 return (identifier, product)
             })
+            var eligible: Set<SignalQuestSubscriptionProduct> = []
+            for (identifier, product) in products {
+                if let subscription = product.subscription, await subscription.isEligibleForIntroOffer {
+                    eligible.insert(identifier)
+                }
+            }
+            introOfferEligibleProducts = eligible
             if products.isEmpty {
                 // Un catalogue vide a plusieurs causes indiscernables d'ici :
                 // offres pas encore approuvées par Apple, territoire hors de la
@@ -1124,6 +1168,7 @@ final class EntitlementsStore: ObservableObject {
             }
         } catch {
             products = [:]
+            introOfferEligibleProducts = []
             // Le détail technique part dans les logs et non à l'écran : le
             // `localizedDescription` de StoreKit est rédigé pour un développeur.
             logger.error("Chargement du catalogue App Store échoué : \(error.localizedDescription, privacy: .public)")
