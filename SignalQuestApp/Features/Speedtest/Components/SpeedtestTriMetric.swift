@@ -544,17 +544,13 @@ struct SpeedtestLastTestCard: View {
         result.createdAt.formatted(.relative(presentation: .named, unitsStyle: .wide))
     }
 
-    /// « ↓ 612 · ↑ 74 Mbit/s · 21 ms ». Une valeur ne se coupe jamais (U+00A0) :
-    /// la ligne passe à la ligne entre deux valeurs.
-    private var summary: String {
-        let down = result.downloadAverageMbps
-        var text = "↓\u{00A0}\(SQUnits.throughputValue(mbps: down))"
+    /// « ↓ 612 Mbit/s · ↑ 74 Mbit/s · 21 ms » : l'unité après chaque débit, comme la
+    /// légende de partage (choix d'Alexandre du 14/11). Une valeur ne se coupe jamais
+    /// (U+00A0) : la ligne passe à la ligne entre deux valeurs.
+    var summary: String {
+        var text = "↓\u{00A0}\(SQUnits.throughput(mbps: result.downloadAverageMbps))"
         if let up = result.uploadAverageMbps, up > 0 {
-            text += SQUnits.throughputUnit(mbps: up) == SQUnits.throughputUnit(mbps: down)
-                ? " · ↑\u{00A0}\(SQUnits.throughput(mbps: up))"
-                : "\u{00A0}\(SQUnits.throughputUnit(mbps: down)) · ↑\u{00A0}\(SQUnits.throughput(mbps: up))"
-        } else {
-            text += "\u{00A0}\(SQUnits.throughputUnit(mbps: down))"
+            text += " · ↑\u{00A0}\(SQUnits.throughput(mbps: up))"
         }
         if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
             text += " · \(SQUnits.milliseconds(ping).replacingOccurrences(of: " ", with: "\u{00A0}"))"

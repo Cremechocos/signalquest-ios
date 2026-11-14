@@ -115,6 +115,23 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedtestPhase.finished.dialTitle, "Résultat")
     }
 
+    /// « Dernier test » : l'unité après chaque débit, même quand les deux la partagent
+    /// (choix d'Alexandre du 14/11, comme la légende de partage), sans coupure dans une valeur.
+    @MainActor
+    func testLastTestSummaryWritesTheUnitAfterEachRate() {
+        func summary(down: Double, up: Double?, ping: Double?) -> String {
+            SpeedtestLastTestCard(result: SpeedtestRunResult(
+                label: "iOS speedtest", downloadMbps: down, downloadAverageMbps: down, downloadMaxMbps: down,
+                uploadMbps: up, uploadAverageMbps: up, pingMs: ping, durationSeconds: 10, connectionType: .cellular
+            ), action: {}).summary
+        }
+        let rate = { "\(SQUnits.throughputValue(mbps: $0))\u{00A0}\(SQUnits.throughputUnit(mbps: $0))" }
+        XCTAssertEqual(summary(down: 612, up: 74, ping: 21), "↓\u{00A0}\(rate(612)) · ↑\u{00A0}\(rate(74)) · 21\u{00A0}ms")
+        XCTAssertEqual(summary(down: 1_172, up: 95, ping: nil), "↓\u{00A0}\(rate(1_172)) · ↑\u{00A0}\(rate(95))")
+        XCTAssertEqual(summary(down: 48, up: nil, ping: 30), "↓\u{00A0}\(rate(48)) · 30\u{00A0}ms")
+        XCTAssertEqual(SQUnits.throughputUnit(mbps: 612), SQUnits.throughputUnit(mbps: 74))
+    }
+
     @MainActor
     func testSpeedtestPrimaryMetricsKeepUnitsAndDialBreathingRoom() {
         let progress = SpeedtestLiveProgress(
