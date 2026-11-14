@@ -178,7 +178,8 @@ struct OutageCardView: View {
                 // Le constat se fait depuis Android ; iOS lit la panne.
                 FeedOpenCapsule(
                     title: String(localized: "Voir la panne"),
-                    destination: .link(.outage(id: string("outageId"), siteId: string("siteId"), market: string("marketCode"))),
+                    destination: .link(.outage(id: string("outageId"), siteId: OutageFeedBadge.fallbackSiteId(string("siteId"), targetKind: string("outageTargetKind")),
+                                               market: string("marketCode"))),
                     onOpenPost: onTap
                 )
 
@@ -351,6 +352,14 @@ struct OutageCardView: View {
 /// Sortie de la vue pour être vérifiable — c'est une règle produit tranchée explicitement, et la
 /// même sur les trois plateformes.
 enum OutageFeedBadge {
+    /// Repli vers la fiche quand la panne n'a pas d'id : `siteId` n'est un site que pour une cible
+    /// `anfr`, `custom` ou `community` ; en `geo` c'est une clé de position (contrat des posts
+    /// automatiques v1 §2.9). Clé absente (anciens posts, tous `anfr`) : repli inchangé.
+    static func fallbackSiteId(_ siteId: String?, targetKind: String?) -> String? {
+        guard let targetKind else { return siteId }
+        return ["anfr", "custom", "community"].contains(targetKind.lowercased()) ? siteId : nil
+    }
+
     /// `severity` et `state` BRUTS, tels que la metadata du post les porte. Les deux
     /// initialiseurs tolérants font le reste : une valeur inconnue retombe sur `down` / `reported`,
     /// donc sur « Panne », qui est la bonne moitié de l'erreur à commettre.
