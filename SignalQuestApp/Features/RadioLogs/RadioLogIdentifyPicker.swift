@@ -121,7 +121,9 @@ final class RadioLogIdentifyPicker: ObservableObject {
             return TaRingSelection.Reading(
                 latitude: latitude,
                 longitude: longitude,
-                timingAdvance: entry.timingAdvance,
+                // Le TA d'une ligne gNB, NR, 2G ou 3G ne mesure pas une cellule 4G :
+                // absent, jamais 0 (TA-READ-1).
+                timingAdvance: entry.reliableTimingAdvance,
                 accuracyMeters: nil,
                 observedAt: entry.observedAt
             )

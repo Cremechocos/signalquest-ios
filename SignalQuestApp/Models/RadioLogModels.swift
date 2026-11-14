@@ -265,6 +265,29 @@ struct RadioLogEntry: Codable, Identifiable, Sendable, Equatable {
         return !tokens.contains("NSA") && tokens.contains("SA") && (tokens.contains("5G") || tokens.contains("NR"))
     }
 
+    /// Le TA de la ligne, seulement quand il peut mesurer la distance à une cellule 4G
+    /// (TA-READ-1 r3, même règle et mêmes vecteurs que `isReliableRadioLogTa` côté serveur).
+    /// La ligne brute garde son TA : la synchronisation ne doit rien perdre, seul le tracé
+    /// l'ignore.
+    var reliableTimingAdvance: Int? {
+        Self.isReliableTimingAdvance(gnb: gnb, technology: technology, scope: scope) ? timingAdvance : nil
+    }
+
+    /// Jamais sur une ligne gNB, ni en 2G, 3G ou NR. L'étiquette ne dit pas si la cellule
+    /// est servante (la servante s'écrit « LTE » au Canada, aux États-Unis, en Corée et dans
+    /// le Drive Test, « 4G » peut être une SCell) : le TA d'une cellule non primaire est
+    /// arrêté à la source, par le serveur et par Android. « 5G NSA » est l'ancre 4G d'un
+    /// point NSA, et seulement en capture.
+    static func isReliableTimingAdvance(gnb: String?, technology: String, scope: String) -> Bool {
+        guard (gnb ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let label = technology.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        switch scope {
+        case "cap": return ["4G", "4G+", "LTE", "LTE+", "5G NSA"].contains(label)
+        case "imp": return ["4G", "4G+", "LTE", "LTE+"].contains(label)
+        default: return false
+        }
+    }
+
     var plmnEvidence: RadioLogPlmnEvidence {
         if plmnEvidenceRequiresRefresh { return .legacyAmbiguous }
         if [networkIdentitySource, networkIdentityConfidence].contains(where: {

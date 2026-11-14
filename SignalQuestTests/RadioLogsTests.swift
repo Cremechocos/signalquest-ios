@@ -1735,3 +1735,59 @@ private struct StubAntennasService: AntennasServicing {
     func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] { [] }
     func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
 }
+
+// MARK: - TA-READ-1 : TA fiable du journal
+
+extension RadioLogsTests {
+
+    /// Mêmes vecteurs que `isReliableRadioLogTa` côté serveur (TA-READ-1 r3, 14/11).
+    func testRadioLogTimingAdvanceIsReliableOnlyOnFourGLines() {
+        let vectors: [(gnb: String?, technology: String, scope: String, reliable: Bool)] = [
+            (nil, "4G", "cap", true),
+            (nil, " 4g+ ", "cap", true),
+            (nil, "5G NSA", "cap", true),
+            (nil, "LTE", "cap", true),
+            (nil, " lte+ ", "cap", true),
+            (nil, "LTE", "imp", true),
+            (nil, "4G", "imp", true),
+            ("123", "5G NSA", "cap", false),
+            ("123", "LTE", "cap", false),
+            (nil, "5G", "cap", false),
+            (nil, "NR", "cap", false),
+            (nil, "3G", "cap", false),
+            (nil, "2G", "imp", false),
+            (nil, "5G NSA", "imp", false),
+            (nil, "", "cap", false),
+            (nil, "4G", "autre", false),
+        ]
+        for vector in vectors {
+            XCTAssertEqual(
+                RadioLogEntry.isReliableTimingAdvance(gnb: vector.gnb, technology: vector.technology, scope: vector.scope),
+                vector.reliable,
+                "\(vector)"
+            )
+        }
+    }
+
+    /// Le tracé lit le TA fiable ; la ligne brute, elle, garde le sien pour la synchronisation.
+    func testAGnbLineKeepsItsRawTimingAdvanceButDrawsNoRing() throws {
+        func line(_ technology: String, node: String) throws -> RadioLogEntry {
+            try decodeEntry("""
+            {"id":"\(technology)","dedupeKey":"\(technology)","scope":"cap","technology":"\(technology)",\
+            \(node),"timingAdvance":4,"latitude":45.59,"longitude":5.24,\
+            "observedAt":"2026-07-01T10:00:00.000Z","updatedAt":"2026-07-01T10:00:00.000Z"}
+            """)
+        }
+        let anchor = try line("LTE", node: #""enb":"632423""#)
+        let nr = try line("NR", node: #""gnb":"1060426""#)
+        XCTAssertEqual(anchor.reliableTimingAdvance, 4)
+        XCTAssertEqual(nr.timingAdvance, 4)
+        XCTAssertNil(nr.reliableTimingAdvance)
+
+        let readings = [anchor, nr].map {
+            TaRingSelection.Reading(latitude: $0.latitude ?? 0, longitude: $0.longitude ?? 0,
+                                    timingAdvance: $0.reliableTimingAdvance)
+        }
+        XCTAssertEqual(TaRingSelection.rings(for: readings).count, 1, "La ligne gNB ne trace aucun anneau, pas même de rayon 0")
+    }
+}
