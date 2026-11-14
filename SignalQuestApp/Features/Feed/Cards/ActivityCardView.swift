@@ -103,9 +103,9 @@ struct FeedActivity: Equatable {
         let quoted = Self.quotedName(in: item.text)
         // Exploration (§2.2) : le lien suit `siteId` seul ; aucun opérateur n'est servi, un support
         // en porte plusieurs. Retiré en zone privée : pas de lien. Un site communautaire n'ouvre
-        // jamais une fiche d'antenne (règle du 14/11).
+        // jamais une fiche d'antenne (règle du 14/11), ni le numéro d'un nœud ENB/GNB.
         let siteLink = string("siteId").flatMap { id in
-            UnifiedSocialFeedItem.isCommunitySiteId(id)
+            UnifiedSocialFeedItem.isCommunitySiteId(id) || item.isNodeSiteId
                 ? nil : Link.site(id: id, market: string("marketCode"), operatorKey: string("operatorKey"))
         }
         let isMine = item.isMine == true

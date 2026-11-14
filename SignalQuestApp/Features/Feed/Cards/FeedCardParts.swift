@@ -81,9 +81,11 @@ extension UnifiedSocialFeedItem {
     /// (3 à 10 chiffres, France et outre-mer) est unique et s'ouvre seul, avec le marché et
     /// l'opérateur s'ils sont servis ; tout autre identifiant (Canada…) exige la clé SITE-1
     /// complète ; un id de 25 caractères est un site communautaire, jamais une fiche d'antenne.
-    /// Sans `siteId` (zone privée), pas de lien. Rien n'est deviné.
+    /// Sans `siteId` (zone privée), pas de lien. Rien n'est deviné. Un `siteId` de `siteType`
+    /// ENB ou GNB (avis d'un nœud, Backend 14/11) est le numéro du nœud, pas un support :
+    /// jamais de fiche, sinon s'ouvrirait le support ANFR de même numéro.
     var antennaLink: (siteId: String, market: String?, operatorKey: String?)? {
-        guard let siteId = metadataString("siteId") else { return nil }
+        guard let siteId = metadataString("siteId"), !isNodeSiteId else { return nil }
         let market = metadataString("marketCode"), operatorKey = metadataString("operatorKey")
         if Self.isANFRSupportNumber(siteId) { return (siteId, market, operatorKey) }
         guard !Self.isCommunitySiteId(siteId), let market, let operatorKey else { return nil }
@@ -96,6 +98,12 @@ extension UnifiedSocialFeedItem {
 
     /// Identifiant de site communautaire (25 caractères) : il n'ouvre jamais une fiche d'antenne.
     static func isCommunitySiteId(_ id: String) -> Bool { id.count == 25 }
+
+    /// `siteId` d'un nœud radio (`siteType` ENB ou GNB) : jamais une fiche par `siteId`.
+    var isNodeSiteId: Bool {
+        guard let type = metadataString("siteType")?.uppercased() else { return false }
+        return type == "ENB" || type == "GNB"
+    }
 
     func metadataString(_ key: String) -> String? {
         switch metadata?[key] {

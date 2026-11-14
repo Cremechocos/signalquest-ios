@@ -343,6 +343,9 @@ final class FeedActivityTests: XCTestCase {
         XCTAssertNil(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_site_visited","siteId":"\#(String(repeating: "c", count: 25))""#))?.link,
             "a community site never opens an antenna sheet")
+        XCTAssertNil(try FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","siteId":"81234","siteType":"ENB""#))?.link,
+            "a node number (ENB/GNB) is not a support: no antenna sheet")
         XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_site_visited","firstDiscovery":false"#))?.family, .siteVisited)
 
@@ -865,6 +868,16 @@ final class FeedPhotoSiteLinkTests: XCTestCase {
         XCTAssertNil(try photo(#""siteId":"\#(community)","marketCode":"FR","operatorKey":"SFR""#).antennaLink)
         XCTAssertNil(try photo(#""marketCode":"FR","operatorKey":"SFR""#, kind: "validation").antennaLink, "private zone: siteId withheld")
         XCTAssertNil(try photo(#""siteId":" ","marketCode":"FR","operatorKey":"SFR""#, kind: "validation").antennaLink)
+    }
+
+    /// Correction Backend du 14/11 (§1.7) : le `siteId` d'un avis de nœud (`siteType` ENB/GNB) est
+    /// le numéro de l'eNB, pas un support ANFR ; jamais de fiche, même avec la clé complète.
+    func testANodeSiteIdNeverOpensAnAntennaSheet() throws {
+        let full = #""siteId":"81234","marketCode":"FR","operatorKey":"SFR""#
+        XCTAssertNil(try photo(full + #","siteType":"ENB""#, kind: "validation").antennaLink)
+        XCTAssertNil(try photo(full + #","siteType":"gnb""#).antennaLink)
+        XCTAssertNil(SignalDetailSheet.photoSiteKey(of: try photo(full + #","siteType":"GNB""#)))
+        XCTAssertEqual(try photo(full + #","siteType":"ANFR""#).antennaLink?.siteId, "81234", "another siteType keeps the rule")
     }
 
     func testAnIncompleteKeyShowsNoLink() throws {
