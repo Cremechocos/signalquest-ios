@@ -678,8 +678,6 @@ struct RootView: View {
                 E2EEV2SafetyNumberQAScreen()
             } else if AppEnvironment.showsE2EEReportQA {
                 E2EEV2MessageReportQAScreen()
-            } else if AppEnvironment.showsBrowserExclusionQA {
-                E2EEV2BrowserExclusionQAScreen()
             } else if AppEnvironment.showsActivationQA {
                 E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
             } else if AppEnvironment.showsAutoLogAlertQA {
@@ -700,8 +698,6 @@ struct RootView: View {
                 UsernameConfirmationQAScreen()
             } else if AppEnvironment.showsDisplayNamePromptQA {
                 DisplayNamePromptQAScreen()
-            } else if AppEnvironment.showsAccountKeyQA {
-                E2EEV2AccountKeyQAScreen()
             } else if AppEnvironment.showsApprovalScannerQA {
                 // Au simulateur, sans caméra : le message de repli.
                 E2EEV2ApprovalScannerView { _ in }

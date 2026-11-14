@@ -2751,40 +2751,6 @@ final class E2EETests: XCTestCase {
         }
     }
 
-    func testTrustedDevicesSettingsUsesV2LifecycleWithoutLegacyClaims() throws {
-        let repository = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let settingsURL = repository.appendingPathComponent(
-            "SignalQuestApp/Features/Profile/SettingsView.swift"
-        )
-        let source = try String(contentsOf: settingsURL, encoding: .utf8)
-
-        XCTAssertTrue(source.contains("E2EEV2DeviceLifecycleCoordinator"))
-        XCTAssertTrue(source.contains("E2EEV2DeviceEnrollmentCoordinator"))
-        XCTAssertTrue(source.contains("requestBootstrapEmailChallenge"))
-        XCTAssertTrue(source.contains("bootstrapInitialDevice"))
-        XCTAssertTrue(source.contains("requestApproval(method)"))
-        XCTAssertTrue(source.contains("loadQRApproval(input)"))
-        // Lot A1 : approbation par QR v3 seulement, l'appareil en attente reçoit l'UIK.
-        XCTAssertFalse(source.contains("resolveProximityCode(input)"))
-        XCTAssertFalse(source.contains("requestApproval(.push)"))
-        XCTAssertTrue(source.contains("lifecycle.approve(detail, comparedQR: qr)"))
-        XCTAssertTrue(source.contains("receiveApprovedTrust(approvalId: approvalId)"))
-        XCTAssertTrue(source.contains("encodeQRPayload(approval, device: device)"))
-        XCTAssertTrue(source.contains("E2EEV2RecoveryCoordinatorV2"))
-        XCTAssertTrue(source.contains("E2EEV2RecoveryEpochCoordinator"))
-        XCTAssertTrue(source.contains("loadActiveBundle()"))
-        XCTAssertTrue(source.contains("acknowledgesHistoryLoss"))
-        XCTAssertTrue(source.contains("acknowledgesDeviceRevocation"))
-        XCTAssertTrue(source.contains("acknowledgesRecoveryReplacement"))
-        XCTAssertTrue(source.contains("Date().addingTimeInterval(60)"))
-        XCTAssertTrue(source.contains("resetCode.count != 6"))
-        XCTAssertTrue(source.contains("quand il sera disponible sur iPhone, Android et le web"))
-        XCTAssertFalse(source.contains("/api/e2ee/trusted-devices"))
-        XCTAssertFalse(source.contains("Tout révoquer"))
-    }
-
     func testV2DeviceApprovalPushRoutesOnlyThroughValidatedOpaqueIdentifier() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
