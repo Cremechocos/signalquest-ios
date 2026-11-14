@@ -196,6 +196,33 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         XCTAssertEqual(world.removed, [Self.pending.requestId])
     }
 
+    /// « C'est fait » laissé ouvert : au retour au premier plan il tombe, et la demande
+    /// suivante s'affiche (14/11 : l'activation d'un Safari n'était jamais relue).
+    /// Une demande encore à servir reste à l'écran.
+    func testSettledApprovalDoesNotHoldTheNextRequest() async {
+        let world = World()
+        world.listing = .requests([Self.pending])
+        let coordinator = world.coordinator()
+        await coordinator.refreshApprovals()
+        await coordinator.approve()
+        XCTAssertEqual(coordinator.approval?.phase, .served)
+
+        let next = Self.browser("5", expiresAtMs: 3_000)
+        world.listing = .requests([next])
+        await coordinator.refreshApprovals()
+        XCTAssertEqual(coordinator.approval?.pending, Self.pending, "jamais remplacé pendant qu'il est affiché")
+
+        coordinator.becameActive()
+        coordinator.resignedActive()
+        XCTAssertNil(coordinator.approval)
+        await coordinator.refreshApprovals()
+        XCTAssertEqual(coordinator.approval, .init(pending: next, phase: .ready))
+
+        coordinator.becameActive()
+        coordinator.resignedActive()
+        XCTAssertEqual(coordinator.approval, .init(pending: next, phase: .ready), "une demande à servir reste")
+    }
+
     /// Servie par un autre appareil (`_closed`) : l'écran non servi se ferme.
     func testClosedPushDismissesAnUnservedApproval() async {
         let world = World()

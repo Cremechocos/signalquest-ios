@@ -144,6 +144,14 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         case unknownDevice
         case tooRecent
         case failed
+
+        /// Résultat affiché : plus rien à faire sur cette demande.
+        var isSettled: Bool {
+            switch self {
+            case .served, .closed, .noHistoryKey, .unknownDevice, .tooRecent: return true
+            case .ready, .acting, .failed: return false
+            }
+        }
     }
 
     struct Approval: Equatable {
@@ -359,6 +367,10 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     /// Retour au premier plan : les demandes ouvertes, puis toutes les 60 s ;
     /// une demande de cet appareil est relue sans rien afficher.
     func becameActive() {
+        // Un résultat laissé à l'écran (« C'est fait »…) a été lu : il tombe au retour. Gardé,
+        // il retenait toute nouvelle demande jusqu'à sa fermeture (constaté le 14/11). Jamais
+        // remplacé pendant qu'il est affiché : un « C'est moi » ne glisse pas sous le doigt.
+        if approval?.phase.isSettled == true { approval = nil }
         listTask?.cancel()
         listTask = Task { [weak self] in
             while !Task.isCancelled {
