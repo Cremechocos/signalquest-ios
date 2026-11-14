@@ -71,6 +71,10 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         var held: Set<String> = []
         var pending: String?
         var reported: String?
+        var vouched = false
+        /// HK de rotation portées par un maillon à preuve.
+        var vouchedKeys: Set<String> = []
+        private(set) var vouchedCalls = 0
         private(set) var created: [String] = []
         private(set) var discarded: [String] = []
         private(set) var posts: [[String: Any]] = []
@@ -111,7 +115,11 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
                 recordPendingKey: { [self] in pending = $0 },
                 reportedStatus: { [self] in reported },
                 recordReportedStatus: { [self] in reported = $0 },
-                nowMs: { [self] in nowMs }
+                nowMs: { [self] in nowMs },
+                vouched: { [self] _, record in
+                    vouchedCalls += 1
+                    return vouched || vouchedKeys.contains(record.hkPubB64)
+                }
             )
         }
     }
@@ -328,15 +336,45 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         XCTAssertTrue(rotating.posts.isEmpty)
     }
 
-    /// Une rotation après un REVOKE, par-dessus la HK détenue, reste attendue :
-    /// l'appareil reçoit HK′ par un transfert, ou la demande comme avant.
-    func testRotationOverTheHeldKeyStaysMissing() async {
+    /// Une rotation après un REVOKE, par-dessus la HK détenue, reste attendue si un
+    /// maillon à preuve la porte : l'appareil la reçoit par un transfert, ou la demande.
+    /// Sans ce maillon, rien ne part seul (révision 23).
+    func testRotationOverTheHeldKeyNeedsAProvenLink() async {
         let held = Self.newKey(), next = Self.newKey()
-        let fake = Fake(reads: [.verified(chain([(held, nil, nil), (next, 40, nil)]))])
-        fake.held = [held]
-        let outcome = await publication(fake).run()
-        XCTAssertEqual(outcome, .missing(hkPubB64: next))
-        XCTAssertTrue(fake.posts.isEmpty)
+        let proven = Fake(reads: [.verified(chain([(held, nil, nil), (next, 40, nil)]))])
+        proven.held = [held]
+        proven.vouched = true
+        let missing = await publication(proven).run()
+        XCTAssertEqual(missing, .missing(hkPubB64: next))
+        XCTAssertTrue(proven.posts.isEmpty)
+
+        let unproven = Fake(reads: [.verified(chain([(held, nil, nil), (next, 40, nil)]))])
+        unproven.held = [held]
+        let waiting = await publication(unproven).run()
+        XCTAssertEqual(waiting, .unvouched(hkPubB64: next))
+        XCTAssertEqual(waiting.traceStep, "unvouched")
+        XCTAssertTrue(unproven.posts.isEmpty)
+        XCTAssertTrue(unproven.puts.isEmpty)
+    }
+
+    /// Chaque rotation écrite après la HK détenue doit porter son maillon à preuve : une
+    /// HK′ non prouvée ne se blanchit pas par une rotation prouvée qui la suit.
+    func testEveryRotationAfterTheHeldKeyIsProven() async {
+        let held = Self.newKey(), first = Self.newKey(), second = Self.newKey()
+        let log = chain([(held, nil, nil), (first, 40, nil), (second, 41, nil)])
+        let laundered = Fake(reads: [.verified(log)])
+        laundered.held = [held]
+        laundered.vouchedKeys = [second]
+        let outcome = await publication(laundered).run()
+        XCTAssertEqual(outcome, .unvouched(hkPubB64: second))
+        XCTAssertEqual(laundered.vouchedCalls, 1, "la première rotation non prouvée suffit")
+
+        let proven = Fake(reads: [.verified(log)])
+        proven.held = [held]
+        proven.vouchedKeys = [first, second]
+        let missing = await publication(proven).run()
+        XCTAssertEqual(missing, .missing(hkPubB64: second))
+        XCTAssertEqual(proven.vouchedCalls, 2)
     }
 
     /// Un appareil qui n'a jamais eu de HK du compte la demande comme avant (§5.3).
@@ -345,6 +383,7 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         let fake = Fake(reads: [.verified(chain([(first, nil, nil), (second, nil, nil)]))])
         let outcome = await publication(fake).run()
         XCTAssertEqual(outcome, .missing(hkPubB64: second))
+        XCTAssertEqual(fake.vouchedCalls, 0)
     }
 
     /// La règle porte sur toutes les HK écrites après la plus récente détenue :

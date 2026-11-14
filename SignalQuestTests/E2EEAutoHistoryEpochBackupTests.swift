@@ -93,6 +93,8 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
         var scalars: [String: Data] = [:]
         var local: [Int: E2EEAutoHistoryEpochBackup.LocalEpoch] = [:]
         var finished: Set<String> = []
+        var vouched = false
+        private(set) var vouchedCalls = 0
         private(set) var readCount = 0
         private(set) var posts: [(path: String, body: [String: Any])] = []
         private(set) var stored: [(epochId: String, key: Data)] = []
@@ -122,7 +124,11 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
                 },
                 finishedEpochIds: { [self] in finished },
                 recordFinished: { [self] in finished.insert($0) },
-                nowMs: { 1_000_000 }
+                nowMs: { 1_000_000 },
+                vouched: { [self] _, _ in
+                    vouchedCalls += 1
+                    return vouched
+                }
             )
         }
     }
@@ -244,6 +250,69 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
         stale.postResults = [{ _, _ in Self.failure(409, "E2EE_HISTORY_KEY_STALE") }]
         let staleOutcome = await backup(stale).backfill()
         XCTAssertEqual(staleOutcome, .retryLater(afterSeconds: nil))
+    }
+
+    // MARK: Conditions de dépôt (§5.2 amendement S3, révision 23)
+
+    /// La dernière HK est une rotation après un REVOKE, publiée par `signer`.
+    private func rotatedAccount(signer: String) -> E2EEAutoLog.AccountState {
+        let older = P256.KeyAgreement.PrivateKey().publicKey.x963Representation.base64EncodedString()
+        var state = account(hks: [older, hk])
+        let last = state.historyKeys.removeLast()
+        state.historyKeys.append(.init(
+            seq: last.seq, entryHash: last.entryHash, hkPubB64: hk, previousHkPubB64: older, signerDeviceId: signer,
+            signerAddedAtMs: 1, createdAtMs: 2, afterRevokeSeq: 40
+        ))
+        return state
+    }
+
+    /// Un REVOKE attend sa rotation : rien ne part vers la HK que l'appareil révoqué détient encore.
+    func testBackfillWaitsWhileARotationIsDue() async {
+        let first = epoch(1)
+        var due = account()
+        due.rotationDueRevokeSeq = 40
+        let fake = Fake(reads: [.verified(due)])
+        fake.scalars = [hk: hkScalar]
+        fake.local = [1: first.local]
+        fake.gets = [backfillPage([(first, true)])]
+        let outcome = await backup(fake).backfill()
+        XCTAssertEqual(outcome, .rotationDue)
+        XCTAssertEqual(outcome.traceStep, "rotation-due")
+        XCTAssertTrue(fake.posts.isEmpty)
+        XCTAssertEqual(fake.gets.count, 1, "la page n'est même pas lue")
+    }
+
+    /// Une rotation publiée par un autre appareil, détenue ici (un transfert a pu la donner),
+    /// ne reçoit rien sans maillon à preuve ; publiée ici, elle n'en demande pas.
+    func testBackfillUsesAnotherDevicesRotationOnlyWithAProvenLink() async {
+        let first = epoch(1), web = "web_device_0000000000001"
+        let unproven = Fake(reads: [.verified(rotatedAccount(signer: web))])
+        unproven.scalars = [hk: hkScalar]
+        unproven.local = [1: first.local]
+        unproven.gets = [backfillPage([(first, true)])]
+        let refused = await backup(unproven).backfill()
+        XCTAssertEqual(refused, .unvouched)
+        XCTAssertEqual(refused.traceStep, "unvouched")
+        XCTAssertTrue(unproven.posts.isEmpty)
+        XCTAssertEqual(unproven.vouchedCalls, 1)
+
+        let proven = Fake(reads: [.verified(rotatedAccount(signer: web))])
+        proven.vouched = true
+        proven.scalars = [hk: hkScalar]
+        proven.local = [1: first.local]
+        proven.gets = [backfillPage([(first, true)])]
+        proven.postResults = [created(first)]
+        let backedUp = await backup(proven).backfill()
+        XCTAssertEqual(backedUp, .backedUp(1))
+
+        let own = Fake(reads: [.verified(rotatedAccount(signer: ownId))])
+        own.scalars = [hk: hkScalar]
+        own.local = [1: first.local]
+        own.gets = [backfillPage([(first, true)])]
+        own.postResults = [created(first)]
+        let ownOutcome = await backup(own).backfill()
+        XCTAssertEqual(ownOutcome, .backedUp(1))
+        XCTAssertEqual(own.vouchedCalls, 0, "publiée ici : pas de lecture du maillon")
     }
 
     // MARK: Restauration

@@ -82,6 +82,27 @@ enum E2EEAutoHistoryRotationContract {
         return object["hkPubB64"] as? String == hkPubB64 && object["nextHkPubB64"] as? String == nextHkPubB64
     }
 
+    /// Maillon à preuve (révision 23, « Preuve exigée du maillon ») : un maillon vers HK′ qui
+    /// passe les contrôles publics du §5.6 étape 2, déposé par un appareil qui a aussi prouvé
+    /// détenir la HK précédente pour `afterRevokeSeq` de HK′. Le lecteur ne peut pas ouvrir le
+    /// maillon ; la preuve, signée par la clé précédente elle-même, montre que son émetteur la
+    /// détenait. Clé admissible : la précédente littérale (la base de r23 viendra ensuite).
+    static func isVouched(
+        userId: String, account: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord,
+        links: [E2EEAutoHistory.Wrap], proofs: [Proof]
+    ) -> Bool {
+        guard let previous = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq else { return false }
+        let reader = E2EEAutoHistory.Reader.history(hkPubB64: rotation.hkPubB64)
+        let senders = Set(links.filter {
+            E2EEAutoHistory.check(userId: userId, wrap: $0, account: account, reader: reader) == nil
+        }.map(\.senderDeviceId))
+        return proofs.contains {
+            senders.contains($0.deviceId) && E2EEAutoHistoryKey.verifyProof(
+                userId: userId, deviceId: $0.deviceId, hkPubB64: previous, revokeSeq: revokeSeq, signatureB64: $0.signatureB64
+            )
+        }
+    }
+
     /// `201 { recipientDeviceId, requestId }`.
     static func parseTransferReceipt(_ data: Data, recipient: String, requestId: String) -> Bool {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -181,10 +202,18 @@ actor E2EEAutoHistoryRotation {
 
         // Détenteur de HK′ : maillon vers HK′ et service des preuves.
         if let rotation = account.historyKeys.last, rotation.hkPubB64 == account.historyKeyPubB64,
-           let previous = rotation.previousHkPubB64, rotation.afterRevokeSeq != nil,
+           let previous = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq,
            let nextScalar = dependencies.scalar(rotation.hkPubB64) {
+            // Notre maillon rendrait HK′ vérifiée : jamais pour une HK′ d'un autre qui ne l'est pas
+            // déjà (une clé reçue par une build sans la porte à preuve, par exemple).
             if let oldScalar = dependencies.scalar(previous), Self.eligibleForChain(account.devices[device.deviceId], rotation: rotation) {
-                report.chainDeposited = await depositChain(device: device, rotation: rotation, previous: previous, oldScalar: oldScalar)
+                var trusted = rotation.signerDeviceId == device.deviceId
+                if !trusted { trusted = await isVouched(account: account, rotation: rotation) }
+                if trusted {
+                    // La preuve suit `afterRevokeSeq` de HK′, même si un REVOKE est venu après la nôtre (r23, T5).
+                    _ = await depositProof(device: device, hkPubB64: previous, revokeSeq: revokeSeq, scalar: oldScalar)
+                    report.chainDeposited = await depositChain(device: device, rotation: rotation, previous: previous, oldScalar: oldScalar)
+                }
             }
             report.served = await serveProofs(device: device, account: account, rotation: rotation, scalar: nextScalar)
         }
@@ -318,12 +347,46 @@ actor E2EEAutoHistoryRotation {
             deviceId: device.deviceId, keyVersions: keyVersions, openRequestIds: [], heldHkPubB64: held
         )
         for wrap in wraps where wrap.requestId == "rotation-\(rotation.seq)" {
-            guard E2EEAutoHistory.check(userId: dependencies.userId, wrap: wrap, account: account, reader: reader) == nil,
-                  let scalar = try? dependencies.openWrap(wrap),
+            guard E2EEAutoHistory.check(userId: dependencies.userId, wrap: wrap, account: account, reader: reader) == nil else { continue }
+            // Sans maillon à preuve, HK′ n'est pas rangée : son émetteur peut ne pas avoir
+            // détenu la HK précédente (r23, T1). Le passage suivant relit.
+            guard await isVouched(account: account, rotation: rotation) else { return false }
+            guard let scalar = try? dependencies.openWrap(wrap),
                   let kept = try? dependencies.keep(scalar), kept == rotation.hkPubB64 else { continue }
             return true
         }
         return false
+    }
+
+    /// Maillon à preuve vers HK′, retenu par un marqueur une fois vu : un maillon et une
+    /// preuve déposés ne s'effacent pas.
+    private func isVouched(account: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord) async -> Bool {
+        let marker = Self.vouchedMarker(rotation.hkPubB64)
+        if dependencies.isDone(marker) { return true }
+        guard await Self.fetchVouched(userId: dependencies.userId, account: account, rotation: rotation, get: dependencies.get) else {
+            return false
+        }
+        dependencies.recordDone(marker)
+        return true
+    }
+
+    static func vouchedMarker(_ hkPubB64: String) -> String { "vouched:\(hkPubB64)" }
+
+    /// Lit `chain/{précédente}` et les preuves de `(précédente, afterRevokeSeq)`, puis juge.
+    static func fetchVouched(
+        userId: String, account: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord,
+        get: @Sendable (_ path: String) async -> E2EEV2TransportResult<Data>
+    ) async -> Bool {
+        guard let previous = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq,
+              let chainPath = E2EEAutoHistoryRotationContract.chainPath(previous),
+              let proofsPath = E2EEAutoHistoryRotationContract.proofsQueryPath(hkPubB64: previous, revokeSeq: revokeSeq),
+              case .success(let linkData, _, _) = await get(chainPath),
+              let links = E2EEAutoHistoryRotationContract.parseWraps(linkData, key: "links"), !links.isEmpty,
+              case .success(let proofData, _, _) = await get(proofsPath),
+              let proofs = E2EEAutoHistoryRotationContract.parseProofs(proofData, hkPubB64: previous, revokeSeq: revokeSeq) else {
+            return false
+        }
+        return E2EEAutoHistoryRotationContract.isVouched(userId: userId, account: account, rotation: rotation, links: links, proofs: proofs)
     }
 
     /// De la plus récente HK détenue vers les plus anciennes : un `GET` par maillon, le
@@ -417,12 +480,37 @@ extension E2EEAutoHistoryRotation {
             openWrap: { wrap in try identityStore.openHistoryWrap(wrap, userId: userId, ownerNamespace: namespace) },
             rotate: { await publication.rotate() },
             declarePresent: { _ = await publication.run() },
-            isDone: { UserDefaults.standard.stringArray(forKey: markersKey)?.contains($0) ?? false },
-            recordDone: { marker in
-                let defaults = UserDefaults.standard, current = defaults.stringArray(forKey: markersKey) ?? []
-                guard !current.contains(marker) else { return }
-                defaults.set(Array((current + [marker]).suffix(markerLimit)), forKey: markersKey)
-            }
+            isDone: { hasMarker($0, markersKey: markersKey) },
+            recordDone: { recordMarker($0, markersKey: markersKey) }
         ))
+    }
+
+    static func hasMarker(_ marker: String, markersKey: String) -> Bool {
+        UserDefaults.standard.stringArray(forKey: markersKey)?.contains(marker) ?? false
+    }
+
+    static func recordMarker(_ marker: String, markersKey: String) {
+        let defaults = UserDefaults.standard, current = defaults.stringArray(forKey: markersKey) ?? []
+        guard !current.contains(marker) else { return }
+        defaults.set(Array((current + [marker]).suffix(markerLimit)), forKey: markersKey)
+    }
+
+    /// Porte à preuve pour la publication et la sauvegarde de la session : même marqueur
+    /// que la rotation, donc un maillon vu une fois n'est plus relu.
+    static func liveVouching(
+        session: LocalAccountSession, api: APIClient, identityStore: E2EEV2DeviceIdentityStore
+    ) -> @Sendable (E2EEAutoLog.AccountState, E2EEAutoLog.HistoryKeyRecord) async -> Bool {
+        let owner = session.ownerScopeId, userId = String(owner.dropFirst(5))
+        let markersKey = markersKey(ownerNamespace: session.ownerNamespace)
+        let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
+        return { account, rotation in
+            let marker = vouchedMarker(rotation.hkPubB64)
+            if hasMarker(marker, markersKey: markersKey) { return true }
+            guard await fetchVouched(userId: userId, account: account, rotation: rotation, get: { path in
+                await transport.getJSON(path: path, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle)
+            }) else { return false }
+            recordMarker(marker, markersKey: markersKey)
+            return true
+        }
     }
 }

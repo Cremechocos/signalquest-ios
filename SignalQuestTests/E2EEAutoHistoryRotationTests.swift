@@ -153,6 +153,22 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         return ["deviceId": device, "hkPubB64": oldHk, "revokeSeq": String(Self.revokeSeq), "signatureB64": signature, "createdAtMs": "9100"]
     }
 
+    /// Maillon `chain/{oldHk}` vers HK′, signé par `sender`.
+    private func chainLink(from sender: Device) throws -> E2EEAutoHistory.Wrap {
+        try E2EEAutoHistory.seal(
+            scalar: oldScalar, userId: Self.userId, senderDeviceId: sender.id, recipient: E2EEAutoHistory.historyRecipientPrefix + newHk,
+            keyVersion: 1, requestId: E2EEAutoHistory.chainRequest, addHash: rotationRecord.entryHash,
+            recipientAgreementKey: P256.KeyAgreement.PrivateKey(rawRepresentation: newScalar).publicKey,
+            sign: { try E2EEV2LowS.sign($0, with: sender.signing) }
+        )
+    }
+
+    private func proofs(_ rows: [[String: Any]]) throws -> [E2EEAutoHistoryRotationContract.Proof] {
+        try XCTUnwrap(E2EEAutoHistoryRotationContract.parseProofs(
+            JSONSerialization.data(withJSONObject: ["proofs": rows]), hkPubB64: oldHk, revokeSeq: Self.revokeSeq
+        ))
+    }
+
     // MARK: Preuve et publication
 
     /// À la vue du REVOKE : une preuve signée par l'ancienne HK, puis la publication de HK′.
@@ -244,6 +260,14 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         fake.routes["PUT \(chainPath)"] = [Self.json(["hkPubB64": oldHk, "nextHkPubB64": newHk])]
         let report = await E2EEAutoHistoryRotation(fake.dependencies(rotator)).run()
         XCTAssertTrue(report.chainDeposited)
+        // La preuve de l'émetteur suit `afterRevokeSeq` de HK′, déposée avant le maillon (r23).
+        let proof = try XCTUnwrap(fake.bodies["POST \(E2EEAutoHistoryRotationContract.proofsPath)"]?.first)
+        XCTAssertEqual(proof["hkPubB64"] as? String, oldHk)
+        XCTAssertEqual(proof["revokeSeq"] as? String, "40")
+        XCTAssertLessThan(
+            try XCTUnwrap(fake.calls.firstIndex(of: "POST \(E2EEAutoHistoryRotationContract.proofsPath)")),
+            try XCTUnwrap(fake.calls.firstIndex(of: "PUT \(chainPath)"))
+        )
 
         let link = try XCTUnwrap(E2EEAutoHistory.parseWrap(try XCTUnwrap(fake.bodies["PUT \(chainPath)"]?.first)))
         XCTAssertEqual(link.recipient, E2EEAutoHistory.historyRecipientPrefix + newHk)
@@ -310,11 +334,66 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         fake.routes["GET \(E2EEAutoHistoryRotationContract.transfersPath)"] = [
             Self.json(["transfers": [forged.jsonObject, valid.jsonObject]], status: 200),
         ]
-        fake.routes["GET \(proofsPath)"] = [Self.json(["proofs": []], status: 200)]
+        let chainPath = try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(oldHk))
+        fake.routes["GET \(chainPath)"] = [Self.json(["links": [try chainLink(from: rotator).jsonObject]], status: 200)]
+        fake.routes["GET \(proofsPath)"] = [
+            Self.json(["proofs": [proofRow(rotator.id)]], status: 200), Self.json(["proofs": []], status: 200),
+        ]
         let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
         XCTAssertTrue(report.received)
         XCTAssertEqual(fake.declared, 1)
         XCTAssertEqual(fake.held[newHk], newScalar)
+    }
+
+    /// Un transfert valide n'est pas rangé sans maillon à preuve : son émetteur peut ne
+    /// jamais avoir détenu l'ancienne HK (révision 23, T1).
+    func testTransferWithoutAProvenLinkIsNotKept() async throws {
+        let account = account(rotated: true)
+        let valid = try E2EEAutoHistory.seal(
+            scalar: newScalar, userId: Self.userId, senderDeviceId: rotator.id, recipient: member.id, keyVersion: 1,
+            requestId: "rotation-41", addHash: account.devices[member.id]!.addEntryHash,
+            recipientAgreementKey: member.agreement.publicKey, sign: { try E2EEV2LowS.sign($0, with: self.rotator.signing) }
+        )
+        let chainPath = try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(oldHk))
+        let fake = Fake(reads: [.verified(account)])
+        fake.held[oldHk] = oldScalar
+        fake.routes["GET \(E2EEAutoHistoryRotationContract.transfersPath)"] = [Self.json(["transfers": [valid.jsonObject]], status: 200)]
+        // Le maillon de l'émetteur existe, mais il n'a déposé aucune preuve de l'ancienne HK.
+        fake.routes["GET \(chainPath)"] = [Self.json(["links": [try chainLink(from: rotator).jsonObject]], status: 200)]
+        fake.routes["GET \(proofsPath)"] = [Self.json(["proofs": [proofRow(member.id)]], status: 200)]
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
+        XCTAssertFalse(report.received)
+        XCTAssertNil(fake.held[newHk])
+        XCTAssertEqual(fake.declared, 0)
+        XCTAssertFalse(fake.done.contains(E2EEAutoHistoryRotation.vouchedMarker(newHk)))
+    }
+
+    /// Une HK′ d'un autre détenue ici sans maillon à preuve (reçue par une build sans la
+    /// porte) ne reçoit ni notre preuve ni notre maillon : il la rendrait vérifiée.
+    func testUnprovenKeyHeldHereGetsNoChainLinkFromHere() async {
+        let fake = Fake(reads: [.verified(account(rotated: true))])
+        fake.held[oldHk] = oldScalar
+        fake.held[newHk] = newScalar
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
+        XCTAssertFalse(report.chainDeposited)
+        XCTAssertFalse(fake.calls.contains { $0.hasPrefix("PUT") || $0.hasPrefix("POST") })
+    }
+
+    /// Le maillon compte seulement si son propre émetteur a prouvé détenir l'ancienne HK
+    /// pour `afterRevokeSeq` de HK′, et s'il passe les contrôles publics du §5.6.
+    func testProvenLinkNeedsItsOwnSendersProof() throws {
+        let account = account(rotated: true)
+        func vouched(_ links: [E2EEAutoHistory.Wrap], _ rows: [[String: Any]]) throws -> Bool {
+            E2EEAutoHistoryRotationContract.isVouched(
+                userId: Self.userId, account: account, rotation: rotationRecord, links: links, proofs: try proofs(rows)
+            )
+        }
+        let link = try chainLink(from: rotator)
+        XCTAssertTrue(try vouched([link], [proofRow(rotator.id)]))
+        XCTAssertFalse(try vouched([link], [proofRow(member.id)]), "preuve d'un autre appareil que l'émetteur")
+        XCTAssertFalse(try vouched([link], [proofRow(rotator.id, signedAs: member.id)]), "preuve rejouée sous l'émetteur")
+        XCTAssertFalse(try vouched([try chainLink(from: lost)], [proofRow(lost.id)]), "émetteur révoqué avant HK′")
+        XCTAssertFalse(try vouched([], [proofRow(rotator.id)]))
     }
 
     /// Un transfert seul d'un appareil révoqué ne donne rien.

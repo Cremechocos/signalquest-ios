@@ -74,6 +74,8 @@ actor E2EEAutoHistoryKeyPublication {
         var reportedStatus: @Sendable () -> String?
         var recordReportedStatus: @Sendable (_ value: String) -> Void
         var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
+        /// Un maillon à preuve existe vers cette HK de rotation (r23) ; sans lecture : non.
+        var vouched: @Sendable (_ account: E2EEAutoLog.AccountState, _ rotation: E2EEAutoLog.HistoryKeyRecord) async -> Bool = { _, _ in false }
     }
 
     enum Outcome: Equatable, Sendable {
@@ -84,6 +86,9 @@ actor E2EEAutoHistoryKeyPublication {
         /// HK publiée hors rotation alors que l'appareil en détenait une plus ancienne
         /// (§5.1, HK inattendue) : aucune demande ne part seule, la personne confirme d'abord.
         case unexpected(hkPubB64: String)
+        /// Rotation après la HK détenue, sans maillon à preuve (r23) : elle doit arriver par un
+        /// transfert vérifié ; rien ne part seul, son émetteur peut ne pas avoir détenu l'ancienne.
+        case unvouched(hkPubB64: String)
         /// Appareil en attente (mode renforcé) : rien avant son activation.
         case notActive
         /// Garde des 24 h (§3.2) : remplacer une HK perdue attend l'ancienneté.
@@ -143,10 +148,10 @@ actor E2EEAutoHistoryKeyPublication {
                 case .rotate:
                     // Plus de rotation due (une autre a gagné) : rien à publier.
                     guard account.rotationDueRevokeSeq != nil, held else {
-                        return held ? await reportPresent(device: device, hkPubB64: current) : absent(account, current)
+                        return held ? await reportPresent(device: device, hkPubB64: current) : await absent(account, current)
                     }
                 case .first:
-                    return held ? await reportPresent(device: device, hkPubB64: current) : absent(account, current)
+                    return held ? await reportPresent(device: device, hkPubB64: current) : await absent(account, current)
                 case .replaceLost:
                     if held { return await reportPresent(device: device, hkPubB64: current) }
                 }
@@ -222,8 +227,20 @@ actor E2EEAutoHistoryKeyPublication {
     /// La HK tirée ici est au journal, ou une autre a gagné : le marqueur tombe,
     /// et une clé jamais publiée quitte le trousseau. Sans HK au journal, elle
     /// reste pour être renvoyée telle quelle.
-    private func absent(_ account: E2EEAutoLog.AccountState, _ current: String) -> Outcome {
-        Self.isUnexpected(account, holds: dependencies.holds) ? .unexpected(hkPubB64: current) : .missing(hkPubB64: current)
+    private func absent(_ account: E2EEAutoLog.AccountState, _ current: String) async -> Outcome {
+        if Self.isUnexpected(account, holds: dependencies.holds) { return .unexpected(hkPubB64: current) }
+        // Toutes en forme de rotation : chacune doit encore porter un maillon à preuve.
+        for record in Self.keysAfterLatestHeld(account, holds: dependencies.holds) {
+            let vouched = await dependencies.vouched(account, record)
+            if !vouched { return .unvouched(hkPubB64: current) }
+        }
+        return .missing(hkPubB64: current)
+    }
+
+    /// Les HK écrites après la plus récente que l'appareil détient (aucune s'il n'en détient pas).
+    static func keysAfterLatestHeld(_ account: E2EEAutoLog.AccountState, holds: (String) -> Bool) -> [E2EEAutoLog.HistoryKeyRecord] {
+        guard let lastHeld = account.historyKeys.lastIndex(where: { holds($0.hkPubB64) }) else { return [] }
+        return Array(account.historyKeys[(lastHeld + 1)...])
     }
 
     /// §5.1 : l'appareil détient une HK du compte, mais une HK écrite après la plus récente
@@ -327,7 +344,8 @@ extension E2EEAutoHistoryKeyPublication {
                 }
             },
             reportedStatus: { try? markerStore.string(for: statusKey) },
-            recordReportedStatus: { try? markerStore.set($0, for: statusKey, accessibility: .afterFirstUnlock) }
+            recordReportedStatus: { try? markerStore.set($0, for: statusKey, accessibility: .afterFirstUnlock) },
+            vouched: E2EEAutoHistoryRotation.liveVouching(session: session, api: api, identityStore: identityStore)
         ))
     }
 }
@@ -339,6 +357,7 @@ extension E2EEAutoHistoryKeyPublication.Outcome {
         case .present: return "present"
         case .missing: return "missing"
         case .unexpected: return "unexpected"
+        case .unvouched: return "unvouched"
         case .notActive: return "not-active"
         case .tooRecent: return "too-recent"
         case .retryLater: return "retry-later"

@@ -174,6 +174,8 @@ actor E2EEAutoHistoryEpochBackup {
         var finishedEpochIds: @Sendable () -> Set<String>
         var recordFinished: @Sendable (_ epochId: String) -> Void
         var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
+        /// Un maillon à preuve existe vers cette HK de rotation (r23) ; sans lecture : non.
+        var vouched: @Sendable (_ account: E2EEAutoLog.AccountState, _ rotation: E2EEAutoLog.HistoryKeyRecord) async -> Bool = { _, _ in false }
     }
 
     enum Outcome: Equatable, Sendable {
@@ -181,6 +183,10 @@ actor E2EEAutoHistoryEpochBackup {
         case restored(Int, missingEpochCount: Int)
         /// Le compte n'a pas de HK, ou l'appareil ne détient pas la dernière.
         case noHistoryKey
+        /// Un `REVOKE` attend sa rotation : l'appareil révoqué détient encore la dernière HK (§5.2 S3, condition 2).
+        case rotationDue
+        /// La dernière HK est une rotation publiée ailleurs, sans maillon à preuve (§5.2 S3 condition 3, r23).
+        case unvouched
         case notActive
         case retryLater(afterSeconds: Int?)
         case logRefused
@@ -216,6 +222,7 @@ actor E2EEAutoHistoryEpochBackup {
         var reread = false
         for _ in 0..<Self.maxPages {
             guard let hk = account.historyKeyPubB64, dependencies.scalar(hk) != nil else { return .noHistoryKey }
+            if let refusal = await depositRefusal(account, hk: hk, device: device) { return refusal }
             let response = await dependencies.get(
                 E2EEAutoHistoryEpochContract.backfillPath, cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? []
             )
@@ -262,6 +269,17 @@ actor E2EEAutoHistoryEpochBackup {
             cursor = next
         }
         return .failed("e2ee-auto-history-pagination-limit")
+    }
+
+    /// §5.2 amendement S3, conditions 2 et 3, pour un appareil qui détient la dernière HK :
+    /// rien pendant une rotation due ; une rotation publiée par un autre appareil n'est
+    /// utilisée qu'avec un maillon à preuve, puisqu'un transfert a pu la donner. La première
+    /// HK et une HK hors rotation détenue (création, « C'est moi », passkey, synchro) suffisent.
+    private func depositRefusal(_ account: E2EEAutoLog.AccountState, hk: String, device: E2EEV2DeviceDescriptor) async -> Outcome? {
+        guard account.rotationDueRevokeSeq == nil else { return .rotationDue }
+        guard let record = account.historyKeys.last, record.hkPubB64 == hk, record.afterRevokeSeq != nil,
+              record.previousHkPubB64 != nil, record.signerDeviceId != device.deviceId else { return nil }
+        return await dependencies.vouched(account, record) ? nil : .unvouched
     }
 
     private enum Deposit { case written, exists, stop(Outcome) }
@@ -389,6 +407,8 @@ extension E2EEAutoHistoryEpochBackup.Outcome {
         case .backedUp(let count): return "backed-up-\(count)"
         case .restored(let count, let missing): return "restored-\(count)-missing-\(missing)"
         case .noHistoryKey: return "no-history-key"
+        case .rotationDue: return "rotation-due"
+        case .unvouched: return "unvouched"
         case .notActive: return "not-active"
         case .retryLater: return "retry-later"
         case .logRefused: return "log-refused"
@@ -461,7 +481,8 @@ extension E2EEAutoHistoryEpochBackup {
                 guard list.insert(epochId).inserted,
                       let data = try? JSONEncoder().encode(list.sorted()) else { return }
                 try? markerStore.set(String(decoding: data, as: UTF8.self), for: finishedKey, accessibility: .afterFirstUnlock)
-            }
+            },
+            vouched: E2EEAutoHistoryRotation.liveVouching(session: session, api: api, identityStore: identityStore)
         ))
     }
 }
