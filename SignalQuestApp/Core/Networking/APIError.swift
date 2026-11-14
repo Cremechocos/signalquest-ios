@@ -214,6 +214,12 @@ enum APIError: Error, LocalizedError, Equatable {
         "APPLE_VERIFY_FAILED": String(localized: "L’App Store n’a pas pu confirmer cet achat. Il sera vérifié de nouveau automatiquement, sans nouveau paiement."),
         "UNKNOWN_PRODUCT": String(localized: "Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement."),
 
+        // Sentinelle (contrat abonnements v1 §1, B10) : le serveur n'écrit qu'en
+        // français, et l'app ne réutilise jamais un nombre de connexions en dur.
+        "QUOTA_EXCEEDED": String(localized: "Tu surveilles déjà autant de connexions que ton offre le permet. Retire-en une pour en ajouter une autre."),
+        "INTERVAL_NOT_ALLOWED": String(localized: "Cette cadence de mesure n’est pas disponible avec ton offre."),
+        "FAST_INTERVAL_QUOTA": String(localized: "Une seule connexion peut être mesurée plus souvent qu’une fois par minute."),
+
         // Journal radio synchronisé.
         "TOO_MANY_ITEMS": String(localized: "Trop d'éléments envoyés d'un coup. Réessaie."),
 

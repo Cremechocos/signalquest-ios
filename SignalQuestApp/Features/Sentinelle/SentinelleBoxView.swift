@@ -142,7 +142,7 @@ struct SentinelleBoxView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 HStack(alignment: .top, spacing: SQSpace.sm2) {
-                    SentinelleStatusDot(color: SentinelleWording.statusColor(target.status), size: 12)
+                    SentinelleStatusDot(color: SentinelleWording.statusColor(target.displayStatus), size: 12)
                         .padding(.top, 8)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(SentinelleWording.verdict(target))
@@ -162,6 +162,12 @@ struct SentinelleBoxView: View {
                     Text("Dernière mesure \(probe).")
                         .font(.footnote)
                         .foregroundStyle(SQColor.label)
+                }
+                // La cadence réelle de cette connexion, qui dépend du palier.
+                if let interval = target.intervalSec, !target.isPaused {
+                    Text(String(localized: "Une mesure \(SentinelleWording.cadence(interval))."))
+                        .font(.footnote)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 SentinelleSuspendedNote(target: target)
                 SentinelleOutagesLine(incidents: incidents)

@@ -21,6 +21,8 @@ final class SentinelleViewModel: ObservableObject {
     @Published private(set) var incidents: [String: [SentinelleIncident]] = [:]
     @Published private(set) var points: [String: [SentinelleSeriesPoint]] = [:]
     @Published private(set) var quota: SentinelleQuota?
+    /// Quotas du palier (`quotas.sentinelle`), nuls sur un serveur plus ancien.
+    @Published private(set) var tierQuotas: SentinelleTierQuotas?
     @Published private(set) var isLoading = true
     @Published private(set) var accessDenied = false
     /// Les connexions suivies. Chargées à part de `targets` — voir `load`.
@@ -38,6 +40,10 @@ final class SentinelleViewModel: ObservableObject {
     /// passe rien, ce qui est le pire retour pour qui vient de cliquer un lien.
     @Published var shareLinkError: String?
     @Published private(set) var errorMessage: String?
+
+    /// Cadence d'une nouvelle connexion : celle du palier, servie par le serveur.
+    /// Un serveur plus ancien n'en sert pas, et sondait alors chaque minute.
+    var newTargetIntervalSec: Int { tierQuotas?.defaultIntervalSec ?? 60 }
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var isBusy = false
     /// Échec d'une action de l'utilisateur (création, correction, retrait). Il se
@@ -103,6 +109,7 @@ final class SentinelleViewModel: ObservableObject {
             accessDenied = false
             targets = response.targets
             quota = response.quota
+            tierQuotas = response.tierQuotas
 
             // Les détails partent EN PARALLÈLE. Enchaînés, ils faisaient sept
             // allers-retours en série pour trois box — plusieurs secondes d'écran
@@ -156,6 +163,7 @@ final class SentinelleViewModel: ObservableObject {
             accessDenied = true
             targets = []
             quota = nil
+            tierQuotas = nil
             incidents = [:]
             points = [:]
             errorMessage = nil
@@ -290,6 +298,7 @@ struct SentinelleView: View {
     @State private var showSettings = false
     @State private var showFollow = false
     @State private var showPremiumPaywall = false
+    @State private var showQuotaUpsell = false
     // Réglages purement locaux : un ordre d'affichage est une préférence de
     // lecture du moment, pas une propriété de la connexion.
     @State private var sort: SentinelleListOrder.Sort = .state
@@ -342,7 +351,7 @@ struct SentinelleView: View {
                         listHeader
                         EmptyStateView(
                             title: "Aucune connexion surveillée",
-                            message: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris.",
+                            message: String(localized: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera \(SentinelleWording.cadence(model.newTargetIntervalSec)) depuis nos serveurs, téléphone éteint compris."),
                             systemImage: "wifi.router"
                         )
                         SentinelleFollowInvite { showFollow = true }
@@ -393,7 +402,7 @@ struct SentinelleView: View {
             SentinelleFollowSheet { input in try await model.follow(shareInput: input) }
         }
         .sheet(isPresented: $showCreate) {
-            SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
+            SentinelleCreateSheet(quota: model.quota, intervalSec: model.newTargetIntervalSec, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
                 await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji)
             }
         }
@@ -419,6 +428,15 @@ struct SentinelleView: View {
             Button("Fermer", role: .cancel) { model.actionError = nil }
         } message: {
             Text(model.actionError ?? "")
+        }
+        .alert(
+            "Nombre de connexions atteint",
+            isPresented: $showQuotaUpsell
+        ) {
+            Button("Découvrir Premium") { showPremiumPaywall = true }
+            Button("Fermer", role: .cancel) {}
+        } message: {
+            Text(quotaUpsellMessage)
         }
         // Un lien invalide ou expiré doit se dire : sinon l'app s'ouvre et il
         // ne se passe rien.
@@ -469,7 +487,13 @@ struct SentinelleView: View {
             MapChipIconButton(systemImage: "plus", label: "Ajouter une connexion", identifier: "sentinelle.add") {
                 if model.quota?.isFull == true {
                     // Le « + » ne disparaît pas sans rien dire : on explique pourquoi.
-                    model.actionError = String(localized: "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre.")
+                    // Hors Premium, la limite se lève avec Premium (D14) : on le dit.
+                    if services.entitlements.serverState.snapshot != nil,
+                       services.entitlements.confirmedServerTier != .premium {
+                        showQuotaUpsell = true
+                    } else {
+                        model.actionError = String(localized: "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre.")
+                    }
                 } else {
                     showCreate = true
                 }
@@ -547,6 +571,14 @@ struct SentinelleView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Le nombre vient du quota servi, jamais d'une constante de l'app.
+    private var quotaUpsellMessage: String {
+        guard let max = model.quota?.max else {
+            return String(localized: "Premium permet de surveiller davantage de connexions, mesurées plus souvent.")
+        }
+        return String(localized: "Hors Premium : \(SentinelleWording.monitored(max)) à la fois. Premium en surveille davantage, mesurées plus souvent.")
+    }
+
     /// « 3 connexions sur 5 · 1 ne répond plus » : le quota, puis ce qui presse.
     private var listSummary: String? {
         guard !model.targets.isEmpty else { return nil }
@@ -554,7 +586,7 @@ struct SentinelleView: View {
         if let quota = model.quota {
             parts.append(String(localized: "\(quota.used) connexions sur \(quota.max)"))
         }
-        let down = model.targets.filter { $0.status == "down" }.count
+        let down = model.targets.filter { $0.displayStatus == "down" }.count
         if down > 0 { parts.append(String(localized: "\(down) ne répond plus")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -730,7 +762,7 @@ struct SentinelleBoxCard: View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 HStack(alignment: .top, spacing: SQSpace.sm2) {
-                    SentinelleStatusDot(color: SentinelleWording.statusColor(target.status))
+                    SentinelleStatusDot(color: SentinelleWording.statusColor(target.displayStatus))
                         .padding(.top, 6)
                     // L'emoji AVANT le verdict : dans une liste, c'est lui qui
                     // distingue une box d'une autre avant même qu'on lise la
@@ -817,6 +849,16 @@ struct SentinelleSuspendedNote: View {
             Text("Surveillance suspendue : l’adresse a changé de réseau. Vérifie depuis le site qu’elle t’appartient toujours.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.dangerInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, SQSpace.xs)
+        } else if target.isPaused {
+            // `plan` : le palier a mis la connexion en pause (D14) ; elle reprend
+            // seule (contrat abonnements v1.12). Aucune mesure n'est gardée d'ici là.
+            Text(target.isPausedByPlan
+                ? String(localized: "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium.")
+                : String(localized: "En pause : plus aucune mesure n’est prise."))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, SQSpace.xs)
         }

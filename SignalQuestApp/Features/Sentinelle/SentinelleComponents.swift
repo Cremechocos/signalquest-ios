@@ -281,6 +281,8 @@ struct SentinelleSheetShell<Content: View>: View {
 /// une box existante est une MODIFICATION, et elle se fait depuis sa page.
 struct SentinelleCreateSheet: View {
     let quota: SentinelleQuota?
+    /// Cadence qu'aura la nouvelle connexion, servie par le serveur selon le palier.
+    let intervalSec: Int
     let currentIp: () async -> SentinelleCurrentIp?
     /// Renvoie le message d'échec : la feuille ne se ferme qu'après un
     /// enregistrement réussi, sans perdre la saisie.
@@ -298,7 +300,7 @@ struct SentinelleCreateSheet: View {
     var body: some View {
         SentinelleSheetShell(
             title: String(localized: "Nouvelle connexion"),
-            subtitle: String(localized: "Sentinelle l’interrogera chaque minute depuis nos serveurs — téléphone éteint compris.")
+            subtitle: String(localized: "Sentinelle l’interrogera \(SentinelleWording.cadence(intervalSec)) depuis nos serveurs — téléphone éteint compris.")
         ) {
             SentinelleField(title: "Nom", placeholder: "Ma box", text: $label, isURL: false)
 
@@ -491,7 +493,8 @@ enum SentinelleWording {
 
     /// Phrase d'état d'une box, écrite du point de vue de l'utilisateur.
     static func verdict(_ target: SentinelleTarget) -> String {
-        switch target.status {
+        switch target.displayStatus {
+        case "paused": return String(localized: "\(target.label) · en pause")
         case "up": return String(localized: "\(target.label) répond normalement.")
         case "down": return String(localized: "\(target.label) ne répond plus.")
         case "degraded": return String(localized: "\(target.label) répond mal.")
@@ -552,6 +555,14 @@ enum SentinelleWording {
 
     static func monitored(_ count: Int) -> String {
         String(localized: "\(count) connexion surveillée")
+    }
+
+    /// Cadence de la sonde : « chaque minute », « toutes les 5 minutes »,
+    /// « toutes les 30 secondes ». Elle dépend du palier (contrat abonnements v1 §1).
+    static func cadence(_ seconds: Int) -> String {
+        if seconds == 60 { return String(localized: "chaque minute") }
+        if seconds > 60, seconds.isMultiple(of: 60) { return String(localized: "toutes les \(seconds / 60) minutes") }
+        return String(localized: "toutes les \(seconds) secondes")
     }
 
     /// 0 = lundi, comme la saisonnalité du serveur.

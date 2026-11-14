@@ -12,6 +12,26 @@ import Foundation
 struct SentinelleTargetsResponse: Decodable, Sendable {
     let targets: [SentinelleTarget]
     let quota: SentinelleQuota?
+    /// `quotas.sentinelle` (contrat abonnements v1.11) ; absent d'un serveur plus ancien.
+    let tierQuotas: SentinelleTierQuotas?
+
+    init(targets: [SentinelleTarget], quota: SentinelleQuota?, tierQuotas: SentinelleTierQuotas? = nil) {
+        self.targets = targets
+        self.quota = quota
+        self.tierQuotas = tierQuotas
+    }
+
+    private enum CodingKeys: String, CodingKey { case targets, quota, quotas }
+    private enum QuotasKeys: String, CodingKey { case sentinelle }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        targets = try container.decode([SentinelleTarget].self, forKey: .targets)
+        // Un quota illisible ne doit pas vider la liste des connexions.
+        quota = try? container.decodeIfPresent(SentinelleQuota.self, forKey: .quota)
+        tierQuotas = try? container.nestedContainer(keyedBy: QuotasKeys.self, forKey: .quotas)
+            .decodeIfPresent(SentinelleTierQuotas.self, forKey: .sentinelle)
+    }
 }
 
 struct SentinelleDetailResponse: Decodable, Sendable {

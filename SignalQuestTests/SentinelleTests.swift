@@ -50,6 +50,84 @@ final class SentinelleAccessRecoveryTests: XCTestCase {
     }
 }
 
+/// Abonnements lot C (contrat v1 §1, D14, v1.12) : Sentinelle allégée hors
+/// Premium. L'app lit la cadence, la pause et les quotas servis ; elle ne les
+/// déduit jamais du palier.
+final class SentinelleTierTests: XCTestCase {
+    private func response(_ json: String) throws -> SentinelleTargetsResponse {
+        try JSONDecoder.signalQuest.decode(SentinelleTargetsResponse.self, from: Data(json.utf8))
+    }
+
+    private static let target = #"{"id":"t1","label":"Maison","status":"up","isActive":true,"intervalSec":300,"pausedReason":null}"#
+
+    func testServedQuotasCadenceAndPauseAreRead() throws {
+        let decoded = try response("""
+        {"targets":[\(Self.target),
+          {"id":"t2","label":"Parents","status":"up","isActive":false,"intervalSec":60,"pausedReason":"plan"},
+          {"id":"t3","label":"Bureau","status":"down","isActive":false}],
+         "quota":{"used":3,"max":1},
+         "quotas":{"sentinelle":{"usedTargets":3,"maxTargets":1,"defaultIntervalSec":300,"allowedIntervalsSec":[300],
+                                 "maxFastTargets":0,"detailDays":7,"rollupDays":90,"incidentFastMode":false,"weeklyReport":false}}}
+        """)
+        XCTAssertEqual(decoded.tierQuotas, SentinelleTierQuotas(maxTargets: 1, defaultIntervalSec: 300, incidentFastMode: false))
+        XCTAssertEqual(decoded.targets.map(\.intervalSec), [300, 60, nil])
+        XCTAssertEqual(decoded.targets.map(\.isPaused), [false, true, true])
+        XCTAssertEqual(decoded.targets.map(\.isPausedByPlan), [false, true, false])
+        // Une connexion en pause ne garde pas son dernier état mesuré à l'écran.
+        XCTAssertEqual(decoded.targets.map(\.displayStatus), ["up", "paused", "paused"])
+        XCTAssertEqual(SentinelleWording.verdict(decoded.targets[1]), String(localized: "\("Parents") · en pause"))
+    }
+
+    /// Un serveur d'avant le contrat ne sert ni quotas ni cadence : rien ne casse.
+    func testAnOlderServerStillDecodes() throws {
+        let decoded = try response(#"{"targets":[{"id":"t1","label":"Maison","status":"up","isActive":true}],"quota":{"used":1,"max":5}}"#)
+        XCTAssertNil(decoded.tierQuotas)
+        XCTAssertNil(decoded.targets.first?.intervalSec)
+        XCTAssertEqual(decoded.targets.first?.displayStatus, "up")
+    }
+
+    /// Des quotas mal formés ne doivent pas vider la liste des connexions.
+    func testMalformedQuotasKeepTheTargets() throws {
+        let decoded = try response("""
+        {"targets":[\(Self.target)],"quota":"x","quotas":{"sentinelle":{"maxTargets":"un","defaultIntervalSec":300}}}
+        """)
+        XCTAssertEqual(decoded.targets.count, 1)
+        XCTAssertNil(decoded.quota)
+        XCTAssertEqual(decoded.tierQuotas?.defaultIntervalSec, 300)
+        XCTAssertNil(decoded.tierQuotas?.maxTargets)
+    }
+
+    func testCadenceWording() {
+        XCTAssertEqual(SentinelleWording.cadence(60), String(localized: "chaque minute"))
+        XCTAssertEqual(SentinelleWording.cadence(300), String(localized: "toutes les \(5) minutes"))
+        XCTAssertEqual(SentinelleWording.cadence(30), String(localized: "toutes les \(30) secondes"))
+        XCTAssertEqual(SentinelleWording.cadence(10), String(localized: "toutes les \(10) secondes"))
+    }
+
+    @MainActor
+    func testANewConnectionTakesTheServedCadence() async throws {
+        let free = SentinelleViewModel(service: SentinelleTierService(response: try response("""
+        {"targets":[],"quota":{"used":0,"max":1},"quotas":{"sentinelle":{"maxTargets":1,"defaultIntervalSec":300,"incidentFastMode":false}}}
+        """)))
+        await free.load()
+        XCTAssertEqual(free.newTargetIntervalSec, 300)
+        XCTAssertEqual(free.tierQuotas?.incidentFastMode, false)
+
+        // Serveur plus ancien : il sondait chaque minute.
+        let older = SentinelleViewModel(service: SentinelleTierService(response: try response(#"{"targets":[],"quota":{"used":0,"max":5}}"#)))
+        await older.load()
+        XCTAssertEqual(older.newTargetIntervalSec, 60)
+    }
+
+    func testSentinelleRefusalsHaveALocalLabel() {
+        for code in ["QUOTA_EXCEEDED", "INTERVAL_NOT_ALLOWED", "FAST_INTERVAL_QUOTA"] {
+            let message = APIError.userFacingMessage(status: 409, code: code, serverMessage: "Vous surveillez déjà une connexion", appIsFrench: false)
+            XCTAssertNotEqual(message, APIError.statusFallback(409), code)
+            XCTAssertFalse(message.contains("Vous surveillez"), code)
+        }
+    }
+}
+
 /// AF-RAD-02, AF-RAD-03, AF-RAD-05 : la personne invitée par un lien est
 /// souvent un compte gratuit ; suivre ne demande aucun abonnement.
 @MainActor
@@ -167,6 +245,34 @@ private actor SentinelleTargetRequests {
     func fail(_ index: Int, _ error: Error) {
         pending.removeValue(forKey: index)?.resume(throwing: error)
     }
+}
+
+private struct SentinelleTierService: SentinelleServicing {
+    let response: SentinelleTargetsResponse
+    func targets() async throws -> SentinelleTargetsResponse { response }
+    func following() async throws -> SentinelleFollowingResponse {
+        try JSONDecoder.signalQuest.decode(SentinelleFollowingResponse.self, from: Data(#"{"following":[]}"#.utf8))
+    }
+    func detail(targetId: String) async throws -> SentinelleDetailResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func series(targetId: String, window: SentinelleWindow, family: SentinelleFamily?) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func diagnostic(targetId: String, family: SentinelleFamily?) async throws -> SentinelleDiagnostic { throw SentinelleAccessTestError.unexpectedCall }
+    func trends(targetId: String, family: SentinelleFamily?) async throws -> SentinelleTrends { throw SentinelleAccessTestError.unexpectedCall }
+    func proof(targetId: String, family: SentinelleFamily?) async throws -> SentinelleProof { throw SentinelleAccessTestError.unexpectedCall }
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func delete(targetId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func currentIp() async throws -> SentinelleCurrentIp { throw SentinelleAccessTestError.unexpectedCall }
+    func preferences() async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func testWebhook() async throws -> SentinelleWebhookTest { throw SentinelleAccessTestError.unexpectedCall }
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func followedSeries(followId: String, window: SentinelleWindow) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox { throw SentinelleAccessTestError.unexpectedCall }
+    func follow(shareInput: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func unfollow(followId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func revokeFollower(targetId: String, followerId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget { throw SentinelleAccessTestError.unexpectedCall }
 }
 
 private struct SentinelleAccessService: SentinelleServicing {

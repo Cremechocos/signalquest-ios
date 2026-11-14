@@ -295,12 +295,23 @@ struct SentinelleAddressView: View {
         }
     }
 
+    /// La cadence est celle de la connexion ; le resserrement pendant une coupure
+    /// n'existe qu'avec Premium (contrat abonnements v1 §1, D14). Sans quotas servis,
+    /// un serveur plus ancien : l'explication d'avant, chaque minute par défaut.
+    private func probeExplanation(_ target: SentinelleTarget) -> String {
+        let cadence = SentinelleWording.cadence(target.intervalSec ?? 60)
+        if model.tierQuotas?.incidentFastMode == false {
+            return String(localized: "Nos serveurs envoient cinq « pings » d’un coup, \(cadence). IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
+        }
+        return String(localized: "Nos serveurs envoient cinq « pings » d’un coup, \(cadence), et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
+    }
+
     private func emptyMessage(_ series: SentinelleLatencySeries, _ address: SentinelleAddress) -> String {
         if series.allLost {
             return String(localized: "Aucune réponse en \(address.familyLabel) sur \(window.periodLabel) : il n’y a pas de latence à tracer, seulement des pertes.")
         }
         if series.isEmpty {
-            return String(localized: "Aucune mesure en \(address.familyLabel) sur cette période. La sonde en produit une par minute.")
+            return String(localized: "Aucune mesure en \(address.familyLabel) sur cette période. La sonde en produit une \(SentinelleWording.cadence(target?.intervalSec ?? 60)).")
         }
         return String(localized: "Pas encore assez de mesures pour tracer une courbe.")
     }
@@ -555,7 +566,7 @@ struct SentinelleAddressView: View {
 
                     // Encre pleine : `labelTertiary` reste volontairement sous le
                     // seuil du texte (DesignTokenContrastTests).
-                    Text("Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
+                    Text(probeExplanation(target))
                         .font(.footnote)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)

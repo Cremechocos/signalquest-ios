@@ -40841,6 +40841,330 @@
         }
       }
     },
+    "Tu surveilles déjà autant de connexions que ton offre le permet. Retire-en une pour en ajouter une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re already monitoring as many connections as your plan allows. Remove one to add another."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu surveilles déjà autant de connexions que ton offre le permet. Retire-en une pour en ajouter une autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu surveilles déjà autant de connexions que ton offre le permet. Retire-en une pour en ajouter une autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous surveillez déjà autant de connexions que votre offre le permet. Retirez-en une pour en ajouter une autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette cadence de mesure n’est pas disponible avec ton offre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This measurement interval isn’t available with your plan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette cadence de mesure n’est pas disponible avec ton offre."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette cadence de mesure n’est pas disponible avec ton offre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette cadence de mesure n’est pas disponible avec votre offre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Une seule connexion peut être mesurée plus souvent qu’une fois par minute." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only one connection can be measured more often than once a minute."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une seule connexion peut être mesurée plus souvent qu’une fois par minute."
+          }
+        }
+      }
+    },
+    "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera %@ depuis nos serveurs, téléphone éteint compris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your router’s public address: Sentinel will check it %@ from our servers, even with your phone off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera %@ depuis nos serveurs, téléphone éteint compris."
+          }
+        }
+      }
+    },
+    "SQFormal|Ajoute l’adresse publique de ta box : Sentinelle l’interrogera %@ depuis nos serveurs, téléphone éteint compris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez l’adresse publique de votre box : Sentinelle l’interrogera %@ depuis nos serveurs, téléphone éteint compris."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Sentinelle l’interrogera %@ depuis nos serveurs — téléphone éteint compris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel will probe it %@ from our servers — even when your phone is off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle l’interrogera %@ depuis nos serveurs — téléphone éteint compris."
+          }
+        }
+      }
+    },
+    "chaque minute" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "every minute"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chaque minute"
+          }
+        }
+      }
+    },
+    "toutes les %lld minutes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "every %lld minutes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "toutes les %lld minutes"
+          }
+        }
+      }
+    },
+    "toutes les %lld secondes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "every %lld seconds"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "toutes les %lld secondes"
+          }
+        }
+      }
+    },
+    "Une mesure %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One measurement %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une mesure %@."
+          }
+        }
+      }
+    },
+    "Aucune mesure en %@ sur cette période. La sonde en produit une %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No %@ measurement during this period. The probe produces one %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure en %@ sur cette période. La sonde en produit une %@."
+          }
+        }
+      }
+    },
+    "Nos serveurs envoient cinq « pings » d’un coup, %@. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Our servers send five pings at once, %@. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nos serveurs envoient cinq « pings » d’un coup, %@. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
+          }
+        }
+      }
+    },
+    "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Our servers send five pings at once, %@, and every ten seconds as soon as a packet is missing, to date an outage to within ten seconds. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nos serveurs envoient cinq « pings » d’un coup, %@, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
+          }
+        }
+      }
+    },
+    "%@ · en pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · paused"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · en pause"
+          }
+        }
+      }
+    },
+    "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused: without Premium, the number of monitored connections is limited. It will resume on its own as soon as a slot frees up, or when Premium is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause : hors Premium, le nombre de connexions surveillées est limité. Elle reprendra seule dès qu’une place se libère, ou au retour de Premium."
+          }
+        }
+      }
+    },
+    "En pause : plus aucune mesure n’est prise." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused: no measurements are being taken."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause : plus aucune mesure n’est prise."
+          }
+        }
+      }
+    },
+    "Nombre de connexions atteint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection limit reached"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de connexions atteint"
+          }
+        }
+      }
+    },
+    "Hors Premium : %@ à la fois. Premium en surveille davantage, mesurées plus souvent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without Premium: %@ at a time. Premium monitors more of them, measured more often."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors Premium : %@ à la fois. Premium en surveille davantage, mesurées plus souvent."
+          }
+        }
+      }
+    },
+    "Premium permet de surveiller davantage de connexions, mesurées plus souvent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium lets you monitor more connections, measured more often."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium permet de surveiller davantage de connexions, mesurées plus souvent."
+          }
+        }
+      }
+    },
     "Premium ajoute du confort et des bonus. Toutes les fonctions Telecom restent gratuites." : {
       "localizations" : {
         "en" : {

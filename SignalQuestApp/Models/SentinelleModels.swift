@@ -62,6 +62,12 @@ struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
     let publicSlug: String?
     /// Échéance du lien, en ISO 8601. Nul = sans limite de durée.
     let publicExpiresAt: String?
+    /// Cadence réelle de la sonde, en secondes (contrat abonnements v1 §1) :
+    /// 300 hors Premium ; 60, 30 ou 10 en Premium. Absente d'un serveur plus ancien.
+    let intervalSec: Int?
+    /// `plan` : en pause parce que le palier n'admet plus cette connexion ; elle
+    /// reprend seule (contrat v1.12). Nul : active, ou mise en pause par la personne.
+    let pausedReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, label, ownerLabel, ownerEmoji, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6
@@ -70,7 +76,18 @@ struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
         // `protocol` est un mot réservé en Swift : on le renomme sans toucher au contrat serveur.
         case protocolName = "protocol"
         case isActive, suspendedReason, operatorKey
+        case intervalSec, pausedReason
     }
+
+    /// Plus aucune mesure n'est prise : la sonde ignore une cible en pause.
+    var isPaused: Bool { isActive == false }
+
+    /// En pause par le palier, et non par la personne.
+    var isPausedByPlan: Bool { isPaused && pausedReason == "plan" }
+
+    /// État à afficher : une connexion en pause garde le dernier état mesuré,
+    /// qui ne dit plus rien de la box.
+    var displayStatus: String { isPaused ? "paused" : status }
 
     /// Adresse affichable : le nom d'hôte prime, il est plus parlant qu'une IP.
     var displayAddress: String { hostname ?? ipv4 ?? ipv6 ?? "—" }
@@ -105,6 +122,34 @@ struct SentinelleQuota: Decodable, Sendable {
     let max: Int
 
     var isFull: Bool { used >= max }
+}
+
+/// Quotas Sentinelle du palier, calculés par le serveur (contrat abonnements v1
+/// §1, D14). L'app ne les déduit jamais du palier : elle lit ce qui est servi.
+/// Chaque champ est lu à part, pour qu'un champ mal formé n'efface pas les autres.
+struct SentinelleTierQuotas: Decodable, Equatable, Sendable {
+    let maxTargets: Int?
+    /// Cadence d'une nouvelle connexion, en secondes.
+    let defaultIntervalSec: Int?
+    /// Sondage resserré pendant une coupure.
+    let incidentFastMode: Bool?
+
+    init(maxTargets: Int? = nil, defaultIntervalSec: Int? = nil, incidentFastMode: Bool? = nil) {
+        self.maxTargets = maxTargets
+        self.defaultIntervalSec = defaultIntervalSec
+        self.incidentFastMode = incidentFastMode
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case maxTargets, defaultIntervalSec, incidentFastMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        maxTargets = try? container.decodeIfPresent(Int.self, forKey: .maxTargets)
+        defaultIntervalSec = try? container.decodeIfPresent(Int.self, forKey: .defaultIntervalSec)
+        incidentFastMode = try? container.decodeIfPresent(Bool.self, forKey: .incidentFastMode)
+    }
 }
 
 // MARK: - Incidents
