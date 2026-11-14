@@ -844,6 +844,58 @@ final class AccountDeletionSubscriptionTests: XCTestCase {
         XCTAssertTrue(retried)
     }
 
+    /// Contrat v1.16 §6 : droits illisibles à l'ouverture, relus au clic avant toute
+    /// succession E2EE ; un abonnement découvert arrête sur l'avertissement, sans
+    /// requête de suppression, et la confirmation suivante l'acquitte.
+    func testUnreadableEntitlementsAreReadAgainBeforeAnySuccessor() async {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "deletion-D")
+        let api = SequencedEntitlementsAPIStub(replies: [nil, #"""
+        {"version":1,"tier":"premium","subscription":{"channel":"stripe","state":"active","tier":"premium",
+         "autoRenew":true,"currentPeriodEnd":"2026-12-14T11:00:00Z"}}
+        """#])
+        let store = EntitlementsStore(api: api, observesTransactions: false)
+        await store.refreshBackendSnapshot()
+        XCTAssertNil(store.serverState.snapshot, "Lecture de l'ouverture en échec")
+        let service = DeletionRecordingUserService()
+        let model = SettingsViewModel(userService: service, authService: MockAuthService())
+
+        let stopped = await model.passSubscriptionWarning(with: store)
+        XCTAssertFalse(stopped)
+        XCTAssertTrue(model.deletionSubscriptionConflict)
+        XCTAssertEqual(model.deletionError, String(localized: "Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte."))
+        XCTAssertEqual(AccountDeletionSubscriptionNotice.running(in: store.serverState.snapshot).count, 1)
+        XCTAssertTrue(service.acknowledgements.isEmpty, "Aucune suppression envoyée")
+
+        let passes = await model.passSubscriptionWarning(with: store)
+        XCTAssertTrue(passes)
+        let deleted = await model.deleteAccount(using: .password("secret"))
+        XCTAssertTrue(deleted)
+        XCTAssertEqual(service.acknowledgements, [true])
+        XCTAssertEqual(api.reads, 2)
+    }
+
+    /// Une panne de lecture des droits ne bloque jamais la suppression ; des droits
+    /// déjà lus ne sont pas relus.
+    func testTheSubscriptionCheckNeverBlocksOnAnOutage() async {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "deletion-E")
+        let model = SettingsViewModel(userService: DeletionRecordingUserService(), authService: MockAuthService())
+
+        let down = SequencedEntitlementsAPIStub(replies: [nil])
+        let unreadable = EntitlementsStore(api: down, observesTransactions: false)
+        let passesDuringOutage = await model.passSubscriptionWarning(with: unreadable)
+        XCTAssertTrue(passesDuringOutage)
+        XCTAssertFalse(model.deletionSubscriptionConflict)
+
+        let free = SequencedEntitlementsAPIStub(replies: [#"{"version":1,"tier":"free","subscription":null}"#])
+        let known = EntitlementsStore(api: free, observesTransactions: false)
+        await known.refreshBackendSnapshot()
+        let passesWhenKnown = await model.passSubscriptionWarning(with: known)
+        XCTAssertTrue(passesWhenKnown)
+        XCTAssertEqual(free.reads, 1, "Des droits connus ne sont pas relus")
+    }
+
     func testAWarningShownUpFrontIsAcknowledgedAtOnce() async {
         defer { LocalAccountScope.deactivate() }
         LocalAccountScope.activate(userId: "deletion-B")
@@ -888,6 +940,31 @@ private final class DeletionRecordingUserService: UserServicing, @unchecked Send
     func accountDeletionPreview() async throws -> AccountDeletionPreview { throw Unused.notImplemented }
     func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge { throw Unused.notImplemented }
     func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult { throw Unused.notImplemented }
+}
+
+/// Réponses du §3 dans l'ordre (`nil` = panne), la dernière se répète.
+private final class SequencedEntitlementsAPIStub: APIClientProtocol, @unchecked Sendable {
+    private let lock = NSLock()
+    private let replies: [String?]
+    private var count = 0
+    var reads: Int { lock.withLock { count } }
+    init(replies: [String?]) { self.replies = replies }
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == EntitlementsStore.entitlementsEndpoint else { throw URLError(.badURL) }
+        let index = lock.withLock { count += 1; return count - 1 }
+        guard let payload = replies[min(index, replies.count - 1)] else {
+            throw APIError.http(status: 503, code: nil, message: "", requestId: nil, retryAfter: nil)
+        }
+        return try JSONDecoder.signalQuest.decode(type, from: Data(payload.utf8))
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw URLError(.badURL) }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw URLError(.badURL) }
 }
 
 private final class AccountScopedSubscriptionAPIStub: APIClientProtocol, @unchecked Sendable {

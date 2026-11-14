@@ -113,6 +113,23 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Contrat v1.16 §6 : les successeurs E2EE ne sont nommés qu'une fois
+    /// l'avertissement d'abonnement passé, sinon un 409 les laisserait sur un
+    /// compte qui reste. Droits illisibles à l'ouverture : ils sont relus ici, et
+    /// un abonnement découvert arrête la suppression sur l'avertissement, comme le
+    /// 409 (la confirmation suivante l'acquitte). Une panne de lecture ne bloque
+    /// pas la suppression. Vrai si elle peut continuer.
+    func passSubscriptionWarning(with entitlements: EntitlementsStore) async -> Bool {
+        guard entitlements.serverState.snapshot == nil, !deletionSubscriptionConflict else { return true }
+        await entitlements.refreshBackendSnapshot()
+        guard AccountDeletionSubscriptionNotice.running(in: entitlements.serverState.snapshot).isEmpty else {
+            deletionSubscriptionConflict = true
+            deletionError = String(localized: "Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte.")
+            return false
+        }
+        return true
+    }
+
     func deleteAccount(using proof: AccountDeletionProof, acknowledgingActiveSubscriptions: Bool = false) async -> Bool {
         deletionError = nil
         deletionNeedsNewEmailCode = false
@@ -1569,7 +1586,14 @@ private struct DeleteAccountSheet: View {
 
     private func delete(using proof: AccountDeletionProof) async {
         isBusy = true
+        guard await model.passSubscriptionWarning(with: services.entitlements) else {
+            Haptics.error()
+            isBusy = false
+            return
+        }
         // D.4 : le successeur d'abord, signé par cet appareil ; jamais bloquant.
+        // Un 503 de résiliation ou une preuve refusée après lui laissent ce
+        // successeur sur un compte qui reste : effet accepté (Alexandre, 14/11).
         if !soleAdminGroups.isEmpty {
             _ = await services.e2eeV2Messaging.promoteSuccessorsBeforeDeletion(soleAdminGroups)
         }
