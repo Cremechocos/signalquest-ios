@@ -174,7 +174,10 @@ struct SubscriptionStatusPresentation: Equatable {
             if cancelled {
                 details.append(end.map { String(localized: "Premium reste actif jusqu’au \(day($0)), sans aucun paiement.") }
                                ?? String(localized: "L’essai s’arrêtera à son terme, sans aucun paiement."))
-            } else if let end, let price = subscription.price.map(formattedPrice), let period = subscription.period {
+            } else if let end, subscription.pendingChange == nil,
+                      let price = subscription.price.map(formattedPrice), let period = subscription.period {
+                // Chez Apple, `price` est celui du produit suivant : avec un changement
+                // d'offre prévu, il ne se lit plus avec la période en cours.
                 details.append(period == .annual
                     ? String(localized: "Essai gratuit jusqu’au \(day(end)), puis \(price) par an.")
                     : String(localized: "Essai gratuit jusqu’au \(day(end)), puis \(price) par mois."))
@@ -203,9 +206,6 @@ struct SubscriptionStatusPresentation: Equatable {
                     details.append(String(localized: "Période en cours jusqu’au \(day(end))."))
                 }
                 tone = .positive
-            }
-            if let effectiveAt = subscription.pendingChange?.effectiveAt {
-                details.append(String(localized: "Changement d’offre prévu le \(day(effectiveAt))."))
             }
         case .grace:
             tag = String(localized: "Paiement à régulariser")
@@ -238,6 +238,12 @@ struct SubscriptionStatusPresentation: Equatable {
         case .unknown:
             tag = nil
             tone = .neutral
+        }
+        // Contrat v1.15 : servi en essai et en actif seulement, et sans objet
+        // quand rien ne se renouvelle plus.
+        if [.trialing, .active].contains(subscription.state), !cancelled,
+           let effectiveAt = subscription.pendingChange?.effectiveAt {
+            details.append(String(localized: "Changement d’offre prévu le \(day(effectiveAt))."))
         }
         if subscription.isSandbox {
             details.append(String(localized: "Achat de test : aucun paiement réel."))

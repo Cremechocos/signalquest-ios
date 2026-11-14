@@ -661,6 +661,35 @@ final class SubscriptionStatusPresentationTests: XCTestCase {
         ])
     }
 
+    /// Contrat v1.15 : `pendingChange` est servi en essai comme en actif. Chez Apple,
+    /// `price` est alors celui du produit suivant : l'essai ne le lit plus avec la
+    /// période en cours. Un abonnement résilié n'annonce aucun changement.
+    func testPendingChangeShowsDuringTrialAndNotOnceCancelled() {
+        let change = EntitlementSubscription.PendingChange(productKey: "premium_annual", effectiveAt: end)
+        let price = EntitlementSubscription.Price(unitAmount: 7_990, currency: "EUR")
+        let day = SubscriptionStatusPresentation.day(end)
+        let trial = present(EntitlementSubscription(
+            channel: .appStore, state: .trialing, tier: .premium, period: .monthly, autoRenew: true,
+            currentPeriodEnd: end, trialEndsAt: end, pendingChange: change, price: price
+        ))
+        XCTAssertEqual(trial.details, [
+            String(localized: "Essai gratuit jusqu’au \(day)."),
+            String(localized: "Changement d’offre prévu le \(day)."),
+        ])
+        let active = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: true,
+            currentPeriodEnd: end, pendingChange: change
+        ))
+        XCTAssertEqual(active.details.last, String(localized: "Changement d’offre prévu le \(day)."))
+        let cancelled = present(EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: false,
+            currentPeriodEnd: end, pendingChange: change
+        ))
+        XCTAssertEqual(cancelled.details, [
+            String(localized: "Premium reste actif jusqu’au \(day), puis s’arrête sans nouveau paiement.")
+        ])
+    }
+
     /// Le serveur sert `autoRenew: null` pour Apple tant qu'il ne lit pas `renewalInfo` :
     /// aucun renouvellement n'est alors promis, puisqu'il serait faux après une résiliation.
     func testUnknownRenewalPromisesNoRenewal() {
@@ -964,6 +993,72 @@ final class ServedEntitlementsPayloadTests: XCTestCase {
         XCTAssertFalse(SentinellePremiumOffer.isOffered(snapshot, tier: snapshot.tier))
         // Suppression : l'avertissement App Store et le bouton de gestion restent.
         XCTAssertEqual(AccountDeletionSubscriptionNotice.running(in: snapshot).count, 1)
+    }
+
+    /// Charges du lot 2 (contrat v1.15 §5, Apple avec `renewalInfo`), reconstituées
+    /// d'après le contrat avant d'être servies : essai, résiliation, grâce, suspension.
+    private static func appStore(tier: String, state: String, entitled: Bool, autoRenew: String,
+                                 end: String, trialEndsAt: String = "null", graceEndsAt: String = "null",
+                                 warnings: String = "") -> String {
+        """
+        {"version":1,"serverTime":"2026-11-14T12:00:00.000Z","tier":"\(tier)","tierSource":"\(tier == "free" ? "none" : "subscription")",
+         "subscription":{"id":"cm1","channel":"app_store","productKey":"premium_monthly","tier":"premium","period":"month",
+           "state":"\(state)","entitled":\(entitled),"autoRenew":\(autoRenew),"currentPeriodEnd":"\(end)",
+           "graceEndsAt":\(graceEndsAt),"resumesAt":null,"trialEndsAt":\(trialEndsAt),"pendingChange":null,
+           "price":{"unitAmount":799,"currency":"EUR"},"environment":"production",
+           "manage":{"kind":"app_store","url":"https://apps.apple.com/account/subscriptions","canCancel":true,"canResume":false}},
+         "otherSubscriptions":[],"warnings":[\(warnings)],"grant":null,"trial":{"eligible":false,"days":7}}
+        """
+    }
+
+    func testLot2ServedShapesAreRead() async throws {
+        let day = SubscriptionStatusPresentation.day
+
+        // Essai : « Essai gratuit jusqu'au …, puis 7,99 € par mois. »
+        let trial = try await snapshot(Self.appStore(
+            tier: "premium", state: "trialing", entitled: true, autoRenew: "true", end: "2026-11-21T12:00:00.000Z",
+            trialEndsAt: #""2026-11-21T12:00:00.000Z""#))
+        let trialEnd = try XCTUnwrap(trial.subscription?.trialEndsAt)
+        let euros = SubscriptionStatusPresentation.formattedPrice(.init(unitAmount: 799, currency: "EUR"))
+        let trialCard = SubscriptionStatusPresentation.make(serverState: .available(trial))
+        XCTAssertEqual(trialCard.tag, String(localized: "Essai gratuit"))
+        XCTAssertEqual(trialCard.details, [String(localized: "Essai gratuit jusqu’au \(day(trialEnd)), puis \(euros) par mois.")])
+
+        // Résilié dans la feuille d'Apple : « Résilié », la reprise est proposée.
+        let cancelled = try await snapshot(Self.appStore(
+            tier: "premium", state: "active", entitled: true, autoRenew: "false", end: "2026-12-14T11:00:00.000Z"))
+        let cancelledCard = SubscriptionStatusPresentation.make(serverState: .available(cancelled))
+        XCTAssertEqual(cancelledCard.tag, String(localized: "Résilié"))
+        XCTAssertEqual(cancelledCard.management, .appStore(canResume: true, canRequestRefund: true))
+
+        // Grâce : Premium jusqu'à graceEndsAt, avec PAYMENT_ISSUE.
+        let grace = try await snapshot(Self.appStore(
+            tier: "premium", state: "grace", entitled: true, autoRenew: "true", end: "2026-11-10T11:00:00.000Z",
+            graceEndsAt: #""2026-11-26T11:00:00.000Z""#, warnings: #""PAYMENT_ISSUE""#))
+        let graceEnd = try XCTUnwrap(grace.subscription?.graceEndsAt)
+        XCTAssertEqual(grace.tier, .premium)
+        XCTAssertEqual(grace.expiresAt, graceEnd, "Le droit court jusqu'à la fin de la grâce")
+        XCTAssertEqual(grace.warnings, ["PAYMENT_ISSUE"])
+        let graceCard = SubscriptionStatusPresentation.make(serverState: .available(grace))
+        XCTAssertEqual(graceCard.tag, String(localized: "Paiement à régulariser"))
+        XCTAssertEqual(graceCard.tone, .warning)
+        XCTAssertEqual(graceCard.details.first, String(localized: "Le dernier paiement n’est pas passé. Premium reste actif jusqu’au \(day(graceEnd)) : mets à jour ton moyen de paiement d’ici là."))
+        XCTAssertFalse(SentinellePremiumOffer.isOffered(grace, tier: grace.tier))
+
+        // Grâce finie : gratuit, l'abonnement reste servi et renvoie vers Apple, pas vers un nouvel achat.
+        let onHold = try await snapshot(Self.appStore(
+            tier: "free", state: "on_hold", entitled: false, autoRenew: "true", end: "2026-11-10T11:00:00.000Z",
+            warnings: #""PAYMENT_ISSUE""#))
+        XCTAssertEqual(onHold.tier, .free)
+        XCTAssertEqual(onHold.status, .paymentFailed)
+        let onHoldCard = SubscriptionStatusPresentation.make(serverState: .available(onHold))
+        XCTAssertEqual(onHoldCard.tag, String(localized: "Suspendu"))
+        XCTAssertEqual(onHoldCard.management, .appStore(canResume: false, canRequestRefund: true))
+        let eligibility = PurchaseEligibilityPolicy.evaluate(
+            serverState: .available(onHold), localTier: .free, purchasesEnabled: true, serverVerificationReady: true)
+        XCTAssertEqual(eligibility.userMessage,
+                       String(localized: "Premium est suspendu : le paiement n’est pas passé. Mets à jour ton moyen de paiement dans tes abonnements Apple pour le rétablir."))
+        XCTAssertEqual(AccountDeletionSubscriptionNotice.running(in: onHold).count, 1)
     }
 
     func testAServedFreeAccountGetsTheOffers() async throws {
