@@ -87,18 +87,21 @@ enum E2EEAutoHistoryRotationContract {
     /// détenir la HK précédente pour `afterRevokeSeq` de HK′. Le lecteur ne peut pas ouvrir le
     /// maillon ; la preuve, signée par la clé précédente elle-même, montre que son émetteur la
     /// détenait. Clé admissible : la précédente littérale (la base de r23 viendra ensuite).
+    /// « Auteur d'abord » (décision 16, §5.6 bis) : seul compte le maillon de l'auteur de HK′
+    /// (`signerDeviceId` de son entrée) ; les maillons des autres appareils ne vérifient rien.
     static func isVouched(
         userId: String, account: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord,
         links: [E2EEAutoHistory.Wrap], proofs: [Proof]
     ) -> Bool {
         guard let previous = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq else { return false }
+        let author = rotation.signerDeviceId
         let reader = E2EEAutoHistory.Reader.history(hkPubB64: rotation.hkPubB64)
-        let senders = Set(links.filter {
-            E2EEAutoHistory.check(userId: userId, wrap: $0, account: account, reader: reader) == nil
-        }.map(\.senderDeviceId))
-        return proofs.contains {
-            senders.contains($0.deviceId) && E2EEAutoHistoryKey.verifyProof(
-                userId: userId, deviceId: $0.deviceId, hkPubB64: previous, revokeSeq: revokeSeq, signatureB64: $0.signatureB64
+        let linked = links.contains {
+            $0.senderDeviceId == author && E2EEAutoHistory.check(userId: userId, wrap: $0, account: account, reader: reader) == nil
+        }
+        return linked && proofs.contains {
+            $0.deviceId == author && E2EEAutoHistoryKey.verifyProof(
+                userId: userId, deviceId: author, hkPubB64: previous, revokeSeq: revokeSeq, signatureB64: $0.signatureB64
             )
         }
     }
@@ -204,8 +207,8 @@ actor E2EEAutoHistoryRotation {
         if let rotation = account.historyKeys.last, rotation.hkPubB64 == account.historyKeyPubB64,
            let previous = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq,
            let nextScalar = dependencies.scalar(rotation.hkPubB64) {
-            // Notre maillon rendrait HK′ vérifiée : jamais pour une HK′ d'un autre qui ne l'est pas
-            // déjà (une clé reçue par une build sans la porte à preuve, par exemple).
+            // Notre maillon n'ajoute rien tant que celui de l'auteur manque (le serveur répond 409
+            // E2EE_HISTORY_CHAIN_INVALID) : jamais pour une HK′ d'un autre qui n'est pas déjà vérifiée.
             if let oldScalar = dependencies.scalar(previous), Self.eligibleForChain(account.devices[device.deviceId], rotation: rotation) {
                 var trusted = rotation.signerDeviceId == device.deviceId
                 if !trusted { trusted = await isVouched(account: account, rotation: rotation) }

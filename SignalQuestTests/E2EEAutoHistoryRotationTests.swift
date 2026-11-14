@@ -379,8 +379,41 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         XCTAssertFalse(fake.calls.contains { $0.hasPrefix("PUT") || $0.hasPrefix("POST") })
     }
 
+    /// Une HK′ d'un autre détenue ici : le maillon prouvé d'un appareil qui n'en est pas
+    /// l'auteur ne la vérifie pas, et n'appelle donc ni notre preuve ni notre maillon ; celui
+    /// de l'auteur, oui (« Auteur d'abord », décision 16).
+    func testHolderLinksOnlyAfterTheAuthorsProvenLink() async throws {
+        let chainPath = try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(oldHk))
+        let proofsPost = "POST \(E2EEAutoHistoryRotationContract.proofsPath)"
+
+        let refused = Fake(reads: [.verified(account(rotated: true))])
+        refused.held[oldHk] = oldScalar
+        refused.held[newHk] = newScalar
+        refused.routes["GET \(chainPath)"] = [Self.json(["links": [try chainLink(from: other).jsonObject]], status: 200)]
+        refused.routes["GET \(proofsPath)"] = [Self.json(["proofs": [proofRow(other.id)]], status: 200)]
+        let refusedReport = await E2EEAutoHistoryRotation(refused.dependencies(member)).run()
+        XCTAssertFalse(refusedReport.chainDeposited)
+        XCTAssertFalse(refused.calls.contains("PUT \(chainPath)"))
+        XCTAssertFalse(refused.calls.contains(proofsPost))
+        XCTAssertFalse(refused.done.contains(E2EEAutoHistoryRotation.vouchedMarker(newHk)))
+
+        let accepted = Fake(reads: [.verified(account(rotated: true))])
+        accepted.held[oldHk] = oldScalar
+        accepted.held[newHk] = newScalar
+        accepted.routes["GET \(chainPath)"] = [
+            Self.json(["links": [try chainLink(from: other).jsonObject, try chainLink(from: rotator).jsonObject]], status: 200),
+        ]
+        accepted.routes["GET \(proofsPath)"] = [Self.json(["proofs": [proofRow(other.id), proofRow(rotator.id)]], status: 200)]
+        accepted.routes["PUT \(chainPath)"] = [Self.json(["hkPubB64": oldHk, "nextHkPubB64": newHk])]
+        let acceptedReport = await E2EEAutoHistoryRotation(accepted.dependencies(member)).run()
+        XCTAssertTrue(acceptedReport.chainDeposited)
+        XCTAssertTrue(accepted.calls.contains(proofsPost))
+        XCTAssertTrue(accepted.done.contains(E2EEAutoHistoryRotation.vouchedMarker(newHk)))
+    }
+
     /// Le maillon compte seulement si son propre émetteur a prouvé détenir l'ancienne HK
-    /// pour `afterRevokeSeq` de HK′, et s'il passe les contrôles publics du §5.6.
+    /// pour `afterRevokeSeq` de HK′, s'il passe les contrôles publics du §5.6, et si cet
+    /// émetteur est l'auteur de HK′ (« Auteur d'abord », décision 16, §5.6 bis).
     func testProvenLinkNeedsItsOwnSendersProof() throws {
         let account = account(rotated: true)
         func vouched(_ links: [E2EEAutoHistory.Wrap], _ rows: [[String: Any]]) throws -> Bool {
@@ -394,6 +427,11 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         XCTAssertFalse(try vouched([link], [proofRow(rotator.id, signedAs: member.id)]), "preuve rejouée sous l'émetteur")
         XCTAssertFalse(try vouched([try chainLink(from: lost)], [proofRow(lost.id)]), "émetteur révoqué avant HK′")
         XCTAssertFalse(try vouched([], [proofRow(rotator.id)]))
+        let otherLink = try chainLink(from: member)
+        XCTAssertFalse(try vouched([otherLink], [proofRow(member.id)]), "maillon prouvé d'un appareil qui n'est pas l'auteur")
+        XCTAssertFalse(try vouched([otherLink, link], [proofRow(member.id)]), "maillon de l'auteur sans sa propre preuve")
+        XCTAssertFalse(try vouched([otherLink], [proofRow(member.id), proofRow(rotator.id)]), "preuve de l'auteur sans son maillon")
+        XCTAssertTrue(try vouched([otherLink, link], [proofRow(member.id), proofRow(rotator.id)]))
     }
 
     /// Un transfert seul d'un appareil révoqué ne donne rien.
