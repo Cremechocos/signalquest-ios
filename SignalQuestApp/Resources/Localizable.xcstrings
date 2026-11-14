@@ -38266,6 +38266,62 @@
         }
       }
     },
+    "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. Try again in a few minutes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes."
+          }
+        }
+      }
+    },
+    "SQFormal|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La résiliation de votre abonnement n’a pas pu aboutir pour l’instant : votre compte n’a pas été supprimé. Réessayez dans quelques minutes."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. This code has already been used: request a new one to try again in a few minutes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes."
+          }
+        }
+      }
+    },
+    "SQFormal|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La résiliation de votre abonnement n’a pas pu aboutir pour l’instant : votre compte n’a pas été supprimé. Ce code a déjà servi : demandez-en un nouveau pour réessayer dans quelques minutes."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Période en cours jusqu’au %@." : {
       "localizations" : {
         "en" : {

@@ -812,6 +812,38 @@ final class AccountDeletionSubscriptionTests: XCTestCase {
         XCTAssertEqual(service.acknowledgements, [false, true])
     }
 
+    /// Contrat §6 (lot 3) : une résiliation en échec répond 503 sans rien effacer.
+    /// Le libellé d'achat du même code ne convient pas ; une preuve par code e-mail
+    /// a déjà servi et l'écran doit en demander un nouveau, pas un mot de passe.
+    func testACancellationFailureKeepsTheAccountAndAsksForANewEmailCode() async {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "deletion-C")
+        let service = DeletionRecordingUserService()
+        let model = SettingsViewModel(userService: service, authService: MockAuthService())
+        for code in ["STORE_UNAVAILABLE", "BILLING_UNCONFIGURED"] {
+            service.failure = APIError.http(status: 503, code: code, message: "La résiliation de ton abonnement n’a pas pu aboutir.",
+                                            requestId: nil, retryAfter: nil)
+            let email = await model.deleteAccount(using: .email(challengeId: "c1", code: "123456"), acknowledgingActiveSubscriptions: true)
+            XCTAssertFalse(email)
+            XCTAssertTrue(model.deletionNeedsNewEmailCode, code)
+            XCTAssertEqual(model.deletionError, String(localized: "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes."))
+            XCTAssertNil(model.deletedOwnerScopeId)
+
+            let password = await model.deleteAccount(using: .password("secret"), acknowledgingActiveSubscriptions: true)
+            XCTAssertFalse(password)
+            XCTAssertFalse(model.deletionNeedsNewEmailCode, "Un mot de passe se rejoue tel quel")
+            XCTAssertEqual(model.deletionError, String(localized: "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes."))
+        }
+        // Un autre 503 garde le libellé général.
+        service.failure = APIError.http(status: 503, code: nil, message: "", requestId: nil, retryAfter: nil)
+        _ = await model.deleteAccount(using: .email(challengeId: "c1", code: "123456"), acknowledgingActiveSubscriptions: true)
+        XCTAssertFalse(model.deletionNeedsNewEmailCode)
+
+        service.failure = nil
+        let retried = await model.deleteAccount(using: .password("secret"), acknowledgingActiveSubscriptions: true)
+        XCTAssertTrue(retried)
+    }
+
     func testAWarningShownUpFrontIsAcknowledgedAtOnce() async {
         defer { LocalAccountScope.deactivate() }
         LocalAccountScope.activate(userId: "deletion-B")
@@ -828,10 +860,13 @@ final class AccountDeletionSubscriptionTests: XCTestCase {
 private final class DeletionRecordingUserService: UserServicing, @unchecked Sendable {
     enum Unused: Error { case notImplemented }
     private(set) var acknowledgements: [Bool] = []
+    /// Refus servi une fois l'avertissement acquitté (503 de résiliation, §6).
+    var failure: APIError?
 
     func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession,
                        acknowledgingActiveSubscriptions: Bool) async throws -> AccountDeletionResult {
         acknowledgements.append(acknowledgingActiveSubscriptions)
+        if acknowledgingActiveSubscriptions, let failure { throw failure }
         guard acknowledgingActiveSubscriptions else {
             throw APIError.http(status: 409, code: "ACTIVE_PAID_SUBSCRIPTION", message: "Abonnement en cours",
                                 requestId: nil, retryAfter: nil)

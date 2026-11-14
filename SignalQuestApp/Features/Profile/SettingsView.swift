@@ -20,6 +20,10 @@ final class SettingsViewModel: ObservableObject {
     /// Le serveur a signalé un abonnement payé que l'écran ne montrait pas encore
     /// (409 ACTIVE_PAID_SUBSCRIPTION) : la confirmation suivante l'acquitte.
     @Published var deletionSubscriptionConflict = false
+    /// La résiliation d'un abonnement a échoué après la vérification de la preuve
+    /// (contrat abonnements §6, 503) : rien n'est effacé, mais un code e-mail à
+    /// usage unique a déjà servi.
+    @Published var deletionNeedsNewEmailCode = false
     private(set) var deletedOwnerScopeId: String?
     /// Renseigné quand l'archive RGPD est prête → déclenche la feuille de partage.
     @Published var exportedFile: ExportedDataFile?
@@ -111,6 +115,7 @@ final class SettingsViewModel: ObservableObject {
 
     func deleteAccount(using proof: AccountDeletionProof, acknowledgingActiveSubscriptions: Bool = false) async -> Bool {
         deletionError = nil
+        deletionNeedsNewEmailCode = false
         guard let expectedSession = LocalAccountScope.sessionSnapshot() else { return false }
         do {
             let receipt = try await userService.deleteAccount(
@@ -124,6 +129,17 @@ final class SettingsViewModel: ObservableObject {
         } catch {
             if case APIError.http(409, "ACTIVE_PAID_SUBSCRIPTION", _, _, _) = error {
                 deletionSubscriptionConflict = true
+            }
+            // Les mêmes codes servent aux achats, avec un libellé d'achat : ici,
+            // c'est la résiliation qui a échoué, et le compte existe toujours.
+            if case APIError.http(503, let code?, _, _, _) = error, ["STORE_UNAVAILABLE", "BILLING_UNCONFIGURED"].contains(code) {
+                if case .email = proof {
+                    deletionNeedsNewEmailCode = true
+                    deletionError = String(localized: "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes.")
+                } else {
+                    deletionError = String(localized: "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes.")
+                }
+                return false
             }
             if !error.isCancellation { deletionError = error.userFacingMessage }
             return false
@@ -1565,6 +1581,11 @@ private struct DeleteAccountSheet: View {
             dismiss()
         } else {
             Haptics.error()
+            // Code consommé : l'écran revient à « Envoyer le code ».
+            if model.deletionNeedsNewEmailCode {
+                emailChallenge = nil
+                emailCode = ""
+            }
         }
         isBusy = false
     }
