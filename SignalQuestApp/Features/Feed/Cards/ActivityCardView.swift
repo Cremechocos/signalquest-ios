@@ -12,7 +12,8 @@ struct FeedActivity: Equatable {
 
     /// Où mène le post dans l'app, depuis son détail.
     enum Link: Equatable {
-        case site(id: String, market: String?)
+        /// Fiche d'antenne par sa clé SITE-1 complète, jamais devinée.
+        case site(id: String, market: String, operatorKey: String)
         case progression
         case bug(id: String)
         /// La feuille de la panne, sinon son site.
@@ -99,7 +100,7 @@ struct FeedActivity: Equatable {
         self.previousLevel = family == .level ? int("oldLevel") : nil
         let text = (key?.text ?? item.text).trimmingCharacters(in: .whitespacesAndNewlines)
         let quoted = Self.quotedName(in: item.text)
-        let siteLink = string("siteId").map { Link.site(id: $0, market: string("marketCode")) }
+        let siteLink = item.siteKey.map { Link.site(id: $0.siteId, market: $0.market, operatorKey: $0.operatorKey) }
         let isMine = item.isMine == true
         switch family {
         case .quest:
@@ -376,7 +377,7 @@ extension FeedActivity.Link {
     @MainActor
     func open(with router: AppRouter) {
         switch self {
-        case .site(let id, let market): router.route(toSite: id, market: market)
+        case .site(let id, let market, let operatorKey): router.route(toSite: id, market: market, operatorKey: operatorKey)
         case .progression: router.route(toProfileScreen: .progression)
         case .bug(let id): router.route(toBug: id)
         case .outage(let id, let siteId, let market): router.route(toCommunityOutageId: id, fallbackSiteId: siteId, market: market)

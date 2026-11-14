@@ -76,6 +76,14 @@ extension UnifiedSocialFeedItem {
         }
     }
 
+    /// Clé SITE-1 d'une fiche d'antenne (contrat des posts automatiques v1 §1.6) : le support,
+    /// son marché et la clé d'opérateur, servis ensemble. L'un manque : pas de lien, rien de deviné.
+    var siteKey: (siteId: String, market: String, operatorKey: String)? {
+        guard let siteId = metadataString("siteId"), let market = metadataString("marketCode"),
+              let operatorKey = metadataString("operatorKey") else { return nil }
+        return (siteId, market, operatorKey)
+    }
+
     func metadataString(_ key: String) -> String? {
         switch metadata?[key] {
         case .string(let value)?:

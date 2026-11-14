@@ -377,14 +377,7 @@ struct SignalDetailSheet: View {
     /// sans clé d'opérateur, pas de lien : on ne devine jamais la clé depuis le libellé.
     static func photoSiteKey(of item: UnifiedSocialFeedItem) -> (siteId: String, market: String, operatorKey: String)? {
         guard ["photo", "antenna_photo"].contains(item.kind.lowercased()) else { return nil }
-        func value(_ key: String) -> String? {
-            guard case .string(let raw)? = item.metadata?[key] else { return nil }
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
-        }
-        guard let siteId = value("siteId"), let market = value("marketCode"), let operatorKey = value("operatorKey")
-        else { return nil }
-        return (siteId, market, operatorKey)
+        return item.siteKey
     }
 
     @ViewBuilder

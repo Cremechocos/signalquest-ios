@@ -331,9 +331,12 @@ final class FeedActivityTests: XCTestCase {
         XCTAssertEqual(badge.subtitle, "Chasseur de 5G", "the name in the text stands in for a missing badgeName")
 
         let discovery = try XCTUnwrap(FeedActivity(item: item(kind: "badge",
-            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR""#)))
+            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR","operatorKey":"ORANGE""#)))
         XCTAssertEqual(discovery.family, .siteDiscovered)
-        XCTAssertEqual(discovery.link, .site(id: "ANFR-0381234", market: "FR"))
+        XCTAssertEqual(discovery.link, .site(id: "ANFR-0381234", market: "FR", operatorKey: "ORANGE"))
+        XCTAssertNil(try FeedActivity(item: item(kind: "badge",
+            #""activityType":"new_site_visited","firstDiscovery":true,"siteId":"ANFR-0381234","marketCode":"FR""#))?.link,
+            "SITE-1 incomplete: no link, the operator is never guessed")
         XCTAssertEqual(try FeedActivity(item: item(kind: "badge",
             #""activityType":"new_site_visited","firstDiscovery":false"#))?.family, .siteVisited)
 
@@ -833,6 +836,17 @@ final class FeedPhotoSiteLinkTests: XCTestCase {
         XCTAssertEqual(key.siteId, "S1")
         XCTAssertEqual(key.market, "FR")
         XCTAssertEqual(key.operatorKey, "ORANGE")
+    }
+
+    /// Lot 5 : la même clé pour toutes les cartes (identification, photo, exploration).
+    func testEveryCardUsesTheSameCompleteKey() throws {
+        let validation = try photo(#""siteId":"802123","marketCode":"FR","operatorKey":"SFR","enb":"81234""#, kind: "validation")
+        XCTAssertEqual(validation.siteKey?.siteId, "802123")
+        XCTAssertEqual(validation.siteKey?.operatorKey, "SFR")
+        XCTAssertNil(try photo(#""siteId":"802123","marketCode":"FR""#, kind: "validation").siteKey)
+        XCTAssertNil(try photo(#""siteId":"802123","operatorKey":"SFR""#, kind: "validation").siteKey)
+        XCTAssertNil(try photo(#""marketCode":"FR","operatorKey":"SFR""#, kind: "validation").siteKey, "private zone: siteId withheld")
+        XCTAssertNil(try photo(#""siteId":" ","marketCode":"FR","operatorKey":"SFR""#, kind: "validation").siteKey)
     }
 
     func testAnIncompleteKeyShowsNoLink() throws {

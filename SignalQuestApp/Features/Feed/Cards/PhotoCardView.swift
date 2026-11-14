@@ -52,9 +52,9 @@ struct PhotoCardView: View {
 
                 FeedNetworkLine(operator: item.signal?.operator ?? item.metadataString("operator"), technology: nil)
 
-                if let siteId = item.metadataString("siteId") {
+                if let key = item.siteKey {
                     FeedOpenCapsule(title: String(localized: "Voir le site"),
-                                    destination: .link(.site(id: siteId, market: item.metadataString("marketCode"))),
+                                    destination: .link(.site(id: key.siteId, market: key.market, operatorKey: key.operatorKey)),
                                     prominent: false, onOpenPost: onTap)
                 }
 

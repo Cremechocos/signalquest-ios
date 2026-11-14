@@ -68,9 +68,9 @@ struct ValidationCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                if let siteId = item.metadataString("siteId") {
+                if let key = item.siteKey {
                     FeedOpenCapsule(title: String(localized: "Voir sur la carte"), symbol: "map",
-                                    destination: .link(.site(id: siteId, market: item.metadataString("marketCode"))),
+                                    destination: .link(.site(id: key.siteId, market: key.market, operatorKey: key.operatorKey)),
                                     onOpenPost: onTap)
                 }
 
