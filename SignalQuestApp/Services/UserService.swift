@@ -210,7 +210,11 @@ protocol UserServicing: Sendable {
     func accountDeletionPreview() async throws -> AccountDeletionPreview
     func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge
     func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult
-    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult
+    /// `acknowledgingActiveSubscriptions` : l'avertissement d'abonnement payé a été
+    /// montré (contrat abonnements v1, D4). Sans lui, le serveur répond `409
+    /// ACTIVE_PAID_SUBSCRIPTION` avant de vérifier la preuve, qui reste donc valable.
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession,
+                       acknowledgingActiveSubscriptions: Bool) async throws -> AccountDeletionResult
     /// Archive RGPD complète (profil, mesures, contributions, messages…) au format
     /// JSON, telle que renvoyée par le backend `GET /api/export/my-data`.
     func exportPersonalData() async throws -> Data
@@ -218,6 +222,11 @@ protocol UserServicing: Sendable {
 
 extension UserServicing {
     func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult {
+        try await deleteAccount(using: proof, expectedSession: expectedSession, acknowledgingActiveSubscriptions: false)
+    }
+
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession,
+                       acknowledgingActiveSubscriptions: Bool) async throws -> AccountDeletionResult {
         guard expectedSession.isCurrent else { throw APIError.cancelled }
         let value = try await deleteAccount(using: proof)
         guard expectedSession.isCurrent else { throw APIError.cancelled }
@@ -317,15 +326,18 @@ final class UserService: UserServicing {
         struct PasswordRequest: Encodable {
             let password: String
             let confirmation: String
+            var subscriptionAware = true
         }
         struct AppleRequest: Encodable {
             let appleIdentityToken: String
             let confirmation: String
+            var subscriptionAware = true
         }
         struct EmailRequest: Encodable {
             let challengeId: String
             let emailCode: String
             let confirmation: String
+            var subscriptionAware = true
         }
 
         let confirmation = "SUPPRIMER MON COMPTE"
@@ -351,11 +363,15 @@ final class UserService: UserServicing {
         }
     }
 
-    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult {
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession,
+                       acknowledgingActiveSubscriptions: Bool) async throws -> AccountDeletionResult {
         guard expectedSession.isCurrent, let token = api.credentials.accessToken(), expectedSession.matchesAuthToken(token) else {
             throw APIError.missingAuthToken
         }
-        var payload: [String: String] = ["confirmation": "SUPPRIMER MON COMPTE"]
+        // `subscriptionAware` : cette app sait lire le 409 ACTIVE_PAID_SUBSCRIPTION
+        // (contrat abonnements v1, D4) ; sans lui, le serveur supprime directement.
+        var payload: [String: Any] = ["confirmation": "SUPPRIMER MON COMPTE", "subscriptionAware": true]
+        if acknowledgingActiveSubscriptions { payload["acknowledgeActiveSubscriptions"] = true }
         switch proof {
         case .password(let value): payload["password"] = value
         case .apple(let value): payload["appleIdentityToken"] = value

@@ -1282,6 +1282,8 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(deleteBodies[2]["challengeId"] as? String, "challenge-1")
         XCTAssertEqual(deleteBodies[2]["emailCode"] as? String, "123456")
         XCTAssertTrue(deleteBodies.allSatisfy { $0["confirmation"] as? String == "SUPPRIMER MON COMPTE" })
+        // Contrat abonnements v1, D4 : cette app lit le 409 ACTIVE_PAID_SUBSCRIPTION.
+        XCTAssertTrue(deleteBodies.allSatisfy { $0["subscriptionAware"] as? Bool == true })
     }
 
     private static func mockSession() -> URLSession {

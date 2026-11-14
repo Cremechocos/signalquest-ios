@@ -681,6 +681,112 @@ final class SubscriptionStatusPresentationTests: XCTestCase {
     }
 }
 
+
+/// Lot D : suppression de compte avec un abonnement payé en cours (contrat
+/// abonnements v1, D4).
+@MainActor
+final class AccountDeletionSubscriptionTests: XCTestCase {
+    private let end = Date(timeIntervalSince1970: 1_798_000_000)
+
+    func testTheAppDeclaresItReadsTheConflict() {
+        XCTAssertTrue(ClientProtocolContract.capabilities.contains("billing_subscription_aware_v1"))
+    }
+
+    func testOnlyRunningSubscriptionsAreWarnedAbout() {
+        let snapshot = EntitlementSnapshot(
+            tier: .premium, source: .appStore, period: .monthly, status: .active, expiresAt: end,
+            subscription: EntitlementSubscription(channel: .appStore, state: .active, tier: .premium, autoRenew: true),
+            otherSubscriptions: [
+                EntitlementSubscription(channel: .stripe, state: .expired, tier: .premium),
+                EntitlementSubscription(channel: .googlePlay, state: .grace, tier: .premium),
+            ]
+        )
+        XCTAssertEqual(AccountDeletionSubscriptionNotice.running(in: snapshot).map(\.channel), [.appStore, .googlePlay])
+        XCTAssertTrue(AccountDeletionSubscriptionNotice.running(in: nil).isEmpty)
+    }
+
+    /// Le serveur résilie le web et l'autre magasin, jamais l'App Store ; aucun
+    /// texte ne nomme une autre plateforme (2.3.10).
+    func testEachChannelSaysWhatHappensAndNamesNoOtherPlatform() {
+        let appStore = AccountDeletionSubscriptionNotice.message(for: EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: true))
+        XCTAssertTrue(appStore.contains("Apple"))
+        let cancelled = AccountDeletionSubscriptionNotice.message(for: EntitlementSubscription(
+            channel: .appStore, state: .active, tier: .premium, autoRenew: false, currentPeriodEnd: end))
+        XCTAssertTrue(cancelled.contains(SubscriptionStatusPresentation.day(end)))
+        XCTAssertNotEqual(appStore, cancelled)
+
+        for channel in [EntitlementSubscription.Channel.stripe, .googlePlay, .unknown] {
+            let message = AccountDeletionSubscriptionNotice.message(for: EntitlementSubscription(
+                channel: channel, state: .active, tier: .premium, autoRenew: true))
+            for word in ["Google", "Android", "Play", "Stripe"] {
+                XCTAssertFalse(message.contains(word), "\(channel) : « \(message) » nomme \(word)")
+            }
+        }
+    }
+
+    /// Le 409 arrive avant la vérification de la preuve : la confirmation suivante
+    /// l'acquitte, avec la même preuve.
+    func testAConflictIsAcknowledgedOnTheNextConfirmation() async throws {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "deletion-A")
+        let service = DeletionRecordingUserService()
+        let model = SettingsViewModel(userService: service, authService: MockAuthService())
+
+        let first = await model.deleteAccount(using: .password("secret"))
+        XCTAssertFalse(first)
+        XCTAssertTrue(model.deletionSubscriptionConflict)
+        XCTAssertEqual(model.deletionError, APIError.http(status: 409, code: "ACTIVE_PAID_SUBSCRIPTION", message: "",
+                                                          requestId: nil, retryAfter: nil).userFacingMessage)
+
+        let second = await model.deleteAccount(using: .password("secret"))
+        XCTAssertTrue(second)
+        XCTAssertEqual(service.acknowledgements, [false, true])
+    }
+
+    func testAWarningShownUpFrontIsAcknowledgedAtOnce() async {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "deletion-B")
+        let service = DeletionRecordingUserService()
+        let model = SettingsViewModel(userService: service, authService: MockAuthService())
+        let succeeded = await model.deleteAccount(using: .password("secret"), acknowledgingActiveSubscriptions: true)
+        XCTAssertTrue(succeeded)
+        XCTAssertEqual(service.acknowledgements, [true])
+    }
+}
+
+/// Refuse la première suppression non acquittée par un 409, comme le serveur
+/// quand un abonnement payé est en cours.
+private final class DeletionRecordingUserService: UserServicing, @unchecked Sendable {
+    enum Unused: Error { case notImplemented }
+    private(set) var acknowledgements: [Bool] = []
+
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession,
+                       acknowledgingActiveSubscriptions: Bool) async throws -> AccountDeletionResult {
+        acknowledgements.append(acknowledgingActiveSubscriptions)
+        guard acknowledgingActiveSubscriptions else {
+            throw APIError.http(status: 409, code: "ACTIVE_PAID_SUBSCRIPTION", message: "Abonnement en cours",
+                                requestId: nil, retryAfter: nil)
+        }
+        return try JSONDecoder().decode(AccountDeletionResult.self,
+            from: Data(#"{"success":true,"reauthMethod":"password","message":"ok"}"#.utf8))
+    }
+
+    func exportPersonalData() async throws -> Data { throw Unused.notImplemented }
+    func profile() async throws -> AuthUser { throw Unused.notImplemented }
+    func updateProfile(_ patch: UserProfilePatch) async throws -> AuthUser { throw Unused.notImplemented }
+    func checkHandleAvailability(_ handle: String) async throws -> HandleAvailability { throw Unused.notImplemented }
+    func checkPublicHandleAvailability(_ handle: String) async throws -> HandleAvailability { throw Unused.notImplemented }
+    func uploadAvatar(data: Data, filename: String, mimeType: String) async throws -> AuthUser { throw Unused.notImplemented }
+    func stats() async throws -> UserStats { throw Unused.notImplemented }
+    func notificationPreferences() async throws -> NotificationPreferences { throw Unused.notImplemented }
+    func updateNotificationPreferences(_ prefs: NotificationPreferences) async throws -> NotificationPreferences { throw Unused.notImplemented }
+    func heartbeat() async throws { throw Unused.notImplemented }
+    func accountDeletionPreview() async throws -> AccountDeletionPreview { throw Unused.notImplemented }
+    func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge { throw Unused.notImplemented }
+    func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult { throw Unused.notImplemented }
+}
+
 private final class AccountScopedSubscriptionAPIStub: APIClientProtocol, @unchecked Sendable {
     private let lock = NSLock()
     private var reads = 0

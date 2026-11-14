@@ -2028,6 +2028,9 @@ final class SettingsViewModel: ObservableObject {
     @Published var deletionPreview: AccountDeletionPreview?
     @Published var isDeletionPreviewLoading = false
     @Published var deletionError: String?
+    /// Le serveur a signalé un abonnement payé que l'écran ne montrait pas encore
+    /// (409 ACTIVE_PAID_SUBSCRIPTION) : la confirmation suivante l'acquitte.
+    @Published var deletionSubscriptionConflict = false
     private(set) var deletedOwnerScopeId: String?
     /// Renseigné quand l'archive RGPD est prête → déclenche la feuille de partage.
     @Published var exportedFile: ExportedDataFile?
@@ -2117,16 +2120,22 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
-    func deleteAccount(using proof: AccountDeletionProof) async -> Bool {
+    func deleteAccount(using proof: AccountDeletionProof, acknowledgingActiveSubscriptions: Bool = false) async -> Bool {
         deletionError = nil
         guard let expectedSession = LocalAccountScope.sessionSnapshot() else { return false }
         do {
-            let receipt = try await userService.deleteAccount(using: proof, expectedSession: expectedSession)
+            let receipt = try await userService.deleteAccount(
+                using: proof, expectedSession: expectedSession,
+                acknowledgingActiveSubscriptions: acknowledgingActiveSubscriptions || deletionSubscriptionConflict
+            )
             guard receipt.success else { throw APIError.transport("account-deletion-not-confirmed") }
             await authService.eraseDeletedAccountVault(ownerScopeId: expectedSession.ownerScopeId)
             deletedOwnerScopeId = expectedSession.ownerScopeId
             return true
         } catch {
+            if case APIError.http(409, "ACTIVE_PAID_SUBSCRIPTION", _, _, _) = error {
+                deletionSubscriptionConflict = true
+            }
             if !error.isCancellation { deletionError = error.userFacingMessage }
             return false
         }
@@ -3281,6 +3290,7 @@ private struct DeleteAccountSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else if let preview = model.deletionPreview {
+                    AccountDeletionSubscriptionNotice(store: services.entitlements)
                     deletionInventory(preview)
                     if !soleAdminGroups.isEmpty {
                         Label(
@@ -3313,6 +3323,11 @@ private struct DeleteAccountSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .task { await loadPreview() }
         .task { await loadSoleAdminGroups() }
+        // D4 : l'abonnement en cours se lit dès l'ouverture, le 409 n'est qu'un filet.
+        .task { await services.entitlements.refreshBackendSnapshot() }
+        .onChangeCompat(of: model.deletionSubscriptionConflict) { _, conflict in
+            if conflict { Task { await services.entitlements.refreshBackendSnapshot() } }
+        }
         .presentationDetents([.large])
         .sqSheet(background: SQColor.bg)
         .interactiveDismissDisabled(isBusy)
@@ -3553,7 +3568,8 @@ private struct DeleteAccountSheet: View {
         if !soleAdminGroups.isEmpty {
             _ = await services.e2eeV2Messaging.promoteSuccessorsBeforeDeletion(soleAdminGroups)
         }
-        let succeeded = await model.deleteAccount(using: proof)
+        let warned = AccountDeletionSubscriptionNotice.running(in: services.entitlements.serverState.snapshot)
+        let succeeded = await model.deleteAccount(using: proof, acknowledgingActiveSubscriptions: !warned.isEmpty)
         if succeeded {
             Haptics.success()
             await onDeleted()

@@ -220,6 +220,9 @@ enum APIError: Error, LocalizedError, Equatable {
         "INTERVAL_NOT_ALLOWED": String(localized: "Cette cadence de mesure n’est pas disponible avec ton offre."),
         "FAST_INTERVAL_QUOTA": String(localized: "Une seule connexion peut être mesurée plus souvent qu’une fois par minute."),
 
+        // Suppression de compte (D4) : servi avant la vérification de la preuve.
+        "ACTIVE_PAID_SUBSCRIPTION": String(localized: "Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte."),
+
         // Journal radio synchronisé.
         "TOO_MANY_ITEMS": String(localized: "Trop d'éléments envoyés d'un coup. Réessaie."),
 

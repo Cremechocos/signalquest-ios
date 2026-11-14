@@ -40841,6 +40841,190 @@
         }
       }
     },
+    "Supprimer ton compte ne résilie pas ton abonnement App Store : SignalQuest ne peut pas le faire à ta place. Résilie-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleting your account doesn’t cancel your App Store subscription: SignalQuest can’t do it for you. Cancel it first with the button below; refunds are requested from Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ton compte ne résilie pas ton abonnement App Store : SignalQuest ne peut pas le faire à ta place. Résilie-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple."
+          }
+        }
+      }
+    },
+    "SQFormal|Supprimer ton compte ne résilie pas ton abonnement App Store : SignalQuest ne peut pas le faire à ta place. Résilie-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer votre compte ne résilie pas votre abonnement App Store : SignalQuest ne peut pas le faire à votre place. Résiliez-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end on %@, with no new payment. Refunds are requested from Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end with no new payment. Refunds are requested from Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period and haven’t waived it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si vous êtes encore dans votre délai de rétractation de 14 jours et que vous n’y avez pas renoncé."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on another device will be cancelled on deletion: no new charge. The current period isn’t refunded by SignalQuest; refunds are requested where it was taken out."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Abonnement en cours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement en cours"
+          }
+        }
+      }
+    },
+    "Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A paid subscription is still running on this account. Read the warning shown, then confirm again to delete your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Un abonnement payé est encore en cours sur ce compte. Lis l’avertissement affiché, puis confirme de nouveau pour supprimer ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un abonnement payé est encore en cours sur ce compte. Lisez l’avertissement affiché, puis confirmez de nouveau pour supprimer votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Tu surveilles déjà autant de connexions que ton offre le permet. Retire-en une pour en ajouter une autre." : {
       "localizations" : {
         "en" : {

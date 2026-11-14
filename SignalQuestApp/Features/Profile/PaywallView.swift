@@ -272,6 +272,60 @@ struct SubscriptionStatusPresentation: Equatable {
     }
 }
 
+/// Suppression de compte avec un abonnement payé en cours (contrat abonnements
+/// v1, D4) : l'avertissement se lit dès l'ouverture, par canal ; le 409
+/// ACTIVE_PAID_SUBSCRIPTION n'est qu'un filet. Un abonnement App Store se résilie
+/// dans la feuille Apple (5.1.1(v)) ; un abonnement pris ailleurs ne nomme
+/// aucune plateforme (2.3.10).
+struct AccountDeletionSubscriptionNotice: View {
+    @ObservedObject var store: EntitlementsStore
+    @State private var showsManageSubscriptions = false
+
+    /// Abonnements payés encore en cours, ceux que la suppression concerne.
+    static func running(in snapshot: EntitlementSnapshot?) -> [EntitlementSubscription] {
+        (snapshot?.subscriptions ?? []).filter { $0.state.blocksNewPurchase }
+    }
+
+    /// Les textes du contrat, par canal : le serveur résilie le web et l'autre
+    /// magasin, jamais l'App Store.
+    static func message(for subscription: EntitlementSubscription) -> String {
+        switch subscription.channel {
+        case .appStore:
+            guard subscription.autoRenew == false else {
+                return String(localized: "Supprimer ton compte ne résilie pas ton abonnement App Store : SignalQuest ne peut pas le faire à ta place. Résilie-le d’abord avec le bouton ci-dessous ; un remboursement se demande à Apple.")
+            }
+            return subscription.accessEndsAt.map {
+                String(localized: "Ton abonnement App Store est déjà résilié : il s’arrêtera le \(SubscriptionStatusPresentation.day($0)), sans nouveau paiement. Un remboursement se demande à Apple.")
+            } ?? String(localized: "Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple.")
+        case .stripe:
+            return String(localized: "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé.")
+        case .googlePlay, .unknown:
+            return String(localized: "Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit.")
+        }
+    }
+
+    var body: some View {
+        let running = Self.running(in: store.serverState.snapshot)
+        if !running.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                ForEach(Array(running.enumerated()), id: \.offset) { _, subscription in
+                    SQNotice(message: Self.message(for: subscription), title: String(localized: "Abonnement en cours"),
+                             systemImage: "creditcard", tone: .warning)
+                }
+                if running.contains(where: { $0.channel == .appStore && $0.autoRenew != false }) {
+                    GradientButton("Gérer ou résilier mon abonnement", systemImage: "creditcard", style: .secondary) {
+                        showsManageSubscriptions = true
+                    }
+                }
+            }
+            .manageSubscriptionsSheet(isPresented: $showsManageSubscriptions)
+            .onChangeCompat(of: showsManageSubscriptions) { _, shown in
+                if !shown { Task { await store.refreshBackendSnapshot() } }
+            }
+        }
+    }
+}
+
 struct PaywallView: View {
     @ObservedObject private var store: EntitlementsStore
     private let entryPoint: PaywallEntryPoint

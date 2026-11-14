@@ -47,6 +47,9 @@ enum ClientProtocolContract {
     /// des demandes, la barre de décision et les reçus v2 qui lisent ce champ.
     static let messageRequestsCapability = "message_requests_v1"
     static let capabilities: Set<String> = [
+        // Suppression de compte avec un abonnement payé en cours : l'app montre
+        // l'avertissement elle-même et lit le 409 ACTIVE_PAID_SUBSCRIPTION (D4).
+        "billing_subscription_aware_v1",
         "exact_schedules_v2",
         // Lot anonyme des ports iPerf3 essayés, envoyé après chaque test (IPERF-2).
         "iperf_attempts_v1",
