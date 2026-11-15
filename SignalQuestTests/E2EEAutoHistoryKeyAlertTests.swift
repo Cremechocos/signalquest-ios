@@ -321,13 +321,19 @@ final class E2EEAutoHistoryKeyAlertTests: XCTestCase {
         XCTAssertTrue(coordinator.showsBanner)
         XCTAssertEqual(coordinator.alert?.suspect, suspect)
 
-        // Une dernière HK annulée, un échec : le bandeau reste (A4 jusqu'à la rotation depuis la base).
-        for kept: E2EEAutoHistoryKeyPublication.Outcome in [.cancelled(hkPubB64: "hk-2"), .retryLater(afterSeconds: nil), .logRefused] {
+        // Un échec de lecture : le bandeau reste.
+        for kept: E2EEAutoHistoryKeyPublication.Outcome in [.retryLater(afterSeconds: nil), .logRefused, .notActive, .tooRecent] {
             XCTAssertNil(info(kept))
         }
         XCTAssertTrue(coordinator.showsBanner)
         coordinator.apply(info(.unvouched(hkPubB64: "hk-3")), ownerNamespace: "ns")
         XCTAssertFalse(coordinator.showsBanner, "tout est jugé, ou en grâce : l'alerte tombe")
+
+        // r23.2 : une dernière HK annulée fait tomber l'alerte, sans attendre la rotation depuis la base.
+        coordinator.apply(info(.unexpected(suspect)), ownerNamespace: "ns")
+        XCTAssertTrue(coordinator.showsBanner)
+        coordinator.apply(info(.cancelled(hkPubB64: "hk-2")), ownerNamespace: "ns")
+        XCTAssertFalse(coordinator.showsBanner)
 
         coordinator.apply(info(.unexpected(suspect)), ownerNamespace: "ns")
         XCTAssertEqual(coordinator.itsMe()?.suspect, suspect)
@@ -358,8 +364,13 @@ final class E2EEAutoHistoryKeyAlertTests: XCTestCase {
         XCTAssertTrue(coordinator.answeredNotMe)
         XCTAssertEqual(calls.ids, ["web_device_signer_0000001"])
         XCTAssertNotNil(coordinator.model?.confirmationMessage, "retrait écrit : la fenêtre passe à « Appareil retiré »")
+        // r23.2 : la HK est annulée, le bandeau tombe ; la fenêtre « Appareil retiré » garde son signataire.
+        coordinator.apply(info(.cancelled(hkPubB64: "hk-2")), ownerNamespace: "ns")
+        XCTAssertFalse(coordinator.showsBanner)
+        XCTAssertTrue(coordinator.isPresented, "un retrait affiché reste jusqu'à « OK »")
+        XCTAssertEqual(coordinator.signerRow?.id, "web_device_signer_0000001")
         coordinator.close()
-        XCTAssertTrue(coordinator.showsBanner, "le bandeau reste jusqu'à la rotation depuis la base")
+        XCTAssertNil(coordinator.signerRow)
 
         let t4 = E2EEAutoHistoryKeyAlertCoordinator { _, _ in }
         t4.apply(info(.unexpected(suspect)), ownerNamespace: "ns")

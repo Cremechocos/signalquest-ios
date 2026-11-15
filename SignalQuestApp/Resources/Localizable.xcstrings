@@ -458,7 +458,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This device has already been removed from your account. Your history stays paused for your safety."
+            "value" : "This device has already been removed from your account. Your history stays paused for your security."
           }
         },
         "fr" : {

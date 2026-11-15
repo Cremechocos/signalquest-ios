@@ -23,6 +23,9 @@ final class E2EEAutoHistoryKeyAlertCoordinator: ObservableObject {
     /// « Ce n'est pas moi » touché : la fenêtre passe au retrait du signataire (A4).
     @Published private(set) var answeredNotMe = false
     private(set) var model: E2EEAutoDevicesViewModel?
+    /// Le suspect de la fenêtre ouverte : il reste jusqu'à « OK », même si l'alerte tombe entre-temps
+    /// (r23.2 : une dernière HK annulée fait tomber le bandeau, jamais la fenêtre « Appareil retiré »).
+    private var presentedSuspect: E2EEAutoHistoryKeyAlert.Suspect?
     private var opening = false
     private let acknowledge: (_ hkPubB64: String, _ ownerNamespace: String) -> Void
 
@@ -36,18 +39,18 @@ final class E2EEAutoHistoryKeyAlertCoordinator: ObservableObject {
 
     var showsBanner: Bool { alert != nil }
 
-    /// `.unexpected` lève l'alerte ; une HK détenue, ou des HK toutes jugées, la font tomber.
-    /// Une dernière HK annulée la garde jusqu'à la rotation depuis la base (A4) ; un échec de
-    /// lecture ne change rien.
+    /// `.unexpected` lève l'alerte ; une HK détenue, des HK toutes jugées ou une dernière HK
+    /// annulée la font tomber (r23.2, choix d'Alexandre du 16/11 : sans attendre la rotation depuis
+    /// la base ; le §5.3 reste fermé pendant l'attente). Un échec de lecture ne change rien.
     nonisolated static func post(_ outcome: E2EEAutoHistoryKeyPublication.Outcome, ownerNamespace: String) {
         var info: [String: String] = ["ownerNamespace": ownerNamespace]
         switch outcome {
         case .unexpected(let suspect):
             info["hkPubB64"] = suspect.hkPubB64
             info["signerDeviceId"] = suspect.signerDeviceId
-        case .present, .missing, .unvouched:
+        case .present, .missing, .unvouched, .cancelled:
             info["clear"] = "1"
-        case .cancelled, .notActive, .tooRecent, .retryLater, .logRefused, .failed:
+        case .notActive, .tooRecent, .retryLater, .logRefused, .failed:
             return
         }
         NotificationCenter.default.post(name: changed, object: nil, userInfo: info)
@@ -75,16 +78,17 @@ final class E2EEAutoHistoryKeyAlertCoordinator: ObservableObject {
         defer { opening = false }
         let model = makeModel()
         await model.load()
-        guard alert != nil else { return }
+        guard let alert else { return }
         self.model = model
+        presentedSuspect = alert.suspect
         answeredNotMe = false
         isPresented = true
     }
 
     /// Le signataire, tel que le journal vérifié le montre ; nil s'il n'a pas pu être relu.
     var signerRow: E2EEAutoDevicesViewModel.Row? {
-        guard let alert, let model else { return nil }
-        return model.row(id: alert.suspect.signerDeviceId)
+        guard let suspect = presentedSuspect ?? alert?.suspect, let model else { return nil }
+        return model.row(id: suspect.signerDeviceId)
     }
 
     /// « C'est moi » : la HK suspecte est acquittée ici, l'alerte tombe ; la suite (A3) part
@@ -111,6 +115,7 @@ final class E2EEAutoHistoryKeyAlertCoordinator: ObservableObject {
         isPresented = false
         answeredNotMe = false
         model = nil
+        presentedSuspect = nil
     }
 
     /// Déconnexion : rien d'un compte ne reste à l'écran du suivant.
@@ -293,7 +298,8 @@ struct E2EEAutoHistoryKeyAlertView: View {
         }
     }
 
-    /// A4 après le retrait (ici, ou vu au journal) : le bandeau reste jusqu'à la rotation depuis la base.
+    /// A4 après le retrait (ici, ou vu au journal) : la fenêtre reste jusqu'à « OK » ; le bandeau, lui,
+    /// tombe dès que la HK est annulée (r23.2).
     @ViewBuilder
     private var removed: some View {
         Text("Appareil retiré")
