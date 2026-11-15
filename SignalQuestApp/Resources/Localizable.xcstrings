@@ -38982,6 +38982,22 @@
         }
       }
     },
+    "une semaine d’essai gratuit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "one-week free trial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "une semaine d’essai gratuit"
+          }
+        }
+      }
+    },
     "Ton abonnement" : {
       "localizations" : {
         "en" : {

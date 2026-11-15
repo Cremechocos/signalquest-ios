@@ -29,6 +29,18 @@ final class SubscriptionPriceCopyTests: XCTestCase {
         XCTAssertFalse(SubscriptionPriceCopy.matchesSelection(.year, value: 1, selection: .monthly))
         XCTAssertFalse(SubscriptionPriceCopy.matchesSelection(.month, value: 3, selection: .annual))
     }
+
+    /// Le format d'Apple rendait « un semaine d’essai gratuit » (rendu du 15/11).
+    func testOneWeekTrialIsWrittenWithoutApplesSpelledOutArticle() {
+        let french = Bundle.main.preferredLocalizations.first?.hasPrefix("fr") == true
+        let week = SubscriptionPriceCopy.trialLine(unit: .week, value: 1) { "un semaine" }
+        XCTAssertEqual(week, french ? "Une semaine d’essai gratuit" : "One-week free trial")
+
+        let month = SubscriptionPriceCopy.trialLine(unit: .month, value: 1) { french ? "un mois" : "one month" }
+        XCTAssertEqual(month, french ? "Un mois d’essai gratuit" : "One month free trial")
+        let twoWeeks = SubscriptionPriceCopy.trialLine(unit: .week, value: 2) { french ? "deux semaines" : "two weeks" }
+        XCTAssertEqual(twoWeeks, french ? "Deux semaines d’essai gratuit" : "Two weeks free trial")
+    }
 }
 
 final class EntitlementsTests: XCTestCase {

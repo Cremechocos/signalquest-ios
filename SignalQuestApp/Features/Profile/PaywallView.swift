@@ -68,13 +68,28 @@ enum SubscriptionPriceCopy {
         }
     }
 
-    /// « 1 semaine d’essai gratuit » : la durée vient de l'offre StoreKit.
+    /// « Une semaine d’essai gratuit » : la durée vient de l'offre StoreKit.
     static func trialLine(offer: Product.SubscriptionOffer, product: Product) -> String {
-        let period = offer.period.formatted(
-            product.subscriptionPeriodFormatStyle.locale(Locale.current),
-            referenceDate: Date(timeIntervalSince1970: 0)
-        )
-        return String(localized: "\(period) d’essai gratuit")
+        trialLine(unit: offer.period.unit, value: offer.period.value) {
+            offer.period.formatted(
+                product.subscriptionPeriodFormatStyle.locale(Locale.current),
+                referenceDate: Date(timeIntervalSince1970: 0)
+            )
+        }
+    }
+
+    /// Le format d'Apple écrit « un » devant toute unité, d'où « un semaine
+    /// d’essai gratuit » en français : semaine est la seule unité féminine
+    /// (jour, mois et an sont masculins), elle a donc sa propre phrase.
+    static func trialLine(
+        unit: Product.SubscriptionPeriod.Unit,
+        value: Int,
+        formattedPeriod: () -> String
+    ) -> String {
+        let line = unit == .week && value == 1
+            ? String(localized: "une semaine d’essai gratuit")
+            : String(localized: "\(formattedPeriod()) d’essai gratuit")
+        return line.prefix(1).uppercased() + line.dropFirst()
     }
 
     private static func periodDescription(_ product: Product) -> String? {
@@ -533,17 +548,19 @@ struct PaywallView: View {
                     .font(SQType.title)
                     .sqHeader()
                     .foregroundStyle(ink)
-                if let trial, let product {
-                    Text(verbatim: SubscriptionPriceCopy.trialLine(offer: trial, product: product))
-                        .font(SQFont.display(18, .bold))
-                        .foregroundStyle(ink)
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
-                }
+                // Le montant facturé reste l'élément de prix le plus visible,
+                // essai ou non (App Review 3.1.2) : l'essai vient dessous.
                 Text(SubscriptionPriceCopy.priceLine(product: product))
-                    .font(trial == nil ? SQFont.display(18, .bold) : SQType.callout)
+                    .font(SQFont.display(18, .bold))
                     .foregroundStyle(ink)
                     // Plafonné à AX3 : en AX5, « indisponible » se coupait en fin de mot (DEV-01).
                     .dynamicTypeSize(...DynamicTypeSize.accessibility3)
+                if let trial, let product {
+                    Text(verbatim: SubscriptionPriceCopy.trialLine(offer: trial, product: product))
+                        .font(SQType.callout)
+                        .foregroundStyle(ink)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
+                }
             }
 
             VStack(alignment: .leading, spacing: SQSpace.sm) {
