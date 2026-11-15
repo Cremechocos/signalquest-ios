@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Banc des codes de secours 2FA, sans réseau ni compte : `--qa-two-factor-backup-codes` (la
 /// fenêtre des codes), `-regenerate` et `-disable` (la feuille de preuve), `-settings` (les états
-/// de la rubrique), `-login` (la connexion, un code de secours refusé) et `-last` (règle B).
+/// de la rubrique), `-login` (la connexion, un code de secours refusé), `-last` (règle B) et
+/// `-card` (les deux cartes « Protège ton compte », §6).
 struct TwoFactorBackupCodesQAScreen: View {
     let variant: String
     #if DEBUG && targetEnvironment(simulator)
@@ -18,6 +19,16 @@ struct TwoFactorBackupCodesQAScreen: View {
             }
         case "settings":
             settings
+        case "card":
+            ScrollView {
+                VStack(spacing: SQSpace.md) {
+                    SecurityPromptCardView(reason: .noTwoFactor, onAction: {}, onLater: {})
+                    SecurityPromptCardView(reason: .noBackupCodes, onAction: {}, onLater: {})
+                }
+                .padding(SQSpace.xl)
+                .sqReadableWidth()
+            }
+            .signalQuestBackground()
         case "login", "last":
             Group {
                 if case .authenticated = session.state {

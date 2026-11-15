@@ -834,6 +834,20 @@ final class AuthSessionViewModel: ObservableObject {
         }, fetchUser: { try await service.me() })
     }
 
+    /// Carte « Protège ton compte » (contrat 2FA r3.4, §6) : le profil relu sur le serveur, jamais
+    /// le cache. Lève une erreur si la lecture échoue, pour que le moment attende la suivante.
+    func readSecurityPrompt() async throws -> SecurityPrompt? {
+        guard case .authenticated(let current) = state else { throw APIError.cancelled }
+        let account = LocalAccountScope.sessionSnapshot()
+        let generation = service.credentialSessionID()
+        let service = service
+        try await refreshUser(expectedUserID: current.id, isCurrent: {
+            LocalAccountScope.sessionSnapshot() == account && service.credentialSessionID() == generation
+        }, fetchUser: { try await service.me() })
+        guard case .authenticated(let user) = state, user.id == current.id else { throw APIError.cancelled }
+        return user.securityPrompt
+    }
+
     /// Le chargeur est lié à la session capturée par l'action qui a demandé le
     /// refresh. Ne jamais installer le profil d'une autre connexion après await.
     func refreshUser(expectedUserID: String, isCurrent: @MainActor () -> Bool,

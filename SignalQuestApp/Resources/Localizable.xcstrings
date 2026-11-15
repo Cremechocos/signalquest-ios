@@ -1,6 +1,134 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Protège ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protect your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protège ton compte"
+          }
+        }
+      }
+    },
+    "SQFormal|Protège ton compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protégez votre compte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Active la double authentification : un code en plus de ton mot de passe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on two-factor authentication: a code on top of your password."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active la double authentification : un code en plus de ton mot de passe."
+          }
+        }
+      }
+    },
+    "SQFormal|Active la double authentification : un code en plus de ton mot de passe." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez la double authentification : un code en plus de votre mot de passe."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Génère tes codes de secours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate your backup codes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Génère tes codes de secours"
+          }
+        }
+      }
+    },
+    "SQFormal|Génère tes codes de secours" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générez vos codes de secours"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ils te permettent de te connecter si tu perds ton téléphone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They let you sign in if you lose your phone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils te permettent de te connecter si tu perds ton téléphone."
+          }
+        }
+      }
+    },
+    "SQFormal|Ils te permettent de te connecter si tu perds ton téléphone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils vous permettent de vous connecter si vous perdez votre téléphone."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Activer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer"
+          }
+        }
+      }
+    },
     "%lld codes de secours restants" : {
       "localizations" : {
         "en" : {

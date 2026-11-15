@@ -683,6 +683,9 @@ final class AppServices: ObservableObject {
         // L'alerte « Nouvel appareil » ne dépend ni des conversations ni de la bascule.
         if !ownAdded.isEmpty, session.isCurrent {
             E2EEAutoNewDeviceAlerts().record(ownAdded, ownerNamespace: session.ownerNamespace)
+            // Moment de la carte « Protège ton compte » (contrat 2FA r3.4, §6). Le lecteur ne signale
+            // que les ADD postérieures à une lecture déjà faite, hors GENESIS : jamais les ADD passées.
+            SecurityPromptCoordinator.arm(ownerScopeId: session.ownerScopeId)
         }
         guard !ownAdded.isEmpty || !contacts.isEmpty,
               let conversations = try? await messages.conversations(), session.isCurrent else { return }

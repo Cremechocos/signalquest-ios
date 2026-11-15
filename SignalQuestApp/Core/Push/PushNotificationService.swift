@@ -783,6 +783,8 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         guard let seq = E2EEAutoNewDeviceAlerts.pushSeq(info) else { return false }
         if let session = LocalAccountScope.sessionSnapshot() {
             E2EEAutoNewDeviceAlerts().expect(seq: seq, ownerNamespace: session.ownerNamespace)
+            // Un moment de la carte « Protège ton compte » (contrat 2FA r3.4, §6), après le filtre de compte.
+            SecurityPromptCoordinator.arm(ownerScopeId: session.ownerScopeId)
             NotificationCenter.default.post(name: E2EEAutoNewDeviceAlerts.pushReceived, object: nil)
         }
         return true

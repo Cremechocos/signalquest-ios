@@ -514,6 +514,8 @@ struct RootView: View {
     @StateObject private var historyRequests = E2EEAutoHistoryRequestCoordinator.live(services: AppServicesHolder.services)
     /// « Nouvelle clé d'historique » (E2EE-AUTO §5.1 r23) : bandeau dans Messages, fenêtre au toucher.
     @StateObject private var historyKeyAlerts = E2EEAutoHistoryKeyAlertCoordinator()
+    /// Carte « Protège ton compte » (contrat 2FA r3.4, §6) : en tête de la liste Messages.
+    @StateObject private var securityPrompt = SecurityPromptCoordinator()
     @EnvironmentObject private var addressStore: SQAddressStore
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
@@ -691,6 +693,7 @@ struct RootView: View {
                     // Bandeau de l'historique dans Messages.
                     .environmentObject(historyRequests)
                     .environmentObject(historyKeyAlerts)
+                    .environmentObject(securityPrompt)
                     .onAppear {
                         mainApplicationAppeared = true
                         acknowledgeGuestPresentation()

@@ -263,10 +263,15 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                 if case .failure(let failure) = $0 { return Self.stale(failure) }
                 return nil
             }) { devices in
-                await parts.messaging.send(
+                let result = await parts.messaging.send(
                     draft, clientRequestId: clientRequestId, conversationId: conversationId, isGroup: isGroup,
                     devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId
                 )
+                // Envoi chiffré réussi depuis cet appareil : un moment de la carte « Protège ton
+                // compte » (contrat 2FA r3.4, §6). Ni l'import d'historique ni les programmés ne
+                // passent par ici.
+                if case .sent = result { SecurityPromptCoordinator.arm(ownerScopeId: parts.session.ownerScopeId) }
+                return result
             }
         } catch {
             return .failure(Self.directoryFailure(error))

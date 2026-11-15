@@ -30,10 +30,14 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     let callsDoNotDisturb: Bool?
     /// Vrai si un Apple ID est associé à ce compte (Sign in with Apple).
     let appleLinked: Bool?
+    /// Carte « Protège ton compte » (contrat 2FA r3.4, §6) ; absente des anciennes API.
+    var securityPrompt: SecurityPrompt? = nil
 
     func withConfirmedTwoFactor(enabled: Bool) -> AuthUser {
         var copy = self
         copy.twoFactorEnabled = enabled
+        // Calculée avec l'ancien état : la prochaine relecture du profil fait autorité.
+        copy.securityPrompt = nil
         return copy
     }
 
@@ -65,7 +69,7 @@ extension AuthUser {
     private enum Keys: String, CodingKey {
         case id, email, emailVerified, name, handle, handleChangedAt, handleConfirmedAt, avatarUrl, bio, role
         case twoFactorEnabled, notifyMessagesPush, notifySocialPush, notifyMessagesInApp
-        case callsDoNotDisturb, appleLinked
+        case callsDoNotDisturb, appleLinked, securityPrompt
     }
 
     /// Seul `id` est indispensable : une URL d'avatar vide ou invalide, un champ
@@ -91,6 +95,7 @@ extension AuthUser {
         notifyMessagesInApp = optional(Bool.self, .notifyMessagesInApp)
         callsDoNotDisturb = optional(Bool.self, .callsDoNotDisturb)
         appleLinked = optional(Bool.self, .appleLinked)
+        securityPrompt = optional(SecurityPrompt.self, .securityPrompt)
     }
 }
 

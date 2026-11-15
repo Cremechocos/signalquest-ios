@@ -517,6 +517,7 @@ struct MessagesView: View {
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @EnvironmentObject private var historyRequests: E2EEAutoHistoryRequestCoordinator
     @EnvironmentObject private var historyKeyAlerts: E2EEAutoHistoryKeyAlertCoordinator
+    @EnvironmentObject private var securityPrompt: SecurityPromptCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -682,6 +683,15 @@ struct MessagesView: View {
                         let api = services.api
                         Task { await historyKeyAlerts.open { E2EEAutoDevicesViewModel.live(api: api) } }
                     }
+                }
+                if !showingShelved, !showingRequests, let card = securityPrompt.card(for: currentUserId) {
+                    SecurityPromptCardView(reason: card.reason, onAction: {
+                        securityPrompt.dismissForAction()
+                        router.route(toProfileScreen: .settings)
+                    }, onLater: {
+                        let service = SecurityPromptService(api: services.api)
+                        Task { await securityPrompt.later(snooze: { try await service.snooze() }) }
+                    })
                 }
                 if historyRequests.showsHistoryBanner, !showingShelved, !showingRequests {
                     historyBanner
@@ -934,6 +944,7 @@ struct MessagesView: View {
         // active et sans conversation ouverte par-dessus.
         .task(id: listIsPolling) {
             guard listIsPolling else { return }
+            await evaluateSecurityPrompt()
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 guard !Task.isCancelled else { break }
@@ -1098,6 +1109,15 @@ struct MessagesView: View {
         // Un compte sans clé v1 n'a rien à ouvrir : aucune clé ne se crée plus.
         // Un échec de lecture garde le bandeau, comme avant.
         offersE2EEUnlock = (try? await e2ee.bootstrap()).map { $0.hasKey && $0.key != nil } ?? true
+    }
+
+    /// Carte « Protège ton compte » (contrat 2FA r3.4, §6) : évaluée à chaque retour de la liste au
+    /// premier plan, comme sur Android ; un moment armé ne la montre jamais d'ailleurs.
+    private func evaluateSecurityPrompt() async {
+        guard let userId = currentUserId else { return }
+        let service = SecurityPromptService(api: services.api)
+        await securityPrompt.evaluate(userID: userId, readPrompt: { try await session.readSecurityPrompt() },
+                                      snooze: { try await service.snooze() })
     }
 
     /// Historique chiffré absent de cet appareil (E2EE-AUTO §5.3) : un bandeau
