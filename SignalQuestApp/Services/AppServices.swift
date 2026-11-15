@@ -286,10 +286,10 @@ final class AppServices: ObservableObject {
         users = UserService(api: api)
         sentinelle = SentinelleService(api: api)
         // Synchroniseur Apple branché : livre les transactions StoreKit vérifiées
-        // au backend et lit l'entitlement canonique. Les achats restent malgré
-        // tout fermés tant que les flags `SQFeatures.storeKit*` sont à `false`
-        // (activés uniquement en build staging le temps de valider la chaîne
-        // serveur) : sa seule présence n'autorise aucun débit.
+        // au backend et lit l'entitlement canonique. L'achat dépend en plus de
+        // `SQFeatures.storeKitPurchasesEnabled` et
+        // `storeKitServerVerificationEnabled`, ouverts sur toutes les
+        // configurations : sa seule présence n'autorise aucun débit.
         entitlements = EntitlementsStore(
             api: api,
             synchronizer: AppStoreTransactionSynchronizer(api: api)

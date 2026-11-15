@@ -31,8 +31,8 @@ enum SQFeatures {
     ///
     /// L'ouverture ne dépend PAS de l'état d'App Store Connect : tant qu'aucun
     /// produit n'y est disponible, `Product.products(for:)` rend une liste vide
-    /// et l'écran affiche « Catalogue App Store non configuré » — aucun achat ne
-    /// peut partir, donc aucun paiement ne peut rester sans contrepartie.
+    /// et l'écran Premium dit l'offre indisponible — aucun achat ne peut partir,
+    /// donc aucun paiement ne peut rester sans contrepartie.
     static let storeKitPurchasesEnabled = true
 
     /// Livraison d'une transaction StoreKit vérifiée au backend. Ce second
