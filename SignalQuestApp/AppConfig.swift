@@ -75,8 +75,9 @@ enum SQFeatures {
     /// Rotation depuis la base servie (E2EE-AUTO r23.1, §5.6 bis) : après « Ce n'est pas moi »,
     /// l'alerte « Nouvelle clé d'historique » promet « Ensuite, un de tes appareils remet ton
     /// historique en route. » Fermé jusqu'au « servi » de Backend, pour ne rien promettre qui
-    /// n'existe pas (§5.1, A4).
-    static let e2eeHistoryRotationFromBaseServed = false
+    /// n'existe pas (§5.1, A4). Ouvert le 16/11 : r23.1 servi le 15/11 à 23:58 (#1335, API en
+    /// 037239d17), R1 actif au dépôt et à la lecture de la chaîne.
+    static let e2eeHistoryRotationFromBaseServed = true
 
     /// Envoi des tests d'expérience (`POST /api/experience-tests`, contrat
     /// `experience-tests-v1`). Ouvert le 03/11 (décision d'Alexandre) : les tests
