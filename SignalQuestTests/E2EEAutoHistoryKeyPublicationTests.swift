@@ -306,12 +306,97 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         var state = account(hk: keys.last?.hk)
         for (index, key) in keys.enumerated() {
             state.historyKeys.append(.init(
-                seq: Int64(10 + index), entryHash: E2EEAutoLog.digest("hk\(index)"), hkPubB64: key.hk,
+                seq: Int64(10 * (index + 1)), entryHash: E2EEAutoLog.digest("hk\(index)"), hkPubB64: key.hk,
                 previousHkPubB64: key.previous ?? (index > 0 ? keys[index - 1].hk : nil), signerDeviceId: ownId,
                 signerAddedAtMs: 1, createdAtMs: Int64(index + 1), afterRevokeSeq: key.afterRevokeSeq
             ))
         }
         return state
+    }
+
+    /// La HK `index` devient celle d'un appareil révoqué juste après elle, en `reason` :
+    /// `NOT_ME` ou `EMAIL_NOT_ME` l'annulent (§5.6 bis), les autres raisons non.
+    private func signedByRevoked(
+        _ state: E2EEAutoLog.AccountState, _ index: Int, reason: E2EEAutoLog.RevokeReason = .notMe
+    ) -> E2EEAutoLog.AccountState {
+        var state = state
+        let record = state.historyKeys[index], deviceId = "web_device_intruder_000\(index)", key = Self.newKey()
+        state.historyKeys[index] = .init(
+            seq: record.seq, entryHash: record.entryHash, hkPubB64: record.hkPubB64, previousHkPubB64: record.previousHkPubB64,
+            signerDeviceId: deviceId, signerAddedAtMs: 1, createdAtMs: record.createdAtMs, afterRevokeSeq: record.afterRevokeSeq
+        )
+        state.devices[deviceId] = E2EEAutoLog.DeviceState(
+            deviceId: deviceId, platform: .web, identityKeyB64: key, signingKeyB64: Self.newKey(), keyVersion: 1, status: .revoked,
+            addedAtMs: 1, activatedAtMs: 1, addEntryHash: E2EEAutoLog.digest("add-\(deviceId)"),
+            identityKeys: [.init(keyVersion: 1, identityKeyB64: key, sinceMs: 1)],
+            revokeReason: reason, revokeSeq: record.seq + 1, revokedAtMs: 2
+        )
+        return state
+    }
+
+    /// La dernière HK est annulée : le détenteur de la base publie HK″ par-dessus la HK
+    /// littérale (CAS inchangé) ; sans la base, rien ne se publie.
+    func testRotationAfterACancelledKeyPublishesFromTheBase() async {
+        let base = Self.newKey(), cancelled = Self.newKey()
+        var due = signedByRevoked(chain([(base, nil, nil), (cancelled, nil, nil)]), 1)
+        due.rotationDueRevokeSeq = 21
+        XCTAssertEqual(due.rotationBaseHkPubB64, base)
+        let rotating = Fake(reads: [.verified(due)])
+        rotating.held = [base]
+        rotating.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        rotating.responses = [echo()]
+        let outcome = await publication(rotating).rotate()
+        XCTAssertEqual(rotating.posts.first?["previousHkPubB64"] as? String, cancelled, "previousHkPubB64 reste la littérale")
+        XCTAssertEqual(outcome, rotating.created.first.map { .present(hkPubB64: $0) })
+
+        let cancelledOnly = Fake(reads: [.verified(due)])
+        cancelledOnly.held = [cancelled]
+        cancelledOnly.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
+        _ = await publication(cancelledOnly).rotate()
+        XCTAssertTrue(cancelledOnly.posts.isEmpty, "jamais depuis la HK annulée")
+        XCTAssertTrue(cancelledOnly.created.isEmpty)
+    }
+
+    /// Une dernière HK annulée ne se demande pas (« C'est moi ») : on attend la rotation depuis la base.
+    func testCancelledLastKeyIsNotRequested() async {
+        let base = Self.newKey(), cancelled = Self.newKey()
+        let log = signedByRevoked(chain([(base, nil, nil), (cancelled, nil, nil)]), 1)
+        for held in [Set([base]), Set<String>()] {
+            let fake = Fake(reads: [.verified(log)])
+            fake.held = held
+            let outcome = await publication(fake).run()
+            XCTAssertEqual(outcome, .cancelled(hkPubB64: cancelled))
+            XCTAssertEqual(outcome.traceStep, "cancelled")
+            XCTAssertTrue(fake.posts.isEmpty)
+            XCTAssertTrue(fake.puts.isEmpty)
+        }
+        // Révoqué en EMAIL_NOT_ME aussi ; en USER, la HK n'est pas annulée et reste inattendue.
+        let email = Fake(reads: [.verified(signedByRevoked(chain([(base, nil, nil), (cancelled, nil, nil)]), 1, reason: .emailNotMe))])
+        email.held = [base]
+        let emailOutcome = await publication(email).run()
+        XCTAssertEqual(emailOutcome, .cancelled(hkPubB64: cancelled))
+        let user = Fake(reads: [.verified(signedByRevoked(chain([(base, nil, nil), (cancelled, nil, nil)]), 1, reason: .user))])
+        user.held = [base]
+        let userOutcome = await publication(user).run()
+        XCTAssertEqual(userOutcome, .unexpected(hkPubB64: cancelled))
+    }
+
+    /// §5.1 (révision 23) : une HK annulée sort du jugement, les autres HK non (vecteurs 12, 13 et 14).
+    func testCancelledKeysLeaveTheUnexpectedRule() {
+        let a = Self.newKey(), b = Self.newKey(), c = Self.newKey(), d = Self.newKey()
+        let holdsA: (String) -> Bool = { $0 == a }
+        let rotatedAfter = chain([(a, nil, nil), (b, nil, nil), (c, 21, nil)])
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.isUnexpected(signedByRevoked(rotatedAfter, 1), holds: holdsA), "13 : HK2 annulée")
+        XCTAssertTrue(
+            E2EEAutoHistoryKeyPublication.isUnexpected(signedByRevoked(rotatedAfter, 1, reason: .user), holds: holdsA),
+            "12 : un REVOKE sans annulation ne blanchit pas HK2"
+        )
+        XCTAssertTrue(E2EEAutoHistoryKeyPublication.isUnexpected(
+            signedByRevoked(chain([(a, nil, nil), (b, nil, nil), (c, nil, nil), (d, 31, nil)]), 1), holds: holdsA
+        ), "14 : la plus ancienne annulée, la suivante non")
+        XCTAssertEqual(
+            E2EEAutoHistoryKeyPublication.keysAfterLatestHeld(signedByRevoked(rotatedAfter, 1), holds: holdsA).map(\.hkPubB64), [c]
+        )
     }
 
     /// Une HK écrite hors rotation par-dessus celle que l'appareil détient : aucune

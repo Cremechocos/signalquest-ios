@@ -1,0 +1,2340 @@
+{
+  "fixtureVersion": 1,
+  "note": "E2EE-AUTO §5.6 bis (révision 23) : HK annulée, base, clé admissible, maillon à preuve, auteur d’abord, preuves et transferts indexés sur la base. Un cas se désigne par son name ; « vectors » donne les numéros de la liste « Révision 23, vecteurs à ajouter » du §11 (2b, 5b à 5f, 14b à 14j y compris). Chaque scénario est un journal à part (compte d’Alice, clé du journal épinglée sans rotation) : chaîne de maillons, tête signée, entrées du compte. Verdicts de chainDeposits : KEY → HTTP 400 E2EE_HISTORY_CHAIN_INVALID (clé non admissible, « CHAIN » côté lecteur) ; TARGET (R1, maillon vers une HK′ annulée, toujours actif) → HTTP 400 E2EE_HISTORY_CHAIN_INVALID, jamais compté par le lecteur ; PROOF et AUTHOR → HTTP 409 E2EE_HISTORY_CHAIN_UNPROVEN (preuve manquante ou périmée, auteur d’abord, et R2 : HK′ hors rotation avec exigence de preuve). requireProof = false est l’état du drapeau serveur éteint : seule la clé admissible s’applique. Les cas 11, 14b, 14c, 14d, 14f, 14g (course du CAS, alerte et grâce, côté apps) ne se rejouent pas sur le cœur ; le cas 15 est rejoué sur les journaux des autres fichiers (existingJournals).",
+  "pinnedLogKeyB64": "BIrx4dBr9DqJJZBauOvSYPcwkjmlcN4621RM4+9XNc2fHkuT9JRrH2vSFZcRUlCf5e2WY4ydg/AGZdUyrUVRvnQ=",
+  "existingJournals": [
+    {
+      "name": "journaux existants : aucune HK annulée, aucun champ dérivé nouveau (vecteur 15)",
+      "vectors": [
+        "15"
+      ],
+      "file": "log-chain-v2.json",
+      "userId": "user_alice_00000000001",
+      "cancelledHkPubB64": []
+    },
+    {
+      "name": "journaux existants : A4 révoqué NOT_ME n’est le signataire d’aucune HK",
+      "vectors": [
+        "15"
+      ],
+      "file": "history-wrap-v1.json",
+      "userId": "user_alice_00000000001",
+      "cancelledHkPubB64": []
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "HK_r annulée par NOT_ME, HK″ tournée depuis la base",
+      "vectors": [
+        "1",
+        "5f",
+        "7",
+        "9",
+        "10",
+        "13",
+        "14e",
+        "14h",
+        "14j"
+      ],
+      "note": "HK0 (D0), HK_r = hk1 (A, hors rotation), REVOKE NOT_ME de A par B, HK″ = hk2 (B, previousHkPubB64 = hk1 littérale, afterRevokeSeq = seq du NOT_ME). base(hk2) = hk0 ; la clé admissible du maillon de hk2 est hk0, jamais hk1.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nr7tgsysz2g4QVuiEwQJsiwxSYeT4kcTzXaHwle6TmMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nu4C6PDSlyKstVHeQjPlblsxlVHOdVIlPtg1QIhQmsJo\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nnJlobR5u-yWP56q373TFfTgqIis1DN9FZmSRR2DBICs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nP2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n9\nk8zAbOa0o0aYcqu5tK8VMnTYK3G8qUPnt1Ft8u3ehmU\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIBfcfFijpXzm8cCq5QORWVAGC4CC/NTLHqj0gzqw8sMOAiAEqozQuGZxoxXa7Wr9zN9y1qlWAbUMf5c/CyZhdlnlkQ=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIAe4iduMTZj7od3XFEKLTivxDTYxcNdgaYr39qhl8CeTAiBURCWawvXmkTRjKdY+JarVwsHR6OCfS9qtKy7ZZoxc4w==\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEQCIDfg7b5TRIznIsEey2yltoKsu59tKZanh5dj49jyvR14AiAwvLyTVNsW0FriJBg6mdgghd/Q3o/y57qUbQ26Mphb3Q==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQCDfNSK0vKphOhSRBw0Y1iS3Q5HjFc+lBrzC0or3d37RQIgX7ofWVqaXs006qW9FGHEpkJTFysgQaTrQwovYlOMa0o=\n1789578800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 7
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 9
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 8,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 8
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "B, auteur de HK″ : maillon sur la base avec sa preuve",
+          "vectors": [
+            "7"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "ok"
+        },
+        {
+          "name": "maillon sur HK_r annulée : refusé, même avec une preuve valide signée par HK_r",
+          "vectors": [
+            "7",
+            "14e"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEQCIHV8nzROqSoS8Io2mzpNMS98Xh8LRshBfBrmDVdammKGAiAWchzbqkxr4MQqBPAz0Gk4L/9V38eaP4SzFGJcILTftA=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "KEY"
+        },
+        {
+          "name": "B sans preuve : refusé",
+          "vectors": [
+            "10"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        },
+        {
+          "name": "preuve de D0 rejouée sous l’émetteur B : refusée",
+          "vectors": [
+            "10"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        },
+        {
+          "name": "preuve de B signée par HK_r, pas par la base : refusée",
+          "vectors": [
+            "10",
+            "14e"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEQCIHV8nzROqSoS8Io2mzpNMS98Xh8LRshBfBrmDVdammKGAiAWchzbqkxr4MQqBPAz0Gk4L/9V38eaP4SzFGJcILTftA=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        },
+        {
+          "name": "preuve pour un autre revokeSeq (preuve périmée) : refusée",
+          "vectors": [
+            "5d"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDJ5ElgV95SMuWiLHCIKVuJhrtlHMELrvOSwr1sN+GLBQIgLvlYT3M4W4bhgtFF4TUIc5D8X5hmL2hWNViBq2vBhW0="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        },
+        {
+          "name": "D0 détient la base mais n’est pas l’auteur : refusé tant que le maillon à preuve de B manque",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "AUTHOR"
+        },
+        {
+          "name": "D0 après le maillon à preuve de l’auteur : accepté",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            },
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "authorLinkPresent": true,
+          "requireProof": true,
+          "expect": "ok"
+        },
+        {
+          "name": "D0, maillon de B présent mais sans la preuve de B : refusé",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "authorLinkPresent": true,
+          "requireProof": true,
+          "expect": "AUTHOR"
+        },
+        {
+          "name": "sans exigence de preuve (drapeau éteint) : la base suffit",
+          "vectors": [
+            "7"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "ok"
+        },
+        {
+          "name": "sans exigence de preuve : un maillon sur HK_r annulée reste refusé",
+          "vectors": [
+            "7"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "KEY"
+        },
+        {
+          "name": "R1 : maillon hk0 → hk1 (cible annulée), sans exigence de preuve : refusé",
+          "vectors": [
+            "R1"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "TARGET"
+        },
+        {
+          "name": "R1 : maillon hk0 → hk1 (cible annulée), avec exigence de preuve : refusé",
+          "vectors": [
+            "R1"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "TARGET"
+        }
+      ],
+      "servedCases": [
+        {
+          "name": "preuve de D0 sur la base : servi ; preuve de C signée par HK_r : non servi",
+          "vectors": [
+            "5f",
+            "9"
+          ],
+          "rotationHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "selfDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            },
+            {
+              "deviceId": "device_alice_hc_000004",
+              "signatureB64": "MEUCIQCPwHt4L/8+9oMN88vxj+Tsi9St6b9knb4sscsx08W0PAIgD5O7IwcbYbMJw78Cp1FHxVQPXfDSjMII5J1kTuXJUok="
+            }
+          ],
+          "served": [
+            "device_alice_h0_000001"
+          ]
+        },
+        {
+          "name": "seules des preuves signées par HK_r (annulée) : personne n’est servi",
+          "vectors": [
+            "5f"
+          ],
+          "rotationHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "selfDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hc_000004",
+              "signatureB64": "MEUCIQCPwHt4L/8+9oMN88vxj+Tsi9St6b9knb4sscsx08W0PAIgD5O7IwcbYbMJw78Cp1FHxVQPXfDSjMII5J1kTuXJUok="
+            },
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEUCIQD2iQnOjGYTUvx7yEnKpWtP5+0t1vHBToDsdHW2e0x2LgIgfbhxOTnQJK3j4bv+epBIx4PftvtsbLLJO3cZeh0I+gs="
+            }
+          ],
+          "served": []
+        },
+        {
+          "name": "preuve de D0 pour un autre revokeSeq : non servi",
+          "vectors": [
+            "5d",
+            "9"
+          ],
+          "rotationHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "selfDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEUCIQDEnYXn4nkpNfGcq6JDTMkYTNomnIir7zNGFiHIYz5z+AIgaPDR/cIld6x3HdayTpKwAJi2j41isfk8/qJCUJtVK3g="
+            }
+          ],
+          "served": []
+        }
+      ],
+      "transferCases": [
+        {
+          "name": "D0 détient la base (hk0) : le transfert de HK″ est accepté",
+          "vectors": [
+            "9"
+          ],
+          "wrap": {
+            "senderDeviceId": "device_alice_hb_000003",
+            "recipient": "device_alice_h0_000001",
+            "keyVersion": 1,
+            "requestId": "rotation-9",
+            "addHash": "fgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI",
+            "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+            "ephemeralB64": "BGHmVVphrJo9zD6wT3fJ8pYsh5cnYud4XBZhx+kGnNKR0VqD4aQOqfpuHnl/OrQwyr4nCtKQivSDIQto+GYSRFw=",
+            "nonceB64": "XEhteVcBeYp3LDfs",
+            "wrappedB64": "WD9TcBvDimAepCAzvTi9yAHwotA5+XcYvjnkUgd4dtANOCqDwulGGxxyFpQxVnX8",
+            "signatureB64": "MEQCIDvJFenuF2Au5K+qb7tPlC/kmnXRtaEuzPaflxZSUICtAiBh366eEoQYD2dMvpYyqtD9atUQHzhvOzVqV/E1/QpXPA=="
+          },
+          "reader": {
+            "kind": "device",
+            "deviceId": "device_alice_h0_000001",
+            "keyVersions": [
+              1
+            ],
+            "openRequestIds": [],
+            "heldHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+            "rotationLinkProven": true
+          },
+          "expect": "ok"
+        },
+        {
+          "name": "D0 ne détient que HK_r annulée : le transfert est refusé (la clé admissible est la base)",
+          "vectors": [
+            "5f",
+            "9"
+          ],
+          "wrap": {
+            "senderDeviceId": "device_alice_hb_000003",
+            "recipient": "device_alice_h0_000001",
+            "keyVersion": 1,
+            "requestId": "rotation-9",
+            "addHash": "fgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI",
+            "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+            "ephemeralB64": "BGHmVVphrJo9zD6wT3fJ8pYsh5cnYud4XBZhx+kGnNKR0VqD4aQOqfpuHnl/OrQwyr4nCtKQivSDIQto+GYSRFw=",
+            "nonceB64": "XEhteVcBeYp3LDfs",
+            "wrappedB64": "WD9TcBvDimAepCAzvTi9yAHwotA5+XcYvjnkUgd4dtANOCqDwulGGxxyFpQxVnX8",
+            "signatureB64": "MEQCIDvJFenuF2Au5K+qb7tPlC/kmnXRtaEuzPaflxZSUICtAiBh366eEoQYD2dMvpYyqtD9atUQHzhvOzVqV/E1/QpXPA=="
+          },
+          "reader": {
+            "kind": "device",
+            "deviceId": "device_alice_h0_000001",
+            "keyVersions": [
+              1
+            ],
+            "openRequestIds": [],
+            "heldHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+            "rotationLinkProven": true
+          },
+          "expect": "ROTATION"
+        },
+        {
+          "name": "D0 détient la base mais aucun maillon à preuve n’existe pour HK″ : transfert ignoré (T1)",
+          "vectors": [
+            "14h"
+          ],
+          "wrap": {
+            "senderDeviceId": "device_alice_hb_000003",
+            "recipient": "device_alice_h0_000001",
+            "keyVersion": 1,
+            "requestId": "rotation-9",
+            "addHash": "fgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI",
+            "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+            "ephemeralB64": "BGHmVVphrJo9zD6wT3fJ8pYsh5cnYud4XBZhx+kGnNKR0VqD4aQOqfpuHnl/OrQwyr4nCtKQivSDIQto+GYSRFw=",
+            "nonceB64": "XEhteVcBeYp3LDfs",
+            "wrappedB64": "WD9TcBvDimAepCAzvTi9yAHwotA5+XcYvjnkUgd4dtANOCqDwulGGxxyFpQxVnX8",
+            "signatureB64": "MEQCIDvJFenuF2Au5K+qb7tPlC/kmnXRtaEuzPaflxZSUICtAiBh366eEoQYD2dMvpYyqtD9atUQHzhvOzVqV/E1/QpXPA=="
+          },
+          "reader": {
+            "kind": "device",
+            "deviceId": "device_alice_h0_000001",
+            "keyVersions": [
+              1
+            ],
+            "openRequestIds": [],
+            "heldHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+            "rotationLinkProven": false
+          },
+          "expect": "ROTATION"
+        },
+        {
+          "name": "lecteur d’avant la révision 23 (rotationLinkProven absent) : seule la clé admissible compte",
+          "vectors": [
+            "9"
+          ],
+          "wrap": {
+            "senderDeviceId": "device_alice_hb_000003",
+            "recipient": "device_alice_h0_000001",
+            "keyVersion": 1,
+            "requestId": "rotation-9",
+            "addHash": "fgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI",
+            "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+            "ephemeralB64": "BGHmVVphrJo9zD6wT3fJ8pYsh5cnYud4XBZhx+kGnNKR0VqD4aQOqfpuHnl/OrQwyr4nCtKQivSDIQto+GYSRFw=",
+            "nonceB64": "XEhteVcBeYp3LDfs",
+            "wrappedB64": "WD9TcBvDimAepCAzvTi9yAHwotA5+XcYvjnkUgd4dtANOCqDwulGGxxyFpQxVnX8",
+            "signatureB64": "MEQCIDvJFenuF2Au5K+qb7tPlC/kmnXRtaEuzPaflxZSUICtAiBh366eEoQYD2dMvpYyqtD9atUQHzhvOzVqV/E1/QpXPA=="
+          },
+          "reader": {
+            "kind": "device",
+            "deviceId": "device_alice_h0_000001",
+            "keyVersions": [
+              1
+            ],
+            "openRequestIds": [],
+            "heldHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo="
+          },
+          "expect": "ok"
+        }
+      ],
+      "provenLinkCases": [
+        {
+          "name": "R1 : maillon hk0 → hk1 (cible annulée) de B, même avec une preuve : ne compte pas",
+          "vectors": [
+            "R1"
+          ],
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BAhzwHO7N/Dyk0AEcOE4cmeLPQVhqA+coJDCBKtlXM5yjPftH/vUeEkAWHO5y26RucayxPY9ToW+67r3yJ4vXN8=",
+              "nonceB64": "B8AWsceVfhhR/J1i",
+              "wrappedB64": "LzG3YpAV/E/Rq4p3i7F9XalnbfE8nT9TZi62BbqSd1n8oAVMrl0/6kYZ3uJU+rOF",
+              "signatureB64": "MEQCIFnGZIxJlidDURf0SeQbj2a+mX0Xaysj9Ekkrhk/wK4tAiBeMenyTpIdwsfI/TIqg+eshOeiOQC5xD8hfKu7JXWKUg=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "senders": [],
+          "readerError": "CHAIN"
+        },
+        {
+          "name": "B (auteur) et D0 : deux maillons à preuve",
+          "vectors": [
+            "7",
+            "9"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_h0_000001",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BKPIEFbFguZG7QTRGJ4JPreCsCJBqU20EaQf2Ph37wonVlN4/WTH1U1Ixa5zvOqdLrx6SdbET8thh1qrlNzPSPg=",
+              "nonceB64": "Dy51I+Prl6oXNp7S",
+              "wrappedB64": "pc2sTZlWY8KJhH9dKPIaeWgZ4chP8He+JJxAGqrXjwWZY5QAL/NO9JhpPUxmojIO",
+              "signatureB64": "MEUCIQCEgHGKIcmhRqWPfC5xnZd2MwtGCrIobN917Jpbl4y8+gIgMh/laNuSdIgY/1OMPeyv5ZE7lq+N6ONWkREwqpe69PY="
+            },
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCYy3nHrjV+Iln0Z06RrPpVKSmmwlNs/o9wu6ooiXGCPx4BXs7ji+hRZJqxl1mtsldH7w0GOuAoXkATRPrOHmyI=",
+              "nonceB64": "+01n8pTV8gIZAbaD",
+              "wrappedB64": "cTmvDjyMyapmaZUHJTzj2v3zccYmh09cx9H7sfA1Guv7Z/zZ9UdTBpsBcme5m3NZ",
+              "signatureB64": "MEQCIGnCcpvHbx7ZSuzTNjiD6k+w7eiWMrGJwlP6i9QvbatTAiB1Snz0GW3yEc3qQkJHtkKWCQAuVB2Okr1hCsWaKX9a/Q=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            },
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "senders": [
+            "device_alice_h0_000001",
+            "device_alice_hb_000003"
+          ]
+        },
+        {
+          "name": "le maillon de D0 seul, sans celui de l’auteur : HK″ sans maillon à preuve",
+          "vectors": [
+            "14j"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_h0_000001",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BKPIEFbFguZG7QTRGJ4JPreCsCJBqU20EaQf2Ph37wonVlN4/WTH1U1Ixa5zvOqdLrx6SdbET8thh1qrlNzPSPg=",
+              "nonceB64": "Dy51I+Prl6oXNp7S",
+              "wrappedB64": "pc2sTZlWY8KJhH9dKPIaeWgZ4chP8He+JJxAGqrXjwWZY5QAL/NO9JhpPUxmojIO",
+              "signatureB64": "MEUCIQCEgHGKIcmhRqWPfC5xnZd2MwtGCrIobN917Jpbl4y8+gIgMh/laNuSdIgY/1OMPeyv5ZE7lq+N6ONWkREwqpe69PY="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "senders": []
+        },
+        {
+          "name": "maillon de l’auteur sans sa preuve : aucun maillon à preuve, celui de D0 ne compte pas",
+          "vectors": [
+            "14j"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCYy3nHrjV+Iln0Z06RrPpVKSmmwlNs/o9wu6ooiXGCPx4BXs7ji+hRZJqxl1mtsldH7w0GOuAoXkATRPrOHmyI=",
+              "nonceB64": "+01n8pTV8gIZAbaD",
+              "wrappedB64": "cTmvDjyMyapmaZUHJTzj2v3zccYmh09cx9H7sfA1Guv7Z/zZ9UdTBpsBcme5m3NZ",
+              "signatureB64": "MEQCIGnCcpvHbx7ZSuzTNjiD6k+w7eiWMrGJwlP6i9QvbatTAiB1Snz0GW3yEc3qQkJHtkKWCQAuVB2Okr1hCsWaKX9a/Q=="
+            },
+            {
+              "senderDeviceId": "device_alice_h0_000001",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BKPIEFbFguZG7QTRGJ4JPreCsCJBqU20EaQf2Ph37wonVlN4/WTH1U1Ixa5zvOqdLrx6SdbET8thh1qrlNzPSPg=",
+              "nonceB64": "Dy51I+Prl6oXNp7S",
+              "wrappedB64": "pc2sTZlWY8KJhH9dKPIaeWgZ4chP8He+JJxAGqrXjwWZY5QAL/NO9JhpPUxmojIO",
+              "signatureB64": "MEUCIQCEgHGKIcmhRqWPfC5xnZd2MwtGCrIobN917Jpbl4y8+gIgMh/laNuSdIgY/1OMPeyv5ZE7lq+N6ONWkREwqpe69PY="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "senders": []
+        },
+        {
+          "name": "maillon de B sur HK_r annulée, même avec une preuve signée par HK_r : ne compte pas",
+          "vectors": [
+            "7",
+            "14e"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "ephemeralB64": "BJbymH+jpfgtL//fBifqaC2QRzZRmUrNSVQW8BXiRFeNnyxXsDd79A96BZtIM1q62eewvB9lvjKWboga+zlDJr8=",
+              "nonceB64": "BghUqujV9+Rsgi3G",
+              "wrappedB64": "OOKmgr2EuAzZZEHeX3xjnDziZYQW7/ujF7aq3B6Bc83/aukD2u7E4Va0lxSYCRfG",
+              "signatureB64": "MEQCIGvNMLVHBQRVO4/gbojOEtkInPaPo3D9dZAZEIcM5k1hAiArSSds9ZmJC0RD5dMttwILTVzAI17yWoH2qpWcdwHj5Q=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEQCIHV8nzROqSoS8Io2mzpNMS98Xh8LRshBfBrmDVdammKGAiAWchzbqkxr4MQqBPAz0Gk4L/9V38eaP4SzFGJcILTftA=="
+            }
+          ],
+          "senders": []
+        },
+        {
+          "name": "maillon au contenu faux signé par B, sans preuve : ne compte pas",
+          "vectors": [
+            "10"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BO88ai0+Krf3K9gRix2vBDR/8k+IXiSbo8bIo78esr/gUaPxVo3LyYN2LHQ0+AU2X6DfpSp6waYq92LZbGAMMg8=",
+              "nonceB64": "XoZkEXBNegrTq9zX",
+              "wrappedB64": "+1mZa3QNOvjrdef8FnTSvpTgdFMzps9hjbWiDS9NGGjxO/mRUTAO8z7qU5w89ef3",
+              "signatureB64": "MEQCIGgZbq+EXSEqv0gYnHsH+wcTO9DrAfzkdhuG695A3EH0AiABajGT9KoRgdzDOpXBxQIKA6TmYBbzUM916fAWFrU4Bg=="
+            }
+          ],
+          "proofs": [],
+          "senders": []
+        },
+        {
+          "name": "preuve de D0 rejouée sous B : le maillon de B ne compte pas",
+          "vectors": [
+            "10"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "P2DjRCqSi87gCRpeNYOnXEm8qphLp7NPzC_zNYGk39U",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCYy3nHrjV+Iln0Z06RrPpVKSmmwlNs/o9wu6ooiXGCPx4BXs7ji+hRZJqxl1mtsldH7w0GOuAoXkATRPrOHmyI=",
+              "nonceB64": "+01n8pTV8gIZAbaD",
+              "wrappedB64": "cTmvDjyMyapmaZUHJTzj2v3zccYmh09cx9H7sfA1Guv7Z/zZ9UdTBpsBcme5m3NZ",
+              "signatureB64": "MEQCIGnCcpvHbx7ZSuzTNjiD6k+w7eiWMrGJwlP6i9QvbatTAiB1Snz0GW3yEc3qQkJHtkKWCQAuVB2Okr1hCsWaKX9a/Q=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "senders": []
+        }
+      ]
+    },
+    {
+      "name": "HK_r en forme de rotation après une auto-révocation, annulée par NOT_ME (cas H1)",
+      "vectors": [
+        "2",
+        "10",
+        "14e"
+      ],
+      "note": "HK0 (D0), REVOKE USER de J par lui-même, HK_r = hk1 (A, afterRevokeSeq = seq de cet USER : elle a la forme d’une rotation), REVOKE NOT_ME de A par B, HK″ = hk2 (B). base(hk2) = hk0. Le maillon au contenu faux signé par A (qui ne détient pas hk0) ne compte pas sans preuve.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\no5IjojNyMrf9onvC8n5oXbfE7WceaVohLe-TrzWj8E0\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\n1tcIJxiW8LA0XR_inyPaz4fExUXOB43id5nz3ndwVmA\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nC6pNdG4ZDX4CCvZoqG4TeWxEzkr9ePBZbcLpv7DziRY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\n8ntbTCxyFzji7FFpUlKt3msewUpg7as9bXslBAiL30I\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\njXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nMBiaIgu1LyiNwSUs1D6BAJtFm1egKzCt1QbIe2jPoEs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n7ga7rTcNquWZMwhVyRf9fkisSgGd7o1ZBeYXCnQp_Ds\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nXfaXOJ-38nsPpFA4iTIDE5nkDpjnk2ESwqGlTDanXcM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\neJn7fIcJLigGBkE1ENKwUoZ6xROgBWKgggOTcvQaCtg\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n10\nlPD2cKH7Io5L5u-fhG2mX4Q2bOpwdV2NzYu2Hmji8nw\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQDj4weJXJUI/viX1BKy8CvYb99WNS/oU9Ozg1SWIXljSgIgYHFoq9dYS0wf3dw4qNqXtF1E+hW92UYuVOcv02nSE/s="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hj_000007\nandroid\nBGSoATXAblx5Cu77a1JRp/1nrRZXjeOS/UYErPBhaYmMby24JZhB9jntJUAFMi/vrdKTY6YVQXbLcAvVjHLvAms=\nBALQWfMWGvlk734JcdZZJZMSBrqXqNMhXiyShJEEhxSOH8aUO/nOP3cFvRlmykqDLWwyzEAZe7ZwWOiqrJld9sg=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\no5IjojNyMrf9onvC8n5oXbfE7WceaVohLe-TrzWj8E0\nREVOKE\ndevice_alice_hj_000007\n-\n-\n-\n-\nUSER:device_alice_hj_000007:MEUCIQDQS8T4pOUytqRAn1S7fg1vwYjMe8HF7Ke7xJamAtRGpgIgX022hxjwxOgF2STUUYtK+57drQY5jYqySv1VEI3P0HE=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nC6pNdG4ZDX4CCvZoqG4TeWxEzkr9ePBZbcLpv7DziRY\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIEy4Y4gDRjqEikYgaF91TMYuzu/HHVkOHNbFuCXKZYA9AiBZVLCh0l1GZKfelAKAPcos+WwC6YZr/TJQK1LlqlD8gQ==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\njXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEUCIQC+SXgKyD72P+kH2jciJ5rjix+o8B6cudcKP849VZSt3QIgeO4N4GbGLo5j4yvie/igirjgNFjzRw3QntyDyvNK8Ck=\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\n7ga7rTcNquWZMwhVyRf9fkisSgGd7o1ZBeYXCnQp_Ds\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQDQ7cRwKYxqXzCm0SER8EiYIdnjqCB51yfhAsSg9XuoNQIgGa9LjA9KLpn1pTQUv7efnhgP8SQ8dOs7QJdpvNn7HZ4=\n1789582400000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 8
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 10
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 9,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 7
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 9
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "A, signataire de HK_r, dépose un maillon au contenu faux vers HK_r (annulée) : refusé (TARGET, avant même la preuve)",
+          "vectors": [
+            "10"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_ha_000002",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "TARGET"
+        },
+        {
+          "name": "A avec la preuve d’un autre appareil rejouée sous son nom : refusé",
+          "vectors": [
+            "10"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_ha_000002",
+          "proofs": [
+            {
+              "deviceId": "device_alice_ha_000002",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "TARGET"
+        },
+        {
+          "name": "R1 : A détient hk0 et hk1 et prouve hk0, mais hk1 est annulée : maillon vers une cible annulée refusé",
+          "vectors": [
+            "R1",
+            "14e"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_ha_000002",
+          "proofs": [
+            {
+              "deviceId": "device_alice_ha_000002",
+              "signatureB64": "MEUCIQCvG0kNwSTO5kEw5UbhIbYoSuHd/feaRePiNGKsR922vAIgD9OzMEWH4Mim/3CBzHpGJuzJvFWPxRSYAAzdJoQVG+I="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "TARGET"
+        },
+        {
+          "name": "maillon de B sur la base, avec preuve : accepté",
+          "vectors": [
+            "2"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDpxJpcn94L+f5pS2zCrBG9f++gbCca5wWK5XVila5h7wIgdTsrh/JdbtoEDMTrz3xJNZpxll/5sZ+N5vyKsfaIb/o="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "ok"
+        },
+        {
+          "name": "maillon de B sur HK_r annulée : refusé",
+          "vectors": [
+            "2",
+            "14e"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQCI/Vtoy/DXVBOPDOBz2WIHD1iVpRDU6gi3gRamdi51aQIgXPMdySypwAuYuZR+Aqv8v68m2JmmpiqR+9VFc1PF4G4="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "KEY"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": [
+        {
+          "name": "maillon au contenu faux de A sur hk0 → hk1, sans preuve : ne compte pas",
+          "vectors": [
+            "10"
+          ],
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_ha_000002",
+              "recipient": "history:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "jXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCQVO/Pm9UmNn23Rx26SGRuZKy54GLMI4oe2sZSBqcOjWkoMYVhhYs0f1cu08eIwWQvnUw133KfzOnBu03EoNmc=",
+              "nonceB64": "/JuGomlXgyrYxWnB",
+              "wrappedB64": "mjnYC+1Zs61R3iKMDiRzstT3T4FbvFY2NH+HOYlUR/lcGykBuSKT9fYKvaUPATbm",
+              "signatureB64": "MEQCIB5Wk778RugkzK5D9xvDihrddudmiqtaLkXG4e8PCgjPAiAwBB8pxR+hKCXWgFCAR/1MGOmUMcH1OGjnAje/o1LPRw=="
+            }
+          ],
+          "proofs": [],
+          "senders": []
+        },
+        {
+          "name": "R1 : même maillon avec une preuve valide de A sur hk0 : ne compte pas, la cible hk1 est annulée",
+          "vectors": [
+            "R1",
+            "14e"
+          ],
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_ha_000002",
+              "recipient": "history:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "jXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCQVO/Pm9UmNn23Rx26SGRuZKy54GLMI4oe2sZSBqcOjWkoMYVhhYs0f1cu08eIwWQvnUw133KfzOnBu03EoNmc=",
+              "nonceB64": "/JuGomlXgyrYxWnB",
+              "wrappedB64": "mjnYC+1Zs61R3iKMDiRzstT3T4FbvFY2NH+HOYlUR/lcGykBuSKT9fYKvaUPATbm",
+              "signatureB64": "MEQCIB5Wk778RugkzK5D9xvDihrddudmiqtaLkXG4e8PCgjPAiAwBB8pxR+hKCXWgFCAR/1MGOmUMcH1OGjnAje/o1LPRw=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_ha_000002",
+              "signatureB64": "MEUCIQCvG0kNwSTO5kEw5UbhIbYoSuHd/feaRePiNGKsR922vAIgD9OzMEWH4Mim/3CBzHpGJuzJvFWPxRSYAAzdJoQVG+I="
+            }
+          ],
+          "senders": [],
+          "readerError": "CHAIN"
+        },
+        {
+          "name": "même maillon, avec la preuve de D0 rejouée sous A : ne compte pas",
+          "vectors": [
+            "10"
+          ],
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_ha_000002",
+              "recipient": "history:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "jXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BCQVO/Pm9UmNn23Rx26SGRuZKy54GLMI4oe2sZSBqcOjWkoMYVhhYs0f1cu08eIwWQvnUw133KfzOnBu03EoNmc=",
+              "nonceB64": "/JuGomlXgyrYxWnB",
+              "wrappedB64": "mjnYC+1Zs61R3iKMDiRzstT3T4FbvFY2NH+HOYlUR/lcGykBuSKT9fYKvaUPATbm",
+              "signatureB64": "MEQCIB5Wk778RugkzK5D9xvDihrddudmiqtaLkXG4e8PCgjPAiAwBB8pxR+hKCXWgFCAR/1MGOmUMcH1OGjnAje/o1LPRw=="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_ha_000002",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "senders": []
+        }
+      ]
+    },
+    {
+      "name": "USER, auto-révocation, ADMIN et INACTIVE n’annulent rien",
+      "vectors": [
+        "2b",
+        "14i"
+      ],
+      "note": "Chaque signataire de HK1 à HK4 est révoqué dans la fenêtre de sa HK, par USER (A, auto-révocation), ADMIN (C), INACTIVE (E), USER signé par D0 (F). Aucune HK n’est annulée ; la clé admissible est toujours la HK littérale précédente (T4 : un signataire déjà retiré pour une autre raison rend sa HK non annulable).",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\naUzH0wKEZOFXKxZWokbL63lhEm-w6yxAfAz3-Mmy4E0\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nzlmxt7IIhv3Tim4mGU1mqyX6_LFE92cD4jeintJXmPM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n0CQZhpohgGrGC_PJpsBfr2GkRt1MwDGQfaGHylNAYqI\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nWYIV8vEy_ZqmHxOwOMzAgF9JZj6Vhvzdq3nY1jq1m4k\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n_G4g8KahwbkvEno1IYw11LDB9WiwT005kdMoil7jIgc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nYgA8poUK_5Sqa7eqFkFRYoX363YzNwcw7x1McGlcN1Q\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nrQpSA8k8QHcwyhVSyPNbJMWRrqLm2Xx6l_TgIJegd60\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nf3nn-l51gZyKhaMO337t_Gg9gRt26TIz_Qqn-aEoovY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nrmySfTmlnp9pvpTwp7NY5iunkzdYG2kvMsWDQv_NqPQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nLI8OyPeoiO_3Y1TBtDbEt3cFnnmnsQ37wTu90dWZFec\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nbf2TqPxl7McJhMB7_8DDgH-1kOPvBBzzcfWLvM2b2GM\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\nEnY1Di9QfJeYEOID7Uq9zGKDCnlQ2iPudN5dW520UVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nn5RuYtIP2tzOxOYKijeyguQc4o1DciQMMpQKhEh6iPU\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\nKxuiVj2sJhcOmL_Bnu-Qd4bGf2cc5_HOtEIfvJQB3Lc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n0Su9z22-G3hfTFizOO9qNxCmZo3SMgI4dkJB0PvbGgk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\n0vsxoqm5Uybkc_Y-Tr5xi37oEfUTmoqYUIyW1DRTWuE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nnUrD-jIciWmUs8aV5oZfu3zkqSO_p8-GpDf0sQlnIA0\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\nL146Kjd5uIFT7GoynGSptsmA-g2UhhfzcgUYXnPZDc0\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nd3cXUvUEWo6fRTzGtK-ZJ9VVp5UvEjH1XgGD9KRB6Nk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n15\n8tFjyx0fA3QE2ojpzbFMGbUHAnrDueURg-GPRZJeyCM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\niEcqxApJZIums8KjQodPvhA_oW2DhhoBmMpyqc_6_N8\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n15\nOD9cA7QvcXaAbtUxpWY63QFNOhtEViDtRoQQfEOjPxU\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQC1k4+T+f7rJw8BTTlYdY6VLbMEjrzmPixITaJgdlO43AIgW+LXiFAkJOq4a1NdSMmULo5anyGLOdN67+Axx8s8XVg="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\naUzH0wKEZOFXKxZWokbL63lhEm-w6yxAfAz3-Mmy4E0\nADD\ndevice_alice_he_000005\nandroid\nBPd+EDcMmANlmNdcQfkWiMS25KHB1IVFnYycZANlZnZTgnEjSAN+dPsOmGMm2vf0UFAgytvmlyxRIeA42n8n0VQ=\nBAmJM59ODOJStnebvn5oJNOeJSDbKDN4RbAEUoYTniTeOFCFISFCrNlzujvWOiAyKNFuu/e/Vatn491U/jK/wvg=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\n0CQZhpohgGrGC_PJpsBfr2GkRt1MwDGQfaGHylNAYqI\nADD\ndevice_alice_hf_000006\nandroid\nBDT4NnVWCEocYeiRWJDRwnLbriZUOyDDjGMSCWsZ/CRDmsbmuHvM1tifcLyuSKJP3mT40kIb1ZPo/e2iqEW8xJM=\nBFLhRlz2gVkyQylw2OBWdA7ed+uL0DKbxPMqmCUfSYSJKx3RLXPEpMp2ay1LHOm+0J4zupnlZW9Rr15wGkGjNUg=\n1\n-\n1789319600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n_G4g8KahwbkvEno1IYw11LDB9WiwT005kdMoil7jIgc\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQCr/hyftLgPuU0TkG79bzufqlMaBRkA95H/eJjsiiHzmAIgYTIqKu2iGo41a5+TCMy88mM/+ZTcXydG1VieZKAZYRc=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nrQpSA8k8QHcwyhVSyPNbJMWRrqLm2Xx6l_TgIJegd60\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nUSER:device_alice_ha_000002:MEQCIGGa4ULVngItqlo3AQtNklO8pvEs2HZh8VF3oEim4HTBAiAi4Orm+nsEP1l9L1Yg9MzwLjlC5UENDCwpWujf+HZB8Q==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nrmySfTmlnp9pvpTwp7NY5iunkzdYG2kvMsWDQv_NqPQ\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hc_000004:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQD/RKlw8ROe5zZjxiNRuebpkVMH/VaakFWhs7WqN4yaBQIgUgqUvqnBjJ4yX4fltg694iYTBnQSAoKKvBPCGfD1wZc=\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nbf2TqPxl7McJhMB7_8DDgH-1kOPvBBzzcfWLvM2b2GM\nREVOKE\ndevice_alice_hc_000004\n-\n-\n-\n-\nADMIN\n1789582400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n12\nuser_alice_00000000001\nn5RuYtIP2tzOxOYKijeyguQc4o1DciQMMpQKhEh6iPU\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_he_000005:BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=:MEUCIQCIhqFYqO4LVKfT0zq6SxQqPGJH19J/0xyD0m5w0feDGQIgLcq40/hurbHsyUQUfPzPuc3Q0gEF4ma6hnNhfQMpsTQ=\n1789586000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\nuser_alice_00000000001\n0Su9z22-G3hfTFizOO9qNxCmZo3SMgI4dkJB0PvbGgk\nREVOKE\ndevice_alice_he_000005\n-\n-\n-\n-\nINACTIVE\n1789589600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n14\nuser_alice_00000000001\nnUrD-jIciWmUs8aV5oZfu3zkqSO_p8-GpDf0sQlnIA0\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hf_000006:BCiWmagXqjNO1YhQyJ9Ll/ed3NhRwozJfWn45vTk6R8LNdhYvcn4EDhai7wwdo3WTyEWFmpZE/9dvz3CH20Aaj4=:MEQCIHdBf04vOeaBo0izGMEAdp5ekvFakRsH0TeNUb8WT3B7AiBGYitlgKbAB7wD+MdhZ7g9CUGYw+suXHJAgznfVl0jPg==\n1789593200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n15\nuser_alice_00000000001\nd3cXUvUEWo6fRTzGtK-ZJ9VVp5UvEjH1XgGD9KRB6Nk\nREVOKE\ndevice_alice_hf_000006\n-\n-\n-\n-\nUSER:device_alice_h0_000001:MEQCIAxiQMv8lbS0XP4xmRNZjAcgatwq0QtPWYBVQX5Bl7TsAiAnNZYpOralTLh1UN0VgoLTzpvQHuuzCWHeC2M5kAHlzg==\n1789596800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 8
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 10
+        },
+        "hk3": {
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "scalarB64": "k2BYj8rX5jNPiFF4ecixpmFckTzCAqsuWv8gOMhcW5I=",
+          "seq": 12
+        },
+        "hk4": {
+          "hkPubB64": "BCiWmagXqjNO1YhQyJ9Ll/ed3NhRwozJfWn45vTk6R8LNdhYvcn4EDhai7wwdo3WTyEWFmpZE/9dvz3CH20Aaj4=",
+          "scalarB64": "j+lltySTTGYdvIhvFa5yicBOeg0InGOR03RBcaHaz8Y=",
+          "seq": 14
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "admissibleHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "afterRevokeSeq": 9
+        },
+        {
+          "hk": "hk3",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "admissibleHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "afterRevokeSeq": 11
+        },
+        {
+          "hk": "hk4",
+          "hkPubB64": "BCiWmagXqjNO1YhQyJ9Ll/ed3NhRwozJfWn45vTk6R8LNdhYvcn4EDhai7wwdo3WTyEWFmpZE/9dvz3CH20Aaj4=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "admissibleHkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "afterRevokeSeq": 13
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "maillon sur la littérale non annulée (hk3 → hk4), sans exigence de preuve",
+          "vectors": [
+            "2b"
+          ],
+          "previousHkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "hkPubB64": "BCiWmagXqjNO1YhQyJ9Ll/ed3NhRwozJfWn45vTk6R8LNdhYvcn4EDhai7wwdo3WTyEWFmpZE/9dvz3CH20Aaj4=",
+          "senderDeviceId": "device_alice_hf_000006",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "ok"
+        },
+        {
+          "name": "maillon sur hk2 pour hk4 : ce n’est pas la clé admissible (hk3 n’est pas annulée)",
+          "vectors": [
+            "8"
+          ],
+          "previousHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "hkPubB64": "BCiWmagXqjNO1YhQyJ9Ll/ed3NhRwozJfWn45vTk6R8LNdhYvcn4EDhai7wwdo3WTyEWFmpZE/9dvz3CH20Aaj4=",
+          "senderDeviceId": "device_alice_hf_000006",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "KEY"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "NOT_ME posé après la HK suivante : non annulée",
+      "vectors": [
+        "3",
+        "5b"
+      ],
+      "note": "HK1 (A), HK2 (B), puis REVOKE NOT_ME de A par B : son seq est supérieur à celui de la HK suivante (HK2), hors fenêtre. HK1 n’est pas annulée. Le révocateur n’entre pas dans le calcul.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nAT9ruVzZHzaFE3WFPJxjk_nBG-rtnHa_4BNiRE6NC-g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nhtBBEXvHvJognFwUPkkTX2lqf5DuIHWMsgBWja9-bGA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nMUWwf4P_NFYn8WIDe9UGxziVzJyP9dhTy6mEnFx4WMc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nCepbH7LRpERPTTrFHlkDOfMianOWg5iMff0vAk8MRPk\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n8\nu178RN3xr2HCI_D41KCl6aNGPKZr0EDpEKqsq0QSy8g\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQCiT8I60zxzOXzx5+laSWageZcQxYl+1757ZA1JIDur9gIgHl9ffdqJko+V+Xq2ubXD1pmWQT07nvCWA0+gcUTS7F8="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQCIckPtaRMp2zxlwJOQOcLjnRbFNpsKp01vbNnmQkBiDgIgQoo7QEjm2RHfYf2S0uCdRTvEe/H5Vh22PqaL928ttlg=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQDWxIah0JdmZ4EX0u/2Hg/1doJO33BMdXYXmkbjoxskFwIgH0MOtzk6Vak6Ur7u/zjtDk7tB7neri6IChbsvNA08pE=\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nhtBBEXvHvJognFwUPkkTX2lqf5DuIHWMsgBWja9-bGA\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEUCIQCdqKjx5Ett2F+pE/W+7g0Xv/jZyl+Z9xl9aTAe5JjkOQIgfwQsIiRZem3psT9Q1jSSd/Db4hXhhWTKnBMDD/Y+Au8=\n1789578800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 6
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 7
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "admissibleHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "afterRevokeSeq": null
+        }
+      ],
+      "chainDeposits": [],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "la première HK n’est jamais annulée",
+      "vectors": [
+        "4"
+      ],
+      "note": "HK0 est signée par D0, que B révoque ensuite en NOT_ME. La première HK ne s’annule jamais : base(hk1) = hk0, clé admissible hk0.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndX3d_661NcdgpWD8USBKrp7IiQJcBfaItOEF_uhds8s\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\nTrrX96SieF67d33jjFazEDwWdi0wgBWvSV6B_rdn-tI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nAeoMhVSIsVfo8HlHCU6W-29HNRwjmAh-89Fe0o_kQkE\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nP2ZX9_A4Z6lAOhg61NOYqIJn9vQ7itjbM0-8_QNHPSM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nrkopd1vCZsBSTKqsMxfF6i9EFBxXwt6qqYXiAJoLe0c\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n6\nZI9y5jPo6SwjMEqsjkEdQYa13psoM0bDIVgJu9rSzCo\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIHvnx2kSFHZhTs1wfrZja5xbSVRfW5gV9E7aL4oploREAiAHH0VmKf6Ie01jpWp+dPOeOqMBHu8V/ASWJyAlAKc25Q=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndX3d_661NcdgpWD8USBKrp7IiQJcBfaItOEF_uhds8s\nREVOKE\ndevice_alice_h0_000001\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEQCIGnZ//PqK0yin3X8BpXPUcqP0GAcQ0X98bXqkqPMcQB1AiArsytmgDCxL9WLgBpZz+h0I+7m86k04NyYvmS3rpSaag==\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nAeoMhVSIsVfo8HlHCU6W-29HNRwjmAh-89Fe0o_kQkE\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIGT9EKD2cQtAyUTHKZY9n3pXWOvc1dRnbLj/P6X28zi4AiBgpvNTsTKRsGP3c0DDS7nvCsyegWXqHPzeHiHp+mn3AA==\n1789575200000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 6
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 5
+        }
+      ],
+      "chainDeposits": [],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "deux HK annulées d’affilée : la base remonte de deux crans",
+      "vectors": [
+        "5",
+        "5e"
+      ],
+      "note": "HK1 = hk0 détenue, hk1 (A) et hk2 (C) annulées chacune par un NOT_ME de B dans sa fenêtre, hk3 (B). base(hk3) = hk0 ; previousHkPubB64 de hk3 reste hk2 (littérale) ; maillon, preuve, transferts sur hk0. afterRevokeSeq de hk3 est celui du dernier REVOKE.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nr7tgsysz2g4QVuiEwQJsiwxSYeT4kcTzXaHwle6TmMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nu4C6PDSlyKstVHeQjPlblsxlVHOdVIlPtg1QIhQmsJo\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nnJlobR5u-yWP56q373TFfTgqIis1DN9FZmSRR2DBICs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\npXg8II4V2fM-NZjhJ-xO2r_aD6ValxmY-NKi6p6BYL8\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nTsjelAo-lx-T5YPXZjzrwtq12Cg8iomCuuR8boekg6c\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n_Y_L4h1Teg3nJSHkdT-TcjVO0IWZIHoz98vbab2HBBs\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\njVIea2sSz_uWPjeyqSQVUyjzHvkTKdn43_gnrd0dA-c\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nG8j2tBDNOwnrZ8pZU011NCNns4hR08cFfncLGxuXoKY\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n11\nBdtFAhGia1KPLiUnd7RCHXxogdV_PRgrlvS8Sh3qVoY\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQCBW+ZJOSRJOYuSdr2y0fPCc24jiWWH44TGto3baOuAIwIgAw+iamH0dcKR1VVFAnW3YDI1iVsvcGyMrFRVgISS78A="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIAe4iduMTZj7od3XFEKLTivxDTYxcNdgaYr39qhl8CeTAiBURCWawvXmkTRjKdY+JarVwsHR6OCfS9qtKy7ZZoxc4w==\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEQCIDfg7b5TRIznIsEey2yltoKsu59tKZanh5dj49jyvR14AiAwvLyTVNsW0FriJBg6mdgghd/Q3o/y57qUbQ26Mphb3Q==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hc_000004:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQCEUPnB0USL0rlRIHNgdMTFjb4qwWi1G+1bQi+0iyBVfgIgH6aj/ym5JnLeATHz3uXzyjcQ+tcLFLYTsFBVdytOTz4=\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\npXg8II4V2fM-NZjhJ-xO2r_aD6ValxmY-NKi6p6BYL8\nREVOKE\ndevice_alice_hc_000004\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEUCIQDavwIOgRXaEWeqXiEvN45T9Hbv6b+OU7plyO1fF+6OJwIgQ9Q05i1ucafC1Gl9bDfMAnGYDkDooIlms+JxWDuBeRE=\n1789582400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\n_Y_L4h1Teg3nJSHkdT-TcjVO0IWZIHoz98vbab2HBBs\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=:MEUCIQDPGRCJDiWTBQcgJZ0T0nMwGEMFCfjz/nzMvF5/t57mQAIgIkANcJWcO3ZnRxQxeNhpmq4tzvA7pDEcYVW5UnTVsKg=\n1789586000000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 7
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 9
+        },
+        "hk3": {
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "scalarB64": "k2BYj8rX5jNPiFF4ecixpmFckTzCAqsuWv8gOMhcW5I=",
+          "seq": 11
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 8,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": true,
+          "cancelSeq": 10,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 8
+        },
+        {
+          "hk": "hk3",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 10
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "B dépose sur hk0 avec sa preuve (hk0, dernier REVOKE)",
+          "vectors": [
+            "5",
+            "5e"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQCKWNZ+NrAQrgemtUSKsuh5hKnz2rWzxuoWqVW+5RcbUgIgS7ZkUpegiMgW9bvxNy1U+eTYAYCjNW4W+JDum4J+Vhc="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "ok"
+        },
+        {
+          "name": "maillon sur hk2 (littérale annulée) : refusé",
+          "vectors": [
+            "5",
+            "5e"
+          ],
+          "previousHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDbbaJPfJfcMJlCHZMj+dBaHKbdwckAqLbg8hNb6r3JbAIgQCtpdqMcljj8IlQAz4u+iLK9isxQJ1Zl3X1ZALEF4Mk="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "KEY"
+        },
+        {
+          "name": "maillon sur hk1 (annulée aussi) : refusé",
+          "vectors": [
+            "5"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDK49awk9AQM/wlCOx66d2BuZsGHh9+LFMBMuLPcEkhEQIgBoadKhg3Dg49qNrL/S43zbygq1nJNEWyRCjySwUyGwY="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "KEY"
+        },
+        {
+          "name": "preuve pour le premier REVOKE seulement (périmée) : refusée",
+          "vectors": [
+            "5d"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BIJnX7LlsTcs8i4qOUHsymA2823B1aJDj6bQ3NxdNrTbe6pqXJV7ILWRewg60li8gZNdy/5uWf+0ToscXaFHPXk=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDdZnoZw49j0OaFyCCluHvH487O+hwz+IWy5xt0m3CcVgIgBAdtu5jXY8Ck4pwwR2Y4PF36do1jn5ZU3OUXPwa2dAU="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "le révocateur est révoqué ensuite ; NOT_ME puis USER avant HK″ : afterRevokeSeq = le dernier",
+      "vectors": [
+        "5b",
+        "5d"
+      ],
+      "note": "REVOKE NOT_ME de A par B (seq n), puis B s’auto-révoque en USER (seq n+1), puis hk2 (D0). hk1 reste annulée (le révocateur n’entre pas dans le calcul) ; afterRevokeSeq de hk2 et revokeSeq de la preuve valent n+1, pas n. Sans le second REVOKE, ce serait n (scénario « deux HK annulées d’affilée » et les autres).",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nAT9ruVzZHzaFE3WFPJxjk_nBG-rtnHa_4BNiRE6NC-g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n3IYkKEmwQTl1do2wfbEjWWSpVo-an2d_rG1WwK1r45k\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\n7-GSwVRnd7g-r6hgfednDRfiG17EWLWlmU2enyvIbtc\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nADm7McNdoNhpbb9_dnj7EYr6R0kBVVZCoQrr5LCWjJg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nn0WNV0c3Hn6b-TYAxKkWzwEs2KwGMc4czQxMWQMmaJ4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ngHxPe2cqAk52Mv3hdYf_bghgGLKnjCcioYAVG_fGAfk\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n9\n-0TSLtwLG8xJ2wKPbEtfY7QhwzaFvbXOEdXMmszNjkI\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIGUykDTnLw27bOmNT1y+jQhbhb/6HiLS0bQxYRN2154sAiBoJ/sAlx5358UXhGvJGpfpdVIxDLo3eM2KpDfZCAu4yA=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQCIckPtaRMp2zxlwJOQOcLjnRbFNpsKp01vbNnmQkBiDgIgQoo7QEjm2RHfYf2S0uCdRTvEe/H5Vh22PqaL928ttlg=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEQCIESe1yEZfl9MWBp6fkmu1qfoGd6breXmRxtdAPDly5mpAiB4LF/vmjobJD//P+VL4H+pzJ33gpaY4ULokcUxMfXQ8Q==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n3IYkKEmwQTl1do2wfbEjWWSpVo-an2d_rG1WwK1r45k\nREVOKE\ndevice_alice_hb_000003\n-\n-\n-\n-\nUSER:device_alice_hb_000003:MEQCIGNw8i2jny5Y5vVJ5qf0V7LY0fDhwMpSeSUOza5+JNA7AiASj6+Hi1EZiu4HNwHRksYFCw6S+uIxlB2zR47VET6hJg==\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nADm7McNdoNhpbb9_dnj7EYr6R0kBVVZCoQrr5LCWjJg\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQC5FP1vCqQ/PG7f1+4vH1iuCoUK4b7YPjgOCU90RN/0qAIgIaeLNbhLIGBWa5briryRPzdgC1v45t2YfIRR5x+sedI=\n1789582400000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 6
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 9
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 7,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 8
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "D0 avec la preuve au dernier REVOKE (n+1) : accepté",
+          "vectors": [
+            "5d"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIDpGU9a0KqDbs7reGhI9RHm7lhpzIdXCQA0nChM+/9qEAiBZR96C0K2RHHbF44s4kkJMg9tkh4Ge2gL/HhyZgaE5bA=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "ok"
+        },
+        {
+          "name": "D0 avec la preuve au premier REVOKE (n) : périmée, refusée",
+          "vectors": [
+            "5d"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "rotation honnête annulée par erreur : on tourne depuis la base",
+      "vectors": [
+        "5c"
+      ],
+      "note": "HK0 détenue, J s’auto-révoque, hk1 (A) est une rotation honnête, puis B pose NOT_ME sur A par erreur. hk2 (B) tourne depuis hk0. chain/{hk1} est refusé ; seuls les appareils qui détiennent hk0 prouvent la base et reçoivent hk2 ; un appareil qui ne détient que hk1 passe par le §5.3.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nr7tgsysz2g4QVuiEwQJsiwxSYeT4kcTzXaHwle6TmMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nMZHfB9tn2mc4oldfCuFhXFbRky1X3JDmIpQ2_-mRwH0\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nzp3UsQ2KJtWpFVAqIg_lOzNr9AGb7aXofOx6naJe2FM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuoErHtuA--d1U0qeZ_JEknTaKjfbGrTfb-gAqWHEBbI\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nG5pfJC33bwdkWHhjNn3yrygYGgVsyt4dfxscO2gXP9A\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nNEj5l15okCKwUuNev6NZ4PmwNNrWRyXmVDeInpm4IWU\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nSNl7spr7JLzG2sQLNIMay1VNS6JMYjOqRn-3ZwsiLCw\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nHX2vCWsmLqwPVzaX4CmGgrxmgZ-s17qr7yX_aV5hHK4\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\n6Pk1paqTKDpIZr5sI_CjIjHMeo_vQh53p8AoGfMwGAE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\njgV8350Qu3JwSzAzZ23sOlAmqtETJxrBNnEXniC2ejA\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n11\nTnzmDYLQe15pz-ruCOr8kWp7UYY9GnUyx89dzNbMnVs\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIGy0+02kzveS5U7MWk21Hvh+BW7pnD2YNY5XR7qiqq99AiB4UNeq0mx50/cef0HaFgK6Ifm7yoNEMhg+xAon1oF1pg=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\nADD\ndevice_alice_hj_000007\nandroid\nBGSoATXAblx5Cu77a1JRp/1nrRZXjeOS/UYErPBhaYmMby24JZhB9jntJUAFMi/vrdKTY6YVQXbLcAvVjHLvAms=\nBALQWfMWGvlk734JcdZZJZMSBrqXqNMhXiyShJEEhxSOH8aUO/nOP3cFvRlmykqDLWwyzEAZe7ZwWOiqrJld9sg=\n1\n-\n1789319600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nMZHfB9tn2mc4oldfCuFhXFbRky1X3JDmIpQ2_-mRwH0\nREVOKE\ndevice_alice_hj_000007\n-\n-\n-\n-\nUSER:device_alice_hj_000007:MEUCIQD0qfWzypsPTpx3c2ArDfLjsK1XUqu3YVi8i6v/JoRbvQIgW6HoQEIIAO8a8wEIHn3WmCbOseHuHbi1VvL0uWy/ClE=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nuoErHtuA--d1U0qeZ_JEknTaKjfbGrTfb-gAqWHEBbI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQCXs8SK7lAnFIm4edgFodRufNmIEuiLq/aQ+5MyNJduzQIgUH7TvRK4u8bVa5PGNjmxCHaaT/u5mQP++kPKXlOaORI=\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nNEj5l15okCKwUuNev6NZ4PmwNNrWRyXmVDeInpm4IWU\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEUCIQCWsLvxU0y78H1/hGyt/jMUER6AzdzCNYTtePD8bs0dkAIgQWH3ZRT+WBLxTsGsj9RyELTEdz2EzbbfIL4M18O4Sy4=\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nHX2vCWsmLqwPVzaX4CmGgrxmgZ-s17qr7yX_aV5hHK4\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQD6qX8V2OUEoODHk1yl5QNBwOSbeNfGhTjIqRAD+UBL8QIgVqcEr4Brfh7u4MbRu+OJf/FCMyFuSPeRzUQF58B9NwQ=\n1789582400000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 9
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 11
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 10,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 8
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 10
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "maillon sur hk1 (annulée par erreur) : refusé",
+          "vectors": [
+            "5c"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQDK49awk9AQM/wlCOx66d2BuZsGHh9+LFMBMuLPcEkhEQIgBoadKhg3Dg49qNrL/S43zbygq1nJNEWyRCjySwUyGwY="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "KEY"
+        },
+        {
+          "name": "maillon de B sur hk0 avec sa preuve : accepté",
+          "vectors": [
+            "5c"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_hb_000003",
+              "signatureB64": "MEUCIQCKWNZ+NrAQrgemtUSKsuh5hKnz2rWzxuoWqVW+5RcbUgIgS7ZkUpegiMgW9bvxNy1U+eTYAYCjNW4W+JDum4J+Vhc="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "ok"
+        }
+      ],
+      "servedCases": [
+        {
+          "name": "seuls les détenteurs de hk0 sont servis ; C, qui ne détient que hk1, ne l’est pas",
+          "vectors": [
+            "5c",
+            "5f"
+          ],
+          "rotationHkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "selfDeviceId": "device_alice_hb_000003",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCIENjfH9GoHPk93IOjfQKrIXRAMQkEhwpwdF1snwloTxSAiAMfRggYoIW+T7jz2hkmQLxx8WYuD/9p6AM4Zt341D0JQ=="
+            },
+            {
+              "deviceId": "device_alice_hc_000004",
+              "signatureB64": "MEQCIEvQ70QQkT/SvEuswjI47c8tKPB5VxY082hTMI6WBK8TAiA5uqFxHwIx8tI0vtw1huQjxdviw/Hh0IOKdSOWKwkCVg=="
+            }
+          ],
+          "served": [
+            "device_alice_h0_000001"
+          ]
+        }
+      ],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "EMAIL_NOT_ME annule",
+      "vectors": [
+        "6"
+      ],
+      "note": "REVOKE EMAIL_NOT_ME (posé par le serveur, sans signature) du signataire de hk1, dans sa fenêtre : hk1 est annulée, base(hk2) = hk0.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nAT9ruVzZHzaFE3WFPJxjk_nBG-rtnHa_4BNiRE6NC-g\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nteAfAyL7rQPDpeGcs2m_kFmU8OUnoCGgrnaV_l8gpLw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\ntz42g1V2aw9kwAO52DkJw3XFQN_KnUkfNz6ebEda4bQ\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nWapk6YPte1VMHBbfILnqAR93QWNy83EphqJJ0z4TYZk\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n8\n_64FrLiWFtHzz6MdqupDEMde4n2UFlxSaEbkJxWKPLE\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIGxxUQrqba61peO111ILMcEXKWXwZ0jzUbxl5AyKFtk6AiB3c+8Zs5s/CXdgnns/3d3VXBOHaWksZaYh1pI3ERmXSw=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQCIckPtaRMp2zxlwJOQOcLjnRbFNpsKp01vbNnmQkBiDgIgQoo7QEjm2RHfYf2S0uCdRTvEe/H5Vh22PqaL928ttlg=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\n7BqAEn1I9ARU7JvA7XazYJqdHp-GEgtoozepmWqNVRc\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nEMAIL_NOT_ME\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nteAfAyL7rQPDpeGcs2m_kFmU8OUnoCGgrnaV_l8gpLw\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEQCIAChsPnNj0QEQuhhnCDwyjGPiA2TEXd7oA0rpt0Oq2q4AiA1e2tv6j1HqfnigRjXrYw36WcJO0gUX3U6x5owBAR9vw==\n1789578800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 6
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 8
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 7,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 7
+        }
+      ],
+      "chainDeposits": [],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "maillon sur la base alors que la HK littérale n’est pas annulée : refusé",
+      "vectors": [
+        "8"
+      ],
+      "note": "hk0, hk1, hk2 sans aucune annulation. chain/{hk0} pour hk2 est refusé (« 400 / CHAIN » côté lecteur, 400 E2EE_HISTORY_CHAIN_INVALID côté serveur) : la clé admissible de hk2 est hk1, la littérale.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nMjTuT7BTfE-NcjjmpUV0tEWvYrN13M0JyRIIaM5wuHc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nX0saoUzgttK1JZO23HichvcjLd8oAU3gRIiSB_RHH8I\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\noGyG37zJe3YoQ4WMPvcXL0NTth9HKCis9_BHSlarkek\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\n3Xz4ma1eVe87c1NqaVXWIzylkAIi5N4zgGwAvmvqpPE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nxgaJvVgZoD4dMydKFp2_n1xUjZS2MGGoPf42uJSVkLI\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nI23Vr7ZAvm0I4OYk98fFAFj1yz_rwJ6dqW6gM0x5KuA\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\naeI28Q3bTGQs-gQwYqjCmA3fVQ01o0gME1vM6MbSC-k\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n9\nHHqPCI1mtlwXJTKJ3DNPqR9aKi8-Pb5-ZCcGKUXVSHA\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQDGMUrh7FZz9hz4z4xkEIeseuRCjEYBLnja6oSXVWBgngIgC9Yh/HcvmL3U55kPjTFw1kUVLBwQB15NIZ+IpuM7+Fs="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nUSER:device_alice_ha_000002:MEUCIQCAdTzH7DdbUHWcrXwsv4cW/GStjuA+CWm6NgJKUPfV2QIgfbVQMqNaKHWdpVKvUqCNSC6v08joBVS/IiOjhJlLsx8=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nMjTuT7BTfE-NcjjmpUV0tEWvYrN13M0JyRIIaM5wuHc\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEUCIQChJZyJ0kmN21EzPWPkKfPQsp/jZqS4JstuVIl9dVzFMQIgcdlHb+lUaA0Gq/0aZfZFIFE8zUCL2zs8Bmb96vUXfdo=\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\noGyG37zJe3YoQ4WMPvcXL0NTth9HKCis9_BHSlarkek\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQD4hj+6D7bfWuP2jIuCNeLcWH92YnG2CJMdIz/p16xTfgIgL0WXW99NUddmUYTWpjaS07+q8zCTEU51xrKNhGVq2Jo=\n1789578800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nxgaJvVgZoD4dMydKFp2_n1xUjZS2MGGoPf42uJSVkLI\nREVOKE\ndevice_alice_h0_000001\n-\n-\n-\n-\nUSER:device_alice_hb_000003:MEUCIQCiG93VrNSAiewtMvduUFe+De/PmisaLIBKT5oPsTM7VgIgHx2LDYr7GfVHGoCeFTHGcgPVS+o4UQAkJPysx5/VCLA=\n1789582400000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 7
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 8
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 6
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "admissibleHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "afterRevokeSeq": null
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "chain/{hk0} pour hk2 : refusé",
+          "vectors": [
+            "8"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "KEY"
+        },
+        {
+          "name": "R2 : même maillon vers une HK′ hors rotation, sans exigence de preuve : accepté (chain/{hk1} pour hk2, la littérale)",
+          "vectors": [
+            "8"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "ok"
+        },
+        {
+          "name": "R2 : maillon vers une HK′ hors rotation (afterRevokeSeq nul), exigence de preuve : refusé",
+          "vectors": [
+            "R2"
+          ],
+          "previousHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "senderDeviceId": "device_alice_hb_000003",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": [
+        {
+          "name": "lecteur : un maillon sur la base (hk0) pour hk2 ne passe pas la vérification « history » (CHAIN)",
+          "vectors": [
+            "8"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "xgaJvVgZoD4dMydKFp2_n1xUjZS2MGGoPf42uJSVkLI",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BMLc76Y4n09QTQ2ZY7c5He4R4tc3k4+NaM5w6DPvIFZxVquNUzxJxsqar6poAC/YwF2s18c3y10KaupOup81pzg=",
+              "nonceB64": "kV491sptboayQJF+",
+              "wrappedB64": "zfaqqxehvvd64YD4O6CwU3fRHTliasABEmsF6lTm55u9xngen8XEC+OyP7tLDD0R",
+              "signatureB64": "MEUCIQChgMsGyJ464McKD5vHV2rWdmiPc+1zwWgNYltSFJX/4wIgRr7/YbLPWVzILeBMAdzxm0nGOt4KLQmCo0ViG5jwTW4="
+            }
+          ],
+          "proofs": [],
+          "senders": []
+        },
+        {
+          "name": "lecteur : un maillon sur la littérale (hk1) sans rotation n’a pas de forme de rotation",
+          "vectors": [
+            "8"
+          ],
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_hb_000003",
+              "recipient": "history:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "xgaJvVgZoD4dMydKFp2_n1xUjZS2MGGoPf42uJSVkLI",
+              "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "ephemeralB64": "BP0jop8MvQkUdQE0AkUYlhpgQJ0vZqGaoq+Bc9FGQ01LUu24v8gkr71zYe4mKTIEYeR9VXeqJzBJyfuA0yr9aw8=",
+              "nonceB64": "araBREYk3trdShAQ",
+              "wrappedB64": "EOJF+FmpLW/G3mmBl1ClBBgso91d/ITIIZE1LuNSVEEW4YBuNlOSxIb379xq1M7a",
+              "signatureB64": "MEUCIQDtrBEb26npJ7KWyuCMlOIzFvjvPV4p2fgRBLzeCKJZNgIgQLt+op+/V4YmPZLRtOYtd8EqB84Re4wsJhkqa8LST1c="
+            }
+          ],
+          "proofs": [],
+          "senders": []
+        }
+      ]
+    },
+    {
+      "name": "REVOKE d’un autre appareil : la HK inattendue n’est pas annulée",
+      "vectors": [
+        "12"
+      ],
+      "note": "HK0 détenue, hk1 (A) inattendue, REVOKE USER de C (sans lien avec le signataire de hk1), hk2 (B) en forme de rotation. hk1 n’est pas annulée : l’alerte « HK inattendue » est maintenue côté apps.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nr7tgsysz2g4QVuiEwQJsiwxSYeT4kcTzXaHwle6TmMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nu4C6PDSlyKstVHeQjPlblsxlVHOdVIlPtg1QIhQmsJo\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nwtVbFXZ8EJGkSAALfs7rys0TpCoJNXjX-aKxlJP130I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\n962fLYEkrEkkJujYjTkbjIOxBWBEOZ9_xRz6RKBVaeg\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\njk6vWS7ZOv7EDTCYcsMhig1sqCTBDR5G9D0HUu7rpOs\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n9\nuFjztTD9n2xAeqpG6yVTv0SdQw2GYmswSox8Yz3QmVo\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQDk39C/35PQdSHdPPDMoZkC9rzXYdWzCwa84VbzfWdA+wIgFFGuRxHsmEVOLGYrqkOSu74/9xr56VKq+9+babLm664="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIAe4iduMTZj7od3XFEKLTivxDTYxcNdgaYr39qhl8CeTAiBURCWawvXmkTRjKdY+JarVwsHR6OCfS9qtKy7ZZoxc4w==\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\nREVOKE\ndevice_alice_hc_000004\n-\n-\n-\n-\nUSER:device_alice_hb_000003:MEQCIGOJJ97ehVmzD/Jecl7r0QnGReRC0mZTmiGaTBQrLaHaAiACk+tkRz6RWFaeY4SRVBcNoutcUPK3PeZuA1wMQG7WVg==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\nwtVbFXZ8EJGkSAALfs7rys0TpCoJNXjX-aKxlJP130I\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hb_000003:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEQCIBxZ2fnij1L1wBf3eX8mXXZc/slsc6u7/Xxh1LG6L990AiBMdVqLnnWqSNjtn5nK3HEl4KYf1UC1ukkwfi+TRLDTkw==\n1789578800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 7
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 9
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "admissibleHkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "afterRevokeSeq": 8
+        }
+      ],
+      "chainDeposits": [],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "la plus ancienne HK inattendue annulée, la suivante non",
+      "vectors": [
+        "14"
+      ],
+      "note": "hk1 (A) annulée par NOT_ME de B ; hk2 (C, previousHkPubB64 = hk1) n’est pas annulée : elle reste suspecte pour l’alerte. base(hk2) = hk0.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nr7tgsysz2g4QVuiEwQJsiwxSYeT4kcTzXaHwle6TmMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nu4C6PDSlyKstVHeQjPlblsxlVHOdVIlPtg1QIhQmsJo\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nnJlobR5u-yWP56q373TFfTgqIis1DN9FZmSRR2DBICs\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\npXg8II4V2fM-NZjhJ-xO2r_aD6ValxmY-NKi6p6BYL8\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n9\nTsjelAo-lx-T5YPXZjzrwtq12Cg8iomCuuR8boekg6c\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEQCIGgx/G3LSnOENDH5fiI4FhAiMMR0zAgpVs6eHle2rmqZAiBKYw88/FPSpAJ061rRYZGAd+4cgvNPfYuY8kI8MwRh3g=="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hc_000004\nandroid\nBFzItN87hoJfiTM71uY4a3kzlGVz23tT4+EdFYZ1XhyP9wDjyb46CnD99j65K1YG87QJCI9v1Ks3TcEiXgWNMZk=\nBIe9zEi+wWGa0JoIGoB2usNSMi9JxsPRPxZYaUlc5ZPYmyKObBz7leIvdQeHk1uW3M0ghSI8l+VrX3eF8t+FI2c=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\nj7sJHxhUMlonZCAycX0uGj-4fHoogj60z44992-vi3I\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIAe4iduMTZj7od3XFEKLTivxDTYxcNdgaYr39qhl8CeTAiBURCWawvXmkTRjKdY+JarVwsHR6OCfS9qtKy7ZZoxc4w==\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\n8nGL3Tdf4m7M9jL-ku6G2c0gxRN1VbbfX6SQDysujBk\nREVOKE\ndevice_alice_ha_000002\n-\n-\n-\n-\nNOT_ME:device_alice_hb_000003:MEQCIDfg7b5TRIznIsEey2yltoKsu59tKZanh5dj49jyvR14AiAwvLyTVNsW0FriJBg6mdgghd/Q3o/y57qUbQ26Mphb3Q==\n1789575200000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n9\nuser_alice_00000000001\n3g38jOvUvy5Suq5tjwG4YjfQeojeHqzQt4VcgoSp2WA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_hc_000004:BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=:MEUCIQCEUPnB0USL0rlRIHNgdMTFjb4qwWi1G+1bQi+0iyBVfgIgH6aj/ym5JnLeATHz3uXzyjcQ+tcLFLYTsFBVdytOTz4=\n1789578800000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 7
+        },
+        "hk2": {
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "scalarB64": "b49r02JLF+bMtu9+JY7qb3MGcJ/7/xcP657visLO3+Y=",
+          "seq": 9
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": true,
+          "cancelSeq": 8,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk2",
+          "hkPubB64": "BAbn5eRf6uN//7LjKru0qJv+53TDYh2ypyp/2v80APbPz4Tzr4xhbiHT6Nwb0why73+pZ48h5i5c/LvVAbX8B+A=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 8
+        }
+      ],
+      "chainDeposits": [],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": []
+    },
+    {
+      "name": "auteur d’abord : HK publiée par un appareil qui ne détient pas la HK précédente",
+      "vectors": [
+        "14j"
+      ],
+      "note": "HK0 détenue par D0, J s’auto-révoque, hk1 est publiée par A (qui ne détient pas hk0) en forme de rotation. D0, honnête, dépose maillon et preuve sur hk0 : refusé (AUTHOR) tant que le maillon à preuve de l’auteur A manque ; un lecteur qui ne verrait que ce maillon ne le compte pas. A ne peut pas prouver hk0 : hk1 reste sans maillon à preuve, alerte maintenue après la grâce, dépôts fermés.",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nm_DrvIVnA2tmIAxgWGOh4rWHgpk0NkYdE5kEUrrEF6o\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nQhCiceQIwj09KwPtpGcazPbpUCovGADHsj91vyQRoVE\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\noEV6TcmnZPH4_ZHyX0Z3NCqUev_tHrz7EqkYH89vqU4\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\n4wNkGV92s3u57Qygk8G52oasK4m0qMcdhqDhpALMiMM\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\no5IjojNyMrf9onvC8n5oXbfE7WceaVohLe-TrzWj8E0\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\n1tcIJxiW8LA0XR_inyPaz4fExUXOB43id5nz3ndwVmA\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nC6pNdG4ZDX4CCvZoqG4TeWxEzkr9ePBZbcLpv7DziRY\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\n8ntbTCxyFzji7FFpUlKt3msewUpg7as9bXslBAiL30I\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\njXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg\n0"
+      ],
+      "head": {
+        "text": "SQ-E2EE-AUTO-LOG-HEAD\n2\n8\nMBiaIgu1LyiNwSUs1D6BAJtFm1egKzCt1QbIe2jPoEs\n4Ld08Nv0sq-On5Apvn-ScdArHnfMS3AUeHf6_DDZMns\n1790003600000",
+        "signatureB64": "MEUCIQDEGvuCsXlfDy19vikOxOP4/NqQSXd28M4EgcJbjU62kgIgSy0QIexaTy7i2UIJ+WeHM96FLeYjjmUk0ZsAHi6llaM="
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_h0_000001\nios\nBADQ085JPRyyLCr1BB1N8JpGk/J4cgmHYS/dF5zafETGfkS8fwGFlT5bDxsVwmOHtatlV9AjsRQsLUJhAc1NB8k=\nBBav2A4nmtsz+jEja0dgFb6obkiJ85U/YRG1Zei5jYQb2OcWEg4/0RSyLO1UOXIBKCogVPUDyh7H0gTNKxjfOVA=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n3\nuser_alice_00000000001\nfgebZKNwXOWDASv6-RWYNmm9ZCRs8n_2wm2IDUBNyFI\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_h0_000001:BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=:MEQCIBlbWlaW/n/uQg0w9s0j2VwjLB/aEho1L8ShxK1AXArWAiBvdGZet0kFYHpWUrN/l8V7BMNckIfEjSsJeMFBKZoD7Q==\n1789222400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n4\nuser_alice_00000000001\nuPB3-BHdhXvaERb5ItVg2zyEffpV-FbLjjUKwFrJoPw\nADD\ndevice_alice_ha_000002\nandroid\nBBK/45jJBYs0oHJJB+P4BqSJ7WxKUbUQM1Byl01PH58ewShJbJ24lsB9kgwYCaAYPrI2GdikXgwXy1hviOLNh5I=\nBDbXoLI5NZulNfSy06J804uQtIkHDen3e6pxa0KXCJNvyyrU0uawSMzxH13BWvA6BkgdJEvlEQBMU7XvG8zCMec=\n1\n-\n1789308800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\ndCzPLvpOrUrZhWbZ9vdiHYOUiqLVngENrWMkN7xkHWQ\nADD\ndevice_alice_hb_000003\nandroid\nBLr8cZwTAS9vZt5keRU+e7WEH4AOYAJ0fIxADCR3d2jjT2saqAzvCb/8JYqB67SdmGSgh6ohLsRRKfA5cV4Tu70=\nBMpJizUfJP4fRSDInNyQ10ssPp/zSO3C20QaQKU99QfA/Odw8yX8HvrZnEqd04suHx25vem0Gjqq55k9x5/8KpY=\n1\n-\n1789312400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nPMInDLWI5jIANFsFir-YoJIy9vXDYruNkLbXvAz20lo\nADD\ndevice_alice_hj_000007\nandroid\nBGSoATXAblx5Cu77a1JRp/1nrRZXjeOS/UYErPBhaYmMby24JZhB9jntJUAFMi/vrdKTY6YVQXbLcAvVjHLvAms=\nBALQWfMWGvlk734JcdZZJZMSBrqXqNMhXiyShJEEhxSOH8aUO/nOP3cFvRlmykqDLWwyzEAZe7ZwWOiqrJld9sg=\n1\n-\n1789316000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n7\nuser_alice_00000000001\no5IjojNyMrf9onvC8n5oXbfE7WceaVohLe-TrzWj8E0\nREVOKE\ndevice_alice_hj_000007\n-\n-\n-\n-\nUSER:device_alice_hj_000007:MEUCIQDQS8T4pOUytqRAn1S7fg1vwYjMe8HF7Ke7xJamAtRGpgIgX022hxjwxOgF2STUUYtK+57drQY5jYqySv1VEI3P0HE=\n1789571600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nC6pNdG4ZDX4CCvZoqG4TeWxEzkr9ePBZbcLpv7DziRY\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_ha_000002:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=:MEQCIEy4Y4gDRjqEikYgaF91TMYuzu/HHVkOHNbFuCXKZYA9AiBZVLCh0l1GZKfelAKAPcos+WwC6YZr/TJQK1LlqlD8gQ==\n1789575200000"
+        ]
+      },
+      "historyKeys": {
+        "hk0": {
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "scalarB64": "385VdO8nr5V4c6iBQDRH+QMaO3LpDfnAy262MEPRZsc=",
+          "seq": 3
+        },
+        "hk1": {
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "scalarB64": "QzTJ5iyqmMe/K6Tg7xjIXcVCofWSigHyJoyUlcGG1FY=",
+          "seq": 8
+        }
+      },
+      "derived": [
+        {
+          "hk": "hk0",
+          "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": null,
+          "admissibleHkPubB64": null,
+          "afterRevokeSeq": null
+        },
+        {
+          "hk": "hk1",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "cancelled": false,
+          "cancelSeq": null,
+          "baseHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "admissibleHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "afterRevokeSeq": 7
+        }
+      ],
+      "chainDeposits": [
+        {
+          "name": "D0 : maillon et preuve sur hk0, auteur A absent : refusé",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "AUTHOR"
+        },
+        {
+          "name": "A (auteur) sans preuve de hk0 : refusé",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_ha_000002",
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "authorLinkPresent": false,
+          "requireProof": true,
+          "expect": "PROOF"
+        },
+        {
+          "name": "D0 sans exigence de preuve (drapeau éteint) : accepté comme avant la révision 23",
+          "vectors": [
+            "14j"
+          ],
+          "previousHkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "senderDeviceId": "device_alice_h0_000001",
+          "proofs": [],
+          "authorLinkPresent": false,
+          "requireProof": false,
+          "expect": "ok"
+        }
+      ],
+      "servedCases": [],
+      "transferCases": [],
+      "provenLinkCases": [
+        {
+          "name": "le maillon de D0 seul, avec sa preuve : HK sans maillon à preuve",
+          "vectors": [
+            "14j"
+          ],
+          "hkPubB64": "BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+          "links": [
+            {
+              "senderDeviceId": "device_alice_h0_000001",
+              "recipient": "history:BDK7ecnmhnNK0gFjhq0YpuUpldCMEfSl8odLsRPxOZzgyix/luD6zn151BSLAYG4k9yQhLZ8MszdGBV3/fe75zU=",
+              "keyVersion": 1,
+              "requestId": "chain",
+              "addHash": "jXPwqsn7y0BP3CcWRkbytXLXcLwzjveCYLBhARWLsXg",
+              "hkPubB64": "BLWT+lXwuiQ0tPsQJkN3ORPoEdxo/s5XIU3h8NJ5/OrrSePNVmAB2SOWjrENzA184f7SACwARluOXIsRE+RdhFo=",
+              "ephemeralB64": "BIgy9n5SjFbrtXdu5sM1Npoa0KrwaI6w5bpKmSHUcRXX1QMxspuSDcutHjX6ZMmFSRjNZQ3A5D4yIsti/NP13vo=",
+              "nonceB64": "HTr/QjiOFC1Dp5rw",
+              "wrappedB64": "BYIuW5vTk1sIT365lmPc1gHw4rYJq+wmfV06/36kTNoWrm8Wkdfh7d+Nxjbkc+yU",
+              "signatureB64": "MEUCIQCZgLBQVHGySZ5c9+M099PW/fZOhevW85vX0AT5QLzcfgIgO4+UUGodbLtM5LLn5uW4dKw0zUv1jzXaHxGHNYEeYzw="
+            }
+          ],
+          "proofs": [
+            {
+              "deviceId": "device_alice_h0_000001",
+              "signatureB64": "MEQCICOpM/W13orCrchdt+i5/+asWni5/cSt9ikI3v9hfVgJAiAfN0FFppKlSyS4lPX8oU7EZjTbar4AhiEey59myjkZDQ=="
+            }
+          ],
+          "senders": []
+        }
+      ]
+    }
+  ]
+}

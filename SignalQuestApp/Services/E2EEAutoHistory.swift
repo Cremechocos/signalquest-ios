@@ -177,7 +177,11 @@ enum E2EEAutoHistory {
             guard wrap.recipient == historyRecipientPrefix + hkPubB64,
                   let record = account.historyKeys.first(where: { $0.hkPubB64 == hkPubB64 }) else { return .recipient }
             guard wrap.addHash == record.entryHash else { return .addHash }
-            guard let previous = record.previousHkPubB64, wrap.hkPubB64 == previous else { return .chain }
+            // Révision 23 (§5.6 bis) : le maillon porte sur la clé admissible de HK′, la littérale
+            // précédente si elle n'est pas annulée, sinon la base et elle seule. R1 : un maillon
+            // vers une HK′ annulée ne compte jamais, puisque son signataire la détient.
+            guard let base = account.historyKeyBase(hkPubB64), !base.cancelled,
+                  let admissible = base.admissibleHkPubB64, wrap.hkPubB64 == admissible else { return .chain }
             // Révision 11 : tout appareil éligible à l'entrée de HK′ dépose le maillon, pas
             // seulement son signataire — activé au plus tard à elle, pas révoqué avant elle,
             // et inscrit depuis 24 h ; l'ancienneté seule en défaut a son propre refus.
@@ -195,9 +199,11 @@ enum E2EEAutoHistory {
             if let rotationSeq = rotationRequestSeq(wrap.requestId) {
                 // §5.6 étape 4 : HK′ suit un REVOKE vérifié et remplace la HK que le lecteur
                 // détient. L'émetteur est tout appareil qui détient HK′, pas forcément le signataire.
+                // Révision 23 : le lecteur détient la clé admissible de HK′, la base quand la HK
+                // précédente est annulée. Le maillon à preuve (T1) se juge ensuite, par la rotation.
                 guard let record = account.historyKeys.first(where: { $0.seq == rotationSeq }),
-                      record.hkPubB64 == wrap.hkPubB64, record.afterRevokeSeq != nil,
-                      let heldHkPubB64, record.previousHkPubB64 == heldHkPubB64 else { return .rotation }
+                      record.hkPubB64 == wrap.hkPubB64, record.afterRevokeSeq != nil, let heldHkPubB64,
+                      account.historyKeyBase(record.hkPubB64)?.admissibleHkPubB64 == heldHkPubB64 else { return .rotation }
             } else if !openRequestIds.contains(wrap.requestId) {
                 return .request
             }

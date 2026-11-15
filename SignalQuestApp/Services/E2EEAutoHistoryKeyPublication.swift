@@ -89,6 +89,9 @@ actor E2EEAutoHistoryKeyPublication {
         /// Rotation après la HK détenue, sans maillon à preuve (r23) : elle doit arriver par un
         /// transfert vérifié ; rien ne part seul, son émetteur peut ne pas avoir détenu l'ancienne.
         case unvouched(hkPubB64: String)
+        /// La dernière HK est annulée (§5.6 bis) : on attend la rotation depuis la base, sans
+        /// demande « C'est moi » vers une clé que son signataire, désigné « pas moi », détient.
+        case cancelled(hkPubB64: String)
         /// Appareil en attente (mode renforcé) : rien avant son activation.
         case notActive
         /// Garde des 24 h (§3.2) : remplacer une HK perdue attend l'ancienneté.
@@ -118,8 +121,8 @@ actor E2EEAutoHistoryKeyPublication {
     }
 
     /// Rotation après un `REVOKE` vérifié (§5.6 étape 1) : HK′ publiée par-dessus la
-    /// HK détenue, par un appareil inscrit depuis 24 h. Le CAS départage ; le perdant
-    /// recevra HK′ par un transfert sur sa preuve.
+    /// dernière HK, par un appareil inscrit depuis 24 h qui détient la base (la dernière HK
+    /// non annulée, r23). Le CAS départage ; le perdant recevra HK′ par un transfert sur sa preuve.
     func rotate() async -> Outcome {
         await publish(.rotate)
     }
@@ -146,8 +149,11 @@ actor E2EEAutoHistoryKeyPublication {
                 let held = dependencies.holds(current)
                 switch mode {
                 case .rotate:
-                    // Plus de rotation due (une autre a gagné) : rien à publier.
-                    guard account.rotationDueRevokeSeq != nil, held else {
+                    // Plus de rotation due (une autre a gagné) : rien à publier. Quand la dernière
+                    // HK est annulée, seul un détenteur de la base publie (r23, §5.6 bis) ;
+                    // `previousHkPubB64` reste la littérale, comme le CAS l'exige.
+                    guard account.rotationDueRevokeSeq != nil, let base = account.rotationBaseHkPubB64,
+                          dependencies.holds(base) else {
                         return held ? await reportPresent(device: device, hkPubB64: current) : await absent(account, current)
                     }
                 case .first:
@@ -229,6 +235,7 @@ actor E2EEAutoHistoryKeyPublication {
     /// reste pour être renvoyée telle quelle.
     private func absent(_ account: E2EEAutoLog.AccountState, _ current: String) async -> Outcome {
         if Self.isUnexpected(account, holds: dependencies.holds) { return .unexpected(hkPubB64: current) }
+        if account.historyKeyBase(current)?.cancelled == true { return .cancelled(hkPubB64: current) }
         // Toutes en forme de rotation : chacune doit encore porter un maillon à preuve.
         for record in Self.keysAfterLatestHeld(account, holds: dependencies.holds) {
             let vouched = await dependencies.vouched(account, record)
@@ -237,20 +244,24 @@ actor E2EEAutoHistoryKeyPublication {
         return .missing(hkPubB64: current)
     }
 
-    /// Les HK écrites après la plus récente que l'appareil détient (aucune s'il n'en détient pas).
+    /// Les HK écrites après la plus récente que l'appareil détient (aucune s'il n'en détient
+    /// pas), hors HK annulées (§5.6 bis) : celles-là sont exclues du jugement.
     static func keysAfterLatestHeld(_ account: E2EEAutoLog.AccountState, holds: (String) -> Bool) -> [E2EEAutoLog.HistoryKeyRecord] {
         guard let lastHeld = account.historyKeys.lastIndex(where: { holds($0.hkPubB64) }) else { return [] }
-        return Array(account.historyKeys[(lastHeld + 1)...])
+        let cancelled = Set(account.historyKeyBases.filter(\.cancelled).map(\.hkPubB64))
+        return account.historyKeys[(lastHeld + 1)...].filter { !cancelled.contains($0.hkPubB64) }
     }
 
-    /// §5.1 : l'appareil détient une HK du compte, mais une HK écrite après la plus récente
-    /// qu'il détient n'a pas la forme d'une rotation (après un `REVOKE`, par-dessus la
-    /// précédente). Un appareil qui n'a jamais eu de HK n'est pas concerné.
+    /// §5.1 (révision 23) : l'appareil détient une HK du compte, mais une HK écrite après la
+    /// plus récente qu'il détient, et non annulée, n'a pas la forme d'une rotation (après un
+    /// `REVOKE`, par-dessus la HK littérale juste avant elle, annulée ou non). Un appareil qui
+    /// n'a jamais eu de HK n'est pas concerné.
     static func isUnexpected(_ account: E2EEAutoLog.AccountState, holds: (String) -> Bool) -> Bool {
         let keys = account.historyKeys
         guard let lastHeld = keys.lastIndex(where: { holds($0.hkPubB64) }) else { return false }
+        let cancelled = Set(account.historyKeyBases.filter(\.cancelled).map(\.hkPubB64))
         return keys.indices.contains { index in
-            index > lastHeld
+            index > lastHeld && !cancelled.contains(keys[index].hkPubB64)
                 && (keys[index].afterRevokeSeq == nil || keys[index].previousHkPubB64 != keys[index - 1].hkPubB64)
         }
     }
@@ -358,6 +369,7 @@ extension E2EEAutoHistoryKeyPublication.Outcome {
         case .missing: return "missing"
         case .unexpected: return "unexpected"
         case .unvouched: return "unvouched"
+        case .cancelled: return "cancelled"
         case .notActive: return "not-active"
         case .tooRecent: return "too-recent"
         case .retryLater: return "retry-later"

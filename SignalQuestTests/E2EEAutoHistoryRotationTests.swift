@@ -451,6 +451,196 @@ final class E2EEAutoHistoryRotationTests: XCTestCase {
         XCTAssertEqual(fake.declared, 0)
     }
 
+    // MARK: HK annulée, rotation depuis la base (révision 23, §5.6 bis)
+
+    private let intruder = Device(id: "web_device_intruder_0001")
+    private let cancelledScalar = P256.Signing.PrivateKey().rawRepresentation
+    private var cancelledHk: String { E2EEAutoHistoryKey.publicKeyB64(scalar: cancelledScalar)! }
+
+    /// HK_r publiée par `intruder` par-dessus HK0, hors rotation.
+    private var cancelledRecord: E2EEAutoLog.HistoryKeyRecord {
+        .init(seq: 30, entryHash: E2EEAutoLog.digest("hk-r"), hkPubB64: cancelledHk, previousHkPubB64: oldHk,
+              signerDeviceId: intruder.id, signerAddedAtMs: 5_000, createdAtMs: 7_000, afterRevokeSeq: nil)
+    }
+
+    /// HK″ tournée depuis la base : `previousHkPubB64` reste HK_r, la littérale (même entrée que `rotationRecord`).
+    private var baseRotationRecord: E2EEAutoLog.HistoryKeyRecord {
+        .init(seq: Self.rotationSeq, entryHash: rotationRecord.entryHash, hkPubB64: newHk, previousHkPubB64: cancelledHk,
+              signerDeviceId: rotator.id, signerAddedAtMs: 5_000, createdAtMs: rotationCreatedAtMs, afterRevokeSeq: Self.revokeSeq)
+    }
+
+    /// HK0, HK_r, puis le REVOKE `NOT_ME` de son signataire (seq 40) : HK_r est annulée, la
+    /// base est HK0. `rotated` : HK″ est au journal ; sinon la rotation est due.
+    private func cancelledAccount(rotated: Bool) -> E2EEAutoLog.AccountState {
+        var account = account(rotated: false)
+        account.devices[lost.id] = nil
+        var revoked = intruder.state()
+        revoked.status = .revoked
+        revoked.revokeReason = .notMe
+        revoked.revokeSeq = Self.revokeSeq
+        revoked.revokedAtMs = 9_000
+        account.devices[intruder.id] = revoked
+        if rotated {
+            account.historyKeys = [firstRecord, cancelledRecord, baseRotationRecord]
+            account.historyKeyPubB64 = newHk
+            account.historyKeyEntryHash = baseRotationRecord.entryHash
+            account.rotationDueRevokeSeq = nil
+        } else {
+            account.historyKeys = [firstRecord, cancelledRecord]
+            account.historyKeyPubB64 = cancelledHk
+            account.historyKeyEntryHash = cancelledRecord.entryHash
+        }
+        return account
+    }
+
+    func testCancelledKeyAndItsBaseAreDerivedFromTheLog() {
+        let bases = cancelledAccount(rotated: true).historyKeyBases
+        XCTAssertEqual(bases.map(\.cancelSeq), [nil, Self.revokeSeq, nil])
+        XCTAssertEqual(bases.map(\.admissibleHkPubB64), [nil, oldHk, oldHk])
+        XCTAssertEqual(bases[2].previousHkPubB64, cancelledHk, "la littérale reste HK_r")
+        XCTAssertEqual(cancelledAccount(rotated: false).rotationBaseHkPubB64, oldHk)
+        // Révoqué en USER, le signataire n'annule rien : la base est HK_r elle-même.
+        var user = cancelledAccount(rotated: false)
+        user.devices[intruder.id]?.revokeReason = .user
+        XCTAssertEqual(user.rotationBaseHkPubB64, cancelledHk)
+        XCTAssertEqual(user.historyKeyBases.map(\.cancelled), [false, false])
+    }
+
+    /// La dernière HK est annulée : le détenteur de la base prouve la base et publie HK″ ;
+    /// celui qui ne détient que HK_r ne prouve rien et ne publie rien.
+    func testCancelledLastKeyRotatesFromTheBase() async throws {
+        let fake = Fake(reads: [.verified(cancelledAccount(rotated: false))])
+        fake.held[oldHk] = oldScalar
+        fake.held[cancelledHk] = cancelledScalar
+        fake.routes["POST \(E2EEAutoHistoryRotationContract.proofsPath)"] = [Self.json([
+            "deviceId": member.id, "hkPubB64": oldHk, "revokeSeq": "40", "createdAtMs": "9100",
+        ])]
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
+        XCTAssertTrue(report.proofDeposited)
+        XCTAssertEqual(fake.rotations, 1)
+        let body = try XCTUnwrap(fake.bodies["POST \(E2EEAutoHistoryRotationContract.proofsPath)"]?.first)
+        XCTAssertEqual(body["hkPubB64"] as? String, oldHk, "jamais la HK annulée")
+        XCTAssertTrue(E2EEAutoHistoryKey.verifyProof(
+            userId: Self.userId, deviceId: member.id, hkPubB64: oldHk, revokeSeq: Self.revokeSeq,
+            signatureB64: try XCTUnwrap(body["signatureB64"] as? String)
+        ))
+
+        let cancelledOnly = Fake(reads: [.verified(cancelledAccount(rotated: false))])
+        cancelledOnly.held[cancelledHk] = cancelledScalar
+        let idle = await E2EEAutoHistoryRotation(cancelledOnly.dependencies(member)).run()
+        XCTAssertFalse(idle.proofDeposited)
+        XCTAssertEqual(cancelledOnly.rotations, 0)
+        XCTAssertTrue(cancelledOnly.calls.isEmpty)
+    }
+
+    /// HK″ tournée depuis la base : preuve et maillon sur la base, jamais `chain/{HK_r}` ;
+    /// HK″ servie aux preuves de la base, qu'un détenteur de la base seule accepte.
+    func testRotationFromTheBaseLinksAndServesOnTheBase() async throws {
+        let account = cancelledAccount(rotated: true)
+        let fake = Fake(reads: [.verified(account)])
+        fake.held[oldHk] = oldScalar
+        fake.held[cancelledHk] = cancelledScalar
+        fake.held[newHk] = newScalar
+        let chainPath = try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(oldHk))
+        fake.routes["PUT \(chainPath)"] = [Self.json(["hkPubB64": oldHk, "nextHkPubB64": newHk])]
+        fake.routes["GET \(proofsPath)"] = [Self.json(["proofs": [proofRow(member.id)]], status: 200)]
+        fake.routes["POST \(E2EEAutoHistoryRotationContract.transfersPath)"] = [Self.json([
+            "recipientDeviceId": member.id, "requestId": "rotation-41",
+        ])]
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(rotator)).run()
+        XCTAssertTrue(report.chainDeposited)
+        XCTAssertEqual(report.served, [member.id])
+        XCTAssertFalse(fake.calls.contains("PUT \(try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(cancelledHk)))"))
+        let proof = try XCTUnwrap(fake.bodies["POST \(E2EEAutoHistoryRotationContract.proofsPath)"]?.first)
+        XCTAssertEqual(proof["hkPubB64"] as? String, oldHk)
+        let link = try XCTUnwrap(E2EEAutoHistory.parseWrap(try XCTUnwrap(fake.bodies["PUT \(chainPath)"]?.first)))
+        XCTAssertEqual(link.hkPubB64, oldHk)
+        XCTAssertNil(E2EEAutoHistory.check(userId: Self.userId, wrap: link, account: account, reader: .history(hkPubB64: newHk)))
+
+        let transfer = try XCTUnwrap(E2EEAutoHistory.parseWrap(try XCTUnwrap(fake.bodies["POST \(E2EEAutoHistoryRotationContract.transfersPath)"]?.first)))
+        func claim(_ held: String) -> E2EEAutoHistory.CheckError? {
+            E2EEAutoHistory.check(userId: Self.userId, wrap: transfer, account: account, reader: .device(
+                deviceId: member.id, keyVersions: [1], openRequestIds: [], heldHkPubB64: held
+            ))
+        }
+        XCTAssertNil(claim(oldHk), "le claim porte sur la base")
+        XCTAssertEqual(claim(cancelledHk), .rotation, "détenir HK_r ne suffit pas")
+    }
+
+    /// Le détenteur de la base seule reçoit HK″ sur le maillon à preuve de l'auteur, posé sur la base.
+    func testHolderOfTheBaseReceivesTheRotationFromTheBase() async throws {
+        let account = cancelledAccount(rotated: true)
+        let valid = try E2EEAutoHistory.seal(
+            scalar: newScalar, userId: Self.userId, senderDeviceId: rotator.id, recipient: member.id, keyVersion: 1,
+            requestId: "rotation-41", addHash: account.devices[member.id]!.addEntryHash,
+            recipientAgreementKey: member.agreement.publicKey, sign: { try E2EEV2LowS.sign($0, with: self.rotator.signing) }
+        )
+        let fake = Fake(reads: [.verified(account)])
+        fake.held[oldHk] = oldScalar
+        fake.routes["GET \(E2EEAutoHistoryRotationContract.transfersPath)"] = [Self.json(["transfers": [valid.jsonObject]], status: 200)]
+        let chainPath = try XCTUnwrap(E2EEAutoHistoryRotationContract.chainPath(oldHk))
+        fake.routes["GET \(chainPath)"] = [Self.json(["links": [try chainLink(from: rotator).jsonObject]], status: 200)]
+        fake.routes["GET \(proofsPath)"] = [Self.json(["proofs": [proofRow(rotator.id)]], status: 200)]
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
+        XCTAssertTrue(report.received)
+        XCTAssertEqual(fake.held[newHk], newScalar)
+        XCTAssertFalse(fake.calls.contains { $0.contains(E2EEAutoHistoryRotationContract.pathParam(cancelledHk)!) })
+    }
+
+    /// R1 : un maillon vers une HK annulée ne compte jamais, ni un maillon posé sur elle ;
+    /// une HK annulée en forme de rotation n'a jamais de maillon à preuve, même de son auteur.
+    func testLinksToOrFromACancelledKeyNeverCount() throws {
+        var account = cancelledAccount(rotated: true)
+        let cancelledAgreement = try P256.KeyAgreement.PrivateKey(rawRepresentation: cancelledScalar).publicKey
+        let toCancelled = try E2EEAutoHistory.seal(
+            scalar: oldScalar, userId: Self.userId, senderDeviceId: rotator.id, recipient: E2EEAutoHistory.historyRecipientPrefix + cancelledHk,
+            keyVersion: 1, requestId: E2EEAutoHistory.chainRequest, addHash: cancelledRecord.entryHash,
+            recipientAgreementKey: cancelledAgreement, sign: { try E2EEV2LowS.sign($0, with: self.rotator.signing) }
+        )
+        XCTAssertEqual(E2EEAutoHistory.check(userId: Self.userId, wrap: toCancelled, account: account, reader: .history(hkPubB64: cancelledHk)), .chain)
+        let fromCancelled = try E2EEAutoHistory.seal(
+            scalar: cancelledScalar, userId: Self.userId, senderDeviceId: rotator.id, recipient: E2EEAutoHistory.historyRecipientPrefix + newHk,
+            keyVersion: 1, requestId: E2EEAutoHistory.chainRequest, addHash: baseRotationRecord.entryHash,
+            recipientAgreementKey: P256.KeyAgreement.PrivateKey(rawRepresentation: newScalar).publicKey,
+            sign: { try E2EEV2LowS.sign($0, with: self.rotator.signing) }
+        )
+        XCTAssertEqual(E2EEAutoHistory.check(userId: Self.userId, wrap: fromCancelled, account: account, reader: .history(hkPubB64: newHk)), .chain)
+
+        // HK_r en forme de rotation, son auteur avec maillon et preuve sur HK0 : annulée, elle ne compte pas.
+        let shaped = E2EEAutoLog.HistoryKeyRecord(
+            seq: 30, entryHash: cancelledRecord.entryHash, hkPubB64: cancelledHk, previousHkPubB64: oldHk, signerDeviceId: rotator.id,
+            signerAddedAtMs: 5_000, createdAtMs: rotationCreatedAtMs, afterRevokeSeq: 20
+        )
+        account.historyKeys = [firstRecord, shaped]
+        account.devices[rotator.id]?.status = .revoked
+        account.devices[rotator.id]?.revokeReason = .notMe
+        account.devices[rotator.id]?.revokeSeq = Self.revokeSeq
+        let proof = E2EEAutoHistoryKey.signProof(userId: Self.userId, deviceId: rotator.id, hkPubB64: oldHk, revokeSeq: 20, scalar: oldScalar)!
+        XCTAssertEqual(E2EEAutoHistoryRotationContract.provenSenders(
+            userId: Self.userId, account: account, rotation: shaped, links: [toCancelled],
+            proofs: [.init(deviceId: rotator.id, signatureB64: proof)]
+        ), [])
+    }
+
+    /// Une HK′ annulée ne se chaîne ni ne se sert, même détenue avec la base.
+    func testCancelledLastKeyIsNeitherLinkedNorServed() async {
+        var account = cancelledAccount(rotated: false)
+        account.historyKeys[1] = .init(
+            seq: 30, entryHash: cancelledRecord.entryHash, hkPubB64: cancelledHk, previousHkPubB64: oldHk, signerDeviceId: intruder.id,
+            signerAddedAtMs: 5_000, createdAtMs: 7_000, afterRevokeSeq: 20
+        )
+        let fake = Fake(reads: [.verified(account)])
+        fake.held[oldHk] = oldScalar
+        fake.held[cancelledHk] = cancelledScalar
+        fake.routes["POST \(E2EEAutoHistoryRotationContract.proofsPath)"] = [Self.json([
+            "deviceId": member.id, "hkPubB64": oldHk, "revokeSeq": "40", "createdAtMs": "9100",
+        ])]
+        let report = await E2EEAutoHistoryRotation(fake.dependencies(member)).run()
+        XCTAssertFalse(report.chainDeposited)
+        XCTAssertEqual(report.served, [])
+        XCTAssertFalse(fake.calls.contains { $0.hasPrefix("PUT") || $0.hasPrefix("GET") })
+    }
+
     // MARK: Contrat
 
     func testStrictParsers() throws {

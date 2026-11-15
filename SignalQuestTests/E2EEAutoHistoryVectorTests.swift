@@ -402,4 +402,210 @@ final class E2EEAutoHistoryVectorTests: XCTestCase {
             XCTAssertNil(E2EEAutoHistory.hkPub(pathParam: try string(invalid, "value")), name)
         }
     }
+
+    // MARK: HK annulée et base (§5.6 bis, révision 23)
+
+    /// Journal d'un scénario de `history-base-v1` : chaîne sur la clé épinglée, tête signée, compte d'Alice.
+    private func scenarioAccount(_ scenario: [String: Any], pinnedLogKeyB64: String) throws -> E2EEAutoLog.AccountState {
+        let links = try XCTUnwrap(scenario["links"] as? [String])
+        let chain = try E2EEAutoLog.extendChain(.initial(pinnedLogKeyB64: pinnedLogKeyB64), links: links, logKeyEntries: [:]).get()
+        let head = try XCTUnwrap(scenario["head"] as? [String: Any])
+        let text = try string(head, "text")
+        let check = E2EEAutoLog.checkHead(
+            text: text, signatureB64: try string(head, "signatureB64"), logKeyB64: chain.logKeyB64,
+            nowMs: try XCTUnwrap(E2EEAutoLog.parseHead(text)).createdAtMs
+        )
+        guard case let .ok(verifiedHead) = check else {
+            XCTFail("tête : \(check)")
+            throw CocoaError(.coderInvalidValue)
+        }
+        XCTAssertEqual(E2EEAutoLog.compare(head: verifiedHead, to: chain), .match)
+        let account = try XCTUnwrap(scenario["account"] as? [String: Any])
+        let bySeq = try Dictionary(uniqueKeysWithValues: links.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
+        return try E2EEAutoLog.verifyAccount(
+            userId: try string(account, "userId"), accountSaltB64: try string(account, "accountSaltB64"),
+            entries: try XCTUnwrap(account["entries"] as? [String]), links: bySeq, chain: chain
+        ).get()
+    }
+
+    private func proofList(_ object: [String: Any]) throws -> [E2EEAutoHistoryRotationContract.Proof] {
+        try XCTUnwrap(object["proofs"] as? [[String: Any]]).map {
+            E2EEAutoHistoryRotationContract.Proof(deviceId: try string($0, "deviceId"), signatureB64: try string($0, "signatureB64"))
+        }
+    }
+
+    private func record(_ account: E2EEAutoLog.AccountState, _ hkPubB64: String) throws -> E2EEAutoLog.HistoryKeyRecord {
+        try XCTUnwrap(account.historyKeys.first { $0.hkPubB64 == hkPubB64 }, hkPubB64)
+    }
+
+    /// Chaque scénario : annulation, base et clé admissible de chaque HK, puis les verdicts
+    /// du dépôt de maillon, du service des preuves, des transferts et du maillon à preuve.
+    func testHistoryBaseScenarios() throws {
+        let vectors = try load("history-base-v1")
+        let pinned = try string(vectors, "pinnedLogKeyB64")
+        let scenarios = try XCTUnwrap(vectors["scenarios"] as? [[String: Any]])
+        XCTAssertFalse(scenarios.isEmpty)
+        var replayed: [String: Int] = [:]
+        for scenario in scenarios {
+            let name = try string(scenario, "name")
+            let account = try scenarioAccount(scenario, pinnedLogKeyB64: pinned)
+            let userId = account.userId
+
+            // Dérivation, dans l'ordre du journal.
+            let derived = try XCTUnwrap(scenario["derived"] as? [[String: Any]], name)
+            let bases = account.historyKeyBases
+            XCTAssertEqual(bases.count, derived.count, name)
+            for (base, expected) in zip(bases, derived) {
+                let label = "\(name) · \(expected["hk"] as? String ?? "?")"
+                XCTAssertEqual(base.hkPubB64, expected["hkPubB64"] as? String, label)
+                XCTAssertEqual(base.cancelled, expected["cancelled"] as? Bool, label)
+                XCTAssertEqual(base.cancelSeq, (expected["cancelSeq"] as? NSNumber)?.int64Value, label)
+                XCTAssertEqual(base.baseHkPubB64, expected["baseHkPubB64"] as? String, label)
+                XCTAssertEqual(base.admissibleHkPubB64, expected["admissibleHkPubB64"] as? String, label)
+                XCTAssertEqual(base.afterRevokeSeq, (expected["afterRevokeSeq"] as? NSNumber)?.int64Value, label)
+            }
+
+            // Dépôt d'un maillon : iOS ne dépose que sur la clé admissible, avec sa preuve sur
+            // elle, et seulement après l'auteur ; les verdicts du serveur en découlent.
+            for deposit in scenario["chainDeposits"] as? [[String: Any]] ?? [] {
+                let label = "\(name) · \(try string(deposit, "name"))"
+                let hk = try string(deposit, "hkPubB64"), sender = try string(deposit, "senderDeviceId")
+                let entry = try XCTUnwrap(account.historyKeyBase(hk), label)
+                let proofs = try proofList(deposit)
+                func holds(_ deviceId: String) -> Bool {
+                    guard let admissible = entry.admissibleHkPubB64, let revokeSeq = entry.afterRevokeSeq else { return false }
+                    return proofs.contains {
+                        $0.deviceId == deviceId && E2EEAutoHistoryKey.verifyProof(
+                            userId: userId, deviceId: deviceId, hkPubB64: admissible, revokeSeq: revokeSeq, signatureB64: $0.signatureB64
+                        )
+                    }
+                }
+                // r23.1 : R1 (HK′ annulée : TARGET) toujours ; R2 (HK′ hors rotation : PROOF) avec la preuve exigée.
+                let author = try record(account, hk).signerDeviceId, previous = try string(deposit, "previousHkPubB64")
+                let authorLinkPresent = deposit["authorLinkPresent"] as? Bool == true
+                let verdict: String
+                if entry.admissibleHkPubB64 != previous {
+                    verdict = "KEY"
+                } else if entry.cancelled {
+                    verdict = "TARGET"
+                } else if deposit["requireProof"] as? Bool != true {
+                    verdict = "ok"
+                } else if entry.afterRevokeSeq == nil || !holds(sender) {
+                    verdict = "PROOF"
+                } else if sender != author && !(authorLinkPresent && holds(author)) {
+                    verdict = "AUTHOR"
+                } else {
+                    verdict = "ok"
+                }
+                XCTAssertEqual(verdict, try string(deposit, "expect"), label)
+                replayed["deposit-\(verdict)", default: 0] += 1
+            }
+
+            // Service des preuves (règle de l'émetteur) indexé sur la clé admissible.
+            for served in scenario["servedCases"] as? [[String: Any]] ?? [] {
+                let label = "\(name) · \(try string(served, "name"))"
+                let rotation = try record(account, try string(served, "rotationHkPubB64"))
+                XCTAssertEqual(
+                    E2EEAutoHistoryKey.servedDevices(
+                        state: account, rotation: rotation, proofs: try proofList(served).map { ($0.deviceId, $0.signatureB64) },
+                        selfDeviceId: try string(served, "selfDeviceId")
+                    ),
+                    try XCTUnwrap(served["served"] as? [String], label), label
+                )
+                replayed["served", default: 0] += 1
+            }
+
+            // Transferts : le claim porte sur la clé admissible ; T1 (sans maillon à preuve) se
+            // juge chez iOS après ce contrôle, par la rotation qui relit le maillon.
+            for transfer in scenario["transferCases"] as? [[String: Any]] ?? [] {
+                let label = "\(name) · \(try string(transfer, "name"))"
+                let wrap = try XCTUnwrap(E2EEAutoHistory.parseWrap(try XCTUnwrap(transfer["wrap"] as? [String: Any])), label)
+                let readerObject = try XCTUnwrap(transfer["reader"] as? [String: Any], label)
+                var error = E2EEAutoHistory.check(userId: userId, wrap: wrap, account: account, reader: try reader(readerObject))?.rawValue
+                if error == nil, readerObject["rotationLinkProven"] as? Bool == false { error = "ROTATION" }
+                XCTAssertEqual(error ?? "ok", try string(transfer, "expect"), label)
+                replayed["transfer", default: 0] += 1
+            }
+
+            // Maillons à preuve : clé admissible, preuve de l'émetteur, auteur d'abord.
+            for proven in scenario["provenLinkCases"] as? [[String: Any]] ?? [] {
+                let label = "\(name) · \(try string(proven, "name"))"
+                let links = try XCTUnwrap(proven["links"] as? [[String: Any]], label).map { try XCTUnwrap(E2EEAutoHistory.parseWrap($0), label) }
+                let rotation = try record(account, try string(proven, "hkPubB64"))
+                let senders = E2EEAutoHistoryRotationContract.provenSenders(
+                    userId: userId, account: account, rotation: rotation, links: links, proofs: try proofList(proven)
+                )
+                XCTAssertEqual(senders, try XCTUnwrap(proven["senders"] as? [String], label), label)
+                // R1 : chaque maillon vers une HK′ annulée est refusé par le lecteur `history`.
+                if let readerError = proven["readerError"] as? String {
+                    for link in links {
+                        XCTAssertEqual(
+                            E2EEAutoHistory.check(userId: userId, wrap: link, account: account, reader: .history(hkPubB64: rotation.hkPubB64))?.rawValue,
+                            readerError, label
+                        )
+                    }
+                }
+                XCTAssertEqual(
+                    E2EEAutoHistoryRotationContract.isVouched(
+                        userId: userId, account: account, rotation: rotation, links: links, proofs: try proofList(proven)
+                    ),
+                    !senders.isEmpty, label
+                )
+                replayed[proven["readerError"] == nil ? "proven" : "proven-R1", default: 0] += 1
+            }
+        }
+        // Une clé du vecteur renommée ne doit pas vider un rejeu en silence.
+        for kind in ["deposit-ok", "deposit-KEY", "deposit-TARGET", "deposit-PROOF", "deposit-AUTHOR", "served", "transfer", "proven", "proven-R1"] {
+            XCTAssertGreaterThan(replayed[kind] ?? 0, 0, kind)
+        }
+    }
+
+    /// Copie à l'octet du vecteur du serveur (885318cbb, r23.1).
+    func testHistoryBaseVectorMatchesItsChecksum() throws {
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/e2ee-auto")
+        let sums = try String(contentsOf: dir.appendingPathComponent("SHA256SUMS"), encoding: .utf8)
+        let line = try XCTUnwrap(sums.split(separator: "\n").first { $0.hasSuffix("  history-base-v1.json") })
+        let data = try Data(contentsOf: dir.appendingPathComponent("history-base-v1.json"))
+        XCTAssertEqual(String(line.prefix(64)), SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+    }
+
+    /// Vecteur 15 : les journaux déjà publiés n'ont aucune HK annulée.
+    func testExistingJournalsHaveNoCancelledKey() throws {
+        let journals = try XCTUnwrap(try load("history-base-v1")["existingJournals"] as? [[String: Any]])
+        XCTAssertEqual(journals.count, 2)
+        for journal in journals {
+            let file = try string(journal, "file"), userId = try string(journal, "userId")
+            let account: E2EEAutoLog.AccountState
+            switch file {
+            case "history-wrap-v1.json":
+                account = try verifiedAccount(try load("history-wrap-v1"))
+            case "log-chain-v2.json":
+                let vectors = try load("log-chain-v2")
+                let reference = try XCTUnwrap(vectors["reference"] as? [String: Any])
+                let links = try XCTUnwrap(reference["links"] as? [String])
+                let logKeyEntries = try Dictionary(uniqueKeysWithValues: try XCTUnwrap(reference["logKeyEntries"] as? [String: String]).map {
+                    (try XCTUnwrap(Int64($0.key)), $0.value)
+                })
+                let chain = try E2EEAutoLog.extendChain(
+                    .initial(pinnedLogKeyB64: try string(vectors, "pinnedLogKeyB64"),
+                             nextLogKeysB64: try XCTUnwrap(vectors["pinnedNextLogKeysB64"] as? [String])),
+                    links: links, logKeyEntries: logKeyEntries
+                ).get()
+                let raw = try XCTUnwrap((reference["accounts"] as? [[String: Any]])?.first { $0["userId"] as? String == userId }, file)
+                let bySeq = try Dictionary(uniqueKeysWithValues: links.map { (try XCTUnwrap(E2EEAutoLog.parseLink($0)).seq, $0) })
+                account = try E2EEAutoLog.verifyAccount(
+                    userId: userId, accountSaltB64: try string(raw, "accountSaltB64"),
+                    entries: try XCTUnwrap(raw["entries"] as? [String]), links: bySeq, chain: chain
+                ).get()
+            default:
+                return XCTFail("journal inconnu : \(file)")
+            }
+            XCTAssertEqual(account.userId, userId, file)
+            XCTAssertEqual(
+                account.historyKeyBases.filter(\.cancelled).map(\.hkPubB64),
+                try XCTUnwrap(journal["cancelledHkPubB64"] as? [String]), file
+            )
+        }
+    }
 }

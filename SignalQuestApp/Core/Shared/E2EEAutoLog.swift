@@ -818,6 +818,69 @@ enum E2EEAutoLog {
     }
 }
 
+// MARK: - HK annulée et base (§5.6 bis, révision 23)
+
+extension E2EEAutoLog {
+    /// Une `HISTORY_KEY` vue sous l'angle de l'annulation (§5.6 bis). Suit
+    /// `deriveE2eeAutoHistoryKeyBases` ; le vecteur `history-base-v1` fait foi.
+    struct HistoryKeyBase: Equatable, Sendable {
+        let seq: Int64
+        let hkPubB64: String
+        /// La HK juste avant elle (littérale, annulée ou non) ; nil pour la première.
+        let previousHkPubB64: String?
+        /// `seq` du `REVOKE` `NOT_ME` ou `EMAIL_NOT_ME` de son signataire qui l'annule.
+        let cancelSeq: Int64?
+        /// La dernière HK non annulée qui la précède ; nil pour la première.
+        let baseHkPubB64: String?
+        /// Clé du maillon de cette HK, de la preuve, des transferts et du `claim` : la
+        /// littérale si elle n'est pas annulée, sinon la base, et elle seule.
+        let admissibleHkPubB64: String?
+        let afterRevokeSeq: Int64?
+
+        var cancelled: Bool { cancelSeq != nil }
+    }
+}
+
+extension E2EEAutoLog.AccountState {
+    /// Annulation, base et clé admissible de chaque `HISTORY_KEY`, dans l'ordre du journal.
+    /// Une HK sauf la première est annulée par un `REVOKE` `NOT_ME` ou `EMAIL_NOT_ME` de son
+    /// signataire écrit après elle et avant la HK suivante (sans suivante : après elle) ; le
+    /// révocateur n'entre pas dans le calcul. `USER`, `INACTIVE`, `ADMIN`… n'annulent rien.
+    var historyKeyBases: [E2EEAutoLog.HistoryKeyBase] {
+        var bases: [E2EEAutoLog.HistoryKeyBase] = []
+        for (index, record) in historyKeys.enumerated() {
+            var cancelSeq: Int64?
+            if index > 0, let signer = devices[record.signerDeviceId], let revokeSeq = signer.revokeSeq,
+               signer.revokeReason == .notMe || signer.revokeReason == .emailNotMe, revokeSeq > record.seq,
+               index + 1 == historyKeys.count || revokeSeq < historyKeys[index + 1].seq {
+                cancelSeq = revokeSeq
+            }
+            // La base : on remonte depuis la HK juste avant tant qu'elle est annulée.
+            var baseIndex = index - 1
+            while baseIndex >= 0 && bases[baseIndex].cancelled { baseIndex -= 1 }
+            let literal = index > 0 ? historyKeys[index - 1].hkPubB64 : nil
+            let base = baseIndex >= 0 ? historyKeys[baseIndex].hkPubB64 : nil
+            let admissible = index > 0 && bases[index - 1].cancelled ? base : literal
+            bases.append(E2EEAutoLog.HistoryKeyBase(
+                seq: record.seq, hkPubB64: record.hkPubB64, previousHkPubB64: literal, cancelSeq: cancelSeq,
+                baseHkPubB64: base, admissibleHkPubB64: admissible, afterRevokeSeq: record.afterRevokeSeq
+            ))
+        }
+        return bases
+    }
+
+    func historyKeyBase(_ hkPubB64: String) -> E2EEAutoLog.HistoryKeyBase? {
+        historyKeyBases.first { $0.hkPubB64 == hkPubB64 }
+    }
+
+    /// La clé depuis laquelle tourner : la dernière HK non annulée (« Tourner depuis la base »).
+    /// Si la dernière HK n'est pas annulée, c'est elle ; sans entrée `HISTORY_KEY`, la HK
+    /// courante ; nil sans HK. La première HK ne s'annule jamais : il y en a toujours une.
+    var rotationBaseHkPubB64: String? {
+        historyKeyBases.last { !$0.cancelled }?.hkPubB64 ?? historyKeyPubB64
+    }
+}
+
 /// Clé d'historique du compte (HK, contrat E2EE-AUTO §2.2 et §5.6) : scalaire
 /// P-256 et preuve de possession avant une rotation.
 enum E2EEAutoHistoryKey {
@@ -856,13 +919,15 @@ enum E2EEAutoHistoryKey {
 
     /// Règle de service d'une rotation de HK (§5.6 étape 4, révision 7), appliquée par
     /// l'émetteur : HK′ ne part qu'aux appareils `ACTIVE` du journal vérifié, hors lui-même,
-    /// dont la preuve se vérifie avec la HK précédente et le `revokeSeq` de la rotation.
-    /// `deviceId` triés par octets, sans doublon.
+    /// dont la preuve se vérifie avec la clé admissible de HK′ (la base si la HK précédente
+    /// est annulée, révision 23) et le `revokeSeq` de la rotation. Une preuve signée par une
+    /// HK annulée ne sert donc personne. `deviceId` triés par octets, sans doublon.
     static func servedDevices(
         state: E2EEAutoLog.AccountState, rotation: E2EEAutoLog.HistoryKeyRecord,
         proofs: [(deviceId: String, signatureB64: String)], selfDeviceId: String
     ) -> [String] {
-        guard let previousHkPubB64 = rotation.previousHkPubB64, let revokeSeq = rotation.afterRevokeSeq else { return [] }
+        guard let previousHkPubB64 = state.historyKeyBase(rotation.hkPubB64)?.admissibleHkPubB64 ?? rotation.previousHkPubB64,
+              let revokeSeq = rotation.afterRevokeSeq else { return [] }
         var served = Set<String>()
         for proof in proofs where proof.deviceId != selfDeviceId && state.devices[proof.deviceId]?.status == .active {
             if verifyProof(userId: state.userId, deviceId: proof.deviceId, hkPubB64: previousHkPubB64,
