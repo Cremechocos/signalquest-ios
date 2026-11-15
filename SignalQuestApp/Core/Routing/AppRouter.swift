@@ -175,9 +175,10 @@ final class AppRouter: ObservableObject {
     /// Jeton d'un lien de partage ouvert depuis l'extérieur (lien universel).
     @Published var openSentinelleShareSlug: String?
     /// Écran du Profil ouvert par une notification qui ne vise pas une fiche précise :
-    /// photos modérées, badge ou niveau, trajet clos par le serveur, statut de soutien.
+    /// photos modérées, badge ou niveau, trajet clos par le serveur, statut de soutien ;
+    /// ou les Réglages et leur rubrique Sécurité (codes de secours, contrat 2FA r3.3).
     enum ProfileScreen: String, Identifiable {
-        case photos, progression, sessions, subscription
+        case photos, progression, sessions, subscription, settings
         var id: String { rawValue }
     }
     @Published var openProfileScreen: ProfileScreen?

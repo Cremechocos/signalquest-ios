@@ -179,6 +179,7 @@ struct ProfileView: View {
                 case .progression: GamificationView(service: services.gamification)
                 case .sessions: SessionsListView(service: services.sessions)
                 case .subscription: PaywallView(store: services.entitlements, entryPoint: .profile)
+                case .settings: SettingsView(userService: services.users, authService: services.auth)
                 }
             }
         }
@@ -313,6 +314,11 @@ struct ProfileView: View {
     private func consumeScreenDeepLink() {
         guard let screen = router.openProfileScreen else { return }
         router.openProfileScreen = nil
+        // Les Réglages se poussent comme depuis le menu : leur bouton retour ramène au Profil.
+        if screen == .settings {
+            push(ProfileDestination.settings)
+            return
+        }
         deepLinkScreen = screen
     }
 

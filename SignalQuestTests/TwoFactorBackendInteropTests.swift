@@ -19,13 +19,13 @@ final class TwoFactorBackendInteropTests: XCTestCase {
         XCTAssertEqual(active.users.first(where: { $0.id == h.scenario.A.userId })?.enabled, true)
         XCTAssertEqual(active.users.first(where: { $0.id == h.scenario.A.userId })?.pending, false)
         try h.activate(h.scenario.B)
-        do { try await operation.disable(code: code); XCTFail("Stale operation accepted") } catch {}
+        do { try await operation.disable(proof: .app(code)); XCTFail("Stale operation accepted") } catch {}
         let unchanged = try await h.state()
         XCTAssertEqual(unchanged.events.count, active.events.count, "No request under the next account")
         let b = try await h.operation().profile()
         XCTAssertEqual(b.twoFactorEnabled, false)
         try h.activate(h.scenario.A)
-        try await h.operation().disable(code: try await h.code(setup.secret))
+        try await h.operation().disable(proof: .app(try await h.code(setup.secret)))
         let after = try await h.state()
         XCTAssertTrue(after.users.allSatisfy { !$0.enabled && !$0.hasSecret && !$0.pending })
         let disabled = try await h.operation().profile()

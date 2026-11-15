@@ -6,10 +6,69 @@ final class TwoFactorSetupViewModelTests: XCTestCase {
     private let secret = "JBSWY3DPEHPK3PXP"
 
     private func model(_ service: EnrollmentMock,
+                       markers: MemoryBackupCodesMarkers = MemoryBackupCodesMarkers(),
                        now: @escaping () -> Date = Date.init,
                        acknowledge: @escaping @MainActor () throws -> Void = {},
                        refresh: @escaping @MainActor () async throws -> Void = {}) -> TwoFactorSetupViewModel {
-        TwoFactorSetupViewModel(service: service, now: now, acknowledge: acknowledge, refreshProfile: refresh)
+        TwoFactorSetupViewModel(service: service, markers: markers.store, now: now, acknowledge: acknowledge, refreshProfile: refresh)
+    }
+
+    func testActivationShowsItsBackupCodesAndTracksTheBatchUntilSaved() async {
+        let service = EnrollmentMock()
+        await service.succeedSetup(secret: secret)
+        await service.setConfirmationBatch(TwoFactorBackupCodeBatch(codes: ["ABCDE-FGHJK", "MNPQR-STVWX"], generatedAt: nil))
+        await service.setStatus(.success(TwoFactorBackupCodeStatus(remaining: 10, generatedAt: "2026-11-15T21:37:00.000Z")))
+        let markers = MemoryBackupCodesMarkers()
+        let model = model(service, markers: markers)
+        await model.load()
+        model.code = "123456"
+        await model.confirm()
+        XCTAssertEqual(model.phase, .complete)
+        XCTAssertEqual(model.backupCodes?.codes, ["ABCDE-FGHJK", "MNPQR-STVWX"])
+        // `generatedAt` absent de la réponse : relu par le GET juste après (règle A).
+        XCTAssertEqual(markers.value, .batch(generatedAt: "2026-11-15T21:37:00.000Z"))
+        model.backupCodesSaved()
+        XCTAssertNil(model.backupCodes)
+        XCTAssertNil(markers.value)
+    }
+
+    func testClosingTheCodesWithoutSavingKeepsTheMarker() async {
+        let service = EnrollmentMock()
+        await service.succeedSetup(secret: secret)
+        await service.setConfirmationBatch(TwoFactorBackupCodeBatch(codes: ["ABCDE-FGHJK"], generatedAt: "2026-11-15T21:37:00.000Z"))
+        let markers = MemoryBackupCodesMarkers()
+        let model = model(service, markers: markers)
+        await model.load()
+        model.code = "123456"
+        await model.confirm()
+        model.close()
+        XCTAssertNil(model.backupCodes)
+        XCTAssertEqual(markers.value, .batch(generatedAt: "2026-11-15T21:37:00.000Z"))
+        let reads = await service.statusCalls
+        XCTAssertEqual(reads, 0, "Served generatedAt needs no read")
+    }
+
+    func testRejectedActivationRestoresTheMarkerAndALostAnswerKeepsIt() async {
+        let markers = MemoryBackupCodesMarkers()
+        markers.value = .batch(generatedAt: "older")
+        let rejected = EnrollmentMock()
+        await rejected.succeedSetup(secret: secret)
+        await rejected.failConfirmation(TwoFactorEnrollmentError.invalidCode)
+        let first = model(rejected, markers: markers)
+        await first.load()
+        first.code = "123456"
+        await first.confirm()
+        XCTAssertEqual(markers.value, .batch(generatedAt: "older"))
+
+        let lost = EnrollmentMock()
+        await lost.succeedSetup(secret: secret)
+        await lost.failConfirmation(APIError.transport("synthetic"))
+        let second = model(lost, markers: markers)
+        await second.load()
+        second.code = "123456"
+        await second.confirm()
+        XCTAssertEqual(markers.value, .unknown(previous: nil))
+        XCTAssertNil(second.backupCodes)
     }
 
     func testInitialFailureStopsLoadingShowsErrorAndCanBeRetried() async {
@@ -282,6 +341,11 @@ private actor EnrollmentMock: TwoFactorEnrollmentServicing {
     private(set) var confirmCalls = 0
     private var setupResult: Result<TwoFactorSetupResponse, Error> = .success(TwoFactorSetupResponse(secret: "JBSWY3DPEHPK3PXP"))
     private var confirmationError: Error?
+    private var confirmationBatch: TwoFactorBackupCodeBatch?
+    private var statusResult: Result<TwoFactorBackupCodeStatus, Error> = .failure(APIError.transport("synthetic"))
+    private(set) var statusCalls = 0
+    func setConfirmationBatch(_ batch: TwoFactorBackupCodeBatch?) { confirmationBatch = batch }
+    func setStatus(_ result: Result<TwoFactorBackupCodeStatus, Error>) { statusResult = result }
     private var setupGate: EnrollmentModelGate?
     private var confirmationGate: EnrollmentModelGate?
     func failSetup(_ error: Error) { setupResult = .failure(error) }
@@ -296,10 +360,15 @@ private actor EnrollmentMock: TwoFactorEnrollmentServicing {
         if let gate = setupGate { await gate.wait() }
         return try setupResult.get()
     }
-    func confirm(secret: String, code: String) async throws {
+    func confirm(secret: String, code: String) async throws -> TwoFactorBackupCodeBatch? {
         confirmCalls += 1
         if let gate = confirmationGate { await gate.wait() }
         if let confirmationError { throw confirmationError }
+        return confirmationBatch
+    }
+    func backupCodeStatus() async throws -> TwoFactorBackupCodeStatus {
+        statusCalls += 1
+        return try statusResult.get()
     }
     func profile() async throws -> AuthUser { .mock }
 }

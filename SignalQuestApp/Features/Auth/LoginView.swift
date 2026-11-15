@@ -38,13 +38,16 @@ struct LoginView: View {
     @State private var identifier = ""
     @State private var password = ""
     @State private var code = ""
+    /// Code de secours tel que tapé (contrat 2FA r3, §1) : le serveur le normalise.
+    @State private var backupCode = ""
+    @State private var usesBackupCode = false
     @State private var showSignup = false
     @State private var showForgotPassword = false
     @State private var pendingAppleConsent: PendingAppleConsent?
     @State private var appeared = false
     @FocusState private var focus: Field?
 
-    private enum Field { case identifier, password, code }
+    private enum Field { case identifier, password, code, backupCode }
 
     private struct PendingAppleConsent: Identifiable {
         let id = UUID()
@@ -91,7 +94,10 @@ struct LoginView: View {
                 // Six chiffres saisis : le code part seul, le bouton reste pour réessayer.
                 let digits = String(value.filter(\.isNumber).prefix(6))
                 if digits != value { code = digits; return }
-                if digits.count == 6 { submitCode() }
+                if digits.count == 6, !usesBackupCode { submitCode() }
+            }
+            .onChangeCompat(of: backupCode) { _, value in
+                if value.count > TwoFactorBackupCodes.inputMax { backupCode = String(value.prefix(TwoFactorBackupCodes.inputMax)) }
             }
             .sheet(isPresented: $showSignup) {
                 NavigationStack { SignupView() }
@@ -304,15 +310,37 @@ struct LoginView: View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
             MapChipIconButton(systemImage: "chevron.left", label: "Annuler", identifier: "login.twoFactor.cancel") {
                 code = ""
+                backupCode = ""
+                usesBackupCode = false
                 session.cancelTwoFactor()
             }
-            SQIconPastille(systemImage: "checkmark.shield", size: 52, font: SQFont.body(22, .semibold, relativeTo: .title3))
+            SQIconPastille(systemImage: usesBackupCode ? "key" : "checkmark.shield", size: 52,
+                           font: SQFont.body(22, .semibold, relativeTo: .title3))
             AuthHeader(title: String(localized: "Code de vérification"),
-                       message: String(localized: "Saisis le code à 6 chiffres de ton application d’authentification (Google Authenticator, Authy…)."),
+                       message: usesBackupCode ? nil
+                           : String(localized: "Saisis le code à 6 chiffres de ton application d’authentification (Google Authenticator, Authy…)."),
                        showsLogo: false)
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                AuthCodeBoxes(code: $code, isFocused: focus == .code)
-                    .focused($focus, equals: .code)
+                if usesBackupCode {
+                    AuthFieldGroup {
+                        AuthFieldRow("Code de secours", isFocused: focus == .backupCode) {
+                            TextField("Code de secours", text: $backupCode,
+                                      prompt: Text(verbatim: "XXXXX-XXXXX").foregroundColor(SQColor.labelSecondary))
+                                .textInputAutocapitalization(.characters)
+                                .keyboardType(.asciiCapable)
+                                .autocorrectionDisabled()
+                                .submitLabel(.go)
+                                .focused($focus, equals: .backupCode)
+                                .onSubmit(submitCode)
+                                .privacySensitive()
+                                .accessibilityLabel("Code de secours")
+                                .accessibilityIdentifier("login.twoFactor.backupCode")
+                        } onTap: { focus = .backupCode }
+                    }
+                } else {
+                    AuthCodeBoxes(code: $code, isFocused: focus == .code)
+                        .focused($focus, equals: .code)
+                }
                 if let error = session.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption)
@@ -323,15 +351,35 @@ struct LoginView: View {
                 }
             }
             GradientButton("Valider", isBusy: session.isBusy, action: submitCode)
-                .disabled(code.count < 6)
+                .disabled(!TwoFactorEnrollmentService.isReady(twoFactorProof))
                 .accessibilityIdentifier("login.twoFactor.submit")
+            Button {
+                session.errorMessage = nil
+                usesBackupCode.toggle()
+                focus = usesBackupCode ? .backupCode : .code
+            } label: {
+                Text(usesBackupCode ? LocalizedStringKey("Utiliser le code de l’application")
+                     : LocalizedStringKey("Utiliser un code de secours"))
+                    .font(SQType.caption(.bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(session.isBusy)
+            .accessibilityIdentifier("login.twoFactor.switch")
         }
-        .onAppear { focus = .code }
+        .onAppear { focus = usesBackupCode ? .backupCode : .code }
+    }
+
+    /// Le code de l'application, ou le code de secours tel que tapé : jamais les deux.
+    private var twoFactorProof: TwoFactorProof {
+        usesBackupCode ? .backup(backupCode) : .app(code)
     }
 
     private func submitCode() {
-        guard isTwoFactor, code.count == 6, !session.isBusy else { return }
-        Task { await session.verify2FA(code: code) }
+        let proof = twoFactorProof
+        guard isTwoFactor, TwoFactorEnrollmentService.isReady(proof), !session.isBusy else { return }
+        Task { await session.verify2FA(proof: proof) }
     }
 
     private var isTwoFactor: Bool {
@@ -815,7 +863,8 @@ struct AuthCodeBoxes: View {
                 }
             }
             .accessibilityHidden(true)
-            TextField("Code à 6 chiffres", text: $code)
+            // Sans texte indicatif : le champ est invisible, seules les cases se voient.
+            TextField("Code à 6 chiffres", text: $code, prompt: Text(verbatim: ""))
                 .textContentType(.oneTimeCode)
                 .keyboardType(.numberPad)
                 .autocorrectionDisabled()

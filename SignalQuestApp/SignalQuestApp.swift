@@ -565,6 +565,11 @@ struct RootView: View {
         return !showsOtherLaunchPrompt
     }
 
+    private var presentsLastBackupCodeNotice: Bool {
+        session.lastBackupCodeNotice && isAuthenticated && !showsOtherLaunchPrompt && !presentsUsernameConfirmation
+            && !presentsDisplayNamePrompt && !callManager.showCallScreen
+    }
+
     private var showsOtherLaunchPrompt: Bool {
         showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
             || showsHistoryApproval || showsHistoryRequester || showsHistoryKeyAlert
@@ -665,6 +670,8 @@ struct RootView: View {
                 E2EEAutoAttachmentsQAScreen()
             } else if AppEnvironment.showsAutoDevicesQA {
                 E2EEAutoDevicesQAScreen()
+            } else if let variant = AppEnvironment.twoFactorBackupQAVariant {
+                TwoFactorBackupCodesQAScreen(variant: variant)
             } else if AppEnvironment.showsUsernameConfirmationQA {
                 UsernameConfirmationQAScreen()
             } else if AppEnvironment.showsDisplayNamePromptQA {
@@ -798,6 +805,12 @@ struct RootView: View {
                         }
                     }
                     .sqAnimation(SQMotion.smooth, value: presentsDisplayNamePrompt)
+                    // Règle B des codes de secours (contrat 2FA r3.3) : la connexion a utilisé le
+                    // dernier code. Une fois, après les autres invites, avec un accès aux Réglages.
+                    .modifier(LastBackupCodeNoticeModifier(isPresented: Binding(
+                        get: { presentsLastBackupCodeNotice },
+                        set: { if !$0 { session.lastBackupCodeNotice = false } }
+                    ), openSecurity: { router.route(toProfileScreen: .settings) }))
                     .overlay {
                         if let presented = newDeviceAlerts.presented, let model = newDeviceAlerts.model {
                             E2EEAutoNewDeviceAlertView(deviceId: presented.deviceId, model: model) { resolved in

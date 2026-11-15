@@ -264,6 +264,17 @@ enum AppEnvironment {
         #endif
     }
 
+    /// Banc des codes de secours 2FA : `--qa-two-factor-backup-codes`, `-regenerate`, `-disable`,
+    /// `-settings`, `-login` ou `-last` ; rend la variante, sans le préfixe.
+    static var twoFactorBackupQAVariant: String? {
+        #if DEBUG && targetEnvironment(simulator)
+        let prefix = "--qa-two-factor-backup-"
+        return ProcessInfo.processInfo.arguments.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+        #else
+        return nil
+        #endif
+    }
+
     static var showsUsernameConfirmationQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-username-confirmation") || hasArgument("--qa-username-confirmation-none")

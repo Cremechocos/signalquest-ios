@@ -23,6 +23,12 @@ struct TwoFactorSetupView: View {
                 header
                 if model.needsProfileRefresh {
                     confirmation
+                    if let batch = model.backupCodes {
+                        TwoFactorBackupCodesPanel(batch: batch) {
+                            model.backupCodesSaved()
+                            close()
+                        }
+                    }
                 } else if let setup = model.setup {
                     enrollment(setup)
                     verification
@@ -205,8 +211,11 @@ struct TwoFactorSetupView: View {
                 }
                 .accessibilityIdentifier("two-factor.setup.refresh-profile")
             }
-            GradientButton("Terminer", systemImage: "checkmark", style: .secondary) { close() }
-                .accessibilityIdentifier("two-factor.setup.done")
+            // Avec des codes à noter, c'est « J'ai noté mes codes » qui termine.
+            if model.backupCodes == nil {
+                GradientButton("Terminer", systemImage: "checkmark", style: .secondary) { close() }
+                    .accessibilityIdentifier("two-factor.setup.done")
+            }
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)

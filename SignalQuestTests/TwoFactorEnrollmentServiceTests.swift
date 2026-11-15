@@ -104,7 +104,7 @@ final class TwoFactorEnrollmentServiceTests: XCTestCase {
             return .init(json: "{\"ok\":true}")
         }
         let secret = secret
-        let task = Task { try await fixture.service.confirm(secret: secret, code: "123456") }
+        let task = Task { _ = try await fixture.service.confirm(secret: secret, code: "123456") }
         await fulfillment(of: [started], timeout: 2)
         try fixture.credentials.setAccessToken(fixture.tokenB)
         release.signal()
@@ -165,15 +165,15 @@ final class TwoFactorEnrollmentServiceTests: XCTestCase {
     func testDisableUsesCapturedOwnerRejectsMalformedCodeAndRequiresAcknowledgement() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
-        do { try await fixture.service.disable(code: "bad"); XCTFail("Malformed code") } catch {}
+        do { try await fixture.service.disable(proof: .app("bad")); XCTFail("Malformed code") } catch {}
         XCTAssertTrue(fixture.recorder.requests.isEmpty)
         fixture.recorder.replies = [.init(json: "{}")]
-        do { try await fixture.service.disable(code: "123456"); XCTFail("Missing receipt") } catch {}
+        do { try await fixture.service.disable(proof: .app("123456")); XCTFail("Missing receipt") } catch {}
         fixture.recorder.replies = [.init(json: "{\"ok\":true}")]
-        try await fixture.service.disable(code: "123456")
+        try await fixture.service.disable(proof: .app("123456"))
         XCTAssertEqual(fixture.recorder.requests.map(\.path), Array(repeating: "/api/auth/2fa/disable", count: 2))
         try fixture.credentials.setAccessToken(fixture.tokenB)
-        do { try await fixture.service.disable(code: "123456"); XCTFail("Wrong account") } catch {}
+        do { try await fixture.service.disable(proof: .app("123456")); XCTFail("Wrong account") } catch {}
         XCTAssertEqual(fixture.recorder.requests.count, 2)
     }
 
@@ -181,8 +181,81 @@ final class TwoFactorEnrollmentServiceTests: XCTestCase {
         let fixture = try Fixture()
         defer { fixture.close() }
         fixture.recorder.replies = [.init(status: 503, json: "{}", headers: ["Retry-After": "0"])]
-        do { try await fixture.service.disable(code: "123456"); XCTFail("Failure expected") } catch {}
+        do { try await fixture.service.disable(proof: .app("123456")); XCTFail("Failure expected") } catch {}
         XCTAssertEqual(fixture.recorder.requests.count, 1)
+    }
+
+    func testActivationReturnsTheBackupCodesItCreated() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.recorder.replies = [
+            .init(json: "{\"ok\":true,\"backupCodes\":[\"ABCDE-FGHJK\",\"MNPQR-STVWX\"]}"),
+            .init(json: "{\"ok\":true,\"backupCodes\":[\"ABCDE-FGHJK\"],\"generatedAt\":\"2026-11-15T21:37:00.000Z\"}"),
+            .init(json: "{\"ok\":true}"),
+        ]
+        let first = try await fixture.service.confirm(secret: secret, code: "123456")
+        XCTAssertEqual(first, TwoFactorBackupCodeBatch(codes: ["ABCDE-FGHJK", "MNPQR-STVWX"], generatedAt: nil))
+        let second = try await fixture.service.confirm(secret: secret, code: "123456")
+        XCTAssertEqual(second?.generatedAt, "2026-11-15T21:37:00.000Z")
+        let older = try await fixture.service.confirm(secret: secret, code: "123456")
+        XCTAssertNil(older, "A server without backup codes still activates")
+    }
+
+    func testBackupCodeProofsAreSentAsTypedAndMalformedOnesStayLocal() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        do { try await fixture.service.disable(proof: .backup("ABCDE-FGH")); XCTFail("Too short") }
+        catch { XCTAssertEqual(error as? TwoFactorEnrollmentError, .invalidBackupCode) }
+        XCTAssertTrue(fixture.recorder.requests.isEmpty)
+        fixture.recorder.replies = [.init(json: "{\"ok\":true}")]
+        try await fixture.service.disable(proof: .backup("abcde fghjk"))
+        let request = try XCTUnwrap(fixture.recorder.requests.last)
+        XCTAssertEqual(request.path, "/api/auth/2fa/disable")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: request.body) as? [String: String])
+        XCTAssertEqual(body, ["backupCode": "abcde fghjk"])
+    }
+
+    func testRegenerationReturnsTheNewBatchAndNamesAnInvalidBackupCode() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.recorder.replies = [
+            .init(status: 400, json: "{\"code\":\"INVALID_BACKUP_CODE\"}"),
+            .init(json: "{}"),
+            .init(json: "{\"backupCodes\":[\"ABCDE-FGHJK\"]}"),
+        ]
+        do { _ = try await fixture.service.regenerateBackupCodes(proof: .backup("ABCDE-FGHJK")); XCTFail("Invalid code") }
+        catch {
+            XCTAssertEqual(error as? TwoFactorEnrollmentError, .invalidBackupCode)
+            XCTAssertEqual(error.userFacingMessage, TwoFactorEnrollmentError.invalidBackupCode.errorDescription)
+        }
+        do { _ = try await fixture.service.regenerateBackupCodes(proof: .app("123456")); XCTFail("No codes") }
+        catch { XCTAssertEqual(error as? TwoFactorEnrollmentError, .unconfirmedResponse) }
+        let batch = try await fixture.service.regenerateBackupCodes(proof: .app("123456"))
+        XCTAssertEqual(batch?.codes, ["ABCDE-FGHJK"])
+        XCTAssertEqual(fixture.recorder.requests.map(\.path), Array(repeating: "/api/auth/2fa/backup-codes", count: 3))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(fixture.recorder.requests.last).body) as? [String: String])
+        XCTAssertEqual(body, ["code": "123456"])
+    }
+
+    func testBackupCodeStatusReadsTheCountAndTheBatchDate() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.recorder.replies = [
+            .init(json: "{\"remaining\":3,\"generatedAt\":\"2026-11-15T21:37:00.000Z\"}"),
+            .init(json: "{\"remaining\":0,\"generatedAt\":null}"),
+            .init(json: "{\"remaining\":-1,\"generatedAt\":null}"),
+        ]
+        let served = try await fixture.service.backupCodeStatus()
+        XCTAssertEqual(served, TwoFactorBackupCodeStatus(remaining: 3, generatedAt: "2026-11-15T21:37:00.000Z"))
+        let off = try await fixture.service.backupCodeStatus()
+        XCTAssertEqual(off, TwoFactorBackupCodeStatus(remaining: 0, generatedAt: nil))
+        do { _ = try await fixture.service.backupCodeStatus(); XCTFail("Negative count") } catch {}
+        XCTAssertEqual(fixture.recorder.requests.map(\.path), Array(repeating: "/api/auth/2fa/backup-codes", count: 3))
+    }
+
+    func testLoginNamesAnInvalidBackupCode() {
+        let error = APIError.http(status: 400, code: "INVALID_BACKUP_CODE", message: "", requestId: nil, retryAfter: nil)
+        XCTAssertEqual(error.userFacingMessage, TwoFactorEnrollmentError.invalidBackupCode.errorDescription)
     }
 
     private final class Fixture: @unchecked Sendable {

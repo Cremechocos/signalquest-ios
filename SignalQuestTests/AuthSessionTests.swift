@@ -27,6 +27,8 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     var signupReplacementBeforeReturn: UUID?
     var appleResponses: [Result<LoginResponse, Error>] = []
     private(set) var appleTermsSent: [Bool] = []
+    var verifyResponses: [Result<LoginResponse, Error>] = []
+    private(set) var verifyProofs: [TwoFactorProof] = []
     private(set) var appleHandlesSent: [String?] = []
     var loginError: Error?
     var wipeIdentity: (@Sendable () async -> Void)?
@@ -60,7 +62,11 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
         credentialID = signupReplacementBeforeReturn ?? signupCredentialID
         return CredentialResponse(value: signupResponse, credentialSessionID: signupCredentialID)
     }
-    func verify2FA(tempToken: String, code: String) async throws -> LoginResponse { throw Unused.notImplemented }
+    func verify2FA(tempToken: String, proof: TwoFactorProof) async throws -> LoginResponse {
+        verifyProofs.append(proof)
+        guard !verifyResponses.isEmpty else { throw Unused.notImplemented }
+        return try verifyResponses.removeFirst().get()
+    }
     func signInWithApple(identityToken: String, fullName: String?, handle: String?, acceptedTerms: Bool) async throws -> LoginResponse {
         appleTermsSent.append(acceptedTerms)
         appleHandlesSent.append(handle)

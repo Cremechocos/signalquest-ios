@@ -13,8 +13,11 @@ final class TwoFactorSetupViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var didEnable = false
     @Published private(set) var serverAlreadyEnabled = false
+    /// Codes de secours créés avec l'activation, montrés une seule fois (contrat 2FA r3.3).
+    @Published private(set) var backupCodes: TwoFactorBackupCodeBatch?
 
     private let service: TwoFactorEnrollmentServicing
+    private let markers: TwoFactorBackupCodesMarkerStore
     private let now: () -> Date
     private let acknowledge: @MainActor () throws -> Void
     private let refreshProfile: @MainActor () async throws -> Void
@@ -22,10 +25,12 @@ final class TwoFactorSetupViewModel: ObservableObject {
     private var operationID = UUID()
     private var closed = false
 
-    init(service: TwoFactorEnrollmentServicing, now: @escaping () -> Date = Date.init,
+    init(service: TwoFactorEnrollmentServicing, markers: TwoFactorBackupCodesMarkerStore? = nil,
+         now: @escaping () -> Date = Date.init,
          acknowledge: @escaping @MainActor () throws -> Void,
          refreshProfile: @escaping @MainActor () async throws -> Void) {
         self.service = service
+        self.markers = markers ?? .live(userID: service.scope.userID)
         self.now = now
         self.acknowledge = acknowledge
         self.refreshProfile = refreshProfile
@@ -81,8 +86,14 @@ final class TwoFactorSetupViewModel: ObservableObject {
         let submittedCode = normalizedCode
         let operation = begin(.confirming)
         do {
-            try await service.confirm(secret: setup.secret, code: submittedCode)
+            // Règle A : le repère est tenu autour de l'envoi, la réponse perdue comprise.
+            let service = service
+            let batch = try await TwoFactorBackupCodes.createTracked(
+                previous: nil, markers: markers,
+                create: { try await service.confirm(secret: setup.secret, code: submittedCode) },
+                readStatus: { try await service.backupCodeStatus() })
             guard current(operation) else { return }
+            backupCodes = batch
             // A consumed challenge cannot be submitted again after this point,
             // including when the subsequent profile read fails or is cancelled.
             didEnable = true
@@ -129,10 +140,17 @@ final class TwoFactorSetupViewModel: ObservableObject {
 
     func sessionDidChange() { _ = requireCurrent() }
 
+    /// « J'ai noté mes codes » : le lot est confirmé, le repère tombe.
+    func backupCodesSaved() {
+        markers.save(nil)
+        backupCodes = nil
+    }
+
     func close() {
         closed = true
         operationID = UUID()
         eraseSecret()
+        backupCodes = nil
     }
 
     private func handleSetupError(_ error: Error) {
@@ -172,6 +190,7 @@ final class TwoFactorSetupViewModel: ObservableObject {
         guard isCurrent else {
             operationID = UUID()
             eraseSecret()
+            backupCodes = nil
             didEnable = false
             serverAlreadyEnabled = false
             phase = .sessionChanged

@@ -167,7 +167,7 @@ enum LocalOfflineOwnership {
 protocol AuthServicing: Sendable {
     func login(identifier: String, password: String) async throws -> LoginResponse
     func signup(email: String, password: String, handle: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse>
-    func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
+    func verify2FA(tempToken: String, proof: TwoFactorProof) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
     func signInWithApple(identityToken: String, fullName: String?, handle: String?, acceptedTerms: Bool) async throws -> LoginResponse
@@ -319,10 +319,10 @@ final class AuthService: AuthServicing {
 
     // MARK: 2FA
 
-    func verify2FA(tempToken: String, code: String) async throws -> LoginResponse {
+    func verify2FA(tempToken: String, proof: TwoFactorProof) async throws -> LoginResponse {
         try await api.requestJSON(
             "/api/auth/2fa/verify",
-            body: TwoFactorVerifyRequest(tempToken: tempToken, code: code),
+            body: TwoFactorVerifyRequest(tempToken: tempToken, proof: proof),
             authenticated: false,
             responseDeadline: Self.interactiveDeadline
         )
@@ -346,7 +346,7 @@ final class AuthService: AuthServicing {
     func disable2FA(code: String) async throws {
         let response: SuccessResponse = try await api.requestJSON(
             "/api/auth/2fa/disable",
-            body: TwoFactorDisableRequest(code: code)
+            body: TwoFactorProofRequest(proof: .app(code))
         )
         guard response.isAcknowledged else { throw APIError.decoding("two-factor-disable-acknowledgement-missing") }
     }
@@ -607,13 +607,19 @@ final class AuthSessionViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .checking {
-        didSet { if oldValue != state { stateID = UUID(); profileRevision = UUID() } }
+        didSet {
+            if oldValue != state { stateID = UUID(); profileRevision = UUID() }
+            if case .authenticated = state {} else { lastBackupCodeNotice = false }
+        }
     }
     @Published var errorMessage: String?
     /// Refus du nom d'utilisateur à l'inscription (e-mail ou Apple) : affiché sous ce champ.
     @Published var handleErrorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
+    /// Règle B des codes de secours : la connexion vient d'utiliser le dernier. Montré une fois,
+    /// par-dessus l'app, avec un accès à la rubrique Sécurité.
+    @Published var lastBackupCodeNotice = false
     /// Compte dont le profil a été relu sur le serveur depuis ce lancement (pas seulement
     /// le cache) : l'écran « Ton nom d'utilisateur » n'apparaît qu'après, donc jamais hors ligne.
     @Published private(set) var serverProfileUserID: String?
@@ -1016,19 +1022,25 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func verify2FA(code: String) async {
+    func verify2FA(proof: TwoFactorProof) async {
         guard case .requires2FA(let tempToken) = state else { return }
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.verify2FA(tempToken: tempToken, code: code)
+            let response = try await service.verify2FA(tempToken: tempToken, proof: proof)
             if let user = response.user {
                 // La réponse de validation ne porte pas `twoFactorEnabled` (seul
                 // /api/auth/me le donne) ; or elle prouve justement que la 2FA est
                 // active. Sans ce marquage, Réglages proposait « Activer la 2FA »
                 // juste après une connexion par code (TRX-33).
                 await setAuthenticated(user.withConfirmedTwoFactor(enabled: true))
+                // Règle B (contrat 2FA r3.3) : `backupCodesRemaining` n'est servi qu'après une
+                // connexion par code de secours. Le dernier code utilisé appelle un message ; il en
+                // reste : rien, l'e-mail du serveur suffit.
+                if case .authenticated(let current) = state, current.id == user.id {
+                    lastBackupCodeNotice = response.backupCodesRemaining == 0
+                }
                 completeProfileAfterLogin()
             } else {
                 errorMessage = String(localized: "Code 2FA accepté mais utilisateur absent")

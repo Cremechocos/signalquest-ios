@@ -158,6 +158,7 @@ enum APIError: Error, LocalizedError, Equatable {
         "RESET_LINK_ALREADY_USED": String(localized: "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."),
         "RESET_LINK_EXPIRED": String(localized: "Ce lien a expiré. Demande un nouveau lien."),
         "INVALID_2FA_CODE": String(localized: "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."),
+        "INVALID_BACKUP_CODE": String(localized: "Ce code de secours n’est pas valide."),
         "EMAIL_ALREADY_USED": String(localized: "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."),
         "ACCOUNT_SUSPENDED": String(localized: "Ton compte est suspendu. Contacte le support SignalQuest pour en savoir plus."),
         // Demandes de message (DM-REQ-1).

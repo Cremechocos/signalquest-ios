@@ -1,6 +1,318 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%lld codes de secours restants" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld backup code left"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld backup codes left"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld code de secours restant"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld codes de secours restants"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Tes codes de secours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your backup codes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes codes de secours"
+          }
+        }
+      }
+    },
+    "SQFormal|Tes codes de secours" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos codes de secours"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Garde ces codes en lieu sûr. Chacun ne sert qu’une fois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep these codes somewhere safe. Each one works only once."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garde ces codes en lieu sûr. Chacun ne sert qu’une fois."
+          }
+        }
+      }
+    },
+    "SQFormal|Garde ces codes en lieu sûr. Chacun ne sert qu’une fois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardez ces codes en lieu sûr. Chacun ne sert qu’une fois."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Copier les codes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy codes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier les codes"
+          }
+        }
+      }
+    },
+    "J’ai noté mes codes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I’ve saved my codes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai noté mes codes"
+          }
+        }
+      }
+    },
+    "Utiliser un code de secours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use a backup code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser un code de secours"
+          }
+        }
+      }
+    },
+    "Utiliser le code de l’application" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the app code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser le code de l’application"
+          }
+        }
+      }
+    },
+    "Code de secours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de secours"
+          }
+        }
+      }
+    },
+    "Ce code de secours n’est pas valide." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This backup code isn’t valid."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce code de secours n’est pas valide."
+          }
+        }
+      }
+    },
+    "Tu as utilisé ton dernier code de secours. Génère-en de nouveaux." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve used your last backup code. Generate new ones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as utilisé ton dernier code de secours. Génère-en de nouveaux."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as utilisé ton dernier code de secours. Génère-en de nouveaux." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez utilisé votre dernier code de secours. Générez-en de nouveaux."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucun code de secours restant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No backup codes left"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun code de secours restant"
+          }
+        }
+      }
+    },
+    "Générés le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generated on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générés le %@"
+          }
+        }
+      }
+    },
+    "Générer de nouveaux codes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate new codes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générer de nouveaux codes"
+          }
+        }
+      }
+    },
+    "Les anciens codes ne fonctionneront plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your old codes will stop working."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anciens codes ne fonctionneront plus."
+          }
+        }
+      }
+    },
+    "Tu n’as pas confirmé avoir noté tes codes de secours. Génère-en de nouveaux pour les noter." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You didn’t confirm you saved your backup codes. Generate new ones to save them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu n’as pas confirmé avoir noté tes codes de secours. Génère-en de nouveaux pour les noter."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu n’as pas confirmé avoir noté tes codes de secours. Génère-en de nouveaux pour les noter." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous n’avez pas confirmé avoir noté vos codes de secours. Générez-en de nouveaux pour les noter."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Nouvelle clé d’historique sur ton compte" : {
       "localizations" : {
         "en" : {

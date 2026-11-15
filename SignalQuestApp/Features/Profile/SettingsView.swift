@@ -181,10 +181,12 @@ struct SettingsView: View {
         pushed = destination
     }
     @State private var twoFactorEnrollment: TwoFactorEnrollmentService?
-    @State private var twoFactorDisable: TwoFactorEnrollmentService?
-    @State private var isDisabling2FA = false
-    @State private var show2FADisable = false
-    @State private var disable2FACode = ""
+    /// Désactivation de la 2FA ou régénération des codes de secours.
+    @State private var twoFactorProof: TwoFactorProofItem?
+    /// Codes de secours : l'état lu sur le serveur, et le repère « non confirmés » de la règle A.
+    @State private var backupCodeStatus: TwoFactorBackupCodeStatus?
+    @State private var backupCodesUnconfirmed = false
+    @State private var backupCodesReads = 0
     @State private var showDeleteConfirm = false
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
@@ -259,6 +261,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.password")
                 twoFactorRow
+                backupCodesRow
                 Button {
                     appleError = nil
                     showAppleSheet = true
@@ -515,7 +518,8 @@ struct SettingsView: View {
         }
         .onDisappear { appLockSetup.cancel() }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $twoFactorEnrollment) { enrollment in
+        .task(id: "\(currentUserID ?? "")|\(twoFactorEnabled)|\(backupCodesReads)") { await readBackupCodes() }
+        .sheet(item: $twoFactorEnrollment, onDismiss: { backupCodesReads += 1 }) { enrollment in
             NavigationStack {
                 TwoFactorSetupView(service: enrollment, acknowledge: {
                     try session.acknowledgeTwoFactorState(expectedUserID: enrollment.scope.userID,
@@ -532,35 +536,18 @@ struct SettingsView: View {
         }
         .onChangeCompat(of: session.state) { _, _ in
             if let enrollment = twoFactorEnrollment, !enrollment.isCurrent() { twoFactorEnrollment = nil }
-            if let operation = twoFactorDisable, !operation.isCurrent() {
-                show2FADisable = false
-                disable2FACode = ""
-                twoFactorDisable = nil
-            }
+            if let item = twoFactorProof, !item.operation.isCurrent() { twoFactorProof = nil }
         }
-        .alert("Désactiver la 2FA ?", isPresented: $show2FADisable) {
-            TextField("Code à 6 chiffres", text: $disable2FACode)
-                .keyboardType(.numberPad)
-            Button("Annuler", role: .cancel) { disable2FACode = ""; twoFactorDisable = nil }
-            Button("Désactiver", role: .destructive) {
-                let code = disable2FACode
-                disable2FACode = ""
-                guard let operation = twoFactorDisable, !isDisabling2FA else { return }
-                isDisabling2FA = true
-                model.errorMessage = nil
-                Task { @MainActor in
-                    defer { isDisabling2FA = false; twoFactorDisable = nil }
-                    do {
-                        try await operation.disable(code: code)
-                        try session.acknowledgeTwoFactorState(enabled: false,
-                            expectedUserID: operation.scope.userID, isCurrent: operation.isCurrent)
-                    } catch {
-                        if operation.isCurrent() { model.errorMessage = error.userFacingMessage }
-                    }
-                }
+        .sheet(item: $twoFactorProof, onDismiss: { backupCodesReads += 1 }) { item in
+            NavigationStack {
+                TwoFactorProofSheet(purpose: item.purpose, operation: item.operation,
+                                    previousGeneratedAt: item.previousGeneratedAt,
+                                    onDisabled: {
+                                        try session.acknowledgeTwoFactorState(enabled: false,
+                                            expectedUserID: item.operation.scope.userID, isCurrent: item.operation.isCurrent)
+                                    },
+                                    onCodesChanged: { backupCodesReads += 1 })
             }
-        } message: {
-            Text("Saisis un code de ton application d'authentification pour confirmer la désactivation.")
         }
         .sheet(isPresented: $showAppleSheet) { appleSheet }
         .sheet(item: $model.exportedFile, onDismiss: { model.clearExport() }) { file in
@@ -614,8 +601,7 @@ struct SettingsView: View {
                     return
                 }
                 if twoFactorEnabled {
-                    twoFactorDisable = operation
-                    show2FADisable = true
+                    twoFactorProof = TwoFactorProofItem(purpose: .disable, operation: operation, previousGeneratedAt: nil)
                 } else {
                     twoFactorEnrollment = operation
                 }
@@ -625,10 +611,54 @@ struct SettingsView: View {
                                    showsChevron: true)
             }
             .buttonStyle(.plain)
-            .disabled(isDisabling2FA)
             .accessibilityHint(twoFactorEnabled ? "Désactive la double authentification" : "Active la double authentification")
             .accessibilityIdentifier("settings.twoFactor")
         }
+    }
+
+    /// Codes de secours : toujours visibles avec la 2FA, sans report possible (contrat 2FA r3, §4
+    /// et §6) : leur état, et de quoi en refaire. Un lot montré ici sans « J'ai noté mes codes »
+    /// invite à en refaire (règle A), sur cet appareil seulement.
+    @ViewBuilder
+    private var backupCodesRow: some View {
+        if !twoFactorStateUnknown, twoFactorEnabled || backupCodesUnconfirmed {
+            Button {
+                guard case .authenticated(let user) = session.state,
+                      let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                    model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                    return
+                }
+                twoFactorProof = TwoFactorProofItem(purpose: .regenerate, operation: operation,
+                                                    previousGeneratedAt: backupCodeStatus?.generatedAt)
+            } label: {
+                SQSettingsRowLabel("Générer de nouveaux codes", systemImage: "key",
+                                   subtitle: TwoFactorBackupCodes.stateText(status: backupCodeStatus,
+                                                                            unconfirmed: backupCodesUnconfirmed),
+                                   showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.backupCodes")
+        }
+    }
+
+    private var currentUserID: String? {
+        if case .authenticated(let user) = session.state { return user.id }
+        return nil
+    }
+
+    /// Relu à l'ouverture et après chaque changement. Le repère de la règle A suit une relecture
+    /// réussie ; si elle échoue, il attend la suivante.
+    private func readBackupCodes() async {
+        guard let userID = currentUserID else { backupCodeStatus = nil; backupCodesUnconfirmed = false; return }
+        let markers = TwoFactorBackupCodesMarkerStore.live(userID: userID)
+        backupCodesUnconfirmed = markers.load() != nil
+        guard twoFactorEnabled || backupCodesUnconfirmed else { backupCodeStatus = nil; return }
+        guard let operation = TwoFactorEnrollmentService(api: services.api, userID: userID),
+              let status = try? await operation.backupCodeStatus(), operation.isCurrent(),
+              currentUserID == userID else { return }
+        backupCodeStatus = status
+        markers.save(TwoFactorBackupCodesMarker.reconcile(markers.load(), with: status))
+        backupCodesUnconfirmed = markers.load() != nil
     }
 
     /// Conditions, confidentialité et mentions légales sur une ligne de liens.
@@ -1629,4 +1659,12 @@ private struct DeleteAccountSheet: View {
             model.deletionError = String(localized: "Réauthentification Apple impossible. Réessaie.")
         }
     }
+}
+
+/// Feuille de preuve ouverte depuis la rubrique : désactivation ou régénération.
+private struct TwoFactorProofItem: Identifiable {
+    let id = UUID()
+    let purpose: TwoFactorProofSheet.Purpose
+    let operation: TwoFactorEnrollmentService
+    let previousGeneratedAt: String?
 }

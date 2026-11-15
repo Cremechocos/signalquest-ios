@@ -128,13 +128,39 @@ struct LoginResponse: Codable, Sendable {
     let user: AuthUser?
     let requires2FA: Bool?
     let tempToken: String?
+    /// Servi seulement après une connexion par code de secours (contrat 2FA r3, §4) : les codes qui restent.
+    var backupCodesRemaining: Int? = nil
 }
 
 // MARK: - 2FA
 
+/// Preuve du second facteur (contrat 2FA r3, §3 et §4) : le code de l'application ou un code de
+/// secours, jamais les deux. Le code de secours part tel que tapé : le serveur le normalise.
+enum TwoFactorProof: Equatable, Sendable {
+    case app(String)
+    case backup(String)
+
+    var code: String? {
+        if case .app(let value) = self { return value }
+        return nil
+    }
+
+    var backupCode: String? {
+        if case .backup(let value) = self { return value }
+        return nil
+    }
+}
+
 struct TwoFactorVerifyRequest: Codable {
     let tempToken: String
-    let code: String
+    let code: String?
+    let backupCode: String?
+
+    init(tempToken: String, proof: TwoFactorProof) {
+        self.tempToken = tempToken
+        self.code = proof.code
+        self.backupCode = proof.backupCode
+    }
 }
 
 struct TwoFactorSetupResponse: Codable, Sendable {
@@ -158,8 +184,50 @@ struct TwoFactorVerifySetupRequest: Codable {
     let code: String
 }
 
-struct TwoFactorDisableRequest: Codable {
-    let code: String
+/// Corps de la désactivation et de la régénération des codes de secours : même preuve.
+struct TwoFactorProofRequest: Codable {
+    let code: String?
+    let backupCode: String?
+
+    init(proof: TwoFactorProof) {
+        self.code = proof.code
+        self.backupCode = proof.backupCode
+    }
+}
+
+/// `verify-setup` et `POST /api/auth/2fa/backup-codes` : les seules réponses qui montrent les
+/// codes. `generatedAt` n'est pas encore servi (lu alors par le GET juste après).
+struct TwoFactorBackupCodesResponse: Decodable, Sendable {
+    let success: Bool?
+    let ok: Bool?
+    let backupCodes: [String]?
+    let generatedAt: String?
+}
+
+/// Lot de codes de secours montré à l'activation ou à la régénération.
+struct TwoFactorBackupCodeBatch: Equatable, Sendable {
+    let codes: [String]
+    let generatedAt: String?
+
+    /// `nil` : la réponse ne porte aucun code (serveur sans codes de secours).
+    init?(_ response: TwoFactorBackupCodesResponse) {
+        let codes = (response.backupCodes ?? []).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !codes.isEmpty else { return nil }
+        self.codes = codes
+        self.generatedAt = response.generatedAt
+    }
+
+    init(codes: [String], generatedAt: String?) {
+        self.codes = codes
+        self.generatedAt = generatedAt
+    }
+}
+
+/// `GET /api/auth/2fa/backup-codes` : jamais les codes, seulement leur nombre et la date du lot
+/// (`null` sans 2FA). La date reste le texte servi : le repère de la règle A la compare telle quelle.
+struct TwoFactorBackupCodeStatus: Codable, Equatable, Sendable {
+    let remaining: Int
+    let generatedAt: String?
 }
 
 // MARK: - Password
