@@ -369,11 +369,19 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         for bad in ["12345", "1234567", "12 345", "١٢٣٤٥٦", "abcdef"] {
             XCTAssertFalse(E2EEAutoRevokeConfirmationContract.isCode(bad), bad)
         }
-        let body = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: nil))
+        let body = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", secondFactor: nil))
         XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["code": "012345"], "totpCode absent, jamais null")
-        let withTotp = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: "654321"))
+        let withTotp = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", secondFactor: .app("654321")))
         XCTAssertEqual(try JSONSerialization.jsonObject(with: withTotp) as? [String: String], ["code": "012345", "totpCode": "654321"])
-        XCTAssertNil(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", totpCode: "65432"))
+        XCTAssertNil(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", secondFactor: .app("65432")))
+        // Contrat 2FA r3, §7.8 C2 : le code de secours à la place du TOTP, tel que tapé, jamais les deux.
+        let withBackup = try XCTUnwrap(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", secondFactor: .backup("abcde fghjk")))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: withBackup) as? [String: String], ["code": "012345", "backupCode": "abcde fghjk"])
+        XCTAssertNil(E2EEAutoRevokeConfirmationContract.verifyBody(code: "012345", secondFactor: .backup("ABCDE-FGHJ")), "9 caractères utiles")
+        XCTAssertNil(E2EEAutoRevokeConfirmationContract.verifyBody(code: "01234", secondFactor: .backup("ABCDE-FGHJK")), "code e-mail toujours exigé")
+        XCTAssertTrue(E2EEAutoRevokeConfirmationContract.isReady(.backup("ABCDE-FGHJK")))
+        XCTAssertTrue(E2EEAutoRevokeConfirmationContract.isReady(.app("654321")))
+        XCTAssertFalse(E2EEAutoRevokeConfirmationContract.isReady(.app("ABCDE-FGHJK")))
 
         func token(_ value: String) -> String? {
             E2EEAutoRevokeConfirmationContract.parseToken(try! JSONSerialization.data(withJSONObject: ["confirmationToken": value, "expiresAtMs": "1"]))
@@ -418,15 +426,20 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
 
         let verified = Fake(reads: [.verified(account([ownState()]))])
         verified.responses = [.success(value: try JSONSerialization.data(withJSONObject: ["confirmationToken": Self.token, "expiresAtMs": "1"]), statusCode: 200, idempotentReplay: false)]
-        let token = await confirmations(verified).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", totpCode: "654321")
+        let token = await confirmations(verified).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", secondFactor: .app("654321"))
         XCTAssertEqual(token, .token(Self.token))
         XCTAssertEqual(verified.posts.first?.path, E2EEAutoRevokeConfirmationContract.verifyPath(confirmationId: Self.confirmationId))
         XCTAssertEqual(verified.posts.first?.body as? [String: String], ["code": "012345", "totpCode": "654321"])
+        let byBackup = Fake(reads: [.verified(account([ownState()]))])
+        byBackup.responses = [.success(value: try JSONSerialization.data(withJSONObject: ["confirmationToken": Self.token, "expiresAtMs": "1"]), statusCode: 200, idempotentReplay: false)]
+        let backupToken = await confirmations(byBackup).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", secondFactor: .backup("7k2qm-9xw4d"))
+        XCTAssertEqual(backupToken, .token(Self.token))
+        XCTAssertEqual(byBackup.posts.first?.body as? [String: String], ["code": "012345", "backupCode": "7k2qm-9xw4d"])
 
         func checked(_ response: E2EEV2TransportResult<Data>) async -> E2EEAutoDeviceRevocation.ConfirmationVerifyOutcome {
             let fake = Fake(reads: [.verified(account([ownState()]))])
             fake.responses = [response]
-            return await confirmations(fake).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", totpCode: nil)
+            return await confirmations(fake).verifyConfirmation(confirmationId: Self.confirmationId, code: "012345", secondFactor: nil)
         }
         let wrong = await checked(Self.failure(403, "E2EE_REVOKE_CONFIRMATION_CODE_INVALID", details: ["attemptsLeft": .number(2)]))
         XCTAssertEqual(wrong, .codeInvalid(attemptsLeft: 2))
@@ -440,7 +453,7 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         XCTAssertEqual(unknown, .expired)
 
         let local = Fake(reads: [.verified(account([ownState()]))])
-        let refused = await confirmations(local).verifyConfirmation(confirmationId: Self.confirmationId, code: "12345", totpCode: nil)
+        let refused = await confirmations(local).verifyConfirmation(confirmationId: Self.confirmationId, code: "12345", secondFactor: nil)
         XCTAssertEqual(refused, .failed("e2ee-auto-revoke-confirmation-invalid"))
         XCTAssertTrue(local.posts.isEmpty, "un code mal formé n’est jamais envoyé")
     }
@@ -484,8 +497,13 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
             readOwnAccount: { .verified(devices) },
             revoke: { id, _ in log.calls.append("revoke:\(id)"); return revoke },
             requestConfirmation: { log.calls.append("request"); return requests.isEmpty ? .failed("x") : requests.removeFirst() },
-            verifyConfirmation: { id, code, totp in
-                log.calls.append("verify:\(id):\(code):\(totp ?? "-")")
+            verifyConfirmation: { id, code, secondFactor in
+                let factor = switch secondFactor {
+                case .app(let totp)?: totp
+                case .backup(let backup)?: "backup:\(backup)"
+                case nil: "-"
+                }
+                log.calls.append("verify:\(id):\(code):\(factor)")
                 return verifications.isEmpty ? .failed("x") : verifications.removeFirst()
             },
             revokeConfirmed: { id, reason, token in log.calls.append("confirmed:\(id):\(reason.rawValue):\(token)"); return confirmed },
@@ -509,11 +527,11 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         XCTAssertEqual(model.emailConfirmation?.request, pending)
         XCTAssertEqual(log.calls, ["request"], "aucune révocation sans code")
 
-        await model.submitEmailCode("12", totpCode: nil)
+        await model.submitEmailCode("12", secondFactor: nil)
         XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Saisis les 6 chiffres reçus."))
-        await model.submitEmailCode("000000", totpCode: nil)
+        await model.submitEmailCode("000000", secondFactor: nil)
         XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Code incorrect. Essais restants : \(4)."))
-        await model.submitEmailCode("012345", totpCode: nil)
+        await model.submitEmailCode("012345", secondFactor: nil)
         XCTAssertNil(model.emailConfirmation)
         XCTAssertEqual(log.calls, [
             "request", "verify:\(Self.confirmationId):000000:-", "verify:\(Self.confirmationId):012345:-",
@@ -541,9 +559,9 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         let totp = emailModel(now: now, request: [.sent(pending), .sent(pending)], verify: [.codeInvalid(attemptsLeft: 0)], log: totpLog)
         await totp.load()
         await totp.revoke(try XCTUnwrap(totp.rows.last), reason: .user)
-        await totp.submitEmailCode("012345", totpCode: nil)
+        await totp.submitEmailCode("012345", secondFactor: nil)
         XCTAssertEqual(totpLog.calls, ["request"], "sans TOTP, rien n’est envoyé")
-        await totp.submitEmailCode("012345", totpCode: "654321")
+        await totp.submitEmailCode("012345", secondFactor: .app("654321"))
         XCTAssertNil(totp.emailConfirmation?.request)
         XCTAssertEqual(totp.emailConfirmation?.message, String(localized: "Trop d’essais. Demande un nouveau code."))
         await totp.requestEmailCode()
@@ -556,7 +574,7 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         let stale = emailModel(now: now, request: [.sent(pending)], verify: [.token(Self.token)], confirmed: .confirmationInvalid, log: staleLog)
         await stale.load()
         await stale.revoke(try XCTUnwrap(stale.rows.last), reason: .user)
-        await stale.submitEmailCode("012345", totpCode: "654321")
+        await stale.submitEmailCode("012345", secondFactor: .app("654321"))
         XCTAssertNil(stale.emailConfirmation?.request)
         XCTAssertEqual(stale.emailConfirmation?.message, String(localized: "Ce code n’est plus valable. Demande un nouveau code."))
         XCTAssertNil(stale.confirmationMessage)
@@ -568,6 +586,39 @@ final class E2EEAutoDeviceRevocationTests: XCTestCase {
         await notNeeded.revoke(try XCTUnwrap(notNeeded.rows.last), reason: .user)
         XCTAssertEqual(notNeededLog.calls, ["request", "revoke:\(otherId)"])
         XCTAssertNil(notNeeded.emailConfirmation)
+    }
+
+    /// Contrat 2FA r3, §7.8 C2 : un code de secours vaut le code de l'application pour confirmer le
+    /// retrait ; il part tel que tapé, et seulement si le compte a la 2FA.
+    @MainActor
+    func testEmailConfirmationAcceptsABackupCodeInPlaceOfTheAppCode() async throws {
+        let now: Int64 = 100 * 24 * 3_600_000
+        let withTotp = E2EEAutoRevokeConfirmationContract.Request(confirmationId: Self.confirmationId, expiresAtMs: now + 600_000, totpRequired: true, emailHint: "a•••@e•••.fr")
+        let log = Log()
+        let model = emailModel(now: now, request: [.sent(withTotp)], verify: [.codeInvalid(attemptsLeft: 3), .token(Self.token)], log: log)
+        await model.load()
+        await model.revoke(try XCTUnwrap(model.rows.last), reason: .notMe)
+
+        await model.submitEmailCode("012345", secondFactor: .backup("ABCDE-FGHJ"))
+        XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Ce code de secours n’est pas valide."))
+        XCTAssertEqual(log.calls, ["request"], "un code de secours incomplet n’est jamais envoyé")
+        await model.submitEmailCode("012345", secondFactor: .backup("abcde-fghjk"))
+        XCTAssertEqual(model.emailConfirmation?.message, String(localized: "Code incorrect. Essais restants : \(3)."))
+        await model.submitEmailCode("012345", secondFactor: .backup(" 7K2QM-9XW4D "))
+        XCTAssertNil(model.emailConfirmation)
+        XCTAssertEqual(log.calls, [
+            "request", "verify:\(Self.confirmationId):012345:backup:abcde-fghjk",
+            "verify:\(Self.confirmationId):012345:backup: 7K2QM-9XW4D ", "confirmed:\(otherId):NOT_ME:\(Self.token)",
+        ])
+
+        // Sans 2FA sur le compte, aucun second facteur ne part, même saisi.
+        let plain = E2EEAutoRevokeConfirmationContract.Request(confirmationId: Self.confirmationId, expiresAtMs: now + 600_000, totpRequired: false, emailHint: "a•••@e•••.fr")
+        let plainLog = Log()
+        let withoutTwoFactor = emailModel(now: now, request: [.sent(plain)], verify: [.token(Self.token)], log: plainLog)
+        await withoutTwoFactor.load()
+        await withoutTwoFactor.revoke(try XCTUnwrap(withoutTwoFactor.rows.last), reason: .user)
+        await withoutTwoFactor.submitEmailCode("012345", secondFactor: .backup("7K2QM-9XW4D"))
+        XCTAssertEqual(plainLog.calls, ["request", "verify:\(Self.confirmationId):012345:-", "confirmed:\(otherId):USER:\(Self.token)"])
     }
 
     // MARK: Alerte « Nouvel appareil » (6b)

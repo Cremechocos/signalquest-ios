@@ -71,12 +71,32 @@ enum E2EEAutoRevokeConfirmationContract {
         value.utf8.count == 6 && value.utf8.allSatisfy { (48...57).contains($0) }
     }
 
-    /// Corps exact `{ "code", "totpCode"? }` : `totpCode` absent quand il ne sert pas.
-    static func verifyBody(code: String, totpCode: String?) -> Data? {
-        guard isCode(code), totpCode.map(isCode) ?? true else { return nil }
+    /// Corps exact `{ "code", "totpCode"? , "backupCode"? }` (contrat 2FA r3, §7.8 C2) : au plus
+    /// un second facteur, absent quand il ne sert pas. Le code de secours part tel que tapé, le
+    /// serveur le normalise.
+    static func verifyBody(code: String, secondFactor: TwoFactorProof?) -> Data? {
+        guard isCode(code) else { return nil }
         var object = ["code": code]
-        object["totpCode"] = totpCode
+        switch secondFactor {
+        case .app(let totp)?:
+            guard isCode(totp) else { return nil }
+            object["totpCode"] = totp
+        case .backup(let backup)?:
+            guard TwoFactorBackupCodes.isInputReady(backup) else { return nil }
+            object["backupCode"] = backup
+        case nil:
+            break
+        }
         return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// Le second facteur est prêt à partir : 6 chiffres pour l'application, 10 caractères utiles
+    /// pour un code de secours.
+    static func isReady(_ secondFactor: TwoFactorProof) -> Bool {
+        switch secondFactor {
+        case .app(let totp): isCode(totp)
+        case .backup(let backup): TwoFactorBackupCodes.isInputReady(backup)
+        }
     }
 
     /// `200 { "confirmationToken", "expiresAtMs" }` : 32 octets en base64url, 43 caractères.
@@ -225,7 +245,7 @@ actor E2EEAutoDeviceRevocation {
 
     enum ConfirmationVerifyOutcome: Equatable, Sendable {
         case token(String)
-        /// Code e-mail ou TOTP faux ; `0` : confirmation épuisée.
+        /// Code e-mail, TOTP ou code de secours faux ; `0` : confirmation épuisée.
         case codeInvalid(attemptsLeft: Int?)
         case totpRequired
         /// Échue, annulée, déjà vérifiée, épuisée ou inconnue : redemander un code.
@@ -265,9 +285,9 @@ actor E2EEAutoDeviceRevocation {
         }
     }
 
-    func verifyConfirmation(confirmationId: String, code: String, totpCode: String?) async -> ConfirmationVerifyOutcome {
+    func verifyConfirmation(confirmationId: String, code: String, secondFactor: TwoFactorProof?) async -> ConfirmationVerifyOutcome {
         guard E2EEV2Canonical.isOpaque(confirmationId),
-              let body = E2EEAutoRevokeConfirmationContract.verifyBody(code: code, totpCode: totpCode) else {
+              let body = E2EEAutoRevokeConfirmationContract.verifyBody(code: code, secondFactor: secondFactor) else {
             return .failed("e2ee-auto-revoke-confirmation-invalid")
         }
         let device: E2EEV2DeviceDescriptor

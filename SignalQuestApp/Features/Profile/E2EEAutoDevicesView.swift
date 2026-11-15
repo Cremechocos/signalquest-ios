@@ -17,7 +17,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         var revoke: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason) async -> E2EEAutoDeviceRevocation.Outcome
         /// Téléphone perdu (révision 21) : code e-mail, puis révocation avec son jeton.
         var requestConfirmation: () async -> E2EEAutoDeviceRevocation.ConfirmationRequestOutcome = { .failed("e2ee-auto-unavailable") }
-        var verifyConfirmation: (_ confirmationId: String, _ code: String, _ totpCode: String?) async
+        var verifyConfirmation: (_ confirmationId: String, _ code: String, _ secondFactor: TwoFactorProof?) async
             -> E2EEAutoDeviceRevocation.ConfirmationVerifyOutcome = { _, _, _ in .failed("e2ee-auto-unavailable") }
         var revokeConfirmed: (_ deviceId: String, _ reason: E2EEAutoLog.RevokeReason, _ confirmationToken: String) async
             -> E2EEAutoDeviceRevocation.Outcome = { _, _, _ in .failed("e2ee-auto-unavailable") }
@@ -334,13 +334,21 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         emailConfirmation = pending
     }
 
-    /// Code e-mail (et TOTP si le compte l'exige), puis la révocation avec le jeton.
-    func submitEmailCode(_ code: String, totpCode: String?) async {
+    /// Code e-mail, puis, si le compte a la 2FA, le code de l'application ou un code de secours
+    /// (contrat 2FA r3, §7.8 C2) ; enfin la révocation avec le jeton.
+    func submitEmailCode(_ code: String, secondFactor: TwoFactorProof?) async {
         guard !isActing, var pending = emailConfirmation, let request = pending.request else { return }
         let code = code.trimmingCharacters(in: .whitespaces)
-        let totp = request.totpRequired ? totpCode?.trimmingCharacters(in: .whitespaces) : nil
-        guard E2EEAutoRevokeConfirmationContract.isCode(code), !request.totpRequired || totp.map(E2EEAutoRevokeConfirmationContract.isCode) == true else {
-            pending.message = String(localized: "Saisis les 6 chiffres reçus.")
+        // Le code de l'application perd ses espaces ; le code de secours part tel que tapé.
+        let secondFactor: TwoFactorProof? = request.totpRequired ? secondFactor.map { (factor: TwoFactorProof) -> TwoFactorProof in
+            if case .app(let totp) = factor { return .app(totp.trimmingCharacters(in: .whitespaces)) }
+            return factor
+        } : nil
+        guard E2EEAutoRevokeConfirmationContract.isCode(code),
+              !request.totpRequired || secondFactor.map(E2EEAutoRevokeConfirmationContract.isReady) == true else {
+            pending.message = secondFactor?.backupCode == nil || !E2EEAutoRevokeConfirmationContract.isCode(code)
+                ? String(localized: "Saisis les 6 chiffres reçus.")
+                : String(localized: "Ce code de secours n’est pas valide.")
             emailConfirmation = pending
             return
         }
@@ -348,7 +356,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         pending.message = nil
         emailConfirmation = pending
         defer { isActing = false }
-        switch await dependencies.verifyConfirmation(request.confirmationId, code, totp) {
+        switch await dependencies.verifyConfirmation(request.confirmationId, code, secondFactor) {
         case .token(let token):
             let outcome = await dependencies.revokeConfirmed(pending.row.id, pending.reason, token)
             if case .confirmationInvalid = outcome {
@@ -410,9 +418,9 @@ extension E2EEAutoDevicesViewModel {
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
                 return await revocation.requestConfirmation()
             },
-            verifyConfirmation: { confirmationId, code, totpCode in
+            verifyConfirmation: { confirmationId, code, secondFactor in
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
-                return await revocation.verifyConfirmation(confirmationId: confirmationId, code: code, totpCode: totpCode)
+                return await revocation.verifyConfirmation(confirmationId: confirmationId, code: code, secondFactor: secondFactor)
             },
             revokeConfirmed: { deviceId, reason, token in
                 guard let revocation = E2EEAutoDeviceRevocation.live(session: session, api: api) else { return .reauthenticate }
@@ -1010,7 +1018,10 @@ struct E2EEAutoDevicesQAScreen: View {
                 .sent(.init(confirmationId: "qa_confirmation_00000001", expiresAtMs: now + 600_000,
                             totpRequired: AppEnvironment.hasQAFlag("auto-devices-totp"), emailHint: "a•••@e•••.fr"))
             },
-            verifyConfirmation: { _, code, _ in code == "000000" ? .codeInvalid(attemptsLeft: 4) : .token(String(repeating: "A", count: 43)) },
+            verifyConfirmation: { _, code, secondFactor in
+                code == "000000" || (secondFactor?.backupCode).map({ $0 != "QA000-00000" }) == true
+                    ? .codeInvalid(attemptsLeft: 4) : .token(String(repeating: "A", count: 43))
+            },
             revokeConfirmed: { _, _, _ in .revoked(ownDevice: false) },
             readLabels: { unlabeled ? nil : labels },
             passkeyOffer: {
@@ -1035,15 +1046,19 @@ struct E2EEAutoDevicesQAScreen: View {
 // MARK: - Confirmation par e-mail (révision 21)
 
 /// Appareil inscrit depuis moins de 24 h : le retrait d'un autre appareil passe
-/// par un code envoyé à l'adresse du compte (et le code TOTP s'il est actif).
-/// Un code ne retire qu'un appareil.
+/// par un code envoyé à l'adresse du compte (et, si la 2FA est active, le code de
+/// l'application ou un code de secours). Un code ne retire qu'un appareil.
 struct E2EEAutoEmailConfirmationSheet: View {
     @ObservedObject var model: E2EEAutoDevicesViewModel
     @State private var code = ""
     @State private var totpCode = ""
+    @State private var backupCode = ""
+    @State private var usesBackupCode = false
     @FocusState private var focused: Field?
 
-    private enum Field { case code, totp }
+    private enum Field { case code, totp, backup }
+
+    private var secondFactor: TwoFactorProof { usesBackupCode ? .backup(backupCode) : .app(totpCode) }
 
     var body: some View {
         NavigationStack {
@@ -1102,21 +1117,42 @@ struct E2EEAutoEmailConfirmationSheet: View {
             .textContentType(.oneTimeCode)
             .accessibilityIdentifier("e2eeAuto.emailConfirmation.code")
         if request.totpRequired {
-            codeField(String(localized: "Code de ton application d’authentification"), text: $totpCode, field: .totp)
-                .accessibilityIdentifier("e2eeAuto.emailConfirmation.totp")
+            if usesBackupCode {
+                backupCodeField
+            } else {
+                codeField(String(localized: "Code de ton application d’authentification"), text: $totpCode, field: .totp)
+                    .accessibilityIdentifier("e2eeAuto.emailConfirmation.totp")
+            }
+            Button {
+                usesBackupCode.toggle()
+                totpCode = ""
+                backupCode = ""
+                focused = usesBackupCode ? .backup : .totp
+            } label: {
+                Text(usesBackupCode ? LocalizedStringKey("Utiliser le code de l’application")
+                     : LocalizedStringKey("Utiliser un code de secours"))
+                    .font(SQType.caption(.bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(model.isActing)
+            .accessibilityIdentifier("e2eeAuto.emailConfirmation.switch")
         }
         if let message {
             errorLabel(message)
         }
         GradientButton(String(localized: "Retirer l’appareil"), isBusy: model.isActing, style: .destructiveFill) {
             focused = nil
-            Task { await model.submitEmailCode(code, totpCode: request.totpRequired ? totpCode : nil) }
+            Task { await model.submitEmailCode(code, secondFactor: request.totpRequired ? secondFactor : nil) }
         }
-        .disabled(model.isActing || code.count != 6 || (request.totpRequired && totpCode.count != 6))
+        .disabled(model.isActing || code.count != 6
+                  || (request.totpRequired && !E2EEAutoRevokeConfirmationContract.isReady(secondFactor)))
         .accessibilityIdentifier("e2eeAuto.emailConfirmation.submit")
         Button("Envoyer un nouveau code") {
             code = ""
             totpCode = ""
+            backupCode = ""
             Task { await model.requestEmailCode() }
         }
         .font(SQType.body)
@@ -1127,6 +1163,32 @@ struct E2EEAutoEmailConfirmationSheet: View {
             .font(SQType.caption)
             .foregroundStyle(SQColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Code de secours (contrat 2FA r3, §8) : tel que tapé, casse et tirets compris.
+    private var backupCodeField: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text("Code de secours")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+            TextField("Code de secours", text: $backupCode,
+                      prompt: Text(verbatim: "XXXXX-XXXXX").foregroundColor(SQColor.labelSecondary))
+                .keyboardType(.asciiCapable)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.characters)
+                .font(SQFont.body(24, .semibold))
+                .multilineTextAlignment(.center)
+                .textFieldStyle(SQTextFieldStyle())
+                .focused($focused, equals: .backup)
+                .accessibilityLabel("Code de secours")
+                .disabled(model.isActing)
+                .privacySensitive()
+                .accessibilityIdentifier("e2eeAuto.emailConfirmation.backup")
+                .onChangeCompat(of: backupCode) { _, value in
+                    let bounded = String(value.prefix(TwoFactorBackupCodes.inputMax))
+                    if value != bounded { backupCode = bounded }
+                }
+        }
     }
 
     private func errorLabel(_ message: String) -> some View {
