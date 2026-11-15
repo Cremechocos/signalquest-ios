@@ -362,7 +362,8 @@ struct LoginView: View {
                      : LocalizedStringKey("Utiliser un code de secours"))
                     .font(SQType.caption(.bold))
                     .foregroundStyle(SQColor.accentInk)
-                    .frame(minHeight: 44)
+                    // Centré : sur iPad, le pavé numérique flottant couvre la gauche, sous les cases.
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .disabled(session.isBusy)
