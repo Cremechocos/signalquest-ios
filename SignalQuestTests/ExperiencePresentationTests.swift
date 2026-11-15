@@ -4,7 +4,7 @@ import XCTest
 /// Présentation commune des tests d'expérience : le vecteur `presentation-v1`
 /// (copie à l'octet de contracts/experience-tests/presentation-v1.json, map-nextjs
 /// 6428dad08, servi le 02/11 ; légende chiffrée d'un speedtest 1743f35ce, #1010 et #1012 du
-/// 09/11) rejoué dans les deux langues.
+/// 09/11 ; unité après chaque débit, sans `ratePair`, a3ea2a26e du 14/11) rejoué dans les deux langues.
 final class ExperiencePresentationTests: XCTestCase {
     private func vector() throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -21,7 +21,6 @@ final class ExperiencePresentationTests: XCTestCase {
             XCTAssertEqual(served["en"] as? String, entry.en, key)
             XCTAssertEqual(served["args"] as? [String: String] ?? [:], entry.args.mapValues(\.rawValue), key)
             XCTAssertEqual(served["local"] as? Bool ?? false, entry.local, key)
-            XCTAssertEqual(served["ratePair"] as? [String], entry.ratePair, key)
         }
         let rules = try XCTUnwrap(try vector()["rules"] as? [String: Any])
         XCTAssertEqual(rules["shareMaxChars"] as? Int, ExperiencePresentation.shareMaxChars)
