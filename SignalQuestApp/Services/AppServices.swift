@@ -583,6 +583,8 @@ final class AppServices: ObservableObject {
         }
         let historyKey = await publication.run()
         E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
+        // Alerte « Nouvelle clé d'historique » (§5.1 r23) : levée, tombée, ou gardée.
+        E2EEAutoHistoryKeyAlertCoordinator.post(historyKey, ownerNamespace: session.ownerNamespace)
         if case .missing(let hkPubB64) = historyKey {
             NotificationCenter.default.post(
                 name: E2EEAutoHistoryRequestCoordinator.historyKeyMissing, object: nil,

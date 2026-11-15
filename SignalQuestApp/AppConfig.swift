@@ -72,6 +72,12 @@ enum SQFeatures {
     /// bascule du serveur (`E2EEV2ServerGate.autoActive`).
     static let e2eeAutoLogEnabled = true
 
+    /// Rotation depuis la base servie (E2EE-AUTO r23.1, §5.6 bis) : après « Ce n'est pas moi »,
+    /// l'alerte « Nouvelle clé d'historique » promet « Ensuite, un de tes appareils remet ton
+    /// historique en route. » Fermé jusqu'au « servi » de Backend, pour ne rien promettre qui
+    /// n'existe pas (§5.1, A4).
+    static let e2eeHistoryRotationFromBaseServed = false
+
     /// Envoi des tests d'expérience (`POST /api/experience-tests`, contrat
     /// `experience-tests-v1`). Ouvert le 03/11 (décision d'Alexandre) : les tests
     /// gardés en attente sur le téléphone partent au premier passage de la file.

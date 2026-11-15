@@ -1,6 +1,330 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Nouvelle clé d’historique sur ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New history key on your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle clé d’historique sur ton compte"
+          }
+        }
+      }
+    },
+    "SQFormal|Nouvelle clé d’historique sur ton compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle clé d’historique sur votre compte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Vérifie que c’est bien toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check that it was you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifie que c’est bien toi."
+          }
+        }
+      }
+    },
+    "SQFormal|Vérifie que c’est bien toi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez que c’est bien vous."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Un autre appareil a créé une nouvelle clé pour ton historique chiffré. C’est normal si tu as perdu tes anciens messages et recommencé sur l’autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another device created a new key for your encrypted history. That’s expected if you lost your old messages and started over on that device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre appareil a créé une nouvelle clé pour ton historique chiffré. C’est normal si tu as perdu tes anciens messages et recommencé sur l’autre appareil."
+          }
+        }
+      }
+    },
+    "SQFormal|Un autre appareil a créé une nouvelle clé pour ton historique chiffré. C’est normal si tu as perdu tes anciens messages et recommencé sur l’autre appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre appareil a créé une nouvelle clé pour votre historique chiffré. C’est normal si vous avez perdu vos anciens messages et recommencé sur l’autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Créée par : %@, ajouté à ton compte le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Created by: %@, added to your account on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créée par : %@, ajouté à ton compte le %@"
+          }
+        }
+      }
+    },
+    "SQFormal|Créée par : %@, ajouté à ton compte le %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créée par : %@, ajouté à votre compte le %@"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "En attendant ta réponse, cet appareil ne sauvegarde plus tes nouveaux messages dans ton historique. Tes messages continuent de partir chiffrés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Until you answer, this device no longer saves your new messages to your history. Your messages are still sent encrypted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attendant ta réponse, cet appareil ne sauvegarde plus tes nouveaux messages dans ton historique. Tes messages continuent de partir chiffrés."
+          }
+        }
+      }
+    },
+    "SQFormal|En attendant ta réponse, cet appareil ne sauvegarde plus tes nouveaux messages dans ton historique. Tes messages continuent de partir chiffrés." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attendant votre réponse, cet appareil ne sauvegarde plus vos nouveaux messages dans votre historique. Vos messages continuent de partir chiffrés."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cet appareil a déjà été retiré de ton compte. Ton historique reste en pause pour ta sécurité." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device has already been removed from your account. Your history stays paused for your safety."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a déjà été retiré de ton compte. Ton historique reste en pause pour ta sécurité."
+          }
+        }
+      }
+    },
+    "SQFormal|Cet appareil a déjà été retiré de ton compte. Ton historique reste en pause pour ta sécurité." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a déjà été retiré de votre compte. Votre historique reste en pause pour votre sécurité."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Appareil retiré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil retiré"
+          }
+        }
+      }
+    },
+    "Change aussi ton mot de passe : la personne qui l’a ajouté le connaît peut-être." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also change your password: whoever added it may know it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change aussi ton mot de passe : la personne qui l’a ajouté le connaît peut-être."
+          }
+        }
+      }
+    },
+    "SQFormal|Change aussi ton mot de passe : la personne qui l’a ajouté le connaît peut-être." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changez aussi votre mot de passe : la personne qui l’a ajouté le connaît peut-être."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ensuite, un de tes appareils remet ton historique en route." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Then one of your devices will get your history going again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensuite, un de tes appareils remet ton historique en route."
+          }
+        }
+      }
+    },
+    "SQFormal|Ensuite, un de tes appareils remet ton historique en route." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensuite, un de vos appareils remet votre historique en route."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta clé d’historique a changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your history key changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta clé d’historique a changé."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta clé d’historique a changé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre clé d’historique a changé."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta clé d’historique a changé. Pour continuer à sauvegarder tes messages ici, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your history key changed. To keep saving your messages here, tap “It’s me” on another of your devices: a notification just arrived there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta clé d’historique a changé. Pour continuer à sauvegarder tes messages ici, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta clé d’historique a changé. Pour continuer à sauvegarder tes messages ici, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre clé d’historique a changé. Pour continuer à sauvegarder vos messages ici, touchez « C’est moi » sur un autre de vos appareils : une notification vient d’y arriver."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Recherche de ta clé dans ton trousseau iCloud…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for your key in your iCloud Keychain…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche de ta clé dans ton trousseau iCloud…"
+          }
+        }
+      }
+    },
+    "SQFormal|Recherche de ta clé dans ton trousseau iCloud…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche de votre clé dans votre trousseau iCloud…"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Réponse privée, chiffrée de bout en bout" : {
       "localizations" : {
         "en" : {

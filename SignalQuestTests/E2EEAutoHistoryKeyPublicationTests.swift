@@ -74,6 +74,9 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         var vouched = false
         /// HK de rotation portées par un maillon à preuve.
         var vouchedKeys: Set<String> = []
+        /// « C'est moi » rangés (§5.1 r23) et rotations non prouvées dont la grâce est finie.
+        var acknowledged: Set<String> = []
+        var graceOverKeys: Set<String> = []
         private(set) var vouchedCalls = 0
         private(set) var created: [String] = []
         private(set) var discarded: [String] = []
@@ -119,7 +122,9 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
                 vouched: { [self] _, record in
                     vouchedCalls += 1
                     return vouched || vouchedKeys.contains(record.hkPubB64)
-                }
+                },
+                acknowledged: { [self] in acknowledged },
+                graceOver: { [self] in graceOverKeys.contains($0.hkPubB64) }
             )
         }
     }
@@ -378,7 +383,7 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         let user = Fake(reads: [.verified(signedByRevoked(chain([(base, nil, nil), (cancelled, nil, nil)]), 1, reason: .user))])
         user.held = [base]
         let userOutcome = await publication(user).run()
-        XCTAssertEqual(userOutcome, .unexpected(hkPubB64: cancelled))
+        XCTAssertEqual(userOutcome, .unexpected(.init(hkPubB64: cancelled, signerDeviceId: "web_device_intruder_0001")))
     }
 
     /// §5.1 (révision 23) : une HK annulée sort du jugement, les autres HK non (vecteurs 12, 13 et 14).
@@ -407,7 +412,7 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         fake.held = [held]
         fake.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
         let outcome = await publication(fake).run()
-        XCTAssertEqual(outcome, .unexpected(hkPubB64: intruder))
+        XCTAssertEqual(outcome, .unexpected(.init(hkPubB64: intruder, signerDeviceId: ownId)))
         XCTAssertEqual(outcome.traceStep, "unexpected")
         XCTAssertTrue(fake.created.isEmpty)
         XCTAssertTrue(fake.posts.isEmpty)
@@ -417,7 +422,7 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         rotating.held = [held]
         rotating.nowMs = 1 + E2EEAutoLog.signerMinAgeMs
         let rotated = await publication(rotating).rotate()
-        XCTAssertEqual(rotated, .unexpected(hkPubB64: intruder), "la rotation ne demande rien non plus")
+        XCTAssertEqual(rotated, .unexpected(.init(hkPubB64: intruder, signerDeviceId: ownId)), "la rotation ne demande rien non plus")
         XCTAssertTrue(rotating.posts.isEmpty)
     }
 
@@ -452,7 +457,7 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         laundered.vouchedKeys = [second]
         let outcome = await publication(laundered).run()
         XCTAssertEqual(outcome, .unvouched(hkPubB64: second))
-        XCTAssertEqual(laundered.vouchedCalls, 1, "la première rotation non prouvée suffit")
+        XCTAssertEqual(laundered.vouchedCalls, 2, "chaque rotation est jugée ; la première, non prouvée, attend sa grâce")
 
         let proven = Fake(reads: [.verified(log)])
         proven.held = [held]
@@ -460,6 +465,36 @@ final class E2EEAutoHistoryKeyPublicationTests: XCTestCase {
         let missing = await publication(proven).run()
         XCTAssertEqual(missing, .missing(hkPubB64: second))
         XCTAssertEqual(proven.vouchedCalls, 2)
+    }
+
+    /// Révision 23 : passé sa grâce, une rotation sans maillon à preuve lève l'alerte, avec
+    /// son signataire ; tant que la grâce court, rien ne se demande (14d, 14f).
+    func testUnprovenRotationAlertsOnceItsGraceIsOver() async {
+        let held = Self.newKey(), next = Self.newKey()
+        let log = chain([(held, nil, nil), (next, 40, nil)])
+        let waiting = Fake(reads: [.verified(log)])
+        waiting.held = [held]
+        let during = await publication(waiting).run()
+        XCTAssertEqual(during, .unvouched(hkPubB64: next))
+
+        let over = Fake(reads: [.verified(log)])
+        over.held = [held]
+        over.graceOverKeys = [next]
+        let outcome = await publication(over).run()
+        XCTAssertEqual(outcome, .unexpected(.init(hkPubB64: next, signerDeviceId: ownId)))
+        XCTAssertTrue(over.posts.isEmpty)
+        XCTAssertTrue(over.puts.isEmpty)
+    }
+
+    /// « C'est moi » sur la HK suspecte (A3) : elle se demande comme une HK absente (§5.3).
+    func testAcknowledgedKeyIsRequestedLikeAMissingOne() async {
+        let held = Self.newKey(), intruder = Self.newKey()
+        let fake = Fake(reads: [.verified(chain([(held, nil, nil), (intruder, nil, nil)]))])
+        fake.held = [held]
+        fake.acknowledged = [intruder]
+        let outcome = await publication(fake).run()
+        XCTAssertEqual(outcome, .missing(hkPubB64: intruder))
+        XCTAssertTrue(fake.posts.isEmpty)
     }
 
     /// Un appareil qui n'a jamais eu de HK du compte la demande comme avant (§5.3).

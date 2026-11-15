@@ -112,6 +112,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     enum RequesterPhase: Equatable {
+        /// Attente de la synchro du trousseau, écran déjà ouvert (A3, après « C'est moi »).
+        case syncing
         /// Après la synchro : une passkey du compte peut ouvrir l'historique (§5.3, avant « C'est moi »).
         case passkey
         case waiting
@@ -124,7 +126,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     struct Requester: Equatable {
-        let fingerprint: [String]
+        var fingerprint: [String]
         var phase: RequesterPhase
         var startedAt: Date
         /// Appareil en attente (mode renforcé, §6) : « C'est moi » l'active.
@@ -168,6 +170,10 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     @Published private(set) var requesterOpened = false
     @Published private(set) var bannerSnoozed = false
     @Published private(set) var approval: Approval?
+    /// « C'est moi » sur l'alerte « Nouvelle clé d'historique » (§5.1 r23, A3) : l'écran dit que la clé a changé.
+    @Published private(set) var keyChanged = false
+    /// A3 : l'écran s'ouvre dès la prochaine demande, sans attendre le bandeau.
+    private var opensWhenReady = false
 
     var presentsRequester: Bool {
         guard let requester else { return false }
@@ -194,6 +200,14 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     }
 
     // MARK: Bandeau
+
+    /// A3 : après « C'est moi » sur l'alerte « Nouvelle clé d'historique », la prochaine demande
+    /// (publication `.missing`) ouvre l'écran tout de suite, avec « Ta clé d'historique a changé ».
+    func expectKeyChange() {
+        keyChanged = true
+        opensWhenReady = true
+        if requester != nil { requesterOpened = true }
+    }
 
     /// « Débloquer » : l'écran de la demande (passkey ou « C'est moi »).
     func openRequester() {
@@ -241,10 +255,16 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
 
     private func runRequester(hkPubB64: String) async {
         guard let client = dependencies.client() else { return }
+        if opensWhenReady {
+            opensWhenReady = false
+            requester = Requester(fingerprint: [], phase: .syncing, startedAt: dependencies.now())
+            requesterOpened = true
+        }
         if await !client.hasOpenRequest() {
             let deadline = dependencies.now().addingTimeInterval(Self.syncWait)
             while dependencies.now() < deadline {
                 if dependencies.historyKeyHeld(hkPubB64) {
+                    if presentsRequester { requester?.phase = .received } else { requester = nil }
                     await dependencies.continueWithHistoryKey()
                     return
                 }
@@ -255,6 +275,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
                 requester = Requester(fingerprint: await client.ownFingerprint() ?? [], phase: .passkey, startedAt: dependencies.now())
                 return
             }
+            if requester?.phase == .syncing { requester?.phase = .checking }
         }
         await handle(await client.start(), client: client)
     }
@@ -324,14 +345,25 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
 
     func hideRequester() {
         requesterOpened = false
-        if requester?.phase == .received { requester = nil } else if requester?.activating == true { requesterHidden = true }
+        if requester?.phase == .received {
+            requester = nil
+            keyChanged = false
+        } else if requester?.activating == true {
+            requesterHidden = true
+        }
     }
 
     private func handle(_ outcome: E2EEAutoHistoryRequests.RequestOutcome, client: Client) async {
         switch outcome {
         case .present:
             // Écran affiché : il le dit ; sinon rien ne s'affiche.
-            if presentsRequester { requester?.phase = .received } else { requester = nil; requesterOpened = false }
+            if presentsRequester {
+                requester?.phase = .received
+            } else {
+                requester = nil
+                requesterOpened = false
+                keyChanged = false
+            }
             await dependencies.continueWithHistoryKey()
         case .waiting(let open):
             if requester == nil {
@@ -342,6 +374,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
             } else {
                 requester?.phase = .waiting
                 requester?.activating = open.activate == true
+                if requester?.fingerprint.isEmpty == true { requester?.fingerprint = await client.ownFingerprint() ?? [] }
             }
         case .closed:
             requester?.phase = .closed
@@ -464,6 +497,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         requester = nil
         requesterHidden = false
         requesterOpened = false
+        keyChanged = false
+        opensWhenReady = false
         approval = nil
         postponedApprovals = []
         reloadBannerSnooze()
@@ -525,11 +560,19 @@ struct E2EEAutoHistoryRequesterView: View {
                         GradientButton(String(localized: "OK")) { coordinator.hideRequester() }
                             .accessibilityIdentifier("e2eeAuto.historyRequest.done")
                     } else if requester.phase == .passkey || requester.usingPasskey {
+                        if coordinator.keyChanged { keyChangedHeader }
                         passkeyContent(requester)
+                    } else if requester.phase == .syncing {
+                        if coordinator.keyChanged { keyChangedHeader }
+                        status(.syncing)
+                        GradientButton(String(localized: "Continuer sans l’historique"), style: .ghost) { coordinator.hideRequester() }
+                            .accessibilityIdentifier("e2eeAuto.historyRequest.later")
                     } else {
                         Group {
                             if requester.activating {
                                 Text("Le mode renforcé protège ton compte : cet appareil ne reçoit ni n’envoie de messages chiffrés tant qu’un autre de tes appareils ne l’a pas activé. Touche « C’est moi » sur cet autre appareil : une notification vient d’y arriver.")
+                            } else if coordinator.keyChanged {
+                                Text("Ta clé d’historique a changé. Pour continuer à sauvegarder tes messages ici, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver.")
                             } else {
                                 Text("Tes nouveaux messages arrivent déjà ici. Pour lire les plus anciens, touche « C’est moi » sur un autre de tes appareils : une notification vient d’y arriver.")
                             }
@@ -563,6 +606,14 @@ struct E2EEAutoHistoryRequesterView: View {
         .task(id: coordinator.requester?.phase) {
             if coordinator.requester?.phase == .waiting { await coordinator.pollWhileVisible() }
         }
+    }
+
+    /// A3 (§5.1 r23) : en tête de l'écran après « C'est moi » sur l'alerte « Nouvelle clé d'historique ».
+    private var keyChangedHeader: some View {
+        Text("Ta clé d’historique a changé.")
+            .font(SQType.body.weight(.semibold))
+            .foregroundStyle(SQColor.label)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// §5.3 : une passkey du compte avant « C'est moi ».
@@ -604,6 +655,15 @@ struct E2EEAutoHistoryRequesterView: View {
     @ViewBuilder
     private func status(_ phase: E2EEAutoHistoryRequestCoordinator.RequesterPhase) -> some View {
         switch phase {
+        case .syncing:
+            HStack(spacing: SQSpace.sm) {
+                ProgressView()
+                Text("Recherche de ta clé dans ton trousseau iCloud…")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
         case .waiting, .checking:
             HStack(spacing: SQSpace.sm) {
                 ProgressView()
@@ -796,6 +856,9 @@ struct E2EEAutoHistoryRequestQAScreen: View {
     nonisolated private static let passkey = AppEnvironment.hasQAFlag("auto-history-passkey")
         || AppEnvironment.hasQAFlag("auto-history-passkey-older")
     nonisolated private static let replaced = AppEnvironment.hasQAFlag("auto-history-approval-replaced")
+    /// A3 : après « C'est moi » sur l'alerte « Nouvelle clé d'historique » ; `-syncing` reste dans la synchro.
+    nonisolated private static let syncing = AppEnvironment.hasQAFlag("auto-history-key-changed-syncing")
+    nonisolated private static let keyChanged = syncing || AppEnvironment.hasQAFlag("auto-history-key-changed")
     /// Horloge du banc : l'attente de synchro passe aussitôt pour la passkey.
     private final class Clock: @unchecked Sendable { var date = Date(); var closedOnce = false }
     nonisolated private static let clock = Clock()
@@ -804,7 +867,7 @@ struct E2EEAutoHistoryRequestQAScreen: View {
             .init(
                 start: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
                 check: { .waiting(.init(requestId: "hreq_qa_000000000000001", expiresAtMs: Int64.max, activate: Self.activation ? true : nil)) },
-                hasOpenRequest: { !Self.passkey },
+                hasOpenRequest: { !Self.passkey && !Self.syncing },
                 ownFingerprint: { ["48213", "09177", "66402", "31958"] },
                 openRequests: {
                     Self.clock.closedOnce
@@ -854,6 +917,9 @@ struct E2EEAutoHistoryRequestQAScreen: View {
         .task {
             if approval {
                 await coordinator.refreshApprovals()
+            } else if Self.keyChanged {
+                coordinator.expectKeyChange()
+                coordinator.historyKeyMissing(hkPubB64: "hk")
             } else if Self.passkey {
                 coordinator.historyKeyMissing(hkPubB64: "hk")
                 if AppEnvironment.hasQAFlag("auto-history-passkey-older") {

@@ -516,6 +516,7 @@ struct MessagesView: View {
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @EnvironmentObject private var historyRequests: E2EEAutoHistoryRequestCoordinator
+    @EnvironmentObject private var historyKeyAlerts: E2EEAutoHistoryKeyAlertCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -676,6 +677,12 @@ struct MessagesView: View {
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
                 E2EEAutoLogAlertBanner()
+                if historyKeyAlerts.showsBanner, !showingShelved, !showingRequests {
+                    E2EEAutoHistoryKeyAlertBanner {
+                        let api = services.api
+                        Task { await historyKeyAlerts.open { E2EEAutoDevicesViewModel.live(api: api) } }
+                    }
+                }
                 if historyRequests.showsHistoryBanner, !showingShelved, !showingRequests {
                     historyBanner
                 }

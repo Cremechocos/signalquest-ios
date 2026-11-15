@@ -76,6 +76,11 @@ actor E2EEAutoHistoryKeyPublication {
         var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
         /// Un maillon à preuve existe vers cette HK de rotation (r23) ; sans lecture : non.
         var vouched: @Sendable (_ account: E2EEAutoLog.AccountState, _ rotation: E2EEAutoLog.HistoryKeyRecord) async -> Bool = { _, _ in false }
+        /// HK suspectes acquittées ici par « C'est moi » (§5.1 r23).
+        var acknowledged: @Sendable () -> Set<String> = { [] }
+        /// Grâce d'une heure finie pour cette HK en forme de rotation sans maillon à preuve
+        /// (§5.1 r23) ; sans horloge : jamais finie, donc ni alerte ni demande.
+        var graceOver: @Sendable (_ record: E2EEAutoLog.HistoryKeyRecord) -> Bool = { _ in false }
     }
 
     enum Outcome: Equatable, Sendable {
@@ -83,11 +88,12 @@ actor E2EEAutoHistoryKeyPublication {
         case present(hkPubB64: String)
         /// Le compte a une HK que l'appareil n'a pas : synchro, passkey ou « C'est moi » (§5.3).
         case missing(hkPubB64: String)
-        /// HK publiée hors rotation alors que l'appareil en détenait une plus ancienne
-        /// (§5.1, HK inattendue) : aucune demande ne part seule, la personne confirme d'abord.
-        case unexpected(hkPubB64: String)
-        /// Rotation après la HK détenue, sans maillon à preuve (r23) : elle doit arriver par un
-        /// transfert vérifié ; rien ne part seul, son émetteur peut ne pas avoir détenu l'ancienne.
+        /// Première HK suspecte non acquittée après la HK détenue (§5.1 r23, HK inattendue) :
+        /// hors forme de rotation, ou sans maillon à preuve passé la grâce. L'alerte se lève,
+        /// et aucune demande ne part seule : la personne confirme d'abord.
+        case unexpected(E2EEAutoHistoryKeyAlert.Suspect)
+        /// Rotation après la HK détenue, sans maillon à preuve, encore dans sa grâce (r23) : elle
+        /// doit arriver par un transfert vérifié ; rien ne part seul, ni alerte ni demande.
         case unvouched(hkPubB64: String)
         /// La dernière HK est annulée (§5.6 bis) : on attend la rotation depuis la base, sans
         /// demande « C'est moi » vers une clé que son signataire, désigné « pas moi », détient.
@@ -234,14 +240,14 @@ actor E2EEAutoHistoryKeyPublication {
     /// et une clé jamais publiée quitte le trousseau. Sans HK au journal, elle
     /// reste pour être renvoyée telle quelle.
     private func absent(_ account: E2EEAutoLog.AccountState, _ current: String) async -> Outcome {
-        if Self.isUnexpected(account, holds: dependencies.holds) { return .unexpected(hkPubB64: current) }
+        let verdict = await E2EEAutoHistoryKeyAlert.judge(
+            account, holds: dependencies.holds, acknowledged: dependencies.acknowledged(),
+            vouched: { [dependencies] in await dependencies.vouched(account, $0) }, graceOver: dependencies.graceOver
+        )
+        if case .alert(let suspect) = verdict { return .unexpected(suspect) }
         if account.historyKeyBase(current)?.cancelled == true { return .cancelled(hkPubB64: current) }
-        // Toutes en forme de rotation : chacune doit encore porter un maillon à preuve.
-        for record in Self.keysAfterLatestHeld(account, holds: dependencies.holds) {
-            let vouched = await dependencies.vouched(account, record)
-            if !vouched { return .unvouched(hkPubB64: current) }
-        }
-        return .missing(hkPubB64: current)
+        // Verrou §5.3 : pas de demande tant qu'une HK postérieure n'est pas jugée.
+        return verdict == .pending ? .unvouched(hkPubB64: current) : .missing(hkPubB64: current)
     }
 
     /// Les HK écrites après la plus récente que l'appareil détient (aucune s'il n'en détient
@@ -252,17 +258,16 @@ actor E2EEAutoHistoryKeyPublication {
         return account.historyKeys[(lastHeld + 1)...].filter { !cancelled.contains($0.hkPubB64) }
     }
 
-    /// §5.1 (révision 23) : l'appareil détient une HK du compte, mais une HK écrite après la
-    /// plus récente qu'il détient, et non annulée, n'a pas la forme d'une rotation (après un
-    /// `REVOKE`, par-dessus la HK littérale juste avant elle, annulée ou non). Un appareil qui
-    /// n'a jamais eu de HK n'est pas concerné.
+    /// §5.1 (révision 23), la forme seule : l'appareil détient une HK du compte, mais une HK
+    /// écrite après la plus récente qu'il détient, et non annulée, n'a pas la forme d'une
+    /// rotation. Un appareil qui n'a jamais eu de HK n'est pas concerné. Le jugement complet
+    /// (maillon à preuve, grâce, acquittement) est `E2EEAutoHistoryKeyAlert.judge`.
     static func isUnexpected(_ account: E2EEAutoLog.AccountState, holds: (String) -> Bool) -> Bool {
         let keys = account.historyKeys
         guard let lastHeld = keys.lastIndex(where: { holds($0.hkPubB64) }) else { return false }
         let cancelled = Set(account.historyKeyBases.filter(\.cancelled).map(\.hkPubB64))
         return keys.indices.contains { index in
-            index > lastHeld && !cancelled.contains(keys[index].hkPubB64)
-                && (keys[index].afterRevokeSeq == nil || keys[index].previousHkPubB64 != keys[index - 1].hkPubB64)
+            index > lastHeld && !cancelled.contains(keys[index].hkPubB64) && !E2EEAutoHistoryKeyAlert.hasRotationShape(keys, at: index)
         }
     }
 
@@ -356,7 +361,9 @@ extension E2EEAutoHistoryKeyPublication {
             },
             reportedStatus: { try? markerStore.string(for: statusKey) },
             recordReportedStatus: { try? markerStore.set($0, for: statusKey, accessibility: .afterFirstUnlock) },
-            vouched: E2EEAutoHistoryRotation.liveVouching(session: session, api: api, identityStore: identityStore)
+            vouched: E2EEAutoHistoryRotation.liveVouching(session: session, api: api, identityStore: identityStore),
+            acknowledged: { E2EEAutoHistoryKeyAcknowledgements.load(markerStore, ownerNamespace: namespace) },
+            graceOver: E2EEAutoHistoryKeyGrace.live(ownerScopeId: owner, ownerNamespace: namespace, markerStore: markerStore).isOver
         ))
     }
 }

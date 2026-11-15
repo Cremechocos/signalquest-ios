@@ -192,6 +192,15 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Alerte « Nouvelle clé d'historique » (§5.1 r23) : `--qa-auto-history-key-alert`, et ses
+    /// variantes `-banner`, `-removed`, `-t4`.
+    static var showsAutoHistoryKeyAlertQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--qa-auto-history-key-alert") }
+        #else
+        false
+        #endif
+    }
     /// Alerte « Nouvel appareil » ; avec `--qa-auto-devices-recent`, sous la garde des 24 h.
     static var showsAutoNewDeviceQA: Bool {
         #if DEBUG && targetEnvironment(simulator)

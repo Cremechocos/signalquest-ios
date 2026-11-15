@@ -207,16 +207,7 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         mode = account.mode
         let ownId = dependencies.ownDeviceId()
         let nowMs = dependencies.nowMs()
-        let all = account.devices.values.map { device in
-            Row(
-                id: device.deviceId, platform: device.platform, isCurrent: device.deviceId == ownId, status: device.status,
-                addedAtMs: device.addedAtMs, revokedAtMs: device.revokedAtMs, revokeReason: device.revokeReason,
-                shortFingerprint: E2EEAutoSafetyCode.shortFingerprint(E2EEAutoSafetyCode.deviceFingerprint(
-                    userId: account.userId, deviceId: device.deviceId, signingKeyB64: device.signingKeyB64
-                )) ?? [],
-                label: labels[device.deviceId]?.label, lastSeenAtMs: labels[device.deviceId]?.lastSeenAtMs
-            )
-        }
+        let all = account.devices.values.map { row($0, in: account, ownId: ownId) }
         // Cet appareil d'abord, puis du plus récent au plus ancien.
         rows = all.filter { $0.status != .revoked }
             .sorted { ($0.isCurrent ? 1 : 0, $0.addedAtMs, $0.id) > ($1.isCurrent ? 1 : 0, $1.addedAtMs, $1.id) }
@@ -226,6 +217,24 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
         .sorted { ($0.revokedAtMs ?? 0, $0.id) > ($1.revokedAtMs ?? 0, $1.id) }
         othersRevocableAtMs = ownId.flatMap { account.devices[$0] }.map { $0.addedAtMs + E2EEAutoLog.signerMinAgeMs }
         phase = rows.contains(where: \.isCurrent) ? .loaded : .notEnrolled
+    }
+
+    /// Un appareil du journal lu, retiré depuis longtemps compris (l'alerte « Nouvelle clé
+    /// d'historique » nomme son signataire quel que soit l'âge du retrait).
+    func row(id deviceId: String) -> Row? {
+        guard let account, let device = account.devices[deviceId] else { return nil }
+        return row(device, in: account, ownId: dependencies.ownDeviceId())
+    }
+
+    private func row(_ device: E2EEAutoLog.DeviceState, in account: E2EEAutoLog.AccountState, ownId: String?) -> Row {
+        Row(
+            id: device.deviceId, platform: device.platform, isCurrent: device.deviceId == ownId, status: device.status,
+            addedAtMs: device.addedAtMs, revokedAtMs: device.revokedAtMs, revokeReason: device.revokeReason,
+            shortFingerprint: E2EEAutoSafetyCode.shortFingerprint(E2EEAutoSafetyCode.deviceFingerprint(
+                userId: account.userId, deviceId: device.deviceId, signingKeyB64: device.signingKeyB64
+            )) ?? [],
+            label: labels[device.deviceId]?.label, lastSeenAtMs: labels[device.deviceId]?.lastSeenAtMs
+        )
     }
 
     func revoke(_ row: Row, reason: E2EEAutoLog.RevokeReason) async {
@@ -978,6 +987,12 @@ struct E2EEAutoDevicesQAScreen: View {
             device("web_device_qa_000000000003", .web, seed: 0x33, addedAgo: 3 * 24 * hour),
             device("web_device_qa_000000000004", .web, seed: 0x44, addedAgo: 9 * 24 * hour, status: .revoked, revokedAgo: 2 * 24 * hour, reason: .notMe),
         ] { account.devices[state.deviceId] = state }
+        // Alerte « Nouvelle clé d'historique », cas T4 : signataire déjà retiré sans annuler sa HK.
+        if AppEnvironment.hasQAFlag("auto-history-key-alert-t4") {
+            let removed = device("web_device_qa_000000000005", .web, seed: 0x55, addedAgo: 6 * 24 * hour, status: .revoked,
+                                 revokedAgo: 24 * hour, reason: .user)
+            account.devices[removed.deviceId] = removed
+        }
         let refused = AppEnvironment.hasQAFlag("auto-devices-refused")
         // Libellés servis (révision 12) ; `--qa-auto-devices-unlabeled` : lecture en échec.
         let labels: [String: E2EEAutoDeviceLabels.Display] = [

@@ -30,6 +30,8 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         var passkeyOutcomes: [Coordinator.PasskeyRecovery] = []
         var passkeyUses = 0
         var snoozedUntil: Date?
+        /// Attente interrompue (tâche annulée) : l'écran reste où il en était.
+        var sleepFails = false
 
         @MainActor
         func coordinator() -> Coordinator {
@@ -53,7 +55,10 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
                 },
                 continueWithHistoryKey: { self.continued += 1 },
                 removeDelivered: { self.removed.append($0) },
-                sleep: { duration in self.clock.addTimeInterval(TimeInterval(duration.components.seconds)) },
+                sleep: { duration in
+                    if self.sleepFails { throw CancellationError() }
+                    self.clock.addTimeInterval(TimeInterval(duration.components.seconds))
+                },
                 now: { self.clock },
                 bannerSnoozedUntil: { self.snoozedUntil },
                 snoozeBanner: { self.snoozedUntil = $0 }
@@ -95,6 +100,49 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         coordinator.openRequester()
         XCTAssertTrue(coordinator.presentsRequester)
         XCTAssertFalse(coordinator.showsHistoryBanner)
+    }
+
+    /// A3 (§5.1 r23) : après « C'est moi » sur l'alerte « Nouvelle clé d'historique », l'écran
+    /// s'ouvre dès la demande, pendant la synchro, avec « Ta clé d'historique a changé ».
+    func testKeyChangeOpensTheScreenDuringTheSyncWait() async {
+        let syncing = World()
+        syncing.sleepFails = true
+        let during = syncing.coordinator()
+        during.expectKeyChange()
+        XCTAssertTrue(during.keyChanged)
+        during.historyKeyMissing(hkPubB64: "hk")
+        await settle(during)
+        XCTAssertEqual(during.requester?.phase, .syncing)
+        XCTAssertTrue(during.presentsRequester, "ouvert sans passer par le bandeau")
+        XCTAssertFalse(during.showsHistoryBanner)
+        XCTAssertEqual(syncing.starts, 0)
+
+        let world = World()
+        let coordinator = world.coordinator()
+        coordinator.expectKeyChange()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        XCTAssertEqual(world.starts, 1)
+        XCTAssertEqual(coordinator.requester?.phase, .waiting)
+        XCTAssertEqual(coordinator.requester?.fingerprint, ["48213", "09177", "66402", "31958"])
+        XCTAssertTrue(coordinator.presentsRequester)
+        XCTAssertTrue(coordinator.keyChanged)
+        coordinator.reset()
+        XCTAssertFalse(coordinator.keyChanged)
+    }
+
+    /// A3, clé arrivée par le trousseau pendant la synchro : l'écran le dit, sans demande.
+    func testKeyChangeArrivingBySyncShowsItWasReceived() async {
+        let world = World()
+        world.heldAfterChecks = 2
+        let coordinator = world.coordinator()
+        coordinator.expectKeyChange()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        XCTAssertEqual(world.starts, 0)
+        XCTAssertEqual(world.continued, 1)
+        XCTAssertEqual(coordinator.requester?.phase, .received)
+        XCTAssertTrue(coordinator.presentsRequester)
     }
 
     /// Une demande déjà ouverte n'attend pas la synchro.
