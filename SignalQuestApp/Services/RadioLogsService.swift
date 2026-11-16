@@ -17,6 +17,8 @@ protocol RadioLogsServicing: Sendable {
     func cachedSiteStates() -> [String: RadioLogSiteState]
     /// Supports proposés par la dernière vérification, encore frais, sans réseau.
     func cachedSiteProposals() -> [String: RadioLogSiteHypothesis]
+    /// Qui a validé chaque site identifié et quand (C18), encore frais, sans réseau.
+    func cachedSiteProvenances() -> [String: RadioLogIdentificationProvenance]
     /// Persiste une identification faite par l'utilisateur, pour qu'elle survive au retour sur
     /// l'écran — le balayage n'en sait rien tant qu'il n'a pas retourné ce site.
     func markIdentified(siteKey: String, siteId: String)
@@ -38,9 +40,15 @@ protocol RadioLogsServicing: Sendable {
 /// Une fenêtre de balayage résolue : le statut de chaque site, et pour les sites non
 /// identifiés le support que le serveur propose, quand il en propose un. La
 /// proposition vient de la MÊME réponse que le statut : aucun appel de plus.
+extension RadioLogsServicing {
+    func cachedSiteProvenances() -> [String: RadioLogIdentificationProvenance] { [:] }
+}
+
 struct RadioLogScanUpdate: Sendable, Equatable {
     var states: [String: RadioLogSiteState] = [:]
     var proposals: [String: RadioLogSiteHypothesis] = [:]
+    /// Qui a validé et quand, pour les sites identifiés (C18).
+    var provenances: [String: RadioLogIdentificationProvenance] = [:]
 }
 
 /// Avancement d'un rattrapage.
@@ -292,6 +300,10 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         statusStore.freshProposals(unidentifiedTtlMs: unidentifiedTtlMs, nowMs: nowMs())
     }
 
+    func cachedSiteProvenances() -> [String: RadioLogIdentificationProvenance] {
+        statusStore.freshProvenances(identifiedTtlMs: identifiedTtlMs, nowMs: nowMs())
+    }
+
     /// Inscrit une identification que L'UTILISATEUR vient de faire.
     ///
     /// Sans cela, le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le
@@ -302,7 +314,17 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// On n'attend pas la confirmation d'un balayage : l'écriture serveur a déjà réussi (on
     /// tient son `siteId`), et le prochain scan ne ferait que reconfirmer ce qu'on sait.
     func markIdentified(siteKey: String, siteId: String) {
-        statusStore.merge([siteKey: .identified(siteId: siteId)], nowMs: nowMs())
+        // Le geste vient du membre : « Par toi », vérifié à l'instant, comme le servira quick.
+        let now = nowMs()
+        statusStore.merge(
+            [siteKey: .identified(siteId: siteId)],
+            proposals: [:],
+            provenances: [siteKey: RadioLogIdentificationProvenance(
+                kind: .mine,
+                lastHumanValidatedAt: Date(timeIntervalSince1970: Double(now) / 1000)
+            )],
+            nowMs: now
+        )
     }
 
     func markWithdrawn(siteKey: String) {
@@ -331,7 +353,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
                         inFlight -= 1
                         if Task.isCancelled { break }
                         if !resolved.states.isEmpty {
-                            self.statusStore.merge(resolved.states, proposals: resolved.proposals, nowMs: self.nowMs())
+                            self.statusStore.merge(
+                                resolved.states,
+                                proposals: resolved.proposals,
+                                provenances: resolved.provenances,
+                                nowMs: self.nowMs()
+                            )
                             continuation.yield(resolved)
                         }
                         if let window = iterator.next() {
@@ -376,6 +403,9 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
                 update.states[site.id] = state
                 if state.isUnidentified, let resolution, let proposal = Self.proposal(from: resolution) {
                     update.proposals[site.id] = proposal
+                }
+                if state.isIdentified, let provenance = resolution?.provenance {
+                    update.provenances[site.id] = provenance
                 }
             }
         } catch {

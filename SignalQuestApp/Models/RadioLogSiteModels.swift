@@ -495,6 +495,68 @@ struct CachedRadioLogSiteState: Codable, Sendable {
     /// Support que le serveur propose pour un site non identifié, rendu par la même
     /// réponse que le statut. Absent des anciens fichiers : décodé comme `nil`.
     var proposal: RadioLogSiteHypothesis? = nil
+    /// Qui a validé l'identification et quand, pour un site identifié (C18).
+    /// Absent des anciens fichiers : décodé comme `nil`.
+    var provenance: RadioLogIdentificationProvenance? = nil
+}
+
+/// Qui a validé une identification, et quand (C18, servi le 16/11 par #1355 ;
+/// choix d'Alexandre : carte et fiche du log antennes). Le serveur donne la priorité
+/// `mine` > `community` > `official`. La date est celle du dernier geste humain,
+/// quel qu'en soit l'auteur : à l'heure près pour `mine`, au jour près (00:00 UTC)
+/// pour `community`, et jamais pour `official` (registres publics).
+struct RadioLogIdentificationProvenance: Codable, Sendable, Equatable {
+    enum Kind: String, Codable, Sendable { case mine, community, official }
+
+    let kind: Kind
+    let lastHumanValidatedAt: Date?
+
+    init(kind: Kind, lastHumanValidatedAt: Date?) {
+        self.kind = kind
+        // Un registre n'a pas de geste humain : aucune date, même servie par erreur.
+        self.lastHumanValidatedAt = kind == .official ? nil : lastHumanValidatedAt
+    }
+
+    /// Valeur servie ; une valeur inconnue ne s'affiche pas.
+    init?(served: String?, lastHumanValidatedAt: Date?) {
+        guard let raw = served?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              let kind = Kind(rawValue: raw) else { return nil }
+        self.init(kind: kind, lastHumanValidatedAt: lastHumanValidatedAt)
+    }
+
+    /// « Par toi · vérifié il y a 2 heures », « Par la communauté · vérifié hier »,
+    /// « Données officielles ».
+    func label(now: Date = Date(), locale: Locale = .current) -> String {
+        let who: String
+        switch kind {
+        case .mine: who = String(localized: "Par toi")
+        case .community: who = String(localized: "Par la communauté")
+        case .official: return String(localized: "Données officielles")
+        }
+        guard let when = verifiedLabel(now: now, locale: locale) else { return who }
+        return "\(who) · \(when)"
+    }
+
+    private func verifiedLabel(now: Date, locale: Locale) -> String? {
+        guard let date = lastHumanValidatedAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = locale
+        formatter.dateTimeStyle = .named
+        switch kind {
+        case .mine:
+            return String(localized: "vérifié \(formatter.localizedString(for: min(date, now), relativeTo: now))")
+        case .community:
+            // Le jour seul : la date servie est arrondie à 00:00 UTC, une heure serait inventée.
+            var utc = Calendar(identifier: .gregorian)
+            utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+            let days = max(0, utc.dateComponents([.day], from: utc.startOfDay(for: date), to: utc.startOfDay(for: now)).day ?? 0)
+            guard days > 0 else { return String(localized: "vérifié aujourd’hui") }
+            let past = now.addingTimeInterval(-Double(days) * 86_400)
+            return String(localized: "vérifié \(formatter.localizedString(for: past, relativeTo: now))")
+        case .official:
+            return nil
+        }
+    }
 }
 
 /// Hypothèse de site proposée par le serveur pour un site NON identifié.

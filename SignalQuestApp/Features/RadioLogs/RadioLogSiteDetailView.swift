@@ -18,6 +18,7 @@ struct RadioLogSiteDetailView: View {
     let siteName: String?
     let proposal: RadioLogSiteHypothesis?
     let isMine: Bool
+    let provenance: RadioLogIdentificationProvenance?
     let service: RadioLogsServicing
     let antennas: AntennasServicing
     /// Ouvre la feuille d'identification (ou de correction) une fois la fiche fermée.
@@ -48,6 +49,7 @@ struct RadioLogSiteDetailView: View {
         siteName: String?,
         proposal: RadioLogSiteHypothesis?,
         isMine: Bool,
+        provenance: RadioLogIdentificationProvenance? = nil,
         service: RadioLogsServicing,
         antennas: AntennasServicing,
         onIdentify: @escaping () -> Void,
@@ -58,6 +60,7 @@ struct RadioLogSiteDetailView: View {
         self.siteName = siteName
         self.proposal = proposal
         self.isMine = isMine
+        self.provenance = provenance
         self.service = service
         self.antennas = antennas
         self.onIdentify = onIdentify
@@ -145,7 +148,7 @@ struct RadioLogSiteDetailView: View {
             HStack(spacing: SQSpace.sm) {
                 if let siteId = state.siteId, !siteId.isEmpty {
                     statusPill(Text("Identifié · site \(siteId)"), symbol: "checkmark", ink: P.okInk, fill: P.okSoft)
-                    if isMine {
+                    if isMine, provenance == nil {
                         statusPill(Text("Par toi"), symbol: nil, ink: P.chipInk, fill: P.chip)
                     }
                 } else {
@@ -153,6 +156,13 @@ struct RadioLogSiteDetailView: View {
                 }
             }
             .padding(.top, SQSpace.xs)
+            if state.isIdentified, let provenance {
+                Text(provenance.label())
+                    .font(SQType.caption)
+                    .foregroundStyle(P.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("radioLogs.detail.provenance")
+            }
         }
     }
 

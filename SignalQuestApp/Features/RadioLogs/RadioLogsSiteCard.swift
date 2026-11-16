@@ -223,6 +223,9 @@ struct RadioLogSiteCard: View {
     var proposal: RadioLogSiteHypothesis? = nil
     /// Identifié par le membre lui-même.
     var isMine = false
+    /// Qui a validé le site identifié et quand (C18) : la ligne « Par toi · vérifié… »
+    /// remplace alors la pastille « Par toi ».
+    var provenance: RadioLogIdentificationProvenance? = nil
     /// La proposition de ce site part en ce moment.
     var isConfirming = false
     let onOpen: () -> Void
@@ -252,6 +255,13 @@ struct RadioLogSiteCard: View {
                             .monospacedDigit()
                             .foregroundStyle(P.muted)
                             .fixedSize(horizontal: false, vertical: true)
+                        if state.isIdentified, let provenance {
+                            Text(provenance.label())
+                                .font(SQFont.body(M.siteMetaSize, .semibold))
+                                .foregroundStyle(P.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("radioLogs.site.provenance")
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -322,7 +332,7 @@ struct RadioLogSiteCard: View {
     @ViewBuilder
     private var trailing: some View {
         if state.isIdentified {
-            if isMine {
+            if isMine, provenance == nil {
                 Text("Par toi")
                     .font(SQFont.body(M.stateSize, .bold))
                     .foregroundStyle(P.chipInk)

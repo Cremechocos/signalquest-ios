@@ -114,6 +114,7 @@ struct RadioLogsView: View {
                             siteName: model.siteNames[site.id],
                             proposal: model.proposal(for: site),
                             isMine: model.isMine(site),
+                            provenance: model.provenance(for: site),
                             isConfirming: model.confirmingSiteId == site.id,
                             onOpen: {
                                 model.loadSiteName(for: site)
@@ -220,6 +221,7 @@ struct RadioLogsView: View {
                 siteName: model.siteNames[site.id],
                 proposal: model.proposal(for: site),
                 isMine: model.isMine(site),
+                provenance: model.provenance(for: site),
                 service: services.radioLogs,
                 antennas: services.antennas,
                 onIdentify: { pendingIdentifyTarget = site },

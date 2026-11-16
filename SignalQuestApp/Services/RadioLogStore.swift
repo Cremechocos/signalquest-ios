@@ -169,13 +169,25 @@ protocol RadioLogSiteStatusStoring: Sendable {
     func freshProposals(unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteHypothesis]
     /// Écrit les statuts. Un site sans proposition dans `proposals` perd la sienne :
     /// la nouvelle réponse remplace l'ancienne, elle ne s'y ajoute pas.
-    func merge(_ states: [String: RadioLogSiteState], proposals: [String: RadioLogSiteHypothesis], nowMs: Int)
+    /// Provenances encore fraîches, pour les sites identifiés seulement (C18).
+    func freshProvenances(identifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogIdentificationProvenance]
+    /// Un site identifié sans provenance dans `provenances` perd la sienne, comme une proposition.
+    func merge(
+        _ states: [String: RadioLogSiteState],
+        proposals: [String: RadioLogSiteHypothesis],
+        provenances: [String: RadioLogIdentificationProvenance],
+        nowMs: Int
+    )
     func clear()
 }
 
 extension RadioLogSiteStatusStoring {
     func merge(_ states: [String: RadioLogSiteState], nowMs: Int) {
-        merge(states, proposals: [:], nowMs: nowMs)
+        merge(states, proposals: [:], provenances: [:], nowMs: nowMs)
+    }
+
+    func merge(_ states: [String: RadioLogSiteState], proposals: [String: RadioLogSiteHypothesis], nowMs: Int) {
+        merge(states, proposals: proposals, provenances: [:], nowMs: nowMs)
     }
 }
 
@@ -252,7 +264,23 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
         return out
     }
 
-    func merge(_ states: [String: RadioLogSiteState], proposals: [String: RadioLogSiteHypothesis], nowMs: Int) {
+    func freshProvenances(identifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogIdentificationProvenance] {
+        lock.lock(); defer { lock.unlock() }
+        let file = (try? readUnlocked()) ?? RadioLogSiteStatusFile()
+        var out: [String: RadioLogIdentificationProvenance] = [:]
+        for (key, cached) in file.states where cached.state.isIdentified {
+            guard let provenance = cached.provenance, nowMs - cached.updatedAtMs <= identifiedTtlMs else { continue }
+            out[key] = provenance
+        }
+        return out
+    }
+
+    func merge(
+        _ states: [String: RadioLogSiteState],
+        proposals: [String: RadioLogSiteHypothesis],
+        provenances: [String: RadioLogIdentificationProvenance],
+        nowMs: Int
+    ) {
         guard !states.isEmpty else { return }
         lock.lock(); defer { lock.unlock() }
         var file = (try? readUnlocked()) ?? RadioLogSiteStatusFile()
@@ -260,7 +288,8 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
             file.states[key] = CachedRadioLogSiteState(
                 state: state,
                 updatedAtMs: nowMs,
-                proposal: state.isUnidentified ? proposals[key] : nil
+                proposal: state.isUnidentified ? proposals[key] : nil,
+                provenance: state.isIdentified ? provenances[key] : nil
             )
         }
         if file.states.count > maxEntries {

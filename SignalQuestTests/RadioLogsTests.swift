@@ -885,6 +885,111 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(raw?["verdictVersion"] as? Int, RadioLogSiteStatusFile.verdictVersion)
     }
 
+    // MARK: C18 — qui a validé, et quand
+
+    /// `identify/quick` sert `validationProvenance` et `lastHumanValidatedAt` à la racine
+    /// (#1355) ; absents sans identification, une valeur inconnue ne s'affiche pas, et un
+    /// registre public ne porte jamais de date.
+    func testQuickReadsWhoValidatedAndWhen() throws {
+        let mine = try resolution(#"""
+        {"found":true,"siteId":"0381522","matchedRadio":[{"type":"enb","value":"812345"}],
+         "validationProvenance":"mine","lastHumanValidatedAt":"2026-11-16T13:02:41.000Z"}
+        """#)
+        XCTAssertEqual(mine.provenance?.kind, .mine)
+        XCTAssertEqual(mine.provenance?.lastHumanValidatedAt, SQDateParsing.parse("2026-11-16T13:02:41.000Z"))
+
+        let community = try resolution(#"{"found":true,"siteId":"1","validationProvenance":"community","lastHumanValidatedAt":"2026-11-13T00:00:00.000Z"}"#)
+        XCTAssertEqual(community.provenance?.kind, .community)
+        let official = try resolution(#"{"found":true,"siteId":"2","validationProvenance":"official","lastHumanValidatedAt":"2026-11-13T00:00:00.000Z"}"#)
+        XCTAssertEqual(official.provenance, RadioLogIdentificationProvenance(kind: .official, lastHumanValidatedAt: nil))
+        let noDate = try resolution(#"{"found":true,"siteId":"3","validationProvenance":"community","lastHumanValidatedAt":null}"#)
+        XCTAssertEqual(noDate.provenance, RadioLogIdentificationProvenance(kind: .community, lastHumanValidatedAt: nil))
+
+        XCTAssertNil(try resolution(#"{"found":true,"siteId":"4"}"#).provenance, "Absent : aucune ligne")
+        XCTAssertNil(try resolution(#"{"found":true,"siteId":"5","validationProvenance":"robot"}"#).provenance)
+        XCTAssertNil(try resolution(#"{"found":true,"siteId":"6","validationProvenance":42}"#).provenance)
+    }
+
+    /// Le balayage réel (`quick/batch`, `results[i].result`) garde la provenance d'un site
+    /// identifié, jamais celle d'un site à identifier, et l'écrit dans le cache du compte.
+    func testScanCarriesTheProvenanceOfIdentifiedSitesOnly() async throws {
+        let identified = try makeSite(kind: .enb, node: "812345")
+        let pending = try makeSite(kind: .enb, node: "700001")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/android/map/identify/quick/batch")
+            let body = """
+            {"ok":true,"count":2,"results":[
+              {"id":"\(identified.id)","ok":true,"result":{"found":true,"siteId":"0381522",
+                "matchedRadio":[{"type":"enb","value":"812345"}],
+                "validationProvenance":"community","lastHumanValidatedAt":"2026-11-13T00:00:00.000Z"}},
+              {"id":"\(pending.id)","ok":true,"result":{"found":false,
+                "validationProvenance":"community","lastHumanValidatedAt":"2026-11-13T00:00:00.000Z"}}]}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(body.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("radiolog-c18-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let service = RadioLogsService(
+            api: APIClient(config: .test, session: URLSession(configuration: configuration)),
+            statusStore: RadioLogSiteStatusStore(fileURL: url)
+        )
+
+        var provenances: [String: RadioLogIdentificationProvenance] = [:]
+        for await update in service.scanStream(sites: [identified, pending]) {
+            provenances.merge(update.provenances) { _, new in new }
+        }
+        XCTAssertEqual(provenances.keys.sorted(), [identified.id])
+        XCTAssertEqual(provenances[identified.id]?.kind, .community)
+        XCTAssertEqual(service.cachedSiteProvenances()[identified.id]?.kind, .community, "Relu depuis le cache")
+    }
+
+    /// Le cache garde la provenance d'un site identifié, l'oublie quand il ne l'est plus,
+    /// et un fichier écrit avant C18 se lit sans elle.
+    func testStatusCacheKeepsTheProvenanceOfAnIdentifiedSite() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("radiolog-c18-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let now = 1_786_000_000_000
+        let week = 7 * 86_400_000
+        let provenance = RadioLogIdentificationProvenance(kind: .mine, lastHumanValidatedAt: Date(timeIntervalSince1970: 1_785_990_000))
+        let store = RadioLogSiteStatusStore(fileURL: url)
+        store.merge(["enb:1": .identified(siteId: "0381522")], proposals: [:], provenances: ["enb:1": provenance], nowMs: now)
+        XCTAssertEqual(RadioLogSiteStatusStore(fileURL: url).freshProvenances(identifiedTtlMs: week, nowMs: now + 1), ["enb:1": provenance])
+
+        store.merge(["enb:1": .unidentified], nowMs: now + 2)
+        XCTAssertTrue(store.freshProvenances(identifiedTtlMs: week, nowMs: now + 3).isEmpty)
+
+        let legacy = #"{"states":{"enb:2":{"state":{"kind":"identified","siteId":"9"},"updatedAtMs":\#(now)}},"verdictVersion":1}"#
+        try Data(legacy.utf8).write(to: url)
+        let reloaded = RadioLogSiteStatusStore(fileURL: url)
+        XCTAssertEqual(reloaded.fresh(identifiedTtlMs: week, unidentifiedTtlMs: week, nowMs: now)["enb:2"], .identified(siteId: "9"))
+        XCTAssertTrue(reloaded.freshProvenances(identifiedTtlMs: week, nowMs: now).isEmpty)
+    }
+
+    /// Les libellés, dans la langue du passage : l'heure pour « Par toi », le jour seul pour
+    /// la communauté (date servie à 00:00 UTC), rien pour les données officielles.
+    func testProvenanceLabels() throws {
+        let french = Bundle.main.preferredLocalizations.first?.hasPrefix("fr") == true
+        let locale = Locale(identifier: french ? "fr_FR" : "en_US")
+        let now = try XCTUnwrap(SQDateParsing.parse("2026-11-16T15:00:00.000Z"))
+        func label(_ kind: RadioLogIdentificationProvenance.Kind, _ iso: String?) -> String {
+            RadioLogIdentificationProvenance(kind: kind, lastHumanValidatedAt: iso.flatMap(SQDateParsing.parse))
+                .label(now: now, locale: locale)
+        }
+        XCTAssertEqual(label(.mine, "2026-11-16T13:00:00.000Z"), french ? "Par toi · vérifié il y a 2 heures" : "By you · verified 2 hours ago")
+        XCTAssertEqual(label(.mine, nil), french ? "Par toi" : "By you")
+        XCTAssertEqual(label(.community, "2026-11-13T00:00:00.000Z"), french ? "Par la communauté · vérifié il y a 3 jours" : "By the community · verified 3 days ago")
+        XCTAssertEqual(label(.community, "2026-11-15T00:00:00.000Z"), french ? "Par la communauté · vérifié hier" : "By the community · verified yesterday")
+        XCTAssertEqual(label(.community, "2026-11-16T00:00:00.000Z"), french ? "Par la communauté · vérifié aujourd’hui" : "By the community · verified today")
+        XCTAssertEqual(label(.official, nil), french ? "Données officielles" : "Official data")
+        // Une date future (horloge décalée) ne s'écrit jamais « dans 2 heures ».
+        XCTAssertFalse(label(.mine, "2026-11-16T17:00:00.000Z").contains(french ? "dans" : "in "))
+    }
+
     func testEstimatedLabelCarriesTheRadius() {
         XCTAssertEqual(RadioLogSiteState.estimated(uncertaintyMeters: nil).label, String(localized: "Position estimée"))
         let label = RadioLogSiteState.estimated(uncertaintyMeters: 412).label
@@ -1805,6 +1910,60 @@ extension RadioLogsTests {
             }
             try XCTUnwrap(image.pngData()).write(
                 to: URL(fileURLWithPath: output).appendingPathComponent("cartes-estimee-\(name).png")
+            )
+        }
+
+        // C18 : qui a validé et quand, sur la fiche et les cartes d'un site identifié.
+        let identified = RadioLogSiteState.identified(siteId: "0381522")
+        let now = Date()
+        let community = RadioLogIdentificationProvenance(kind: .community, lastHumanValidatedAt: now.addingTimeInterval(-3 * 86_400))
+        let mine = RadioLogIdentificationProvenance(kind: .mine, lastHumanValidatedAt: now.addingTimeInterval(-2 * 3_600))
+        let official = RadioLogIdentificationProvenance(kind: .official, lastHumanValidatedAt: nil)
+        for scheme in [ColorScheme.light, .dark] {
+            let view = RadioLogSiteDetailView(
+                site: site, state: identified, siteName: "Le Fontanil — Rue du Stade", proposal: nil, isMine: false,
+                provenance: community,
+                service: SnapshotRadioLogsService(entries: entries), antennas: StubAntennasService(),
+                onIdentify: {}, onConfirmProposal: {}
+            )
+            .environment(\.colorScheme, scheme)
+            let host = UIHostingController(rootView: view)
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: 6_000_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(
+                to: URL(fileURLWithPath: output).appendingPathComponent("fiche-provenance-\(scheme == .dark ? "sombre" : "clair").png")
+            )
+        }
+        for (name, scheme, size) in variants {
+            let cards = ScrollView {
+                VStack(spacing: 0) {
+                    RadioLogSiteCard(site: site, state: identified, siteName: "Le Fontanil — Rue du Stade",
+                                     isMine: true, provenance: mine, onOpen: {}, onIdentify: {}, onOpenMap: {})
+                    Divider()
+                    RadioLogSiteCard(site: site, state: identified, siteName: "Le Fontanil — Rue du Stade",
+                                     provenance: community, onOpen: {}, onIdentify: {}, onOpenMap: {})
+                    Divider()
+                    RadioLogSiteCard(site: site, state: identified, siteName: nil,
+                                     provenance: official, onOpen: {}, onIdentify: {}, onOpenMap: {})
+                }
+                .padding(SQSpace.lg)
+            }
+            .background(SQColor.surface)
+            .environment(\.colorScheme, scheme)
+            .environment(\.dynamicTypeSize, size)
+            let host = UIHostingController(rootView: cards)
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(
+                to: URL(fileURLWithPath: output).appendingPathComponent("cartes-provenance-\(name).png")
             )
         }
     }

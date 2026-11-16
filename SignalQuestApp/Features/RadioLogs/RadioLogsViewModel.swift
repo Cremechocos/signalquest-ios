@@ -58,6 +58,8 @@ final class RadioLogsViewModel: ObservableObject {
     /// Support que le serveur propose pour un site non identifié, rendu par la
     /// vérification du catalogue elle-même : il ne coûte aucun appel de plus.
     @Published private(set) var proposals: [String: RadioLogSiteHypothesis] = [:]
+    /// Qui a validé chaque site identifié, et quand (C18).
+    @Published private(set) var provenances: [String: RadioLogIdentificationProvenance] = [:]
     /// Site dont la proposition est en cours d'envoi : sa ligne désactive « C'est lui ».
     @Published private(set) var confirmingSiteId: String?
     /// Commune et adresse des sites identifiés, chargées à la demande.
@@ -269,6 +271,12 @@ final class RadioLogsViewModel: ObservableObject {
         return proposals[site.id]
     }
 
+    /// Qui a validé le site et quand, pour un site identifié seulement.
+    func provenance(for site: RadioLogSite) -> RadioLogIdentificationProvenance? {
+        guard state(of: site).isIdentified else { return nil }
+        return provenances[site.id]
+    }
+
     /// Sites encore inconnus du serveur ET vérifiables : ce que la vérification
     /// n'a pas encore atteint.
     var pendingCount: Int { max(0, totalCount - checkedCount - uncheckableCount) }
@@ -324,13 +332,14 @@ final class RadioLogsViewModel: ObservableObject {
     /// (MES-17). Seules les affectations reviennent ici.
     private func loadFromCache() async {
         let service = self.service
-        let (snapshot, builtSites, cachedStates, cachedProposals) = await Task.detached(priority: .userInitiated) {
+        let (snapshot, builtSites, cachedStates, cachedProposals, cachedProvenances) = await Task.detached(priority: .userInitiated) {
             let snapshot = service.cachedSnapshot()
             return (
                 snapshot,
                 RadioLogSiteBuilder.build(from: snapshot.entries),
                 service.cachedSiteStates(),
-                service.cachedSiteProposals()
+                service.cachedSiteProposals(),
+                service.cachedSiteProvenances()
             )
         }.value
         logCount = snapshot.entries.count
@@ -338,6 +347,7 @@ final class RadioLogsViewModel: ObservableObject {
         sites = builtSites
         states = cachedStates
         proposals = cachedProposals
+        provenances = cachedProvenances
         rebuild()
     }
 
@@ -419,7 +429,10 @@ final class RadioLogsViewModel: ObservableObject {
                 guard let self, !Task.isCancelled else { break }
                 self.states.merge(resolved.states) { _, new in new }
                 // La nouvelle réponse remplace l'ancienne proposition, y compris par « aucune ».
-                for key in resolved.states.keys { self.proposals[key] = resolved.proposals[key] }
+                for key in resolved.states.keys {
+                    self.proposals[key] = resolved.proposals[key]
+                    self.provenances[key] = resolved.provenances[key]
+                }
                 self.rebuild()
             }
             // Un balayage annulé ou remplacé ne touche plus à l'état du suivant.
@@ -568,6 +581,7 @@ final class RadioLogsViewModel: ObservableObject {
     func markIdentified(_ site: RadioLogSite, siteId: String) {
         states[site.id] = .identified(siteId: siteId)
         proposals[site.id] = nil
+        provenances[site.id] = RadioLogIdentificationProvenance(kind: .mine, lastHumanValidatedAt: Date())
         // Déplacé : l'ancienne clé ne vaut plus. Le nœud n'a qu'un support par membre.
         myNodeKeys = myNodeKeys.filter { !$0.hasPrefix("\(site.kind.rawValue)|\(site.node)|") }
         myNodeKeys.insert(Self.nodeKey(kind: site.kind, node: site.node, siteId: siteId))
@@ -584,6 +598,7 @@ final class RadioLogsViewModel: ObservableObject {
     /// redevient à identifier, ici et dans le cache.
     func markWithdrawn(_ site: RadioLogSite) {
         states[site.id] = .unidentified
+        provenances[site.id] = nil
         myNodeKeys = myNodeKeys.filter { !$0.hasPrefix("\(site.kind.rawValue)|\(site.node)|") }
         service.markWithdrawn(siteKey: site.id)
         siteNames[site.id] = nil
@@ -640,6 +655,7 @@ final class RadioLogsViewModel: ObservableObject {
             sites = []
             states = [:]
             proposals = [:]
+            provenances = [:]
             siteNames = [:]
             logCount = 0
             lastSyncedAt = nil

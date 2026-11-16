@@ -182,11 +182,14 @@ struct QuickIdentifyResolution: Decodable, Sendable {
     /// Incertitude d'une position calculée par multilatération TA (`estimatedSite`), en mètres.
     let estimatedUncertaintyMeters: Double?
     private let hasEstimatedSite: Bool
+    /// Qui a validé l'identification et quand (C18) ; absent sans identification.
+    let provenance: RadioLogIdentificationProvenance?
 
     enum CodingKeys: String, CodingKey {
         case found, siteId, canonicalSiteId, market, operatorMatched, distanceMeters
         case matchedRadio, matchedRadioTypes, resolutionMode, source, requiresUserConfirmation
         case ambiguous, sharedNode, hypothesis, positionSource, radiusMeters, estimatedSite
+        case validationProvenance, lastHumanValidatedAt
     }
 
     private enum EstimatedSiteKeys: String, CodingKey { case uncertaintyMeters }
@@ -214,6 +217,10 @@ struct QuickIdentifyResolution: Decodable, Sendable {
         let estimated = try? c.nestedContainer(keyedBy: EstimatedSiteKeys.self, forKey: .estimatedSite)
         hasEstimatedSite = estimated != nil
         estimatedUncertaintyMeters = try? estimated?.decodeIfPresent(Double.self, forKey: .uncertaintyMeters)
+        provenance = RadioLogIdentificationProvenance(
+            served: c.decodeFlexibleString(forKey: .validationProvenance),
+            lastHumanValidatedAt: try? c.decodeIfPresent(Date.self, forKey: .lastHumanValidatedAt)
+        )
     }
 
     /// Le serveur ne connaît le support que par une position CALCULÉE : multilatération TA
