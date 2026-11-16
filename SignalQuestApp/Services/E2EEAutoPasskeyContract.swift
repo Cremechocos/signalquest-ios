@@ -42,26 +42,54 @@ enum E2EEAutoPasskeyContract {
 
     enum Offer: Equatable, Sendable {
         case none
-        /// « Protéger l'historique avec une passkey ».
+        /// « Retrouver mes messages partout » : une passkey sur cet appareil (§5.5, révision 22).
         case create
-        /// « Mettre à jour la passkey » : enveloppes d'une HK précédente (§5.6).
+        /// « Mettre à jour ma passkey » : enveloppes d'une HK précédente (§5.6).
         case update(credentialIds: [String])
+        /// Enveloppes périmées, mais cet appareil est inscrit depuis moins de 24 h (H1) : le
+        /// remplacement serait refusé. Rien ne s'affiche ; les réglages disent « Réessaie demain ».
+        case updateTomorrow
     }
 
-    /// Sur iPhone, la passkey apporte peu face au trousseau synchronisé : créée
-    /// seulement si le compte a aussi un appareil actif non Apple, et proposée une
-    /// fois. Une passkey périmée se met à jour dès que cet appareil détient la
-    /// dernière HK du journal (`hkPubB64` recoupé, pas seulement `current`).
+    /// Ce que l'app propose ici (§5.5, amendement SD2), une fois la dernière HK du journal
+    /// détenue (`hkPubB64` recoupé, pas seulement `current`) et le PRF disponible :
+    /// - une passkey périmée se met à jour, par un appareil inscrit depuis 24 h (H1) ;
+    /// - sinon, la création, sauf si HK est venue par une passkey de ce gestionnaire
+    ///   (attachement `platform`) : HK venue par « C'est moi » ou d'une passkey d'un autre
+    ///   appareil (`localPasskeyWanted`), ou bien la liste n'a aucune enveloppe à jour (synchro
+    ///   du trousseau, HK créée ici). Le « une fois par appareil » est à l'appelant.
     static func offer(
         account: E2EEAutoLog.AccountState, deviceId: String, holdsLatestHistoryKey: Bool, prfAvailable: Bool,
-        listed: [Listed], creationDismissed: Bool
+        listed: [Listed], localPasskeyWanted: Bool, nowMs: Int64
     ) -> Offer {
         guard prfAvailable, holdsLatestHistoryKey, let latest = account.historyKeyPubB64,
-              account.devices[deviceId]?.status == .active else { return .none }
-        let stale = listed.filter { !$0.current || $0.wrap.hkPubB64 != latest }.map(\.credentialId)
-        if !stale.isEmpty { return .update(credentialIds: stale.sorted()) }
-        guard listed.isEmpty, !creationDismissed else { return .none }
-        let hasNonApple = account.devices.values.contains { $0.status == .active && $0.platform != .ios }
-        return hasNonApple ? .create : .none
+              let own = account.devices[deviceId], own.status == .active else { return .none }
+        let stale = listed.filter { !isCurrent($0, latest: latest) }.map(\.credentialId)
+        if !stale.isEmpty {
+            return nowMs - own.addedAtMs >= E2EEAutoLog.signerMinAgeMs ? .update(credentialIds: stale.sorted()) : .updateTomorrow
+        }
+        if localPasskeyWanted { return .create }
+        return listed.contains { isCurrent($0, latest: latest) } ? .none : .create
     }
+
+    /// À jour selon le serveur et selon le journal.
+    static func isCurrent(_ item: Listed, latest: String) -> Bool {
+        item.current && item.wrap.hkPubB64 == latest
+    }
+
+    /// Limite des dix enveloppes atteinte : la plus ancienne qui n'est pas à jour
+    /// (`updatedAtMs` le plus bas, puis `credentialId`), nil si toutes le sont.
+    static func oldestStale(_ listed: [Listed], latest: String?) -> Listed? {
+        listed.filter { item in latest.map { !isCurrent(item, latest: $0) } ?? true }
+            .min { ($0.updatedAtMs, $0.credentialId) < ($1.updatedAtMs, $1.credentialId) }
+    }
+
+    /// `200 { "deleted": true }`.
+    static func isDeleted(_ data: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], Set(object.keys) == ["deleted"],
+              let deleted = object["deleted"] as? Bool, CFGetTypeID(object["deleted"] as CFTypeRef) == CFBooleanGetTypeID() else { return false }
+        return deleted
+    }
+
+    static let maxWraps = 10
 }

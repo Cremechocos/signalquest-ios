@@ -10,6 +10,9 @@ actor E2EEAutoPasskeyBackup {
         var device: @Sendable () throws -> E2EEV2DeviceDescriptor
         var get: @Sendable (_ path: String) async -> E2EEV2TransportResult<Data>
         var put: @Sendable (_ path: String, _ body: Data, _ clockOffsetMs: Int64) async -> E2EEV2TransportResult<Data>
+        var delete: @Sendable (_ path: String, _ clockOffsetMs: Int64) async -> E2EEV2TransportResult<Data> = { _, _ in
+            .failure(.init(kind: .permanent, statusCode: 404, message: "e2ee-auto-passkey-delete-unavailable"))
+        }
         var readOwnAccount: @Sendable () async -> E2EEAutoEnrollment.OwnAccount
         var scalar: @Sendable (_ hkPubB64: String) -> Data?
         var keep: @Sendable (_ scalar: Data) throws -> String
@@ -24,6 +27,8 @@ actor E2EEAutoPasskeyBackup {
         case stale
         /// Dix passkeys déjà enregistrées pour le compte.
         case limit
+        /// Remplacement par un appareil inscrit depuis moins de 24 h (H1) : « Réessaie demain ».
+        case tooRecent
         case notActive
         case retryLater(afterSeconds: Int?)
         case logRefused
@@ -54,14 +59,46 @@ actor E2EEAutoPasskeyBackup {
     }
 
     /// Ce que l'app propose ici (§5.5) : créer, mettre à jour, ou rien.
-    func offer(prfAvailable: Bool, creationDismissed: Bool) async -> E2EEAutoPasskeyContract.Offer {
+    func offer(prfAvailable: Bool, localPasskeyWanted: Bool) async -> E2EEAutoPasskeyContract.Offer {
         guard prfAvailable, let device = try? dependencies.device(),
               case .verified(let account) = await dependencies.readOwnAccount(), let listed = await list() else { return .none }
         let holdsLatest = account.historyKeyPubB64.map { dependencies.scalar($0) != nil } ?? false
         return E2EEAutoPasskeyContract.offer(
             account: account, deviceId: device.deviceId, holdsLatestHistoryKey: holdsLatest, prfAvailable: prfAvailable,
-            listed: listed, creationDismissed: creationDismissed
+            listed: listed, localPasskeyWanted: localPasskeyWanted, nowMs: dependencies.nowMs()
         )
+    }
+
+    enum SlotOutcome: Equatable, Sendable {
+        /// Moins de dix enveloppes : la création peut partir.
+        case available
+        /// La plus ancienne enveloppe périmée a été retirée.
+        case freed
+        /// Dix enveloppes, toutes à jour : aucune création.
+        case allCurrent
+        /// Retrait refusé à un appareil inscrit depuis moins de 24 h (H1) : « Réessaie demain ».
+        case tooRecent
+        case failed
+    }
+
+    /// Limite des dix enveloppes (§5.5, révision 22) : retire la plus ancienne qui n'est pas
+    /// à jour, sans jamais toucher à une enveloppe de la dernière HK. `force` : le serveur a
+    /// déjà répondu `409 E2EE_PASSKEY_WRAP_LIMIT`, même si la liste lue en montre moins.
+    func freeSlot(force: Bool = false) async -> SlotOutcome {
+        guard case .verified(let account) = await dependencies.readOwnAccount(), let listed = await list() else { return .failed }
+        guard force || listed.count >= E2EEAutoPasskeyContract.maxWraps else { return .available }
+        guard let oldest = E2EEAutoPasskeyContract.oldestStale(listed, latest: account.historyKeyPubB64),
+              let path = E2EEAutoPasskeyContract.path(credentialId: oldest.credentialId) else { return .allCurrent }
+        switch await delete(path) {
+        case .success(let data, _, _):
+            return E2EEAutoPasskeyContract.isDeleted(data) ? .freed : .failed
+        case .failure(let failure):
+            switch failure.code {
+            case "E2EE_PASSKEY_WRAP_NOT_FOUND": return .freed
+            case "E2EE_DEVICE_TOO_RECENT": return .tooRecent
+            default: return .failed
+            }
+        }
     }
 
     /// Les enveloppes qu'une passkey peut ouvrir ici : celles d'une HK du journal vérifié.
@@ -99,6 +136,7 @@ actor E2EEAutoPasskeyBackup {
             switch failure.code {
             case "E2EE_HISTORY_KEY_STALE": return .stale
             case "E2EE_PASSKEY_WRAP_LIMIT": return .limit
+            case "E2EE_DEVICE_TOO_RECENT": return .tooRecent
             case "E2EE_DEVICE_NOT_ACTIVE": return .notActive
             default:
                 if failure.statusCode == 429 || failure.kind == .retryable || (failure.statusCode ?? 0) >= 500 {
@@ -139,6 +177,119 @@ actor E2EEAutoPasskeyBackup {
         clockOffsetMs = serverTimeMs - dependencies.nowMs()
         return await dependencies.put(path, body, clockOffsetMs)
     }
+
+    private func delete(_ path: String) async -> E2EEV2TransportResult<Data> {
+        let first = await dependencies.delete(path, clockOffsetMs)
+        guard case .failure(let failure) = first, let serverTimeMs = failure.serverTimeMs else { return first }
+        clockOffsetMs = serverTimeMs - dependencies.nowMs()
+        return await dependencies.delete(path, clockOffsetMs)
+    }
+}
+
+/// Le geste « Retrouver mes messages partout » ou « Mettre à jour ma passkey » (§5.5) :
+/// la feuille système, Face ID ou empreinte, puis le dépôt. Partagé par les réglages,
+/// le bandeau de Messages et l'écran « Retrouver mes messages ».
+enum E2EEAutoPasskeyGesture {
+    enum Result: Equatable, Sendable {
+        case done
+        case cancelled
+        /// Le gestionnaire de passkeys ne prend pas en charge `prf`.
+        case unsupported
+        /// Dix passkeys à jour : aucune n'est retirée.
+        case limit
+        /// Appareil inscrit depuis moins de 24 h (H1) : « Réessaie demain ».
+        case tooRecent
+        case failed
+    }
+
+    /// Création : la limite est libérée avant la feuille (sinon une passkey resterait orpheline
+    /// dans le trousseau), nouvelle passkey et nouveau `prfSalt`. Mise à jour : une assertion sur
+    /// les passkeys périmées, chacune avec un `prfSalt` neuf, puis l'enveloppe remplacée. Aucune
+    /// clé d'enveloppe n'est gardée (décision du 14/11).
+    @MainActor
+    static func perform(_ offer: E2EEAutoPasskeyContract.Offer, backup: E2EEAutoPasskeyBackup, userId: String) async -> Result {
+        let authenticator = E2EEAutoPasskeyAuthenticator()
+        let output: E2EEAutoPasskeyAuthenticator.Output
+        let salt: Data
+        do {
+            switch offer {
+            case .none, .updateTomorrow:
+                return offer == .updateTomorrow ? .tooRecent : .failed
+            case .create:
+                switch await backup.freeSlot() {
+                case .available, .freed: break
+                case .allCurrent: return .limit
+                case .tooRecent: return .tooRecent
+                case .failed: return .failed
+                }
+                guard let fresh = randomSalt() else { return .failed }
+                salt = fresh
+                output = try await authenticator.create(
+                    userName: String(localized: "Historique chiffré SignalQuest"),
+                    userHandle: E2EEAutoPasskeyAuthenticator.userHandle(userId: userId), salt: salt
+                )
+            case .update(let credentialIds):
+                let listed = (await backup.list() ?? []).filter { credentialIds.contains($0.credentialId) }
+                var candidates: [(raw: Data, salt: Data, credentialId: String)] = []
+                for item in listed {
+                    guard let raw = E2EEAutoPasskeyAuthenticator.rawCredentialId(item.credentialId), let fresh = randomSalt() else { continue }
+                    candidates.append((raw, fresh, item.credentialId))
+                }
+                output = try await authenticator.assert(candidates.map { ($0.raw, $0.salt) })
+                guard let chosen = candidates.first(where: { $0.credentialId == output.credentialId }) else { return .failed }
+                salt = chosen.salt
+            }
+        } catch E2EEAutoPasskeyAuthenticator.Failure.cancelled {
+            return .cancelled
+        } catch E2EEAutoPasskeyAuthenticator.Failure.prfUnsupported {
+            return .unsupported
+        } catch {
+            return .failed
+        }
+        var outcome = await backup.protect(credentialId: output.credentialId, prfSalt: salt, prfOutput: output.prfOutput)
+        if outcome == .limit, offer == .create {
+            // Une autre enveloppe est arrivée entre la lecture et le dépôt : un retrait, un seul nouvel essai.
+            switch await backup.freeSlot(force: true) {
+            case .freed: outcome = await backup.protect(credentialId: output.credentialId, prfSalt: salt, prfOutput: output.prfOutput)
+            case .tooRecent: return .tooRecent
+            case .available, .allCurrent, .failed: break
+            }
+        }
+        switch outcome {
+        case .protected: return .done
+        case .limit: return .limit
+        case .tooRecent: return .tooRecent
+        default: return .failed
+        }
+    }
+
+    private static func randomSalt() -> Data? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        return SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess ? Data(bytes) : nil
+    }
+}
+
+/// Drapeaux locaux de la passkey, par compte (§5.5) : « déjà proposée » et « passkey locale
+/// voulue » (HK venue par « C'est moi » ou par la passkey d'un autre appareil).
+enum E2EEAutoPasskeyMarks {
+    static func dismissedKey(_ namespace: String) -> String { "e2ee-auto-passkey-offer-dismissed-v1:\(namespace)" }
+    static func wantedKey(_ namespace: String) -> String { "e2ee-auto-passkey-local-wanted-v1:\(namespace)" }
+
+    static func creationDismissed(_ namespace: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: dismissedKey(namespace))
+    }
+
+    static func dismissCreation(_ namespace: String, defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: dismissedKey(namespace))
+    }
+
+    static func localPasskeyWanted(_ namespace: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: wantedKey(namespace))
+    }
+
+    static func setLocalPasskeyWanted(_ wanted: Bool, _ namespace: String, defaults: UserDefaults = .standard) {
+        if wanted { defaults.set(true, forKey: wantedKey(namespace)) } else { defaults.removeObject(forKey: wantedKey(namespace)) }
+    }
 }
 
 extension E2EEAutoPasskeyBackup {
@@ -169,6 +320,9 @@ extension E2EEAutoPasskeyBackup {
                 await transport.putJSON(
                     path: path, body: body, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle, clockOffsetMs: clockOffsetMs
                 )
+            },
+            delete: { path, clockOffsetMs in
+                await transport.deleteJSON(path: path, expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle, clockOffsetMs: clockOffsetMs)
             },
             readOwnAccount: { await E2EEAutoDeviceRevocation.ownAccount(reader: reader, userId: userId) },
             scalar: { hkPubB64 in try? historyKeys.scalar(userId: userId, hkPubB64: hkPubB64) },

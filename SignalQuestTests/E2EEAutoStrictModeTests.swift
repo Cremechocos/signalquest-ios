@@ -183,37 +183,66 @@ final class E2EEAutoStrictModeTests: XCTestCase {
         XCTAssertNil(E2EEAutoPasskeyContract.path(credentialId: "a/b"))
     }
 
-    func testPasskeyIsOfferedOnlyWithANonAppleDeviceAndUpdatedWhenStale() throws {
+    /// §5.5 révision 22 : passkey par défaut, sans condition d'appareil non Apple, selon « Quand créer » ;
+    /// mise à jour d'une passkey périmée par un appareil inscrit depuis 24 h (H1).
+    func testPasskeyIsOfferedByDefaultAndUpdatedWhenStale() throws {
         let hk = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
         let old = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
+        let now = 10 * Self.day
         func offer(
-            _ devices: [E2EEAutoLog.DeviceState], listed: [[String: Any]] = [], holds: Bool = true, prf: Bool = true, dismissed: Bool = false
+            _ devices: [E2EEAutoLog.DeviceState], listed: [[String: Any]] = [], holds: Bool = true, prf: Bool = true,
+            wanted: Bool = false, nowMs: Int64? = nil
         ) throws -> E2EEAutoPasskeyContract.Offer {
             let parsed = try XCTUnwrap(E2EEAutoPasskeyContract.parseList(JSONSerialization.data(withJSONObject: ["wraps": listed])))
             return E2EEAutoPasskeyContract.offer(
                 account: account(devices, hk: hk), deviceId: ownId, holdsLatestHistoryKey: holds, prfAvailable: prf,
-                listed: parsed, creationDismissed: dismissed
+                listed: parsed, localPasskeyWanted: wanted, nowMs: nowMs ?? now
             )
         }
-        let android = state(otherId, platform: .android)
-        XCTAssertEqual(try offer([own, android]), .create)
-        XCTAssertEqual(try offer([own, state("ios_device_other_000000")]), .none, "que des appareils Apple : le trousseau suffit")
-        XCTAssertEqual(try offer([own, state(otherId, platform: .web, status: .pending)]), .none, "appareil non Apple en attente")
-        XCTAssertEqual(try offer([own, android], dismissed: true), .none, "proposée une fois")
-        XCTAssertEqual(try offer([own, android], holds: false), .none)
-        XCTAssertEqual(try offer([own, android], prf: false), .none)
-        XCTAssertEqual(try offer([own, android], listed: [wrapObject(credentialId: "AQID", hk: hk)]), .none, "déjà à jour")
+        let apple = state("ios_device_other_000000")
+        XCTAssertEqual(try offer([own]), .create, "seul appareil, sans passkey : proposée")
+        XCTAssertEqual(try offer([own, apple]), .create, "plus de condition d'appareil non Apple")
+        XCTAssertEqual(try offer([own], holds: false), .none)
+        XCTAssertEqual(try offer([own], prf: false), .none, "iOS 16 et 17 : « C'est moi » seul")
+        XCTAssertEqual(try offer([state(ownId, status: .pending)]), .none)
+        let current = wrapObject(credentialId: "AQID", hk: hk)
+        XCTAssertEqual(try offer([own, apple], listed: [current]), .none, "passkey à jour : synchro ou passkey de ce gestionnaire")
+        XCTAssertEqual(try offer([own, apple], listed: [current], wanted: true), .create, "« C'est moi » ou passkey par QR : la locale")
         XCTAssertEqual(
-            try offer([own, state("ios_device_other_000000")], listed: [
-                wrapObject(credentialId: "BQYH", hk: old, current: false), wrapObject(credentialId: "AQID", hk: hk)
-            ]),
-            .update(credentialIds: ["BQYH"]),
-            "une passkey périmée se met à jour, même sans appareil non Apple"
-        )
-        XCTAssertEqual(
-            try offer([own, android], listed: [wrapObject(credentialId: "AQID", hk: old, current: true)]),
+            try offer([own], listed: [wrapObject(credentialId: "AQID", hk: old, current: true)]),
             .update(credentialIds: ["AQID"]),
             "current du serveur démenti par le journal"
         )
+        XCTAssertEqual(
+            try offer([own, apple], listed: [
+                wrapObject(credentialId: "BQYH", hk: old, current: false), wrapObject(credentialId: "AQID", hk: hk)
+            ], wanted: true),
+            .update(credentialIds: ["BQYH"]),
+            "une passkey périmée se met à jour d'abord"
+        )
+        // H1 : inscrit depuis moins de 24 h, le remplacement serait refusé.
+        let stale = [wrapObject(credentialId: "BQYH", hk: old, current: false)]
+        XCTAssertEqual(try offer([own], listed: stale, nowMs: 1 + Self.day - 1), .updateTomorrow)
+        XCTAssertEqual(try offer([own], listed: stale, nowMs: 1 + Self.day), .update(credentialIds: ["BQYH"]))
+    }
+
+    /// Limite des dix enveloppes : la plus ancienne qui n'est pas à jour part, jamais une à jour.
+    func testOldestStaleWrapIsTheOneRemoved() throws {
+        let hk = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
+        let old = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
+        func listed(_ wraps: [[String: Any]]) throws -> [E2EEAutoPasskeyContract.Listed] {
+            try XCTUnwrap(E2EEAutoPasskeyContract.parseList(JSONSerialization.data(withJSONObject: ["wraps": wraps])))
+        }
+        let wraps = try listed([
+            wrapObject(credentialId: "AQID", hk: hk, extra: ["updatedAtMs": "100"]),
+            wrapObject(credentialId: "BQYH", hk: old, current: false, extra: ["updatedAtMs": "300"]),
+            wrapObject(credentialId: "CQoL", hk: old, current: false, extra: ["updatedAtMs": "200"]),
+            wrapObject(credentialId: "DQ4P", hk: old, current: true, extra: ["updatedAtMs": "250"]),
+        ])
+        XCTAssertEqual(E2EEAutoPasskeyContract.oldestStale(wraps, latest: hk)?.credentialId, "CQoL")
+        XCTAssertNil(E2EEAutoPasskeyContract.oldestStale(try listed([wrapObject(credentialId: "AQID", hk: hk)]), latest: hk))
+        XCTAssertTrue(E2EEAutoPasskeyContract.isDeleted(Data(#"{"deleted":true}"#.utf8)))
+        XCTAssertFalse(E2EEAutoPasskeyContract.isDeleted(Data(#"{"deleted":1}"#.utf8)))
+        XCTAssertFalse(E2EEAutoPasskeyContract.isDeleted(Data(#"{"deleted":true,"x":1}"#.utf8)))
     }
 }

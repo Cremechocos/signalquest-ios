@@ -82,6 +82,9 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         private(set) var kept: [Data] = []
         var nowMs: Int64 = 1_000_000
 
+        /// HK reçue par « C'est moi » : passkey locale voulue (§5.5).
+        var receivedFromAnotherDevice = 0
+
         init(reads: [E2EEAutoEnrollment.OwnAccount]) { self.reads = reads }
 
         private func answer(_ key: String, body: Data?) -> E2EEV2TransportResult<Data> {
@@ -119,6 +122,7 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
                 },
                 heldKeyVersions: { [1] },
                 openWrap: { wrap in try E2EEAutoHistory.open(wrap, userId: E2EEAutoHistoryRequestsTests.userId, agreementKey: device.agreement) },
+                receivedFromAnotherDevice: { [self] in receivedFromAnotherDevice += 1 },
                 openRequest: { [self] in open },
                 recordOpenRequest: { [self] in open = $0 },
                 nowMs: { [self] in nowMs }
@@ -163,6 +167,7 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         let outcome = await E2EEAutoHistoryRequests(fake.dependencies(requester)).check()
         XCTAssertEqual(outcome, .present(hkPubB64: hkPubB64))
         XCTAssertEqual(fake.kept, [scalar])
+        XCTAssertEqual(fake.receivedFromAnotherDevice, 1, "« C'est moi » : la passkey locale sera proposée")
         XCTAssertNil(fake.open, "la demande servie n'est plus attendue")
         XCTAssertEqual(fake.bodies["PUT \(E2EEAutoHistoryKeyContract.historyStatusPath(deviceId: requester.id))"]?["historyKey"] as? String, "present")
     }
@@ -206,6 +211,7 @@ final class E2EEAutoHistoryRequestsTests: XCTestCase {
         fake.routes["DELETE \(requestPath)"] = [Self.json(Self.view(device: requester.id, status: "cancelled"))]
         let outcome = await E2EEAutoHistoryRequests(fake.dependencies(requester)).start()
         XCTAssertEqual(outcome, .present(hkPubB64: hkPubB64))
+        XCTAssertEqual(fake.receivedFromAnotherDevice, 0, "synchro : la règle de la liste décide")
         XCTAssertTrue(fake.calls.contains("DELETE \(requestPath)"))
         XCTAssertNil(fake.open)
         XCTAssertFalse(fake.calls.contains("POST \(E2EEAutoHistoryRequestContract.requestsPath)"))

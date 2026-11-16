@@ -49,6 +49,8 @@ final class E2EEAutoPasskeyBackupTests: XCTestCase {
         var held: [String: Data] = [:]
         var listed: [[String: Any]] = []
         var putResponse: ((Data) -> E2EEV2TransportResult<Data>)?
+        var deleteResponse: E2EEV2TransportResult<Data> = .success(value: Data(#"{"deleted":true}"#.utf8), statusCode: 200, idempotentReplay: false)
+        private(set) var deletes: [String] = []
         private(set) var puts: [(path: String, body: [String: Any])] = []
         private(set) var kept: [Data] = []
 
@@ -66,6 +68,10 @@ final class E2EEAutoPasskeyBackupTests: XCTestCase {
                     puts.append((path, (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]))
                     guard let putResponse else { return .failure(.init(kind: .retryable, statusCode: 503, message: "x")) }
                     return putResponse(body)
+                },
+                delete: { [self] path, _ in
+                    deletes.append(path)
+                    return deleteResponse
                 },
                 readOwnAccount: { [self] in own },
                 scalar: { [self] in held[$0] },
@@ -149,14 +155,74 @@ final class E2EEAutoPasskeyBackupTests: XCTestCase {
             ("E2EE_HISTORY_KEY_STALE", E2EEAutoPasskeyBackup.ProtectOutcome.stale),
             ("E2EE_PASSKEY_WRAP_LIMIT", .limit),
             ("E2EE_DEVICE_NOT_ACTIVE", .notActive),
+            ("E2EE_DEVICE_TOO_RECENT", .tooRecent),
         ] {
             let fake = Fake(own: .verified(account()))
             fake.held = [pub(latest): latest]
-            fake.putResponse = { _ in .failure(.init(kind: .permanent, statusCode: code == "E2EE_DEVICE_NOT_ACTIVE" ? 403 : 409, code: code, message: "x")) }
+            let status = code.hasPrefix("E2EE_DEVICE") ? 403 : 409
+            fake.putResponse = { _ in .failure(.init(kind: .permanent, statusCode: status, code: code, message: "x")) }
             let outcome = await E2EEAutoPasskeyBackup(fake.dependencies(device: device))
                 .protect(credentialId: credentialId, prfSalt: prfSalt, prfOutput: prfOutput)
             XCTAssertEqual(outcome, expected, code)
         }
+    }
+
+    /// Limite des dix (§5.5 r22) : la plus ancienne enveloppe périmée est retirée avant la
+    /// création ; jamais une à jour ; H1 refuse le retrait à un appareil récent.
+    func testFreeSlotRemovesTheOldestStaleWrapOnlyAtTheLimit() async throws {
+        func wraps(stale: Int) throws -> [[String: Any]] {
+            try (0..<10).map { index -> [String: Any] in
+                var object = try listedObject(index < stale ? older : latest, credentialId: "AAA\(index)", current: index >= stale)
+                object["updatedAtMs"] = String(1_793_000_000_000 - Int64(index))
+                return object
+            }
+        }
+        let room = Fake(own: .verified(account()))
+        room.listed = Array(try wraps(stale: 2).prefix(9))
+        let available = await E2EEAutoPasskeyBackup(room.dependencies(device: device)).freeSlot()
+        XCTAssertEqual(available, .available)
+        XCTAssertTrue(room.deletes.isEmpty)
+
+        let full = Fake(own: .verified(account()))
+        full.listed = try wraps(stale: 3)
+        let freed = await E2EEAutoPasskeyBackup(full.dependencies(device: device)).freeSlot()
+        XCTAssertEqual(freed, .freed)
+        XCTAssertEqual(full.deletes, ["\(E2EEAutoPasskeyContract.listPath)/AAA2"], "la périmée au updatedAtMs le plus bas")
+
+        let allCurrent = Fake(own: .verified(account()))
+        allCurrent.listed = try wraps(stale: 0)
+        let refused = await E2EEAutoPasskeyBackup(allCurrent.dependencies(device: device)).freeSlot()
+        XCTAssertEqual(refused, .allCurrent)
+        XCTAssertTrue(allCurrent.deletes.isEmpty)
+
+        let recent = Fake(own: .verified(account()))
+        recent.listed = try wraps(stale: 1)
+        recent.deleteResponse = .failure(.init(kind: .permanent, statusCode: 403, code: "E2EE_DEVICE_TOO_RECENT", message: "x"))
+        let tooRecent = await E2EEAutoPasskeyBackup(recent.dependencies(device: device)).freeSlot()
+        XCTAssertEqual(tooRecent, .tooRecent)
+
+        // 409 du serveur malgré une liste plus courte : le retrait part quand même.
+        let raced = Fake(own: .verified(account()))
+        raced.listed = Array(try wraps(stale: 1).prefix(9))
+        let forced = await E2EEAutoPasskeyBackup(raced.dependencies(device: device)).freeSlot(force: true)
+        XCTAssertEqual(forced, .freed)
+        XCTAssertEqual(raced.deletes.count, 1)
+    }
+
+    /// Ce qui est proposé suit le journal et la liste (« Quand créer », §5.5 r22).
+    func testOfferFollowsTheListAndTheLocalFlag() async throws {
+        let fake = Fake(own: .verified(account()))
+        fake.held = [pub(latest): latest]
+        let backup = E2EEAutoPasskeyBackup(fake.dependencies(device: device))
+        let empty = await backup.offer(prfAvailable: true, localPasskeyWanted: false)
+        XCTAssertEqual(empty, .create)
+        fake.listed = [try listedObject(latest, credentialId: credentialId, current: true)]
+        let synced = await backup.offer(prfAvailable: true, localPasskeyWanted: false)
+        XCTAssertEqual(synced, .none)
+        let wanted = await backup.offer(prfAvailable: true, localPasskeyWanted: true)
+        XCTAssertEqual(wanted, .create)
+        let noPrf = await backup.offer(prfAvailable: false, localPasskeyWanted: true)
+        XCTAssertEqual(noPrf, .none)
     }
 
     /// Ouverture : la dernière HK donne `present`, une précédente `older` ; une HK

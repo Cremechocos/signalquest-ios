@@ -124,6 +124,8 @@ actor E2EEAutoHistoryRequests {
         var keep: @Sendable (_ scalar: Data) throws -> String
         var heldKeyVersions: @Sendable () throws -> [Int]
         var openWrap: @Sendable (_ wrap: E2EEAutoHistory.Wrap) throws -> Data
+        /// HK ouverte depuis l'enveloppe d'un autre appareil (« C'est moi ») : passkey locale voulue (§5.5).
+        var receivedFromAnotherDevice: @Sendable () -> Void = {}
         var openRequest: @Sendable () -> OpenRequest?
         var recordOpenRequest: @Sendable (_ value: OpenRequest?) -> Void
         var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
@@ -318,6 +320,8 @@ actor E2EEAutoHistoryRequests {
             return .failed("e2ee-auto-history-wrap-open")
         }
         guard hkPubB64 == wrap.hkPubB64 else { return .failed("e2ee-auto-history-wrap-open") }
+        // §5.5 « Quand créer » : HK venue par « C'est moi », la passkey de cet appareil est proposée.
+        dependencies.receivedFromAnotherDevice()
         await reportPresent(device: context.device)
         return .present(hkPubB64: hkPubB64)
     }
@@ -620,6 +624,7 @@ extension E2EEAutoHistoryRequests {
             },
             heldKeyVersions: { try identityStore.heldAgreementKeyVersions(ownerNamespace: namespace) },
             openWrap: { wrap in try identityStore.openHistoryWrap(wrap, userId: userId, ownerNamespace: namespace) },
+            receivedFromAnotherDevice: { E2EEAutoPasskeyMarks.setLocalPasskeyWanted(true, namespace) },
             openRequest: {
                 guard let raw = try? markerStore.string(for: openKey) else { return nil }
                 return try? JSONDecoder().decode(OpenRequest.self, from: Data(raw.utf8))

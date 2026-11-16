@@ -21,6 +21,9 @@ final class E2EEAutoPasskeyAuthenticator: NSObject {
         /// Identifiant brut, en `b64url` sans bourrage (`{credentialId}`).
         let credentialId: String
         let prfOutput: Data
+        /// Passkey d'un autre appareil (QR, clé de sécurité) : attachement `crossPlatform` de
+        /// l'assertion (§5.5, « Quand créer ») ; la passkey locale est alors à créer.
+        var crossPlatform = false
     }
 
     /// iOS 18 au moins (§5.5).
@@ -62,7 +65,10 @@ final class E2EEAutoPasskeyAuthenticator: NSObject {
         let authorization = try await perform(request)
         guard let assertion = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion else { throw Failure.failed }
         guard let prf = assertion.prf else { throw Failure.prfUnsupported }
-        return Output(credentialId: assertion.credentialID.base64URLEncodedNoPadding(), prfOutput: Self.bytes(prf.first))
+        return Output(
+            credentialId: assertion.credentialID.base64URLEncodedNoPadding(), prfOutput: Self.bytes(prf.first),
+            crossPlatform: assertion.attachment == .crossPlatform
+        )
     }
 
     /// Identifiant WebAuthn de l'utilisateur, stable par compte et sans donnée personnelle.
