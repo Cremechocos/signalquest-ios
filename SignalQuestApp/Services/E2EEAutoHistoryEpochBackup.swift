@@ -181,7 +181,8 @@ actor E2EEAutoHistoryEpochBackup {
     enum Outcome: Equatable, Sendable {
         case backedUp(Int)
         case restored(Int, missingEpochCount: Int)
-        /// Le compte n'a pas de HK, ou l'appareil ne détient pas la dernière.
+        /// Le compte n'a pas de HK ; au dépôt, la dernière n'est ni la première, ni une rotation, ni
+        /// détenue ici (§5.2 S3 condition 3) ; à la restauration, l'appareil n'en détient aucune.
         case noHistoryKey
         /// Un `REVOKE` attend sa rotation : l'appareil révoqué détient encore la dernière HK (§5.2 S3, condition 2).
         case rotationDue
@@ -202,6 +203,8 @@ actor E2EEAutoHistoryEpochBackup {
     }
 
     /// Enveloppe vers la dernière HK chaque époque reçue ici qui n'y est pas encore (§5.2).
+    /// Amendement S3 : seule la clé publique de HK entre dans l'enveloppe, la clé privée
+    /// n'est donc pas exigée ; la légitimité de la dernière HK l'est (`depositRefusal`).
     /// Les dépôts suivent la cadence partagée avec l'import des messages v1 (N1-6).
     func backfill(pacer: APIWritePacer? = .shared) async -> Outcome {
         await APIWritePacer.$current.withValue(pacer) { await backfillPages() }
@@ -221,7 +224,7 @@ actor E2EEAutoHistoryEpochBackup {
         var backedUp = 0
         var reread = false
         for _ in 0..<Self.maxPages {
-            guard let hk = account.historyKeyPubB64, dependencies.scalar(hk) != nil else { return .noHistoryKey }
+            guard let hk = account.historyKeyPubB64 else { return .noHistoryKey }
             if let refusal = await depositRefusal(account, hk: hk, device: device) { return refusal }
             let response = await dependencies.get(
                 E2EEAutoHistoryEpochContract.backfillPath, cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? []
@@ -271,14 +274,22 @@ actor E2EEAutoHistoryEpochBackup {
         return .failed("e2ee-auto-history-pagination-limit")
     }
 
-    /// §5.2 amendement S3, conditions 2 et 3, pour un appareil qui détient la dernière HK :
-    /// rien pendant une rotation due ; une rotation publiée par un autre appareil n'est
-    /// utilisée qu'avec un maillon à preuve, puisqu'un transfert a pu la donner. La première
-    /// HK et une HK hors rotation détenue (création, « C'est moi », passkey, synchro) suffisent.
+    /// §5.2 amendement S3, conditions 2 et 3, vérifiées sur des données publiques : rien
+    /// pendant une rotation due, ni vers une HK annulée (§5.6 bis). Puis la dernière HK doit être :
+    /// - la première du compte, ou
+    /// - détenue ici (création, « C'est moi », passkey, synchro), une rotation publiée par un
+    ///   autre appareil exigeant en plus son maillon à preuve, puisqu'un transfert a pu la donner, ou
+    /// - une rotation dont le maillon à preuve passe les contrôles publics (§5.6, r23), sans l'ouvrir.
+    /// Toute autre HK, non détenue ici, attend : c'est un changement de clé (§5.1).
     private func depositRefusal(_ account: E2EEAutoLog.AccountState, hk: String, device: E2EEV2DeviceDescriptor) async -> Outcome? {
         guard account.rotationDueRevokeSeq == nil else { return .rotationDue }
-        guard let record = account.historyKeys.last, record.hkPubB64 == hk, record.afterRevokeSeq != nil,
-              record.previousHkPubB64 != nil, record.signerDeviceId != device.deviceId else { return nil }
+        let held = dependencies.scalar(hk) != nil
+        guard let record = account.historyKeys.last, record.hkPubB64 == hk else { return held ? nil : .noHistoryKey }
+        guard account.historyKeyBase(hk)?.cancelled != true else { return .noHistoryKey }
+        if account.historyKeys.count == 1 { return nil }
+        let rotation = record.afterRevokeSeq != nil && record.previousHkPubB64 != nil
+        if held && (!rotation || record.signerDeviceId == device.deviceId) { return nil }
+        guard rotation else { return .noHistoryKey }
         return await dependencies.vouched(account, record) ? nil : .unvouched
     }
 

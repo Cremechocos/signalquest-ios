@@ -598,9 +598,16 @@ final class AppServices: ObservableObject {
                 userInfo: ["hkPubB64": hkPubB64, "ownerNamespace": session.ownerNamespace]
             )
         }
-        guard case .present = historyKey,
-              let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
-        E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep)
+        // §5.2 S3 : sans la HK privée, l'appareil dépose quand même les époques qu'il a reçues ;
+        // la restauration des autres, elle, exige la HK.
+        let held: Bool
+        switch historyKey {
+        case .present: held = true
+        case .missing: held = false
+        default: return
+        }
+        guard let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
+        if held { E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep) }
         E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
     }
 

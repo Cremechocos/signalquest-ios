@@ -228,7 +228,7 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
         XCTAssertEqual(E2EEAutoHistory.parseEpochUploadBody(fake.posts.first?.body ?? [:])?.hkPubB64, newerPub)
     }
 
-    func testBackfillStopsOnRateLimitAndWithoutTheLatestKey() async {
+    func testBackfillStopsOnRateLimitAndWithoutAHistoryKey() async {
         let first = epoch(1)
         let limited = Fake(reads: [.verified(account())])
         limited.scalars = [hk: hkScalar]
@@ -238,7 +238,7 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
         let rateLimited = await backup(limited).backfill()
         XCTAssertEqual(rateLimited, .retryLater(afterSeconds: 120))
 
-        let withoutKey = Fake(reads: [.verified(account())])
+        let withoutKey = Fake(reads: [.verified(account(hks: []))])
         let noKey = await backup(withoutKey).backfill()
         XCTAssertEqual(noKey, .noHistoryKey)
         XCTAssertTrue(withoutKey.posts.isEmpty)
@@ -313,6 +313,108 @@ final class E2EEAutoHistoryEpochBackupTests: XCTestCase {
         let ownOutcome = await backup(own).backfill()
         XCTAssertEqual(ownOutcome, .backedUp(1))
         XCTAssertEqual(own.vouchedCalls, 0, "publiée ici : pas de lecture du maillon")
+    }
+
+    // MARK: Dépôt sans la HK privée (§5.2 amendement S3)
+
+    /// La première HK du compte suffit : l'époque reçue part vers sa clé publique, sans la clé privée.
+    func testBackfillWithoutThePrivateKeyWrapsReceivedEpochsTowardTheFirstKey() async throws {
+        let first = epoch(1), missing = epoch(2)
+        let fake = Fake(reads: [.verified(account())])
+        fake.local = [1: first.local]
+        fake.gets = [backfillPage([(first, true), (missing, true)])]
+        fake.postResults = [created(first)]
+        let outcome = await backup(fake).backfill()
+        XCTAssertEqual(outcome, .backedUp(1), "seule l'époque reçue ici part")
+        XCTAssertEqual(fake.posts.count, 1)
+        let uploaded = try XCTUnwrap(E2EEAutoHistory.parseEpochUploadBody(fake.posts.first?.body ?? [:]))
+        XCTAssertEqual(uploaded.hkPubB64, hk)
+        // L'enveloppe déposée s'ouvre avec la HK que le déposant n'a pas.
+        let reopened = try E2EEAutoHistory.openEpoch(
+            uploaded, scalar: hkScalar, userId: Self.userId, conversationId: Self.conversationId, epochNumber: 1,
+            senderDeviceId: ownId, keyCommitmentB64: first.commitment
+        )
+        XCTAssertEqual(reopened, first.key)
+        XCTAssertEqual(fake.vouchedCalls, 0)
+    }
+
+    /// Une rotation non détenue ici n'est utilisée qu'avec un maillon à preuve, lu sans être ouvert.
+    func testBackfillWithoutThePrivateKeyNeedsAProvenLinkForARotation() async {
+        let first = epoch(1), web = "web_device_0000000000001"
+        let unproven = Fake(reads: [.verified(rotatedAccount(signer: web))])
+        unproven.local = [1: first.local]
+        unproven.gets = [backfillPage([(first, true)])]
+        let refused = await backup(unproven).backfill()
+        XCTAssertEqual(refused, .unvouched)
+        XCTAssertTrue(unproven.posts.isEmpty)
+        XCTAssertEqual(unproven.gets.count, 1, "la page n'est même pas lue")
+
+        let proven = Fake(reads: [.verified(rotatedAccount(signer: web))])
+        proven.vouched = true
+        proven.local = [1: first.local]
+        proven.gets = [backfillPage([(first, true)])]
+        proven.postResults = [created(first)]
+        let backedUp = await backup(proven).backfill()
+        XCTAssertEqual(backedUp, .backedUp(1))
+        XCTAssertEqual(proven.vouchedCalls, 1)
+
+        // Publiée ici puis perdue : le maillon à preuve reste exigé.
+        let lost = Fake(reads: [.verified(rotatedAccount(signer: ownId))])
+        lost.local = [1: first.local]
+        lost.gets = [backfillPage([(first, true)])]
+        let lostOutcome = await backup(lost).backfill()
+        XCTAssertEqual(lostOutcome, .unvouched)
+        XCTAssertEqual(lost.vouchedCalls, 1)
+    }
+
+    /// Une HK ni première ni rotation (republiée après une perte, ou changement de clé) n'est
+    /// utilisée que par ses détenteurs ; les autres attendent, sans lire le maillon.
+    func testBackfillWithoutThePrivateKeyWaitsForAKeyOutsideARotation() async {
+        let first = epoch(1)
+        let older = P256.KeyAgreement.PrivateKey().publicKey.x963Representation.base64EncodedString()
+        let waiting = Fake(reads: [.verified(account(hks: [older, hk]))])
+        waiting.local = [1: first.local]
+        waiting.gets = [backfillPage([(first, true)])]
+        let outcome = await backup(waiting).backfill()
+        XCTAssertEqual(outcome, .noHistoryKey)
+        XCTAssertTrue(waiting.posts.isEmpty)
+        XCTAssertEqual(waiting.vouchedCalls, 0)
+
+        let holder = Fake(reads: [.verified(account(hks: [older, hk]))])
+        holder.scalars = [hk: hkScalar]
+        holder.local = [1: first.local]
+        holder.gets = [backfillPage([(first, true)])]
+        holder.postResults = [created(first)]
+        let held = await backup(holder).backfill()
+        XCTAssertEqual(held, .backedUp(1))
+    }
+
+    /// Conditions 2 et §5.6 bis : rien pendant une rotation due, ni vers une HK annulée, même détenue.
+    func testBackfillSendsNothingTowardADueOrCancelledKeyWithoutThePrivateKey() async {
+        let first = epoch(1), web = "web_device_0000000000001"
+        var due = account()
+        due.rotationDueRevokeSeq = 40
+        let dueFake = Fake(reads: [.verified(due)])
+        dueFake.local = [1: first.local]
+        let dueOutcome = await backup(dueFake).backfill()
+        XCTAssertEqual(dueOutcome, .rotationDue)
+
+        var cancelled = rotatedAccount(signer: web)
+        var signer = device(web, signingKeyB64: P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString())
+        signer.status = .revoked
+        signer.revokeReason = .notMe
+        signer.revokeSeq = 50
+        cancelled.devices[web] = signer
+        for scalars in [[:], [hk: hkScalar]] {
+            let fake = Fake(reads: [.verified(cancelled)])
+            fake.vouched = true
+            fake.scalars = scalars
+            fake.local = [1: first.local]
+            fake.gets = [backfillPage([(first, true)])]
+            let outcome = await backup(fake).backfill()
+            XCTAssertEqual(outcome, .noHistoryKey)
+            XCTAssertTrue(fake.posts.isEmpty)
+        }
     }
 
     // MARK: Restauration
