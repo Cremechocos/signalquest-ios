@@ -349,12 +349,13 @@ enum SessionPostText {
         return metrics
     }
 
-    /// Km à une décimale, arrondis au plus proche, la moitié vers le haut comme le serveur
-    /// (12 250 m → « 12,3 km ») : le format d'Apple arrondirait l'égalité au pair (« 12,2 »).
-    /// Les mètres entiers passent d'abord aux 100 m, puis le format n'a plus d'égalité à trancher.
+    /// Km à une décimale, la moitié vers le haut comme le serveur (12 250 m → « 12,3 km »),
+    /// la règle de `SQUnits.distance`. Seule différence gardée : de 950 à 999 m, le post
+    /// écrit « 1,0 km » (l'arrondi aux 100 m d'avant y menait), là où `SQUnits` écrit
+    /// encore des mètres sous 1 000.
     static func distance(meters: Int) -> String {
-        guard SQUnits.current == .metric, meters >= 950 else { return SQUnits.distance(meters: Double(meters)) }
-        return SQUnits.distance(meters: Double((meters + 50) / 100 * 100))
+        let shown = SQUnits.current == .metric && (950..<1000).contains(meters) ? 1000 : meters
+        return SQUnits.distance(meters: Double(shown))
     }
 
     /// « Bon · 1 trou », ou « Peu fiable · Trop peu de mesures » (contrat §3.2).

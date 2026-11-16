@@ -104,6 +104,29 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.distance(meters: 2_414, system: .imperial, locale: fr), "1,5 mi")
     }
 
+    /// Une égalité s'arrondit vers le haut, comme le serveur et Android : le format
+    /// d'Apple écrivait « 12,2 », « 12,4 » et « 1,0 » (arrondi au pair).
+    func testDistanceRoundsATieUpLikeTheServer() {
+        let fr = Locale(identifier: "fr_FR")
+        for (meters, expected) in [(12_250.0, "12,3 km"), (12_450, "12,5 km"), (1_050, "1,1 km"), (12_249, "12,2 km"), (12_350, "12,4 km")] {
+            XCTAssertEqual(SQUnits.distance(meters: meters, system: .metric, locale: fr), expected, "\(meters)")
+        }
+        // Des kilomètres en double : 16,15 × 1 000 vaut 16 149,999… m.
+        for (km, expected) in [(12.25, "12,3 km"), (12.45, "12,5 km"), (1.05, "1,1 km"), (16.15, "16,2 km"), (32.55, "32,6 km")] {
+            XCTAssertEqual(SQUnits.distance(kilometers: km, system: .metric).replacingOccurrences(of: ".", with: ","), expected, "\(km)")
+        }
+        // 50 292 m valent exactement 31,25 mi.
+        XCTAssertEqual(SQUnits.distance(meters: 50_292, system: .imperial, locale: fr), "31,3 mi")
+        XCTAssertEqual(SQUnits.distance(meters: 3 * 50_292, system: .imperial, locale: fr), "93,8 mi")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 1_250, system: .metric, locale: fr), "1,3 km")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 1_950, system: .metric, locale: fr), "2 km")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 50_292, system: .imperial, locale: fr), "31,3 mi")
+        XCTAssertEqual(SQUnits.routeMarker(kilometers: 2.45, system: .metric, locale: fr), "km 2,5")
+        XCTAssertEqual(SQUnits.routeMarker(kilometers: 2.45, fractionDigits: 0...1, system: .metric, locale: fr), "km 2,5")
+        XCTAssertEqual(SQUnits.routeMarker(kilometers: 2.5, fractionDigits: 0...0, system: .metric, locale: fr), "km 3")
+        XCTAssertEqual(SQUnits.routeMarker(kilometers: 50.292, system: .imperial, locale: fr), "mi 31,3")
+    }
+
     /// Les widgets et la Live Activity recopient les règles de `SQUnits` (la cible
     /// widget ne le voit pas) : débit, unité et distance restent identiques.
     func testWidgetUnitsFollowTheAppRules() {
@@ -117,7 +140,7 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(WidgetUnits.throughputValue(mbps: 6.4, locale: fr), "6,4", "6,4 ne s'arrondit plus à 6")
         XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 1_240, locale: fr), "1,240G")
         XCTAssertEqual(WidgetUnits.compactThroughput(mbps: 412, locale: fr), "412")
-        for meters in [30.0, 180, 340, 999, 1_000, 2_414, 12_345, .nan] {
+        for meters in [30.0, 180, 340, 999, 1_000, 1_050, 2_414, 12_250, 12_345, 12_450, 50_292, .nan] {
             XCTAssertEqual(WidgetUnits.distance(meters: meters, imperial: false, locale: fr), SQUnits.distance(meters: meters, system: .metric, locale: fr), "\(meters)")
             XCTAssertEqual(WidgetUnits.distance(meters: meters, imperial: true, locale: fr), SQUnits.distance(meters: meters, system: .imperial, locale: fr), "\(meters)")
         }

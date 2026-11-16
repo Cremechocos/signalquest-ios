@@ -74,14 +74,14 @@ enum SQUnits {
         switch system {
         case .metric:
             return meters >= 1000
-                ? "\((meters / 1000).formatted(oneDecimal)) km"
+                ? "\(halfUp(meters: meters, unitMeters: 1000).formatted(oneDecimal)) km"
                 : "\(Int(meters.rounded())) m"
         case .imperial:
             let miles = meters / metersPerMile
             // Sous un dixième de mile (~160 m), le pied est plus parlant : « 0,1 mi »
             // couvrirait indistinctement 80 et 240 mètres.
             return miles >= 0.1
-                ? "\(miles.formatted(oneDecimal)) mi"
+                ? "\(halfUp(meters: meters, unitMeters: metersPerMile).formatted(oneDecimal)) mi"
                 : "\(Int((meters / metersPerFoot).rounded())) ft"
         }
     }
@@ -95,12 +95,12 @@ enum SQUnits {
         switch system {
         case .metric:
             return meters >= 1000
-                ? "\((meters / 1000).formatted(upToOneDecimal)) km"
+                ? "\(halfUp(meters: meters, unitMeters: 1000).formatted(upToOneDecimal)) km"
                 : "\(Int(meters.rounded())) m"
         case .imperial:
             let miles = meters / metersPerMile
             return miles >= 0.1
-                ? "\(miles.formatted(upToOneDecimal)) mi"
+                ? "\(halfUp(meters: meters, unitMeters: metersPerMile).formatted(upToOneDecimal)) mi"
                 : "\(Int((meters / metersPerFoot).rounded())) ft"
         }
     }
@@ -119,14 +119,31 @@ enum SQUnits {
     ) -> String {
         guard kilometers.isFinite else { return "—" }
         let style = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(fractionDigits)).locale(locale)
+        let meters = kilometers * 1000
         switch system {
         case .metric:
-            let value = kilometers.formatted(style)
+            let value = halfUp(meters: meters, unitMeters: 1000, digits: fractionDigits.upperBound).formatted(style)
             return String(localized: "km \(value)")
         case .imperial:
-            let value = (kilometers * 1000 / metersPerMile).formatted(style)
+            let value = halfUp(meters: meters, unitMeters: metersPerMile, digits: fractionDigits.upperBound).formatted(style)
             return String(localized: "mi \(value)")
         }
+    }
+
+    /// Longueur en km (`unitMeters` 1 000) ou en miles, arrondie à `digits` décimales,
+    /// la moitié vers le haut comme le serveur et Android : 12 250 m s'écrit « 12,3 km ».
+    /// Le format d'Apple arrondit une égalité au chiffre pair (« 12,2 », 12 450 m
+    /// « 12,4 », 1 050 m « 1,0 », vérifié le 12/11) ; une fois la valeur arrondie ici,
+    /// il n'a plus d'égalité à trancher.
+    ///
+    /// Les mètres sont d'abord recalés au millimètre : 16,15 km × 1 000 vaut
+    /// 16 149,999… m en double, juste sous l'égalité. Puis on multiplie avant de
+    /// diviser : 12 250 × 10 / 1 000 = 122,5 est exact, alors que 12,25 × 10 passe
+    /// par un double approché (idem pour 50 292 m = 31,25 mi).
+    static func halfUp(meters: Double, unitMeters: Double, digits: Int = 1) -> Double {
+        let scale = [1.0, 10, 100, 1000][min(max(digits, 0), 3)]
+        let millimetres = (meters * 1000).rounded() / 1000
+        return (millimetres * scale / unitMeters).rounded(.toNearestOrAwayFromZero) / scale
     }
 
     /// Rayon d'une zone, toujours court : on ne bascule pas en unité longue.

@@ -637,8 +637,16 @@ final class SessionPostBlockDecodeTests: XCTestCase {
         XCTAssertEqual(km(12_250), "12,3 km")
         XCTAssertEqual(km(12_350), "12,4 km")
         XCTAssertEqual(km(12_249), "12,2 km")
+        XCTAssertEqual(km(12_450), "12,5 km")
+        XCTAssertEqual(km(1_050), "1,1 km")
         XCTAssertEqual(km(1_000), "1,0 km")
+        XCTAssertEqual(km(999), "1,0 km")
         XCTAssertEqual(km(950), "1,0 km")
+        XCTAssertEqual(km(949), "949 m")
+        // La page Trajet lit la même distance en km : même texte que le post.
+        for meters in [12_250, 12_450, 1_050, 12_345, 4_000] {
+            XCTAssertEqual(SessionPostText.distance(meters: meters), SessionDetailView.formatKm(Double(meters) / 1000), "\(meters)")
+        }
     }
 
     func testTitleKeyFollowsTheContract() throws {

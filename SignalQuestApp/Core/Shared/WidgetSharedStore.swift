@@ -237,18 +237,21 @@ enum WidgetUnits {
         throughputValue(mbps: mbps, locale: locale) + (mbps.isFinite && mbps >= 999.5 ? "G" : "")
     }
 
-    /// Distance depuis des mètres : mêmes seuils que `SQUnits.distance`.
+    /// Distance depuis des mètres : mêmes seuils que `SQUnits.distance`, et le même
+    /// arrondi des dixièmes, la moitié vers le haut (`SQUnits.halfUp`).
     static func distance(meters: Double, imperial: Bool, locale: Locale = .current) -> String {
         guard meters.isFinite else { return "—" }
         let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1)).locale(locale)
+        let millimetres = (meters * 1000).rounded() / 1000
+        func tenths(_ unitMeters: Double) -> Double { (millimetres * 10 / unitMeters).rounded(.toNearestOrAwayFromZero) / 10 }
         if imperial {
             let miles = meters / 1609.344
             return miles >= 0.1
-                ? "\(miles.formatted(oneDecimal)) mi"
+                ? "\(tenths(1609.344).formatted(oneDecimal)) mi"
                 : "\(Int((meters / 0.3048).rounded())) ft"
         }
         return meters >= 1000
-            ? "\((meters / 1000).formatted(oneDecimal)) km"
+            ? "\(tenths(1000).formatted(oneDecimal)) km"
             : "\(Int(meters.rounded())) m"
     }
 }
