@@ -57,30 +57,21 @@ final class E2EEAutoStrictModeTests: XCTestCase {
 
     // MARK: Mode renforcé
 
-    func testStrictModeFollowsTheReaderRules() {
+    /// Temps 1 du §6 : seule la sortie reste, aux règles du lecteur, sans condition de deux appareils.
+    func testLeavingStrictFollowsTheReaderRules() {
         let now = 10 * Self.day
-        let both = account([own, state(otherId, platform: .android)])
-        XCTAssertNil(E2EEAutoStrictMode.refusal(account: both, deviceId: ownId, mode: .strict, nowMs: now))
-        XCTAssertEqual(E2EEAutoStrictMode.refusal(account: account([own]), deviceId: ownId, mode: .strict, nowMs: now), .needsTwoDevices)
+        XCTAssertNil(E2EEAutoStrictMode.refusal(account: account([own], mode: .strict), deviceId: ownId, nowMs: now))
+        XCTAssertEqual(E2EEAutoStrictMode.refusal(account: account([own, state(otherId)]), deviceId: ownId, nowMs: now), .unchanged)
         XCTAssertEqual(
             E2EEAutoStrictMode.refusal(
-                account: account([own, state(otherId), state(pendingId, status: .pending)]), deviceId: pendingId, mode: .strict, nowMs: now
+                account: account([own, state(otherId), state(pendingId, status: .pending)], mode: .strict), deviceId: pendingId, nowMs: now
             ),
             .notActive
         )
-        XCTAssertEqual(
-            E2EEAutoStrictMode.refusal(account: account([own, state(otherId)], mode: .strict), deviceId: ownId, mode: .strict, nowMs: now),
-            .unchanged
-        )
         // Ancienneté depuis l'`ADD` : 24 h pile suffisent.
-        let young = account([state(ownId, addedAtMs: 5), state(otherId)])
-        XCTAssertEqual(
-            E2EEAutoStrictMode.refusal(account: young, deviceId: ownId, mode: .strict, nowMs: 4 + Self.day),
-            .tooRecent(eligibleAtMs: 5 + Self.day)
-        )
-        XCTAssertNil(E2EEAutoStrictMode.refusal(account: young, deviceId: ownId, mode: .strict, nowMs: 5 + Self.day))
-        // Revenir en `NORMAL` ne demande pas deux appareils.
-        XCTAssertNil(E2EEAutoStrictMode.refusal(account: account([own], mode: .strict), deviceId: ownId, mode: .normal, nowMs: now))
+        let young = account([state(ownId, addedAtMs: 5), state(otherId)], mode: .strict)
+        XCTAssertEqual(E2EEAutoStrictMode.refusal(account: young, deviceId: ownId, nowMs: 4 + Self.day), .tooRecent(eligibleAtMs: 5 + Self.day))
+        XCTAssertNil(E2EEAutoStrictMode.refusal(account: young, deviceId: ownId, nowMs: 5 + Self.day))
     }
 
     func testModeResponseMustBeThisModeSignedHere() throws {

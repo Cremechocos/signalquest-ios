@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Désactiver le mode renforcé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off strict mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactiver le mode renforcé"
+          }
+        }
+      }
+    },
+    "Le mode renforcé disparaît. Une fois désactivé, un appareil où tu te connectes reçoit tes messages tout de suite. Le désactiver n’active aucun appareil en attente." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strict mode is going away. Once it’s off, a device you sign in on gets your messages right away. Turning it off doesn’t activate any waiting device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode renforcé disparaît. Une fois désactivé, un appareil où tu te connectes reçoit tes messages tout de suite. Le désactiver n’active aucun appareil en attente."
+          }
+        }
+      }
+    },
+    "SQFormal|Le mode renforcé disparaît. Une fois désactivé, un appareil où tu te connectes reçoit tes messages tout de suite. Le désactiver n’active aucun appareil en attente." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode renforcé disparaît. Une fois désactivé, un appareil où vous vous connectez reçoit vos messages tout de suite. Le désactiver n’active aucun appareil en attente."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Bilan" : {
       "localizations" : {
         "en" : {
@@ -7999,22 +8043,6 @@
         }
       }
     },
-    "Il faut au moins deux appareils actifs pour l’activer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You need at least two active devices to turn it on."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il faut au moins deux appareils actifs pour l’activer."
-          }
-        }
-      }
-    },
     "Impossible de changer le mode. Réessaie dans un instant." : {
       "localizations" : {
         "en" : {
@@ -8139,22 +8167,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le journal des appareils n’a pas pu être vérifié. Le mode n’a pas changé."
-          }
-        }
-      }
-    },
-    "Le mode renforcé demande au moins deux appareils actifs." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strict mode needs at least two active devices."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le mode renforcé demande au moins deux appareils actifs."
           }
         }
       }
@@ -9031,18 +9043,6 @@
       },
       "shouldTranslate" : false
     },
-    "SQFormal|Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un nouvel appareil ne lit ni n’envoie vos messages chiffrés tant qu’un de vos appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "SQFormal|Visible de toi seul" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9462,22 +9462,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte."
-          }
-        }
-      }
-    },
-    "Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A new device can’t read or send your encrypted messages until one of your devices activates it with “It’s me”. Turning this off doesn’t activate any waiting device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente."
           }
         }
       }

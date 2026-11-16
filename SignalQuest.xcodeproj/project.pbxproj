@@ -348,6 +348,7 @@
 		56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885DAE78D34639CBB592A710 /* ValidationsService.swift */; };
 		572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */; };
 		576DD3A42C021E6ADE3FB9A0 /* CarPlayAccountAndMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB905FA5FB34E1265CF3EFA6 /* CarPlayAccountAndMeasurementTests.swift */; };
+		5830BB9AF13EAF4A3C31CB88 /* E2EEAutoPasskeyContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEE562AC31C8F1E4B78EB0B /* E2EEAutoPasskeyContract.swift */; };
 		58B3C723BEA3B4CA9CE1013E /* ExperienceTestsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B5F2A143285F25621123FEC /* ExperienceTestsModelTests.swift */; };
 		58DD4781348DDCCACA2E1CF6 /* WeeklyRecapSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8546AA12F535BBF65596A6B8 /* WeeklyRecapSheet.swift */; };
 		59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */; };
@@ -1770,6 +1771,7 @@
 		BBF2AD7AC7DAD4AF23D40B47 /* E2EEAutoAttachmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoAttachmentView.swift; sourceTree = "<group>"; };
 		BC0528597DB985754DD4A9AD /* WeeklyRecapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyRecapCard.swift; sourceTree = "<group>"; };
 		BC160421CE1CD7BA1CC39557 /* LocationFixPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationFixPolicy.swift; sourceTree = "<group>"; };
+		BDEE562AC31C8F1E4B78EB0B /* E2EEAutoPasskeyContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoPasskeyContract.swift; sourceTree = "<group>"; };
 		BE07B2B79534DEE898416D4B /* PlannedSiteDetailTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedSiteDetailTests.swift; sourceTree = "<group>"; };
 		BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestSessionRecapTests.swift; sourceTree = "<group>"; };
 		BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "nci-provenance-v1.json"; sourceTree = "<group>"; };
@@ -3017,6 +3019,7 @@
 				71FB2DC45176685D48C0378F /* E2EEAutoModeSetting.swift */,
 				EAEAEBF52D5A5342EAD4FF02 /* E2EEAutoNewDeviceAlerts.swift */,
 				E0315ECC7AF54CD300A54A82 /* E2EEAutoPasskeyBackup.swift */,
+				BDEE562AC31C8F1E4B78EB0B /* E2EEAutoPasskeyContract.swift */,
 				31ACA9A3145E1250E575DCE9 /* E2EEAutoPostShare.swift */,
 				0614C8D69784703247FDAA99 /* E2EEAutoSafetyCode.swift */,
 				34AD85F97CB2E3AB1B15167B /* E2EEAutoStrictMode.swift */,
@@ -4071,6 +4074,7 @@
 				5191262520D293B7C5BA7B14 /* E2EEAutoNewDeviceAlerts.swift in Sources */,
 				FD2C3B7A1EB1B2560EA15FCD /* E2EEAutoPasskeyAuthenticator.swift in Sources */,
 				8210FB3E603681C8FD82F2E6 /* E2EEAutoPasskeyBackup.swift in Sources */,
+				5830BB9AF13EAF4A3C31CB88 /* E2EEAutoPasskeyContract.swift in Sources */,
 				52B4400C69112FCE77841462 /* E2EEAutoPostShare.swift in Sources */,
 				ECD06E336CCD0CDEA157CB74 /* E2EEAutoSafetyCode.swift in Sources */,
 				4155ED18B181CDA43F529A5A /* E2EEAutoSafetyCodeView.swift in Sources */,

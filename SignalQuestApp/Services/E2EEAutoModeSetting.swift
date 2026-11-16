@@ -1,7 +1,8 @@
 import Foundation
 
-/// Mode renforcé du compte (E2EE-AUTO §6, route r3) : requête signée par un appareil
-/// actif inscrit depuis 24 h, sur la charge `SQ-E2EE-AUTO-MODE` (`E2EEAutoStrictMode`).
+/// Sortie du mode renforcé (E2EE-AUTO §6, route r3, retiré par l'amendement SD1) :
+/// `MODE NORMAL` signé par un appareil actif inscrit depuis 24 h, sur la charge
+/// `SQ-E2EE-AUTO-MODE` (`E2EEAutoStrictMode`). L'app ne met plus un compte en `STRICT`.
 /// Le serveur ne fait foi de rien : la réponse doit être le `MODE` signé ici, et l'app
 /// n'adopte le mode qu'à la relecture vérifiée du journal.
 actor E2EEAutoModeSetting {
@@ -17,7 +18,7 @@ actor E2EEAutoModeSetting {
     /// Ce que l'écran peut proposer, lu au journal vérifié.
     struct Status: Equatable, Sendable {
         let mode: E2EEAutoLog.Mode
-        /// Inscrit depuis 24 h et actif : cet appareil peut changer le mode.
+        /// Inscrit depuis 24 h et actif : cet appareil peut quitter le mode renforcé.
         let canChange: Bool
         let activeDevices: Int
     }
@@ -27,8 +28,6 @@ actor E2EEAutoModeSetting {
         case set(E2EEAutoLog.Mode)
         /// Garde des 24 h (§3.2).
         case tooRecent
-        /// `STRICT` sans deux appareils actifs.
-        case needsTwoDevices
         case notActive
         case retryLater(afterSeconds: Int?)
         case logRefused
@@ -68,7 +67,9 @@ actor E2EEAutoModeSetting {
         )
     }
 
-    func set(_ mode: E2EEAutoLog.Mode) async -> Outcome {
+    /// Repasse le compte en `NORMAL`, seul changement de mode que l'app écrit encore.
+    func leaveStrict() async -> Outcome {
+        let mode = E2EEAutoLog.Mode.normal
         let device: E2EEV2DeviceDescriptor
         do { device = try dependencies.device() } catch { return .failed("e2ee-auto-device-unavailable") }
         for _ in 0..<2 {
@@ -80,12 +81,11 @@ actor E2EEAutoModeSetting {
             }
             guard account.devices[device.deviceId]?.signingKeyB64 == device.publicSigningKeyB64 else { return .retryLater(afterSeconds: nil) }
             // Mêmes règles que le lecteur (§3.2) : rien ne part que le journal refuserait.
-            switch E2EEAutoStrictMode.refusal(account: account, deviceId: device.deviceId, mode: mode, nowMs: dependencies.nowMs()) {
+            switch E2EEAutoStrictMode.refusal(account: account, deviceId: device.deviceId, nowMs: dependencies.nowMs()) {
             case nil: break
             case .unchanged?: return .set(mode)
             case .notActive?: return .notActive
             case .tooRecent?: return .tooRecent
-            case .needsTwoDevices?: return .needsTwoDevices
             }
             guard let previous = account.lastEntryHash else { return .failed("e2ee-auto-mode-state") }
             let body: Data
@@ -115,7 +115,6 @@ actor E2EEAutoModeSetting {
                 switch failure.code {
                 case "E2EE_DEVICE_TOO_RECENT": return .tooRecent
                 case "E2EE_DEVICE_NOT_ACTIVE": return .notActive
-                case "E2EE_STRICT_NEEDS_TWO_DEVICES": return .needsTwoDevices
                 // Une autre entrée est passée entre la lecture et l'écriture : relire, re-signer une fois.
                 case "E2EE_LOG_STALE", "E2EE_REQUEST_REPLAYED": continue
                 default:

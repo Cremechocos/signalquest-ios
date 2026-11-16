@@ -23,8 +23,8 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
             -> E2EEAutoDeviceRevocation.Outcome = { _, _, _ in .failed("e2ee-auto-unavailable") }
         /// Libellés et activités (§4.2, révision 12) ; nil : inconnus, sans message.
         var readLabels: () async -> [String: E2EEAutoDeviceLabels.Display]? = { nil }
-        /// Mode renforcé (§6) ; l'écran ne l'adopte qu'à la relecture du journal.
-        var setMode: (_ mode: E2EEAutoLog.Mode) async -> E2EEAutoModeSetting.Outcome = { _ in .failed("e2ee-auto-mode-unavailable") }
+        /// Sortie du mode renforcé (§6, temps 1) ; l'écran ne l'adopte qu'à la relecture du journal.
+        var leaveStrict: () async -> E2EEAutoModeSetting.Outcome = { .failed("e2ee-auto-mode-unavailable") }
         /// Passkey (§5.5) : ce que l'app propose, puis la feuille système et le dépôt.
         var passkeyOffer: () async -> E2EEAutoPasskeyContract.Offer = { .none }
         var protectWithPasskey: (_ offer: E2EEAutoPasskeyContract.Offer) async -> PasskeyResult = { _ in .failed }
@@ -128,24 +128,22 @@ final class E2EEAutoDevicesViewModel: ObservableObject {
 
     var activeCount: Int { rows.filter { $0.status == .active }.count }
 
-    /// Changer le mode : même garde que révoquer les autres (actif, inscrit depuis 24 h),
-    /// et `STRICT` demande deux appareils actifs (§6).
-    var canChangeMode: Bool {
-        canRevokeOthers && (mode == .strict || activeCount >= 2)
+    /// Quitter le mode renforcé (§6, temps 1) : même garde que révoquer les autres
+    /// (actif, inscrit depuis 24 h). L'app ne met plus un compte en `STRICT`.
+    var canLeaveStrict: Bool {
+        canRevokeOthers && mode == .strict
     }
 
-    func setMode(_ mode: E2EEAutoLog.Mode) async {
-        guard !isActing, mode != self.mode, canChangeMode else { return }
+    func leaveStrict() async {
+        guard !isActing, canLeaveStrict else { return }
         isActing = true
         errorMessage = nil
         defer { isActing = false }
-        switch await dependencies.setMode(mode) {
+        switch await dependencies.leaveStrict() {
         case .set:
             break
         case .tooRecent:
             errorMessage = String(localized: "Cet appareil a été ajouté il y a moins de 24 h : change le mode depuis un appareil plus ancien.")
-        case .needsTwoDevices:
-            errorMessage = String(localized: "Le mode renforcé demande au moins deux appareils actifs.")
         case .notActive:
             errorMessage = String(localized: "Cet appareil attend encore son activation : il ne peut pas changer le mode.")
         case .logRefused:
@@ -427,9 +425,9 @@ extension E2EEAutoDevicesViewModel {
                 return await revocation.revoke(deviceId: deviceId, reason: reason, confirmationToken: token)
             },
             readLabels: E2EEAutoDeviceLabels.live(session: session, api: api),
-            setMode: { mode in
+            leaveStrict: {
                 guard let setting = E2EEAutoModeSetting.live(session: session, api: api) else { return .failed("e2ee-auto-mode-unavailable") }
-                return await setting.set(mode)
+                return await setting.leaveStrict()
             },
             passkeyOffer: {
                 guard let backup = E2EEAutoPasskeyBackup.live(session: session, api: api) else { return .none }
@@ -548,7 +546,7 @@ struct E2EEAutoDevicesView: View {
             case .loaded:
                 devicesSection
                 passkeySection
-                strictModeSection
+                if model.mode == .strict { strictModeSection }
                 if !model.revokedRows.isEmpty {
                     Section {
                         ForEach(model.revokedRows) { row in
@@ -691,25 +689,26 @@ struct E2EEAutoDevicesView: View {
         }
     }
 
-    /// Mode renforcé (§6) : l'interrupteur montre le mode du journal vérifié, jamais l'intention.
+    /// Mode renforcé (§6, temps 1) : affiché seulement si le journal vérifié dit `STRICT`,
+    /// pour en sortir. Il n'y a plus d'interrupteur pour y entrer.
     private var strictModeSection: some View {
         Section {
-            Toggle(isOn: Binding(
-                get: { model.mode == .strict },
-                set: { on in Task { await model.setMode(on ? .strict : .normal) } }
-            )) {
-                Label("Mode renforcé", systemImage: "lock.shield")
+            Button {
+                Task { await model.leaveStrict() }
+            } label: {
+                Label("Désactiver le mode renforcé", systemImage: "lock.open")
                     .frame(minHeight: 44)
             }
-            .disabled(!model.canChangeMode || model.isActing)
+            .disabled(!model.canLeaveStrict || model.isActing)
             .accessibilityIdentifier("e2eeAuto.devices.strictMode")
+        } header: {
+            Text("Mode renforcé")
+                .foregroundStyle(SQColor.labelSecondary)
         } footer: {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Un nouvel appareil ne lit ni n’envoie tes messages chiffrés tant qu’un de tes appareils ne l’a pas activé avec « C’est moi ». Le désactiver n’active aucun appareil en attente.")
+                Text("Le mode renforcé disparaît. Une fois désactivé, un appareil où tu te connectes reçoit tes messages tout de suite. Le désactiver n’active aucun appareil en attente.")
                 if let hours = model.hoursBeforeRevokingOthers {
                     Text("Disponible sur cet appareil dans \(hours) h.")
-                } else if model.mode == .normal && model.activeCount < 2 {
-                    Text("Il faut au moins deux appareils actifs pour l’activer.")
                 }
             }
             .foregroundStyle(SQColor.labelSecondary)
@@ -968,7 +967,8 @@ struct E2EEAutoDevicesView: View {
 /// Banc visuel (simulateur Debug) : un compte de démonstration, sans réseau.
 /// `--qa-auto-devices`, `--qa-auto-devices-recent` (garde des 24 h),
 /// `--qa-auto-devices-refused` (journal refusé), `--qa-auto-devices-unlabeled` (sans libellés),
-/// `--qa-auto-devices-passkey` (création proposée), `--qa-auto-devices-passkey-update` (passkey périmée).
+/// `--qa-auto-devices-passkey` (création proposée), `--qa-auto-devices-passkey-update` (passkey périmée),
+/// `--qa-auto-devices-strict` (compte encore en mode renforcé).
 struct E2EEAutoDevicesQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     static func model() -> E2EEAutoDevicesViewModel {
@@ -1001,6 +1001,8 @@ struct E2EEAutoDevicesQAScreen: View {
                                  revokedAgo: 24 * hour, reason: .user)
             account.devices[removed.deviceId] = removed
         }
+        // `--qa-auto-devices-strict` : compte resté en mode renforcé, la sortie seule (§6, temps 1).
+        if AppEnvironment.hasQAFlag("auto-devices-strict") { account.mode = .strict }
         let refused = AppEnvironment.hasQAFlag("auto-devices-refused")
         // Libellés servis (révision 12) ; `--qa-auto-devices-unlabeled` : lecture en échec.
         let labels: [String: E2EEAutoDeviceLabels.Display] = [

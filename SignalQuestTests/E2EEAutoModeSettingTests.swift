@@ -2,8 +2,9 @@ import CryptoKit
 import XCTest
 @testable import SignalQuest
 
-/// Lot C5 (E2EE-AUTO §6, route r3) : le mode renforcé se règle par une requête signée,
-/// la réponse doit être le `MODE` signé ici, et seul le journal relu fait foi.
+/// Lot C5 (E2EE-AUTO §6, route r3), temps 1 de l'amendement SD1 : l'app ne fait plus que
+/// sortir du mode renforcé, par une requête signée ; la réponse doit être le `MODE` signé
+/// ici, et seul le journal relu fait foi.
 final class E2EEAutoModeSettingTests: XCTestCase {
     private static let userId = "user_alice_00000000001"
     private static let day = E2EEAutoLog.signerMinAgeMs
@@ -96,79 +97,79 @@ final class E2EEAutoModeSettingTests: XCTestCase {
         E2EEAutoModeSetting(fake.dependencies(device: device, signing: signing))
     }
 
-    /// Corps à trois champs exacts, charge signée par cet appareil, mode adopté à la relecture.
-    func testStrictIsSignedWrittenAndAdoptedFromTheLog() async throws {
-        let fake = Fake(reads: [.verified(account()), .verified(account(mode: .strict))])
+    /// Sortie du mode renforcé (§6, temps 1) : corps à trois champs exacts, `NORMAL` signé
+    /// par cet appareil, adopté à la relecture.
+    func testNormalIsSignedWrittenAndAdoptedFromTheLog() async throws {
+        let fake = Fake(reads: [.verified(account(mode: .strict)), .verified(account())])
         fake.responses = [written()]
-        let outcome = await setting(fake).set(.strict)
-        XCTAssertEqual(outcome, .set(.strict))
+        let outcome = await setting(fake).leaveStrict()
+        XCTAssertEqual(outcome, .set(.normal))
         let body = try XCTUnwrap(fake.bodies.first)
         XCTAssertEqual(Set(body.keys), ["prevUserEntryHash", "mode", "signatureB64"])
-        XCTAssertEqual(body["mode"] as? String, "STRICT")
+        XCTAssertEqual(body["mode"] as? String, "NORMAL")
         XCTAssertEqual(body["prevUserEntryHash"] as? String, E2EEAutoLog.digest("last"))
         let payload = E2EEAutoStrictMode.payload(
-            userId: Self.userId, prevUserEntryHash: E2EEAutoLog.digest("last"), signerDeviceId: ownId, mode: .strict
+            userId: Self.userId, prevUserEntryHash: E2EEAutoLog.digest("last"), signerDeviceId: ownId, mode: .normal
         )
         XCTAssertTrue(E2EEAutoLog.verify(
             publicKeyB64: device.publicSigningKeyB64, payload: payload, signatureB64: try XCTUnwrap(body["signatureB64"] as? String)
         ))
     }
 
-    /// La réponse ne vaut pas adoption : le journal relu sans le `MODE` ne le montre pas.
+    /// La réponse ne vaut pas adoption : le journal relu encore en `STRICT` ne change rien.
     func testResponseAloneIsNotAdoption() async {
-        let fake = Fake(reads: [.verified(account())])
+        let fake = Fake(reads: [.verified(account(mode: .strict))])
         fake.responses = [written()]
-        let outcome = await setting(fake).set(.strict)
+        let outcome = await setting(fake).leaveStrict()
         XCTAssertEqual(outcome, .retryLater(afterSeconds: nil))
     }
 
     /// Un `MODE` signé par une autre clé ou un autre appareil est refusé.
     func testForgedResponseIsRefused() async {
-        let fake = Fake(reads: [.verified(account()), .verified(account(mode: .strict))])
+        let fake = Fake(reads: [.verified(account(mode: .strict)), .verified(account())])
         fake.responses = [written(key: P256.Signing.PrivateKey())]
-        let forgedKey = await setting(fake).set(.strict)
+        let forgedKey = await setting(fake).leaveStrict()
         XCTAssertEqual(forgedKey, .failed("invalid-e2ee-auto-mode-response"))
 
-        let other = Fake(reads: [.verified(account()), .verified(account(mode: .strict))])
+        let other = Fake(reads: [.verified(account(mode: .strict)), .verified(account())])
         other.responses = [written(signer: otherId, key: signing)]
-        let forgedSigner = await setting(other).set(.strict)
+        let forgedSigner = await setting(other).leaveStrict()
         XCTAssertEqual(forgedSigner, .failed("invalid-e2ee-auto-mode-response"))
     }
 
-    /// Gardes locales avant toute requête : 24 h, deux appareils actifs, mode déjà en vigueur.
+    /// Gardes locales avant toute requête : 24 h, compte déjà en `NORMAL`. La sortie ne
+    /// demande pas deux appareils, et l'app n'écrit jamais `STRICT`.
     func testLocalGuardsSendNothing() async {
-        let recent = Fake(reads: [.verified(account())])
+        let recent = Fake(reads: [.verified(account(mode: .strict))])
         recent.nowMs = 1_000 + Self.day - 1
-        let tooRecent = await setting(recent).set(.strict)
+        let tooRecent = await setting(recent).leaveStrict()
         XCTAssertEqual(tooRecent, .tooRecent)
 
-        let alone = Fake(reads: [.verified(account(others: 0))])
-        let needsTwo = await setting(alone).set(.strict)
-        XCTAssertEqual(needsTwo, .needsTwoDevices)
+        let already = Fake(reads: [.verified(account())])
+        let unchanged = await setting(already).leaveStrict()
+        XCTAssertEqual(unchanged, .set(.normal))
 
-        let already = Fake(reads: [.verified(account(mode: .strict))])
-        let unchanged = await setting(already).set(.strict)
-        XCTAssertEqual(unchanged, .set(.strict))
-
-        // NORMAL ne demande pas deux appareils.
-        let back = Fake(reads: [.verified(account(mode: .strict, others: 0)), .verified(account(mode: .normal, others: 0))])
-        back.responses = [written()]
-        let normal = await setting(back).set(.normal)
+        let alone = Fake(reads: [.verified(account(mode: .strict, others: 0)), .verified(account(others: 0))])
+        alone.responses = [written()]
+        let normal = await setting(alone).leaveStrict()
         XCTAssertEqual(normal, .set(.normal))
 
-        for fake in [recent, alone, already] { XCTAssertTrue(fake.bodies.isEmpty) }
+        for fake in [recent, already] { XCTAssertTrue(fake.bodies.isEmpty) }
+        XCTAssertEqual(alone.bodies.map { $0["mode"] as? String }, ["NORMAL"])
     }
 
     /// `409 E2EE_LOG_STALE` : relire le compte et re-signer sur la nouvelle tête, une fois.
     func testStaleLogRereadsAndResigns() async throws {
-        let fake = Fake(reads: [.verified(account()), .verified(account(last: "newer")), .verified(account(mode: .strict))])
+        let fake = Fake(reads: [
+            .verified(account(mode: .strict)), .verified(account(mode: .strict, last: "newer")), .verified(account()),
+        ])
         fake.responses = [
             { _ in .failure(.init(kind: E2EEV2TransportFailurePolicy.classify(statusCode: 409, code: "E2EE_LOG_STALE"),
                                   statusCode: 409, code: "E2EE_LOG_STALE", message: "x")) },
             written(),
         ]
-        let outcome = await setting(fake).set(.strict)
-        XCTAssertEqual(outcome, .set(.strict))
+        let outcome = await setting(fake).leaveStrict()
+        XCTAssertEqual(outcome, .set(.normal))
         XCTAssertEqual(fake.bodies.map { $0["prevUserEntryHash"] as? String }, [E2EEAutoLog.digest("last"), E2EEAutoLog.digest("newer")])
     }
 
