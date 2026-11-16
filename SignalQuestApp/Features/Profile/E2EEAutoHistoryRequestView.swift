@@ -42,8 +42,13 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         /// Une passkey du compte peut-elle ouvrir une HK du journal ici ?
         var hasPasskey: @Sendable () async -> Bool = { false }
         var usePasskey: @Sendable () async -> PasskeyRecovery = { .failed }
+        /// Invitation passkey (§5.5) : ce que l'app propose ici, le geste, et « déjà proposée ».
+        var passkeyOffer: @Sendable () async -> E2EEAutoPasskeyContract.Offer = { .none }
+        var performPasskey: @Sendable (_ offer: E2EEAutoPasskeyContract.Offer) async -> E2EEAutoPasskeyGesture.Result = { _ in .failed }
+        var creationDismissed: @Sendable () -> Bool = { false }
+        var dismissCreation: @Sendable () -> Void = {}
 
-        static func live(_ requests: E2EEAutoHistoryRequests, passkey: E2EEAutoPasskeyBackup?) -> Client {
+        static func live(_ requests: E2EEAutoHistoryRequests, passkey: E2EEAutoPasskeyBackup?, namespace: String, userId: String) -> Client {
             Client(
                 start: { await requests.start() },
                 check: { await requests.check() },
@@ -75,11 +80,29 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
                     }
                     guard let chosen = candidates.first(where: { $0.2.credentialId == output.credentialId })?.2 else { return .failed }
                     switch await passkey.recover(chosen, prfOutput: output.prfOutput) {
-                    case .present(let hkPubB64): return .present(hkPubB64: hkPubB64)
+                    case .present(let hkPubB64):
+                        // §5.5 : passkey d'un autre appareil (QR) : la passkey locale est à créer aussitôt.
+                        if output.crossPlatform { E2EEAutoPasskeyMarks.setLocalPasskeyWanted(true, namespace) }
+                        return .present(hkPubB64: hkPubB64)
                     case .older: return .older
                     case .logRefused, .retryLater, .failed: return .failed
                     }
-                }
+                },
+                passkeyOffer: {
+                    guard let passkey else { return .none }
+                    return await passkey.offer(
+                        prfAvailable: E2EEAutoPasskeyAuthenticator.isAvailable,
+                        localPasskeyWanted: E2EEAutoPasskeyMarks.localPasskeyWanted(namespace)
+                    )
+                },
+                performPasskey: { offer in
+                    guard let passkey else { return .failed }
+                    let result = await E2EEAutoPasskeyGesture.perform(offer, backup: passkey, userId: userId)
+                    if result == .done, offer == .create { E2EEAutoPasskeyMarks.setLocalPasskeyWanted(false, namespace) }
+                    return result
+                },
+                creationDismissed: { E2EEAutoPasskeyMarks.creationDismissed(namespace) },
+                dismissCreation: { E2EEAutoPasskeyMarks.dismissCreation(namespace) }
             )
         }
     }
@@ -135,6 +158,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         var passkeyIssue: PasskeyRecovery?
         /// La feuille de la passkey est ouverte : l'écran reste celui de la passkey.
         var usingPasskey = false
+        /// Une passkey du compte peut ouvrir l'historique ici : l'écran d'attente y ramène.
+        var passkeyAvailable = false
     }
 
     enum ApprovalPhase: Equatable {
@@ -174,6 +199,13 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     @Published private(set) var keyChanged = false
     /// A3 : l'écran s'ouvre dès la prochaine demande, sans attendre le bandeau.
     private var opensWhenReady = false
+    /// Invitation passkey (§5.5) : « Retrouver mes messages partout » ou « Mettre à jour ma passkey ».
+    @Published private(set) var passkeyInvitation: E2EEAutoPasskeyContract.Offer = .none
+    @Published private(set) var passkeyActing = false
+    /// Résultat du dernier geste passkey, affiché puis effacé.
+    @Published var passkeyMessage: E2EEAutoDevicesViewModel.PasskeyMessage?
+    /// « Plus tard » sur une mise à jour : jusqu'au prochain lancement.
+    private var updateInvitationSnoozed = false
 
     var presentsRequester: Bool {
         guard let requester else { return false }
@@ -219,6 +251,50 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
     func snoozeBanner() {
         dependencies.snoozeBanner(dependencies.now().addingTimeInterval(Self.bannerSnooze))
         bannerSnoozed = true
+    }
+
+    /// Bandeau passkey de Messages : jamais en même temps que celui de l'historique ni que l'écran.
+    var showsPasskeyBanner: Bool {
+        passkeyInvitation != .none && !showsHistoryBanner && !presentsRequester
+    }
+
+    // MARK: Invitation passkey (§5.5)
+
+    /// Relue au retour au premier plan et quand HK arrive. La création n'est proposée qu'une
+    /// fois ici ; la mise à jour, seulement à un appareil inscrit depuis 24 h (H1).
+    func refreshPasskeyInvitation() async {
+        guard let client = dependencies.client() else {
+            passkeyInvitation = .none
+            return
+        }
+        let offer = await client.passkeyOffer()
+        switch offer {
+        case .create: passkeyInvitation = client.creationDismissed() ? .none : .create
+        case .update: passkeyInvitation = updateInvitationSnoozed ? .none : offer
+        case .none, .updateTomorrow: passkeyInvitation = .none
+        }
+    }
+
+    /// Un appui, la feuille système, Face ID ou le code, puis le dépôt.
+    func acceptPasskeyInvitation() async {
+        guard !passkeyActing, passkeyInvitation != .none, let client = dependencies.client() else { return }
+        passkeyActing = true
+        defer { passkeyActing = false }
+        let result = await client.performPasskey(passkeyInvitation)
+        if result == .unsupported { client.dismissCreation() }
+        passkeyMessage = E2EEAutoDevicesViewModel.passkeyMessage(result)
+        await refreshPasskeyInvitation()
+    }
+
+    /// « Plus tard » : la création ne revient plus ici (les réglages la gardent) ; la mise à jour
+    /// revient au prochain lancement.
+    func postponePasskeyInvitation() {
+        if passkeyInvitation == .create {
+            dependencies.client()?.dismissCreation()
+        } else {
+            updateInvitationSnoozed = true
+        }
+        passkeyInvitation = .none
     }
 
     func reloadBannerSnooze() {
@@ -270,9 +346,11 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
                 }
                 do { try await dependencies.sleep(Self.pollInterval) } catch { return }
             }
-            // §5.3 point 2 : la passkey avant « C'est moi ».
+            // §5.3 point 2 et §5.5 : la passkey d'abord, « Valider depuis un autre appareil » en secours.
             if await client.hasPasskey() {
-                requester = Requester(fingerprint: await client.ownFingerprint() ?? [], phase: .passkey, startedAt: dependencies.now())
+                requester = Requester(
+                    fingerprint: await client.ownFingerprint() ?? [], phase: .passkey, startedAt: dependencies.now(), passkeyAvailable: true
+                )
                 return
             }
             if requester?.phase == .syncing { requester?.phase = .checking }
@@ -280,7 +358,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         await handle(await client.start(), client: client)
     }
 
-    /// « Utiliser ma passkey » : la feuille système, puis HK vérifiée contre le journal.
+    /// « Retrouver mes messages » : la feuille système, puis HK vérifiée contre le journal.
     func usePasskey() async {
         guard let client = dependencies.client(), requester?.phase == .passkey else { return }
         requester?.phase = .checking
@@ -300,7 +378,15 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         }
     }
 
-    /// « Demander à un autre appareil » : la demande « C'est moi » part.
+    /// Écran d'attente « C'est moi » : retour à la passkey, la demande restant ouverte.
+    func usePasskeyInstead() {
+        guard let requester, requester.passkeyAvailable, !requester.activating,
+              [.waiting, .paused, .closed, .failed].contains(requester.phase) else { return }
+        self.requester?.phase = .passkey
+        self.requester?.passkeyIssue = nil
+    }
+
+    /// « Valider depuis un autre appareil » : la demande « C'est moi » part.
     func askAnotherDevice() async {
         guard let client = dependencies.client(), requester?.phase == .passkey else { return }
         requester?.phase = .checking
@@ -348,6 +434,8 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         if requester?.phase == .received {
             requester = nil
             keyChanged = false
+            // Déjà lu sur l'écran : Messages ne le redit pas.
+            passkeyMessage = nil
         } else if requester?.activating == true {
             requesterHidden = true
         }
@@ -365,6 +453,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
                 keyChanged = false
             }
             await dependencies.continueWithHistoryKey()
+            await refreshPasskeyInvitation()
         case .waiting(let open):
             if requester == nil {
                 requester = Requester(
@@ -406,6 +495,7 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         if approval?.phase.isSettled == true { approval = nil }
         listTask?.cancel()
         listTask = Task { [weak self] in
+            await self?.refreshPasskeyInvitation()
             while !Task.isCancelled {
                 await self?.refresh()
                 do { try await self?.dependencies.sleep(Self.listInterval) } catch { return }
@@ -501,6 +591,9 @@ final class E2EEAutoHistoryRequestCoordinator: ObservableObject {
         opensWhenReady = false
         approval = nil
         postponedApprovals = []
+        passkeyInvitation = .none
+        passkeyMessage = nil
+        updateInvitationSnoozed = false
         reloadBannerSnooze()
     }
 }
@@ -515,7 +608,10 @@ extension E2EEAutoHistoryRequestCoordinator {
                 guard SQFeatures.e2eeAutoLogEnabled, let session = LocalAccountScope.sessionSnapshot() else { return nil }
                 if let cached, cached.namespace == session.ownerNamespace { return cached.client }
                 guard let requests = E2EEAutoHistoryRequests.live(session: session, api: api) else { return nil }
-                let client = Client.live(requests, passkey: E2EEAutoPasskeyBackup.live(session: session, api: api))
+                let client = Client.live(
+                    requests, passkey: E2EEAutoPasskeyBackup.live(session: session, api: api),
+                    namespace: session.ownerNamespace, userId: String(session.ownerScopeId.dropFirst(5))
+                )
                 cached = (session.ownerNamespace, client)
                 return client
             },
@@ -544,7 +640,7 @@ struct E2EEAutoHistoryRequesterView: View {
                     if coordinator.requester?.activating == true {
                         Text("Activer cet appareil")
                     } else {
-                        Text("Ouvrir ton historique sur cet appareil")
+                        Text("Retrouver mes messages")
                     }
                 }
                     .font(SQType.display)
@@ -553,12 +649,7 @@ struct E2EEAutoHistoryRequesterView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let requester = coordinator.requester {
                     if requester.phase == .received {
-                        Text("Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent.")
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .fixedSize(horizontal: false, vertical: true)
-                        GradientButton(String(localized: "OK")) { coordinator.hideRequester() }
-                            .accessibilityIdentifier("e2eeAuto.historyRequest.done")
+                        receivedContent
                     } else if requester.phase == .passkey || requester.usingPasskey {
                         if coordinator.keyChanged { keyChangedHeader }
                         passkeyContent(requester)
@@ -587,6 +678,10 @@ struct E2EEAutoHistoryRequesterView: View {
                             )
                         }
                         status(requester.phase)
+                        if requester.passkeyAvailable && !requester.activating {
+                            GradientButton(String(localized: "Retrouver avec ma passkey"), style: .ghost) { coordinator.usePasskeyInstead() }
+                                .accessibilityIdentifier("e2eeAuto.historyRequest.passkeyInstead")
+                        }
                         GradientButton(
                             requester.activating ? String(localized: "Plus tard") : String(localized: "Continuer sans l’historique"), style: .ghost
                         ) { coordinator.hideRequester() }
@@ -608,6 +703,46 @@ struct E2EEAutoHistoryRequesterView: View {
         }
     }
 
+    /// Messages retrouvés ; HK venue d'un autre appareil (« C'est moi », passkey par QR) : la
+    /// passkey de cet appareil est proposée aussitôt (§5.5, parcours A étape 6).
+    @ViewBuilder
+    private var receivedContent: some View {
+        Text("Messages retrouvés. Tes anciens messages arrivent sur cet appareil.")
+            .font(SQType.body)
+            .foregroundStyle(SQColor.label)
+            .fixedSize(horizontal: false, vertical: true)
+        if let message = coordinator.passkeyMessage {
+            Text(message.text)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if coordinator.passkeyInvitation == .create {
+            Text("Avec une passkey sur cet appareil, la prochaine fois, un seul geste suffira.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            GradientButton(String(localized: "Retrouver mes messages en un geste sur cet appareil"), isBusy: coordinator.passkeyActing) {
+                Task { await coordinator.acceptPasskeyInvitation() }
+            }
+            .disabled(coordinator.passkeyActing)
+            .accessibilityIdentifier("e2eeAuto.historyRequest.createPasskey")
+            GradientButton(String(localized: "Plus tard"), style: .ghost) {
+                coordinator.postponePasskeyInvitation()
+                coordinator.passkeyMessage = nil
+                coordinator.hideRequester()
+            }
+            .disabled(coordinator.passkeyActing)
+            .accessibilityIdentifier("e2eeAuto.historyRequest.done")
+        } else {
+            GradientButton(String(localized: "OK")) {
+                coordinator.passkeyMessage = nil
+                coordinator.hideRequester()
+            }
+            .accessibilityIdentifier("e2eeAuto.historyRequest.done")
+        }
+    }
+
     /// A3 (§5.1 r23) : en tête de l'écran après « C'est moi » sur l'alerte « Nouvelle clé d'historique ».
     private var keyChangedHeader: some View {
         Text("Ta clé d’historique a changé.")
@@ -616,16 +751,16 @@ struct E2EEAutoHistoryRequesterView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// §5.3 : une passkey du compte avant « C'est moi ».
+    /// §5.3 et §5.5 : la passkey d'abord, « Valider depuis un autre appareil » en secours.
     @ViewBuilder
     private func passkeyContent(_ requester: E2EEAutoHistoryRequestCoordinator.Requester) -> some View {
-        Text("Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil.")
+        Text("Ta passkey ouvre tes anciens messages ici, sans passer par un autre appareil. Si elle est sur un autre téléphone, la fenêtre qui s’ouvre te le propose aussi.")
             .font(SQType.body)
             .foregroundStyle(SQColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
         switch requester.passkeyIssue {
         case .older?:
-            Label(String(localized: "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil."), systemImage: "clock.arrow.circlepath")
+            Label(String(localized: "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, valide depuis un autre appareil."), systemImage: "clock.arrow.circlepath")
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
@@ -637,12 +772,12 @@ struct E2EEAutoHistoryRequesterView: View {
         default:
             EmptyView()
         }
-        GradientButton(String(localized: "Utiliser ma passkey"), isBusy: requester.usingPasskey) {
+        GradientButton(String(localized: "Retrouver mes messages"), isBusy: requester.usingPasskey) {
             Task { await coordinator.usePasskey() }
         }
         .disabled(requester.usingPasskey)
         .accessibilityIdentifier("e2eeAuto.historyRequest.passkey")
-        GradientButton(String(localized: "Demander à un autre appareil"), style: .ghost) {
+        GradientButton(String(localized: "Valider depuis un autre appareil"), style: .ghost) {
             Task { await coordinator.askAnotherDevice() }
         }
         .disabled(requester.usingPasskey)
@@ -848,13 +983,17 @@ struct E2EEAutoHistoryFingerprintCard: View {
 /// Banc visuel (simulateur Debug) : `--qa-auto-history-request` (demandeur),
 /// `--qa-auto-history-approval` (« C'est moi ») ; avec `--qa-auto-history-activation`,
 /// la variante du mode renforcé (§6) ; avec `--qa-auto-history-passkey`, la passkey (§5.5)
-/// et `--qa-auto-history-passkey-older` après une passkey périmée ; avec
+/// et `--qa-auto-history-passkey-older` après une passkey périmée, `--qa-auto-history-passkey-received`
+/// après une passkey d'un autre appareil (création proposée), `--qa-auto-history-passkey-waiting` dans
+/// l'attente de « C'est moi » avec une passkey disponible ; avec
 /// `--qa-auto-history-approval-replaced`, la première demande est déjà close et une autre la remplace.
 struct E2EEAutoHistoryRequestQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     nonisolated private static let activation = AppEnvironment.hasQAFlag("auto-history-activation")
+    nonisolated private static let received = AppEnvironment.hasQAFlag("auto-history-passkey-received")
+    nonisolated private static let passkeyWaiting = AppEnvironment.hasQAFlag("auto-history-passkey-waiting")
     nonisolated private static let passkey = AppEnvironment.hasQAFlag("auto-history-passkey")
-        || AppEnvironment.hasQAFlag("auto-history-passkey-older")
+        || AppEnvironment.hasQAFlag("auto-history-passkey-older") || received || passkeyWaiting
     nonisolated private static let replaced = AppEnvironment.hasQAFlag("auto-history-approval-replaced")
     /// A3 : après « C'est moi » sur l'alerte « Nouvelle clé d'historique » ; `-syncing` reste dans la synchro.
     nonisolated private static let syncing = AppEnvironment.hasQAFlag("auto-history-key-changed-syncing")
@@ -888,7 +1027,9 @@ struct E2EEAutoHistoryRequestQAScreen: View {
                     return .closed
                 },
                 hasPasskey: { Self.passkey },
-                usePasskey: { .older }
+                usePasskey: { Self.received ? .present(hkPubB64: "hk") : .older },
+                passkeyOffer: { Self.received ? .create : .none },
+                performPasskey: { _ in .done }
             )
         },
         historyKeyHeld: { _ in false },
@@ -922,9 +1063,10 @@ struct E2EEAutoHistoryRequestQAScreen: View {
                 coordinator.historyKeyMissing(hkPubB64: "hk")
             } else if Self.passkey {
                 coordinator.historyKeyMissing(hkPubB64: "hk")
-                if AppEnvironment.hasQAFlag("auto-history-passkey-older") {
+                if AppEnvironment.hasQAFlag("auto-history-passkey-older") || Self.received || Self.passkeyWaiting {
                     while coordinator.requester?.phase != .passkey { try? await Task.sleep(for: .milliseconds(50)) }
-                    await coordinator.usePasskey()
+                    coordinator.openRequester()
+                    if Self.passkeyWaiting { await coordinator.askAnotherDevice() } else { await coordinator.usePasskey() }
                 }
             } else {
                 await coordinator.refresh()

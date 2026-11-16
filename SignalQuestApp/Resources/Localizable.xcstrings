@@ -1,6 +1,226 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Retrouver mes messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get my messages back"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retrouver mes messages"
+          }
+        }
+      }
+    },
+    "Valider depuis un autre appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm from another device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider depuis un autre appareil"
+          }
+        }
+      }
+    },
+    "Retrouver avec ma passkey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use my passkey instead"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retrouver avec ma passkey"
+          }
+        }
+      }
+    },
+    "Retrouver mes messages en un geste sur cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get my messages in one step on this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retrouver mes messages en un geste sur cet appareil"
+          }
+        }
+      }
+    },
+    "Avec une passkey sur cet appareil, la prochaine fois, un seul geste suffira." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With a passkey on this device, next time one step is all it takes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec une passkey sur cet appareil, la prochaine fois, un seul geste suffira."
+          }
+        }
+      }
+    },
+    "Messages retrouvés. Tes anciens messages arrivent sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages found. Your older messages are on their way to this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages retrouvés. Tes anciens messages arrivent sur cet appareil."
+          }
+        }
+      }
+    },
+    "SQFormal|Messages retrouvés. Tes anciens messages arrivent sur cet appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages retrouvés. Vos anciens messages arrivent sur cet appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta passkey ouvre tes anciens messages ici, sans passer par un autre appareil. Si elle est sur un autre téléphone, la fenêtre qui s’ouvre te le propose aussi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your passkey opens your older messages here, without going through another device. If it’s on another phone, the window that opens offers that too."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta passkey ouvre tes anciens messages ici, sans passer par un autre appareil. Si elle est sur un autre téléphone, la fenêtre qui s’ouvre te le propose aussi."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta passkey ouvre tes anciens messages ici, sans passer par un autre appareil. Si elle est sur un autre téléphone, la fenêtre qui s’ouvre te le propose aussi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre passkey ouvre vos anciens messages ici, sans passer par un autre appareil. Si elle est sur un autre téléphone, la fenêtre qui s’ouvre vous le propose aussi."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, valide depuis un autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This passkey only opens your older messages. For the most recent ones, confirm from another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, valide depuis un autre appareil."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, valide depuis un autre appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette passkey n’ouvre que vos anciens messages. Pour les plus récents, validez depuis un autre appareil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta clé d’historique a changé : ta passkey ouvrira aussi tes nouveaux messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your history key changed: your passkey will open your new messages too"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta clé d’historique a changé : ta passkey ouvrira aussi tes nouveaux messages"
+          }
+        }
+      }
+    },
+    "SQFormal|Ta clé d’historique a changé : ta passkey ouvrira aussi tes nouveaux messages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre clé d’historique a changé : votre passkey ouvrira aussi vos nouveaux messages"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Crée une passkey qui ouvre tes anciens messages sur tes autres appareils" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a passkey that opens your older messages on your other devices"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crée une passkey qui ouvre tes anciens messages sur tes autres appareils"
+          }
+        }
+      }
+    },
+    "SQFormal|Crée une passkey qui ouvre tes anciens messages sur tes autres appareils" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créez une passkey qui ouvre vos anciens messages sur vos autres appareils"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Retrouver mes messages partout" : {
       "localizations" : {
         "en" : {
@@ -7782,22 +8002,6 @@
         }
       }
     },
-    "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This passkey only opens your older messages. For the most recent ones, ask another device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil."
-          }
-        }
-      }
-    },
     "Cette pièce jointe est illisible." : {
       "localizations" : {
         "en" : {
@@ -8012,22 +8216,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "C’est fait : l’autre appareil est activé."
-          }
-        }
-      }
-    },
-    "Demander à un autre appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ask another device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demander à un autre appareil"
           }
         }
       }
@@ -8899,18 +9087,6 @@
       },
       "shouldTranslate" : false
     },
-    "SQFormal|Cette passkey n’ouvre que tes anciens messages. Pour les plus récents, demande à un autre appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette passkey n’ouvre que vos anciens messages. Pour les plus récents, demandez à un autre appareil."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
     "SQFormal|Cette vidéo dépasse 100 Mo. Choisis-en une plus courte." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9002,18 +9178,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre clé d’historique a changé : mettez à jour la passkey pour qu’elle ouvre aussi vos nouveaux messages."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "SQFormal|Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre passkey peut ouvrir votre historique ici, sans passer par un autre appareil."
           }
         }
       },
@@ -9239,22 +9403,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta clé d’historique a changé : mets à jour la passkey pour qu’elle ouvre aussi tes nouveaux messages."
-          }
-        }
-      }
-    },
-    "Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your passkey can open your history here, without going through another device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ta passkey peut ouvrir ton historique ici, sans passer par un autre appareil."
           }
         }
       }
@@ -9518,22 +9666,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un appareil attend d’être activé sur ton compte, en mode renforcé. Une fois activé, il lira et enverra tes messages chiffrés. Touche « C’est moi » seulement si c’est le tien et que son écran affiche la même empreinte."
-          }
-        }
-      }
-    },
-    "Utiliser ma passkey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use my passkey"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser ma passkey"
           }
         }
       }
@@ -112680,62 +112812,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les extraits ISED ne sont pas encore disponibles. Tirez l’écran vers le bas pour actualiser."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Ouvrir ton historique sur cet appareil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open your history on this device"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir ton historique sur cet appareil"
-          }
-        }
-      }
-    },
-    "SQFormal|Ouvrir ton historique sur cet appareil" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir votre historique sur cet appareil"
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your history is open on this device. Your older messages are on their way."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent."
-          }
-        }
-      }
-    },
-    "SQFormal|Ton historique est ouvert sur cet appareil. Tes anciens messages arrivent." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre historique est ouvert sur cet appareil. Vos anciens messages arrivent."
           }
         }
       },

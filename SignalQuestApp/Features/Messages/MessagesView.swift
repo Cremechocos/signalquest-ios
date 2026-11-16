@@ -696,6 +696,9 @@ struct MessagesView: View {
                 if historyRequests.showsHistoryBanner, !showingShelved, !showingRequests {
                     historyBanner
                 }
+                if historyRequests.showsPasskeyBanner, !showingShelved, !showingRequests {
+                    passkeyBanner
+                }
                 if offersE2EEUnlock, !showingShelved, !showingRequests {
                     e2eeUnlockBanner
                 }
@@ -999,6 +1002,17 @@ struct MessagesView: View {
         } message: { _ in
             Text("Elle disparaîtra de ta liste et tu ne recevras plus ses messages.")
         }
+        // Résultat d'un geste lancé depuis le bandeau passkey ; l'écran « Retrouver mes
+        // messages » montre le sien lui-même.
+        .alert(
+            Text(historyRequests.passkeyMessage?.text ?? ""),
+            isPresented: Binding(
+                get: { historyRequests.passkeyMessage != nil && !historyRequests.presentsRequester },
+                set: { if !$0 { historyRequests.passkeyMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { historyRequests.passkeyMessage = nil }
+        }
         // Après la boîte de dialogue, jamais depuis elle : iOS 16 refuse une
         // feuille présentée pendant qu'elle se ferme.
         .sheet(item: $successorRequest) { request in
@@ -1166,6 +1180,69 @@ struct MessagesView: View {
             .accessibilityLabel(Text("Plus tard"))
             .accessibilityHint(Text("Masque ce rappel pendant une semaine"))
             .accessibilityIdentifier("messages.history.later")
+        }
+        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    /// Invitation passkey (E2EE-AUTO §5.5) : « Retrouver mes messages partout » une fois, ou
+    /// « Mettre à jour ma passkey » après une rotation de la clé d'historique. Un appui ouvre
+    /// la feuille système ; rien de technique n'est montré.
+    private var passkeyBanner: some View {
+        let updating = historyRequests.passkeyInvitation != .create
+        return HStack(spacing: 0) {
+            Button {
+                Haptics.light()
+                Task { await historyRequests.acceptPasskeyInvitation() }
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Image(systemName: "person.badge.key")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityHidden(true)
+                    }
+                    Group {
+                        if updating { Text("Mettre à jour ma passkey") } else { Text("Retrouver mes messages partout") }
+                    }
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if historyRequests.passkeyActing {
+                        ProgressView()
+                    } else {
+                        Group {
+                            if updating { Text("Mettre à jour") } else { Text("Activer") }
+                        }
+                            .font(SQType.subhead(.semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                    }
+                }
+                .padding(.leading, SQSpace.md)
+                .frame(minHeight: 44)
+                .padding(.vertical, SQSpace.xs)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .disabled(historyRequests.passkeyActing)
+            .accessibilityHint(updating
+                ? Text("Ta clé d’historique a changé : ta passkey ouvrira aussi tes nouveaux messages")
+                : Text("Crée une passkey qui ouvre tes anciens messages sur tes autres appareils"))
+            .accessibilityIdentifier("messages.passkey.banner")
+            Button {
+                Haptics.light()
+                historyRequests.postponePasskeyInvitation()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(historyRequests.passkeyActing)
+            .accessibilityLabel(Text("Plus tard"))
+            .accessibilityIdentifier("messages.passkey.later")
         }
         .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }

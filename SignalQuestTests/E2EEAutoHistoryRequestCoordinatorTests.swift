@@ -29,6 +29,10 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         var hasPasskey = false
         var passkeyOutcomes: [Coordinator.PasskeyRecovery] = []
         var passkeyUses = 0
+        var offers: [E2EEAutoPasskeyContract.Offer] = []
+        var gestures: [E2EEAutoPasskeyContract.Offer] = []
+        var gestureResult: E2EEAutoPasskeyGesture.Result = .done
+        var creationDismissed = false
         var snoozedUntil: Date?
         /// Attente interrompue (tâche annulée) : l'écran reste où il en était.
         var sleepFails = false
@@ -45,7 +49,11 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
                         openRequests: { self.listing },
                         approve: { self.approved.append($0); return self.approveOutcome },
                         hasPasskey: { self.hasPasskey },
-                        usePasskey: { self.passkeyUses += 1; return self.passkeyOutcomes.isEmpty ? .failed : self.passkeyOutcomes.removeFirst() }
+                        usePasskey: { self.passkeyUses += 1; return self.passkeyOutcomes.isEmpty ? .failed : self.passkeyOutcomes.removeFirst() },
+                        passkeyOffer: { self.offers.isEmpty ? .none : self.offers.removeFirst() },
+                        performPasskey: { self.gestures.append($0); return self.gestureResult },
+                        creationDismissed: { self.creationDismissed },
+                        dismissCreation: { self.creationDismissed = true }
                     )
                 },
                 historyKeyHeld: { _ in
@@ -362,7 +370,7 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.requester?.phase, .received)
     }
 
-    /// Passkey périmée ou annulée : l'écran reste, « Demander à un autre appareil » ouvre la demande.
+    /// Passkey périmée ou annulée : l'écran reste, « Valider depuis un autre appareil » ouvre la demande.
     func testStalePasskeyFallsBackToARequest() async {
         let world = World()
         world.hasPasskey = true
@@ -380,5 +388,96 @@ final class E2EEAutoHistoryRequestCoordinatorTests: XCTestCase {
         await coordinator.askAnotherDevice()
         XCTAssertEqual(world.starts, 1)
         XCTAssertEqual(coordinator.requester?.phase, .waiting)
+    }
+
+    // MARK: Écran unique et invitation passkey (§5.5 r22)
+
+    /// Après « C'est moi » ou une passkey d'un autre appareil, l'écran propose aussitôt la passkey
+    /// locale ; un appui la crée, puis l'invitation tombe.
+    func testReceivedScreenOffersTheLocalPasskeyAtOnce() async {
+        let world = World()
+        world.hasPasskey = true
+        let coordinator = world.coordinator()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        coordinator.openRequester()
+        world.passkeyOutcomes = [.present(hkPubB64: "hk")]
+        world.offers = [.create, .none]
+        await coordinator.usePasskey()
+        XCTAssertEqual(coordinator.requester?.phase, .received)
+        XCTAssertEqual(coordinator.passkeyInvitation, .create)
+        XCTAssertFalse(coordinator.showsPasskeyBanner, "l'écran la montre, pas le bandeau")
+
+        await coordinator.acceptPasskeyInvitation()
+        XCTAssertEqual(world.gestures, [.create])
+        XCTAssertEqual(coordinator.passkeyMessage?.text, String(localized: "Ta passkey ouvre maintenant tes messages sur tes autres appareils."))
+        XCTAssertEqual(coordinator.passkeyInvitation, .none)
+        coordinator.hideRequester()
+        XCTAssertNil(coordinator.passkeyMessage, "lu sur l'écran, Messages ne le redit pas")
+    }
+
+    /// « Plus tard » : une création ne revient plus (drapeau « déjà proposée ») ; une mise à jour
+    /// revient au prochain lancement seulement.
+    func testLaterOnTheInvitation() async {
+        let world = World()
+        let coordinator = world.coordinator()
+        world.offers = [.create]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertTrue(coordinator.showsPasskeyBanner)
+        coordinator.postponePasskeyInvitation()
+        XCTAssertTrue(world.creationDismissed)
+        world.offers = [.create]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyInvitation, .none)
+
+        world.offers = [.update(credentialIds: ["AQID"])]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyInvitation, .update(credentialIds: ["AQID"]))
+        coordinator.postponePasskeyInvitation()
+        world.offers = [.update(credentialIds: ["AQID"])]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyInvitation, .none)
+        coordinator.reset()
+        world.offers = [.update(credentialIds: ["AQID"])]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyInvitation, .update(credentialIds: ["AQID"]))
+
+        // H1 : un appareil récent n'est pas invité à mettre à jour.
+        world.offers = [.updateTomorrow]
+        await coordinator.refreshPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyInvitation, .none)
+    }
+
+    /// Un geste refusé (24 h) se dit sans alerte et l'invitation reste lisible.
+    func testTooRecentGestureSaysTryTomorrow() async {
+        let world = World()
+        let coordinator = world.coordinator()
+        world.offers = [.update(credentialIds: ["AQID"]), .update(credentialIds: ["AQID"])]
+        world.gestureResult = .tooRecent
+        await coordinator.refreshPasskeyInvitation()
+        await coordinator.acceptPasskeyInvitation()
+        XCTAssertEqual(coordinator.passkeyMessage, .problem(String(localized: "Réessaie demain : cet appareil a été ajouté il y a moins de 24 h.")))
+    }
+
+    /// Dans l'attente de « C'est moi », la passkey reste à un appui ; sans passkey, rien.
+    func testWaitingScreenLeadsBackToThePasskey() async {
+        let world = World()
+        world.hasPasskey = true
+        let coordinator = world.coordinator()
+        coordinator.historyKeyMissing(hkPubB64: "hk")
+        await settle(coordinator)
+        await coordinator.askAnotherDevice()
+        XCTAssertEqual(coordinator.requester?.phase, .waiting)
+        XCTAssertEqual(coordinator.requester?.passkeyAvailable, true)
+        coordinator.usePasskeyInstead()
+        XCTAssertEqual(coordinator.requester?.phase, .passkey)
+
+        let plain = World()
+        let other = plain.coordinator()
+        other.historyKeyMissing(hkPubB64: "hk")
+        await settle(other)
+        XCTAssertEqual(other.requester?.phase, .waiting)
+        other.usePasskeyInstead()
+        XCTAssertEqual(other.requester?.phase, .waiting)
     }
 }

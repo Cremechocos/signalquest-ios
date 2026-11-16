@@ -625,6 +625,8 @@ struct E2EEAutoDevicesView: View {
                         }
                     }
                     .frame(minHeight: 44)
+                    // Désactivée jusqu'à demain : grisée, pas en noir comme un texte actif.
+                    .foregroundStyle(model.passkeyOffer == .updateTomorrow ? AnyShapeStyle(SQColor.labelSecondary) : AnyShapeStyle(.tint))
                 }
                 .disabled(model.isActing || model.passkeyOffer == .updateTomorrow)
                 .accessibilityIdentifier("e2eeAuto.devices.passkey")
