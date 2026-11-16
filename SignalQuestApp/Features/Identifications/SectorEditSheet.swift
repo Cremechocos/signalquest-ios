@@ -290,7 +290,7 @@ struct SectorEditSheet: View {
         ScrollView {
             VStack(spacing: SQSpace.lg) {
                 MapSheetHeader(
-                    title: "Corriger le secteur",
+                    title: String(localized: "Corriger le secteur"),
                     subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.row.label)."),
                     closeIdentifier: "sector.cancel"
                 ) { dismiss() }

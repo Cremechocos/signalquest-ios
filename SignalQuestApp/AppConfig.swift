@@ -99,11 +99,12 @@ enum SQFeatures {
     /// numérotent S1..SN comme Orange, Bouygues et Free, et tout autre opérateur aussi
     /// (« Tout en base 1 », §5 : plus de mode legacy, comme Android),
     /// chaque requête porte `X-SQ-Sector-Base: 1` et un signalement envoie le numéro et
-    /// l'azimut à part. Le serveur est en base 1 depuis le 16/11 (#1349, 04:27) et
-    /// convertit les builds sans l'en-tête. Fermé jusqu'au « servi » du nord d'abord
-    /// SFR (SECTOR-NORTH-2) : décision d'Alexandre, « Mêmes builds », pour que les
-    /// numéros SFR ne changent qu'une fois dans l'app.
-    static let sectorBaseOne = false
+    /// l'azimut à part, et les cônes suivent l'ordre du serveur (`SectorOrientation` :
+    /// regroupement à 20°, nord d'abord pour SFR sur un Crozon mené par Bouygues).
+    /// Le serveur est en base 1 depuis le 16/11 (#1349, 04:27) et au nord d'abord SFR
+    /// depuis le 16/11 (SECTOR-NORTH-2, 12:57) ; il convertit les builds sans l'en-tête.
+    /// Ouvert pour les deux à la fois : décision d'Alexandre, « Mêmes builds ».
+    static let sectorBaseOne = true
 }
 
 struct AppConfig: Equatable {

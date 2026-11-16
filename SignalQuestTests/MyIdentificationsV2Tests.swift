@@ -405,16 +405,17 @@ final class MyIdentificationsV2Tests: XCTestCase {
             await model.load()
             XCTAssertTrue(model.usesList, "\(azimuts.count) azimut(s) : pas de schéma")
             XCTAssertEqual(model.slotCount, 3)
-            XCTAssertEqual((0..<3).map(model.sectorLabel(forIndex:)), [0, 1, 2])
-            XCTAssertEqual(model.selectedIndex, 0, "le secteur 0 enregistré par SFR est retrouvé")
+            // Base 1 (SECTOR-BASE-1) : SFR numérote S1..S3 ; un 0 d'avant la base 1 reste lu.
+            XCTAssertEqual((0..<3).map(model.sectorLabel(forIndex:)), [1, 2, 3])
+            XCTAssertEqual(model.selectedIndex, 0, "le secteur 0 enregistré par SFR en base 0 est retrouvé")
         }
         let model = SectorEditViewModel(item: sfr, antennas: AzimuthAntennasService(azimuts: []), identify: service)
         await model.load()
         model.addListSlot()
-        XCTAssertEqual(model.sectorLabel(forIndex: 3), 3)
+        XCTAssertEqual(model.sectorLabel(forIndex: 3), 4)
         model.selectedIndex = 3
         await model.submit()
-        XCTAssertEqual(service.sentSectors.last, [3])
+        XCTAssertEqual(service.sentSectors.last, [4])
 
         // Borne commune de 6 lignes ; un secteur enregistré au-delà reste affiché et choisi.
         for _ in 0..<10 { model.addListSlot() }
@@ -425,14 +426,35 @@ final class MyIdentificationsV2Tests: XCTestCase {
         """.utf8))
         let wide = SectorEditViewModel(item: beyond, antennas: AzimuthAntennasService(azimuts: []), identify: service)
         await wide.load()
-        XCTAssertEqual(wide.slotCount, 10)
-        XCTAssertEqual(wide.selectedIndex, 9)
+        XCTAssertEqual(wide.slotCount, 9, "S9 en base 1 : neuf lignes")
+        XCTAssertEqual(wide.selectedIndex, 8)
         wide.addListSlot()
-        XCTAssertEqual(wide.slotCount, 10, "« Ajouter » ne raccourcit jamais la liste")
+        XCTAssertEqual(wide.slotCount, 9, "« Ajouter » ne raccourcit jamais la liste")
     }
 
     /// `derivedSector` (02/11) : la référence du PCI se montre avant tout choix, même sans
     /// secteur enregistré ; absent, rien n'est deviné.
+    /// SECTOR-NORTH-2 : sur un Crozon mené par Bouygues, le radar de SFR part du cône le plus
+    /// proche du nord, comme le serveur ; S1 désigne alors 330°, pas 90°.
+    func testSfrRadarStartsNorthOnABouyguesLedCrozon() async throws {
+        let sfr = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
+        {"id":"n","siteId":"799050","type":"pci","pci":214,"pciValue":"214","operator":"SFR","operatorMcc":208,
+         "operatorMnc":10,"marketCode":"FR","sectors":[1]}
+        """.utf8))
+        let service = PagedIdentifyService()
+        let crozon = SectorEditViewModel(item: sfr, antennas: AzimuthAntennasService(azimuts: [90, 200, 330], sharing: "\"crozon\""),
+                                         identify: service)
+        await crozon.load()
+        XCTAssertEqual(crozon.azimuths.map { Int($0.rounded()) }, [330, 90, 200])
+        XCTAssertEqual(crozon.selectedIndex, 0, "S1 enregistré = 330°")
+        await crozon.submit()
+        XCTAssertEqual(service.sentSectors.last, [1])
+        // Hors Crozon mené par Bouygues : ordre croissant.
+        let plain = SectorEditViewModel(item: sfr, antennas: AzimuthAntennasService(azimuts: [90, 200, 330]), identify: service)
+        await plain.load()
+        XCTAssertEqual(plain.azimuths.map { Int($0.rounded()) }, [90, 200, 330])
+    }
+
     func testDerivedSectorIsShownBeforeTheChoiceAndNeverGuessed() async throws {
         let derived = try JSONDecoder.signalQuest.decode(MyIdentification.self, from: Data("""
         {"id":"c","siteId":"799050","type":"cellid","ci":"267173893","operator":"SFR","operatorMcc":208,
@@ -442,8 +464,8 @@ final class MyIdentificationsV2Tests: XCTestCase {
         let model = SectorEditViewModel(item: derived, antennas: AzimuthAntennasService(), identify: PagedIdentifyService())
         await model.load()
         XCTAssertNil(model.selectedIndex)
-        XCTAssertEqual(model.referenceIndex, 1, "SFR en base 0 : secteur 1 = deuxième azimut")
-        model.selectedIndex = 1
+        XCTAssertEqual(model.referenceIndex, 0, "SFR en base 1 : secteur 1 = premier azimut")
+        model.selectedIndex = 0
         XCTAssertNil(model.referenceIndex)
         XCTAssertTrue(model.selectionMatchesPci)
 
@@ -694,6 +716,8 @@ private final class PagedIdentifyService: IdentifyServicing, @unchecked Sendable
 
 private struct AzimuthAntennasService: AntennasServicing {
     var azimuts: [Double] = [0, 120, 240]
+    /// Partage servi par le détail (`sharingKind`, `crozonLeader`), « null » par défaut.
+    var sharing = "null"
     var sites: [AntennaSite] = []
     func list(bbox: BoundingBox) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { sites }
@@ -702,7 +726,7 @@ private struct AzimuthAntennasService: AntennasServicing {
     func details(id: String) async throws -> AntennaDetails { try await details(id: id, market: "FR", operatorName: "ORANGE") }
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails {
         try JSONDecoder.signalQuest.decode(AntennaDetails.self, from: Data("""
-        {"antenna":{"id":"799050","supId":"799050","lat":45.0,"lng":5.0,"operators":["ORANGE"],"technologies":["4G"],"azimuts":\(azimuts)}}
+        {"antenna":{"id":"799050","supId":"799050","lat":45.0,"lng":5.0,"operators":["ORANGE"],"technologies":["4G"],"azimuts":\(azimuts),"sharingKind":\(sharing),"crozonLeader":\(sharing == "null" ? "null" : "\"BOUYGUES\"")}}
         """.utf8))
     }
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails {
