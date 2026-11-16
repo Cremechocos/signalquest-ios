@@ -20,13 +20,14 @@ final class SpeedtestFailureReporterTests: XCTestCase {
         ])
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(batch)) as? [String: Any])
         XCTAssertEqual(Set(object.keys), ["version", "platform", "build", "failures"])
-        XCTAssertEqual(object["version"] as? String, "1")
+        XCTAssertEqual(object["version"] as? String, "2")
         XCTAssertEqual(object["platform"] as? String, "ios")
         let first = try XCTUnwrap((object["failures"] as? [[String: Any]])?.first)
-        XCTAssertEqual(Set(first.keys), ["code", "phase", "engine", "technology", "operatorKey", "quarterStart"],
-                       "engine et operatorKey toujours présents, même à null")
+        XCTAssertEqual(Set(first.keys), ["code", "phase", "engine", "technology", "operatorKey", "quarterStart", "experience"],
+                       "engine, operatorKey et experience toujours présents, même à null")
         XCTAssertTrue(first["engine"] is NSNull)
         XCTAssertTrue(first["operatorKey"] is NSNull)
+        XCTAssertTrue(first["experience"] is NSNull, "speedtest classique : experience à null en v2")
         XCTAssertEqual(first["phase"] as? String, "setup")
     }
 
@@ -127,7 +128,7 @@ final class SpeedtestFailureReporterTests: XCTestCase {
         let keys = await sent.keys
         let body = try XCTUnwrap(bodies.first)
         XCTAssertEqual(String(decoding: body, as: UTF8.self),
-                       #"{"build":"185","failures":[{"code":"NO_INTERNET","engine":null,"operatorKey":null,"phase":"setup","quarterStart":"2026-11-13T19:30:00.000Z","technology":"WIFI"}],"platform":"ios","version":"1"}"#)
+                       #"{"build":"185","failures":[{"code":"NO_INTERNET","engine":null,"experience":null,"operatorKey":null,"phase":"setup","quarterStart":"2026-11-13T19:30:00.000Z","technology":"WIFI"}],"platform":"ios","version":"2"}"#)
         let key = try XCTUnwrap(keys.first)
         XCTAssertNotNil(UUID(uuidString: key), "Idempotency-Key au format UUID")
     }
@@ -187,6 +188,107 @@ final class SpeedtestFailureReporterTests: XCTestCase {
         let wait = await reporter.delayBeforeSend(at: clock.now)
         XCTAssertEqual(wait, 50, accuracy: 1)
         SpeedtestFailureReporter.noteSpeedtestPost(at: .distantPast)
+    }
+
+    // MARK: SPEEDTEST-FAIL-2
+
+    private func experienceRun() -> ExperienceRun {
+        var tests = ExperienceTestsResult()
+        tests.webPage = ExperienceWebResult(state: .failed, openings: [])
+        tests.gameAndCalls = ExperienceGameResult(state: .interrupted, reason: .userStopped)
+        tests.upload = ExperienceUploadResult(state: .failed, items: [])
+        return ExperienceRun(
+            tests: tests, bytesUsed: 3_000_000, durationMs: 40_000, stop: .userStopped,
+            failures: [.upload: .httpError(503)],
+            usage: [.webPage: .init(bytes: 2_349_999, durationMs: 30_400), .upload: .init(bytes: 650_001, durationMs: 9_600)],
+            addressFamilies: [.upload: "ipv6"]
+        )
+    }
+
+    func testOneExperienceLinePerFailedTestWithTheContractShape() throws {
+        let now = ISO8601DateFormatter().date(from: "2026-11-16T22:07:00Z")!
+        let lines = SpeedtestFailure.experienceLines(experienceRun(), status: status(.cellular, .fourG), operatorKey: "FREE",
+                                                     viaVpn: false, nat64: nil, now: now)
+        XCTAssertEqual(lines.map { $0.experience?.test }, ["webPage", "upload"], "ni interrompu ni non testé")
+        let web = try XCTUnwrap(lines.first)
+        XCTAssertEqual(web.code, "UNKNOWN")
+        XCTAssertEqual(web.phase, .setup)
+        XCTAssertEqual(web.engine, "experience")
+        XCTAssertEqual(web.technology, "4G")
+        XCTAssertEqual(web.operatorKey, "FREE")
+        XCTAssertEqual(web.quarterStart, "2026-11-16T22:00:00.000Z")
+        XCTAssertEqual(web.experience?.cause, "generic", "aucune cause retenue")
+        XCTAssertNil(web.experience?.httpStatus)
+        XCTAssertEqual(web.experience?.megabytes, 2.3)
+        XCTAssertEqual(web.experience?.durationS, 30)
+        XCTAssertNil(web.experience?.addressFamily)
+        let upload = try XCTUnwrap(lines.last?.experience)
+        XCTAssertEqual(upload.cause, "http_error")
+        XCTAssertEqual(upload.httpStatus, 503)
+        XCTAssertEqual(upload.megabytes, 0.7)
+        XCTAssertEqual(upload.durationS, 10)
+        XCTAssertEqual(upload.addressFamily, "ipv6")
+        XCTAssertTrue(lines.allSatisfy { SpeedtestFailure.isSendable($0, now: now) })
+
+        let batch = SpeedtestFailure.Batch(build: "187", failures: lines)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(batch)) as? [String: Any])
+        XCTAssertEqual(object["version"] as? String, "2")
+        let sent = try XCTUnwrap((object["failures"] as? [[String: Any]])?.first?["experience"] as? [String: Any])
+        XCTAssertEqual(Set(sent.keys), ["test", "cause", "httpStatus", "megabytes", "durationS", "ipMode", "addressFamily",
+                                        "nat64", "privateDns", "vpn"], "toutes les clés, null compris")
+        XCTAssertEqual(sent["ipMode"] as? String, "auto")
+        XCTAssertTrue(sent["nat64"] is NSNull, "détection ratée : null, jamais false")
+        XCTAssertTrue(sent["privateDns"] is NSNull, "iOS ne lit pas le DNS chiffré du système")
+        XCTAssertEqual(sent["vpn"] as? Bool, false)
+    }
+
+    func testUnderAVPNTheExperienceLineSaysSoAndDescribesNoNetwork() throws {
+        let line = try XCTUnwrap(SpeedtestFailure.experienceLines(
+            experienceRun(), status: status(.cellular, .fiveGNSA), operatorKey: "SFR", viaVpn: true, nat64: true, now: Date()
+        ).first)
+        XCTAssertEqual(line.technology, "UNKNOWN")
+        XCTAssertNil(line.operatorKey)
+        XCTAssertEqual(line.experience?.vpn, true)
+        XCTAssertEqual(line.experience?.nat64, true)
+    }
+
+    func testEveryCauseHasAContractName() {
+        let causes: [ExperienceFailureCause] = [.serverBusy, .routeChanged, .httpError(500), .dns, .connect, .tls, .timeout,
+                                                .cut, .probeLoss, .noNetwork, .generic]
+        for cause in causes {
+            XCTAssertTrue(SpeedtestFailure.Experience.causes.contains(SpeedtestFailure.cause(cause)), "\(cause)")
+        }
+    }
+
+    func testTheServerRulesForExperienceLinesAreCheckedBeforeSending() {
+        let now = Date()
+        let quarter = SpeedtestFailure.quarterStart(now)
+        let experience = SpeedtestFailure.Experience(test: "upload", cause: "cut", httpStatus: nil, megabytes: 1,
+                                                     durationS: 3, addressFamily: "ipv4", nat64: false, vpn: false)
+        func line(code: String = "UNKNOWN", phase: SpeedtestFailure.Phase = .setup, engine: String? = "experience",
+                  experience: SpeedtestFailure.Experience?) -> SpeedtestFailure.Line {
+            SpeedtestFailure.Line(code: code, phase: phase, engine: engine, technology: "WIFI", operatorKey: nil,
+                                  quarterStart: quarter, experience: experience)
+        }
+        XCTAssertTrue(SpeedtestFailure.isSendable(line(experience: experience), now: now))
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(experience: nil), now: now), "test d'expérience sans objet")
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(code: "TIMEOUT", experience: experience), now: now), "UNKNOWN imposé")
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(phase: .download, experience: experience), now: now), "setup imposé")
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(engine: "cloudflare", experience: experience), now: now),
+                       "speedtest classique avec un objet")
+        let wrongCause = SpeedtestFailure.Experience(test: "upload", cause: "boom", httpStatus: nil, megabytes: 1,
+                                                     durationS: 3, addressFamily: nil, nat64: nil, vpn: false)
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(experience: wrongCause), now: now))
+        let wrongStatus = SpeedtestFailure.Experience(test: "upload", cause: "http_error", httpStatus: 700, megabytes: 1,
+                                                      durationS: 3, addressFamily: nil, nat64: nil, vpn: false)
+        XCTAssertFalse(SpeedtestFailure.isSendable(line(experience: wrongStatus), now: now))
+    }
+
+    func testALineQueuedByAVersionOneBuildIsReadAsAClassicLine() throws {
+        let stored = Data(#"{"code":"TIMEOUT","phase":"download","engine":"cloudflare","technology":"4G","operatorKey":null,"quarterStart":"2026-11-16T21:45:00.000Z"}"#.utf8)
+        let line = try JSONDecoder().decode(SpeedtestFailure.Line.self, from: stored)
+        XCTAssertNil(line.experience)
+        XCTAssertEqual(line.engine, "cloudflare")
     }
 }
 

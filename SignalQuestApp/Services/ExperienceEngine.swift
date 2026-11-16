@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Issue d'un transfert vers le serveur de mesure.
 enum ExperienceFetch: Equatable, Sendable {
@@ -8,20 +9,60 @@ enum ExperienceFetch: Equatable, Sendable {
     case stopped
 }
 
-/// Pourquoi un test a échoué : pour l'écran seulement, jamais envoyé (le contrat
-/// n'a pas de champ de raison pour `failed`).
+/// Pourquoi un test a échoué. Jamais dans le résultat envoyé (le contrat experience-tests
+/// n'a pas de champ de raison pour `failed`) ; seulement à l'écran et dans la ligne anonyme
+/// de SPEEDTEST-FAIL-2.
 enum ExperienceFailureCause: Equatable, Sendable {
     /// HTTP 429 : serveur de mesure limité.
     case serverBusy
     /// Redirection, jamais suivie : la route de mesure a changé.
     case routeChanged
+    /// Autre statut HTTP hors 2xx.
+    case httpError(Int)
+    case dns
+    case connect
+    case tls
+    case timeout
+    /// Connexion coupée, ou transfert terminé avant le dernier octet.
+    case cut
+    /// Trop de sondes perdues pour une médiane honnête.
+    case probeLoss
+    /// Requête refusée avant tout réseau (hors ligne, données cellulaires coupées pour l'app).
+    case noNetwork
     case generic
 
     static func http(_ status: Int) -> Self {
         switch status {
         case 429: .serverBusy
         case 300...399: .routeChanged
+        case 100...599: .httpError(status)
         default: .generic
+        }
+    }
+
+    static func transport(_ code: URLError.Code) -> Self {
+        switch code {
+        case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff: .noNetwork
+        case .cannotFindHost, .dnsLookupFailed: .dns
+        case .cannotConnectToHost: .connect
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .clientCertificateRejected,
+             .clientCertificateRequired, .appTransportSecurityRequiresSecureConnection: .tls
+        case .timedOut: .timeout
+        case .networkConnectionLost: .cut
+        default: .generic
+        }
+    }
+
+    /// 429 ou redirection : un nouvel essai dans le même test ne changerait rien.
+    var refusesRetry: Bool { self == .serverBusy || self == .routeChanged }
+
+    /// Générique < délai dépassé < cause précise : la plus précise est gardée.
+    var precision: Int {
+        switch self {
+        case .generic: 0
+        case .timeout: 1
+        default: 2
         }
     }
 }
@@ -49,6 +90,18 @@ protocol ExperienceTransport: Sendable {
     func resolveHost() async -> String?
     /// Poignée de main TCP vers l'adresse:443 ; RTT en nanosecondes, nil en échec ou au-delà du délai.
     func tcpProbe(address: String, timeoutMs: Int64) async -> Int64?
+    /// Famille de l'adresse de la dernière connexion (`ipv4`, `ipv6`), remise à zéro à la lecture.
+    func takeAddressFamily() -> String?
+}
+
+extension ExperienceTransport {
+    func takeAddressFamily() -> String? { nil }
+
+    /// `ipv6` pour une adresse à deux-points (NAT64 compris : c'est la famille réellement utilisée).
+    static func addressFamily(of address: String?) -> String? {
+        guard let address, !address.isEmpty else { return nil }
+        return address.contains(":") ? "ipv6" : "ipv4"
+    }
 }
 
 /// Conditions relues pendant le test : une fausse arrête la suite, les tests finis sont gardés.
@@ -80,6 +133,8 @@ struct ExperienceRun: Sendable {
     let failures: [ExperienceTestKind: ExperienceFailureCause]
     /// Consommation et durée de chaque test lancé : la somme des octets est `bytesUsed`.
     let usage: [ExperienceTestKind: ExperienceTestUsage]
+    /// Famille (`ipv4`, `ipv6`) de l'adresse de la dernière connexion de chaque test, si connue.
+    var addressFamilies: [ExperienceTestKind: String] = [:]
 }
 
 struct ExperienceTestUsage: Equatable, Sendable {
@@ -132,12 +187,14 @@ final class ExperienceEngine: @unchecked Sendable {
         let startedAt = nowNanos()
         var tests = ExperienceTestsResult()
         var usage: [ExperienceTestKind: ExperienceTestUsage] = [:]
+        var families: [ExperienceTestKind: String] = [:]
         for key in ExperienceMethod.order where selected.contains(key) {
             if let blocked = interruption(force: true) {
                 tests.set(key, notTested: blocked)
                 continue
             }
             lock.withLock { currentTest = key }
+            _ = transport.takeAddressFamily()
             let bytesBefore = bytesUsed
             let testStartedAt = nowNanos()
             switch key {
@@ -148,11 +205,12 @@ final class ExperienceEngine: @unchecked Sendable {
             case .upload: tests.upload = await runUpload(onLive)
             }
             usage[key] = ExperienceTestUsage(bytes: bytesUsed - bytesBefore, durationMs: (nowNanos() - testStartedAt) / 1_000_000)
+            families[key] = transport.takeAddressFamily()
         }
         let (used, stopped, failed) = lock.withLock { (bytes, stop, failures) }
         return ExperienceRun(
             tests: tests, bytesUsed: used, durationMs: (nowNanos() - startedAt) / 1_000_000, stop: stopped,
-            failures: failed.filter { tests.state(of: $0.key) == .failed }, usage: usage
+            failures: failed.filter { tests.state(of: $0.key) == .failed }, usage: usage, addressFamilies: families
         )
     }
 
@@ -185,18 +243,25 @@ final class ExperienceEngine: @unchecked Sendable {
 
     private var stopped: ExperienceStopReason? { lock.withLock { stop } }
 
-    /// Retient la cause d'échec du test en cours (la plus précise l'emporte sur « générique »).
+    /// Retient la cause d'échec du test en cours (la plus précise l'emporte).
     private func remember(_ fetch: ExperienceFetch) {
-        guard case .failed(let cause) = fetch else { return }
+        switch fetch {
+        case .failed(let cause): remember(cause)
+        case .timedOut: remember(.timeout)
+        case .done, .stopped: break
+        }
+    }
+
+    private func remember(_ cause: ExperienceFailureCause) {
         lock.withLock {
             guard let key = currentTest else { return }
-            if failures[key] == nil || failures[key] == .generic { failures[key] = cause }
+            if cause.precision > (failures[key]?.precision ?? -1) { failures[key] = cause }
         }
     }
 
     /// 429 ou redirection : pas de nouvel essai dans le même test.
     private var serverRefused: Bool {
-        lock.withLock { currentTest.flatMap { failures[$0] }.map { $0 != .generic } ?? false }
+        lock.withLock { currentTest.flatMap { failures[$0] }?.refusesRetry ?? false }
     }
 
     private func sleepWatching(_ ms: Int64) async {
@@ -419,6 +484,7 @@ final class ExperienceEngine: @unchecked Sendable {
     private func runGame(_ onLive: @escaping @Sendable (ExperienceLive) -> Void) async -> ExperienceGameResult {
         guard let address = await transport.resolveHost() else {
             if let reason = failureReason() { return ExperienceGameResult(state: .interrupted, reason: reason) }
+            remember(.dns)
             return ExperienceGameResult(state: .failed)
         }
         // Sonde de chauffe, NON comptée : elle sort la radio de veille.
@@ -431,6 +497,7 @@ final class ExperienceEngine: @unchecked Sendable {
         guard ExperienceGameStats.hasEnoughProbes(sent: probes.sent, valid: probes.valid.count),
               let summary = ExperienceGameStats.summarize(probes.valid) else {
             // Réseau trop instable pour une médiane honnête : les sondes réussies restent montrées.
+            remember(.probeLoss)
             return ExperienceGameResult(state: .failed, probeMethod: "tcp_connect", series: probes.valid)
         }
         let underLoad = await measureUnderLoad(address)
@@ -601,6 +668,7 @@ final class URLSessionExperienceTransport: NSObject, ExperienceTransport, @unche
     private let host: String
     private let session: URLSession
     private let tcp = NetworkSpeedtestTCPProbe()
+    private let familyLock = OSAllocatedUnfairLock<String?>(initialState: nil)
     /// Contenu non compressible, tiré une fois et répété.
     private static let chunk: Data = {
         var generator = SystemRandomNumberGenerator()
@@ -641,6 +709,7 @@ final class URLSessionExperienceTransport: NSObject, ExperienceTransport, @unche
         let task = session.uploadTask(with: request, from: body)
         let outcome = await ExperienceTaskRunner(task: task, expectedBytes: nil, timeoutMs: timeoutMs, shouldStop: shouldStop,
                                                  onRead: { _ in }, onWrite: onWrite).run()
+        noteFamily(of: outcome.remoteAddress)
         // Durée de la demande à la réponse : le dernier octet écrit ne dit rien du débit réel.
         return (outcome.fetch, outcome.fetch == .done ? outcome.responseNanos : 0)
     }
@@ -685,7 +754,21 @@ final class URLSessionExperienceTransport: NSObject, ExperienceTransport, @unche
 
     func resolveHost() async -> String? {
         let host = host
-        return await Task.detached { try? ICMPPinger.resolve(host: host).addressText }.value
+        let address = await Task.detached { try? ICMPPinger.resolve(host: host).addressText }.value
+        noteFamily(of: address)
+        return address
+    }
+
+    func takeAddressFamily() -> String? {
+        familyLock.withLock { value in
+            defer { value = nil }
+            return value
+        }
+    }
+
+    private func noteFamily(of address: String?) {
+        guard let family = Self.addressFamily(of: address) else { return }
+        familyLock.withLock { $0 = family }
     }
 
     func tcpProbe(address: String, timeoutMs: Int64) async -> Int64? {
@@ -699,8 +782,10 @@ final class URLSessionExperienceTransport: NSObject, ExperienceTransport, @unche
         guard let url = url("/__down?bytes=\(bytes)") else { return .init(fetch: .failed(.generic)) }
         var request = URLRequest(url: url)
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        return await ExperienceTaskRunner(task: session.dataTask(with: request), expectedBytes: bytes, timeoutMs: timeoutMs,
-                                          shouldStop: shouldStop, onRead: onRead, onWrite: { _ in }).run()
+        let outcome = await ExperienceTaskRunner(task: session.dataTask(with: request), expectedBytes: bytes, timeoutMs: timeoutMs,
+                                                 shouldStop: shouldStop, onRead: onRead, onWrite: { _ in }).run()
+        noteFamily(of: outcome.remoteAddress)
+        return outcome
     }
 }
 
@@ -712,6 +797,7 @@ private final class ExperienceTaskRunner: NSObject, URLSessionDataDelegate, @unc
         var times = ExperienceWebPhases.Times()
         var protocolName: String?
         var responseNanos: Int64 = 0
+        var remoteAddress: String?
     }
 
     private let task: URLSessionTask
@@ -815,6 +901,7 @@ private final class ExperienceTaskRunner: NSObject, URLSessionDataDelegate, @unc
         lock.withLock {
             outcome.times = times
             outcome.protocolName = transaction.networkProtocolName
+            outcome.remoteAddress = transaction.remoteAddress
         }
     }
 
@@ -825,9 +912,10 @@ private final class ExperienceTaskRunner: NSObject, URLSessionDataDelegate, @unc
             if let ended {
                 outcome.fetch = ended
             } else if let error {
-                outcome.fetch = (error as? URLError)?.code == .timedOut ? .timedOut : .failed(.generic)
+                let code = (error as? URLError)?.code
+                outcome.fetch = code == .timedOut ? .timedOut : .failed(code.map(ExperienceFailureCause.transport) ?? .generic)
             } else if let expectedBytes, received < expectedBytes {
-                outcome.fetch = .failed(.generic)
+                outcome.fetch = .failed(.cut)
             } else {
                 outcome.fetch = .done
             }

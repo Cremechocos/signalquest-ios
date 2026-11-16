@@ -433,7 +433,7 @@ final class ExperienceEngineTests: XCTestCase {
         let edge = FakeEdge(clock: VirtualClock(), transferMs: rate(40e6), status: { _ in 500 })
         let run = await engine(edge).run([.upload])
         XCTAssertEqual(run.tests.upload, ExperienceUploadResult(state: .failed))
-        XCTAssertEqual(run.failures[.upload], .generic)
+        XCTAssertEqual(run.failures[.upload], .httpError(500))
         XCTAssertEqual(edge.httpCalls, 2)
     }
 
@@ -468,8 +468,48 @@ final class ExperienceEngineTests: XCTestCase {
         XCTAssertEqual(ExperienceFailureCause.http(429), .serverBusy)
         XCTAssertEqual(ExperienceFailureCause.http(301), .routeChanged)
         XCTAssertEqual(ExperienceFailureCause.http(307), .routeChanged)
-        XCTAssertEqual(ExperienceFailureCause.http(500), .generic)
-        XCTAssertEqual(ExperienceFailureCause.http(403), .generic)
+        XCTAssertEqual(ExperienceFailureCause.http(500), .httpError(500))
+        XCTAssertEqual(ExperienceFailureCause.http(403), .httpError(403))
+        XCTAssertEqual(ExperienceFailureCause.http(0), .generic, "hors 100-599 : pas de statut à envoyer")
+        XCTAssertFalse(ExperienceFailureCause.httpError(500).refusesRetry, "une erreur 5xx laisse réessayer")
+    }
+
+    /// SPEEDTEST-FAIL-2 : les erreurs de transport d'iOS rejoignent les causes du contrat.
+    func testTransportErrorsMapToContractCauses() {
+        XCTAssertEqual(ExperienceFailureCause.transport(.notConnectedToInternet), .noNetwork)
+        XCTAssertEqual(ExperienceFailureCause.transport(.dataNotAllowed), .noNetwork)
+        XCTAssertEqual(ExperienceFailureCause.transport(.internationalRoamingOff), .noNetwork)
+        XCTAssertEqual(ExperienceFailureCause.transport(.cannotFindHost), .dns)
+        XCTAssertEqual(ExperienceFailureCause.transport(.dnsLookupFailed), .dns)
+        XCTAssertEqual(ExperienceFailureCause.transport(.cannotConnectToHost), .connect)
+        XCTAssertEqual(ExperienceFailureCause.transport(.serverCertificateUntrusted), .tls)
+        XCTAssertEqual(ExperienceFailureCause.transport(.secureConnectionFailed), .tls)
+        XCTAssertEqual(ExperienceFailureCause.transport(.networkConnectionLost), .cut)
+        XCTAssertEqual(ExperienceFailureCause.transport(.timedOut), .timeout)
+        XCTAssertEqual(ExperienceFailureCause.transport(.badServerResponse), .generic)
+        XCTAssertEqual(URLSessionExperienceTransport.addressFamily(of: "104.16.1.1"), "ipv4")
+        XCTAssertEqual(URLSessionExperienceTransport.addressFamily(of: "64:ff9b::6810:101"), "ipv6")
+        XCTAssertNil(URLSessionExperienceTransport.addressFamily(of: nil))
+    }
+
+    func testALadderThatNeverStartsFailsOnATimeout() async throws {
+        let edge = FakeEdge(clock: VirtualClock(), transferMs: rate(50e3))
+        let run = await engine(edge).run([.videoLadder])
+        XCTAssertEqual(run.tests.videoLadder?.state, .failed)
+        XCTAssertEqual(run.failures[.videoLadder], .timeout)
+    }
+
+    func testGameWithoutEnoughProbesFailsOnProbeLoss() async throws {
+        let edge = FakeEdge(clock: VirtualClock(), transferMs: rate(100e6), tcp: { _ in nil })
+        let run = await engine(edge).run([.gameAndCalls])
+        XCTAssertEqual(run.tests.gameAndCalls?.state, .failed)
+        XCTAssertEqual(run.failures[.gameAndCalls], .probeLoss)
+        XCTAssertTrue(run.addressFamilies.isEmpty, "un transport sans relevé ne dit aucune famille")
+    }
+
+    func testAPreciseCauseIsNotReplacedByATimeoutOrAGenericOne() {
+        XCTAssertGreaterThan(ExperienceFailureCause.httpError(503).precision, ExperienceFailureCause.timeout.precision)
+        XCTAssertGreaterThan(ExperienceFailureCause.timeout.precision, ExperienceFailureCause.generic.precision)
     }
 
     func testOfflineDuringATransferInterruptsTheSuite() async throws {

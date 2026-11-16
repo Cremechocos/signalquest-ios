@@ -171,6 +171,8 @@ final class ExperienceTestsModel: ObservableObject {
         var recentLatency: () -> ExperienceLatencyReuse.Snapshot?
         var appVersion: String?
         var now: () -> Date = Date.init
+        /// SPEEDTEST-FAIL-2 : les tests finis en échec partent en lignes anonymes, plus tard.
+        var reportFailures: (ExperienceRun, NetworkPathStatus, String?) -> Void = { _, _, _ in }
     }
 
     @Published private(set) var network = ExperienceNetworkDisplay()
@@ -289,7 +291,10 @@ final class ExperienceTestsModel: ObservableObject {
                 self.live = update
             }
         }
-        if generation == current { self.engine = nil }
+        if generation == current {
+            self.engine = nil
+            environment.reportFailures(run, startStatus, context.operatorKey)
+        }
         await finish(run, selection: selection, display: display, context: context, reusedAge: reusedAge, generation: current)
     }
 
@@ -396,7 +401,10 @@ extension ExperienceTestsModel.Environment {
             save: { submission, run in await store.save(submission, run: run) },
             localItems: { await store.localItems() },
             recentLatency: { ExperienceRecentLatency.current },
-            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            reportFailures: { run, status, operatorKey in
+                SpeedtestFailureReporter.recordExperience(run, status: status, operatorKey: operatorKey)
+            }
         )
     }
 }

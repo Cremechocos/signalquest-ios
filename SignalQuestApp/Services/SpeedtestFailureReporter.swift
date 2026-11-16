@@ -15,7 +15,7 @@ enum SpeedtestFailure {
         "IP_MODE_UNAVAILABLE", "SECURE_ACCESS_UNAVAILABLE", "SESSION_UNAVAILABLE",
         "TEMPORARILY_UNAVAILABLE", "UPLOAD_UNVERIFIED", "CANCELLED", "TIMEOUT", "UNKNOWN",
     ]
-    static let engines: Set<String> = ["cloudflare", "iperf3", "librespeed", "vps"]
+    static let engines: Set<String> = ["cloudflare", "iperf3", "librespeed", "vps", "experience"]
     static let technologies: Set<String> = ["2G", "3G", "4G", "5G_NSA", "5G_SA", "WIFI", "ETHERNET", "UNKNOWN"]
 
     /// Étape atteinte. L'ordre compte : une étape ne recule jamais pendant un test.
@@ -44,8 +44,8 @@ enum SpeedtestFailure {
         }
     }
 
-    /// Une ligne du lot. `engine` et `operatorKey` sont toujours présents, `null` compris :
-    /// le schéma du serveur est strict et refuse une clé absente.
+    /// Une ligne du lot. `engine`, `operatorKey` et `experience` sont toujours présents, `null`
+    /// compris : le schéma du serveur est strict et refuse une clé absente.
     struct Line: Codable, Equatable, Sendable {
         let code: String
         let phase: Phase
@@ -53,16 +53,21 @@ enum SpeedtestFailure {
         let technology: String
         let operatorKey: String?
         let quarterStart: String
+        /// SPEEDTEST-FAIL-2 : null pour un speedtest classique. Absent des lignes gardées par une
+        /// build v1, donc lu comme null.
+        let experience: Experience?
 
-        enum CodingKeys: String, CodingKey { case code, phase, engine, technology, operatorKey, quarterStart }
+        enum CodingKeys: String, CodingKey { case code, phase, engine, technology, operatorKey, quarterStart, experience }
 
-        init(code: String, phase: Phase, engine: String?, technology: String, operatorKey: String?, quarterStart: String) {
+        init(code: String, phase: Phase, engine: String?, technology: String, operatorKey: String?, quarterStart: String,
+             experience: Experience? = nil) {
             self.code = code
             self.phase = phase
             self.engine = engine
             self.technology = technology
             self.operatorKey = operatorKey
             self.quarterStart = quarterStart
+            self.experience = experience
         }
 
         func encode(to encoder: Encoder) throws {
@@ -73,11 +78,76 @@ enum SpeedtestFailure {
             try c.encode(technology, forKey: .technology)
             try c.encode(operatorKey, forKey: .operatorKey)
             try c.encode(quarterStart, forKey: .quarterStart)
+            try c.encode(experience, forKey: .experience)
+        }
+    }
+
+    /// SPEEDTEST-FAIL-2 : un test d'expérience fini en échec. Toutes les clés partent, `null` compris.
+    struct Experience: Codable, Equatable, Sendable {
+        static let tests: Set<String> = Set(ExperienceTestKind.allCases.map(\.rawValue))
+        static let causes: Set<String> = [
+            "server_busy", "route_changed", "http_error", "dns", "ip_mode", "connect", "tls", "timeout", "cut",
+            "probe_loss", "no_network", "generic",
+        ]
+
+        let test: String
+        let cause: String
+        let httpStatus: Int?
+        let megabytes: Double
+        let durationS: Int
+        /// Réglage Speedtest : iOS n'en a pas pour ces tests, toujours `auto`.
+        let ipMode: String
+        let addressFamily: String?
+        /// RFC 7050 ; null quand la détection n'a pas abouti, jamais false par défaut.
+        let nat64: Bool?
+        /// Une app iOS ne lit pas le DNS chiffré du système : toujours null.
+        let privateDns: String?
+        let vpn: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case test, cause, httpStatus, megabytes, durationS, ipMode, addressFamily, nat64, privateDns, vpn
+        }
+
+        init(test: String, cause: String, httpStatus: Int?, megabytes: Double, durationS: Int, ipMode: String = "auto",
+             addressFamily: String?, nat64: Bool?, privateDns: String? = nil, vpn: Bool) {
+            self.test = test
+            self.cause = cause
+            self.httpStatus = httpStatus
+            self.megabytes = megabytes
+            self.durationS = durationS
+            self.ipMode = ipMode
+            self.addressFamily = addressFamily
+            self.nat64 = nat64
+            self.privateDns = privateDns
+            self.vpn = vpn
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(test, forKey: .test)
+            try c.encode(cause, forKey: .cause)
+            try c.encode(httpStatus, forKey: .httpStatus)
+            try c.encode(megabytes, forKey: .megabytes)
+            try c.encode(durationS, forKey: .durationS)
+            try c.encode(ipMode, forKey: .ipMode)
+            try c.encode(addressFamily, forKey: .addressFamily)
+            try c.encode(nat64, forKey: .nat64)
+            try c.encode(privateDns, forKey: .privateDns)
+            try c.encode(vpn, forKey: .vpn)
+        }
+
+        var isValid: Bool {
+            Self.tests.contains(test) && Self.causes.contains(cause)
+                && httpStatus.map { (100...599).contains($0) } ?? true
+                && (0...100_000).contains(megabytes) && (0...3_600).contains(durationS)
+                && ["auto", "ipv4", "ipv6"].contains(ipMode)
+                && addressFamily.map { ["ipv4", "ipv6"].contains($0) } ?? true
+                && privateDns.map { ["off", "auto", "strict"].contains($0) } ?? true
         }
     }
 
     struct Batch: Encodable, Equatable {
-        let version = "1"
+        let version = "2"
         let platform = "ios"
         let build: String
         let failures: [Line]
@@ -210,8 +280,91 @@ enum SpeedtestFailure {
               line.engine.map(engines.contains) ?? true,
               line.operatorKey.map(isOperatorKey) ?? true,
               let quarter = date(ofQuarter: line.quarterStart) else { return false }
+        // v2 : `experience` présent pour un test d'expérience seulement, avec `UNKNOWN` et `setup` imposés.
+        if line.engine == "experience" {
+            guard let experience = line.experience, experience.isValid,
+                  line.code == "UNKNOWN", line.phase == .setup else { return false }
+        } else if line.experience != nil {
+            return false
+        }
         return quarter >= now.addingTimeInterval(-(7 * 24 * 3600 - 30 * 60))
             && quarter <= now.addingTimeInterval(15 * 60)
+    }
+}
+
+// MARK: Tests d'expérience (SPEEDTEST-FAIL-2)
+
+extension SpeedtestFailure {
+    /// Nom de la cause dans le contrat.
+    static func cause(_ cause: ExperienceFailureCause) -> String {
+        switch cause {
+        case .serverBusy: "server_busy"
+        case .routeChanged: "route_changed"
+        case .httpError: "http_error"
+        case .dns: "dns"
+        case .connect: "connect"
+        case .tls: "tls"
+        case .timeout: "timeout"
+        case .cut: "cut"
+        case .probeLoss: "probe_loss"
+        case .noNetwork: "no_network"
+        case .generic: "generic"
+        }
+    }
+
+    /// Une ligne par test fini en échec (ni interrompu, ni non testé), comme Android.
+    static func experienceLines(_ run: ExperienceRun, status: NetworkPathStatus, operatorKey: String?, viaVpn: Bool,
+                                nat64: Bool?, now: Date) -> [Line] {
+        let quarter = quarterStart(now)
+        return ExperienceMethod.order.compactMap { test -> Line? in
+            guard run.tests.state(of: test) == .failed else { return nil }
+            let failure = run.failures[test] ?? .generic
+            let usage = run.usage[test]
+            var httpStatus: Int?
+            if case .httpError(let status) = failure { httpStatus = status }
+            let megabytes = (Double(usage?.bytes ?? 0) / 1e6 * 10).rounded() / 10
+            let seconds = (Double(usage?.durationMs ?? 0) / 1_000).rounded()
+            return Line(
+                code: "UNKNOWN", phase: .setup, engine: "experience",
+                technology: technology(status, viaVpn: viaVpn),
+                operatorKey: self.operatorKey(operatorKey, status: status, viaVpn: viaVpn),
+                quarterStart: quarter,
+                experience: Experience(
+                    test: test.rawValue, cause: cause(failure), httpStatus: httpStatus,
+                    megabytes: min(max(megabytes, 0), 100_000), durationS: Int(min(max(seconds, 0), 3_600)),
+                    addressFamily: run.addressFamilies[test], nat64: nat64, vpn: viaVpn
+                )
+            )
+        }
+    }
+
+    /// RFC 7050 : le réseau annonce un préfixe NAT64 quand `ipv4only.arpa` se résout en IPv6.
+    /// nil si la résolution échoue ou dépasse le délai : jamais false par défaut.
+    static func detectNAT64(timeout: TimeInterval = 3) async -> Bool? {
+        let pending = OSAllocatedUnfairLock<CheckedContinuation<Bool?, Never>?>(initialState: nil)
+        return await withCheckedContinuation { continuation in
+            pending.withLock { $0 = continuation }
+            let finish: @Sendable (Bool?) -> Void = { value in pending.withLock { $0.take() }?.resume(returning: value) }
+            DispatchQueue.global(qos: .utility).async { finish(nat64Lookup()) }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) { finish(nil) }
+        }
+    }
+
+    private static func nat64Lookup() -> Bool? {
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_STREAM
+        var result: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo("ipv4only.arpa", nil, &hints, &result) == 0, let first = result else { return nil }
+        defer { freeaddrinfo(first) }
+        var sawIPv4 = false
+        var cursor: UnsafeMutablePointer<addrinfo>? = first
+        while let node = cursor {
+            if node.pointee.ai_family == AF_INET6 { return true }
+            if node.pointee.ai_family == AF_INET { sawIPv4 = true }
+            cursor = node.pointee.ai_next
+        }
+        return sawIPv4 ? false : nil
     }
 }
 
@@ -382,6 +535,19 @@ actor SpeedtestFailureReporter {
             return
         }
         _ = await sendOneBatch()
+    }
+
+    /// Les tests d'expérience ratés d'une suite (SPEEDTEST-FAIL-2), mis en file comme un speedtest
+    /// raté. NAT64 n'est cherché que s'il y a au moins une ligne à envoyer.
+    nonisolated static func recordExperience(_ run: ExperienceRun, status: NetworkPathStatus, operatorKey: String?) {
+        guard isLiveEnvironment, ExperienceMethod.order.contains(where: { run.tests.state(of: $0) == .failed }) else { return }
+        let viaVpn = VPNDetector.isActive()
+        Task.detached(priority: .utility) {
+            let nat64 = await SpeedtestFailure.detectNAT64()
+            let lines = SpeedtestFailure.experienceLines(run, status: status, operatorKey: operatorKey, viaVpn: viaVpn,
+                                                         nat64: nat64, now: Date())
+            for line in lines { await shared.record(line) }
+        }
     }
 
     /// Un lot : au plus 50 lignes et 16 Kio, les plus anciennes d'abord.
