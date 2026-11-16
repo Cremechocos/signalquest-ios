@@ -15,6 +15,8 @@ struct AntennaRadioIdentifiersView: View {
     let tint: Color
     /// Opérateur du site : sa convention dit quel azimut porte chaque numéro.
     var operatorName: String? = nil
+    /// Partage du support : l'ordre des cônes en dépend en base 1 (`SectorOrientation`).
+    var sectorContext = SectorOrientation.Context()
 
     @State private var expandedSector: Int?
     @State private var copiedValue: String?
@@ -241,11 +243,12 @@ struct AntennaRadioIdentifiersView: View {
             cellsBySector[sector, default: []].append(cell)
         }
         let numbers = Set(pcisBySector.keys).union(cellsBySector.keys).sorted()
+        let cones = SectorOrientation.numberedCones(azimuths, context: sectorContext)
         return numbers.map { number in
             RadioSector(
                 id: number,
                 azimuth: Self.azimuthIndex(forSector: number, operatorName: operatorName)
-                    .flatMap { azimuths.indices.contains($0) ? azimuths[$0] : nil },
+                    .flatMap { cones.indices.contains($0) ? cones[$0] : nil },
                 pcis: pcisBySector[number] ?? [],
                 cells: cellsBySector[number] ?? []
             )

@@ -356,6 +356,7 @@ struct AntennaDetailSheet: View {
                 service: services.antennaReports,
                 leaderReport: leaderReport,
                 operatorName: selectedOperator,
+                sectorCones: SectorOrientation.numberedCones(displayedAzimuths, context: sectorContext),
                 initialType: reportInitialType
             )
         }
@@ -1485,6 +1486,18 @@ struct AntennaDetailSheet: View {
         return core.isEmpty ? operatorAzimuths : core
     }
 
+    /// Partage du support, qui fixe l'ordre des cônes en base 1 : le détail d'abord, la tuile
+    /// tant qu'il n'a pas répondu.
+    private var sectorContext: SectorOrientation.Context {
+        let core = model.details?.core
+        return SectorOrientation.Context(
+            operatorName: selectedOperator,
+            sharingType: core?.sharingKind ?? site.sharingType,
+            crozonLeader: core?.crozonLeader ?? site.crozonLeader,
+            isZTD: core?.isZTD ?? site.isZTD
+        )
+    }
+
     private var operatorAzimuths: [Double] {
         site.azimuths(for: selectedOperator)
     }
@@ -1811,7 +1824,8 @@ struct AntennaDetailSheet: View {
             identifiers: core.cellIdentifiers,
             azimuths: displayedAzimuths,
             tint: operatorColor,
-            operatorName: selectedOperator
+            operatorName: selectedOperator,
+            sectorContext: sectorContext
         )
         .foregroundStyle(SQColor.label)
     }

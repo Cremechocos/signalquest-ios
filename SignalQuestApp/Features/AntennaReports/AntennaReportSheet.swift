@@ -14,6 +14,9 @@ struct AntennaReportSheet: View {
     let leaderReport: AntennaLeaderReport?
     /// Réseau affiché sur la fiche : donne la numérotation des secteurs (« Secteur 2 · 120° »).
     let operatorName: String?
+    /// Cônes du support dans l'ordre des numéros (`SectorOrientation.numberedCones`) : en base 1,
+    /// le numéro d'un azimut est le rang de son cône, nord d'abord là où le serveur l'applique.
+    let sectorCones: [Double]
 
     @Environment(\.dismiss) private var dismiss
 
@@ -36,6 +39,7 @@ struct AntennaReportSheet: View {
         service: AntennaReportsServicing,
         leaderReport: AntennaLeaderReport? = nil,
         operatorName: String? = nil,
+        sectorCones: [Double] = [],
         initialType: AntennaReportType = .other
     ) {
         self.siteId = siteId
@@ -44,6 +48,7 @@ struct AntennaReportSheet: View {
         self.service = service
         self.leaderReport = leaderReport
         self.operatorName = operatorName
+        self.sectorCones = sectorCones
         _reportType = State(initialValue: leaderReport == nil && initialType == .incorrectLeader ? .other : initialType)
     }
 
@@ -203,9 +208,18 @@ struct AntennaReportSheet: View {
     /// « Secteur 2 · 120° » : le numéro suit la convention du réseau affiché ;
     /// sans réseau connu, seul l'azimut est sûr.
     private func sectorLabel(index: Int, azimuth: Int) -> String {
-        guard let operatorName else { return String(localized: "Secteur \(azimuth)°") }
-        let number = SectorNumbering.displayValue(index: index, operatorName: operatorName)
+        guard let number = sectorNumber(index: index, azimuth: azimuth) else { return String(localized: "Secteur \(azimuth)°") }
         return String(localized: "Secteur \(number) · \(azimuth)°")
+    }
+
+    /// Le numéro n'est connu qu'avec l'opérateur. En base 1, c'est le rang du cône le plus
+    /// proche dans l'ordre du serveur ; sinon le rang de l'azimut dans la liste croissante.
+    private func sectorNumber(index: Int, azimuth: Int) -> Int? {
+        guard let operatorName else { return nil }
+        let rank = SQFeatures.sectorBaseOne && !sectorCones.isEmpty
+            ? SectorOrientation.nearestIndex(of: Double(azimuth), in: sectorCones) ?? index
+            : index
+        return SectorNumbering.displayValue(index: rank, operatorName: operatorName)
     }
 
     private var selectedSectorLabel: String {
@@ -274,9 +288,7 @@ struct AntennaReportSheet: View {
         defer { isBusy = false }
         // Le numéro n'est connu qu'avec l'opérateur, comme dans le libellé du choix.
         let sectorNumber = sector.flatMap { azimuth in
-            availableSectors.firstIndex(of: azimuth).flatMap { index in
-                operatorName.map { SectorNumbering.displayValue(index: index, operatorName: $0) }
-            }
+            availableSectors.firstIndex(of: azimuth).flatMap { sectorNumber(index: $0, azimuth: azimuth) }
         }
         let sectorFields = AntennaReportSubmission.sectorFields(azimuth: sector, number: sectorNumber)
         do {

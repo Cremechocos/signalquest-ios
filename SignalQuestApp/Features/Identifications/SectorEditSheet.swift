@@ -137,8 +137,20 @@ final class SectorEditViewModel: ObservableObject {
         // Azimuts dédupliqués/triés : porteuses radio si dispo, sinon azimuts bruts.
         let carrierAzimuths = details.core?.radioCarriers.compactMap { $0.sectorAzimuthDeg } ?? []
         let raw = carrierAzimuths.isEmpty ? details.core?.azimuts ?? [] : carrierAzimuths
-        let unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
-            .sorted()
+        let unique: [Double]
+        if SQFeatures.sectorBaseOne {
+            // Base 1 (avec l'en-tête) : les cônes du serveur, regroupés à 20° et dans son ordre
+            // de numérotation (nord d'abord pour Bouygues en ZTD ou sur un Crozon qu'il mène, et
+            // pour SFR sur un Crozon mené par Bouygues), à partir des azimuts qu'il numérote.
+            let core = details.core
+            let served = core?.azimuts ?? []
+            unique = SectorOrientation.numberedCones(served.isEmpty ? raw : served, context: SectorOrientation.Context(
+                operatorName: item.operatorName, sharingType: core?.sharingKind,
+                crozonLeader: core?.crozonLeader, isZTD: core?.isZTD ?? false))
+        } else {
+            unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
+                .sorted()
+        }
         // Support communautaire ou personnalisé, au plus un azimut : pas de schéma possible,
         // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0 tant que la base 1 est fermée).
         if unique.count <= 1 {

@@ -1,0 +1,963 @@
+{
+  "contract": "sector-numbering-v1",
+  "decidedOn": "2026-11-14",
+  "rules": {
+    "northFirstSfrOnBouyguesLedCrozon": {
+      "scope": "operator SFR, sharingType crozon, crozonLeader BOUYGUES (toutes technos)",
+      "effect": "les azimuts des secteurs physiques sont ordonnés à partir de celui qui est le plus près du nord, puis dans le sens croissant ; le numéro de secteur ((cellId mod N) + 1, base 1) ne change pas, seul le cône désigné change"
+    },
+    "bouyguesNrOnSfrLedCrozon": {
+      "scope": "operator BOUYGUES, tech 5G, sharingType crozon, crozonLeader SFR",
+      "effect": "cellId local dans [100, 100+N) => secteur = cellId − 99 (base 1), azimuts dans l'ordre croissant ; hors plage, ou N inconnu : (cellId mod N) + 1",
+      "sectorCount": "N = azimuts hors faisceau hertzien regroupés à 20° (bouclage 360°→0° compris)"
+    },
+    "bases": {
+      "SFR": 1,
+      "BOUYGUES": 1,
+      "ORANGE": 1,
+      "FREE": 1
+    },
+    "switched": "SECTOR-BASE-1 : SFR est servi en base 1 (S1..SN) ; les anciennes apps sont converties par le serveur"
+  },
+  "cellCases": [
+    {
+      "name": "real-gnb-1060426-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": true,
+      "note": "support 2975837, gNB 1060426, PCI 580 : S3 (320°) devient S2 (170°)",
+      "pci": 580,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "real-gnb-1002217-cid-102",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        0,
+        90,
+        270
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 270,
+      "changedByDecision": true,
+      "note": "support 2877566, gNB 1002217, PCI 862 : S1 devient S3. Déduit de la règle, non vérifié sur le terrain : la cellule Bouygues 102/862 n'a ni Validation ni point de couverture ; son rattachement vient du gNB partagé (NCI − 102 = 1002217 × 2^14), observé en direct le 15/11.",
+      "pci": 862,
+      "sectorOnMain": 1
+    },
+    {
+      "name": "real-gnb-1060426-cid-100",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 100,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 60,
+      "changedByDecision": true,
+      "sectorOnMain": 2
+    },
+    {
+      "name": "real-gnb-1060426-cid-102",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": true,
+      "sectorOnMain": 1
+    },
+    {
+      "name": "n2-cid-100",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 100,
+      "azimuts": [
+        0,
+        180
+      ],
+      "expectedSectorCount": 2,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 0,
+      "changedByDecision": false,
+      "sectorOnMain": 1
+    },
+    {
+      "name": "n2-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        0,
+        180
+      ],
+      "expectedSectorCount": 2,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 180,
+      "changedByDecision": false,
+      "sectorOnMain": 2
+    },
+    {
+      "name": "n2-cid-102-out-of-range",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        0,
+        180
+      ],
+      "expectedSectorCount": 2,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 0,
+      "changedByDecision": false,
+      "note": "102 ≥ 100+N : règle (cellId mod N)+1",
+      "sectorOnMain": 1
+    },
+    {
+      "name": "n4-cid-103",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 103,
+      "azimuts": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "expectedSectorCount": 4,
+      "expectedSector": 4,
+      "expectedAzimuthDeg": 270,
+      "changedByDecision": false,
+      "sectorOnMain": 4
+    },
+    {
+      "name": "n4-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "expectedSectorCount": 4,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 90,
+      "changedByDecision": false,
+      "sectorOnMain": 2
+    },
+    {
+      "name": "n4-cid-104-out-of-range",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 104,
+      "azimuts": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "expectedSectorCount": 4,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 0,
+      "changedByDecision": false,
+      "sectorOnMain": 1
+    },
+    {
+      "name": "n4-cid-102",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "expectedSectorCount": 4,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 180,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "band-duplicates-cid-100",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 100,
+      "azimuts": [
+        60,
+        62,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 61,
+      "changedByDecision": true,
+      "note": "60° et 62° = un seul secteur physique",
+      "sectorOnMain": 2
+    },
+    {
+      "name": "fh-excluded-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320,
+        200
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": true,
+      "azimutsFh": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "note": "le 4e azimut est un faisceau hertzien",
+      "sectorOnMain": 3
+    },
+    {
+      "name": "cellid-as-text",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": "101",
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": true,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "cid-103-n3",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 103,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": false,
+      "note": "103 ≥ 100+N : (103 mod 3)+1",
+      "sectorOnMain": 2
+    },
+    {
+      "name": "cid-99-n3",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 99,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 60,
+      "changedByDecision": false,
+      "note": "sous 100 : (99 mod 3)+1",
+      "sectorOnMain": 1
+    },
+    {
+      "name": "cid-1-n3",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 1,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": false,
+      "sectorOnMain": 2
+    },
+    {
+      "name": "leader-unknown",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": null,
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "note": "meneur inconnu : pas assez de preuve",
+      "sectorOnMain": 3
+    },
+    {
+      "name": "leader-bouygues",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": false,
+      "note": "Crozon mené par Bouygues : règle actuelle ; ordre nord d'abord (320°, 60°, 170°)",
+      "sectorOnMain": 3
+    },
+    {
+      "name": "sharing-zb",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "zb",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "sharing-exclusive",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "exclusive",
+      "crozonLeader": null,
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "sharing-null",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": null,
+      "crozonLeader": null,
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "tech-4g-cid-102",
+      "operator": "BOUYGUES",
+      "tech": "4G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 60,
+      "changedByDecision": false,
+      "note": "4G : règle actuelle",
+      "sectorOnMain": 1
+    },
+    {
+      "name": "tech-4g-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "4G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "n-unknown-cid-101",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [],
+      "expectedSectorCount": null,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": null,
+      "changedByDecision": false,
+      "note": "aucun azimut : N inconnu, la règle ne s'applique pas (défaut N=3 comme avant)",
+      "sectorOnMain": 3
+    },
+    {
+      "name": "cellid-not-numeric",
+      "operator": "BOUYGUES",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": "abc",
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": null,
+      "expectedAzimuthDeg": null,
+      "changedByDecision": false,
+      "sectorOnMain": null
+    },
+    {
+      "name": "sfr-5g-cid-102",
+      "operator": "SFR",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 60,
+      "changedByDecision": false,
+      "note": "SFR : base 1, (cellId mod N) + 1 ; le meneur SFR garde l'ordre croissant",
+      "sectorOnMain": 1
+    },
+    {
+      "name": "sfr-5g-cid-101",
+      "operator": "SFR",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 320,
+      "changedByDecision": false,
+      "sectorOnMain": 3
+    },
+    {
+      "name": "orange-5g-cid-101",
+      "operator": "ORANGE",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 101,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": false,
+      "note": "Orange : ((cellId−1) mod N)+1",
+      "sectorOnMain": 2
+    },
+    {
+      "name": "free-5g-cid-102",
+      "operator": "FREE",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 102,
+      "azimuts": [
+        60,
+        170,
+        320
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 170,
+      "changedByDecision": false,
+      "note": "Free : dernier chiffre du cellId",
+      "sectorOnMain": 2
+    },
+    {
+      "name": "sfr-on-bouygues-led-cid-0",
+      "operator": "SFR",
+      "tech": "4G",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "cellId": 0,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 330,
+      "sectorOnMain": 1,
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-on-bouygues-led-cid-1",
+      "operator": "SFR",
+      "tech": "4G",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "cellId": 1,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 2,
+      "expectedAzimuthDeg": 90,
+      "sectorOnMain": 2,
+      "changedByDecision": true,
+      "note": "même numéro de secteur, autre cône : seul l'azimut change"
+    },
+    {
+      "name": "sfr-on-bouygues-led-cid-2-5g",
+      "operator": "SFR",
+      "tech": "5G",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "cellId": 2,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 3,
+      "expectedAzimuthDeg": 200,
+      "sectorOnMain": 3,
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-on-sfr-led-cid-0",
+      "operator": "SFR",
+      "tech": "4G",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "cellId": 0,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedSectorCount": 3,
+      "expectedSector": 1,
+      "expectedAzimuthDeg": 90,
+      "sectorOnMain": 1,
+      "changedByDecision": false
+    }
+  ],
+  "orderCases": [
+    {
+      "name": "sfr-crozon-leader-bouygues",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        330,
+        90,
+        200
+      ],
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-crozon-leader-bouygues-lowercase-sharing",
+      "operator": "SFR",
+      "sharingType": "Crozon",
+      "crozonLeader": "bouygues",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        330,
+        90,
+        200
+      ],
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-crozon-leader-bouygues-negative-input",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        -30,
+        90,
+        200
+      ],
+      "expectedOrder": [
+        330,
+        90,
+        200
+      ],
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-crozon-leader-bouygues-north-at-zero",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        120,
+        0,
+        240
+      ],
+      "expectedOrder": [
+        0,
+        120,
+        240
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-crozon-leader-bouygues-bi-sector",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        100,
+        350
+      ],
+      "expectedOrder": [
+        350,
+        100
+      ],
+      "changedByDecision": true
+    },
+    {
+      "name": "sfr-crozon-leader-bouygues-single",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        200
+      ],
+      "expectedOrder": [
+        200
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-crozon-leader-sfr",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "azimuts": [
+        330,
+        90,
+        200
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-crozon-leader-unknown",
+      "operator": "SFR",
+      "sharingType": "crozon",
+      "crozonLeader": null,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-exclusive",
+      "operator": "SFR",
+      "sharingType": "exclusive",
+      "crozonLeader": null,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-zb-leader-bouygues",
+      "operator": "SFR",
+      "sharingType": "zb",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "sfr-ztd-flag-is-ignored",
+      "operator": "SFR",
+      "sharingType": "exclusive",
+      "crozonLeader": null,
+      "isZTD": true,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "bouygues-crozon-leader-bouygues",
+      "operator": "BOUYGUES",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        330,
+        90,
+        200
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "bouygues-crozon-leader-sfr",
+      "operator": "BOUYGUES",
+      "sharingType": "crozon",
+      "crozonLeader": "SFR",
+      "azimuts": [
+        330,
+        90,
+        200
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "bouygues-crozon-leader-unknown",
+      "operator": "BOUYGUES",
+      "sharingType": "crozon",
+      "crozonLeader": null,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "bouygues-ztd",
+      "operator": "BOUYGUES",
+      "sharingType": "exclusive",
+      "crozonLeader": null,
+      "isZTD": true,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        330,
+        90,
+        200
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "bouygues-zb",
+      "operator": "BOUYGUES",
+      "sharingType": "zb",
+      "crozonLeader": "BOUYGUES",
+      "isZTD": true,
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "orange-crozon-leader-bouygues",
+      "operator": "ORANGE",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    },
+    {
+      "name": "free-crozon-leader-bouygues",
+      "operator": "FREE",
+      "sharingType": "crozon",
+      "crozonLeader": "BOUYGUES",
+      "azimuts": [
+        90,
+        200,
+        330
+      ],
+      "expectedOrder": [
+        90,
+        200,
+        330
+      ],
+      "changedByDecision": false
+    }
+  ]
+}

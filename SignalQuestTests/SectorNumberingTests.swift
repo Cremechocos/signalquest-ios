@@ -154,4 +154,70 @@ final class SectorNumberingTests: XCTestCase {
                        String(localized: "Secteur \(220)°"))
         XCTAssertNil(AntennaReport(id: "r5", siteId: "s", reportType: .other).sectorLabel(sectorBaseOne: true))
     }
+
+    // MARK: SECTOR-NORTH-2 (vecteur sector-numbering-v1, copié à l'octet de la PR #1352)
+
+    private func sectorVector() throws -> [String: Any] {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("contracts/identify/sector-numbering-v1.json"))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func context(_ item: [String: Any]) -> SectorOrientation.Context {
+        SectorOrientation.Context(operatorName: item["operator"] as? String, sharingType: item["sharingType"] as? String,
+                                  crozonLeader: item["crozonLeader"] as? String, isZTD: item["isZTD"] as? Bool ?? false)
+    }
+
+    func testNorthFirstOrderReplaysTheServerVector() throws {
+        let cases = try XCTUnwrap(sectorVector()["orderCases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 18)
+        for item in cases {
+            let name = item["name"] as? String ?? "?"
+            let azimuths = try XCTUnwrap(item["azimuts"] as? [Double], name)
+            let expected = try XCTUnwrap(item["expectedOrder"] as? [Double], name)
+            XCTAssertEqual(SectorOrientation.ordered(azimuths, context: context(item)), expected, name)
+        }
+    }
+
+    /// Le numéro servi désigne le même cône que chez le serveur : azimuts hors faisceau hertzien
+    /// (comme `azimuts` du détail), regroupés à 20°, ordonnés, puis le secteur N au rang N.
+    func testEachServedNumberPointsTheServerCone() throws {
+        let cases = try XCTUnwrap(sectorVector()["cellCases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 34)
+        for item in cases {
+            let name = item["name"] as? String ?? "?"
+            let raw = try XCTUnwrap(item["azimuts"] as? [Double], name)
+            let fh = item["azimutsFh"] as? [Bool] ?? []
+            let served = raw.enumerated().filter { !(fh.indices.contains($0.offset) && fh[$0.offset]) }.map(\.element)
+            let cones = SectorOrientation.numberedCones(served, context: context(item), sectorBaseOne: true)
+            XCTAssertEqual(cones.count, item["expectedSectorCount"] as? Int ?? 0, name)
+            guard let sector = item["expectedSector"] as? Int, let azimuth = item["expectedAzimuthDeg"] as? Double else { continue }
+            let index = try XCTUnwrap(AntennaRadioIdentifiersView.azimuthIndex(
+                forSector: sector, operatorName: item["operator"] as? String, sectorBaseOne: true), name)
+            XCTAssertEqual(cones[index], azimuth, accuracy: 0.01, name)
+        }
+    }
+
+    func testNorthFirstWaitsForBaseOne() {
+        let sfrOnBouyguesCrozon = SectorOrientation.Context(operatorName: "SFR", sharingType: "crozon", crozonLeader: "BOUYGUES")
+        // Sans l'en-tête, l'ordre servi reste tel quel : le serveur convertit les numéros SFR.
+        XCTAssertEqual(SectorOrientation.numberedCones([90, 200, 330], context: sfrOnBouyguesCrozon, sectorBaseOne: false), [90, 200, 330])
+        XCTAssertEqual(SectorOrientation.numberedCones([74, 75, 255], context: SectorOrientation.Context(), sectorBaseOne: false), [74, 75, 255])
+        let northFirst = SectorOrientation.numberedCones([90, 200, 330], context: sfrOnBouyguesCrozon, sectorBaseOne: true)
+        XCTAssertEqual(northFirst.count, 3)
+        for (cone, expected) in zip(northFirst, [330.0, 90, 200]) { XCTAssertEqual(cone, expected, accuracy: 0.01) }
+        // Le regroupement boucle par le nord : 355° et 3° sont un seul secteur, vers 359°.
+        let wrapped = SectorOrientation.clustered([3, 120, 240, 355])
+        XCTAssertEqual(wrapped.count, 3)
+        XCTAssertEqual(wrapped.last ?? 0, 359, accuracy: 0.01)
+    }
+
+    func testReportAzimuthTakesTheRankOfItsNearestCone() {
+        let cones: [Double] = [330, 90, 200]
+        XCTAssertEqual(SectorOrientation.nearestIndex(of: 332, in: cones), 0)
+        XCTAssertEqual(SectorOrientation.nearestIndex(of: 2, in: cones), 0)
+        XCTAssertEqual(SectorOrientation.nearestIndex(of: 91, in: cones), 1)
+        XCTAssertEqual(SectorOrientation.nearestIndex(of: 199, in: cones), 2)
+        XCTAssertNil(SectorOrientation.nearestIndex(of: 10, in: []))
+    }
 }
