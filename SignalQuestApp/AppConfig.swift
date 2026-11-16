@@ -96,7 +96,8 @@ enum SQFeatures {
     static let isedChangesMapEnabled = true
 
     /// Secteurs en base 1 partout (contrat SECTOR-BASE-1 r3.2) : SFR et la zone blanche
-    /// numérotent S1..SN comme Orange, Bouygues et Free, le Canada s'aligne sur Android,
+    /// numérotent S1..SN comme Orange, Bouygues et Free, et tout autre opérateur aussi
+    /// (« Tout en base 1 », §5 : plus de mode legacy, comme Android),
     /// chaque requête porte `X-SQ-Sector-Base: 1` et un signalement envoie le numéro et
     /// l'azimut à part. Le serveur est en base 1 depuis le 16/11 (#1349, 04:27) et
     /// convertit les builds sans l'en-tête. Fermé jusqu'au « servi » du nord d'abord

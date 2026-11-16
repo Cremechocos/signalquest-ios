@@ -10,9 +10,10 @@ import Foundation
 /// - Par défaut (opérateur inconnu) : `legacy` = affiche 1-based, soumet 0-based
 ///   (comportement historique conservé pour ne rien casser hors-FR).
 ///
-/// En base 1 (`SQFeatures.sectorBaseOne`, contrat SECTOR-BASE-1) : toute la France
-/// (MCC 208, zone blanche comprise) et le Canada (MCC 302, comme Android) passent
-/// à partir de **1**. Seuls les autres marchés restent `legacy`, comme chez Android.
+/// En base 1 (`SQFeatures.sectorBaseOne`, contrat SECTOR-BASE-1 §5) : TOUS les
+/// opérateurs passent à partir de **1**, à l'écriture comme à la lecture (SFR, zone
+/// blanche, DROM, Canada, Belgique, Suisse…) ; le mode `legacy` disparaît, comme chez
+/// Android, et le serveur numérote déjà tout opérateur inconnu en base 1.
 enum SectorNumbering {
     enum Mode { case zeroBased, oneBased, legacy }
 
@@ -63,28 +64,17 @@ enum SectorNumbering {
         return String(format: "%03d%02d", mcc, mnc)
     }
 
-    /// Opérateurs canadiens numérotés à partir de 1 en base 1, comme `buildCanadaSectorIndex`
-    /// d'Android (clés du marché CA du serveur).
-    private static let canadianOperatorNames = ["BELL", "ROGERS", "TELUS", "VIDEOTRON", "FREEDOM", "REGIONAL"]
-
     static func resolveMode(mccMnc: String?, operatorName: String?,
                             sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Mode {
+        // « Tout en base 1 » (décision d'Alexandre du 16/11) : plus de base 0 ni de legacy.
+        if sectorBaseOne { return .oneBased }
+
         let code = (mccMnc ?? "").filter(\.isNumber)
         let mcc = String(code.prefix(3))
         let mncRaw = String(code.dropFirst(3))
         let trimmed = String(mncRaw.drop(while: { $0 == "0" }))
         let mnc = trimmed.isEmpty ? mncRaw : trimmed
         let name = (operatorName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-
-        if sectorBaseOne {
-            // La base 0 disparaît en France, SFR et zone blanche (MNC 0) compris ; le
-            // Canada s'aligne sur Android (décision d'Alexandre du 16/11).
-            if mcc == "208" || mcc == "302" { return .oneBased }
-            if name.contains("SFR") || name == "ZB" || name == "ZONE BLANCHE"
-                || canadianOperatorNames.contains(where: name.contains) {
-                return .oneBased
-            }
-        }
 
         if mcc == "208" && ["1", "2", "15", "16", "20"].contains(mnc) { return .oneBased }
         if mcc == "208" && ["8", "10", "11", "13"].contains(mnc) { return .zeroBased }

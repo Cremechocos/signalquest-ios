@@ -92,17 +92,23 @@ final class SectorNumberingTests: XCTestCase {
         XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: "20801", operatorName: nil, sectorBaseOne: true), .oneBased)
     }
 
-    func testBaseOneAlignsCanadaOnAndroidAndKeepsOtherMarketsLegacy() {
+    func testBaseOneNumbersEveryOperatorFromOne() {
         for name in ["BELL", "ROGERS", "TELUS", "VIDEOTRON_FREEDOM", "Freedom Mobile", "REGIONAL"] {
             XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: nil, operatorName: name, sectorBaseOne: true), .oneBased, name)
             XCTAssertEqual(SectorNumbering.submissionValue(index: 0, operatorName: name, sectorBaseOne: true), 1, name)
         }
         XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: "302220", operatorName: nil, sectorBaseOne: true), .oneBased)
         XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: nil, operatorName: "VIDEOTRON_FREEDOM", sectorBaseOne: false), .legacy)
-        // Belgique, Suisse, Réunion hors des noms français : inchangés, comme chez Android.
-        for (plmn, name) in [("20620", "BASE"), ("22803", "SALT"), ("64710", "SRR"), ("34020", "DIGICEL")] {
-            XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: plmn, operatorName: name, sectorBaseOne: true), .legacy, name)
+        // « Tout en base 1 » (§5) : Belgique, Suisse, DROM et opérateur inconnu aussi, le
+        // legacy disparaît ; hors base 1 ils restent legacy.
+        for (plmn, name) in [("20620", "BASE"), ("22803", "SALT"), ("64710", "SRR"), ("34020", "DIGICEL"),
+                             (nil, "UnknownCarrier"), (nil, nil)] as [(String?, String?)] {
+            XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: plmn, operatorName: name, sectorBaseOne: true), .oneBased, name ?? "nil")
+            XCTAssertEqual(SectorNumbering.submissionValue(index: 0, mccMnc: plmn, operatorName: name, sectorBaseOne: true), 1, name ?? "nil")
+            XCTAssertEqual(SectorNumbering.resolveMode(mccMnc: plmn, operatorName: name, sectorBaseOne: false), .legacy, name ?? "nil")
         }
+        XCTAssertEqual(SectorNumbering.index(forStoredValue: 1, azimuthCount: 3, operatorName: "DIGICEL", sectorBaseOne: true), 0)
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 1, operatorName: "ALL", sectorBaseOne: true), 0)
     }
 
     // MARK: Signalements d'antenne (SECTOR-BASE-1 §3)
