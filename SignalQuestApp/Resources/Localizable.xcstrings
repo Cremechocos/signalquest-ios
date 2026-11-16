@@ -1,6 +1,38 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "TA hors de portée : distance non vérifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA out of range: distance not checked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA hors de portée : distance non vérifiée"
+          }
+        }
+      }
+    },
+    "Score limité sans TA fiable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Score capped without a reliable TA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Score limité sans TA fiable"
+          }
+        }
+      }
+    },
     "Par la communauté" : {
       "localizations" : {
         "en" : {

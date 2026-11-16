@@ -69,6 +69,15 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertFalse(hypothesis.evidenceLabels.contains { $0.contains("_") })
     }
 
+    /// Contrat r1, lot 1 : les deux codes ajoutés par le serveur ont un libellé lisible.
+    func testLotOneEvidenceCodesHaveReadableLabels() {
+        for code in ["ta_out_of_range", "score_capped_no_ta"] {
+            let label = ServingAntenna.evidenceLabel(code)
+            XCTAssertNotNil(label, code)
+            XCTAssertFalse(label?.contains("_") ?? true, code)
+        }
+    }
+
     func testTimingAdvanceRingsCoverEveryPointOfTheNodeWithoutDuplicates() throws {
         let points = try detail().points
         // a et b : même TA dans la même case de 100 m, un seul anneau ; c : un autre.

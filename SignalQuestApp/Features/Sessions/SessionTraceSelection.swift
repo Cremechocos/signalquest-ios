@@ -245,6 +245,9 @@ extension ServingAntenna {
         case "frequency_no_match": return String(localized: "Fréquences absentes de ce site")
         case "proximity_hypothesis": return String(localized: "Choisie par proximité")
         case "ta_absent_no_distance_prior": return String(localized: "Sans TA : distance non vérifiée")
+        // Contrat r1, lot 1 : TA au-delà de 35 km ou saturé, et score plafonné à 60 sans TA fiable.
+        case "ta_out_of_range": return String(localized: "TA hors de portée : distance non vérifiée")
+        case "score_capped_no_ta": return String(localized: "Score limité sans TA fiable")
         case "radio_identifiers_missing": return String(localized: "Identifiants radio absents")
         case "gps_missing": return String(localized: "Position GPS absente")
         case "location_accuracy_poor": return String(localized: "Position GPS imprécise")
