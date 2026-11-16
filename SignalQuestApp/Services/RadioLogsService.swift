@@ -426,6 +426,14 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             return .unidentified
         }
 
+        // Position calculée (multilatération TA ou centroïde) : jamais une identification,
+        // et pas de fiche à lire pour un id `estimated:…` (Android, LG2 ; décision du 16/11).
+        // Seule une estimation qui porte sur CE nœud est annoncée comme telle.
+        if resolution.isEstimatedPosition {
+            guard resolution.matchesNode(site) || resolution.matchedRadio.isEmpty else { return .unidentified }
+            return .estimated(uncertaintyMeters: resolution.positionUncertaintyMeters)
+        }
+
         if resolution.matchesNode(site) {
             if site.kind == .gnb && !resolution.matchesPhysicalCell(of: site) {
                 return .unidentified
@@ -504,7 +512,9 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
               !resolution.isAmbiguousOrUnresolved,
               let payload = resolution.hypothesis,
               let siteId = payload.canonicalSiteId ?? payload.siteId ?? resolution.canonicalSiteId ?? resolution.siteId,
-              !siteId.isEmpty
+              !siteId.isEmpty,
+              // Une position calculée n'a pas de support à proposer.
+              !siteId.hasPrefix(QuickIdentifyResolution.estimatedSiteIdPrefix)
         else { return nil }
 
         let effectiveDistance = payload.distanceMeters ?? resolution.distanceMeters

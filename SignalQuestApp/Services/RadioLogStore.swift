@@ -179,8 +179,29 @@ extension RadioLogSiteStatusStoring {
     }
 }
 
-private struct RadioLogSiteStatusFile: Codable {
+struct RadioLogSiteStatusFile: Codable {
     var states: [String: CachedRadioLogSiteState] = [:]
+
+    /// Version des règles de verdict. 1 (16/11) : une position calculée n'identifie plus le
+    /// site ; un fichier plus ancien oublie ses « identifié », que le balayage réévalue.
+    static let verdictVersion = 1
+
+    private enum CodingKeys: String, CodingKey { case states, verdictVersion }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decoded = try c.decodeIfPresent([String: CachedRadioLogSiteState].self, forKey: .states) ?? [:]
+        let version = (try? c.decodeIfPresent(Int.self, forKey: .verdictVersion)) ?? 0
+        states = version < 1 ? decoded.filter { !$0.value.state.isIdentified } : decoded
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(states, forKey: .states)
+        try c.encode(Self.verdictVersion, forKey: .verdictVersion)
+    }
 }
 
 final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Sendable {

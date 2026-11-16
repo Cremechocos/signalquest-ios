@@ -430,9 +430,18 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
     case unchecked
     case identified(siteId: String)
     case unidentified
+    /// Le serveur ne connaît que la position CALCULÉE du support (multilatération TA ou
+    /// centroïde), avec son rayon en mètres s'il est connu. Le site reste à identifier :
+    /// il compte avec les sites à identifier, jamais avec les identifiés (Android, LG2).
+    case estimated(uncertaintyMeters: Int?)
 
     var isIdentified: Bool { if case .identified = self { return true }; return false }
-    var isUnidentified: Bool { self == .unidentified }
+    var isUnidentified: Bool {
+        switch self {
+        case .unidentified, .estimated: return true
+        case .unchecked, .identified: return false
+        }
+    }
     var isChecked: Bool { self != .unchecked }
 
     var siteId: String? { if case let .identified(siteId) = self { return siteId }; return nil }
@@ -442,11 +451,17 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
         case .unchecked: return String(localized: "Vérification…")
         case .identified: return String(localized: "Identifié")
         case .unidentified: return String(localized: "À identifier")
+        case let .estimated(uncertaintyMeters):
+            guard let uncertaintyMeters else { return String(localized: "Position estimée") }
+            // « ± 412 m » d'un seul tenant : la pastille ne coupe jamais entre le signe et l'unité.
+            let radius = "±\u{00A0}" + SQUnits.distanceCompact(meters: Double(uncertaintyMeters))
+                .replacingOccurrences(of: " ", with: "\u{00A0}")
+            return String(localized: "Position estimée \(radius)")
         }
     }
 
-    private enum Kind: String, Codable { case unchecked, identified, unidentified }
-    private enum CodingKeys: String, CodingKey { case kind, siteId }
+    private enum Kind: String, Codable { case unchecked, identified, unidentified, estimated }
+    private enum CodingKeys: String, CodingKey { case kind, siteId, uncertaintyMeters }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -454,6 +469,7 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
         case .unchecked: self = .unchecked
         case .identified: self = .identified(siteId: (try? c.decode(String.self, forKey: .siteId)) ?? "")
         case .unidentified: self = .unidentified
+        case .estimated: self = .estimated(uncertaintyMeters: try? c.decodeIfPresent(Int.self, forKey: .uncertaintyMeters))
         }
     }
 
@@ -465,6 +481,9 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
             try c.encode(Kind.identified, forKey: .kind)
             try c.encode(siteId, forKey: .siteId)
         case .unidentified: try c.encode(Kind.unidentified, forKey: .kind)
+        case let .estimated(uncertaintyMeters):
+            try c.encode(Kind.estimated, forKey: .kind)
+            try c.encodeIfPresent(uncertaintyMeters, forKey: .uncertaintyMeters)
         }
     }
 }

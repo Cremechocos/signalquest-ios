@@ -799,6 +799,100 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(RadioLogsService.state(from: matched, site: site), .identified(siteId: "0382700518"))
     }
 
+    /// POSITION CALCULÉE — décision du 16/11, alignée sur Android (LG2) : quand le serveur ne
+    /// connaît le support que par une multilatération TA ou un centroïde d'observations, le
+    /// site reste à identifier, avec son rayon, et n'a ni fiche ni nom à lire.
+    func testEstimatedPositionIsNeverAnIdentification() throws {
+        let site = try makeSite(kind: .enb, node: "4566")
+        // Réponse réelle de `identify/quick` (route.ts, `community_estimated_site`).
+        let multilateration = try resolution("""
+        {"found":true,"market":"LU","source":"community_estimated_site","siteId":"estimated:enb:4566",
+         "canonicalSiteId":null,"resolutionMode":"community_estimated_position",
+         "requiresUserConfirmation":true,"matchedOperators":["POST_LU"],
+         "matchedRadio":[{"type":"enb","value":"4566"}],"positionSource":"estimated",
+         "latitude":49.61,"longitude":6.13,
+         "estimatedSite":{"latitude":49.61,"longitude":6.13,"uncertaintyMeters":412,"observationCount":37}}
+        """)
+        let state = RadioLogsService.state(from: multilateration, site: site)
+        XCTAssertEqual(state, .estimated(uncertaintyMeters: 412))
+        XCTAssertFalse(state.isIdentified)
+        XCTAssertTrue(state.isUnidentified, "Compté avec les sites à identifier")
+        XCTAssertNil(state.siteId, "Aucune fiche à lire pour un id estimated:")
+        XCTAssertNil(RadioLogsService.proposal(from: multilateration), "Pas de support à proposer")
+
+        // Centroïde d'observations (`community_candidates`) : rayon `radiusMeters`, piste gardée.
+        let centroid = try resolution("""
+        {"found":true,"source":"community_candidates","siteId":"cand-77","canonicalSiteId":"cand-77",
+         "resolutionMode":"community_probable_site","requiresUserConfirmation":true,
+         "matchedRadio":[{"type":"enb","value":"4566"}],"positionSource":"centroid","radiusMeters":180.4,
+         "latitude":49.6,"longitude":6.1,"distanceMeters":300,
+         "hypothesis":{"siteId":"cand-77","distanceMeters":300,"confidenceScore":55}}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: centroid, site: site), .estimated(uncertaintyMeters: 180))
+        XCTAssertEqual(RadioLogsService.proposal(from: centroid)?.siteId, "cand-77", "La piste « À valider » reste")
+
+        // Sans rayon : « Position estimée » seule. Une estimation d'un AUTRE nœud n'est pas la sienne.
+        let noRadius = try resolution("""
+        {"found":true,"siteId":"estimated:enb:4566","matchedRadio":[{"type":"enb","value":"4566"}]}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: noRadius, site: site), .estimated(uncertaintyMeters: nil))
+        let otherNode = try resolution("""
+        {"found":true,"siteId":"cand-9","positionSource":"centroid","radiusMeters":90,
+         "matchedRadio":[{"type":"pci","value":"35"}]}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: otherNode, site: site), .unidentified)
+
+        // Un site DÉCLARÉ par un membre reste une identification.
+        let declared = try resolution("""
+        {"found":true,"source":"community_custom_site","siteId":"user-site-3",
+         "resolutionMode":"community_user_site","requiresUserConfirmation":false,
+         "matchedRadio":[{"type":"enb","value":"4566"}],"positionSource":"declared"}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: declared, site: site), .identified(siteId: "user-site-3"))
+    }
+
+    /// L'état estimé survit au cache disque ; un fichier d'avant le 16/11 oublie ses
+    /// « identifié » (une position estimée y passait pour une identification), garde le reste,
+    /// et le fichier réécrit porte la version.
+    func testEstimatedStateRoundTripsAndOldCacheForgetsItsIdentifiedVerdicts() throws {
+        for state in [RadioLogSiteState.estimated(uncertaintyMeters: 412), .estimated(uncertaintyMeters: nil)] {
+            let data = try JSONEncoder.signalQuest.encode(state)
+            XCTAssertEqual(try JSONDecoder.signalQuest.decode(RadioLogSiteState.self, from: data), state)
+        }
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("radiolog-status-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let now = 1_786_000_000_000
+        let legacy = """
+        {"states":{
+          "enb:4566":{"state":{"kind":"identified","siteId":"estimated:enb:4566"},"updatedAtMs":\(now)},
+          "enb:1":{"state":{"kind":"unidentified"},"updatedAtMs":\(now)}}}
+        """
+        try Data(legacy.utf8).write(to: url)
+
+        let store = RadioLogSiteStatusStore(fileURL: url)
+        let states = store.fresh(identifiedTtlMs: 7 * 86_400_000, unidentifiedTtlMs: 86_400_000, nowMs: now + 1)
+        XCTAssertNil(states["enb:4566"], "Réévalué par le prochain balayage")
+        XCTAssertEqual(states["enb:1"], .unidentified)
+
+        store.merge(["enb:626821": .identified(siteId: "sup-42"), "enb:4566": .estimated(uncertaintyMeters: 412)], nowMs: now + 2)
+        let reloaded = RadioLogSiteStatusStore(fileURL: url)
+            .fresh(identifiedTtlMs: 7 * 86_400_000, unidentifiedTtlMs: 86_400_000, nowMs: now + 3)
+        XCTAssertEqual(reloaded["enb:626821"], .identified(siteId: "sup-42"), "Un fichier à jour garde ses identifiés")
+        XCTAssertEqual(reloaded["enb:4566"], .estimated(uncertaintyMeters: 412))
+        let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        XCTAssertEqual(raw?["verdictVersion"] as? Int, RadioLogSiteStatusFile.verdictVersion)
+    }
+
+    func testEstimatedLabelCarriesTheRadius() {
+        XCTAssertEqual(RadioLogSiteState.estimated(uncertaintyMeters: nil).label, String(localized: "Position estimée"))
+        let label = RadioLogSiteState.estimated(uncertaintyMeters: 412).label
+        // Espaces insécables : la pastille ne coupe jamais entre « ± », le nombre et l'unité.
+        let radius = "±\u{00A0}" + SQUnits.distanceCompact(meters: 412).replacingOccurrences(of: " ", with: "\u{00A0}")
+        XCTAssertTrue(label.hasSuffix(radius), label)
+    }
+
     /// SITE MUTUALISÉ — le cas qui a fait tomber 23 % du catalogue à tort.
     ///
     /// Le serveur renvoie `requiresUserConfirmation: true` et
@@ -1664,7 +1758,7 @@ extension RadioLogsTests {
         window.makeKeyAndVisible()
         for scheme in [ColorScheme.light, .dark] {
             let view = RadioLogSiteDetailView(
-                site: site, state: .unidentified, siteName: nil, proposal: proposal, isMine: false,
+                site: site, state: .estimated(uncertaintyMeters: 412), siteName: nil, proposal: proposal, isMine: false,
                 service: SnapshotRadioLogsService(entries: entries), antennas: StubAntennasService(),
                 onIdentify: {}, onConfirmProposal: {}
             )
@@ -1678,6 +1772,39 @@ extension RadioLogsTests {
             }
             try XCTUnwrap(image.pngData()).write(
                 to: URL(fileURLWithPath: output).appendingPathComponent("fiche-\(scheme == .dark ? "sombre" : "clair").png")
+            )
+        }
+
+        // Cartes de la liste : position estimée avec rayon et piste, sans rayon, puis à identifier.
+        let variants: [(String, ColorScheme, DynamicTypeSize)] = [
+            ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2),
+        ]
+        for (name, scheme, size) in variants {
+            let cards = ScrollView {
+                VStack(spacing: 0) {
+                    RadioLogSiteCard(site: site, state: .estimated(uncertaintyMeters: 412), siteName: nil,
+                                     proposal: proposal, onOpen: {}, onIdentify: {}, onOpenMap: {}, onConfirmProposal: {})
+                    Divider()
+                    RadioLogSiteCard(site: site, state: .estimated(uncertaintyMeters: nil), siteName: nil,
+                                     onOpen: {}, onIdentify: {}, onOpenMap: {})
+                    Divider()
+                    RadioLogSiteCard(site: site, state: .unidentified, siteName: nil,
+                                     onOpen: {}, onIdentify: {}, onOpenMap: {})
+                }
+                .padding(SQSpace.lg)
+            }
+            .background(SQColor.surface)
+            .environment(\.colorScheme, scheme)
+            .environment(\.dynamicTypeSize, size)
+            let host = UIHostingController(rootView: cards)
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(
+                to: URL(fileURLWithPath: output).appendingPathComponent("cartes-estimee-\(name).png")
             )
         }
     }

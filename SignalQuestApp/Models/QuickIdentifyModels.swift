@@ -175,12 +175,21 @@ struct QuickIdentifyResolution: Decodable, Sendable {
     let ambiguous: Bool?
     let sharedNode: Bool?
     let hypothesis: QuickIdentifyHypothesis?
+    /// `declared`, `centroid` ou `estimated` : d'où vient la position du support.
+    let positionSource: String?
+    /// Rayon d'incertitude d'un centroïde d'observations, en mètres.
+    let radiusMeters: Double?
+    /// Incertitude d'une position calculée par multilatération TA (`estimatedSite`), en mètres.
+    let estimatedUncertaintyMeters: Double?
+    private let hasEstimatedSite: Bool
 
     enum CodingKeys: String, CodingKey {
         case found, siteId, canonicalSiteId, market, operatorMatched, distanceMeters
         case matchedRadio, matchedRadioTypes, resolutionMode, source, requiresUserConfirmation
-        case ambiguous, sharedNode, hypothesis
+        case ambiguous, sharedNode, hypothesis, positionSource, radiusMeters, estimatedSite
     }
+
+    private enum EstimatedSiteKeys: String, CodingKey { case uncertaintyMeters }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -200,7 +209,33 @@ struct QuickIdentifyResolution: Decodable, Sendable {
         ambiguous = try? c.decodeIfPresent(Bool.self, forKey: .ambiguous)
         sharedNode = try? c.decodeIfPresent(Bool.self, forKey: .sharedNode)
         hypothesis = try? c.decodeIfPresent(QuickIdentifyHypothesis.self, forKey: .hypothesis)
+        positionSource = c.decodeFlexibleString(forKey: .positionSource)
+        radiusMeters = try? c.decodeIfPresent(Double.self, forKey: .radiusMeters)
+        let estimated = try? c.nestedContainer(keyedBy: EstimatedSiteKeys.self, forKey: .estimatedSite)
+        hasEstimatedSite = estimated != nil
+        estimatedUncertaintyMeters = try? estimated?.decodeIfPresent(Double.self, forKey: .uncertaintyMeters)
     }
+
+    /// Le serveur ne connaît le support que par une position CALCULÉE : multilatération TA
+    /// (`estimated`, id `estimated:…`) ou centroïde d'observations (`centroid`). Ce n'est
+    /// jamais une identification, comme chez Android (LG2).
+    var isEstimatedPosition: Bool {
+        switch positionSource?.lowercased() {
+        case "estimated", "centroid": return true
+        case nil: break
+        default: return false
+        }
+        if hasEstimatedSite { return true }
+        return [siteId, canonicalSiteId].contains { $0?.hasPrefix(Self.estimatedSiteIdPrefix) == true }
+    }
+
+    /// Rayon à afficher (« ± X m ») : celui de la multilatération d'abord, puis celui du centroïde.
+    var positionUncertaintyMeters: Int? {
+        (estimatedUncertaintyMeters ?? radiusMeters).flatMap { $0.isFinite && $0 > 0 ? Int($0.rounded()) : nil }
+    }
+
+    /// Identifiant synthétique d'une position calculée : aucune fiche de site derrière.
+    static let estimatedSiteIdPrefix = "estimated:"
 
     /// Types d'identifiants reconnus, normalisés en minuscules.
     var matchedTypes: Set<String> { Set(matchedRadio.map { $0.type.lowercased() }) }

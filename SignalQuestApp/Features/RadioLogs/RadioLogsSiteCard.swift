@@ -53,7 +53,7 @@ struct RadioLogStatePill: View {
     private var container: Color {
         switch state {
         case .identified: return P.okSoft
-        case .unidentified: return P.chip
+        case .unidentified, .estimated: return P.chip
         case .unchecked: return checkable ? SQColor.warningSoft : P.chip
         }
     }
@@ -61,7 +61,7 @@ struct RadioLogStatePill: View {
     private var ink: Color {
         switch state {
         case .identified: return P.okInk
-        case .unidentified: return P.muted
+        case .unidentified, .estimated: return P.muted
         // Vérification en cours : ambre, comme le bandeau de vérification.
         case .unchecked: return checkable ? OutageTint.degradedInk : P.muted
         }
@@ -229,6 +229,7 @@ struct RadioLogSiteCard: View {
     let onIdentify: () -> Void
     let onOpenMap: () -> Void
     var onConfirmProposal: (() -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Les actions s'alignent sous le texte, pas sous la pastille.
     private var actionInset: CGFloat { M.leadPill + M.cardInnerGap }
@@ -300,15 +301,21 @@ struct RadioLogSiteCard: View {
     }
 
     private var titleLine: some View {
-        HStack(spacing: SQSpace.sm) {
-            Text(title)
-                .font(titleIsNode ? .sqTechnical(M.siteIdSize, .semibold) : SQFont.body(M.siteIdSize, .bold))
-                .tracking(titleIsNode ? M.siteIdTracking : 0)
-                .foregroundStyle(P.ink)
-                .lineLimit(2)
-            RadioLogTechBadge(label: site.techLabel)
-            Spacer(minLength: 0)
-            trailing
+        // Aux tailles d'accessibilité, la pastille passe sous le titre : à côté, elle se
+        // brisait lettre par lettre (« À / identif / ier »).
+        let pillBelow = dynamicTypeSize.isAccessibilitySize && !state.isIdentified
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: SQSpace.sm) {
+                Text(title)
+                    .font(titleIsNode ? .sqTechnical(M.siteIdSize, .semibold) : SQFont.body(M.siteIdSize, .bold))
+                    .tracking(titleIsNode ? M.siteIdTracking : 0)
+                    .foregroundStyle(P.ink)
+                    .lineLimit(2)
+                RadioLogTechBadge(label: site.techLabel)
+                Spacer(minLength: 0)
+                if !pillBelow { trailing }
+            }
+            if pillBelow { RadioLogStatePill(state: state, checkable: site.isCheckable) }
         }
     }
 
@@ -347,7 +354,7 @@ struct RadioLogSiteCard: View {
         let style: (symbol: String, ink: Color, fill: Color) = {
             switch state {
             case .identified: return ("checkmark", P.okInk, P.okSoft)
-            case .unidentified: return ("antenna.radiowaves.left.and.right", P.accentInk, P.accentSoft)
+            case .unidentified, .estimated: return ("antenna.radiowaves.left.and.right", P.accentInk, P.accentSoft)
             case .unchecked:
                 return site.isCheckable
                     ? ("ellipsis", P.muted, P.chip)
