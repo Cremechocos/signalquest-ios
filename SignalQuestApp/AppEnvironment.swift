@@ -275,6 +275,18 @@ enum AppEnvironment {
         #endif
     }
 
+    /// Banc du Bilan mensuel : `--qa-monthly-recap-full`, `-partial`, `-notfound`, `-error`,
+    /// `-notready`, `-expired`, `-ended` ou `-share` (écran sur un faux service), `-entries`
+    /// (Profil et Notifications d'un compte Premium) ou `-free` (carte d'un compte gratuit).
+    static var monthlyRecapQAVariant: String? {
+        #if DEBUG && targetEnvironment(simulator)
+        let prefix = "--qa-monthly-recap-"
+        return ProcessInfo.processInfo.arguments.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+        #else
+        return nil
+        #endif
+    }
+
     static var showsUsernameConfirmationQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-username-confirmation") || hasArgument("--qa-username-confirmation-none")

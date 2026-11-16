@@ -121,7 +121,16 @@
         "newLevel": "integer"
       },
       "title": "Niveau {newLevel}",
-      "fr": "Vous passez au niveau {newLevel}."
+      "fr": "Tu passes au niveau {newLevel}."
+    },
+    {
+      "key": "notif.recap.ready",
+      "args": {
+        "month": "string"
+      },
+      "title": "Ton bilan est prêt",
+      "fr": "Découvre ton mois {month}.",
+      "note": "Ajout du 16/11/2026 (Bilan mensuel, décision d'Alexandre). `month` vaut `yyyy-mm` ; chaque app écrit le nom du mois avec son élision : « d’octobre », « de mars » ; en anglais « See your October. »."
     }
   ],
   "cases": [
@@ -875,6 +884,48 @@
         "metadata": {
           "actorCount": 1
         },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "bilan mensuel prêt",
+      "input": {
+        "type": "recap.ready",
+        "metadata": {
+          "month": "2026-10"
+        },
+        "message": "Découvre ton mois d’octobre."
+      },
+      "expect": {
+        "textKey": "notif.recap.ready",
+        "textArgs": {
+          "month": "2026-10"
+        }
+      }
+    },
+    {
+      "name": "bilan mensuel, mois mal formé",
+      "input": {
+        "type": "recap.ready",
+        "metadata": {
+          "month": "2026-13"
+        },
+        "message": "x"
+      },
+      "expect": {
+        "textKey": null,
+        "textArgs": null
+      }
+    },
+    {
+      "name": "bilan mensuel sans mois",
+      "input": {
+        "type": "recap.ready",
+        "metadata": {},
         "message": "x"
       },
       "expect": {

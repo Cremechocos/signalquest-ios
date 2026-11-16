@@ -140,6 +140,11 @@ struct NotificationPreferences: Codable {
     /// Activité des antennes suivies (messages, activations, nouvelles bandes, panne
     /// confirmée), au plus une alerte par site et par jour. Activée par défaut côté serveur.
     var notifySiteFollowsPush: Bool? = nil
+    /// Bilan mensuel Premium (contrat Abonnements v1.20 §3) : e-mail et push du 1er du mois,
+    /// et nom ou profil sur l'image de partage. Tous trois activés par défaut côté serveur.
+    var notifyMonthlyRecapEmail: Bool? = nil
+    var notifyMonthlyRecapPush: Bool? = nil
+    var recapShareIdentity: Bool? = nil
     var callsDoNotDisturb: Bool?
 }
 

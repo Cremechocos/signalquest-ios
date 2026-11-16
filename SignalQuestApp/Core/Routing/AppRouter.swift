@@ -182,6 +182,9 @@ final class AppRouter: ObservableObject {
         var id: String { rawValue }
     }
     @Published var openProfileScreen: ProfileScreen?
+    /// Bilan mensuel (notification `recap.ready`, lien `/profile/bilan/{yyyy-mm}`) : le mois
+    /// visé, ou une chaîne vide pour le dernier mois clos. Consommé par le Profil.
+    @Published var openRecapMonth: String?
     /// Mise à jour ANFR : l'écran ANFR de l'onglet Carte, consommé par la carte.
     @Published var openANFRMap = false
     /// Statistiques des antennes sur un pays (lien `/stats`, annonce ISED), consommées par la carte.
@@ -322,9 +325,13 @@ final class AppRouter: ObservableObject {
         anfrFocus: ANFRFocus? = nil,
         market: String? = nil,
         operatorKey: String? = nil,
-        commentId: String? = nil
+        commentId: String? = nil,
+        month: String? = nil
     ) {
         switch rawType?.lowercased() {
+        // Bilan mensuel prêt (contrat Abonnements v1.20 §3) : le Bilan du mois porté.
+        case "recap.ready":
+            route(toRecap: month)
         // Types réellement émis par le serveur : préfixés `message_*` et
         // `social_*` (confirmé le 30/09) ; les noms nus restent pour les
         // anciennes notifications.
@@ -583,6 +590,12 @@ final class AppRouter: ObservableObject {
     func route(toProfileScreen screen: ProfileScreen) {
         selectedTab = .profile
         openProfileScreen = screen
+    }
+
+    /// Un mois mal formé ou absent ouvre le dernier mois clos.
+    func route(toRecap month: String?) {
+        selectedTab = .profile
+        openRecapMonth = month.flatMap { MonthlyRecapLink.isMonth($0) ? $0 : nil } ?? ""
     }
 
     func route(toBug id: String?) {

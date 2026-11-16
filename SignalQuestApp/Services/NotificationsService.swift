@@ -85,7 +85,8 @@ struct NotificationTextKey: Equatable {
     let key: String
     private let args: [String: JSONValue]
 
-    private enum Kind { case string, count }
+    /// `month` : un mois `yyyy-mm` (Bilan mensuel), écrit avec son élision par l'app.
+    private enum Kind { case string, count, month }
 
     private static let catalog: [String: [String: Kind]] = [
         "notif.social.reaction_heart": ["actorName": .string],
@@ -102,6 +103,7 @@ struct NotificationTextKey: Equatable {
         "notif.social.follow": ["actorName": .string],
         "notif.progress.badge": ["badgeId": .string, "badgeName": .string],
         "notif.progress.level": ["newLevel": .count],
+        "notif.recap.ready": ["month": .month],
     ]
 
     /// Schéma au format du contrat (`string` / `integer`), pour le test qui le compare.
@@ -117,6 +119,7 @@ struct NotificationTextKey: Equatable {
             case (.string, .string(let text)?) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: continue
             case (.count, .number(let number)?) where number.isFinite && number >= 1 && number == number.rounded()
                 && number <= 9_007_199_254_740_991: continue
+            case (.month, .string(let month)?) where MonthlyRecapLink.isMonth(month): continue
             default: return nil
             }
         }
@@ -146,6 +149,7 @@ struct NotificationTextKey: Equatable {
         case "notif.social.follow": return String(localized: "Nouvel abonné")
         case "notif.progress.badge": return String(localized: "Nouveau badge")
         case "notif.progress.level": return String(localized: "Niveau \(count("newLevel"))")
+        case "notif.recap.ready": return String(localized: "Ton bilan est prêt")
         default: return ""
         }
     }
@@ -183,6 +187,9 @@ struct NotificationTextKey: Equatable {
         case "notif.social.follow": return String(localized: "\(actor) suit maintenant ton profil public.")
         case "notif.progress.badge": return String(localized: "Badge « \(string("badgeName")) » obtenu.")
         case "notif.progress.level": return String(localized: "Tu passes au niveau \(count("newLevel")).")
+        case "notif.recap.ready":
+            let month = MonthlyRecapPresentation.monthOf(string("month"))
+            return String(localized: "Découvre ton mois \(month).")
         default: return ""
         }
     }

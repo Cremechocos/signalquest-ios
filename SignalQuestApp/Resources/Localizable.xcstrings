@@ -1,6 +1,1594 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Bilan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recap"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilan"
+          }
+        }
+      }
+    },
+    "Bilan mensuel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly recap"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilan mensuel"
+          }
+        }
+      }
+    },
+    "Notification du bilan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recap notification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification du bilan"
+          }
+        }
+      }
+    },
+    "Bilan par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recap by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilan par e-mail"
+          }
+        }
+      }
+    },
+    "Le 1er de chaque mois, avec Premium. Les deux réglages suivent ton compte sur le web, Android et l’iPhone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the 1st of every month, with Premium. Both settings follow your account on the web, Android and iPhone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le 1er de chaque mois, avec Premium. Les deux réglages suivent ton compte sur le web, Android et l’iPhone."
+          }
+        }
+      }
+    },
+    "SQFormal|Le 1er de chaque mois, avec Premium. Les deux réglages suivent ton compte sur le web, Android et l’iPhone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le 1er de chaque mois, avec Premium. Les deux réglages suivent votre compte sur le web, Android et l’iPhone."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton bilan chaque mois, à lire et à partager." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap every month, to read and share."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton bilan chaque mois, à lire et à partager."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton bilan chaque mois, à lire et à partager." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bilan chaque mois, à lire et à partager."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton bilan est prêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap is ready"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton bilan est prêt"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton bilan est prêt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bilan est prêt"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Découvre ton mois %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See your %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découvre ton mois %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Découvre ton mois %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découvrez votre mois %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Mois précédent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mois précédent"
+          }
+        }
+      }
+    },
+    "Mois suivant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mois suivant"
+          }
+        }
+      }
+    },
+    "Mois précédent : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous month: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mois précédent : %@"
+          }
+        }
+      }
+    },
+    "Mois suivant : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next month: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mois suivant : %@"
+          }
+        }
+      }
+    },
+    "Sans activité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No activity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans activité"
+          }
+        }
+      }
+    },
+    "Choisir un mois, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a month, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un mois, %@"
+          }
+        }
+      }
+    },
+    "Tes jours actifs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your active days"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes jours actifs"
+          }
+        }
+      }
+    },
+    "SQFormal|Tes jours actifs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos jours actifs"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "E-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-mail"
+          }
+        }
+      }
+    },
+    "Tu reçois ce bilan par e-mail le 1er de chaque mois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You receive this recap by email on the 1st of every month."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu reçois ce bilan par e-mail le 1er de chaque mois."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu reçois ce bilan par e-mail le 1er de chaque mois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous recevez ce bilan par e-mail le 1er de chaque mois."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Gérer dans les réglages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage in settings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer dans les réglages"
+          }
+        }
+      }
+    },
+    "Afficher mon nom et mon profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show my name and profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher mon nom et mon profil"
+          }
+        }
+      }
+    },
+    "Coupé, l’image perd ton nom, ton badge Premium, l’adresse de ton profil et ta bannière. Ton choix est retenu sur ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, the image drops your name, Premium badge, profile address and banner. Your choice is saved to your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coupé, l’image perd ton nom, ton badge Premium, l’adresse de ton profil et ta bannière. Ton choix est retenu sur ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Coupé, l’image perd ton nom, ton badge Premium, l’adresse de ton profil et ta bannière. Ton choix est retenu sur ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coupé, l’image perd votre nom, votre badge Premium, l’adresse de votre profil et votre bannière. Votre choix est retenu sur votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton choix n’a pas pu être enregistré. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your choice couldn’t be saved. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton choix n’a pas pu être enregistré. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton choix n’a pas pu être enregistré. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre choix n’a pas pu être enregistré. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aperçu de l’image du bilan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview of the recap image"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperçu de l’image du bilan"
+          }
+        }
+      }
+    },
+    "L’image n’a pas pu être préparée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The image couldn’t be prepared."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image n’a pas pu être préparée."
+          }
+        }
+      }
+    },
+    "Ton mois, raconté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your month, told"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton mois, raconté"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton mois, raconté" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre mois, raconté"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Chaque 1er du mois, un bilan de tes mesures et de tes contributions, à lire, à recevoir par e-mail et à partager." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the 1st of every month, a recap of your measurements and contributions, to read, get by email and share."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque 1er du mois, un bilan de tes mesures et de tes contributions, à lire, à recevoir par e-mail et à partager."
+          }
+        }
+      }
+    },
+    "SQFormal|Chaque 1er du mois, un bilan de tes mesures et de tes contributions, à lire, à recevoir par e-mail et à partager." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque 1er du mois, un bilan de vos mesures et de vos contributions, à lire, à recevoir par e-mail et à partager."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton mois %@ sur SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your month of %@ on SignalQuest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton mois %@ sur SignalQuest"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton mois %@ sur SignalQuest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre mois %@ sur SignalQuest"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Du 1er au %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From the 1st to %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du 1er au %@"
+          }
+        }
+      }
+    },
+    "arrêté le %@ à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "frozen on %@ at %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "arrêté le %@ à %@"
+          }
+        }
+      }
+    },
+    "Tu as parcouru %@ en mesurant le réseau et identifié %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You covered %@ measuring the network and identified %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as parcouru %@ en mesurant le réseau et identifié %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as parcouru %@ en mesurant le réseau et identifié %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez parcouru %@ en mesurant le réseau et identifié %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu as parcouru %@ en mesurant le réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You covered %@ measuring the network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as parcouru %@ en mesurant le réseau."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as parcouru %@ en mesurant le réseau." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez parcouru %@ en mesurant le réseau."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu as identifié %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You identified %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as identifié %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu as identifié %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous avez identifié %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    ", dont 1 que personne n’avait encore trouvée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", including 1 that nobody had found yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", dont 1 que personne n’avait encore trouvée"
+          }
+        }
+      }
+    },
+    ", dont %lld que personne n’avait encore trouvées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", including %lld that nobody had found yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", dont %lld que personne n’avait encore trouvées"
+          }
+        }
+      }
+    },
+    "Ton meilleur débit : %@ en %@, le %@ près de %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your best download speed: %@ on %@, on %@ near %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton meilleur débit : %@ en %@, le %@ près de %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton meilleur débit : %@ en %@, le %@ près de %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre meilleur débit : %@ en %@, le %@ près de %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton meilleur débit : %@ en %@, le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your best download speed: %@ on %@, on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton meilleur débit : %@ en %@, le %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton meilleur débit : %@ en %@, le %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre meilleur débit : %@ en %@, le %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton meilleur débit : %@, le %@ près de %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your best download speed: %@, on %@ near %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton meilleur débit : %@, le %@ près de %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton meilleur débit : %@, le %@ près de %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre meilleur débit : %@, le %@ près de %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton meilleur débit : %@, le %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your best download speed: %@, on %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton meilleur débit : %@, le %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton meilleur débit : %@, le %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre meilleur débit : %@, le %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "en session de mesure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in measuring sessions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en session de mesure"
+          }
+        }
+      }
+    },
+    "antenne identifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "antenna identified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "antenne identifiée"
+          }
+        }
+      }
+    },
+    "antennes identifiées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "antennas identified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "antennes identifiées"
+          }
+        }
+      }
+    },
+    "point" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "point"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "point"
+          }
+        }
+      }
+    },
+    "Plus longue session" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longest session"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus longue session"
+          }
+        }
+      }
+    },
+    "Sur le terrain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the field"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur le terrain"
+          }
+        }
+      }
+    },
+    "Débit descendant médian" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median download speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit descendant médian"
+          }
+        }
+      }
+    },
+    "1 test sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 of %lld tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 test sur %lld"
+          }
+        }
+      }
+    },
+    "%lld tests sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld of %lld tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tests sur %lld"
+          }
+        }
+      }
+    },
+    "Réseau le plus mesuré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most measured network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau le plus mesuré"
+          }
+        }
+      }
+    },
+    "Tes mesures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes mesures"
+          }
+        }
+      }
+    },
+    "SQFormal|Tes mesures" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos mesures"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Médiane, record et réseau : speedtests en données mobiles. Le Wi-Fi ne compte que dans le nombre de speedtests." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median, best speed and network: mobile data speedtests only. Wi-Fi only counts in the number of speedtests."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médiane, record et réseau : speedtests en données mobiles. Le Wi-Fi ne compte que dans le nombre de speedtests."
+          }
+        }
+      }
+    },
+    "dont 1 première" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "including 1 first"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dont 1 première"
+          }
+        }
+      }
+    },
+    "dont %lld premières" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "including %lld firsts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dont %lld premières"
+          }
+        }
+      }
+    },
+    "Antennes identifiées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas identified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes identifiées"
+          }
+        }
+      }
+    },
+    "Photos publiées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos published"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos publiées"
+          }
+        }
+      }
+    },
+    "Ce que tu as apporté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you contributed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que tu as apporté"
+          }
+        }
+      }
+    },
+    "SQFormal|Ce que tu as apporté" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que vous avez apporté"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Points gagnés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points earned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points gagnés"
+          }
+        }
+      }
+    },
+    "Rang du mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rank for the month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rang du mois"
+          }
+        }
+      }
+    },
+    "Plus longue série" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longest streak"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus longue série"
+          }
+        }
+      }
+    },
+    "Badges débloqués" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges unlocked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges débloqués"
+          }
+        }
+      }
+    },
+    "Ta progression" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your progress"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta progression"
+          }
+        }
+      }
+    },
+    "SQFormal|Ta progression" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre progression"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "1 jour actif sur %lld, du lundi au dimanche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 active day out of %lld, Monday to Sunday."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 jour actif sur %lld, du lundi au dimanche."
+          }
+        }
+      }
+    },
+    "%lld jours actifs sur %lld, du lundi au dimanche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld active days out of %lld, Monday to Sunday."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld jours actifs sur %lld, du lundi au dimanche."
+          }
+        }
+      }
+    },
+    "Plus le carré est foncé, plus le jour a compté de mesures et de contributions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The darker the square, the more measurements and contributions the day had."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus le carré est foncé, plus le jour a compté de mesures et de contributions."
+          }
+        }
+      }
+    },
+    "1 jour actif sur %lld en %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 active day out of %lld in %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 jour actif sur %lld en %@"
+          }
+        }
+      }
+    },
+    "%lld jours actifs sur %lld en %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld active days out of %lld in %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld jours actifs sur %lld en %@"
+          }
+        }
+      }
+    },
+    "Rang" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rank"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rang"
+          }
+        }
+      }
+    },
+    "Par rapport à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compared with %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par rapport à %@"
+          }
+        }
+      }
+    },
+    "de janvier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "January"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de janvier"
+          }
+        }
+      }
+    },
+    "de février" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "February"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de février"
+          }
+        }
+      }
+    },
+    "de mars" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "March"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de mars"
+          }
+        }
+      }
+    },
+    "d’avril" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "April"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d’avril"
+          }
+        }
+      }
+    },
+    "de mai" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de mai"
+          }
+        }
+      }
+    },
+    "de juin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "June"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de juin"
+          }
+        }
+      }
+    },
+    "de juillet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "July"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de juillet"
+          }
+        }
+      }
+    },
+    "d’août" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "August"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d’août"
+          }
+        }
+      }
+    },
+    "de septembre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "September"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de septembre"
+          }
+        }
+      }
+    },
+    "d’octobre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "October"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d’octobre"
+          }
+        }
+      }
+    },
+    "de novembre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "November"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de novembre"
+          }
+        }
+      }
+    },
+    "de décembre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "December"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de décembre"
+          }
+        }
+      }
+    },
+    "Pas de bilan pour %@ : aucune mesure ni contribution ce mois-là." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recap for %@: no measurements or contributions that month."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de bilan pour %@ : aucune mesure ni contribution ce mois-là."
+          }
+        }
+      }
+    },
+    "Ton bilan n’a pas pu être lu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap couldn’t be loaded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton bilan n’a pas pu être lu."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton bilan n’a pas pu être lu." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bilan n’a pas pu être lu."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton bilan %@ sera prêt le 1er %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %@ recap will be ready on %@ 1."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton bilan %@ sera prêt le 1er %@."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton bilan %@ sera prêt le 1er %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bilan %@ sera prêt le 1er %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ce bilan n’est plus consultable. Les bilans restent disponibles 12 mois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This recap is no longer available. Recaps stay available for 12 months."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce bilan n’est plus consultable. Les bilans restent disponibles 12 mois."
+          }
+        }
+      }
+    },
     "Position estimée %@" : {
       "localizations" : {
         "en" : {

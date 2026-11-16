@@ -124,6 +124,8 @@ final class AppServices: ObservableObject {
     let friends: FriendsServicing
     let gamification: GamificationServicing
     let gamificationV2: GamificationV2Servicing
+    /// Bilan mensuel Premium (contrat Abonnements v1.20 §3).
+    let monthlyRecap: MonthlyRecapServicing
     let notifications: NotificationsServicing
     let calls: CallsServicing
     let users: UserServicing
@@ -251,7 +253,12 @@ final class AppServices: ObservableObject {
         driveTripSummaries = DriveTripSummaryService(
             api: api, serverId: { await speedtestService.serverId(forClientId: $0) }
         )
-        accountDataEraser.install { await speedtestService.eraseLocalData(ownerScopeId: $0) }
+        let monthlyRecapService = MonthlyRecapService(api: api)
+        monthlyRecap = monthlyRecapService
+        accountDataEraser.install {
+            await speedtestService.eraseLocalData(ownerScopeId: $0)
+            await monthlyRecapService.eraseLocalData(ownerScopeId: $0)
+        }
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService

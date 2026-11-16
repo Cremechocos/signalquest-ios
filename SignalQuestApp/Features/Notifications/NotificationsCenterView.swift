@@ -500,7 +500,9 @@ struct NotificationsCenterView: View {
             anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil,
             market: metaString(meta, "market"),
             operatorKey: metaString(meta, "operator"),
-            commentId: metaString(meta, "commentId") ?? metaString(meta, "replyId")
+            commentId: metaString(meta, "commentId") ?? metaString(meta, "replyId"),
+            month: metaString(meta, "month")
+                ?? item.link.flatMap { URL(string: $0)?.path ?? $0 }.flatMap(MonthlyRecapLink.month(fromPath:))
         )
     }
 
@@ -590,6 +592,8 @@ struct NotificationsCenterView: View {
         if k == "site_follow" { return "antenna.radiowaves.left.and.right" }
         // Demande de message (DM-REQ-1) : avant la règle « message », qui donnerait celle d'un message reçu.
         if k == "message_request" { return "tray" }
+        // Bilan mensuel prêt.
+        if k == "recap.ready" { return "calendar" }
         if k.contains("like") || k.contains("reaction") || k.contains("favorite") {
             return "heart.fill"
         }

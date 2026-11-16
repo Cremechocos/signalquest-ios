@@ -7,7 +7,8 @@ import XCTest
 @MainActor
 final class NotificationMutationTests: XCTestCase {
     // MARK: NOTIF-I18N (contrat `notification-text-keys` v1, copie à l'octet de
-    // `contracts/notification-text-keys/v1.json`, 982af8f46, servi le 12/11)
+    // `contracts/notification-text-keys/v1.json`, 982af8f46, servi le 12/11 ;
+    // 7c6608608 du 16/11 : `notif.recap.ready` du Bilan mensuel)
 
     private struct TextKeyVectors: Decodable {
         struct Key: Decodable { let key: String; let args: [String: String]; let title: String; let fr: String }
@@ -30,7 +31,7 @@ final class NotificationMutationTests: XCTestCase {
     func testNotificationTextCatalogMatchesTheContract() throws {
         let vectors = try textKeyVectors()
         XCTAssertEqual(vectors.version, 1)
-        XCTAssertEqual(vectors.keys.count, 14)
+        XCTAssertEqual(vectors.keys.count, 15)
         XCTAssertEqual(Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0.args) }), NotificationTextKey.contractArgs)
     }
 
@@ -41,7 +42,7 @@ final class NotificationMutationTests: XCTestCase {
     func testEveryServedNotificationCaseRendersLikeTheContract() throws {
         guard Bundle.main.preferredLocalizations.first == "fr" else { return }
         let vectors = try textKeyVectors()
-        XCTAssertEqual(vectors.cases.count, 35)
+        XCTAssertEqual(vectors.cases.count, 38)
         let templates = Dictionary(uniqueKeysWithValues: vectors.keys.map { ($0.key, $0) })
         var rendered = 0
         for testCase in vectors.cases {
@@ -56,6 +57,8 @@ final class NotificationMutationTests: XCTestCase {
                 for (name, value) in testCase.expect.textArgs ?? [:] {
                     let shown: String
                     switch value {
+                    // Le mois du Bilan s'écrit avec son élision (« d’octobre »), comme le dit la note du contrat.
+                    case .string(let string) where name == "month": shown = MonthlyRecapPresentation.monthOf(string)
                     case .string(let string): shown = string
                     case .number(let number): shown = String(Int(number))
                     default: shown = ""
@@ -71,7 +74,7 @@ final class NotificationMutationTests: XCTestCase {
             XCTAssertEqual(text.message, fill(template.fr), testCase.name)
             rendered += 1
         }
-        XCTAssertEqual(rendered, 24)
+        XCTAssertEqual(rendered, 25)
     }
 
     /// Tout ou rien : la ligne garde le texte du serveur dès qu'un argument manque,
@@ -126,6 +129,7 @@ final class NotificationMutationTests: XCTestCase {
             "%@ a repartagé ta publication.", "%@ et %lld autres personnes ont repartagé ta publication.",
             "%@ t’a mentionné dans le réseau social.", "%@ et %lld autres personnes t’ont mentionné.",
             "%@ suit maintenant ton profil public.", "Badge « %@ » obtenu.", "Tu passes au niveau %lld.",
+            "Ton bilan est prêt", "Découvre ton mois %@.",
         ]
         let missing = "\u{1}missing"
         for sentence in sentences {

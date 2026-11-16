@@ -85,6 +85,9 @@ private extension NotificationPreferences {
         prefs.notifyAnfrUpdatesPush = false
         prefs.notifyAntennaReportsEmail = true
         prefs.callsDoNotDisturb = false
+        prefs.notifyMonthlyRecapPush = true
+        prefs.notifyMonthlyRecapEmail = true
+        prefs.recapShareIdentity = true
         return prefs
     }
 }
@@ -238,6 +241,26 @@ struct NotificationSettingsView: View {
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
             .opacity(isDenied ? 0.45 : 1)
+
+            // Bilan mensuel (contrat Abonnements v1.20 §3) : Premium, avantage servi, et
+            // réglages lus du compte (un serveur qui ne les sert pas n'en montre aucun).
+            if MonthlyRecapAccess.isOffered(services.entitlements), MonthlyRecapAccess.isPremium(services.entitlements),
+               model.prefs.notifyMonthlyRecapPush != nil || model.prefs.notifyMonthlyRecapEmail != nil {
+                Section {
+                    preferenceToggle("Notification du bilan", systemImage: "calendar", \.notifyMonthlyRecapPush)
+                    preferenceToggle("Bilan par e-mail", systemImage: "envelope", \.notifyMonthlyRecapEmail)
+                } header: {
+                    Text("Bilan mensuel").sqKicker()
+                        .accessibilityIdentifier("notifications.header.recap")
+                } footer: {
+                    Text("Le 1er de chaque mois, avec Premium. Les deux réglages suivent ton compte sur le web, Android et l’iPhone.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .tint(SQColor.brandRed)
+                .listRowBackground(SQColor.surface)
+                .opacity(isDenied ? 0.45 : 1)
+            }
         }
         .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)

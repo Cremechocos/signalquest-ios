@@ -80,6 +80,8 @@ struct ProfileView: View {
     @State private var unsentMessages = 0
     /// `logout()` enchaîne plusieurs appels réseau : sans état d'attente, l'action semblait ignorée et pouvait être relancée.
     @State private var isLoggingOut = false
+    /// Bilan mensuel : rangée Premium, carte gratuite ou rien (D20).
+    @State private var recapEntry: MonthlyRecapEntryState = .hidden
 
     init(user: AuthUser) {
         self.user = user
@@ -109,6 +111,9 @@ struct ProfileView: View {
                 // Récompenses et Classements : juste sous le niveau et les
                 // points auxquels ils se rapportent.
                 progressionTiles
+                    .background(MonthlyRecapEntryLoader(store: services.entitlements, service: services.monthlyRecap,
+                                                        state: $recapEntry))
+                recapEntryView
 
                 // Pas de sqFadeUp sur le menu : plus haut que le viewport, la
                 // scrollTransition ne l'amène jamais à l'identité → il resterait
@@ -260,8 +265,10 @@ struct ProfileView: View {
             consumeE2EEApprovalDeepLink()
             consumeE2EEApprovalQRDeepLink()
             consumeNotificationSettingsDeepLink()
+            consumeRecapDeepLink()
         }
         .onChangeCompat(of: router.openNotificationSettings) { _, _ in consumeNotificationSettingsDeepLink() }
+        .onChangeCompat(of: router.openRecapMonth) { _, _ in consumeRecapDeepLink() }
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openBugId) { _, _ in consumeBugDeepLink() }
@@ -320,6 +327,14 @@ struct ProfileView: View {
             return
         }
         deepLinkScreen = screen
+    }
+
+    /// Bilan mensuel (notification `recap.ready`, lien `/profile/bilan/…`) : poussé comme
+    /// depuis la rangée ; une chaîne vide ouvre le dernier mois clos.
+    private func consumeRecapDeepLink() {
+        guard let month = router.openRecapMonth else { return }
+        router.openRecapMonth = nil
+        push(ProfileDestination.recap(month))
     }
 
     private func consumeNotificationSettingsDeepLink() {
@@ -787,6 +802,18 @@ struct ProfileView: View {
     }
 
     @ViewBuilder
+    private var recapEntryView: some View {
+        switch recapEntry {
+        case .hidden:
+            EmptyView()
+        case .premium(let month):
+            MonthlyRecapProfileRow(month: month) { push(ProfileDestination.recap(month)) }
+        case .free:
+            MonthlyRecapFreeCard { push(ProfileDestination.subscription) }
+        }
+    }
+
+    @ViewBuilder
     private var progressionTileContent: some View {
         progressionTile("Récompenses", icon: "rosette", subtitle: missionsSubtitle, destination: .rewards)
         progressionTile("Classements", icon: "trophy", subtitle: weekRank.map { String(localized: "\($0)e de tes amis") },
@@ -904,6 +931,8 @@ struct ProfileView: View {
         case .adminBugs: AdminBugsView(service: services.adminBugs)
         case .rewards: GamificationView(service: services.gamification)
         case .leaderboards: LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+        case .recap(let month):
+            MonthlyRecapView(model: MonthlyRecapViewModel.live(services: services, initialMonth: month.isEmpty ? nil : month))
         }
     }
 
@@ -991,6 +1020,8 @@ private enum ProfileDestination: Hashable {
     case sessions, radioLogs, identifications
     case settings, privacy, subscription, glossary, bugs, adminBugs
     case rewards, leaderboards
+    /// Bilan mensuel d'un mois `yyyy-mm` ; vide pour le dernier mois clos.
+    case recap(String)
 }
 
 /// Petite icône de ligne Halo : glyphe dans un carré arrondi de 30 pt.

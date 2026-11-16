@@ -459,6 +459,11 @@ struct AppRootView: View {
             windowRouter.route(toPhoto: photoID)
             return
         }
+        // Bilan mensuel (`/profile/bilan/{yyyy-mm}`, e-mail du 1er du mois).
+        if let month = MonthlyRecapLink.month(from: url, appOrigin: AppConfig.current.appBaseURL) {
+            windowRouter.route(toRecap: month)
+            return
+        }
         // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
         // vérifiée sur la foi du lien : elle relit le reçu de /api/auth/me.
         if url.scheme == SQSharedConfiguration.urlScheme, url.host == "verify-email" {
@@ -674,6 +679,8 @@ struct RootView: View {
                 E2EEAutoDevicesQAScreen()
             } else if let variant = AppEnvironment.twoFactorBackupQAVariant {
                 TwoFactorBackupCodesQAScreen(variant: variant)
+            } else if let variant = AppEnvironment.monthlyRecapQAVariant, MonthlyRecapQAScreen.screenVariants.contains(variant) {
+                MonthlyRecapQAScreen(variant: variant)
             } else if AppEnvironment.showsUsernameConfirmationQA {
                 UsernameConfirmationQAScreen()
             } else if AppEnvironment.showsDisplayNamePromptQA {
