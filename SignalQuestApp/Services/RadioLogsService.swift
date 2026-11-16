@@ -526,7 +526,6 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             longitude: payload.longitude,
             confidenceScore: payload.confidenceScore,
             distanceMeters: effectiveDistance.map { Int($0.rounded()) },
-            sector: payload.sector,
             resolutionMode: resolution.resolutionMode ?? resolution.source,
             commune: payload.commune,
             address: payload.address

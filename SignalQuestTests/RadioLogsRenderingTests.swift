@@ -38,7 +38,7 @@ final class RadioLogsRenderingTests: XCTestCase {
         ]
         let proposal = RadioLogSiteHypothesis(
             siteId: "0381522", latitude: 45.24, longitude: 5.68, confidenceScore: nil,
-            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+            distanceMeters: 240, resolutionMode: "proximity", commune: "Le Fontanil"
         )
         for (name, locale, size, identified) in cases {
             let content = RadioLogSiteCard(

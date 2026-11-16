@@ -746,8 +746,8 @@ struct AntennaReportHeaderCard: View {
             HStack(spacing: SQSpace.sm) {
                 AntennaReportStatusChip(status: report.status)
                 Spacer(minLength: SQSpace.sm)
-                if let sector = report.sector {
-                    Label("Secteur \(sector)°", systemImage: "safari")
+                if let sectorLabel = report.sectorLabel() {
+                    Label(sectorLabel, systemImage: "safari")
                         .font(SQFont.body(12, .bold, relativeTo: .caption))
                         .foregroundStyle(SQColor.labelSecondary)
                         .padding(.horizontal, SQSpace.sm)

@@ -133,6 +133,16 @@ final class APIClientTests: XCTestCase {
         }
     }
 
+    /// SECTOR-BASE-1 §2 : `X-SQ-Sector-Base: 1` part sur toutes les requêtes, lectures comprises,
+    /// dès que la base 1 est ouverte, et jamais avant.
+    func testSectorBaseHeaderFollowsTheBaseOneSwitch() throws {
+        let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
+        for path in ["/api/android/map/identify/mine", "/api/antennas/reports", "/api/realtime/stream"] {
+            let request = try client.makeURLRequest(APIEndpoint(path: path))
+            XCTAssertEqual(request.value(forHTTPHeaderField: APIClient.sectorBaseHeader), SQFeatures.sectorBaseOne ? "1" : nil, path)
+        }
+    }
+
     func testExpectedCurrentSessionAllowsTheRequest() async throws {
         let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
         try credentials.setAccessToken("account-a")

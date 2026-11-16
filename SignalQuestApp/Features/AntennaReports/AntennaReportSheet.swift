@@ -272,6 +272,13 @@ struct AntennaReportSheet: View {
         error = nil
         duplicateMessage = nil
         defer { isBusy = false }
+        // Le numéro n'est connu qu'avec l'opérateur, comme dans le libellé du choix.
+        let sectorNumber = sector.flatMap { azimuth in
+            availableSectors.firstIndex(of: azimuth).flatMap { index in
+                operatorName.map { SectorNumbering.displayValue(index: index, operatorName: $0) }
+            }
+        }
+        let sectorFields = AntennaReportSubmission.sectorFields(azimuth: sector, number: sectorNumber)
         do {
             let result = try await service.submit(
                 siteId: siteId,
@@ -281,7 +288,8 @@ struct AntennaReportSheet: View {
                 currentValue: isLeaderReport ? leaderReport?.currentLeader : (reportType.suggestsValues ? currentValue : nil),
                 suggestedValue: isLeaderReport ? suggestedLeader : (reportType.suggestsValues ? suggestedValue : nil),
                 reason: reason,
-                sector: sector,
+                sector: sectorFields.sector,
+                sectorAzimuth: sectorFields.sectorAzimuth,
                 submissionID: submissionID
             )
             Haptics.success()

@@ -158,7 +158,11 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
     let reason: String?
     let currentValue: String?
     let suggestedValue: String?
+    /// Numéro de secteur. Sans `X-SQ-Sector-Base: 1`, le serveur y renvoie à iOS
+    /// l'azimut en degrés, comme les builds d'avant l'écrivaient (SECTOR-BASE-1 §3).
     let sector: Int?
+    /// Azimut du secteur en degrés, à part du numéro (SECTOR-BASE-1).
+    let sectorAzimuth: Int?
     let status: AntennaReportStatus
     let createdAt: Date?
     let reviewedAt: Date?
@@ -168,7 +172,7 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
     let communityConfirmed: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, siteId, reportType, reason, currentValue, suggestedValue, sector
+        case id, siteId, reportType, reason, currentValue, suggestedValue, sector, sectorAzimuth
         case status, createdAt, reviewedAt, reviewComment
         case confirmCount, disputeCount, communityConfirmed
     }
@@ -183,6 +187,7 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
         currentValue = try? c.decodeIfPresent(String.self, forKey: .currentValue)
         suggestedValue = try? c.decodeIfPresent(String.self, forKey: .suggestedValue)
         sector = try? c.decodeIfPresent(Int.self, forKey: .sector)
+        sectorAzimuth = try? c.decodeIfPresent(Int.self, forKey: .sectorAzimuth)
         status = (try? c.decodeIfPresent(AntennaReportStatus.self, forKey: .status)) ?? .pending
         // `try?` : la stratégie de date jette sur une chaîne non parsable — on ne
         // veut pas qu'une date invalide vide toute la liste (cf. AppNotification/ROB-03).
@@ -203,6 +208,7 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
         currentValue: String? = nil,
         suggestedValue: String? = nil,
         sector: Int? = nil,
+        sectorAzimuth: Int? = nil,
         status: AntennaReportStatus = .pending,
         createdAt: Date? = nil,
         reviewedAt: Date? = nil,
@@ -218,6 +224,7 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
         self.currentValue = currentValue
         self.suggestedValue = suggestedValue
         self.sector = sector
+        self.sectorAzimuth = sectorAzimuth
         self.status = status
         self.createdAt = createdAt
         self.reviewedAt = reviewedAt
@@ -225,6 +232,18 @@ struct AntennaReport: Decodable, Identifiable, Equatable {
         self.confirmCount = confirmCount
         self.disputeCount = disputeCount
         self.communityConfirmed = communityConfirmed
+    }
+
+    /// « Secteur 2 · 220° », « Secteur 2 » ou « Secteur 220° » ; `nil` sans secteur.
+    /// Sans l'en-tête de base 1, `sector` porte l'azimut, comme l'écrivaient les builds d'avant.
+    func sectorLabel(sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> String? {
+        guard sectorBaseOne else { return sector.map { String(localized: "Secteur \($0)°") } }
+        switch (sector, sectorAzimuth) {
+        case let (number?, azimuth?): return String(localized: "Secteur \(number) · \(azimuth)°")
+        case let (number?, nil): return String(localized: "Secteur \(number)")
+        case let (nil, azimuth?): return String(localized: "Secteur \(azimuth)°")
+        case (nil, nil): return nil
+        }
     }
 }
 
@@ -240,6 +259,19 @@ struct AntennaReportSubmission: Encodable {
     let suggestedValue: String?
     let reason: String?
     let sector: Int?
+    let sectorAzimuth: Int?
+}
+
+extension AntennaReportSubmission {
+    /// Champs envoyés pour le secteur choisi dans la feuille. En base 1 (SECTOR-BASE-1) :
+    /// le numéro affiché, s'il est connu, et l'azimut à part. Avant : l'azimut dans `sector`,
+    /// que le serveur range dans `sectorAzimuth` pour une build iOS sans l'en-tête.
+    static func sectorFields(azimuth: Int?, number: Int?,
+                             sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> (sector: Int?, sectorAzimuth: Int?) {
+        guard let azimuth else { return (nil, nil) }
+        guard sectorBaseOne else { return (azimuth, nil) }
+        return (number, azimuth)
+    }
 }
 
 /// Réponse de `POST /api/antennas/reports` : `duplicate == true` signale que

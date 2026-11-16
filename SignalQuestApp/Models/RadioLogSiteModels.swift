@@ -506,7 +506,9 @@ struct RadioLogSiteHypothesis: Codable, Sendable, Equatable {
     let longitude: Double?
     let confidenceScore: Int?
     let distanceMeters: Int?
-    let sector: Int?
+    // Pas de numéro de secteur : celui d'`identify/quick` n'était jamais relu, et ceux
+    // gardés par les builds d'avant sont en base 0 pour SFR (SECTOR-BASE-1 §6.5). Un
+    // ancien fichier qui en porte un se lit sans lui.
     /// `proximity`, `exact_operator`… — dit d'où vient la piste.
     let resolutionMode: String?
     /// Commune et adresse du support proposé, quand le serveur les donne.

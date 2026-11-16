@@ -15,6 +15,7 @@ protocol AntennaReportsServicing: Sendable {
         suggestedValue: String?,
         reason: String?,
         sector: Int?,
+        sectorAzimuth: Int?,
         submissionID: UUID
     ) async throws -> AntennaReportSubmissionResult
 
@@ -37,6 +38,7 @@ final class AntennaReportsService: AntennaReportsServicing {
         suggestedValue: String?,
         reason: String?,
         sector: Int?,
+        sectorAzimuth: Int?,
         submissionID: UUID
     ) async throws -> AntennaReportSubmissionResult {
         let body = AntennaReportSubmission(
@@ -45,7 +47,8 @@ final class AntennaReportsService: AntennaReportsServicing {
             currentValue: currentValue.nonBlank,
             suggestedValue: suggestedValue.nonBlank,
             reason: reason.nonBlank,
-            sector: sector
+            sector: sector,
+            sectorAzimuth: sectorAzimuth
         )
         // Clé d'idempotence : `submissionID` est créé une fois à l'ouverture de la
         // feuille, donc un double-tap « Envoyer » ou un renvoi après une réponse

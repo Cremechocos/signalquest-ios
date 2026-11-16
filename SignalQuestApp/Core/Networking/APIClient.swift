@@ -426,6 +426,9 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return "SignalQuest-iOS/\(version) (\(build); iOS \(osVersionLabel))"
     }()
 
+    /// Base des numéros de secteur de la requête (contrat SECTOR-BASE-1).
+    static let sectorBaseHeader = "X-SQ-Sector-Base"
+
     /// En-têtes d'identité client (X-Client-*) joints à chaque requête 1re partie,
     /// pour que le registre des sessions affiche « iPhone15,3 · iOS 18 » au lieu de
     /// « Navigateur ». Calculés une seule fois (valeurs constantes). On évite UIKit
@@ -438,6 +441,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             ClientProtocolContract.capabilitiesHeaderName: ClientProtocolContract.capabilitiesHeader,
         ]
         headers["X-Client-Os"] = "iOS \(osVersionLabel)"
+        // SECTOR-BASE-1 §2 : les secteurs de toutes nos requêtes sont en base 1. Sans
+        // l'en-tête, le serveur traite l'app comme une ancienne build et convertit SFR.
+        if SQFeatures.sectorBaseOne {
+            headers[sectorBaseHeader] = "1"
+        }
         if let model = hardwareModelIdentifier(), !model.isEmpty {
             headers["X-Client-Model"] = model
         }

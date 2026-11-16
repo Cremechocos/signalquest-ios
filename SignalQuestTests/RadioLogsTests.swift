@@ -1750,7 +1750,7 @@ extension RadioLogsTests {
         )
         let proposal = RadioLogSiteHypothesis(
             siteId: "0381522", latitude: 45.255, longitude: 5.668, confidenceScore: nil,
-            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+            distanceMeters: 240, resolutionMode: "proximity", commune: "Le Fontanil"
         )
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
@@ -1826,7 +1826,7 @@ extension RadioLogsTests {
         defer { try? FileManager.default.removeItem(at: url) }
         let proposal = RadioLogSiteHypothesis(
             siteId: "0381522", latitude: 45.24, longitude: 5.68, confidenceScore: nil,
-            distanceMeters: 240, sector: nil, resolutionMode: "proximity", commune: "Le Fontanil"
+            distanceMeters: 240, resolutionMode: "proximity", commune: "Le Fontanil"
         )
         let now = 1_786_000_000_000
         let store = RadioLogSiteStatusStore(fileURL: url)

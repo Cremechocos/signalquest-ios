@@ -253,9 +253,12 @@ struct AntennaRadioIdentifiersView: View {
     }
 
     /// Rang de l'azimut d'un secteur, dans l'ordre publié par l'ANFR. SFR
-    /// numérote à partir de 0, les autres opérateurs à partir de 1.
-    static func azimuthIndex(forSector number: Int, operatorName: String?) -> Int? {
-        let index = SectorNumbering.resolveMode(mccMnc: nil, operatorName: operatorName) == .zeroBased
+    /// numérote à partir de 0, les autres opérateurs à partir de 1 ; en base 1
+    /// (SECTOR-BASE-1), tous à partir de 1.
+    static func azimuthIndex(forSector number: Int, operatorName: String?,
+                             sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Int? {
+        let index = SectorNumbering.resolveMode(mccMnc: nil, operatorName: operatorName,
+                                                sectorBaseOne: sectorBaseOne) == .zeroBased
             ? number : number - 1
         return index >= 0 ? index : nil
     }

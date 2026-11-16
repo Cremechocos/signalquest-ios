@@ -9,21 +9,27 @@ import Foundation
 /// - Orange (1/2), Bouygues (20), Free (15/16) à partir de **1**.
 /// - Par défaut (opérateur inconnu) : `legacy` = affiche 1-based, soumet 0-based
 ///   (comportement historique conservé pour ne rien casser hors-FR).
+///
+/// En base 1 (`SQFeatures.sectorBaseOne`, contrat SECTOR-BASE-1) : toute la France
+/// (MCC 208, zone blanche comprise) et le Canada (MCC 302, comme Android) passent
+/// à partir de **1**. Seuls les autres marchés restent `legacy`, comme chez Android.
 enum SectorNumbering {
     enum Mode { case zeroBased, oneBased, legacy }
 
     /// Numéro de secteur AFFICHÉ pour un index d'azimut (0 = premier azimut trié),
     /// cohérent avec la valeur soumise.
-    static func displayValue(index: Int, mccMnc: String? = nil, operatorName: String?) -> Int {
-        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName) {
+    static func displayValue(index: Int, mccMnc: String? = nil, operatorName: String?,
+                             sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Int {
+        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName, sectorBaseOne: sectorBaseOne) {
         case .zeroBased: return index
         case .oneBased, .legacy: return index + 1
         }
     }
 
     /// Valeur de secteur à SOUMETTRE pour l'azimut à l'index donné.
-    static func submissionValue(index: Int, mccMnc: String? = nil, operatorName: String?) -> Int {
-        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName) {
+    static func submissionValue(index: Int, mccMnc: String? = nil, operatorName: String?,
+                                sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Int {
+        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName, sectorBaseOne: sectorBaseOne) {
         case .oneBased: return index + 1
         case .zeroBased, .legacy: return index
         }
@@ -31,11 +37,12 @@ enum SectorNumbering {
 
     /// Index d'azimut (0-based) correspondant à une valeur de secteur stockée, en
     /// tolérant les deux conventions ; `nil` si rien ne tombe dans la plage.
-    static func index(forStoredValue value: Int, azimuthCount: Int, mccMnc: String? = nil, operatorName: String?) -> Int? {
+    static func index(forStoredValue value: Int, azimuthCount: Int, mccMnc: String? = nil, operatorName: String?,
+                      sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Int? {
         guard azimuthCount > 0 else { return nil }
         let direct = (0..<azimuthCount).contains(value) ? value : nil
         let oneBased = (0..<azimuthCount).contains(value - 1) ? value - 1 : nil
-        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName) {
+        switch resolveMode(mccMnc: mccMnc, operatorName: operatorName, sectorBaseOne: sectorBaseOne) {
         case .oneBased: return oneBased ?? direct
         case .zeroBased, .legacy: return direct ?? oneBased
         }
@@ -43,9 +50,10 @@ enum SectorNumbering {
 
     /// Secteur déduit du PCI via la convention PSS (PCI mod 3), dans la numérotation
     /// de l'opérateur — bien plus fiable que le bearing antenne→utilisateur. `nil` si PCI < 0.
-    static func sectorValue(forPci pci: Int, mccMnc: String? = nil, operatorName: String?) -> Int? {
+    static func sectorValue(forPci pci: Int, mccMnc: String? = nil, operatorName: String?,
+                            sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Int? {
         guard pci >= 0 else { return nil }
-        return submissionValue(index: pci % 3, mccMnc: mccMnc, operatorName: operatorName)
+        return submissionValue(index: pci % 3, mccMnc: mccMnc, operatorName: operatorName, sectorBaseOne: sectorBaseOne)
     }
 
     /// PLMN (« 20810 ») d'une identification, quand son MCC et son MNC sont connus.
@@ -55,16 +63,32 @@ enum SectorNumbering {
         return String(format: "%03d%02d", mcc, mnc)
     }
 
-    static func resolveMode(mccMnc: String?, operatorName: String?) -> Mode {
+    /// Opérateurs canadiens numérotés à partir de 1 en base 1, comme `buildCanadaSectorIndex`
+    /// d'Android (clés du marché CA du serveur).
+    private static let canadianOperatorNames = ["BELL", "ROGERS", "TELUS", "VIDEOTRON", "FREEDOM", "REGIONAL"]
+
+    static func resolveMode(mccMnc: String?, operatorName: String?,
+                            sectorBaseOne: Bool = SQFeatures.sectorBaseOne) -> Mode {
         let code = (mccMnc ?? "").filter(\.isNumber)
         let mcc = String(code.prefix(3))
         let mncRaw = String(code.dropFirst(3))
         let trimmed = String(mncRaw.drop(while: { $0 == "0" }))
         let mnc = trimmed.isEmpty ? mncRaw : trimmed
+        let name = (operatorName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+
+        if sectorBaseOne {
+            // La base 0 disparaît en France, SFR et zone blanche (MNC 0) compris ; le
+            // Canada s'aligne sur Android (décision d'Alexandre du 16/11).
+            if mcc == "208" || mcc == "302" { return .oneBased }
+            if name.contains("SFR") || name == "ZB" || name == "ZONE BLANCHE"
+                || canadianOperatorNames.contains(where: name.contains) {
+                return .oneBased
+            }
+        }
+
         if mcc == "208" && ["1", "2", "15", "16", "20"].contains(mnc) { return .oneBased }
         if mcc == "208" && ["8", "10", "11", "13"].contains(mnc) { return .zeroBased }
 
-        let name = (operatorName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         if name.contains("BOUYGUES") || name.contains("BYTEL") || name.contains("ORANGE")
             || (name.contains("FREE") && !name.contains("FREEDOM")) {
             return .oneBased

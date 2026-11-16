@@ -140,7 +140,7 @@ final class SectorEditViewModel: ObservableObject {
         let unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
             .sorted()
         // Support communautaire ou personnalisé, au plus un azimut : pas de schéma possible,
-        // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0).
+        // une liste. Les numéros passent par `SectorNumbering` comme sur le radar (SFR en base 0 tant que la base 1 est fermée).
         if unique.count <= 1 {
             listCount = Self.defaultListCount
             ensureListCovers(row.storedSectors + [prefilledSector].compactMap { $0 } + row.members.compactMap(\.referenceSector))
@@ -148,7 +148,7 @@ final class SectorEditViewModel: ObservableObject {
             azimuths = unique
         }
         // Pré-sélection sur le secteur proposé par la règle, sinon sur celui enregistré, selon la convention de
-        // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
+        // numérotation de l'opérateur (`SectorNumbering`, SFR en base 0 tant que la base 1 est fermée).
         if let first = prefilledSector ?? Self.initialSector(of: row) {
             selectedIndex = storedIndex(first)
         }

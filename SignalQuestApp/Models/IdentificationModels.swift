@@ -461,7 +461,8 @@ struct IdentificationCellConflict: Decodable, Equatable, Sendable {
 }
 
 /// `sectorCheck` d'une cellule. `expected` n'existe que pour `mismatch`, dans la
-/// numérotation stockée (SFR en base 0, les autres en base 1), comme `sectors`.
+/// numérotation que rend le serveur, comme `sectors` : SFR en base 0 sans l'en-tête
+/// `X-SQ-Sector-Base: 1`, tout en base 1 avec (SECTOR-BASE-1).
 struct IdentificationSectorCheck: Decodable, Equatable, Sendable {
     enum Status: String, Equatable, Sendable {
         case match, mismatch, notApplicable = "not_applicable", unknown
