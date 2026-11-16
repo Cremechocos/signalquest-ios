@@ -472,6 +472,43 @@ final class EntitlementsTests: XCTestCase {
         if case .managedByAppStore = store.eligibility {} else { XCTFail("\(store.eligibility)") }
     }
 
+    /// 186, 16/11 : « tirer pour actualiser » interrompu affichait « Le serveur des
+    /// abonnements ne répond pas » et bloquait l'achat, alors que le serveur avait
+    /// répondu. Une lecture annulée rend l'état d'avant ; une vraie panne reste une panne.
+    @MainActor
+    func testCancelledRefreshKeepsTheStateBeforeIt() async throws {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "entitlement-cancel-\(UUID().uuidString)")
+        let api = SequencedEntitlementsAPIStub(replies: [
+            EntitlementsTests.contractPayload, SequencedEntitlementsAPIStub.cancelled, nil,
+        ])
+        let store = EntitlementsStore(api: api, observesTransactions: false)
+        await store.refreshBackendSnapshot()
+        let before = try XCTUnwrap(store.serverState.snapshot)
+
+        await store.refreshBackendSnapshot()
+        XCTAssertEqual(store.serverState, .available(before), "Une lecture annulée ne dit rien du serveur")
+        if case .managedByAppStore = store.eligibility {} else { XCTFail("\(store.eligibility)") }
+
+        await store.refreshBackendSnapshot()
+        if case .unavailable = store.serverState {} else { XCTFail("Une vraie panne : \(store.serverState)") }
+        XCTAssertEqual(api.reads, 3)
+    }
+
+    /// Une première lecture annulée ne laisse pas l'écran sur « Vérification… » pour
+    /// toujours : l'état revient au repos, et la lecture suivante le remplit.
+    @MainActor
+    func testCancelledFirstRefreshReturnsToIdle() async {
+        defer { LocalAccountScope.deactivate() }
+        LocalAccountScope.activate(userId: "entitlement-cancel-first-\(UUID().uuidString)")
+        let api = SequencedEntitlementsAPIStub(replies: [SequencedEntitlementsAPIStub.cancelled, EntitlementsTests.contractPayload])
+        let store = EntitlementsStore(api: api, observesTransactions: false)
+        await store.refreshBackendSnapshot()
+        XCTAssertEqual(store.serverState, .idle)
+        await store.refreshBackendSnapshot()
+        XCTAssertNotNil(store.serverState.snapshot)
+    }
+
     @MainActor
     func testPremiumSnapshotAndOperationDoNotFollowAccountAfterLogout() async {
         let previousUserID = LocalAccountScope.currentUserId
@@ -961,6 +998,8 @@ private final class SequencedEntitlementsAPIStub: APIClientProtocol, @unchecked 
     private var count = 0
     var reads: Int { lock.withLock { count } }
     init(replies: [String?]) { self.replies = replies }
+    /// Lecture interrompue, comme un « tirer pour actualiser » que SwiftUI annule.
+    static let cancelled = "cancelled"
 
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
         guard endpoint.path == EntitlementsStore.entitlementsEndpoint else { throw URLError(.badURL) }
@@ -968,6 +1007,7 @@ private final class SequencedEntitlementsAPIStub: APIClientProtocol, @unchecked 
         guard let payload = replies[min(index, replies.count - 1)] else {
             throw APIError.http(status: 503, code: nil, message: "", requestId: nil, retryAfter: nil)
         }
+        if payload == Self.cancelled { throw APIError.cancelled }
         return try JSONDecoder.signalQuest.decode(type, from: Data(payload.utf8))
     }
 

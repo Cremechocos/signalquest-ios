@@ -957,10 +957,20 @@ final class EntitlementsStore: ObservableObject {
             storedServerState = .idle
             return
         }
+        let previous: ServerEntitlementState = serverStateSession == session ? storedServerState : .idle
         publishServerState(.loading, for: session)
         do {
             let response = try await fetchEntitlements()
             publishServerState(.available(EntitlementSnapshot(response: response)), for: session)
+        } catch where error.isCancellation {
+            // Une lecture interrompue (« tirer pour actualiser » que SwiftUI
+            // annule, écran quitté) ne dit rien du serveur : l'état d'avant
+            // revient, au lieu de « Le serveur des abonnements ne répond pas »
+            // qui bloquait l'achat (186, 16/11). Rien ne l'écrase si une autre
+            // lecture a publié entre-temps.
+            if serverStateSession == session, storedServerState == .loading {
+                publishServerState(previous == .loading ? .idle : previous, for: session)
+            }
         } catch {
             publishServerState(.unavailable(error.localizedDescription), for: session)
         }
