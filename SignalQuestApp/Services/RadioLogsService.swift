@@ -464,6 +464,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             return .estimated(uncertaintyMeters: resolution.positionUncertaintyMeters)
         }
 
+        // « À confirmer » (AUDIT-ID-1 lot 3, comme Android) : quand le serveur demande une
+        // confirmation (validation automatique sans geste humain, site d'un autre opérateur,
+        // hypothèse Belgique ou Suisse), le site n'est jamais « Identifié », même si le nœud
+        // figure dans `matchedRadio`. La ligne garde la piste et son bouton « Confirmer ».
+        if resolution.requiresUserConfirmation == true { return .unidentified }
+
         if resolution.matchesNode(site) {
             if site.kind == .gnb && !resolution.matchesPhysicalCell(of: site) {
                 return .unidentified
@@ -479,7 +485,6 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         // où le serveur a rapproché le nœud lui-même (DROM, Belgique, Suisse,
         // Canada, site déclaré) comptent ; tout autre mode (proximité, hypothèse,
         // site partagé…) propose un site sans identifier le nœud.
-        if resolution.requiresUserConfirmation == true { return .unidentified }
         guard let mode = resolution.resolutionMode?.lowercased(),
               nodeResolutionModes.contains(mode) else { return .unidentified }
         if site.kind == .gnb { return .unidentified }

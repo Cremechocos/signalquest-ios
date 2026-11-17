@@ -963,7 +963,7 @@ final class RadioLogsTests: XCTestCase {
         store.merge(["enb:1": .unidentified], nowMs: now + 2)
         XCTAssertTrue(store.freshProvenances(identifiedTtlMs: week, nowMs: now + 3).isEmpty)
 
-        let legacy = #"{"states":{"enb:2":{"state":{"kind":"identified","siteId":"9"},"updatedAtMs":\#(now)}},"verdictVersion":1}"#
+        let legacy = #"{"states":{"enb:2":{"state":{"kind":"identified","siteId":"9"},"updatedAtMs":\#(now)}},"verdictVersion":\#(RadioLogSiteStatusFile.verdictVersion)}"#
         try Data(legacy.utf8).write(to: url)
         let reloaded = RadioLogSiteStatusStore(fileURL: url)
         XCTAssertEqual(reloaded.fresh(identifiedTtlMs: week, unidentifiedTtlMs: week, nowMs: now)["enb:2"], .identified(siteId: "9"))
@@ -998,27 +998,69 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertTrue(label.hasSuffix(radius), label)
     }
 
-    /// SITE MUTUALISÉ — le cas qui a fait tomber 23 % du catalogue à tort.
-    ///
-    /// Le serveur renvoie `requiresUserConfirmation: true` et
-    /// `resolutionMode: "shared_operator"` pour un site partagé entre opérateurs,
-    /// TOUT EN listant l'eNB dans `matchedRadio` et en le sourçant depuis
-    /// `fr_validations`. Le nœud est donc parfaitement connu : ce qui demande
-    /// confirmation, c'est l'opérateur propriétaire, pas l'existence du nœud.
-    /// Mesuré sur un journal réel : 35 sites sur 150 dans ce cas.
-    func testSharedOperatorSiteWithMatchedNodeIsIdentified() throws {
+    /// « À CONFIRMER » — AUDIT-ID-1 lot 3 (17/11), comme Android : `requiresUserConfirmation: true`
+    /// passe avant « Identifié », même quand `matchedRadio` désigne le nœud. Le site reste proposé,
+    /// avec « Confirmer », et la ligne compte avec les sites à identifier.
+    func testConfirmationRequiredIsNeverIdentifiedEvenWithTheMatchedNode() throws {
         let site = try makeSite(kind: .enb, node: "531087")
+
+        // Site d'un autre opérateur (réponse réelle de quick : `shared_operator`, avec son hypothèse).
         let shared = try resolution("""
         {"found":true,"siteId":"1713624","canonicalSiteId":"1713624",
          "resolutionMode":"shared_operator","source":"fr_validations",
-         "requiresUserConfirmation":true,"operatorMatched":true,
-         "matchedRadio":[{"type":"enb","value":"531087"}]}
+         "requiresUserConfirmation":true,"operatorMatched":true,"distanceMeters":420,
+         "matchedRadio":[{"type":"enb","value":"531087"}],
+         "hypothesis":{"siteId":"1713624","distanceMeters":420}}
         """)
-        XCTAssertEqual(
-            RadioLogsService.state(from: shared, site: site),
-            .identified(siteId: "1713624"),
-            "Un nœud listé dans matchedRadio est connu, quelle que soit la confirmation demandée sur le site"
-        )
+        XCTAssertEqual(RadioLogsService.state(from: shared, site: site), .unidentified)
+        XCTAssertEqual(RadioLogsService.proposal(from: shared)?.siteId, "1713624", "La piste « Confirmer » reste")
+
+        // Lot 3 : validation automatique, sans geste humain.
+        let auto = try resolution("""
+        {"found":true,"siteId":"0381522","canonicalSiteId":"0381522",
+         "resolutionMode":"exact_operator","source":"fr_validations","validationOrigin":"auto",
+         "requiresUserConfirmation":true,"matchedRadio":[{"type":"enb","value":"531087"}],
+         "hypothesis":{"siteId":"0381522","distanceMeters":180}}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: auto, site: site), .unidentified)
+        XCTAssertEqual(RadioLogsService.proposal(from: auto)?.siteId, "0381522")
+
+        // Lot 3 : hypothèse Belgique ou Suisse sur une position officielle, sans secteur.
+        let belgium = try resolution("""
+        {"found":true,"market":"BE","siteId":"be-4411","canonicalSiteId":"be-4411",
+         "resolutionMode":"exact_operator","requiresUserConfirmation":true,
+         "matchedRadio":[{"type":"enb","value":"531087"}],
+         "hypothesis":{"siteId":"be-4411","distanceMeters":260,"sector":null}}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: belgium, site: site), .unidentified)
+        XCTAssertEqual(RadioLogsService.proposal(from: belgium)?.siteId, "be-4411")
+
+        // Validation manuelle : le même nœud, sans confirmation demandée, est identifié.
+        let manual = try resolution("""
+        {"found":true,"siteId":"0381522","canonicalSiteId":"0381522",
+         "resolutionMode":"exact_operator","source":"fr_validations","validationOrigin":"manual",
+         "requiresUserConfirmation":false,"matchedRadio":[{"type":"enb","value":"531087"}]}
+        """)
+        XCTAssertEqual(RadioLogsService.state(from: manual, site: site), .identified(siteId: "0381522"))
+    }
+
+    /// Un cache écrit avec les règles du 16/11 (version 1) oublie ses « identifié » : ils
+    /// pouvaient venir d'une réponse qui demandait confirmation. Le reste est gardé.
+    func testCacheFromBeforeTheConfirmationRuleForgetsItsIdentifiedVerdicts() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("radiolog-status-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let now = 1_786_000_000_000
+        let week = 7 * 86_400_000
+        let legacy = """
+        {"states":{
+          "enb:1":{"state":{"kind":"identified","siteId":"1713624"},"updatedAtMs":\(now)},
+          "enb:2":{"state":{"kind":"unidentified"},"updatedAtMs":\(now)}},"verdictVersion":1}
+        """
+        try Data(legacy.utf8).write(to: url)
+        let states = RadioLogSiteStatusStore(fileURL: url).fresh(identifiedTtlMs: week, unidentifiedTtlMs: week, nowMs: now)
+        XCTAssertNil(states["enb:1"], "Réévalué au prochain balayage")
+        XCTAssertEqual(states["enb:2"], .unidentified)
     }
 
     /// Sans AUCUNE correspondance détaillée, `requiresUserConfirmation` reprend
