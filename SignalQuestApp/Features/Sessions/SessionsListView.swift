@@ -47,7 +47,8 @@ final class SessionsListViewModel: ObservableObject {
     }
 
     private let loadPage: @MainActor (Int, Int) async throws -> SessionsListResponse
-    private var offset = 0
+    /// Lu par l'écran : chaque page reçue relance le chargement de la suivante.
+    private(set) var offset = 0
     private var requestGeneration = UUID()
     /// Quinze, pas trente.
     ///
@@ -233,9 +234,12 @@ struct SessionsListView: View {
                 }
                 if model.hasMore {
                     Section {
-                        if model.isLoading {
-                            loadingRow
-                        } else if model.filtered.isEmpty || model.errorMessage != nil {
+                        // Une seule ligne de chargement, la même pendant et après la requête :
+                        // deux branches séparées par `isLoading` faisaient disparaître la ligne
+                        // dès le début du chargement, ce qui annulait sa tâche et sa requête.
+                        // Elle repartait aussitôt, sans fin (ticket du 17/11). La page reçue
+                        // (`offset`) relance la suivante.
+                        if !model.isLoading, model.filtered.isEmpty || model.errorMessage != nil {
                             GradientButton("Afficher les trajets suivants", style: .secondary) {
                                 Task { await model.loadMore() }
                             }
@@ -244,7 +248,7 @@ struct SessionsListView: View {
                             .listRowInsets(EdgeInsets())
                         } else {
                             loadingRow
-                                .task { await model.loadMore() }
+                                .task(id: model.offset) { await model.loadMore() }
                         }
                     }
                 }
