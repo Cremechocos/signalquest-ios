@@ -130,6 +130,8 @@ struct AppRootView: View {
     @StateObject private var addressStore = SQAddressStore()
     @StateObject private var inAppNotifications = SQInAppNotificationCenter()
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
+    /// Avec `fieldMode` : leur bascule repeint tout l'écran affiché (`SQAppearanceRepaint`).
+    @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     /// Enregistre les notifications APNs + le token VoIP dès que la session
     /// devient authentifiée. Ne pose jamais la question des notifications
@@ -191,6 +193,7 @@ struct AppRootView: View {
             .environment(\.signedInUser, signedInUser)
             .environment(\.legibilityWeight, fieldMode ? .bold : nil)
             .controlSize(fieldMode ? .large : .regular)
+            .modifier(SQAppearanceRepaint(fieldMode: fieldMode, pureBlack: pureBlack))
             .background(PasswordResetPresentation(route: passwordResetRoute,
                 canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
                 session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))

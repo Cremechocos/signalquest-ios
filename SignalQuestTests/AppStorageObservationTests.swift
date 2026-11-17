@@ -66,3 +66,107 @@ final class AppStorageObservationTests: XCTestCase {
         XCTAssertEqual(plain, 0, "Une clé sans point ne devrait pas réagir aux autres écritures")
     }
 }
+
+// MARK: - Mode terrain et Noir intense repeignent l'écran affiché (17/11)
+
+/// Feuille qui ne lit aucun réglage : seule sa couleur dynamique dépend de l'apparence,
+/// comme les jetons `SQColor`. Elle n'est jamais recalculée par la bascule.
+private struct AppearanceLeaf: View {
+    var body: some View {
+        Rectangle().fill(Color(UIColor { _ in
+            SQFieldMode.isEnabled || SQOledPalette.isEnabled ? .red : .blue
+        }))
+    }
+}
+
+/// Racine comme `AppRootView` : observe les deux réglages et pose `SQAppearanceRepaint`.
+private struct AppearanceRoot: View {
+    @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
+    @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
+    let repaints: Bool
+
+    var body: some View {
+        if repaints {
+            AppearanceLeaf().modifier(SQAppearanceRepaint(fieldMode: fieldMode, pureBlack: pureBlack))
+        } else {
+            let _ = (fieldMode, pureBlack)
+            AppearanceLeaf()
+        }
+    }
+}
+
+@MainActor
+final class AppearanceRepaintTests: XCTestCase {
+    private var saved: [String: Any] = [:]
+
+    override func setUp() {
+        super.setUp()
+        for key in [SQFieldMode.storageKey, SQOledPalette.storageKey] {
+            if let value = UserDefaults.standard.object(forKey: key) { saved[key] = value }
+            UserDefaults.standard.set(false, forKey: key)
+        }
+    }
+
+    override func tearDown() {
+        for key in [SQFieldMode.storageKey, SQOledPalette.storageKey] {
+            if let value = saved[key] { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        super.tearDown()
+    }
+
+    /// Rouge au centre de la fenêtre, lu dans un tampon RGBA 8 bits (le rendu, lui, peut être
+    /// en demi-flottants 16 bits).
+    private func centerIsRed(_ window: UIWindow) -> Bool {
+        let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        }
+        guard let cg = image.cgImage else { return false }
+        var pixel = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        context.draw(cg, in: CGRect(x: -CGFloat(cg.width / 2), y: -CGFloat(cg.height / 2),
+                                    width: CGFloat(cg.width), height: CGFloat(cg.height)))
+        return pixel[0] > 128 && pixel[2] < 128
+    }
+
+    /// Vrai si la bascule de `key` repeint la feuille déjà affichée, sans changer d'écran.
+    private func switchRepaints(_ key: String, withModifier: Bool) async throws -> Bool {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Une scène UIKit active est nécessaire pour le rendu")
+        }
+        for each in [SQFieldMode.storageKey, SQOledPalette.storageKey] { UserDefaults.standard.set(false, forKey: each) }
+        let previousKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let controller = UIHostingController(rootView: AppearanceRoot(repaints: withModifier))
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.view.frame = window.bounds
+        controller.view.layoutIfNeeded()
+        defer {
+            window.isHidden = true
+            previousKeyWindow?.makeKey()
+        }
+        try await Task.sleep(for: .milliseconds(800))
+        XCTAssertFalse(centerIsRed(window), "Départ hors du mode")
+        UserDefaults.standard.set(true, forKey: key)
+        try await Task.sleep(for: .milliseconds(800))
+        return centerIsRed(window)
+    }
+
+    func testFieldModeAndPureBlackRepaintTheShownScreen() async throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Le trait relié à l'environnement est iOS 17+") }
+        let field = try await switchRepaints(SQFieldMode.storageKey, withModifier: true)
+        XCTAssertTrue(field, "Mode terrain : l'écran affiché change tout de suite")
+        let black = try await switchRepaints(SQOledPalette.storageKey, withModifier: true)
+        XCTAssertTrue(black, "Noir intense : l'écran affiché change tout de suite")
+    }
+
+    /// Contrôle : sans le modificateur, observer les réglages à la racine ne repeint rien.
+    func testObservingTheSettingsAloneDoesNotRepaint() async throws {
+        let observed = try await switchRepaints(SQOledPalette.storageKey, withModifier: false)
+        XCTAssertFalse(observed, "Si ceci passe un jour, SwiftUI repeint seul et le modificateur devient inutile")
+    }
+}
