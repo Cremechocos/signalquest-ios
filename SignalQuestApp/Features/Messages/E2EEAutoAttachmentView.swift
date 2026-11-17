@@ -119,6 +119,8 @@ struct E2EEAutoAttachmentView: View {
     @State private var image: UIImage?
     @State private var thumbnail: UIImage?
     @State private var preview: PreviewItem?
+    /// Photo ouverte dans la visionneuse de l'app : entière, zoomable, en plein écran.
+    @State private var viewer: MessageImageTarget?
 
     private var presentation: E2EEAutoContentR17.Presentation {
         E2EEAutoContentR17.presentation(mimeType: attachment.contentType ?? "application/octet-stream")
@@ -139,14 +141,59 @@ struct E2EEAutoAttachmentView: View {
         .sheet(item: $preview) { item in
             QuickLookPreview(url: item.url) { preview = nil }.ignoresSafeArea()
         }
+        .fullScreenCover(item: $viewer) { target in
+            MessageImageViewer(target: target)
+        }
     }
 
+    /// Image à montrer : décodée ici, sinon celle d'une rangée précédente de la même pièce
+    /// (la liste recrée ses rangées en défilant), sinon la miniature.
+    private var shownImage: UIImage? {
+        image ?? attachment.id.flatMap(Self.decodedImage(for:)) ?? thumbnail
+    }
+
+    /// Taille dans le fil, aux proportions de la photo : celles de la pièce, sinon celles de
+    /// l'image décodée. Un carré fixe rognait les photos larges des deux côtés (vidéo du 17/11).
     private var displaySize: CGSize {
-        guard let width = attachment.width, let height = attachment.height, width > 0, height > 0 else {
-            return CGSize(width: 220, height: 220)
+        let pixels: CGSize?
+        if let width = attachment.width, let height = attachment.height, width > 0, height > 0 {
+            pixels = CGSize(width: width, height: height)
+        } else if let shown = shownImage, shown.size.width > 0, shown.size.height > 0 {
+            pixels = shown.size
+        } else {
+            pixels = nil
         }
-        let scale = 240 / CGFloat(max(width, height))
-        return CGSize(width: max(80, CGFloat(width) * scale), height: max(80, CGFloat(height) * scale))
+        guard let pixels else { return CGSize(width: 220, height: 220) }
+        return Self.fittedSize(pixels)
+    }
+
+    /// Plus grand côté à 240 pt, plus petit côté à 80 pt au moins, proportions gardées
+    /// tant que possible (une photo très étirée est rognée au minimum).
+    static func fittedSize(_ pixels: CGSize) -> CGSize {
+        let scale = 240 / max(pixels.width, pixels.height)
+        return CGSize(width: max(80, pixels.width * scale), height: max(80, pixels.height * scale))
+    }
+
+    /// Images décodées du fil, en mémoire seulement, par compte et par pièce : une rangée
+    /// recréée en remontant la conversation retrouve tout de suite sa taille et son image,
+    /// au lieu d'un carré qui change ensuite de hauteur et fait sauter la liste.
+    private static let decoded: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 80
+        return cache
+    }()
+
+    private static func cacheKey(_ id: String) -> NSString? {
+        LocalAccountScope.sessionSnapshot().map { "\($0.ownerNamespace)|\(id)" as NSString }
+    }
+
+    static func decodedImage(for id: String) -> UIImage? {
+        cacheKey(id).flatMap { decoded.object(forKey: $0) }
+    }
+
+    private static func remember(_ image: UIImage?, for id: String?) {
+        guard let image, let id, let key = cacheKey(id) else { return }
+        decoded.setObject(image, forKey: key)
     }
 
     private var visual: some View {
@@ -155,7 +202,7 @@ struct E2EEAutoAttachmentView: View {
             Task { await open() }
         } label: {
             ZStack {
-                if let shown = image ?? thumbnail {
+                if let shown = shownImage {
                     Image(uiImage: shown).resizable().scaledToFill()
                 } else {
                     Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
@@ -259,7 +306,7 @@ struct E2EEAutoAttachmentView: View {
     private func prepare() async {
         if let url = attachment.url, url.isFileURL {
             phase = .ready(url)
-            if presentation == .image { image = await Self.decode(url) }
+            if presentation == .image { image = await Self.decode(url); Self.remember(image, for: attachment.id) }
             return
         }
         guard let media else { phase = .unavailable; return }
@@ -281,7 +328,7 @@ struct E2EEAutoAttachmentView: View {
         switch await load(media.file) {
         case .file(let url):
             phase = .ready(url)
-            if presentation == .image { image = await Self.decode(url) }
+            if presentation == .image { image = await Self.decode(url); Self.remember(image, for: attachment.id) }
             return url
         case .deleted:
             phase = .deleted
@@ -294,7 +341,14 @@ struct E2EEAutoAttachmentView: View {
     private func open() async {
         guard let url = await fetch() else { return }
         Haptics.selection()
-        preview = PreviewItem(url: url)
+        // Une photo s'ouvre dans la visionneuse de l'app, tout de suite et en entier ; l'aperçu
+        // du système s'ouvrait vide, puis décalé sous sa barre (vidéo du 17/11). Vidéos et
+        // fichiers gardent l'aperçu du système.
+        if presentation == .image {
+            viewer = MessageImageTarget(id: attachment.id ?? url.path, url: url, accountSession: nil)
+        } else {
+            preview = PreviewItem(url: url)
+        }
     }
 
     private static func decode(_ url: URL) async -> UIImage? {

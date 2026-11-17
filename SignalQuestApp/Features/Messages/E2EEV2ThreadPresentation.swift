@@ -90,6 +90,9 @@ struct E2EEV2ThreadPresentation: Equatable {
     var polls: [String: MessagePoll] = [:]
     /// Publications partagées chiffrées (§7.7, `CARD` `POST`) par identifiant de message.
     var cards: [String: E2EEAutoContentR17.PostCard] = [:]
+    /// Moment du dernier changement d'appareils de chaque membre cité par un avis
+    /// `devicesChanged` : l'avis se place à sa date dans le fil, pas en tête.
+    var deviceChangeTimesMs: [String: Int64] = [:]
 
     /// Mentions d'un message importé, sous sa bulle.
     struct ImportLabel: Equatable {
@@ -243,9 +246,11 @@ enum E2EEV2ThreadPresenter {
                 notices.append(.deviceRefused(userId: alert.userId, name: members[alert.userId]?.displayName))
             }
         }
+        var deviceChangeTimesMs: [String: Int64] = [:]
         for change in result.deviceChanges.reversed()
         where change.userId != ownUserId && nowMs - change.atMs < deviceChangeWindowMs {
             notices.append(.devicesChanged(userId: change.userId, name: members[change.userId]?.displayName))
+            deviceChangeTimesMs[change.userId] = max(deviceChangeTimesMs[change.userId] ?? 0, change.atMs)
         }
         if result.waitingForEpoch { notices.append(.waitingForEpoch) }
         if !result.snapshot.equivocalRefs.isEmpty {
@@ -275,7 +280,8 @@ enum E2EEV2ThreadPresenter {
             media: media,
             blobEnvelopes: blobEnvelopes,
             polls: polls,
-            cards: cards
+            cards: cards,
+            deviceChangeTimesMs: deviceChangeTimesMs
         )
     }
 

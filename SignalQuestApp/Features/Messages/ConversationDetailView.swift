@@ -65,6 +65,9 @@ struct ConversationDetailView: View {
     /// avant, seul le « Lu » de la page v1 s'affiche, comme auparavant.
     @State private var deliveryReceipts: [DeliveryReceipt] = []
     @State private var receiptsKnown = false
+    /// Dernier « Lu » montré sous mon dernier message : un message lu ne redevient jamais
+    /// non lu, même quand un rechargement remet un instant les accusés à vide (vidéo du 17/11).
+    @State private var shownRead: (messageId: String, status: OwnMessageReceiptStatus)?
     @State private var receiptsTask: Task<Void, Never>?
     // PERF-MSG-01 : le texte saisi vit dans `MessageComposerBar` (sous-vue) pour que la
     // frappe n'invalide plus le corps de cette vue (et donc la liste des messages) à
@@ -106,6 +109,8 @@ struct ConversationDetailView: View {
     @State private var v2Resolved = false
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
+    /// Moment des changements d'appareils cités par les avis, par membre (placement dans le fil).
+    @State private var v2DeviceChangeTimesMs: [String: Int64] = [:]
     @State private var v2Imports: [String: E2EEV2ThreadPresentation.ImportLabel] = [:]
     /// Pièces chiffrées du fil (E2EE-AUTO §7.7), par `blobId`.
     @State private var v2Media: [String: E2EEAutoMediaRef] = [:]
@@ -570,7 +575,12 @@ struct ConversationDetailView: View {
                                 .tint(SQColor.brandRed)
                                 .padding(.vertical, SQSpace.sm)
                         }
-                        ForEach(Array(v2Notices.enumerated()), id: \.offset) { _, notice in
+                        // « Les appareils de X ont changé » se place à sa date dans le fil ; les
+                        // autres avis restent en tête (vidéo du 17/11 : il précédait un message plus ancien).
+                        let noticePlacement = DatedNoticePlacement.make(
+                            messages: messages, notices: v2Notices, deviceChangeTimesMs: v2DeviceChangeTimesMs
+                        )
+                        ForEach(Array(noticePlacement.leading.enumerated()), id: \.offset) { _, notice in
                             if case .logMismatch(let userId, _) = notice {
                                 E2EEAutoAccountAlertReportRow(notice: notice, userId: userId)
                             } else {
@@ -610,23 +620,30 @@ struct ConversationDetailView: View {
                             let index = renderCache.index(of: message, in: messages)
                             let previous = index > 0 ? messages[index - 1] : nil
                             let next = index + 1 < messages.count ? messages[index + 1] : nil
-                            let stamp = sectionStamp(for: message, previous: previous)
                             let callsBefore = callPlacement.before[message.id] ?? []
+                            // Après des appels, la date se lit par rapport au dernier d'entre eux.
+                            let stamp: String? = if let lastCall = callsBefore.last {
+                                message.createdAt.flatMap { stampText(for: $0, after: lastCall.startedAt) }
+                            } else {
+                                sectionStamp(for: message, previous: previous)
+                            }
                             let nextHasCalls = next.map { callPlacement.before[$0.id]?.isEmpty == false } ?? false
                             VStack(spacing: 0) {
-                                ForEach(callsBefore) { event in
+                                ForEach(Array((noticePlacement.before[message.id] ?? []).enumerated()), id: \.offset) { _, notice in
+                                    v2NoticeLabel(notice, detail: nil)
+                                        .accessibilityIdentifier("conversation.v2Notice")
+                                }
+                                // Les appels portent leur jour comme les messages : une série
+                                // d'appels sur plusieurs jours n'est plus lue comme une seule journée.
+                                ForEach(Array(callsBefore.enumerated()), id: \.element.id) { offset, event in
+                                    let previousDate = offset > 0 ? callsBefore[offset - 1].startedAt : previous?.createdAt
+                                    if let callStamp = stampText(for: event.startedAt, after: previousDate) {
+                                        stampLabel(callStamp)
+                                    }
                                     callRow(event)
                                 }
                                 if let stamp {
-                                    Text(stamp)
-                                        .font(SQType.micro)
-                                        .foregroundStyle(SQColor.chipInk)
-                                        .padding(.horizontal, SQSpace.sm2)
-                                        .padding(.vertical, 4)
-                                        .background(SQColor.chip, in: Capsule(style: .continuous))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, SQSpace.sm)
-                                        .accessibilityIdentifier("conversation.stamp")
+                                    stampLabel(stamp)
                                 }
                                 if v2Imports[message.id]?.startsBlock == true {
                                     E2EEAutoImportedHistoryHeader()
@@ -641,10 +658,17 @@ struct ConversationDetailView: View {
                                     isGroupEnd: isGroupEnd(message, next: next) || nextHasCalls,
                                     showsTime: showsTime(message, next: next) || nextHasCalls
                                 )
+                                // Mentions d'import et d'ancien message : une fois, sous la dernière
+                                // bulle d'une série qui partage la même mention.
                                 if let label = v2Imports[message.id] {
-                                    E2EEAutoImportCaption(label: label, isMine: message.senderId == currentUserId)
+                                    let caption = E2EEAutoImportCaption(
+                                        label: label, isMine: message.senderId == currentUserId,
+                                        showsImporter: next.flatMap { v2Imports[$0.id]?.importedBy } != label.importedBy
+                                    )
+                                    if !caption.isEmpty { caption }
                                 }
-                                if let caption = v2LegacyCaptions[message.id] {
+                                if let caption = v2LegacyCaptions[message.id],
+                                   next.flatMap({ v2LegacyCaptions[$0.id] }) != caption {
                                     E2EEAutoLegacyCaption(text: caption, isMine: message.senderId == currentUserId)
                                 }
                                 if message.id == receiptMessageId {
@@ -664,8 +688,16 @@ struct ConversationDetailView: View {
                             )
                             .sqAnimation(SQMotion.standard, value: highlightedMessageId)
                         }
-                        ForEach(callPlacement.trailing) { event in
+                        ForEach(Array(callPlacement.trailing.enumerated()), id: \.element.id) { offset, event in
+                            let previousDate = offset > 0 ? callPlacement.trailing[offset - 1].startedAt : messages.last?.createdAt
+                            if let callStamp = stampText(for: event.startedAt, after: previousDate) {
+                                stampLabel(callStamp)
+                            }
                             callRow(event)
+                        }
+                        ForEach(Array(noticePlacement.trailing.enumerated()), id: \.offset) { _, notice in
+                            v2NoticeLabel(notice, detail: nil)
+                                .accessibilityIdentifier("conversation.v2Notice")
                         }
                         // Frappe : dernier élément de la liste, pour qu'elle pousse le contenu
                         // au lieu de rétrécir la zone visible (parité Android).
@@ -676,8 +708,16 @@ struct ConversationDetailView: View {
                         Color.clear
                             .frame(height: SQSpace.md)
                             .id(Self.bottomRowId)
-                            .onAppear { isNearBottom = true; hasUnseenMessages = false }
-                            .onDisappear { isNearBottom = false }
+                            // Avant iOS 18 : le repère dit si l'on est en bas. Ensuite, la géométrie
+                            // du défilement, plus sûre (`NearBottomWatcher`).
+                            .onAppear {
+                                guard !NearBottomWatcher.isAvailable else { return }
+                                isNearBottom = true; hasUnseenMessages = false
+                            }
+                            .onDisappear {
+                                guard !NearBottomWatcher.isAvailable else { return }
+                                isNearBottom = false
+                            }
                         if noLongerMember {
                             noLongerMemberCard
                                 .padding(.horizontal)
@@ -694,8 +734,12 @@ struct ConversationDetailView: View {
                     // Placée hors de la vue, puis montrée d'un coup (retour du 09/11).
                     .opacity(isPlacingOpening ? 0 : 1)
                 }
-                .modifier(BottomAnchoredScroll())
+                .modifier(BottomAnchoredScroll(pinsToBottom: isNearBottom))
                 .modifier(ScrollInteractionWatcher { userScrolledSinceOpening = true })
+                .modifier(NearBottomWatcher { near in
+                    if near != isNearBottom { isNearBottom = near }
+                    if near, hasUnseenMessages { hasUnseenMessages = false }
+                })
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
                 .onChangeCompat(of: messages.last?.id) { old, _ in
@@ -722,7 +766,8 @@ struct ConversationDetailView: View {
                             // On se recale pendant ce premier chargement.
                             // La liste reste cachée pendant les premiers recalages :
                             // on ne voit plus le saut du milieu vers le bas.
-                            if old == nil {
+                            // iOS 18+ : l'ancre de taille garde le bas, aucun recalage minuté.
+                            if old == nil, !(BottomAnchoredScroll.keepsBottomOnResize && target.id == Self.bottomRowId) {
                                 // iOS 17+ : la liste s'ancre déjà en bas dès sa première mise
                                 // en page (`defaultScrollAnchor`), rien à cacher.
                                 if #available(iOS 17.0, *), target.id == Self.bottomRowId {} else {
@@ -1873,6 +1918,8 @@ struct ConversationDetailView: View {
             } else if let embed = sharedPostEmbedTarget(for: message) {
                 standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime)
                     .sqShadowSoft()
+            } else if let emoji = jumboEmoji(for: message) {
+                jumboEmojiBubble(emoji, message: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime)
             } else {
                 classicBubble(for: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime)
             }
@@ -1933,6 +1980,58 @@ struct ConversationDetailView: View {
             .foregroundStyle(SQColor.labelSecondary)
             .accessibilityIdentifier("message.time")
         }
+    }
+
+    /// Message fait de 1 à 3 emojis seulement, sans citation, pièce jointe ni carte :
+    /// il s'affiche en grand, sans fond de bulle, comme dans Messages.
+    private func jumboEmoji(for message: MessageItem) -> EmojiOnlyText? {
+        guard message.deletedAt == nil,
+              message.replyToId == nil,
+              message.attachments.isEmpty,
+              pendingAttachmentSends[message.id] == nil,
+              transcriptions[message.id]?.isEmpty ?? true,
+              pollsByMessageId[message.id] == nil,
+              shareCard(for: message) == nil,
+              location(for: message) == nil else { return nil }
+        return EmojiOnlyText(displayedContent(for: message))
+    }
+
+    private func jumboEmojiBubble(_ emoji: EmojiOnlyText, message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool) -> some View {
+        VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
+            if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
+                Text(name)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            JumboEmojiText(emoji: emoji)
+                .accessibilityIdentifier("message.text")
+            // Heure discrète sous les emojis, comme sous une carte : pas de bulle pour la porter.
+            let showsMeta = (showsTime && message.createdAt != nil)
+                || message.expiresAt != nil || message.editedAt != nil
+                || sendStatus[message.id] == .sending
+            if showsMeta {
+                HStack(spacing: SQSpace.xs) {
+                    if showsTime, let created = message.createdAt {
+                        Text(created, format: .dateTime.hour().minute())
+                            .accessibilityIdentifier("message.time")
+                    }
+                    if message.expiresAt != nil {
+                        Image(systemName: "timer")
+                            .font(.system(size: 11))
+                            .accessibilityLabel("Message éphémère")
+                    }
+                    if message.editedAt != nil {
+                        Text("modifié")
+                            .accessibilityIdentifier("message.time.edited")
+                    }
+                    sendStatusIndicator(for: message)
+                }
+                .font(SQType.micro(.regular))
+                .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .padding(.horizontal, SQSpace.xs2)
+        .modifier(SpokenBubble(summary: spokenTextSummary(for: message, mine: mine, card: nil), interactive: false))
     }
 
     private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, showsTime: Bool) -> some View {
@@ -2921,13 +3020,24 @@ struct ConversationDetailView: View {
     /// Change quand le pied « Envoyé / Distribué / Lu » apparaît ou se modifie : sert à rester en bas de la liste.
     private var receiptFooterKey: String? {
         guard let last = messages.last(where: { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }),
-              let status = receiptStatus(for: last) else { return nil }
+              let status = displayedReceiptStatus(for: last) else { return nil }
         return "\(last.id)|\(status)"
+    }
+
+    /// Statut affiché : le calcul, sinon le « Lu » déjà montré pour ce même message.
+    private func displayedReceiptStatus(for lastMine: MessageItem) -> OwnMessageReceiptStatus? {
+        let status = receiptStatus(for: lastMine)
+        switch status {
+        case .read?, .seenBy?: return status
+        default:
+            if let shownRead, shownRead.messageId == lastMine.id { return shownRead.status }
+            return status
+        }
     }
 
     @ViewBuilder
     private func readReceiptFooter(for lastMine: MessageItem) -> some View {
-        if let status = receiptStatus(for: lastMine) {
+        if let status = displayedReceiptStatus(for: lastMine) {
             // Une coche pour « Envoyé », deux pour « Distribué » et « Lu » (accentuée) ;
             // en groupe, un lu partiel dit qui a vu. La seconde coche garde sa place
             // à « Envoyé » : le pied ne change pas de largeur.
@@ -2960,6 +3070,25 @@ struct ConversationDetailView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(receiptAccessibilityLabel(status))
             .accessibilityIdentifier("conversation.readReceipt")
+            .onAppear { rememberRead(status, for: lastMine) }
+            .onChangeCompat(of: status) { _, new in rememberRead(new, for: lastMine) }
+        } else {
+            // Place gardée tant que le statut n'est pas connu : son arrivée ne fait plus
+            // monter puis redescendre la conversation.
+            Text("Lu")
+                .font(SQType.micro)
+                .padding(.top, SQSpace.xs)
+                .hidden()
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func rememberRead(_ status: OwnMessageReceiptStatus, for message: MessageItem) {
+        switch status {
+        case .read, .seenBy:
+            if shownRead?.messageId != message.id || shownRead?.status != status { shownRead = (message.id, status) }
+        default:
+            break
         }
     }
 
@@ -3077,7 +3206,13 @@ struct ConversationDetailView: View {
 
     private func computeSectionStamp(for message: MessageItem, previous: MessageItem?) -> String? {
         guard let date = message.createdAt else { return nil }
-        if let previousDate = previous?.createdAt {
+        return stampText(for: date, after: previous?.createdAt)
+    }
+
+    /// Repère de date d'un élément du fil (message ou appel) : au premier, à chaque
+    /// changement de jour, ou après plus d'une heure de silence.
+    private func stampText(for date: Date, after previousDate: Date?) -> String? {
+        if let previousDate {
             let sameDay = Calendar.current.isDate(date, inSameDayAs: previousDate)
             guard !sameDay || date.timeIntervalSince(previousDate) > 3600 else { return nil }
         }
@@ -3087,6 +3222,18 @@ struct ConversationDetailView: View {
         if Calendar.current.isDateInToday(date) { return String(localized: "Aujourd’hui \(time)") }
         if Calendar.current.isDateInYesterday(date) { return String(localized: "Hier \(time)") }
         return "\(date.formatted(.dateTime.weekday(.wide).day().month(.wide))) \(time)"
+    }
+
+    private func stampLabel(_ text: String) -> some View {
+        Text(text)
+            .font(SQType.micro)
+            .foregroundStyle(SQColor.chipInk)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, 4)
+            .background(SQColor.chip, in: Capsule(style: .continuous))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SQSpace.sm)
+            .accessibilityIdentifier("conversation.stamp")
     }
 
     /// Dernier message d'un groupe du même auteur (porte l'avatar en groupe entrant).
@@ -3431,6 +3578,7 @@ struct ConversationDetailView: View {
             let next = confirmed.isEmpty ? merged : merged.filter { !confirmed.contains($0.id) }
             if next != messages { setMessagesAnimatingArrivals(next) }
             v2Notices = presentation.notices
+            if v2DeviceChangeTimesMs != presentation.deviceChangeTimesMs { v2DeviceChangeTimesMs = presentation.deviceChangeTimesMs }
             if v2Imports != presentation.imports { v2Imports = presentation.imports }
             if v2Media != presentation.media { v2Media = presentation.media }
             if v2Cards != presentation.cards { v2Cards = presentation.cards }
@@ -3571,7 +3719,8 @@ struct ConversationDetailView: View {
             messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()) + (await restoredPendingAttachments()))
             computeUnreadDividerIfNeeded()
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
-            if !receiptsKnown { readReceipts = page.readReceipts ?? [] }
+            // Une page sans accusés ne vide pas ceux déjà lus (« Lu » qui clignotait).
+            if !receiptsKnown, let receipts = page.readReceipts, receipts != readReceipts { readReceipts = receipts }
             errorMessage = nil
             if membershipLoss != nil { membershipLoss = nil; noLongerMember = false }
             advanceLastSync(with: page.messages)
@@ -6467,6 +6616,50 @@ private struct EncryptionInfoAction: ViewModifier {
     }
 }
 
+/// Texte fait seulement de 1 à 3 emojis (espaces ignorés). Un emoji dont la forme par
+/// défaut est textuelle (✌, ❤, ☺…) reçoit le sélecteur U+FE0F : sans lui, il pouvait
+/// se dessiner en glyphe monochrome teinté par la couleur du texte, d'où un ✌ délavé.
+struct EmojiOnlyText: Equatable {
+    let text: String
+    let count: Int
+
+    init?(_ raw: String) {
+        let characters = raw.filter { !$0.isWhitespace }
+        guard (1...3).contains(characters.count),
+              characters.allSatisfy(Self.isEmoji) else { return nil }
+        count = characters.count
+        text = String(characters.map(Self.withEmojiPresentation).joined())
+    }
+
+    static func isEmoji(_ character: Character) -> Bool {
+        let scalars = character.unicodeScalars
+        guard let first = scalars.first, first.properties.isEmoji else { return false }
+        if first.properties.isEmojiPresentation || scalars.count > 1 { return true }
+        // Chiffres, « # », « * », ©, ® ou ™ seuls ont la propriété Emoji mais restent du texte.
+        return first.value >= 0x2194
+    }
+
+    static func withEmojiPresentation(_ character: Character) -> String {
+        let scalars = character.unicodeScalars
+        guard scalars.count == 1, let first = scalars.first,
+              !first.properties.isEmojiPresentation else { return String(character) }
+        return String(character) + "\u{FE0F}"
+    }
+}
+
+/// Emojis seuls en grand : 48 pt pour un, 40 pour deux ou trois, à l'échelle du texte.
+private struct JumboEmojiText: View {
+    let emoji: EmojiOnlyText
+    @ScaledMetric(relativeTo: .largeTitle) private var single: CGFloat = 48
+    @ScaledMetric(relativeTo: .largeTitle) private var several: CGFloat = 40
+
+    var body: some View {
+        Text(verbatim: emoji.text)
+            .font(.system(size: emoji.count == 1 ? single : several))
+            .fixedSize()
+    }
+}
+
 /// Bulle lue d'un seul tenant par VoiceOver quand un résumé existe ; sinon
 /// ses éléments sont combinés, ou gardés séparés s'ils sont interactifs.
 private struct SpokenBubble: ViewModifier {
@@ -6865,9 +7058,12 @@ private struct PickedMovie: Transferable {
 }
 
 /// Glisser une rangée de message vers la droite pour y répondre. L'état du glissement vit dans ce
-/// modificateur : seule la rangée touchée se redessine, pas toute la conversation. Le geste est
-/// simultané avec le défilement et ne démarre que sur un mouvement nettement horizontal, donc le
-/// défilement vertical et l'appui long (menu contextuel) restent intacts.
+/// modificateur : seule la rangée touchée se redessine, pas toute la conversation. Le geste ne
+/// démarre que sur un mouvement nettement horizontal, donc le défilement vertical et l'appui long
+/// (menu contextuel) restent intacts. Depuis iOS 18, un `DragGesture` posé sur les bulles, même
+/// simultané, empêchait la liste de défiler quand le doigt partait d'une bulle : seul le bord
+/// droit, sans bulle, la faisait remonter (vidéo du 17/11). Il passe donc par un geste UIKit qui
+/// refuse de commencer sur un mouvement vertical et laisse la liste défiler.
 private struct SwipeToReply: ViewModifier {
     let isEnabled: Bool
     let onReply: () -> Void
@@ -6891,7 +7087,7 @@ private struct SwipeToReply: ViewModifier {
                     .opacity(Double(min(offset / threshold, 1)))
                     .accessibilityHidden(true)
             }
-            .simultaneousGesture(drag, including: isEnabled ? .all : .subviews)
+            .modifier(ReplySwipeGesture(isEnabled: isEnabled, drag: drag, onChanged: track, onEnded: finish))
     }
 
     private var drag: some Gesture {
@@ -6900,23 +7096,85 @@ private struct SwipeToReply: ViewModifier {
                 let t = value.translation
                 // Départ : vers la droite et nettement plus horizontal que vertical.
                 guard offset > 0 || (t.width > 0 && t.width > abs(t.height) * 1.5) else { return }
-                let raw = max(t.width, 0)
-                // Résistance au-delà du seuil.
-                offset = raw <= threshold ? raw : threshold + (raw - threshold) * 0.3
-                let nowArmed = offset >= threshold
-                if nowArmed != armed {
-                    armed = nowArmed
-                    if nowArmed { Haptics.light() }
-                }
+                track(t.width)
             }
-            .onEnded { _ in
-                let shouldReply = armed
-                armed = false
-                if offset != 0 {
-                    withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { offset = 0 }
-                }
-                if shouldReply { onReply() }
+            .onEnded { _ in finish() }
+    }
+
+    private func track(_ width: CGFloat) {
+        let raw = max(width, 0)
+        // Résistance au-delà du seuil.
+        offset = raw <= threshold ? raw : threshold + (raw - threshold) * 0.3
+        let nowArmed = offset >= threshold
+        if nowArmed != armed {
+            armed = nowArmed
+            if nowArmed { Haptics.light() }
+        }
+    }
+
+    private func finish() {
+        let shouldReply = armed
+        armed = false
+        if offset != 0 {
+            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { offset = 0 }
+        }
+        if shouldReply { onReply() }
+    }
+}
+
+/// iOS 18+ : geste UIKit qui ne commence que vers la droite et nettement à l'horizontale, et
+/// cohabite avec le défilement ; avant, le `DragGesture` simultané d'origine.
+private struct ReplySwipeGesture<Drag: Gesture>: ViewModifier {
+    let isEnabled: Bool
+    let drag: Drag
+    let onChanged: (CGFloat) -> Void
+    let onEnded: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            if isEnabled {
+                content.gesture(HorizontalReplyPan(onChanged: onChanged, onEnded: onEnded))
+            } else {
+                content
             }
+        } else {
+            content.simultaneousGesture(drag, including: isEnabled ? .all : .subviews)
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct HorizontalReplyPan: UIGestureRecognizerRepresentable {
+    let onChanged: (CGFloat) -> Void
+    let onEnded: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .changed: onChanged(recognizer.translation(in: recognizer.view).x)
+        case .ended, .cancelled, .failed: onEnded()
+        default: break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        /// Vertical ou vers la gauche : le geste échoue aussitôt, la liste défile.
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            let velocity = pan.velocity(in: pan.view)
+            return velocity.x > 0 && velocity.x > abs(velocity.y) * 1.5
+        }
+
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
     }
 }
 
@@ -7190,10 +7448,77 @@ extension EnvironmentValues {
 
 /// Fil de messages ancré en bas dès sa première mise en page (iOS 17+) : la
 /// conversation s'ouvre sur le dernier message sans saut (retour du 09/11).
+/// iOS 18+ : tant qu'on est en bas, il y reste quand la taille du contenu ou de l'écran
+/// change (photos décodées, « Lu », lignes d'appel, ancien historique, bandeaux). Les
+/// recalages minutés de l'ouverture faisaient monter et descendre le fil (vidéo du 17/11).
+/// En lisant plus haut, rien n'est ancré : ce qui arrive en bas ne déplace pas la lecture.
 private struct BottomAnchoredScroll: ViewModifier {
+    let pinsToBottom: Bool
+
+    static var keepsBottomOnResize: Bool {
+        if #available(iOS 18.0, *) { return true }
+        return false
+    }
+
     func body(content: Content) -> some View {
-        if #available(iOS 17.0, *) {
+        if #available(iOS 18.0, *) {
+            content
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(pinsToBottom ? .bottom : nil, for: .sizeChanges)
+        } else if #available(iOS 17.0, *) {
             content.defaultScrollAnchor(.bottom)
+        } else {
+            content
+        }
+    }
+}
+
+/// Avis du fil chiffré placés : un changement d'appareils daté va devant le premier message
+/// plus récent, ou après le dernier ; les autres avis restent en tête de la conversation.
+struct DatedNoticePlacement {
+    var leading: [E2EEV2ThreadPresentation.Notice] = []
+    var before: [String: [E2EEV2ThreadPresentation.Notice]] = [:]
+    var trailing: [E2EEV2ThreadPresentation.Notice] = []
+
+    static func make(
+        messages: [MessageItem], notices: [E2EEV2ThreadPresentation.Notice], deviceChangeTimesMs: [String: Int64]
+    ) -> DatedNoticePlacement {
+        var placement = DatedNoticePlacement()
+        for notice in notices {
+            guard case .devicesChanged(let userId, _) = notice, let atMs = deviceChangeTimesMs[userId] else {
+                placement.leading.append(notice)
+                continue
+            }
+            let date = Date(timeIntervalSince1970: TimeInterval(atMs) / 1_000)
+            if let next = messages.first(where: { ($0.createdAt ?? .distantPast) > date }) {
+                placement.before[next.id, default: []].append(notice)
+            } else {
+                placement.trailing.append(notice)
+            }
+        }
+        return placement
+    }
+}
+
+/// En bas de la conversation ou non, lu dans la géométrie du défilement (iOS 18+). Le repère
+/// de fin d'une liste paresseuse ne disait pas toujours qu'il avait quitté l'écran : la
+/// conversation se croyait en bas et y revenait seule, par exemple en fermant une photo
+/// (vidéo du 17/11).
+private struct NearBottomWatcher: ViewModifier {
+    let onChange: (Bool) -> Void
+
+    static var isAvailable: Bool {
+        if #available(iOS 18.0, *) { return true }
+        return false
+    }
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.visibleRect.maxY >= geometry.contentSize.height - 120
+            } action: { _, near in
+                onChange(near)
+            }
         } else {
             content
         }

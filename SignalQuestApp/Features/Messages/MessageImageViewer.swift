@@ -136,6 +136,10 @@ struct MessageImageViewer: View {
     private func loadShareImage() async {
         shareImage = nil
         guard let target = current else { return }
+        if target.url.isFileURL {
+            shareImage = await LocalFileImage.decode(target.url)
+            return
+        }
         // Mêmes paramètres que l'affichage (RemoteImage) pour retomber sur le cache.
         let scale = UITraitCollection.current.displayScale
         shareImage = try? await ImagePipeline.shared.image(
@@ -180,18 +184,7 @@ private struct MessageImagePage: View {
 
     var body: some View {
         GeometryReader { geo in
-            RemoteImage(
-                url: target.url,
-                maxDimension: 1600,
-                contentMode: .fit,
-                cacheScope: target.accountSession.map(ImageCacheScope.privateAccount) ?? .publicContent,
-                showsFailureUI: true,
-                animates: true
-            ) {
-                SQSpinner()
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            picture
             .scaleEffect(scale)
             .offset(x: panOffset.width, y: panOffset.height + dismissOffset)
             .frame(width: geo.size.width, height: geo.size.height)
@@ -207,6 +200,27 @@ private struct MessageImagePage: View {
             .accessibilityAction(named: Text("Réduire")) { zoomOut() }
             .accessibilityAction(named: Text("Taille adaptée")) {
                 withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { resetZoom() }
+            }
+        }
+    }
+
+    /// Photo d'une conversation chiffrée : fichier déjà déchiffré sur l'appareil, décodé
+    /// ici sans passer par le cache réseau. Sinon, l'image distante habituelle.
+    @ViewBuilder private var picture: some View {
+        if target.url.isFileURL {
+            LocalFileImage(url: target.url)
+        } else {
+            RemoteImage(
+                url: target.url,
+                maxDimension: 1600,
+                contentMode: .fit,
+                cacheScope: target.accountSession.map(ImageCacheScope.privateAccount) ?? .publicContent,
+                showsFailureUI: true,
+                animates: true
+            ) {
+                SQSpinner()
+                    .tint(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -289,5 +303,43 @@ private struct MessageImagePage: View {
         lastScale = 1
         panOffset = .zero
         lastPanOffset = .zero
+    }
+}
+
+/// Fichier image local (pièce chiffrée déjà déchiffrée), affiché en entier dans l'écran.
+private struct LocalFileImage: View {
+    let url: URL
+    @State private var image: UIImage?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else if failed {
+                Label("Photo indisponible", systemImage: "exclamationmark.triangle")
+                    .font(SQType.subhead)
+                    .foregroundStyle(Color.white)
+            } else {
+                SQSpinner()
+                    .tint(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: url) {
+            image = await Self.decode(url)
+            failed = image == nil
+        }
+    }
+
+    static func decode(_ url: URL) async -> UIImage? {
+        let scale = await UITraitCollection.current.displayScale
+        return await Task.detached(priority: .userInitiated) {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return ImagePipeline.animatedImage(data: data, maxPixel: 1600 * max(scale, 1))
+                ?? ImagePipeline.downsample(data: data, maxPixel: 1600 * max(scale, 1))
+        }.value
     }
 }

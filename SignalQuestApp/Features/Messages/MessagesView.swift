@@ -640,7 +640,12 @@ struct MessagesView: View {
                         )
                     }
                 }
-                .onChangeCompat(of: routedConversationId) { _, id in model.openConversationId = id }
+                .onChangeCompat(of: routedConversationId) { _, id in
+                    model.openConversationId = id
+                    // Retour à la liste : le dock revient dès le début du retour, pas
+                    // après la fin de l'animation, où la conversation le rend (vidéo du 17/11).
+                    if id == nil { router.isDockHidden = false }
+                }
         }
     }
 

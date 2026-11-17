@@ -556,6 +556,57 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertNil(UnreadDivider.make(messages: Array(thread.prefix(2)), lastReadAt: read, currentUserId: "me"))
     }
 
+    /// Vidéo du 17/11 : 1 à 3 emojis seuls s'affichent en grand, sans bulle ; un emoji à forme
+    /// textuelle par défaut reçoit U+FE0F pour ne plus se dessiner en glyphe délavé.
+    func testOnlyOneToThreeEmojisAreShownLarge() {
+        XCTAssertEqual(EmojiOnlyText("✌️")?.count, 1)
+        XCTAssertEqual(EmojiOnlyText("✌")?.text, "✌\u{FE0F}", "Sans sélecteur, ✌ pouvait se dessiner en texte")
+        XCTAssertEqual(EmojiOnlyText(" 😂 👍🏽 ")?.count, 2)
+        XCTAssertEqual(EmojiOnlyText("👨‍👩‍👧‍👦🇫🇷❤️")?.count, 3)
+        XCTAssertNil(EmojiOnlyText("😂😂😂😂"), "Au-delà de trois, la bulle normale reste")
+        XCTAssertNil(EmojiOnlyText("ok 👍"))
+        XCTAssertNil(EmojiOnlyText("1"), "Un chiffre a la propriété Emoji mais reste du texte")
+        XCTAssertNil(EmojiOnlyText("#"))
+        XCTAssertNil(EmojiOnlyText("©"))
+        XCTAssertNil(EmojiOnlyText(""))
+    }
+
+    /// Vidéo du 17/11 : « Les appareils de X ont changé » se place à sa date dans le fil,
+    /// et plus toujours tout en haut.
+    func testDeviceChangeNoticeSitsAtItsDateInTheThread() {
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        func message(_ id: String, at seconds: TimeInterval) -> MessageItem {
+            MessageItem(
+                id: id, conversationId: "c1", senderId: "u", kind: "TEXT", content: "x",
+                e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                createdAt: start.addingTimeInterval(seconds), editedAt: nil,
+                deletedAt: nil, replyToId: nil, threadReplyCount: 0,
+                sender: nil, attachments: [], reactions: []
+            )
+        }
+        let thread = [message("m1", at: 0), message("m2", at: 60), message("m3", at: 120)]
+        let ms = { (seconds: TimeInterval) in Int64((start.timeIntervalSince1970 + seconds) * 1_000) }
+        let middle = E2EEV2ThreadPresentation.Notice.devicesChanged(userId: "a", name: "A")
+        let late = E2EEV2ThreadPresentation.Notice.devicesChanged(userId: "b", name: "B")
+        let undated = E2EEV2ThreadPresentation.Notice.devicesChanged(userId: "c", name: "C")
+        let placement = DatedNoticePlacement.make(
+            messages: thread,
+            notices: [.keyUnverified, middle, late, undated],
+            deviceChangeTimesMs: ["a": ms(30), "b": ms(500)]
+        )
+        XCTAssertEqual(placement.leading, [.keyUnverified, undated])
+        XCTAssertEqual(placement.before, ["m2": [middle]])
+        XCTAssertEqual(placement.trailing, [late])
+    }
+
+    /// Vidéo du 17/11 : la bulle d'une image suit ses proportions (240 pt au plus long côté,
+    /// 80 au moins), au lieu d'un cadre fixe qui la rognait ou la laissait flotter.
+    func testAnImageBubbleFollowsTheImageProportions() {
+        XCTAssertEqual(E2EEAutoAttachmentView.fittedSize(CGSize(width: 1200, height: 2400)), CGSize(width: 120, height: 240))
+        XCTAssertEqual(E2EEAutoAttachmentView.fittedSize(CGSize(width: 3000, height: 1000)), CGSize(width: 240, height: 80))
+        XCTAssertEqual(E2EEAutoAttachmentView.fittedSize(CGSize(width: 4000, height: 400)), CGSize(width: 240, height: 80))
+    }
+
     /// M16 : le badge de l'icône compte les conversations non lues du compte connecté, 0 sans session.
     func testIconBadgeCountsUnreadConversationsOfTheSignedInAccount() {
         XCTAssertEqual(AppServices.iconBadgeCount(unreadConversations: 3, isSignedIn: true), 3)

@@ -21,10 +21,18 @@ struct E2EEAutoImportedHistoryHeader: View {
 struct E2EEAutoImportCaption: View {
     let label: E2EEV2ThreadPresentation.ImportLabel
     let isMine: Bool
+    /// « importé par … » seulement sous le dernier message d'une série du même import :
+    /// répété sous chaque bulle, il chargeait le fil (vidéo du 17/11).
+    var showsImporter = true
+
+    /// Rien à dire sous cette bulle.
+    var isEmpty: Bool { !showsImporter && !label.contested && !label.missingAttachments }
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 2) {
-            Text(verbatim: label.importedBy)
+            if showsImporter {
+                Text(verbatim: label.importedBy)
+            }
             if label.contested {
                 Text(verbatim: String(localized: "import contesté"))
                     .foregroundStyle(SQColor.dangerInk)
