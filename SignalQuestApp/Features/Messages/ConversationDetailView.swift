@@ -116,6 +116,8 @@ struct ConversationDetailView: View {
     @State private var pendingE2EEMedia: [String: String] = [:]
     /// Anciens messages v1 ou en clair d'une conversation passée en auto (E2EE-AUTO §8).
     @State private var v2Legacy: [MessageItem] = []
+    /// Lu une fois par écran, pas à chaque retour de la recherche ou des réglages.
+    @State private var legacyHistoryLoaded = false
     @State private var v2LegacyCaptions: [String: String] = [:]
     /// Lecture v1 de cet appareil, par identifiant v1 : affichée, puis importée.
     @State private var v2LegacyReadings: [String: String] = [:]
@@ -136,8 +138,11 @@ struct ConversationDetailView: View {
     @State private var hasUnseenMessages = false
     /// Ouverture : la liste attend d'être placée avant d'apparaître.
     @State private var isPlacingOpening = false
+    /// Le doigt a pris la liste depuis l'ouverture : les recalages prévus s'arrêtent.
+    @State private var userScrolledSinceOpening = false
     /// Ouverture affichée depuis le magasin local, avant la relève : le repère
-    /// « non lus » n'est connu qu'après elle, et s'y place alors une fois.
+    /// « non lus » est calculé sur ces messages-là. S'il n'y en a pas parmi eux, il
+    /// vient avec la relève et s'y place alors une fois.
     @State private var openedFromStore = false
     /// Actions destructives confirmées avant exécution (SOC-22).
     @State private var pendingDeletion: PendingMessageDeletion?
@@ -690,6 +695,7 @@ struct ConversationDetailView: View {
                     .opacity(isPlacingOpening ? 0 : 1)
                 }
                 .modifier(BottomAnchoredScroll())
+                .modifier(ScrollInteractionWatcher { userScrolledSinceOpening = true })
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
                 .onChangeCompat(of: messages.last?.id) { old, _ in
@@ -722,9 +728,15 @@ struct ConversationDetailView: View {
                                 if #available(iOS 17.0, *), target.id == Self.bottomRowId {} else {
                                     isPlacingOpening = true
                                 }
+                                userScrolledSinceOpening = false
                                 Task { @MainActor in
                                     for delay in [60, 120, 150, 570] as [UInt64] {
                                         try? await Task.sleep(nanoseconds: delay * 1_000_000)
+                                        // Le doigt a pris la liste (iOS 18+) : on ne la lui reprend pas.
+                                        if userScrolledSinceOpening {
+                                            if isPlacingOpening { isPlacingOpening = false }
+                                            break
+                                        }
                                         withTransaction(transaction) { proxy.scrollTo(target.id, anchor: target.anchor) }
                                         if isPlacingOpening, delay == 120 {
                                             withAnimation(SQMotion.resolve(.easeOut(duration: 0.15), reduceMotion)) { isPlacingOpening = false }
@@ -740,10 +752,11 @@ struct ConversationDetailView: View {
                         hasUnseenMessages = true
                     }
                 }
-                // Ouverture depuis le magasin : le repère « non lus » arrive avec la
-                // relève ; s'il y en a beaucoup, on s'y place une fois.
+                // Ouverture depuis le magasin sans non-lu gardé : le repère arrive avec la
+                // relève ; s'il y en a beaucoup, on s'y place une fois. Celui calculé sur le
+                // magasin (relève pas encore répondue) est déjà placé par l'ouverture.
                 .onChangeCompat(of: unreadDivider?.messageId) { _, id in
-                    guard openedFromStore, let id, let divider = unreadDivider,
+                    guard openedFromStore, hasLoadedOnce, let id, let divider = unreadDivider,
                           divider.count >= UnreadDivider.scrollsToDividerFrom else { return }
                     openedFromStore = false
                     withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(id, anchor: .top) }
@@ -1182,8 +1195,17 @@ struct ConversationDetailView: View {
             await refreshSenderRequestState()
             await restoreDraftIfNeeded()
             if usesV2 {
-                await loadLegacyHistory()
+                // Le fil chiffré d'abord : l'ancien historique (jusqu'à 10 pages lues l'une après
+                // l'autre) retardait chaque ouverture. Il est lu une fois par écran, puis le fil
+                // est relu avec lui s'il en a.
                 await loadV2()
+                guard !Task.isCancelled else { return }
+                if !legacyHistoryLoaded {
+                    await loadLegacyHistory()
+                    guard !Task.isCancelled else { return }
+                    legacyHistoryLoaded = true
+                    if !v2Legacy.isEmpty { await loadV2() }
+                }
                 guard !Task.isCancelled else { return }
                 askImportPasswordIfNeeded()
                 Task { await importLegacyHistoryIfNeeded() }
@@ -3370,6 +3392,13 @@ struct ConversationDetailView: View {
         pollsByMessageId.merge(presentation.polls) { _, new in new }
         v2BlobEnvelopes = presentation.blobEnvelopes
         v2LegacyCaptions = presentation.legacyCaptions
+        // Le repère « non lus » se calcule dès ces messages : l'ouverture s'y place d'emblée,
+        // au lieu d'y remonter une à trois secondes plus tard, à la relève. Celle-ci le
+        // recalcule (même message, compte à jour), ou le pose si aucun non-lu n'est gardé ici.
+        unreadDivider = UnreadDivider.make(
+            messages: thread, lastReadAt: conversation.lastReadAt, currentUserId: currentUserId,
+            imports: Set(presentation.imports.keys)
+        )
         messages = thread
     }
 
@@ -3665,8 +3694,19 @@ struct ConversationDetailView: View {
         defer { isLoadingOlder = false }
         let anchorId = messages.first?.id
         v2Limit += E2EEV2ThreadWindow.pageSize
-        await loadV2()
-        prependAnchorId = anchorId
+        // Une relève déjà en cours (relevé, flux, notification, ouverture) fait revenir
+        // `loadV2` tout de suite : on attend qu'elle ait relu la fenêtre agrandie. Sans cela,
+        // l'écran se recalait sur l'ancien premier message avant l'arrivée des plus anciens,
+        // puis sautait une seconde fois à leur insertion. Un second essai couvre une relève
+        // annulée avant de refaire son passage.
+        for _ in 0..<2 {
+            await loadV2()
+            while v2LoadInFlight, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            if messages.first?.id != anchorId { break }
+        }
+        if messages.first?.id != anchorId { prependAnchorId = anchorId }
         await syncCallHistory()
     }
 
@@ -7154,6 +7194,22 @@ private struct BottomAnchoredScroll: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 17.0, *) {
             content.defaultScrollAnchor(.bottom)
+        } else {
+            content
+        }
+    }
+}
+
+/// Le doigt prend la liste (iOS 18+, seule version qui dit la phase du défilement) : les
+/// recalages de l'ouverture s'arrêtent au lieu de ramener en bas un défilement commencé.
+private struct ScrollInteractionWatcher: ViewModifier {
+    let onInteraction: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollPhaseChange { _, phase in
+                if phase == .interacting { onInteraction() }
+            }
         } else {
             content
         }

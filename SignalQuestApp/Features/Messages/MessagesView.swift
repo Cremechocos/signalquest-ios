@@ -42,6 +42,11 @@ final class MessagesViewModel: ObservableObject {
     /// Pages déjà chargées : une relecture périodique les refait toutes, sinon elle
     /// ferait disparaître les plus anciennes que l'on vient de faire défiler.
     private var loadedPages = 1
+    /// Conversation affichée par-dessus la liste : une relecture la garde même quand les
+    /// pages relues ne la portent pas (ouverte depuis une notification, la recherche ou un
+    /// profil). Son écran n'existe que tant qu'elle est dans la liste : sinon il devenait
+    /// vide, puis repartait de zéro à son retour.
+    var openConversationId: String?
     static let pageSize = 50
     static let maxPages = 40
 
@@ -96,6 +101,10 @@ final class MessagesViewModel: ObservableObject {
                 pages += 1
             }
             loadedPages = pages
+            if let openId = openConversationId, !seen.contains(openId),
+               let kept = conversations.first(where: { $0.id == openId }) {
+                all.append(kept)
+            }
             conversations = all.inDisplayOrder()
             pinLimit = first.pinLimit
             shelvedSummary = first.shelvedSummary
@@ -617,7 +626,10 @@ struct MessagesView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sqKeepsSwipeBack()
             .task { restorePersistedSelection() }
-            .onChangeCompat(of: routedConversationId) { _, id in persistSelection(id) }
+            .onChangeCompat(of: routedConversationId) { _, id in
+                persistSelection(id)
+                model.openConversationId = id
+            }
         } else {
             listColumn
                 .navigationDestinationItemCompat($routedConversationId) { id in
@@ -628,6 +640,7 @@ struct MessagesView: View {
                         )
                     }
                 }
+                .onChangeCompat(of: routedConversationId) { _, id in model.openConversationId = id }
         }
     }
 

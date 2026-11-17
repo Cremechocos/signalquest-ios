@@ -342,6 +342,42 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "b"])
     }
 
+    /// Une conversation hors des pages chargées, ouverte depuis une notification ou la recherche,
+    /// reste dans la liste tant qu'elle est ouverte : une relecture (message chiffré reçu) la
+    /// retirait, et son écran devenait vide. Fermée, elle repart avec la relecture suivante.
+    @MainActor
+    func testTheOpenConversationSurvivesAListReloadThatDoesNotCarryIt() async throws {
+        MockURLProtocol.requestHandler = { request in
+            // La liste ne porte jamais « old » ; seule sa route à part la sert.
+            let json = request.url?.path.hasSuffix("/conversations/old") == true
+                ? #"{"conversation":{"id":"old","isGroup":false,"participants":[]}}"#
+                : #"{"conversations":[{"id":"a","isGroup":false,"participants":[]}],"hasMore":false}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("open-conversation-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let model = MessagesViewModel(service: MessagesService(api: api))
+
+        await model.load()
+        await model.ensureLoaded(id: "old")
+        XCTAssertNotNil(model.openableConversation(id: "old"))
+
+        model.openConversationId = "old"
+        await model.load()
+        XCTAssertNotNil(model.openableConversation(id: "old"), "L'écran ouvert garde sa conversation")
+        XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "old"])
+
+        model.openConversationId = nil
+        await model.load()
+        XCTAssertNil(model.openableConversation(id: "old"), "Fermée, elle suit de nouveau les pages servies")
+        XCTAssertEqual(model.conversations.map(\.id), ["a"])
+    }
+
     func testDeliveredAndReceiptsUseTheServerRoutes() async throws {
         var calls: [(method: String?, path: String?, body: [String: Any])] = []
         MockURLProtocol.requestHandler = { request in
