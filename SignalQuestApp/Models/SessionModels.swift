@@ -731,7 +731,13 @@ struct ServingAntenna: Identifiable, Equatable {
 
     private static func resolveStatus(_ r: ServingAntennaResult) -> ServingStatus {
         switch (r.identificationStatus ?? "").lowercased() {
-        case "confirmed", "auto": return .identified
+        case "confirmed", "auto":
+            // AUDIT-ID-1 lot 3, comme Android : un site que le serveur ne tient pas pour
+            // identifié (validation sans geste humain, opérateur non reconnu) ou qu'il demande
+            // de confirmer reste une hypothèse, avec « C'est elle ». Un ancien serveur sans
+            // `identified` garde la lecture du statut.
+            if r.identified == false || r.requiresUserConfirmation == true { return .hypothesis }
+            return .identified
         case "uncertain": return .hypothesis
         case "insufficient_data":
             if r.source?.lowercased() == "proximity" { return .proximity }
@@ -783,11 +789,14 @@ struct ServingAntennaResult: Decodable {
     let estimatedSite: ServingAntenna.EstimatedSite?
     let identificationConflict: IdentificationConflict?
     let cellValidationSuggested: Bool?
+    /// Le serveur demande une confirmation (validation sans geste humain, autre opérateur…).
+    let requiresUserConfirmation: Bool?
 
     enum CodingKeys: String, CodingKey {
         case found, identified, identificationStatus, source, confidence, confidenceReason
         case distance, canonicalSiteId, matchedOperators, antenna, hypothesis
         case confidenceScore, estimatedSite, identificationConflict, cellValidationSuggested
+        case requiresUserConfirmation
     }
 
     private enum EstimatedSiteKeys: String, CodingKey { case latitude, longitude, uncertaintyMeters }
@@ -798,7 +807,7 @@ struct ServingAntennaResult: Decodable {
             confidence = nil; confidenceReason = nil; distance = nil; canonicalSiteId = nil
             matchedOperators = nil
             antenna = nil; hypothesis = nil; confidenceScore = nil; estimatedSite = nil
-            identificationConflict = nil; cellValidationSuggested = nil; return
+            identificationConflict = nil; cellValidationSuggested = nil; requiresUserConfirmation = nil; return
         }
         found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
         identified = (try? c.decodeIfPresent(Bool.self, forKey: .identified)) ?? nil
@@ -824,6 +833,7 @@ struct ServingAntennaResult: Decodable {
         // Un `kind` inconnu fait échouer le bloc seul : le statut reste affiché.
         identificationConflict = (try? c.decodeIfPresent(IdentificationConflict.self, forKey: .identificationConflict)) ?? nil
         cellValidationSuggested = (try? c.decodeIfPresent(Bool.self, forKey: .cellValidationSuggested)) ?? nil
+        requiresUserConfirmation = (try? c.decodeIfPresent(Bool.self, forKey: .requiresUserConfirmation)) ?? nil
     }
 }
 

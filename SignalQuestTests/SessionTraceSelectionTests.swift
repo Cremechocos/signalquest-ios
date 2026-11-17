@@ -173,6 +173,27 @@ final class SessionTraceSelectionTests: XCTestCase {
         XCTAssertEqual(ServingAntenna.distinctOperatorKeys(["Free", "FREE", " Orange+SFR "]), ["Free", "Orange", "SFR"])
     }
 
+    /// AUDIT-ID-1 lot 3, comme Android : une validation que le serveur ne tient pas pour
+    /// identifiée (`identified: false`) ou qu'il demande de confirmer reste une hypothèse, avec
+    /// « C'est elle », même quand son statut est `confirmed` ou `auto`.
+    func testAServedValidationToConfirmIsAHypothesis() throws {
+        func status(_ fields: String) throws -> ServingAntenna {
+            let json = """
+            {"id":"531087","ok":true,"result":{\(fields),"confidenceScore":80,
+              "antenna":{"latitude":48.2,"longitude":-4.5,"operator":"SFR","sup_id":"1713624","enb":"531087"}}}
+            """
+            let wrapper = try JSONDecoder().decode(ServingAntennaWrapper.self, from: Data(json.utf8))
+            return try XCTUnwrap(ServingAntenna(wrapper: wrapper))
+        }
+        let autoCapture = try status(#""identificationStatus":"confirmed","identified":false,"requiresUserConfirmation":true,"validationOrigin":"auto""#)
+        XCTAssertEqual(autoCapture.status, .hypothesis)
+        XCTAssertTrue(autoCapture.isUnconfirmed, "« C'est elle » reste proposé")
+        XCTAssertEqual(try status(#""identificationStatus":"auto","identified":false"#).status, .hypothesis)
+        XCTAssertEqual(try status(#""identificationStatus":"confirmed","identified":true,"requiresUserConfirmation":false,"validationOrigin":"manual""#).status,
+                       .identified)
+        XCTAssertEqual(try status(#""identificationStatus":"confirmed""#).status, .identified, "ancien serveur sans `identified`")
+    }
+
     /// LOOKUP-CONFLICT r1 : le conflit est lu à part du statut ; un `kind` inconnu fait ignorer
     /// le bloc sans toucher au statut ; un candidat sans position reste listé, pas dessiné.
     @MainActor
