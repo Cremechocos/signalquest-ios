@@ -48,11 +48,12 @@ struct FrequencyBlocksCard: View {
         .accessibilityIdentifier("antenna.detail.frequencies")
     }
 
-    /// « 6 bandes », « 2 opérateurs · 5 bandes ».
+    /// « 6 bandes », « 2 opérateurs · 5 bandes », « 7 porteuses · 5 bandes » (Canada), comme le site.
     private var countLine: String {
         let bands = String(localized: "\(rows.count) bandes")
-        guard isShared else { return bands }
-        return String(localized: "\(blocks.operators.count) opérateurs") + " · " + bands
+        if isShared { return String(localized: "\(blocks.operators.count) opérateurs") + " · " + bands }
+        if let carriers = blocks.carrierCount, carriers > 0 { return String(localized: "\(carriers) porteuses") + " · " + bands }
+        return bands
     }
 
     /// Pied de cadre, au mot près le même sur les 3 apps (r0.5 §2).
@@ -162,8 +163,8 @@ struct FrequencyBandRowView: View {
             (Text(verbatim: row.label).foregroundColor(row.isPlanned ? SQColor.labelSecondary : SQColor.label)
                 + Text(verbatim: detail).foregroundColor(SQColor.labelSecondary))
                 .font(SQType.caption(.bold))
-            ForEach(Array(row.groups.enumerated()), id: \.offset) { _, group in
-                rangeLine(group)
+            ForEach(row.operators, id: \.operatorKey) { entry in
+                rangeLines(entry)
             }
         }
     }
@@ -174,58 +175,59 @@ struct FrequencyBandRowView: View {
         }
     }
 
-    /// « · FDD · 10 MHz », « · FDD · 2 porteuses », « · TDD ».
+    /// « · FDD · 10 MHz », « · FDD · 2 porteuses » (Canada), « · TDD ». Plusieurs plages hors Canada :
+    /// pas de chiffre, il ne vaudrait que pour l'une d'elles.
     private var detail: String {
         var parts: [String] = []
         if let duplex = row.duplex { parts.append(duplex) }
-        if !isShared {
-            if row.groups.count > 1 {
-                parts.append(source == .ised ? String(localized: "\(row.groups.count) porteuses")
-                                             : String(localized: "\(row.groups.count) blocs"))
-            } else if let width = row.groups.first?.first.widthMhz, width > 0 {
-                parts.append("\(FrequencyBlocksCard.mhz(width)) MHz")
-            }
+        if let carriers = row.carriers {
+            parts.append(String(localized: "\(carriers) porteuses"))
+        } else if let width = row.widthMhz {
+            parts.append("\(FrequencyBlocksCard.mhz(width)) MHz")
         }
         return parts.isEmpty ? "" : " · " + parts.joined(separator: " · ")
     }
 
     @ViewBuilder
-    private func rangeLine(_ group: FrequencyBlocks.BoundsGroup) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                if isShared {
-                    Circle().fill(operatorColor(group.operatorKey)).frame(width: 8, height: 8)
+    private func rangeLines(_ entry: FrequencyBlocks.OperatorRanges) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            if isShared {
+                Circle().fill(operatorColor(entry.operatorKey)).frame(width: 8, height: 8)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(Array(Self.rangeLines(entry).enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line)
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(verbatim: Self.rangeText(group.first))
-                    .font(SQType.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let share = group.dlSharePercent {
-                Text(verbatim: String(localized: "\(Self.percent(share)) du temps en ↓"))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.ink2)
             }
         }
     }
 
-    /// « ↓ 763–773 · ↑ 708–718 MHz », « ↓↑ 3710–3800 MHz », « ↕ 3300–3800 MHz ». Chaque sens
-    /// est insécable : la ligne ne passe à la ligne qu'entre la descente et la montée.
-    static func rangeText(_ block: FrequencyBlocks.Block) -> String {
-        rawRangeText(block).replacingOccurrences(of: " ", with: "\u{00A0}")
-            .replacingOccurrences(of: "\u{00A0}·\u{00A0}", with: "\u{00A0}· ")
-    }
-
-    private static func rawRangeText(_ block: FrequencyBlocks.Block) -> String {
-        if let range = block.range { return "↕ \(FrequencyBlocksCard.span(range)) MHz" }
-        if block.duplex == "TDD", let dl = block.dl { return "↓↑ \(FrequencyBlocksCard.span(dl)) MHz" }
-        switch (block.dl, block.ul) {
-        case let (dl?, ul?): return "↓ \(FrequencyBlocksCard.span(dl)) · ↑ \(FrequencyBlocksCard.span(ul)) MHz"
-        case let (dl?, nil): return "↓ \(FrequencyBlocksCard.span(dl)) MHz"
-        case let (nil, ul?): return "↑ \(FrequencyBlocksCard.span(ul)) MHz"
-        default: return ""
+    /// Les lignes d'un opérateur, comme le site : une paire FDD seule sur une ligne
+    /// (« ↓ 763–773 · ↑ 708–718 MHz ») ; sinon une ligne par sens, « ↓ », « ↑ », « ↓↑ » (TDD) puis
+    /// « ↕ » (sens inconnu), et la part de descente d'un TDD. Une plage ne se coupe jamais.
+    static func rangeLines(_ entry: FrequencyBlocks.OperatorRanges) -> [String] {
+        func nb(_ text: String) -> String {
+            text.replacingOccurrences(of: " ", with: "\u{00A0}").replacingOccurrences(of: "\u{00A0}·\u{00A0}", with: "\u{00A0}· ")
         }
+        func line(_ arrow: String, _ ranges: [FrequencyBlocks.Range]) -> String {
+            nb("\(arrow) " + ranges.map(FrequencyBlocksCard.span).joined(separator: " · ") + " MHz")
+        }
+        if entry.isSinglePair, let dl = entry.dl.first, let ul = entry.ul.first {
+            return [nb("↓ \(FrequencyBlocksCard.span(dl)) · ↑ \(FrequencyBlocksCard.span(ul)) MHz")]
+        }
+        var lines: [String] = []
+        if !entry.dl.isEmpty { lines.append(line("↓", entry.dl)) }
+        if !entry.ul.isEmpty { lines.append(line("↑", entry.ul)) }
+        if !entry.both.isEmpty { lines.append(line("↓↑", entry.both)) }
+        if !entry.unknown.isEmpty { lines.append(line("↕\u{FE0E}", entry.unknown)) }
+        if let share = entry.dlSharePercent {
+            lines.append(String(localized: "\(percent(share)) du temps en ↓"))
+        }
+        return lines
     }
 
     static func percent(_ value: Double) -> String {
@@ -235,10 +237,10 @@ struct FrequencyBandRowView: View {
     /// Ce que lit VoiceOver : les flèches deviennent des mots.
     private var spoken: String {
         var parts = ["\(row.bandMhz.map { FrequencyBlocksCard.mhz($0) } ?? "") MHz", row.label + detail.replacingOccurrences(of: " · ", with: ", ")]
-        for group in row.groups {
-            var line = isShared ? operatorLabel(group.operatorKey) + ", " : ""
-            line += Self.spokenRange(group.first)
-            if let share = group.dlSharePercent {
+        for entry in row.operators {
+            var line = isShared ? operatorLabel(entry.operatorKey) + ", " : ""
+            line += Self.spokenRanges(entry)
+            if let share = entry.dlSharePercent {
                 line += ", " + String(localized: "\(Self.percent(share)) du temps en descente")
             }
             parts.append(line)
@@ -249,14 +251,14 @@ struct FrequencyBandRowView: View {
         return parts.joined(separator: ", ")
     }
 
-    private static func spokenRange(_ block: FrequencyBlocks.Block) -> String {
+    private static func spokenRanges(_ entry: FrequencyBlocks.OperatorRanges) -> String {
         func lo(_ r: FrequencyBlocks.Range) -> String { FrequencyBlocksCard.mhz(r.low) }
         func hi(_ r: FrequencyBlocks.Range) -> String { FrequencyBlocksCard.mhz(r.high) }
-        if let r = block.range { return String(localized: "Sens inconnu, de \(lo(r)) à \(hi(r)) MHz") }
-        if block.duplex == "TDD", let r = block.dl { return String(localized: "Descente et montée de \(lo(r)) à \(hi(r)) MHz") }
         var parts: [String] = []
-        if let r = block.dl { parts.append(String(localized: "Descente de \(lo(r)) à \(hi(r)) MHz")) }
-        if let r = block.ul { parts.append(String(localized: "Montée de \(lo(r)) à \(hi(r)) MHz")) }
+        parts += entry.dl.map { r in String(localized: "Descente de \(lo(r)) à \(hi(r)) MHz") }
+        parts += entry.ul.map { r in String(localized: "Montée de \(lo(r)) à \(hi(r)) MHz") }
+        parts += entry.both.map { r in String(localized: "Descente et montée de \(lo(r)) à \(hi(r)) MHz") }
+        parts += entry.unknown.map { r in String(localized: "Sens inconnu, de \(lo(r)) à \(hi(r)) MHz") }
         return parts.joined(separator: ", ")
     }
 }

@@ -436,6 +436,7 @@
 		6CD73C75FD424AD31DA0E3A5 /* StoriesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852D72B0FCA155AD0410D50F /* StoriesService.swift */; };
 		6CF9467F46E13CAEEEDE4FBF /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B11B2DAF5DED109A1CA2CE /* SettingsView.swift */; };
 		6D0D0E949DA23EDC762B820C /* MapTileAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEC827F41E87C4A32738BC4 /* MapTileAdmission.swift */; };
+		6DDDD0E45B7180393C7F72F9 /* frequency-blocks-fr-shared-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 74805AC2738ADF784CF297EF /* frequency-blocks-fr-shared-v1.json */; };
 		6EB38F1A471075B0275F0A53 /* SpeedtestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A7E285B40002E79EA8CC1BB /* SpeedtestService.swift */; };
 		6EC78D1C71A760B6A239524F /* OledTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEB88B2CA9EC99EE88C5146 /* OledTourQATests.swift */; };
 		6EFC8C5DA19C1A7B50A6CFD0 /* SQMapKitMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA388892729A99B8736A88C1 /* SQMapKitMarkerView.swift */; };
@@ -526,6 +527,7 @@
 		8210FB3E603681C8FD82F2E6 /* E2EEAutoPasskeyBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0315ECC7AF54CD300A54A82 /* E2EEAutoPasskeyBackup.swift */; };
 		822A0F232492CF47B4507066 /* SQFieldMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D3B65E51125990DBFD9F5D /* SQFieldMode.swift */; };
 		823B807FDEC7912481B1DDF0 /* SQShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCEF2D66932C76B827ED058 /* SQShareCard.swift */; };
+		829BB54DE00366208F850AFF /* frequency-blocks-fr-umts-range-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 03B79C486C850B4E46F7F928 /* frequency-blocks-fr-umts-range-v1.json */; };
 		829D3D825AA9E18848AEA136 /* E2EEV2MessageReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA58AA7263C2A15B78AB7797 /* E2EEV2MessageReport.swift */; };
 		82B8CCDD09875B43EA5B1B65 /* SQMapProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9D1FA2FF05990176A038D4C /* SQMapProjection.swift */; };
 		82C7D06B8D1D2960E61EF1C7 /* FeedPollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A497779B95276F8B69AB2B7D /* FeedPollView.swift */; };
@@ -1069,6 +1071,7 @@
 		032235535FD3F83D7CD6CFBF /* E2EEV2ReportSenderV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2ReportSenderV2Tests.swift; sourceTree = "<group>"; };
 		0372B71199E513FF758E6BEA /* E2EEAutoHistoryKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoHistoryKeyStoreTests.swift; sourceTree = "<group>"; };
 		037C68274D3262D5EF8EC45B /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
+		03B79C486C850B4E46F7F928 /* frequency-blocks-fr-umts-range-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "frequency-blocks-fr-umts-range-v1.json"; sourceTree = "<group>"; };
 		0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		0447B79F47CDC0258E0BEA27 /* SQFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFont.swift; sourceTree = "<group>"; };
 		04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyRecapRenderTests.swift; sourceTree = "<group>"; };
@@ -1503,6 +1506,7 @@
 		739902E9E40436CAC9CAFF28 /* PrivacyZoneDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyZoneDraft.swift; sourceTree = "<group>"; };
 		73E0D8DEAE7E434C80A77516 /* ComposerPollQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerPollQATests.swift; sourceTree = "<group>"; };
 		743199D868E04642B691ED1A /* MentionAutocomplete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocomplete.swift; sourceTree = "<group>"; };
+		74805AC2738ADF784CF297EF /* frequency-blocks-fr-shared-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "frequency-blocks-fr-shared-v1.json"; sourceTree = "<group>"; };
 		74C44E54A806F05156B150F1 /* CustomSitesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSitesService.swift; sourceTree = "<group>"; };
 		74CF7E1DDA21B03198307ED6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7505B3FAA779728681639452 /* CustomSiteOfficialNearbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSiteOfficialNearbyView.swift; sourceTree = "<group>"; };
@@ -2297,6 +2301,8 @@
 			isa = PBXGroup;
 			children = (
 				10D993FDAA16B4D1D3F9F529 /* experience-score-v1-vectors.json */,
+				74805AC2738ADF784CF297EF /* frequency-blocks-fr-shared-v1.json */,
+				03B79C486C850B4E46F7F928 /* frequency-blocks-fr-umts-range-v1.json */,
 				A7DEC153CB635E3EAD378372 /* geotagged-mdta.mov */,
 				53043E8410BD4D6EF71540B8 /* geotagged.mov */,
 				BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */,
@@ -3821,6 +3827,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				3D21B9B2DCFFC76B6EE496E4 /* experience-score-v1-vectors.json in Resources */,
+				6DDDD0E45B7180393C7F72F9 /* frequency-blocks-fr-shared-v1.json in Resources */,
+				829BB54DE00366208F850AFF /* frequency-blocks-fr-umts-range-v1.json in Resources */,
 				1BC4AB188A4696FADCD58628 /* geotagged-mdta.mov in Resources */,
 				4FB32C72F5EB1EB842A8A5F3 /* geotagged.mov in Resources */,
 				D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */,

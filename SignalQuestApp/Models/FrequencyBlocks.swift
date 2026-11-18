@@ -155,96 +155,123 @@ extension FrequencyBlocks {
         return blocks.filter { !$0.planned || !inService.contains($0.sameBlockKey) }
     }
 
-    /// Un groupe de bornes identiques d'un opérateur, avec les générations qui les déclarent.
-    struct BoundsGroup: Equatable, Sendable {
+    /// Les plages d'un opérateur dans une rangée, rangées par sens (comme le Web, `rangesOf`).
+    struct OperatorRanges: Equatable, Sendable {
         let operatorKey: String
-        let blocks: [Block]
-        var first: Block { blocks[0] }
-        /// Générations dans l'ordre servi, chacune « en projet » si tous ses blocs le sont.
-        var generations: [(generation: String, planned: Bool)] {
-            var order: [String] = []
-            var planned: [String: Bool] = [:]
-            for block in blocks {
-                if planned[block.generation] == nil { order.append(block.generation) }
-                planned[block.generation] = (planned[block.generation] ?? true) && block.planned
-            }
-            return order.map { ($0, planned[$0] ?? false) }
-        }
-        var isPlanned: Bool { blocks.allSatisfy(\.planned) }
-        var dlSharePercent: Double? { blocks.lazy.compactMap(\.dlSharePercent).first }
+        var dl: [Range] = []
+        var ul: [Range] = []
+        /// TDD : la même plage dans les deux sens.
+        var both: [Range] = []
+        /// Sens inconnu (`rangeMhz`), en dernier.
+        var unknown: [Range] = []
+        /// Part du temps en descente d'un TDD (ISED).
+        var dlSharePercent: Double?
 
-        static func == (lhs: BoundsGroup, rhs: BoundsGroup) -> Bool {
-            lhs.operatorKey == rhs.operatorKey && lhs.blocks == rhs.blocks
+        /// Une seule paire FDD : elle tient sur une ligne « ↓ … · ↑ … MHz ».
+        var isSinglePair: Bool { dl.count == 1 && ul.count == 1 && both.isEmpty && unknown.isEmpty }
+
+        init(operatorKey: String, blocks: [Block]) {
+            self.operatorKey = operatorKey
+            var seen = Set<BoundsKey>()
+            for block in blocks where seen.insert(BoundsKey(dl: block.dl, ul: block.ul, range: block.range, duplex: nil)).inserted {
+                if let range = block.range {
+                    unknown.append(range)
+                } else if block.duplex == "TDD", let dl = block.dl {
+                    both.append(dl)
+                    if let share = block.dlSharePercent { dlSharePercent = share }
+                } else {
+                    if let dl = block.dl { self.dl.append(dl) }
+                    if let ul = block.ul { self.ul.append(ul) }
+                }
+            }
+            let byLow: (Range, Range) -> Bool = { $0.low < $1.low }
+            dl.sort(by: byLow); ul.sort(by: byLow); both.sort(by: byLow); unknown.sort(by: byLow)
         }
     }
 
-    /// Une rangée de la liste : une bande (même fréquence et même mode de duplex), ses groupes de
-    /// bornes, tous opérateurs confondus sur un support partagé.
+    /// Une rangée de la liste : une bande (`bandMhz`), tous opérateurs confondus, comme le site
+    /// (`frequencyFrameView`, choix d'Alexandre du 18/11 d'aligner le cadre sur le site).
     struct BandRow: Equatable, Sendable, Identifiable {
         let id: String
         let bandMhz: Double?
-        /// Libellé 3GPP du premier bloc qui en a un, sinon le système brut (2G, 3G).
+        /// Bande 3GPP des blocs en service (B…, sinon n…, sinon une autre), sinon le système.
         let label: String
         let duplex: String?
-        let groups: [BoundsGroup]
-
-        var isPlanned: Bool { groups.allSatisfy(\.isPlanned) }
-
+        /// Largeur, quand la bande n'a qu'une plage en service, sur un support non partagé et hors plan 3GPP.
+        let widthMhz: Double?
+        /// Plages distinctes en service, quand il y en a plusieurs au Canada (« 2 porteuses »).
+        let carriers: Int?
+        let operators: [OperatorRanges]
         /// Générations de la rangée, dans l'ordre 2G → 5G ; « en projet » si aucun bloc n'est en service.
-        var generations: [(generation: String, planned: Bool)] {
-            var planned: [String: Bool] = [:]
-            for group in groups {
-                for entry in group.generations {
-                    planned[entry.generation] = (planned[entry.generation] ?? true) && entry.planned
-                }
-            }
-            return ["2G", "3G", "4G", "5G"].compactMap { gen in planned[gen].map { (gen, $0) } }
+        let generations: [GenerationTag]
+        let isPlanned: Bool
+
+        struct GenerationTag: Equatable, Sendable {
+            let generation: String
+            let planned: Bool
         }
     }
 
-    /// Les rangées de la liste, de la plus basse fréquence à la plus haute.
+    /// Les rangées de la liste, une par `bandMhz`, de la plus basse à la plus haute ; à fréquence égale,
+    /// l'ordre servi. Sans `bandMhz`, une rangée par libellé, en fin de liste. Le serveur range par
+    /// génération : garder son ordre mettait 900 (UMTS) avant 700 (B28).
     var bandRows: [BandRow] {
-        var rows: [String: (bandMhz: Double?, label: String?, system: String, duplex: String?, groups: [BoundsGroup])] = [:]
+        let visible = operators.map { ($0.operatorKey, Self.visibleBlocks($0.blocks)) }.filter { !$0.1.isEmpty }
+        let shared = visible.count > 1
+        let all = visible.flatMap(\.1)
+        func label(_ blocks: [Block]) -> String {
+            let bands = blocks.compactMap(\.band)
+            return bands.first { $0.hasPrefix("B") } ?? bands.first { $0.hasPrefix("n") } ?? bands.first
+                ?? blocks.first?.system ?? ""
+        }
+        func rowKey(_ block: Block) -> String {
+            block.bandMhz.map { "mhz-\(Self.keyNumber($0))" } ?? "label-\(label([block]))"
+        }
         var order: [String] = []
-        for op in operators {
-            var groups: [BoundsKey: [Block]] = [:]
-            var groupOrder: [BoundsKey] = []
-            for block in Self.visibleBlocks(op.blocks) {
-                if groups[block.boundsKey] == nil { groupOrder.append(block.boundsKey) }
-                groups[block.boundsKey, default: []].append(block)
+        for block in all where !order.contains(rowKey(block)) { order.append(rowKey(block)) }
+        let rows = order.map { key -> BandRow in
+            let inRow = all.filter { rowKey($0) == key }
+            let live = inRow.filter { !$0.planned }
+            let shown = live.isEmpty ? inRow : live
+            let distinct = Set(shown.map { BoundsKey(dl: $0.dl, ul: $0.ul, range: $0.range, duplex: nil) }).count
+            let ranges = visible.compactMap { key2, blocks -> OperatorRanges? in
+                let own = blocks.filter { rowKey($0) == key }
+                let ownLive = own.filter { !$0.planned }
+                return own.isEmpty ? nil : OperatorRanges(operatorKey: key2, blocks: ownLive.isEmpty ? own : ownLive)
             }
-            for key in groupOrder {
-                let blocks = groups[key] ?? []
-                guard let first = blocks.first else { continue }
-                let mhz = first.bandMhz ?? first.drawnRange.map { ($0.low).rounded() }
-                let rowKey = "\(mhz.map { String(Int($0.rounded())) } ?? first.system)|\(first.duplex ?? "-")"
-                let group = BoundsGroup(operatorKey: op.operatorKey, blocks: blocks)
-                let label = blocks.lazy.compactMap(\.band).first
-                if var row = rows[rowKey] {
-                    row.groups.append(group)
-                    if row.label == nil { row.label = label }
-                    rows[rowKey] = row
-                } else {
-                    rows[rowKey] = (mhz, label, first.system, first.duplex, [group])
-                    order.append(rowKey)
-                }
+            let tags = ["2G", "3G", "4G", "5G"].compactMap { gen -> BandRow.GenerationTag? in
+                guard inRow.contains(where: { $0.generation == gen }) else { return nil }
+                return .init(generation: gen, planned: !live.contains { $0.generation == gen })
             }
+            return BandRow(
+                id: key,
+                bandMhz: inRow.first?.bandMhz,
+                label: label(shown),
+                duplex: shown.lazy.compactMap(\.duplex).first,
+                widthMhz: !shared && distinct == 1 && source != .bandPlan ? shown.first?.widthMhz.flatMap { $0 > 0 ? $0 : nil } : nil,
+                carriers: !shared && distinct > 1 && source == .ised ? distinct : nil,
+                operators: ranges,
+                generations: tags,
+                isPlanned: live.isEmpty
+            )
         }
-        // La liste suit la règle de gauche à droite (planche) : par fréquence, puis génération,
-        // puis ordre servi. Le serveur range par génération d'abord, ce qui mettait 2100 (3G) en tête.
-        let rank = ["2G": 2, "3G": 3, "4G": 4, "5G": 5]
-        let indexed = order.enumerated().compactMap { index, key -> (Int, BandRow)? in
-            guard let row = rows[key] else { return nil }
-            return (index, BandRow(id: key, bandMhz: row.bandMhz, label: row.label ?? row.system,
-                                   duplex: row.duplex, groups: row.groups))
+        return rows.enumerated().sorted { a, b in
+            let fa = a.element.bandMhz ?? .infinity, fb = b.element.bandMhz ?? .infinity
+            return fa != fb ? fa < fb : a.offset < b.offset
+        }.map(\.element)
+    }
+
+    /// Porteuses distinctes en service, sur tous les opérateurs : en-tête du cadre au Canada seulement.
+    var carrierCount: Int? {
+        guard source == .ised else { return nil }
+        return operators.reduce(0) { sum, op in
+            sum + Set(Self.visibleBlocks(op.blocks).filter { !$0.planned }
+                .map { BoundsKey(dl: $0.dl, ul: $0.ul, range: $0.range, duplex: nil) }).count
         }
-        return indexed.sorted { a, b in
-            let fa = a.1.bandMhz ?? .infinity, fb = b.1.bandMhz ?? .infinity
-            if fa != fb { return fa < fb }
-            let ga = a.1.groups.compactMap { rank[$0.first.generation] }.min() ?? 9
-            let gb = b.1.groups.compactMap { rank[$0.first.generation] }.min() ?? 9
-            return ga != gb ? ga < gb : a.0 < b.0
-        }.map(\.1)
+    }
+
+    private static func keyNumber(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value)
     }
 
     /// Le cadre n'a rien à montrer.
@@ -275,14 +302,22 @@ extension FrequencyBlocks {
 
     var stripRows: [StripRow] {
         let visible = operators.map { ($0.operatorKey, Self.visibleBlocks($0.blocks)) }
+        // Une barre par plage, comme le site (`bars`) : en service avant en projet, puis la
+        // génération la plus récente ; B1 et n1 aux mêmes bornes ne font qu'une barre.
         func marks(_ blocks: [Block]) -> [Mark] {
-            var seen = Set<String>()
-            return blocks.compactMap { block in
-                guard let range = block.drawnRange else { return nil }
-                let key = "\(range.low)-\(range.high)-\(block.generation)-\(block.planned)"
-                guard seen.insert(key).inserted else { return nil }
+            let rank = ["2G": 2, "3G": 3, "4G": 4, "5G": 5]
+            let ordered = blocks.enumerated().sorted { a, b in
+                if a.element.planned != b.element.planned { return !a.element.planned }
+                let ga = rank[a.element.generation] ?? 0, gb = rank[b.element.generation] ?? 0
+                return ga != gb ? ga > gb : a.offset < b.offset
+            }.map(\.element)
+            var seen = Set<BoundsKey>()
+            return ordered.compactMap { block -> Mark? in
+                guard let range = block.drawnRange,
+                      seen.insert(BoundsKey(dl: block.dl, ul: block.ul, range: block.range, duplex: nil)).inserted
+                else { return nil }
                 return Mark(range: range, generation: block.generation, planned: block.planned)
-            }
+            }.sorted { $0.range.low < $1.range.low }
         }
         if visible.count > 1 {
             return visible.compactMap { key, blocks in

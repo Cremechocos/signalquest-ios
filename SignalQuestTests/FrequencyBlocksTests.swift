@@ -81,11 +81,13 @@ final class FrequencyBlocksTests: XCTestCase {
         XCTAssertEqual(rows.map(\.label), ["B28", "B20", "B3", "B1", "B7", "n78"])
         // 2100 : UMTS, LTE et NR en projet partagent les mêmes bornes, une seule rangée.
         let b1 = rows[3]
-        XCTAssertEqual(b1.groups.count, 1)
+        XCTAssertEqual(b1.operators.count, 1)
+        XCTAssertTrue(b1.operators[0].isSinglePair)
+        XCTAssertEqual(b1.widthMhz, 14.8)
         XCTAssertEqual(b1.generations.map(\.generation), ["3G", "4G", "5G"])
         XCTAssertEqual(b1.generations.map(\.planned), [false, false, true])
         // Le B20 en projet identique au B20 en service n'est pas répété.
-        XCTAssertEqual(rows[1].groups.first?.blocks.count, 1)
+        XCTAssertEqual(rows[1].operators[0].dl.count, 1)
         XCTAssertEqual(rows[1].generations.map(\.planned), [false])
         XCTAssertTrue(value.showsPlanned)
     }
@@ -103,8 +105,11 @@ final class FrequencyBlocksTests: XCTestCase {
         XCTAssertEqual(value.source, .ised)
         let rows = value.bandRows
         XCTAssertEqual(rows.map(\.label), ["B13", "B66", "B7", "n78"])
-        XCTAssertEqual(rows[1].groups.count, 2)
-        XCTAssertEqual(rows[3].groups.first?.dlSharePercent, 75)
+        XCTAssertEqual(rows[1].operators[0].dl.count, 2)
+        XCTAssertEqual(rows[1].carriers, 2)
+        XCTAssertNil(rows[1].widthMhz)
+        XCTAssertEqual(rows[3].operators.first?.dlSharePercent, 75)
+        XCTAssertEqual(value.carrierCount, 5)
         XCTAssertFalse(value.showsPlanned)
     }
 
@@ -114,51 +119,87 @@ final class FrequencyBlocksTests: XCTestCase {
         let rows = value.bandRows
         XCTAssertEqual(rows.map(\.bandMhz), [700, 2600, 3500])
         XCTAssertEqual(rows[0].label, "B28")
-        XCTAssertEqual(rows[0].groups.map(\.operatorKey), ["ORANGE", "FREE"])
+        XCTAssertEqual(rows[0].operators.map(\.operatorKey), ["ORANGE", "FREE"])
         XCTAssertEqual(rows[0].generations.map(\.generation), ["4G", "5G"])
-        XCTAssertEqual(rows[2].groups.map(\.operatorKey), ["ORANGE", "FREE"])
+        XCTAssertNil(rows[0].widthMhz)
+        XCTAssertEqual(rows[2].operators.map(\.operatorKey), ["ORANGE", "FREE"])
+        XCTAssertNil(value.carrierCount)
     }
 
     private func plain(_ text: String) -> String {
         text.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{2060}", with: "")
+            .replacingOccurrences(of: "\u{FE0E}", with: "")
     }
 
-    /// Passage à blanc du 18/11 : en France, 11 172 émetteurs UMTS 2100 sont déclarés dans l'ancienne
-    /// bande 3G TDD (1900-1920 MHz), sans sens. Leur plage brute s'affiche sans flèche de sens,
-    /// dans une rangée à part du 2100 FDD, et n'élargit pas la règle.
-    func testAnfrUmtsOutsideItsBandKeepsItsRawRange() throws {
-        let value = try blocks("""
-        {"source":"anfr_sup_bande","datasetDate":"2026-11-06","operators":[{"operatorKey":"SFR","blocks":[
-        \(Self.block("3G", nil, 2100, dl: "[2110.5,2125.3]", ul: "[1920.5,1935.3]", width: 14.8, system: "UMTS 2100")),
-        \(Self.block("3G", nil, 2100, range: "[1900.1,1905.1]", width: 5, duplex: nil, system: "UMTS 2100")),
-        \(Self.block("3G", nil, 2100, range: "[1910.1,1915.1]", width: 5, duplex: nil, system: "UMTS 2100")),
-        \(Self.block("3G", nil, 2100, range: "[1915.1,1920.1]", width: 5, duplex: nil, system: "UMTS 2100"))]}]}
-        """)
+    private func fixture(_ name: String) throws -> FrequencyBlocks {
+        let bundle = Bundle(for: Self.self)
+        let url = try XCTUnwrap(bundle.url(forResource: name, withExtension: "json")
+            ?? bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"))
+        let json = try String(contentsOf: url, encoding: .utf8)
+        return try blocks(json)
+    }
+
+    private func lines(_ row: FrequencyBlocks.BandRow, _ operatorKey: String? = nil) -> [String] {
+        let entry = operatorKey.flatMap { key in row.operators.first { $0.operatorKey == key } } ?? row.operators[0]
+        return FrequencyBandRowView.rangeLines(entry).map(plain)
+    }
+
+    /// Vraie réponse servie le 18/11 (support partagé SFR et Bouygues, ANFR du 06/11, blocs seuls),
+    /// le même vecteur qu'Android (fcd675020). Servie par génération, affichée par fréquence comme le site.
+    func testRealAnfrSharedSiteFollowsTheSite() throws {
+        let value = try fixture("frequency-blocks-fr-shared-v1")
         let rows = value.bandRows
-        XCTAssertEqual(rows.count, 2)
-        XCTAssertEqual(rows.map(\.label), ["UMTS 2100", "UMTS 2100"])
-        let unknown = try XCTUnwrap(rows.first { $0.duplex == nil })
-        XCTAssertEqual(unknown.groups.count, 3)
-        let texts = unknown.groups.map { plain(FrequencyBandRowView.rangeText($0.first)) }
-        XCTAssertTrue(texts.allSatisfy { $0.hasPrefix("↕ ") && $0.hasSuffix(" MHz") }, "\(texts)")
-        XCTAssertTrue(texts.contains { $0.contains("1900") && $0.contains("1905") }, "\(texts)")
-        XCTAssertEqual(value.stripDomain.low, 600)
-        XCTAssertEqual(value.stripDomain.high, 4000)
+        XCTAssertEqual(rows.map(\.bandMhz), [700, 800, 900, 1800, 2100, 2600, 3500])
+        XCTAssertEqual(rows.map(\.label), ["B28", "B20", "UMTS 900", "B3", "B1", "B7", "n78"])
+        let b1 = rows[4]
+        XCTAssertEqual(b1.generations.map(\.generation), ["4G", "5G"])
+        XCTAssertEqual(b1.generations.map(\.planned), [false, false])
+        XCTAssertNil(b1.widthMhz)
+        XCTAssertEqual(lines(b1, "SFR"), ["↓ 2110,5–2125,3 · ↑ 1920,5–1935,3 MHz"].map(localized))
+        XCTAssertEqual(lines(rows[6], "BOUYGUES"), ["↓↑ 3570–3640 MHz"])
+        XCTAssertEqual(value.stripRows.map(\.marks.count), [7, 7])
+        XCTAssertNil(value.carrierCount)
+        XCTAssertFalse(value.showsPlanned)
+    }
+
+    /// Vraie réponse servie le 18/11 (SFR seul) : en 2100, UMTS, LTE et NR (en projet) aux mêmes bornes
+    /// prennent le nom 3GPP (B1), et la plage UMTS sans sens (1915,1–1920,1) vient en dernière ligne.
+    func testRealAnfrUmtsRangeWithoutDirectionComesLast() throws {
+        let value = try fixture("frequency-blocks-fr-umts-range-v1")
+        let rows = value.bandRows
+        XCTAssertEqual(rows.map(\.label), ["B20", "GSM 900", "B3", "B1", "B7", "n78"])
+        XCTAssertEqual(rows[1].generations.map(\.generation), ["2G", "3G"])
+        XCTAssertEqual(rows[1].widthMhz, 8.7)
+        let b1 = rows[3]
+        XCTAssertEqual(lines(b1), ["↓ 2110,5–2125,3 · 2149,9–2154,9 MHz", "↑ 1920,5–1935,3 · 1959,9–1964,9 MHz",
+                                   "↕ 1915,1–1920,1 MHz"].map(localized))
+        XCTAssertEqual(b1.generations.map(\.generation), ["3G", "4G", "5G"])
+        XCTAssertEqual(b1.generations.map(\.planned), [false, false, true])
+        XCTAssertNil(b1.widthMhz)
+        XCTAssertNil(b1.carriers)
+        XCTAssertEqual(b1.duplex, "FDD")
+        XCTAssertTrue(value.showsPlanned)
+    }
+
+    /// Les vecteurs sont écrits en français : en anglais, la virgule décimale devient un point.
+    private func localized(_ text: String) -> String {
+        Bundle.main.preferredLocalizations.first == "fr" ? text : text.replacingOccurrences(of: ",", with: ".")
     }
 
     func testRangeTextsSayTheDirection() throws {
         let france = try blocks(Self.france).bandRows
-        XCTAssertEqual(plain(FrequencyBandRowView.rangeText(france[0].groups[0].first)), "↓ 763–773 · ↑ 708–718 MHz")
-        XCTAssertEqual(plain(FrequencyBandRowView.rangeText(france[5].groups[0].first)), "↓↑ 3710–3800 MHz")
+        XCTAssertEqual(lines(france[0]), ["↓ 763–773 · ↑ 708–718 MHz"])
+        XCTAssertEqual(lines(france[5]), ["↓↑ 3710–3800 MHz"])
         let plan = try blocks(Self.bandPlan).bandRows
-        XCTAssertEqual(plain(FrequencyBandRowView.rangeText(plan[1].groups[0].first)), "↕ 3300–3800 MHz")
+        XCTAssertEqual(lines(plan[1]), ["↕ 3300–3800 MHz"])
+        XCTAssertNil(plan[0].widthMhz)
         let dlOnly = try blocks("""
         {"source":"anfr_sup_bande","datasetDate":"2026-11-06","operators":[{"operatorKey":"SFR","blocks":[
         \(Self.block("4G", "B32", 1500, dl: "[1452,1472]", duplex: "SDL")),
         \(Self.block("4G", "B3", 1800, ul: "[1710,1730]"))]}]}
         """).bandRows
-        XCTAssertEqual(plain(FrequencyBandRowView.rangeText(dlOnly[0].groups[0].first)), "↓ 1452–1472 MHz")
-        XCTAssertEqual(plain(FrequencyBandRowView.rangeText(dlOnly[1].groups[0].first)), "↑ 1710–1730 MHz")
+        XCTAssertEqual(lines(dlOnly[0]), ["↓ 1452–1472 MHz"])
+        XCTAssertEqual(lines(dlOnly[1]), ["↑ 1710–1730 MHz"])
     }
 
     /// Textes au mot près ceux du contrat (r0.5 §2), en français.
@@ -205,16 +246,24 @@ final class FrequencyBlocksTests: XCTestCase {
         let window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
         window.makeKeyAndVisible()
-        let fixtures = [("france", Self.france), ("canada", Self.canada), ("partage", Self.shared), ("autres", Self.bandPlan)]
+        var fixtures = [("france", Self.france), ("canada", Self.canada), ("partage", Self.shared), ("autres", Self.bandPlan)]
+        for name in ["frequency-blocks-fr-shared-v1", "frequency-blocks-fr-umts-range-v1"] {
+            let bundle = Bundle(for: Self.self)
+            let url = try XCTUnwrap(bundle.url(forResource: name, withExtension: "json")
+                ?? bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"))
+            fixtures.append((name, try String(contentsOf: url, encoding: .utf8)))
+        }
         let colors: [String: Color] = ["ORANGE": Color(hex: 0xFF7900), "FREE": Color(hex: 0xCD1E25),
+                                       "SFR": Color(hex: 0xE2001A), "BOUYGUES": Color(hex: 0x00A3E0),
                                        "BELL": Color(hex: 0x0066CC), "POST_LU": Color(hex: 0xFFCC00)]
-        let names = ["ORANGE": "Orange", "FREE": "Free Mobile", "BELL": "Bell", "POST_LU": "POST"]
+        let names = ["ORANGE": "Orange", "FREE": "Free Mobile", "BELL": "Bell", "POST_LU": "POST",
+                     "SFR": "SFR", "BOUYGUES": "Bouygues Telecom"]
         let variants: [(String, ColorScheme, DynamicTypeSize)] = [
             ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2),
         ]
         for (fixture, json) in fixtures {
             let value = try blocks(json)
-            for (name, scheme, size) in variants where fixture == "france" || name == "clair" {
+            for (name, scheme, size) in variants where fixture == "france" || fixture.hasSuffix("umts-range-v1") || name == "clair" {
                 let view = ScrollView {
                     FrequencyBlocksCard(blocks: value, operatorLabel: { names[$0] ?? $0 },
                                         operatorColor: { colors[$0] ?? .gray })

@@ -1,0 +1,347 @@
+{
+ "revision": "r0",
+ "source": "anfr_sup_bande",
+ "datasetDate": "2026-11-06",
+ "operators": [
+  {
+   "operatorKey": "SFR",
+   "blocks": [
+    {
+     "system": "UMTS 900",
+     "generation": "3G",
+     "band": null,
+     "bandMhz": 900,
+     "dlMhz": [
+      951.2,
+      959.9
+     ],
+     "ulMhz": [
+      906.2,
+      914.9
+     ],
+     "rangeMhz": null,
+     "widthMhz": 8.7,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 700",
+     "generation": "4G",
+     "band": "B28",
+     "bandMhz": 700,
+     "dlMhz": [
+      758,
+      763
+     ],
+     "ulMhz": [
+      703,
+      708
+     ],
+     "rangeMhz": null,
+     "widthMhz": 5,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 800",
+     "generation": "4G",
+     "band": "B20",
+     "bandMhz": 800,
+     "dlMhz": [
+      801,
+      811
+     ],
+     "ulMhz": [
+      842,
+      852
+     ],
+     "rangeMhz": null,
+     "widthMhz": 10,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 1800",
+     "generation": "4G",
+     "band": "B3",
+     "bandMhz": 1800,
+     "dlMhz": [
+      1825,
+      1845
+     ],
+     "ulMhz": [
+      1730,
+      1750
+     ],
+     "rangeMhz": null,
+     "widthMhz": 20,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 2100",
+     "generation": "4G",
+     "band": "B1",
+     "bandMhz": 2100,
+     "dlMhz": [
+      2110.5,
+      2125.3
+     ],
+     "ulMhz": [
+      1920.5,
+      1935.3
+     ],
+     "rangeMhz": null,
+     "widthMhz": 14.8,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 2600",
+     "generation": "4G",
+     "band": "B7",
+     "bandMhz": 2600,
+     "dlMhz": [
+      2620,
+      2635
+     ],
+     "ulMhz": [
+      2500,
+      2515
+     ],
+     "rangeMhz": null,
+     "widthMhz": 15,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "5G NR 2100",
+     "generation": "5G",
+     "band": "n1",
+     "bandMhz": 2100,
+     "dlMhz": [
+      2110.5,
+      2125.3
+     ],
+     "ulMhz": [
+      1920.5,
+      1935.3
+     ],
+     "rangeMhz": null,
+     "widthMhz": 14.8,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "5G NR 3500",
+     "generation": "5G",
+     "band": "n78",
+     "bandMhz": 3500,
+     "dlMhz": [
+      3490,
+      3570
+     ],
+     "ulMhz": null,
+     "rangeMhz": null,
+     "widthMhz": 80,
+     "duplex": "TDD",
+     "paired": false,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    }
+   ]
+  },
+  {
+   "operatorKey": "BOUYGUES",
+   "blocks": [
+    {
+     "system": "UMTS 900",
+     "generation": "3G",
+     "band": null,
+     "bandMhz": 900,
+     "dlMhz": [
+      925.1,
+      934.9
+     ],
+     "ulMhz": [
+      880.1,
+      889.9
+     ],
+     "rangeMhz": null,
+     "widthMhz": 9.8,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 700",
+     "generation": "4G",
+     "band": "B28",
+     "bandMhz": 700,
+     "dlMhz": [
+      773,
+      778
+     ],
+     "ulMhz": [
+      718,
+      723
+     ],
+     "rangeMhz": null,
+     "widthMhz": 5,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 800",
+     "generation": "4G",
+     "band": "B20",
+     "bandMhz": 800,
+     "dlMhz": [
+      791,
+      801
+     ],
+     "ulMhz": [
+      832,
+      842
+     ],
+     "rangeMhz": null,
+     "widthMhz": 10,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 1800",
+     "generation": "4G",
+     "band": "B3",
+     "bandMhz": 1800,
+     "dlMhz": [
+      1860,
+      1880
+     ],
+     "ulMhz": [
+      1765,
+      1785
+     ],
+     "rangeMhz": null,
+     "widthMhz": 20,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 2100",
+     "generation": "4G",
+     "band": "B1",
+     "bandMhz": 2100,
+     "dlMhz": [
+      2125.3,
+      2140.1
+     ],
+     "ulMhz": [
+      1935.3,
+      1950.1
+     ],
+     "rangeMhz": null,
+     "widthMhz": 14.8,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "LTE 2600",
+     "generation": "4G",
+     "band": "B7",
+     "bandMhz": 2600,
+     "dlMhz": [
+      2655,
+      2670
+     ],
+     "ulMhz": [
+      2535,
+      2550
+     ],
+     "rangeMhz": null,
+     "widthMhz": 15,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "5G NR 2100",
+     "generation": "5G",
+     "band": "n1",
+     "bandMhz": 2100,
+     "dlMhz": [
+      2125.3,
+      2140.1
+     ],
+     "ulMhz": [
+      1935.3,
+      1950.1
+     ],
+     "rangeMhz": null,
+     "widthMhz": 14.8,
+     "duplex": "FDD",
+     "paired": true,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    },
+    {
+     "system": "5G NR 3500",
+     "generation": "5G",
+     "band": "n78",
+     "bandMhz": 3500,
+     "dlMhz": [
+      3570,
+      3640
+     ],
+     "ulMhz": null,
+     "rangeMhz": null,
+     "widthMhz": 70,
+     "duplex": "TDD",
+     "paired": false,
+     "planned": false,
+     "emitters": 3,
+     "dlSharePercent": null
+    }
+   ]
+  }
+ ]
+}
