@@ -552,6 +552,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let displayName: String?
     /// Commentaire libre du contributeur.
     let description: String?
+    /// FREQ-BLOCKS r0 : bornes de fréquences par opérateur. `nil` sans source pour le pays, sur un
+    /// site sans bande relevée ou sur un serveur antérieur.
+    let frequencyBlocks: FrequencyBlocks?
 
     /// Le site est-il réellement en service ? L'ANFR distingue « En service » de
     /// « Techniquement opérationnel » (prêt, pas ouvert) et de « Projet approuvé ».
@@ -681,6 +684,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
         case datasetPublishedAt, operatorBrand, licences, municipality, provinceCode
         case isCustomSite, validationStatus, source, displayName, description
+        case frequencyBlocks
     }
 
     /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
@@ -754,6 +758,8 @@ struct AntennaCoreDetails: Decodable, Equatable {
         source = c.decodeFlexibleString(forKey: .source)
         displayName = c.decodeFlexibleString(forKey: .displayName)
         description = c.decodeFlexibleString(forKey: .description)
+        frequencyBlocks = (try? c.decodeIfPresent(FrequencyBlocks.self, forKey: .frequencyBlocks))
+            .flatMap { $0 }.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

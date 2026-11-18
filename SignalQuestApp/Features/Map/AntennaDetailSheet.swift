@@ -861,6 +861,10 @@ struct AntennaDetailSheet: View {
                 SQNotice(message: outageError, tone: .warning)
             }
             radioBlock
+            // FREQ-BLOCKS : les bornes réelles de chaque opérateur, quand le pays a une source.
+            if let frequencyBlocks = model.details?.core?.frequencyBlocks {
+                FrequencyBlocksCard(blocks: frequencyBlocks, operatorLabel: photoOperatorLabel, operatorColor: registryColor)
+            }
             // Les cellules que le membre a placées ici, à corriger sans passer par les logs.
             SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify,
                                        sectorCounts: model.details?.core?.cellIdentifiers)
