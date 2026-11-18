@@ -556,10 +556,11 @@ struct IdentificationCorrectionBlock: View {
         return derived
     }
 
-    /// Comptes de la fiche pour cette rangée (seulement sur la fiche d'un support).
+    /// Comptes de la rangée : ceux de la ligne PCI servis par `mine` (#1401), sinon ceux de la fiche.
     private func counts(_ row: SectorRow) -> SectorConfirmCounts? {
-        guard let sectorCounts else { return nil }
         let line = row.primary
+        if let served = line.sectorConfirmCounts { return served }
+        guard let sectorCounts else { return nil }
         return SectorConfirmCounts.lookup(in: sectorCounts, pci: row.pci ?? line.pci,
                                           cellId: row.pci == nil ? line.cellId : nil,
                                           enb: row.enb, gnb: row.gnb, sectors: row.commonSectors)

@@ -124,6 +124,12 @@ final class SectorStatusTests: XCTestCase {
                      "plusieurs secteurs : pas de compte unique")
     }
 
+    func testMineLinesCarryTheirCounts() throws {
+        let served = try line(#"{"id":"p1","siteId":"s","type":"pci","pci":215,"sectors":[2],"sectorStatus":"confirmed","sectorConfirmations":3,"sectorVerifiedConfirmations":5}"#)
+        XCTAssertEqual(served.sectorConfirmCounts, SectorConfirmCounts(members: 3, verified: 3), "jamais plus de membres sur place que de membres")
+        XCTAssertNil(try pciLine().sectorConfirmCounts, "serveur d'avant #1401 : la fiche sert de repli")
+    }
+
     func testFicheEntriesDecodeTheirCounts() throws {
         let json = #"{"value":"215","sector":2,"tech":"4G","band":20,"enb":"610423","sectorStatus":"verified_on_site","sectorConfirmations":3,"sectorVerifiedConfirmations":2}"#
         let entry = try JSONDecoder.signalQuest.decode(AntennaPciEntry.self, from: Data(json.utf8))

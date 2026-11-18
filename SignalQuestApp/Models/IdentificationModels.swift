@@ -60,6 +60,9 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     /// plus « toi ». Absent d'un serveur plus ancien : voir `ownConfirmation`.
     let myConfirmation: SectorStatus?
     let servesMyConfirmation: Bool
+    /// SECTOR-ORIGIN r1.2 (#1401) : membres distincts qui ont confirmé CE secteur, dont sur place.
+    /// Absent sans secteur ou d'un serveur plus ancien.
+    let sectorConfirmCounts: SectorConfirmCounts?
     /// v2 : cellule qu'aucune ligne nœud active du membre ne porte (pages finales).
     let orphan: Bool
     /// v2 : nœud dont seules les 4 000 cellules les plus récentes sont servies.
@@ -71,6 +74,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case createdAt, lastValidated, conflict
         case conflictSiteId, conflictSiteAddress, conflictSiteValidations, conflictSiteLat, conflictSiteLng
         case conflictStatus, contested, cellConflict, sectorCheck, derivedSector, sectorStatus, myConfirmation, orphan, cellsTruncated
+        case sectorConfirmations, sectorVerifiedConfirmations
     }
 
     init(from decoder: Decoder) throws {
@@ -109,6 +113,12 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         sectorStatus = SectorStatus(raw: c.decodeFlexibleString(forKey: .sectorStatus))
         servesMyConfirmation = c.contains(.myConfirmation)
         myConfirmation = SectorStatus(raw: c.decodeFlexibleString(forKey: .myConfirmation))
+        if let members = (try? c.decodeIfPresent(Int.self, forKey: .sectorConfirmations)) ?? nil {
+            let verified = (try? c.decodeIfPresent(Int.self, forKey: .sectorVerifiedConfirmations)) ?? nil
+            sectorConfirmCounts = SectorConfirmCounts(members: max(members, 0), verified: min(max(verified ?? 0, 0), max(members, 0)))
+        } else {
+            sectorConfirmCounts = nil
+        }
         orphan = (try? c.decodeIfPresent(Bool.self, forKey: .orphan)) ?? false
         cellsTruncated = (try? c.decodeIfPresent(Bool.self, forKey: .cellsTruncated)) ?? false
     }
