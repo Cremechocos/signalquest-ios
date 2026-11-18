@@ -123,6 +123,29 @@ final class FrequencyBlocksTests: XCTestCase {
         text.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{2060}", with: "")
     }
 
+    /// Passage à blanc du 18/11 : en France, 11 172 émetteurs UMTS 2100 sont déclarés dans l'ancienne
+    /// bande 3G TDD (1900-1920 MHz), sans sens. Leur plage brute s'affiche sans flèche de sens,
+    /// dans une rangée à part du 2100 FDD, et n'élargit pas la règle.
+    func testAnfrUmtsOutsideItsBandKeepsItsRawRange() throws {
+        let value = try blocks("""
+        {"source":"anfr_sup_bande","datasetDate":"2026-11-06","operators":[{"operatorKey":"SFR","blocks":[
+        \(Self.block("3G", nil, 2100, dl: "[2110.5,2125.3]", ul: "[1920.5,1935.3]", width: 14.8, system: "UMTS 2100")),
+        \(Self.block("3G", nil, 2100, range: "[1900.1,1905.1]", width: 5, duplex: nil, system: "UMTS 2100")),
+        \(Self.block("3G", nil, 2100, range: "[1910.1,1915.1]", width: 5, duplex: nil, system: "UMTS 2100")),
+        \(Self.block("3G", nil, 2100, range: "[1915.1,1920.1]", width: 5, duplex: nil, system: "UMTS 2100"))]}]}
+        """)
+        let rows = value.bandRows
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.map(\.label), ["UMTS 2100", "UMTS 2100"])
+        let unknown = try XCTUnwrap(rows.first { $0.duplex == nil })
+        XCTAssertEqual(unknown.groups.count, 3)
+        let texts = unknown.groups.map { plain(FrequencyBandRowView.rangeText($0.first)) }
+        XCTAssertTrue(texts.allSatisfy { $0.hasPrefix("↕ ") && $0.hasSuffix(" MHz") }, "\(texts)")
+        XCTAssertTrue(texts.contains { $0.contains("1900") && $0.contains("1905") }, "\(texts)")
+        XCTAssertEqual(value.stripDomain.low, 600)
+        XCTAssertEqual(value.stripDomain.high, 4000)
+    }
+
     func testRangeTextsSayTheDirection() throws {
         let france = try blocks(Self.france).bandRows
         XCTAssertEqual(plain(FrequencyBandRowView.rangeText(france[0].groups[0].first)), "↓ 763–773 · ↑ 708–718 MHz")
