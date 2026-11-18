@@ -172,7 +172,7 @@ final class FrequencyBlocksTests: XCTestCase {
         XCTAssertEqual(rows[1].widthMhz, 8.7)
         let b1 = rows[3]
         XCTAssertEqual(lines(b1), ["↓ 2110,5–2125,3 · 2149,9–2154,9 MHz", "↑ 1920,5–1935,3 · 1959,9–1964,9 MHz",
-                                   "↕ 1915,1–1920,1 MHz"].map(localized))
+                                   "1915,1–1920,1 MHz"].map(localized))
         XCTAssertEqual(b1.generations.map(\.generation), ["3G", "4G", "5G"])
         XCTAssertEqual(b1.generations.map(\.planned), [false, false, true])
         XCTAssertNil(b1.widthMhz)
@@ -191,7 +191,7 @@ final class FrequencyBlocksTests: XCTestCase {
         XCTAssertEqual(lines(france[0]), ["↓ 763–773 · ↑ 708–718 MHz"])
         XCTAssertEqual(lines(france[5]), ["↓↑ 3710–3800 MHz"])
         let plan = try blocks(Self.bandPlan).bandRows
-        XCTAssertEqual(lines(plan[1]), ["↕ 3300–3800 MHz"])
+        XCTAssertEqual(lines(plan[1]), ["3300–3800 MHz"])
         XCTAssertNil(plan[0].widthMhz)
         let dlOnly = try blocks("""
         {"source":"anfr_sup_bande","datasetDate":"2026-11-06","operators":[{"operatorKey":"SFR","blocks":[

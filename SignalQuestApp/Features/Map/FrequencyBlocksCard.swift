@@ -208,7 +208,8 @@ struct FrequencyBandRowView: View {
 
     /// Les lignes d'un opérateur, comme le site : une paire FDD seule sur une ligne
     /// (« ↓ 763–773 · ↑ 708–718 MHz ») ; sinon une ligne par sens, « ↓ », « ↑ », « ↓↑ » (TDD) puis
-    /// « ↕ » (sens inconnu), et la part de descente d'un TDD. Une plage ne se coupe jamais.
+    /// la plage sans sens, sans flèche (« ↕ » se confondait avec le « ↓↑ » du TDD, choix d'Alexandre du
+    /// 18/11), et la part de descente d'un TDD. Une plage ne se coupe jamais.
     static func rangeLines(_ entry: FrequencyBlocks.OperatorRanges) -> [String] {
         func nb(_ text: String) -> String {
             text.replacingOccurrences(of: " ", with: "\u{00A0}").replacingOccurrences(of: "\u{00A0}·\u{00A0}", with: "\u{00A0}· ")
@@ -223,7 +224,9 @@ struct FrequencyBandRowView: View {
         if !entry.dl.isEmpty { lines.append(line("↓", entry.dl)) }
         if !entry.ul.isEmpty { lines.append(line("↑", entry.ul)) }
         if !entry.both.isEmpty { lines.append(line("↓↑", entry.both)) }
-        if !entry.unknown.isEmpty { lines.append(line("↕\u{FE0E}", entry.unknown)) }
+        if !entry.unknown.isEmpty {
+            lines.append(nb(entry.unknown.map(FrequencyBlocksCard.span).joined(separator: " · ") + " MHz"))
+        }
         if let share = entry.dlSharePercent {
             lines.append(String(localized: "\(percent(share)) du temps en ↓"))
         }
