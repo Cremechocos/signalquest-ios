@@ -140,6 +140,62 @@ final class SectorStatusTests: XCTestCase {
         XCTAssertNil(bare.sectorConfirmations)
     }
 
+    // MARK: - Votant (r1.3 à r1.3.5)
+
+    /// Fiche d'un membre connecté : un PCI voté, le même sous une autre bande, une cellule votée
+    /// sur deux secteurs, une ligne de l'auteur, un rôle nul et une entrée anonyme.
+    private static let voterFiche = #"""
+    {"enb":["610423"],"gnb":[],"pci":[
+     {"value":"215","sector":2,"tech":"4G","band":20,"enb":"610423","sectorStatus":"confirmed","sectorConfirmations":2,"sectorVerifiedConfirmations":1,"myRole":"voter","myConfirmation":null,"operator":"ORANGE","sectors":[2]},
+     {"value":"215","sector":2,"tech":"4G","band":3,"enb":"610423","sectorStatus":"confirmed","myRole":"voter","operator":"ORANGE","sectors":[2]},
+     {"value":"216","sector":3,"tech":"4G","enb":"610423","sectorStatus":"operator_rule","myRole":"author","operator":"ORANGE","sectors":[3]},
+     {"value":"217","sector":1,"tech":"4G","enb":"610423","sectorStatus":"operator_rule","myRole":null},
+     {"value":"218","sector":1,"tech":"4G","enb":"610423","sectorStatus":"operator_rule"},
+     {"value":"219","sector":1,"tech":"4G","enb":"610423","sectorStatus":"operator_rule","myRole":"voter","sectors":[1]}
+    ],"cellId":[
+     {"value":"156266497","pci":"215","tech":"4G","sector":1,"ci":"1","enb":"610423","sectorStatus":"verified_on_site","myRole":"voter","myConfirmation":"verified_on_site","operator":"ORANGE","sectors":[3,1]}
+    ]}
+    """#
+
+    private func voterLines() throws -> [SectorVoterLine] {
+        let identifiers = try JSONDecoder.signalQuest.decode(AntennaCellIdentifiers.self, from: Data(Self.voterFiche.utf8))
+        return SectorVoterLine.lines(in: identifiers, siteId: "0381522", marketCode: "FR")
+    }
+
+    func testOnlyVotedEntriesWithOperatorAndSectorsGetTheButton() throws {
+        let lines = try voterLines()
+        XCTAssertEqual(lines.map { $0.target.pci ?? "" } + lines.map { $0.target.cellId ?? "-" }, ["215", "215", "-", "156266497"],
+                       "ni l'auteur (son geste est dans le bloc), ni un rôle nul, ni un anonyme, ni un votant sans opérateur ; un PCI sous deux bandes une seule fois")
+        let pci = lines[0].target
+        XCTAssertEqual(pci.operatorName, "ORANGE")
+        XCTAssertEqual(pci.sectors, [2])
+        XCTAssertEqual(pci.pci, "215")
+        XCTAssertNil(pci.cellId)
+        XCTAssertEqual(pci.enb, "610423")
+        XCTAssertEqual(pci.status, .confirmed)
+        XCTAssertNil(pci.own)
+        XCTAssertTrue(pci.canConfirm)
+        XCTAssertEqual(lines[0].counts, SectorConfirmCounts(members: 2, verified: 1))
+        let cell = lines[1].target
+        XCTAssertEqual(cell.cellId, "156266497")
+        XCTAssertEqual(cell.ci, "1")
+        XCTAssertEqual(cell.sectors, [1, 3])
+        XCTAssertFalse(cell.canConfirm, "ma confirmation vérifiée sur place grise le bouton (r1.3.4)")
+        XCTAssertTrue(SectorVoterLine.lines(in: nil, siteId: "s", marketCode: nil).isEmpty)
+    }
+
+    func testAVoterSendsTheServedOperatorAndSectors() async throws {
+        let service = ConfirmSpy(outcome: .success(ConfirmSectorResult(confirmed: 1, scope: "pci",
+                                                                       sectorStatus: .verifiedOnSite, proof: .radioLog)))
+        let model = SectorConfirmModel(service: service, sleep: { _ in })
+        let target = try XCTUnwrap(try voterLines().first).target
+        model.start(target) { _ in [2] }
+        await waitUntilIdle(model)
+        let calls = await service.calls
+        XCTAssertEqual(calls, [ConfirmSpy.Call(pci: "215", cellId: nil, sectors: [2], operatorName: "ORANGE", ci: nil)])
+        XCTAssertEqual(model.notes[target.id]?.status, .verifiedOnSite, "le statut servi s'affiche avant la fiche, qui peut avoir 5 min de retard")
+    }
+
     // MARK: - Geste
 
     private func target(status: SectorStatus = .operatorRule, own: SectorStatus? = nil) throws -> SectorConfirmTarget {
@@ -267,6 +323,7 @@ final class SectorStatusTests: XCTestCase {
         conflict.start(try target()) { _ in [3] }
         for _ in 0..<200 where conflict.phase != .idle { await Task.yield() }
         let detailLine = try pciLine(status: "confirmed", myConfirmation: "confirmed", id: "c1", type: "cellid", cellId: "156266497")
+        let voters = try JSONDecoder.signalQuest.decode(AntennaCellIdentifiers.self, from: Data(Self.voterFiche.utf8))
 
         let variants: [(String, ColorScheme, DynamicTypeSize)] = [
             ("bloc-clair", .light, .large), ("bloc-sombre", .dark, .large), ("bloc-ax", .light, .accessibility2),
@@ -283,6 +340,8 @@ final class SectorStatusTests: XCTestCase {
                     SectorConfirmNoteView(note: .init(lines: [SectorStatusText.noProof], status: .confirmed))
                     SectorConfirmSection(item: detailLine, expected: nil, service: PageService(page: page),
                                          isOnline: true, onChanged: {})
+                    SectorVoterSection(identifiers: voters, siteId: "0381522", marketCode: "FR",
+                                       service: PageService(page: page), isOnline: true) { voters }
                 }
                 .padding(16)
             }
@@ -294,6 +353,27 @@ final class SectorStatusTests: XCTestCase {
             host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
             window.rootViewController = host
             try await Task.sleep(nanoseconds: 1_500_000_000)
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: output).appendingPathComponent("\(name).png"))
+        }
+        // La section des votes, seule : elle tombe sous le pli de la capture du bloc.
+        for (name, scheme, size) in [("votes-clair", ColorScheme.light, DynamicTypeSize.large),
+                                     ("votes-sombre", .dark, .large), ("votes-ax", .light, .accessibility2)] {
+            let view = ScrollView {
+                SectorVoterSection(identifiers: voters, siteId: "0381522", marketCode: "FR",
+                                   service: PageService(page: page), isOnline: true) { voters }
+                    .padding(16)
+            }
+            .background(SQColor.bg)
+            .environmentObject(services)
+            .environment(\.colorScheme, scheme)
+            .environment(\.dynamicTypeSize, size)
+            let host = UIHostingController(rootView: view)
+            host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+            window.rootViewController = host
+            try await Task.sleep(nanoseconds: 1_000_000_000)
             let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
                 window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
             }
@@ -315,7 +395,7 @@ private actor SleepGate {
 }
 
 private actor ConfirmSpy: IdentifyServicing {
-    struct Call: Equatable { let pci: String?; let cellId: String?; let sectors: [Int] }
+    struct Call: Equatable { let pci: String?; let cellId: String?; let sectors: [Int]; var operatorName = ""; var ci: String? = nil }
     let outcome: Result<ConfirmSectorResult, Error>
     private(set) var calls: [Call] = []
 
@@ -323,7 +403,7 @@ private actor ConfirmSpy: IdentifyServicing {
 
     func confirmSector(siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?,
                        tech: String?, operatorName: String, marketCode: String?, sectors: [Int]) async throws -> ConfirmSectorResult {
-        calls.append(Call(pci: pci, cellId: cellId, sectors: sectors))
+        calls.append(Call(pci: pci, cellId: cellId, sectors: sectors, operatorName: operatorName, ci: ci))
         return try outcome.get()
     }
 

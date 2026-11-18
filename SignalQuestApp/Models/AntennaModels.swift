@@ -894,6 +894,14 @@ struct AntennaPciEntry: Decodable, Equatable, Identifiable {
     var gnb: String? = nil
     var sectorConfirmations: Int? = nil
     var sectorVerifiedConfirmations: Int? = nil
+    /// SECTOR-ORIGIN r1.3.1 à r1.3.5 : statut de la ligne retenue, et pour un membre connecté son rôle
+    /// (« author », « voter » ou nul), sa confirmation encore valide, l'opérateur et les secteurs de
+    /// sa ligne, à renvoyer tels quels à confirm-sector. Absents pour un anonyme.
+    var sectorStatus: String? = nil
+    var myRole: String? = nil
+    var myConfirmation: String? = nil
+    var `operator`: String? = nil
+    var sectors: [Int]? = nil
 }
 
 struct AntennaCellIdEntry: Decodable, Equatable, Identifiable {
@@ -915,6 +923,14 @@ struct AntennaCellIdEntry: Decodable, Equatable, Identifiable {
     var gnb: String? = nil
     var sectorConfirmations: Int? = nil
     var sectorVerifiedConfirmations: Int? = nil
+    /// SECTOR-ORIGIN r1.3.1 à r1.3.5 : statut de la ligne retenue, et pour un membre connecté son rôle
+    /// (« author », « voter » ou nul), sa confirmation encore valide, l'opérateur et les secteurs de
+    /// sa ligne, à renvoyer tels quels à confirm-sector. Absents pour un anonyme.
+    var sectorStatus: String? = nil
+    var myRole: String? = nil
+    var myConfirmation: String? = nil
+    var `operator`: String? = nil
+    var sectors: [Int]? = nil
 }
 
 struct AntennaSiteInfo: Decodable, Equatable {

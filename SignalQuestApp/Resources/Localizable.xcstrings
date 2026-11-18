@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Tes votes ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your votes here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes votes ici"
+          }
+        }
+      }
+    },
+    "SQFormal|Tes votes ici" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos votes ici"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "%lld bandes" : {
       "localizations" : {
         "en" : {

@@ -869,6 +869,15 @@ struct AntennaDetailSheet: View {
             SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify,
                                        sectorCounts: model.details?.core?.cellIdentifiers)
                 .id(site.siteId ?? site.id)
+            // SECTOR-ORIGIN r1.3 : les lignes que le membre a votées, avec leur « Je confirme ».
+            SectorVoterSection(
+                identifiers: model.details?.core?.cellIdentifiers, siteId: site.siteId ?? site.id,
+                marketCode: market, service: services.identify, isOnline: services.networkPath.isOnline
+            ) {
+                await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                return model.details?.core?.cellIdentifiers
+            }
+            .id(site.siteId ?? site.id)
             sightCard
             if let details = model.details {
                 if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
