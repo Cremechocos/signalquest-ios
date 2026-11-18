@@ -195,9 +195,32 @@ protocol IdentifyServicing: Sendable {
         marketCode: String?,
         sectors: [Int]
     ) async throws -> EditSectorsResult
+
+    /// « Je confirme ce secteur » (SECTOR-ORIGIN r1) : même ciblage qu'`editSectors`, avec les
+    /// secteurs que le membre a sous les yeux. Ne change pas le secteur. `409 SECTOR_CHANGED` si
+    /// la ligne porte un autre secteur : rien n'est confirmé.
+    func confirmSector(
+        siteId: String,
+        enb: String?,
+        gnb: String?,
+        pci: String?,
+        cellId: String?,
+        ci: String?,
+        tech: String?,
+        operatorName: String,
+        marketCode: String?,
+        sectors: [Int]
+    ) async throws -> ConfirmSectorResult
 }
 
 extension IdentifyServicing {
+    func confirmSector(
+        siteId: String, enb: String?, gnb: String?, pci: String?, cellId: String?, ci: String?,
+        tech: String?, operatorName: String, marketCode: String?, sectors: [Int]
+    ) async throws -> ConfirmSectorResult {
+        throw APIError.cancelled
+    }
+
     func minePage(cursor: String?, conflictOnly: Bool, includeRelated: Bool, limit: Int?) async throws -> MyIdentificationsPage {
         throw APIError.cancelled
     }
@@ -420,6 +443,40 @@ final class IdentifyService: IdentifyServicing {
         }
         return try await api.requestJSON(
             "/api/android/map/identify/edit-sectors",
+            method: .post,
+            body: Body(
+                siteId: siteId, enb: enb, gnb: gnb, pci: pci, cellId: cellId, ci: ci,
+                tech: tech, operator: operatorName, marketCode: marketCode, sectors: sectors
+            )
+        )
+    }
+
+    func confirmSector(
+        siteId: String,
+        enb: String?,
+        gnb: String?,
+        pci: String?,
+        cellId: String?,
+        ci: String?,
+        tech: String?,
+        operatorName: String,
+        marketCode: String?,
+        sectors: [Int]
+    ) async throws -> ConfirmSectorResult {
+        struct Body: Encodable {
+            let siteId: String
+            let enb: String?
+            let gnb: String?
+            let pci: String?
+            let cellId: String?
+            let ci: String?
+            let tech: String?
+            let `operator`: String
+            let marketCode: String?
+            let sectors: [Int]
+        }
+        return try await api.requestJSON(
+            "/api/android/map/identify/confirm-sector",
             method: .post,
             body: Body(
                 siteId: siteId, enb: enb, gnb: gnb, pci: pci, cellId: cellId, ci: ci,

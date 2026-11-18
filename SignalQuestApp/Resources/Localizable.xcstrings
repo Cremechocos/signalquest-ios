@@ -1,6 +1,514 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Vérifié sur place" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified on site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifié sur place"
+          }
+        }
+      }
+    },
+    "Confirmé par un membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmed by a member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmé par un membre"
+          }
+        }
+      }
+    },
+    "Corrigé par un membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrected by a member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrigé par un membre"
+          }
+        }
+      }
+    },
+    "Auto (règle opérateur)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto (operator rule)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto (règle opérateur)"
+          }
+        }
+      }
+    },
+    "Déduit de l’azimut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Derived from the azimuth"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déduit de l’azimut"
+          }
+        }
+      }
+    },
+    "Saisi par l’app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entered by the app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisi par l’app"
+          }
+        }
+      }
+    },
+    "Ancien, conforme à la règle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older, matches the rule"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancien, conforme à la règle"
+          }
+        }
+      }
+    },
+    "Ancien, saisi à la main ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older, entered by hand?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancien, saisi à la main ?"
+          }
+        }
+      }
+    },
+    "Origine inconnue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown origin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Origine inconnue"
+          }
+        }
+      }
+    },
+    "Confirmé par 1 membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmed by 1 member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmé par 1 membre"
+          }
+        }
+      }
+    },
+    "Confirmé par 1 membre, sur place" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmed by 1 member, on site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmé par 1 membre, sur place"
+          }
+        }
+      }
+    },
+    "Confirmé par %lld membres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmed by %lld members"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmé par %lld membres"
+          }
+        }
+      }
+    },
+    "Confirmé par %lld membres, dont %lld sur place" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmed by %lld members, %lld of them on site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmé par %lld membres, dont %lld sur place"
+          }
+        }
+      }
+    },
+    "Toi, sans relevé radio de cette cellule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You, without a radio reading of this cell"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toi, sans relevé radio de cette cellule"
+          }
+        }
+      }
+    },
+    "SQFormal|Toi, sans relevé radio de cette cellule" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous, sans relevé radio de cette cellule"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Preuve : ton journal Radio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proof: your radio log"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : ton journal Radio"
+          }
+        }
+      }
+    },
+    "SQFormal|Preuve : ton journal Radio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : votre journal Radio"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Preuve : ta couverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proof: your coverage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : ta couverture"
+          }
+        }
+      }
+    },
+    "SQFormal|Preuve : ta couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : votre couverture"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Preuve : ton speedtest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proof: your speed test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : ton speedtest"
+          }
+        }
+      }
+    },
+    "SQFormal|Preuve : ton speedtest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preuve : votre speedtest"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Pour passer à « Vérifié sur place », il faut un relevé de cette cellule fait avec un appareil Android (journal Radio, couverture ou speedtest) dans les 30 derniers jours. Confirme à nouveau ensuite." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To reach \"Verified on site\", this cell needs a reading made with an Android device (radio log, coverage or speed test) in the last 30 days. Then confirm again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour passer à « Vérifié sur place », il faut un relevé de cette cellule fait avec un appareil Android (journal Radio, couverture ou speedtest) dans les 30 derniers jours. Confirme à nouveau ensuite."
+          }
+        }
+      }
+    },
+    "SQFormal|Pour passer à « Vérifié sur place », il faut un relevé de cette cellule fait avec un appareil Android (journal Radio, couverture ou speedtest) dans les 30 derniers jours. Confirme à nouveau ensuite." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour passer à « Vérifié sur place », il faut un relevé de cette cellule fait avec un appareil Android (journal Radio, couverture ou speedtest) dans les 30 derniers jours. Confirmez à nouveau ensuite."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "1 cellule de ce PCI porte un autre secteur : elle reste telle quelle." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 cell of this PCI has another sector: it stays as it is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 cellule de ce PCI porte un autre secteur : elle reste telle quelle."
+          }
+        }
+      }
+    },
+    "%lld cellules de ce PCI portent un autre secteur : elles restent telles quelles." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cells of this PCI have another sector: they stay as they are."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cellules de ce PCI portent un autre secteur : elles restent telles quelles."
+          }
+        }
+      }
+    },
+    "%@ confirmé pour %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ confirmed for %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ confirmé pour %@"
+          }
+        }
+      }
+    },
+    "Confirmation dans %lld s…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirming in %lld s…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmation dans %lld s…"
+          }
+        }
+      }
+    },
+    "Le secteur a changé entre-temps. Rien n’a été confirmé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sector changed in the meantime. Nothing was confirmed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le secteur a changé entre-temps. Rien n’a été confirmé."
+          }
+        }
+      }
+    },
+    "Le secteur est passé à %lld entre-temps. Rien n’a été confirmé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sector changed to %lld in the meantime. Nothing was confirmed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le secteur est passé à %lld entre-temps. Rien n’a été confirmé."
+          }
+        }
+      }
+    },
+    "Les secteurs sont passés à %@ entre-temps. Rien n’a été confirmé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sectors changed to %@ in the meantime. Nothing was confirmed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les secteurs sont passés à %@ entre-temps. Rien n’a été confirmé."
+          }
+        }
+      }
+    },
+    "Confirmer à nouveau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer à nouveau"
+          }
+        }
+      }
+    },
+    "Je confirme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I confirm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je confirme"
+          }
+        }
+      }
+    },
+    "Origine du secteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sector origin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Origine du secteur"
+          }
+        }
+      }
+    },
     "Ce site ne peut pas être confirmé pour l’instant." : {
       "localizations" : {
         "en" : {

@@ -52,6 +52,14 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     /// v2, lignes pci et cellid : secteur que la règle de l'opérateur prouve, stocké ou non,
     /// dans la numérotation de `sectors`. Absent quand rien n'est prouvé : jamais deviné ici.
     let derivedSector: Int?
+    /// SECTOR-ORIGIN r1, lignes pci et cellid : d'où vient le secteur. `nil` : secteur vide ou
+    /// serveur plus ancien, et l'app garde alors l'affichage du `sectorCheck`.
+    let sectorStatus: SectorStatus?
+    /// SECTOR-ORIGIN r1.3.2 : la confirmation du membre qui regarde, encore valide. Depuis r1.3,
+    /// `sectorStatus` est le meilleur état entre l'auteur et les votants : « confirmed » ne dit
+    /// plus « toi ». Absent d'un serveur plus ancien : voir `ownConfirmation`.
+    let myConfirmation: SectorStatus?
+    let servesMyConfirmation: Bool
     /// v2 : cellule qu'aucune ligne nœud active du membre ne porte (pages finales).
     let orphan: Bool
     /// v2 : nœud dont seules les 4 000 cellules les plus récentes sont servies.
@@ -62,7 +70,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case `operator`, operatorMcc, operatorMnc, marketCode, sectors, validations, source
         case createdAt, lastValidated, conflict
         case conflictSiteId, conflictSiteAddress, conflictSiteValidations, conflictSiteLat, conflictSiteLng
-        case conflictStatus, contested, cellConflict, sectorCheck, derivedSector, orphan, cellsTruncated
+        case conflictStatus, contested, cellConflict, sectorCheck, derivedSector, sectorStatus, myConfirmation, orphan, cellsTruncated
     }
 
     init(from decoder: Decoder) throws {
@@ -98,8 +106,18 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         cellConflict = (try? c.decodeIfPresent(IdentificationCellConflict.self, forKey: .cellConflict)) ?? nil
         sectorCheck = (try? c.decodeIfPresent(IdentificationSectorCheck.self, forKey: .sectorCheck)) ?? nil
         derivedSector = (try? c.decodeIfPresent(Int.self, forKey: .derivedSector)) ?? nil
+        sectorStatus = SectorStatus(raw: c.decodeFlexibleString(forKey: .sectorStatus))
+        servesMyConfirmation = c.contains(.myConfirmation)
+        myConfirmation = SectorStatus(raw: c.decodeFlexibleString(forKey: .myConfirmation))
         orphan = (try? c.decodeIfPresent(Bool.self, forKey: .orphan)) ?? false
         cellsTruncated = (try? c.decodeIfPresent(Bool.self, forKey: .cellsTruncated)) ?? false
+    }
+
+    /// Ma confirmation encore valide. Sans `myConfirmation` (serveur d'avant r1.3.2), seul l'auteur
+    /// pouvait confirmer sa ligne : `sectorStatus` confirmé y voulait dire « toi ».
+    var ownConfirmation: SectorStatus? {
+        if servesMyConfirmation { return myConfirmation }
+        return sectorStatus == .confirmed || sectorStatus == .verifiedOnSite ? sectorStatus : nil
     }
 
     /// Le contrôle de conflit de ce nœud n'a pas pu être fait.

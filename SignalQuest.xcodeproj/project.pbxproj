@@ -227,6 +227,7 @@
 		371ABAFDA51D821594C0E3BF /* E2EEV2TrustDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B0F809D4CB770501A61B432 /* E2EEV2TrustDirectoryTests.swift */; };
 		372D167F0B48A125051CD026 /* SignatureSpeedDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D454E35F1134B2689C8BF45 /* SignatureSpeedDial.swift */; };
 		37A3AB3BD9CA8F55AFC8B406 /* E2EEAutoDeviceRevocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80688E358C9C44A9F57C5A15 /* E2EEAutoDeviceRevocation.swift */; };
+		37F41DEC5387AA635EF31E3C /* SectorStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0729D4022C4C1F25438C600 /* SectorStatusTests.swift */; };
 		3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */; };
 		3817D42225B030A228C581D5 /* OutageContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1A5B76D33ECAD240F471C5 /* OutageContextTests.swift */; };
 		3829F55FB3D8BD1EA3935F55 /* RadioLogTaCandidatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41C949459EB26518349AD32 /* RadioLogTaCandidatesTests.swift */; };
@@ -573,6 +574,7 @@
 		9027786ED4AB1D5B0675AC3C /* ISEDChangesMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E5F20774A2755469467DA /* ISEDChangesMapTests.swift */; };
 		902F95C7CCB9DD4867C917D2 /* market_registry_fallback.json in Resources */ = {isa = PBXBuildFile; fileRef = 65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */; };
 		9056779315AE6915C3F2D4CE /* WindowRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CAF4B37757E604E4F88430 /* WindowRouting.swift */; };
+		906AC8F9265DBC51F4B882FD /* SectorConfirm.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C782DC36787B9D06EB6FBE /* SectorConfirm.swift */; };
 		90B7AE3977363612D175DFCE /* WeeklyRecapRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */; };
 		90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */; };
 		920A9FE3A612D269FF9416BB /* MapViewportProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12EF89E43C97DCB163392370 /* MapViewportProjection.swift */; };
@@ -985,6 +987,7 @@
 		FDD931BC9FB1C1B8A09B2CE5 /* E2EEV2MessageStoreV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E7A9EA6E54935466169B88 /* E2EEV2MessageStoreV2.swift */; };
 		FE0091AF588B95EA65BCBB2A /* CallUnlockPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A02FA99463304D3EC356A5 /* CallUnlockPromptTests.swift */; };
 		FE06618978AF041B7C59E003 /* TypingDotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3298EDB2E0523439799250 /* TypingDotsView.swift */; };
+		FE0C221347787264234C813C /* SectorStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F991EB097210B450D7275111 /* SectorStatus.swift */; };
 		FF3E0D68B4625D1B30F8797F /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837BE028B595E4102320DD6F /* NotificationService.swift */; };
 		FF540CAB6E6C3889FAE0ED6C /* MapFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */; };
 /* End PBXBuildFile section */
@@ -1720,6 +1723,7 @@
 		B011EC6077C3E8E806D4F94C /* SpeedtestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestView.swift; sourceTree = "<group>"; };
 		B0421A119135C490C2075C09 /* SentinelleCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleCharts.swift; sourceTree = "<group>"; };
 		B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReliabilityTests.swift; sourceTree = "<group>"; };
+		B0729D4022C4C1F25438C600 /* SectorStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorStatusTests.swift; sourceTree = "<group>"; };
 		B0C35D31007009FECF320CF4 /* QualityScaleContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityScaleContractTests.swift; sourceTree = "<group>"; };
 		B0C5E602A6A315E2740F2E69 /* TwoFactorBackupCodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorBackupCodesView.swift; sourceTree = "<group>"; };
 		B0E1077E22C2EA2D3D667108 /* RadioLogsTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTokens.swift; sourceTree = "<group>"; };
@@ -1810,6 +1814,7 @@
 		C59DC9809ADBAB596135C2BD /* E2EEAutoEnrollment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoEnrollment.swift; sourceTree = "<group>"; };
 		C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
 		C6B3B3E33665A0D12EB2183E /* SQEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQEffects.swift; sourceTree = "<group>"; };
+		C6C782DC36787B9D06EB6FBE /* SectorConfirm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorConfirm.swift; sourceTree = "<group>"; };
 		C6D04C87CE6B4E179FE38964 /* MapAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityTests.swift; sourceTree = "<group>"; };
 		C704EE10C88C7A44ADB51EC7 /* KeyboardShortcutsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsQATests.swift; sourceTree = "<group>"; };
 		C74751AC2209AF843E92E6E5 /* TaRingSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaRingSelection.swift; sourceTree = "<group>"; };
@@ -1990,6 +1995,7 @@
 		F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSessionAccumulator.swift; sourceTree = "<group>"; };
 		F8E5F3734600F0C6CC5DEEFF /* SpeedtestIcmpLiveProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestIcmpLiveProgressTests.swift; sourceTree = "<group>"; };
 		F95EB05B86F26CEFD0F46621 /* SiteRemapSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRemapSheet.swift; sourceTree = "<group>"; };
+		F991EB097210B450D7275111 /* SectorStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorStatus.swift; sourceTree = "<group>"; };
 		F9D4816039C8B5C174F95E4B /* MapTileAdmissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTileAdmissionTests.swift; sourceTree = "<group>"; };
 		FA096353EB714B9BE15A1133 /* MapColorsRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapColorsRenderingTests.swift; sourceTree = "<group>"; };
 		FA0EA69007EEEBEA853E24CD /* E2EEV2MessageSendingV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2MessageSendingV2.swift; sourceTree = "<group>"; };
@@ -2130,6 +2136,7 @@
 				C263B41C968A1E89912CAEA9 /* RadioLogModels.swift */,
 				2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */,
 				7EA335C0E28D911E82A274ED /* RadioLogTaCandidates.swift */,
+				F991EB097210B450D7275111 /* SectorStatus.swift */,
 				055A661FC799E8A29E448AF7 /* SentinelleIpv6.swift */,
 				267A49276A6A6F922F316125 /* SentinelleModels.swift */,
 				3FE5C79C83022DCA9EF9955F /* SessionAnalysisModels.swift */,
@@ -2751,6 +2758,7 @@
 			children = (
 				8117ED0BFD9D37569D811ABC /* IdentificationCorrectionBlock.swift */,
 				7B3358D3E2CFEC772D02F2D2 /* MyIdentificationsView.swift */,
+				C6C782DC36787B9D06EB6FBE /* SectorConfirm.swift */,
 				18C58605C20828352068B1EE /* SectorEditSheet.swift */,
 				3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */,
 				BB3D480A341DB08EB7E83EFF /* SiteIdentificationsSection.swift */,
@@ -3360,6 +3368,7 @@
 				49F698B1964EB775ACCA35C3 /* RecipeBackendPersistenceTests.swift */,
 				ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */,
 				1CC2679B071BC850638B4DB5 /* SectorNumberingTests.swift */,
+				B0729D4022C4C1F25438C600 /* SectorStatusTests.swift */,
 				F01158B4674EEE6415B11968 /* SecurityPromptTests.swift */,
 				3B9DCCD7740AD051F1829F43 /* SentinelleTests.swift */,
 				F57CD7A138E9541A1EB9C69C /* SessionAnalysisTests.swift */,
@@ -4371,8 +4380,10 @@
 				523C31F38FEC5EFE05662838 /* SSEClient.swift in Sources */,
 				D9270EE5F2BA3509FBF72312 /* SavedMessagesView.swift in Sources */,
 				D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */,
+				906AC8F9265DBC51F4B882FD /* SectorConfirm.swift in Sources */,
 				1B46DD506F06F337F9743269 /* SectorEditSheet.swift in Sources */,
 				F6BC5F6AB5F5BC1D5D2B282E /* SectorNumbering.swift in Sources */,
+				FE0C221347787264234C813C /* SectorStatus.swift in Sources */,
 				84C469E060144D725DAD38B1 /* SecurityPrompt.swift in Sources */,
 				A4D1B0324EC238AF1203781E /* SecurityPromptCardView.swift in Sources */,
 				05EE88A8F44A25554E44E766 /* SentinelleAddressView.swift in Sources */,
@@ -4814,6 +4825,7 @@
 				9FBCA5F1A88CB551F515FD7A /* SQShareFontsTests.swift in Sources */,
 				8A9BA3041BDCFBAA5AB6FB82 /* SSEFrameParserTests.swift in Sources */,
 				1634EFD5E0F2C9E8D7DDC258 /* SectorNumberingTests.swift in Sources */,
+				37F41DEC5387AA635EF31E3C /* SectorStatusTests.swift in Sources */,
 				4A6937B58461B70D9D39DCB9 /* SecurityPromptTests.swift in Sources */,
 				C4BBA38BBA0DEB83A1A3620F /* SentinelleTests.swift in Sources */,
 				556034ECBEC524874AD177B8 /* SessionAnalysisTests.swift in Sources */,

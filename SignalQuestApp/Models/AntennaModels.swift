@@ -882,6 +882,12 @@ struct AntennaPciEntry: Decodable, Equatable, Identifiable {
     let tech: String?
     let band: Int?
     let frequency: String?
+    /// SECTOR-ORIGIN r1 : nœud de l'entrée, et comptes des membres qui ont confirmé ce secteur.
+    /// Les comptes ne s'affichent qu'à côté des lignes du membre, jamais dans la partie publique.
+    var enb: String? = nil
+    var gnb: String? = nil
+    var sectorConfirmations: Int? = nil
+    var sectorVerifiedConfirmations: Int? = nil
 }
 
 struct AntennaCellIdEntry: Decodable, Equatable, Identifiable {
@@ -899,6 +905,10 @@ struct AntennaCellIdEntry: Decodable, Equatable, Identifiable {
     /// Identité de cellule dans l'eNB/gNB (CI/ECI), distincte de l'identifiant
     /// global `value`.
     let ci: String?
+    var enb: String? = nil
+    var gnb: String? = nil
+    var sectorConfirmations: Int? = nil
+    var sectorVerifiedConfirmations: Int? = nil
 }
 
 struct AntennaSiteInfo: Decodable, Equatable {

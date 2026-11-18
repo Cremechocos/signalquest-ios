@@ -862,7 +862,8 @@ struct AntennaDetailSheet: View {
             }
             radioBlock
             // Les cellules que le membre a placées ici, à corriger sans passer par les logs.
-            SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify)
+            SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify,
+                                       sectorCounts: model.details?.core?.cellIdentifiers)
                 .id(site.siteId ?? site.id)
             sightCard
             if let details = model.details {

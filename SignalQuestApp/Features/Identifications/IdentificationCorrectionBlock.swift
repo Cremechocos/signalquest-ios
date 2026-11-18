@@ -205,6 +205,8 @@ final class IdentificationCorrectionModel: ObservableObject {
 /// cellule observée, ou le choix du support quand la ligne est en conflit ou sans cellule.
 struct IdentificationCorrectionBlock: View {
     @StateObject private var model: IdentificationCorrectionModel
+    /// SECTOR-ORIGIN r1 : « Je confirme » sur chaque rangée.
+    @StateObject private var confirm: SectorConfirmModel
     @EnvironmentObject private var services: AppServices
     @State private var route: Route?
     /// « Pas le bon support ? » depuis les secteurs : la carte s'ouvre une fois la feuille fermée.
@@ -212,6 +214,8 @@ struct IdentificationCorrectionBlock: View {
     @State private var confirmingWithdraw = false
     @State private var withdrawReason = ""
     @State private var confirmingDelete = false
+    /// Identifiants de la fiche : ses comptes de confirmations, montrés à côté des lignes du membre.
+    let sectorCounts: AntennaCellIdentifiers?
     let onOutcome: (IdentificationCorrectionOutcome) -> Void
 
     private enum Route: Identifiable {
@@ -229,9 +233,12 @@ struct IdentificationCorrectionBlock: View {
     init(
         target: IdentificationCorrectionTarget,
         service: IdentifyServicing,
+        sectorCounts: AntennaCellIdentifiers? = nil,
         onOutcome: @escaping (IdentificationCorrectionOutcome) -> Void
     ) {
         _model = StateObject(wrappedValue: IdentificationCorrectionModel(target: target, service: service))
+        _confirm = StateObject(wrappedValue: SectorConfirmModel(service: service))
+        self.sectorCounts = sectorCounts
         self.onOutcome = onOutcome
     }
 
@@ -363,6 +370,7 @@ struct IdentificationCorrectionBlock: View {
                                 .accessibilityHidden(true)
                         }
                         // Toucher une rangée ouvre le schéma de SON PCI (règle commune avec le Web).
+                        VStack(alignment: .leading, spacing: 0) {
                         Button {
                             route = .sectors(cell: row.primary, cells: cells)
                         } label: {
@@ -382,10 +390,13 @@ struct IdentificationCorrectionBlock: View {
                         .disabled(model.isBusy)
                         .accessibilityHint(Text("Ouvre les secteurs de cette cellule"))
                         .accessibilityIdentifier("identification.block.cell.\(row.primary.id)")
+                        confirmFooter(row)
+                        }
                     }
                 }
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
+            SectorConfirmBanner(model: confirm)
             if let error = model.actionError {
                 SQNotice(message: error, tone: .danger)
                     .accessibilityIdentifier("identification.actionError")
@@ -397,7 +408,7 @@ struct IdentificationCorrectionBlock: View {
                 }
             }
             HStack(spacing: SQSpace.sm) {
-                GradientButton(String(localized: "Corriger"), systemImage: "pencil", isBusy: model.isBusy, style: .secondary) {
+                GradientButton("Corriger", systemImage: "pencil", isBusy: model.isBusy, style: .secondary) {
                     correct(node: node, cells: cells)
                 }
                 .accessibilityIdentifier("radioLogs.identify.correct")
@@ -452,6 +463,11 @@ struct IdentificationCorrectionBlock: View {
                 if row.isMisaligned {
                     reference(SectorRowText.misaligned(row.storedSectors), systemImage: "exclamationmark.triangle.fill",
                               tint: OutageTint.degradedInk)
+                } else if let status = row.primary.sectorStatus {
+                    // SECTOR-ORIGIN : une ligne de statut remplace « Conforme » / « ◆ … indique » ;
+                    // le secteur attendu par la règle reste affiché sur un écart.
+                    SectorStatusLine(status: status, expected: expectedSector(row), counts: counts(row),
+                                     own: row.primary.ownConfirmation, secondsLeft: confirm.secondsLeft(for: row.id))
                 } else if model.checks.sectorCheck == .ok {
                     // La référence vient du numéro de cellule, même sans secteur enregistré.
                     switch row.reference {
@@ -469,7 +485,8 @@ struct IdentificationCorrectionBlock: View {
                 }
                 if row.pci != nil {
                     ForEach(row.cells) { cell in
-                        Text(verbatim: cellLine(cell, showsSector: row.reference == .disagreement))
+                        Text(verbatim: cellLine(cell, showsSector: row.reference == .disagreement,
+                                                rowStatus: row.primary.sectorStatus))
                             .font(SQType.caption)
                             .monospacedDigit()
                             .foregroundStyle(SQColor.labelSecondary)
@@ -482,10 +499,12 @@ struct IdentificationCorrectionBlock: View {
     }
 
     /// « Cellule 154834434 · B20 », avec le secteur de son numéro quand les cellules divergent.
-    private func cellLine(_ cell: MyIdentification, showsSector: Bool) -> String {
+    private func cellLine(_ cell: MyIdentification, showsSector: Bool, rowStatus: SectorStatus? = nil) -> String {
         var parts = [cell.cellId.flatMap { $0.isEmpty ? nil : String(localized: "Cellule \($0)") } ?? cell.ci.map { "CI \($0)" } ?? ""]
         if let band = cell.band { parts.append(cell.techLabel == "5G" ? "n\(band)" : "B\(band)") }
         if showsSector, let derived = cell.referenceSector { parts.append(String(localized: "secteur \(derived)")) }
+        // Une cellule dont le statut diffère de sa rangée (confirmée à part, ou laissée de côté) le dit.
+        if let status = cell.sectorStatus, status != rowStatus { parts.append(SectorStatusText.label(status)) }
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
@@ -505,6 +524,52 @@ struct IdentificationCorrectionBlock: View {
             .accessibilitySortPriority(-1)
             // En désaccord, la ligne « secteurs 1 et 2 · à réaligner » le dit déjà.
             .accessibilityHidden(row.isMisaligned)
+    }
+
+    /// Bouton « Je confirme » sous la rangée, et la preuve ou la phrase « sans preuve » après la réponse.
+    @ViewBuilder
+    private func confirmFooter(_ row: SectorRow) -> some View {
+        let target = SectorConfirmTarget.row(row)
+        let note = confirm.notes[row.id]
+        if target != nil || note != nil {
+            HStack(alignment: .center, spacing: SQSpace.sm) {
+                if let note { SectorConfirmNoteView(note: note) }
+                Spacer(minLength: 0)
+                if let target {
+                    SectorConfirmButton(target: target, model: confirm, isOnline: services.networkPath.isOnline) { target in
+                        await model.load(quietly: true)
+                        return currentSectors(of: target)
+                    }
+                    .disabled(model.isBusy)
+                }
+            }
+            .padding(.leading, SQSpace.md + 32 + SQSpace.sm2)
+            .padding(.trailing, SQSpace.md)
+            .padding(.bottom, SQSpace.sm)
+        }
+    }
+
+    /// Secteur attendu par la règle, seulement quand il diffère du secteur enregistré.
+    private func expectedSector(_ row: SectorRow) -> Int? {
+        guard model.checks.sectorCheck == .ok, case let .sector(derived) = row.reference,
+              row.commonSectors != [derived] else { return nil }
+        return derived
+    }
+
+    /// Comptes de la fiche pour cette rangée (seulement sur la fiche d'un support).
+    private func counts(_ row: SectorRow) -> SectorConfirmCounts? {
+        guard let sectorCounts else { return nil }
+        let line = row.primary
+        return SectorConfirmCounts.lookup(in: sectorCounts, pci: row.pci ?? line.pci,
+                                          cellId: row.pci == nil ? line.cellId : nil,
+                                          enb: row.enb, gnb: row.gnb, sectors: row.commonSectors)
+    }
+
+    /// Après une relecture : les secteurs actuels de la rangée confirmée.
+    private func currentSectors(of target: SectorConfirmTarget) -> [Int]? {
+        guard case let .found(_, cells) = model.state,
+              let row = SectorRow.rows(cells).first(where: { $0.id == target.id }) else { return nil }
+        return row.isMisaligned ? row.storedSectors : row.commonSectors
     }
 
     private func reference(_ text: String, systemImage: String, tint: Color) -> some View {

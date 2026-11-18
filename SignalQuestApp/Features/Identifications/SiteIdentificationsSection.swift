@@ -52,17 +52,20 @@ final class SiteIdentificationsModel: ObservableObject {
 struct SiteIdentificationsSection: View {
     @StateObject private var model: SiteIdentificationsModel
     private let service: IdentifyServicing
+    /// Identifiants de la fiche : les comptes de confirmations des secteurs (SECTOR-ORIGIN r1).
+    private let sectorCounts: AntennaCellIdentifiers?
 
-    init(siteId: String, service: IdentifyServicing) {
+    init(siteId: String, service: IdentifyServicing, sectorCounts: AntennaCellIdentifiers? = nil) {
         _model = StateObject(wrappedValue: SiteIdentificationsModel(siteId: siteId, service: service))
         self.service = service
+        self.sectorCounts = sectorCounts
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             ForEach(model.targets) { target in
                 // Retirée ou déplacée : le nœud n'est plus ici, la liste se relit.
-                IdentificationCorrectionBlock(target: target, service: service) { outcome in
+                IdentificationCorrectionBlock(target: target, service: service, sectorCounts: sectorCounts) { outcome in
                     if case .edited = outcome { return }
                     Task { await model.load() }
                 }

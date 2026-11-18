@@ -781,7 +781,7 @@ private struct IdentificationCellRow: View {
                         .font(SQFont.body(14, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    if cell.source.sectorCheck?.status == .mismatch {
+                    if cell.source.sectorStatus == nil, cell.source.sectorCheck?.status == .mismatch {
                         SignalPill(text: "Secteur à vérifier")
                     } else if let conflict = cell.source.cellConflict {
                         switch conflict.reason {
@@ -795,6 +795,12 @@ private struct IdentificationCellRow: View {
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(2)
+                }
+                // SECTOR-ORIGIN : l'étiquette remplace « Secteur à vérifier » ; l'attendu reste dessous.
+                if let status = cell.source.sectorStatus {
+                    SectorStatusLine(status: status,
+                                     expected: cell.source.sectorCheck?.status == .mismatch ? cell.source.sectorCheck?.expected : nil,
+                                     own: cell.source.ownConfirmation)
                 }
             }
             Spacer(minLength: 0)
@@ -848,6 +854,10 @@ private struct IdentificationDetailSheet: View {
                 }
                 signalsSection
                 detailsCard
+                if canEditSector {
+                    SectorConfirmSection(item: item, expected: sectorMismatch, service: services.identify,
+                                         isOnline: services.networkPath.isOnline, onChanged: onChanged)
+                }
                 editSection
                 withdrawBlock
                 dangerZone
