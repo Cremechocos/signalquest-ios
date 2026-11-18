@@ -190,7 +190,7 @@ struct AntennaReportSheet: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            GradientButton(String(localized: "Envoyer le signalement"), systemImage: "paperplane.fill", isBusy: isBusy) {
+            GradientButton("Envoyer le signalement", systemImage: "paperplane.fill", isBusy: isBusy) {
                 Task { await send() }
             }
             .disabled(!canSend)

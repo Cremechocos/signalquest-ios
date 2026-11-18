@@ -195,7 +195,7 @@ struct E2EEAutoSafetyCodeView: View {
                             .foregroundStyle(SQColor.dangerInk)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("safetyCode.error")
-                        GradientButton(String(localized: "Réessayer"), style: .secondary) {
+                        GradientButton("Réessayer", style: .secondary) {
                             Task { await model.load(showingProgress: true) }
                         }
                     }
@@ -389,14 +389,14 @@ struct E2EEAutoSafetyCodeContent: View {
 
     private var actions: some View {
         VStack(spacing: SQSpace.sm) {
-            GradientButton(String(localized: "Scanner son code"), systemImage: "qrcode.viewfinder",
+            GradientButton("Scanner son code", systemImage: "qrcode.viewfinder",
                            style: content.status == .verified ? .secondary : .primary, allowsMultiline: true, action: onScan)
                 .accessibilityIdentifier("safetyCode.scan")
             if content.status == .verified {
-                GradientButton(String(localized: "Retirer la vérification"), style: .ghost, allowsMultiline: true, action: onClearVerification)
+                GradientButton("Retirer la vérification", style: .ghost, allowsMultiline: true, action: onClearVerification)
                     .accessibilityIdentifier("safetyCode.clearVerification")
             } else {
-                GradientButton(String(localized: "Marquer comme vérifié"), systemImage: "checkmark.seal",
+                GradientButton("Marquer comme vérifié", systemImage: "checkmark.seal",
                                style: .secondary, allowsMultiline: true, action: onMarkVerified)
                     .accessibilityIdentifier("safetyCode.markVerified")
             }

@@ -86,7 +86,7 @@ struct E2EEAutoNewDeviceAlertView: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
-                    GradientButton(String(localized: "OK")) { onClose(true) }
+                    GradientButton("OK") { onClose(true) }
                         .accessibilityIdentifier("e2eeAuto.newDevice.done")
                 } else if let row = model.rows.first(where: { $0.id == deviceId }) {
                     Text("Il vient d’être ajouté à ton compte et reçoit désormais tes messages chiffrés. Si c’est toi, il n’y a rien à faire.")
@@ -149,11 +149,11 @@ struct E2EEAutoNewDeviceAlertView: View {
 
     @ViewBuilder
     private func actions(_ row: E2EEAutoDevicesViewModel.Row) -> some View {
-        GradientButton(String(localized: "C’est moi")) { onClose(true) }
+        GradientButton("C’est moi") { onClose(true) }
             .disabled(model.isActing)
             .accessibilityIdentifier("e2eeAuto.newDevice.itsMe")
         if model.canRevokeOthers {
-            GradientButton(String(localized: "Ce n’est pas moi"), isBusy: model.isActing, style: .destructive) {
+            GradientButton("Ce n’est pas moi", isBusy: model.isActing, style: .destructive) {
                 Task { await model.revoke(row, reason: .notMe) }
             }
             .disabled(model.isActing)
@@ -164,7 +164,7 @@ struct E2EEAutoNewDeviceAlertView: View {
                 .fixedSize(horizontal: false, vertical: true)
         } else if model.revokesOthersByEmail {
             // Téléphone perdu (révision 21) : le code e-mail remplace l'attente des 24 h.
-            GradientButton(String(localized: "Ce n’est pas moi"), isBusy: model.isActing, style: .destructive) {
+            GradientButton("Ce n’est pas moi", isBusy: model.isActing, style: .destructive) {
                 Task { await model.revoke(row, reason: .notMe) }
             }
             .disabled(model.isActing)
@@ -173,14 +173,14 @@ struct E2EEAutoNewDeviceAlertView: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose(false) }
+            GradientButton("Plus tard", style: .ghost) { onClose(false) }
                 .accessibilityIdentifier("e2eeAuto.newDevice.later")
         } else {
             Text("Si ce n’est pas toi, retire-le depuis un autre de tes appareils, dans Réglages > Appareils.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose(false) }
+            GradientButton("Plus tard", style: .ghost) { onClose(false) }
                 .accessibilityIdentifier("e2eeAuto.newDevice.later")
         }
     }

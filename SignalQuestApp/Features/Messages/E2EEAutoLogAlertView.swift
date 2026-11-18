@@ -146,7 +146,7 @@ struct E2EEAutoLogAlertView: View {
                     reportCard
                     reportActions
                     if model.report == .sent { resetSection }
-                    GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose() }
+                    GradientButton("Plus tard", style: .ghost) { onClose() }
                         .disabled(model.isResetting)
                         .accessibilityIdentifier("e2eeAuto.logAlert.later")
                 }
@@ -180,7 +180,7 @@ struct E2EEAutoLogAlertView: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "OK")) { onClose() }
+            GradientButton("OK") { onClose() }
                 .accessibilityIdentifier("e2eeAuto.logAlert.done")
         }
     }
@@ -276,7 +276,7 @@ struct E2EEAutoLogAlertView: View {
                     .foregroundStyle(SQColor.dangerInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            GradientButton(String(localized: "Signaler à l’équipe"), isBusy: model.report == .sending) {
+            GradientButton("Signaler à l’équipe", isBusy: model.report == .sending) {
                 Task { await model.sendReport() }
             }
             .disabled(model.report == .sending)
@@ -296,7 +296,7 @@ struct E2EEAutoLogAlertView: View {
                     .foregroundStyle(SQColor.dangerInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            GradientButton(String(localized: "Refaire confiance au journal actuel"), isBusy: model.isResetting, style: .destructive, allowsMultiline: true) {
+            GradientButton("Refaire confiance au journal actuel", isBusy: model.isResetting, style: .destructive, allowsMultiline: true) {
                 confirmsReset = true
             }
             .disabled(model.isResetting)

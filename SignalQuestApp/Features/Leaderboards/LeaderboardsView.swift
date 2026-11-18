@@ -488,7 +488,7 @@ struct LeaderboardsView: View {
         VStack(spacing: SQSpace.md) {
             EmptyStateView(title: title, message: message, systemImage: systemImage)
             if model.scope == "friends" {
-                GradientButton(String(localized: "Voir tout le monde"), systemImage: "person.2", style: .secondary) {
+                GradientButton("Voir tout le monde", systemImage: "person.2", style: .secondary) {
                     model.setScope("global")
                 }
                 .accessibilityIdentifier("leaderboards.empty.everyone")

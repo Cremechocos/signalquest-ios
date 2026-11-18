@@ -561,7 +561,7 @@ struct RadioLogSiteMapPicker: View {
                 .accessibilityElement(children: .combine)
             }
 
-            GradientButton(String(localized: "Identifier ici"), isBusy: picker.isSubmitting) {
+            GradientButton("Identifier ici", isBusy: picker.isSubmitting) {
                 showsConfirmation = true
             }
             .disabled(selected == nil || picker.isSubmitting)

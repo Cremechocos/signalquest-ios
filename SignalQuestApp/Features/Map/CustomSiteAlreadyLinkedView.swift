@@ -148,13 +148,13 @@ struct CustomSiteAlreadyLinkedView: View {
             }
             if linked.pending != nil {
                 if !linked.isOwn, linked.siteId != nil, let onCreateAnyway {
-                    GradientButton(String(localized: "Créer quand même"), isBusy: isBusy, style: .secondary,
+                    GradientButton("Créer quand même", isBusy: isBusy, style: .secondary,
                                    allowsMultiline: true, action: onCreateAnyway)
                         .disabled(isBusy)
                         .accessibilityIdentifier("customSiteLinked.createAnyway")
                 }
                 if let onAbandon {
-                    GradientButton(String(localized: "Abandonner mon site"), style: .ghost, allowsMultiline: true, action: onAbandon)
+                    GradientButton("Abandonner mon site", style: .ghost, allowsMultiline: true, action: onAbandon)
                         .disabled(isBusy)
                         .accessibilityIdentifier("customSiteLinked.abandon")
                 }

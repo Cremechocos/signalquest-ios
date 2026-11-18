@@ -87,7 +87,7 @@ struct E2EEV2ApprovalScannerView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("approvalScanner.unavailable")
             if showsSettings, let url = URL(string: UIApplication.openSettingsURLString) {
-                GradientButton(String(localized: "Ouvrir les Réglages"), style: .secondary) { openURL(url) }
+                GradientButton("Ouvrir les Réglages", style: .secondary) { openURL(url) }
             }
         }
         .padding(SQSpace.lg)

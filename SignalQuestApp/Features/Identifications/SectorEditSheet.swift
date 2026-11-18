@@ -630,7 +630,7 @@ struct SectorEditSheet: View {
     @ViewBuilder
     private var saveButton: some View {
         if model.savedAwaitingClose {
-            GradientButton(String(localized: "Fermer"), style: .secondary) { model.finish() }
+            GradientButton("Fermer", style: .secondary) { model.finish() }
                 .accessibilityIdentifier("sector.close")
         } else if model.slotCount > 0 {
             GradientButton(

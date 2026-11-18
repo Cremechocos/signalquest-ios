@@ -491,7 +491,7 @@ struct AntennaDetailSheet: View {
             }
         }
         if !isCustomSite {
-            GradientButton(String(localized: "Envoyer dans une conversation"), systemImage: "paperplane",
+            GradientButton("Envoyer dans une conversation", systemImage: "paperplane",
                            style: .secondary, allowsMultiline: true) {
                 Haptics.selection()
                 siteShareDraft = SiteShareDraft(text: siteShareText)

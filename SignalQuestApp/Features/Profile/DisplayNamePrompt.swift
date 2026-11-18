@@ -77,7 +77,7 @@ struct DisplayNamePromptView: View {
                     GradientButton("Enregistrer", isBusy: isBusy) { Task { await submit() } }
                         .disabled(trimmed.isEmpty || isBusy)
                         .accessibilityIdentifier("displayName.prompt.save")
-                    GradientButton(String(localized: "Plus tard"), style: .ghost) { onLater() }
+                    GradientButton("Plus tard", style: .ghost) { onLater() }
                         .disabled(isBusy)
                         .accessibilityIdentifier("displayName.prompt.later")
                 }

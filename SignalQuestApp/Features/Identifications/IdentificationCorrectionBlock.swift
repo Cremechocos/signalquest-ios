@@ -330,7 +330,7 @@ struct IdentificationCorrectionBlock: View {
                 .font(SQType.subhead(.regular))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Recharger"), systemImage: "arrow.clockwise", style: .secondary) {
+            GradientButton("Recharger", systemImage: "arrow.clockwise", style: .secondary) {
                 Task { await model.load() }
             }
             .accessibilityIdentifier("identification.block.reload")

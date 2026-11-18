@@ -755,7 +755,7 @@ struct SignalDetailSheet: View {
                     .accessibilityIdentifier("signal.detail.trace")
                 // Post de trajet : « Voir le trajet », comme sa carte, vers la carte du trajet.
                 if let block = item.session {
-                    GradientButton(String(localized: "Voir le trajet"), systemImage: "map", style: .secondary) {
+                    GradientButton("Voir le trajet", systemImage: "map", style: .secondary) {
                         Haptics.selection()
                         dismiss()
                         FeedActivity.Link.session(id: block.id, title: nil).open(with: services.router)

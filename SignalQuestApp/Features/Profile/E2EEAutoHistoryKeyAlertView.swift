@@ -234,9 +234,9 @@ struct E2EEAutoHistoryKeyAlertView: View {
             .font(SQType.body)
             .foregroundStyle(SQColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
-        GradientButton(String(localized: "C’est moi")) { onItsMe() }
+        GradientButton("C’est moi") { onItsMe() }
             .accessibilityIdentifier("e2eeAuto.historyKeyAlert.itsMe")
-        GradientButton(String(localized: "Ce n’est pas moi"), style: .destructive) {
+        GradientButton("Ce n’est pas moi", style: .destructive) {
             Task { await coordinator.notMe() }
         }
         .accessibilityIdentifier("e2eeAuto.historyKeyAlert.notMe")
@@ -252,7 +252,7 @@ struct E2EEAutoHistoryKeyAlertView: View {
             .foregroundStyle(SQColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        GradientButton(String(localized: "Plus tard"), style: .ghost) { coordinator.close() }
+        GradientButton("Plus tard", style: .ghost) { coordinator.close() }
             .accessibilityIdentifier("e2eeAuto.historyKeyAlert.later")
     }
 
@@ -266,7 +266,7 @@ struct E2EEAutoHistoryKeyAlertView: View {
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             passwordAdvice
-            GradientButton(String(localized: "OK")) { coordinator.close() }
+            GradientButton("OK") { coordinator.close() }
                 .accessibilityIdentifier("e2eeAuto.historyKeyAlert.done")
         } else if let row = coordinator.signerRow, model.canRevokeOthers || model.revokesOthersByEmail {
             if model.isActing {
@@ -280,11 +280,11 @@ struct E2EEAutoHistoryKeyAlertView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !model.isActing, model.emailConfirmation == nil {
-                GradientButton(String(localized: "Réessayer"), style: .destructive) {
+                GradientButton("Réessayer", style: .destructive) {
                     Task { await model.revoke(row, reason: .notMe) }
                 }
                 .accessibilityIdentifier("e2eeAuto.historyKeyAlert.retry")
-                GradientButton(String(localized: "Plus tard"), style: .ghost) { coordinator.close() }
+                GradientButton("Plus tard", style: .ghost) { coordinator.close() }
                     .accessibilityIdentifier("e2eeAuto.historyKeyAlert.later")
             }
         } else {
@@ -293,7 +293,7 @@ struct E2EEAutoHistoryKeyAlertView: View {
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             passwordAdvice
-            GradientButton(String(localized: "OK")) { coordinator.close() }
+            GradientButton("OK") { coordinator.close() }
                 .accessibilityIdentifier("e2eeAuto.historyKeyAlert.done")
         }
     }
@@ -314,7 +314,7 @@ struct E2EEAutoHistoryKeyAlertView: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        GradientButton(String(localized: "OK")) { coordinator.close() }
+        GradientButton("OK") { coordinator.close() }
             .accessibilityIdentifier("e2eeAuto.historyKeyAlert.done")
     }
 

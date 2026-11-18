@@ -192,7 +192,7 @@ struct WeeklyRecapSheet: View {
     @ViewBuilder
     private func actions(for stats: WeeklyRecapStats) -> some View {
         VStack(spacing: SQSpace.sm) {
-            GradientButton(String(localized: "Partager mon bilan"), systemImage: "square.and.arrow.up") {
+            GradientButton("Partager mon bilan", systemImage: "square.and.arrow.up") {
                 Task {
                     // Un rendu raté ne doit pas laisser le bouton sans effet.
                     if let url = await WeeklyRecapImageRenderer.render(stats) {
@@ -204,7 +204,7 @@ struct WeeklyRecapSheet: View {
                     }
                 }
             }
-            GradientButton(String(localized: "Publier en story"), isBusy: isPublishing, style: .secondary) {
+            GradientButton("Publier en story", isBusy: isPublishing, style: .secondary) {
                 Task { await publish() }
             }
             .disabled(isPublishing)

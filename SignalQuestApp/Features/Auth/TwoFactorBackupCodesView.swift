@@ -37,9 +37,9 @@ struct TwoFactorBackupCodesPanel: View {
                 }
             }
             .accessibilityIdentifier("two-factor.backup-codes.list")
-            GradientButton(String(localized: "Copier les codes"), systemImage: "doc.on.doc", style: .secondary) { copy() }
+            GradientButton("Copier les codes", systemImage: "doc.on.doc", style: .secondary) { copy() }
                 .accessibilityIdentifier("two-factor.backup-codes.copy")
-            GradientButton(String(localized: "J’ai noté mes codes"), systemImage: "checkmark") { onSaved() }
+            GradientButton("J’ai noté mes codes", systemImage: "checkmark") { onSaved() }
                 .accessibilityIdentifier("two-factor.backup-codes.saved")
         }
         .padding(SQSpace.lg)

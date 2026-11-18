@@ -2214,7 +2214,7 @@ private struct ConversationFoldersSheet: View {
                         .onSubmit { Task { await create() } }
                         .sqHaloField()
                         .accessibilityIdentifier("folders.name")
-                    GradientButton(String(localized: "Créer le dossier"), systemImage: "folder.badge.plus", isBusy: isCreating) {
+                    GradientButton("Créer le dossier", systemImage: "folder.badge.plus", isBusy: isCreating) {
                         Task { await create() }
                     }
                     .disabled(!canCreate)
@@ -2425,7 +2425,7 @@ private struct FocusSheet: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                GradientButton(String(localized: "Activer le mode focus"), systemImage: "scope", isBusy: isBusy) {
+                GradientButton("Activer le mode focus", systemImage: "scope", isBusy: isBusy) {
                     Task { await start() }
                 }
                 .disabled(selected.isEmpty || isBusy)

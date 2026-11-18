@@ -248,7 +248,7 @@ struct ErrorStateView: View {
                 // ne valait pas de livrer une régression inexpliquée.
                 if let retry {
                     // Bouton secondaire du design system (planche Halo, « Retours »).
-                    GradientButton(String(localized: "Réessayer"), systemImage: "arrow.clockwise",
+                    GradientButton("Réessayer", systemImage: "arrow.clockwise",
                                    style: .secondary, action: retry)
                         .accessibilityIdentifier("state.error.retry")
                         .padding(.top, SQSpace.sm)

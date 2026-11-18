@@ -137,4 +137,28 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(String(AttributedString(localized: "**\(count) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la.").characters),
                        "1 identification en conflit : un autre site a plus de validations sur cette antenne. Vérifiez-la ou retirez-la.")
     }
+
+    /// `GradientButton` cherche déjà son titre `String` dans le catalogue. Un titre
+    /// passé par `String(localized:)` serait traduit deux fois : en anglais, la
+    /// traduction relue comme une clé donnait « Corriger » → « Correct » → « Okay »
+    /// et « Relief » → « Terrain » → « Field ». Titre statique : la clé littérale ;
+    /// titre construit : `GradientButton(verbatim:)`.
+    func testGradientButtonTitlesAreNotLocalizedTwice() throws {
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        XCTAssertEqual(english.localizedString(forKey: "Corriger", value: nil, table: nil), "Correct")
+        XCTAssertEqual(english.localizedString(forKey: "Correct", value: nil, table: nil), "Okay")
+
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("SignalQuestApp")
+        let files = try XCTUnwrap(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        var offenders: [String] = []
+        var scanned = 0
+        for case let url as URL in files where url.pathExtension == "swift" {
+            scanned += 1
+            let source = try String(contentsOf: url, encoding: .utf8)
+            if source.contains("GradientButton(String(localized:") { offenders.append(url.lastPathComponent) }
+        }
+        XCTAssertGreaterThan(scanned, 100)
+        XCTAssertEqual(offenders, [], "GradientButton(\"clé\") ou GradientButton(verbatim:)")
+    }
 }

@@ -1042,7 +1042,7 @@ struct E2EEAutoEmailConfirmationSheet: View {
                         }
                         if pending.request == nil, let message = pending.message {
                             errorLabel(message)
-                            GradientButton(String(localized: "Envoyer un nouveau code"), isBusy: model.isActing) {
+                            GradientButton("Envoyer un nouveau code", isBusy: model.isActing) {
                                 Task { await model.requestEmailCode() }
                             }
                             .disabled(model.isActing)
@@ -1102,7 +1102,7 @@ struct E2EEAutoEmailConfirmationSheet: View {
         if let message {
             errorLabel(message)
         }
-        GradientButton(String(localized: "Retirer l’appareil"), isBusy: model.isActing, style: .destructiveFill) {
+        GradientButton("Retirer l’appareil", isBusy: model.isActing, style: .destructiveFill) {
             focused = nil
             Task { await model.submitEmailCode(code, secondFactor: request.totpRequired ? secondFactor : nil) }
         }

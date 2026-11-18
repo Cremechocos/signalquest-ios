@@ -107,7 +107,7 @@ struct DefaultPostVisibilitySheet: View {
                             .accessibilityIdentifier("dpv.closeNote")
                     }
 
-                    GradientButton(String(localized: "Valider"), style: .accent) {
+                    GradientButton("Valider", style: .accent) {
                         guard let selection else { return }
                         Task { await save(selection, applying: showsApplyOption && applyToExistingPosts) }
                     }

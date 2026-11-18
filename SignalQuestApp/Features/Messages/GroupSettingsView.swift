@@ -154,7 +154,7 @@ struct GroupSettingsView: View {
                         .foregroundStyle(SQColor.dangerInk)
                 }
 
-                GradientButton(String(localized: "Quitter le groupe"), systemImage: "rectangle.portrait.and.arrow.right", style: .destructive) {
+                GradientButton("Quitter le groupe", systemImage: "rectangle.portrait.and.arrow.right", style: .destructive) {
                     // Relu au moment du départ : membres et admins ont pu changer.
                     refreshChainRoles()
                     if case .mustName = successorNeed {
@@ -656,7 +656,7 @@ struct SuccessorPickerSheet: View {
             .padding(SQSpace.lg)
         }
         .safeAreaInset(edge: .bottom) {
-            GradientButton(String(localized: "Nommer admin et quitter"), systemImage: "rectangle.portrait.and.arrow.right", style: .primary) {
+            GradientButton("Nommer admin et quitter", systemImage: "rectangle.portrait.and.arrow.right", style: .primary) {
                 if let selection { onConfirm(selection) }
             }
             .disabled(selection == nil)

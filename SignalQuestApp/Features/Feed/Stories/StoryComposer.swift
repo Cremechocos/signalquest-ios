@@ -555,7 +555,7 @@ struct StoryComposer: View {
     }
 
     private var nextButton: some View {
-        GradientButton(String(localized: "Suivant"), systemImage: "arrow.right", style: .primary) {
+        GradientButton("Suivant", systemImage: "arrow.right", style: .primary) {
             go(to: .share)
         }
         .disabled(!model.canPublish)
@@ -665,7 +665,7 @@ struct StoryComposer: View {
                 .padding(.vertical, SQSpace.md)
             }
 
-            GradientButton(String(localized: "Partager la story"), systemImage: "paperplane.fill", isBusy: model.isSending) {
+            GradientButton("Partager la story", systemImage: "paperplane.fill", isBusy: model.isSending) {
                 Task {
                     await model.publish()
                     if model.didPublish {

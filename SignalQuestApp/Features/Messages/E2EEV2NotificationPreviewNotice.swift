@@ -91,7 +91,7 @@ struct E2EEV2NotificationPreviewNoticeContent: View {
             GradientButton(choiceLabel, style: .primary, allowsMultiline: true) { onChoose(selected) }
                 .accessibilityIdentifier("e2ee-preview-notice-accept")
             if selected != .hidden {
-                GradientButton(String(localized: "Tout masquer"), style: .ghost, allowsMultiline: true) { onChoose(.hidden) }
+                GradientButton("Tout masquer", style: .ghost, allowsMultiline: true) { onChoose(.hidden) }
                     .accessibilityIdentifier("e2ee-preview-notice-hide")
             }
             if let errorMessage {

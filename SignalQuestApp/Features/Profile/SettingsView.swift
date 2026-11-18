@@ -1123,7 +1123,7 @@ struct SQAddressFormPrompt: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                GradientButton(String(localized: "Plus tard"), style: .ghost) { onClose() }
+                GradientButton("Plus tard", style: .ghost) { onClose() }
                     .disabled(addressStore.isSaving)
                     .accessibilityIdentifier("address-form-later")
             }

@@ -38,7 +38,7 @@ struct CustomSiteOfficialNearbyView: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Aucune ne convient, créer le site"), isBusy: isBusy, style: .secondary,
+            GradientButton("Aucune ne convient, créer le site", isBusy: isBusy, style: .secondary,
                            allowsMultiline: true, action: onCreate)
                 .disabled(isBusy)
                 .accessibilityIdentifier("createSite.officialNearby.create")

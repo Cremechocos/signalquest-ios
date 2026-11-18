@@ -2339,7 +2339,7 @@ struct ANFRDatePickerSheet: View {
                 (end ?? Self.latestTag, end.map(prettyDate) ?? String(localized: "Dernier relevé"))
             })
             .accessibilityIdentifier("anfr.map.compare.to")
-            GradientButton(String(localized: "Comparer"), systemImage: "arrow.left.arrow.right") {
+            GradientButton("Comparer", systemImage: "arrow.left.arrow.right") {
                 let from = compareFrom
                 let to = compareEnd
                 Task { await model.compare(from: from, to: to) }

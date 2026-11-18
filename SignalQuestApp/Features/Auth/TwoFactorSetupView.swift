@@ -132,7 +132,7 @@ struct TwoFactorSetupView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .privacySensitive()
                 .accessibilityIdentifier("two-factor.setup.secret")
-            GradientButton(String(localized: "Copier le secret"), systemImage: "doc.on.doc", style: .secondary) {
+            GradientButton("Copier le secret", systemImage: "doc.on.doc", style: .secondary) {
                 copySecret(setup.secret)
             }
             .disabled(model.phase == .confirming)

@@ -335,9 +335,9 @@ struct MapLayersSheet: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Fond").sqKicker().accessibilityAddTraits(.isHeader)
             HStack(spacing: SQSpace.sm) {
-                backdropTile(.applePlan, title: String(localized: "Plan"))
-                backdropTile(.satellite, title: String(localized: "Satellite"))
-                backdropTile(.topo, title: String(localized: "Relief"))
+                backdropTile(.applePlan, title: "Plan")
+                backdropTile(.satellite, title: "Satellite")
+                backdropTile(.topo, title: "Relief")
             }
         }
     }

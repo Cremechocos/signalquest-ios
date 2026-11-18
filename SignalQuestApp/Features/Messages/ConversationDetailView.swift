@@ -4199,7 +4199,7 @@ struct ConversationDetailView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if unlockable {
-                GradientButton(String(localized: "Déverrouiller"), systemImage: BiometricAuth.kind.systemImage, isBusy: isAuthenticating) {
+                GradientButton("Déverrouiller", systemImage: BiometricAuth.kind.systemImage, isBusy: isAuthenticating) {
                     Task { await unlockProtection() }
                 }
                 .fixedSize()

@@ -189,12 +189,12 @@ struct UsernameConfirmationView: View {
                     .accessibilityIdentifier("username.confirmation.cancelChange")
                 }
             } else {
-                GradientButton(String(localized: "Garder ce nom d’utilisateur"), isBusy: isBusy, allowsMultiline: true) {
+                GradientButton("Garder ce nom d’utilisateur", isBusy: isBusy, allowsMultiline: true) {
                     Task { await submit(handle: nil) }
                 }
                 .disabled(isBusy)
                 .accessibilityIdentifier("username.confirmation.keep")
-                GradientButton(String(localized: "Choisir un autre nom d’utilisateur"), style: .ghost, allowsMultiline: true) {
+                GradientButton("Choisir un autre nom d’utilisateur", style: .ghost, allowsMultiline: true) {
                     changing = true
                     error = nil
                     focus = .username

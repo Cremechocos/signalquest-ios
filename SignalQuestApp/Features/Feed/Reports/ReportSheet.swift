@@ -105,7 +105,7 @@ struct ReportSheet: View {
                         .accessibilityIdentifier("report.error")
                 }
 
-                GradientButton(String(localized: "Envoyer le signalement"), isBusy: isBusy) {
+                GradientButton("Envoyer le signalement", isBusy: isBusy) {
                     Task { await send() }
                 }
                 .disabled(isBusy || reason == nil)
@@ -283,7 +283,7 @@ struct BugReportsListView: View {
                 if isSignedOut {
                     guestCard
                 } else {
-                    GradientButton(String(localized: "Nouveau signalement"), systemImage: "plus") { showComposer = true }
+                    GradientButton("Nouveau signalement", systemImage: "plus") { showComposer = true }
                         .accessibilityIdentifier("bugs.new")
                     if pendingCount > 0 { pendingCard }
                     content
@@ -464,9 +464,9 @@ struct BugReportsListView: View {
                 .font(SQType.callout)
                 .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
-            GradientButton(String(localized: "Se connecter")) { router.selectedTab = .profile }
+            GradientButton("Se connecter") { router.selectedTab = .profile }
                 .accessibilityIdentifier("bugs.guest.login")
-            GradientButton(String(localized: "Créer un compte"), style: .secondary) { showSignup = true }
+            GradientButton("Créer un compte", style: .secondary) { showSignup = true }
                 .accessibilityIdentifier("bugs.guest.signup")
         }
         .frame(maxWidth: .infinity)
@@ -863,12 +863,12 @@ struct BugReportComposerSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: SQSpace.xl)
-            GradientButton(String(localized: "Voir mon signalement")) {
+            GradientButton("Voir mon signalement") {
                 onOpen(report)
                 dismiss()
             }
             .accessibilityIdentifier("bugs.composer.open")
-            GradientButton(String(localized: "Fermer"), style: .secondary) { dismiss() }
+            GradientButton("Fermer", style: .secondary) { dismiss() }
                 .accessibilityIdentifier("bugs.composer.done")
         }
         .padding(SQSpace.lg)
@@ -891,7 +891,7 @@ struct BugReportComposerSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: SQSpace.xl)
-            GradientButton(String(localized: "Fermer")) { dismiss() }
+            GradientButton("Fermer") { dismiss() }
                 .accessibilityIdentifier("bugs.composer.queuedDone")
         }
         .padding(SQSpace.lg)
@@ -2245,13 +2245,13 @@ struct AdminBugDetailView: View {
     private func context(_ bug: AdminBug) -> some View {
         let report = bug.report
         let rows: [(String, String?)] = [
-            (String(localized: "Appareil"), report.deviceModel),
-            (String(localized: "Système"), report.osVersion),
-            (String(localized: "Version"), report.appVersion),
-            (String(localized: "Build"), bug.build),
-            (String(localized: "Corrigé dans"), bug.fixReleaseVersion),
-            (String(localized: "Signalements similaires"), bug.similarCount > 0 ? bug.similarCount.formatted() : nil),
-            (String(localized: "Identifiant"), report.id)
+            ("Appareil", report.deviceModel),
+            ("Système", report.osVersion),
+            ("Version", report.appVersion),
+            ("Build", bug.build),
+            ("Corrigé dans", bug.fixReleaseVersion),
+            ("Signalements similaires", bug.similarCount > 0 ? bug.similarCount.formatted() : nil),
+            ("Identifiant", report.id)
         ]
         let visible = rows.compactMap { label, value in value.flatMap { $0.isEmpty ? nil : (label, $0) } }
         return section("Contexte") {
@@ -2443,7 +2443,7 @@ private struct AdminBugResponseSheet: View {
                 SQInlineError(message: errorMessage)
                     .accessibilityIdentifier("admin.response.error")
             }
-            GradientButton(String(localized: "Enregistrer"), systemImage: "checkmark") {
+            GradientButton("Enregistrer", systemImage: "checkmark") {
                 Task {
                     isSaving = true
                     defer { isSaving = false }

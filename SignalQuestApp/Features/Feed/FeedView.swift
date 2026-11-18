@@ -1541,7 +1541,7 @@ struct FeedView: View {
                 }
                 .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
-            GradientButton(String(localized: "Découvrir des membres"), systemImage: "magnifyingglass",
+            GradientButton("Découvrir des membres", systemImage: "magnifyingglass",
                            style: .secondary) {
                 showExplore = true
             }
@@ -2027,7 +2027,7 @@ struct PostShareSheet: View {
                 }
 
                 if publicLink != nil {
-                    GradientButton(String(localized: "Partager hors de l’app"), systemImage: "square.and.arrow.up", style: .secondary) {
+                    GradientButton("Partager hors de l’app", systemImage: "square.and.arrow.up", style: .secondary) {
                         showsSystemShare = true
                     }
                     .accessibilityIdentifier("post.share.external")

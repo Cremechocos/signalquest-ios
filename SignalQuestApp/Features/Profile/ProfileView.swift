@@ -1172,13 +1172,13 @@ private struct EmailVerificationCard: View {
                 .foregroundStyle(SQColor.label)
                 .textSelection(.enabled)
 
-            GradientButton(String(localized: "Renvoyer le lien"), isBusy: isSending, style: .accent) {
+            GradientButton("Renvoyer le lien", isBusy: isSending, style: .accent) {
                 Task { await resend() }
             }
             .disabled(isSending || isRefreshing)
             .accessibilityIdentifier("profile.emailVerification.resend")
 
-            GradientButton(String(localized: "J’ai confirmé"), style: .secondary) {
+            GradientButton("J’ai confirmé", style: .secondary) {
                 Task { await refresh() }
             }
             .disabled(isSending || isRefreshing)

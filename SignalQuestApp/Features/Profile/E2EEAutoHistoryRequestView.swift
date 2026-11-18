@@ -656,7 +656,7 @@ struct E2EEAutoHistoryRequesterView: View {
                     } else if requester.phase == .syncing {
                         if coordinator.keyChanged { keyChangedHeader }
                         status(.syncing)
-                        GradientButton(String(localized: "Continuer sans l’historique"), style: .ghost) { coordinator.hideRequester() }
+                        GradientButton("Continuer sans l’historique", style: .ghost) { coordinator.hideRequester() }
                             .accessibilityIdentifier("e2eeAuto.historyRequest.later")
                     } else {
                         Group {
@@ -679,7 +679,7 @@ struct E2EEAutoHistoryRequesterView: View {
                         }
                         status(requester.phase)
                         if requester.passkeyAvailable && !requester.activating {
-                            GradientButton(String(localized: "Retrouver avec ma passkey"), style: .ghost) { coordinator.usePasskeyInstead() }
+                            GradientButton("Retrouver avec ma passkey", style: .ghost) { coordinator.usePasskeyInstead() }
                                 .accessibilityIdentifier("e2eeAuto.historyRequest.passkeyInstead")
                         }
                         GradientButton(
@@ -722,12 +722,12 @@ struct E2EEAutoHistoryRequesterView: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Retrouver mes messages en un geste sur cet appareil"), isBusy: coordinator.passkeyActing) {
+            GradientButton("Retrouver mes messages en un geste sur cet appareil", isBusy: coordinator.passkeyActing) {
                 Task { await coordinator.acceptPasskeyInvitation() }
             }
             .disabled(coordinator.passkeyActing)
             .accessibilityIdentifier("e2eeAuto.historyRequest.createPasskey")
-            GradientButton(String(localized: "Plus tard"), style: .ghost) {
+            GradientButton("Plus tard", style: .ghost) {
                 coordinator.postponePasskeyInvitation()
                 coordinator.passkeyMessage = nil
                 coordinator.hideRequester()
@@ -735,7 +735,7 @@ struct E2EEAutoHistoryRequesterView: View {
             .disabled(coordinator.passkeyActing)
             .accessibilityIdentifier("e2eeAuto.historyRequest.done")
         } else {
-            GradientButton(String(localized: "OK")) {
+            GradientButton("OK") {
                 coordinator.passkeyMessage = nil
                 coordinator.hideRequester()
             }
@@ -772,17 +772,17 @@ struct E2EEAutoHistoryRequesterView: View {
         default:
             EmptyView()
         }
-        GradientButton(String(localized: "Retrouver mes messages"), isBusy: requester.usingPasskey) {
+        GradientButton("Retrouver mes messages", isBusy: requester.usingPasskey) {
             Task { await coordinator.usePasskey() }
         }
         .disabled(requester.usingPasskey)
         .accessibilityIdentifier("e2eeAuto.historyRequest.passkey")
-        GradientButton(String(localized: "Valider depuis un autre appareil"), style: .ghost) {
+        GradientButton("Valider depuis un autre appareil", style: .ghost) {
             Task { await coordinator.askAnotherDevice() }
         }
         .disabled(requester.usingPasskey)
         .accessibilityIdentifier("e2eeAuto.historyRequest.askDevice")
-        GradientButton(String(localized: "Continuer sans l’historique"), style: .ghost) { coordinator.hideRequester() }
+        GradientButton("Continuer sans l’historique", style: .ghost) { coordinator.hideRequester() }
             .disabled(requester.usingPasskey)
             .accessibilityIdentifier("e2eeAuto.historyRequest.later")
     }
@@ -818,14 +818,14 @@ struct E2EEAutoHistoryRequesterView: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Vérifier")) { Task { await coordinator.verify() } }
+            GradientButton("Vérifier") { Task { await coordinator.verify() } }
                 .accessibilityIdentifier("e2eeAuto.historyRequest.verify")
         case .closed:
             Text("La demande a pris fin sans réponse.")
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "Refaire une demande")) { Task { await coordinator.requestAgain() } }
+            GradientButton("Refaire une demande") { Task { await coordinator.requestAgain() } }
                 .accessibilityIdentifier("e2eeAuto.historyRequest.again")
         case .received, .passkey:
             EmptyView()
@@ -877,7 +877,7 @@ struct E2EEAutoHistoryApprovalView: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            GradientButton(String(localized: "OK")) { coordinator.closeApproval() }
+            GradientButton("OK") { coordinator.closeApproval() }
                 .accessibilityIdentifier("e2eeAuto.historyApproval.done")
         } else {
             if approval.replacesClosed {
@@ -914,12 +914,12 @@ struct E2EEAutoHistoryApprovalView: View {
                     .foregroundStyle(SQColor.dangerInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            GradientButton(String(localized: "C’est moi"), isBusy: approval.phase == .acting) {
+            GradientButton("C’est moi", isBusy: approval.phase == .acting) {
                 Task { await coordinator.approve() }
             }
             .disabled(approval.phase == .acting)
             .accessibilityIdentifier("e2eeAuto.historyApproval.itsMe")
-            GradientButton(String(localized: "Pas maintenant"), style: .ghost) { coordinator.closeApproval() }
+            GradientButton("Pas maintenant", style: .ghost) { coordinator.closeApproval() }
                 .disabled(approval.phase == .acting)
                 .accessibilityIdentifier("e2eeAuto.historyApproval.later")
             Text("Si ce n’est pas toi, retire cet appareil dans Réglages > Appareils.")
