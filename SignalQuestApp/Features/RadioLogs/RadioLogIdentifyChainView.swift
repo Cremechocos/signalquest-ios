@@ -207,9 +207,9 @@ struct RadioLogIdentifyChainView: View {
             .accessibilityIdentifier("radioLogs.chain.pending")
         } else if RadioLogIdentifyPicker.blockingReason(for: site) == nil {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                if let candidate = picker.selectedCandidate, candidate.needsVerification {
+                if let caution = picker.selectedCandidate?.verificationCaution {
                     noticeBanner(
-                        String(localized: "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer."),
+                        caution,
                         tint: OutageTint.degradedInk,
                         soft: SQColor.warningSoft
                     )
@@ -288,6 +288,7 @@ struct RadioLogIdentifyChainView: View {
             }
             .padding(.vertical, SQSpace.sm)
         } else {
+            RadioLogTaVisionSummaryView(state: picker.taVision, hasLocalRings: !picker.taRings.isEmpty)
             if picker.candidates.isEmpty {
                 noticeBanner(
                     picker.errorMessage ?? String(localized: "Aucune antenne connue à proximité."),
@@ -312,7 +313,7 @@ struct RadioLogIdentifyChainView: View {
                 hypothesisFailed: picker.hypothesisFailed,
                 onRetryHypothesis: { Task { await picker.load(for: site) } },
                 onSelect: { candidate in
-                    guard pending == nil else { return }
+                    guard pending == nil, candidate.isSelectable else { return }
                     picker.selectedId = candidate.id
                     recenterOnSelection()
                 },

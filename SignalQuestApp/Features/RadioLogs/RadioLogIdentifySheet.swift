@@ -143,7 +143,7 @@ struct RadioLogIdentifySheet: View {
                     nodeLabel: site.nodeLabel,
                     siteId: candidate.siteId,
                     address: candidate.address,
-                    needsVerification: candidate.needsVerification
+                    caution: candidate.verificationCaution
                 ))
             }
             .sheet(isPresented: $showsMapPicker) {
@@ -330,6 +330,7 @@ struct RadioLogIdentifySheet: View {
             }
             .padding(.vertical, SQSpace.lg)
         } else {
+            RadioLogTaVisionSummaryView(state: picker.taVision, hasLocalRings: !picker.taRings.isEmpty)
             RadioLogCandidateCard(
                 candidates: picker.candidates,
                 selectedId: picker.selectedId,
@@ -337,6 +338,7 @@ struct RadioLogIdentifySheet: View {
                 hypothesisFailed: picker.hypothesisFailed,
                 onRetryHypothesis: { Task { await picker.load(for: site) } },
                 onSelect: { candidate in
+                    guard candidate.isSelectable else { return }
                     picker.selectedId = candidate.id
                     if let latitude = candidate.latitude, let longitude = candidate.longitude {
                         region.center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -380,6 +382,13 @@ struct RadioLogCandidateCard: View {
                 .font(SQFont.display(17, .bold, relativeTo: .headline))
                 .foregroundStyle(P.ink)
                 .sqHeader()
+            // TA-VISION : dire si l'ordre vient des anneaux, ou s'il n'y en a pas.
+            if let first = candidates.first, first.vision != nil {
+                Text(first.isRanked
+                     ? String(localized: "Antennes classées par les anneaux")
+                     : String(localized: "Antennes de la zone, sans classement"))
+                    .sqKicker()
+            }
             if hypothesisFailed {
                 HStack(spacing: SQSpace.sm) {
                     Text("Piste du serveur indisponible.")
@@ -401,7 +410,7 @@ struct RadioLogCandidateCard: View {
                     RadioLogCandidateRow(
                         candidate: candidate,
                         isSelected: selectedId == candidate.id,
-                        number: numbered ? position + 1 : nil,
+                        number: candidate.isRanked ? candidate.vision?.rank : (numbered ? position + 1 : nil),
                         isNearest: candidate.id == nearestId
                     ) {
                         onSelect(candidate)
@@ -472,6 +481,9 @@ struct RadioLogCandidateRow: View {
                 .padding(.top, 1)
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
+                    if let vision = candidate.vision {
+                        visionContent(vision)
+                    } else {
                     HStack(spacing: SQSpace.sm) {
                         Text("Site \(candidate.siteId)")
                             .font(.sqTechnical(14, .semibold))
@@ -521,6 +533,7 @@ struct RadioLogCandidateRow: View {
                             .padding(.top, 2)
                             .accessibilityIdentifier("radioLogs.identify.nearest")
                     }
+                    }
                 }
             }
             .padding(.horizontal, SQSpace.md)
@@ -530,8 +543,69 @@ struct RadioLogCandidateRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!candidate.isSelectable)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("radioLogs.identify.candidate.\(candidate.siteId)")
+    }
+
+    /// Un candidat classé par les anneaux (TA-VISION) : lieu, origine, compatibilité avec
+    /// les passages et raisons. Le score brut n'est jamais montré.
+    @ViewBuilder
+    private func visionContent(_ vision: RadioLogTaCandidates.Candidate) -> some View {
+        Text(vision.label ?? (candidate.siteId.isEmpty ? String(localized: "Site estimé") : String(localized: "Site \(candidate.siteId)")))
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(P.ink)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+        if let meta = visionMeta(vision) {
+            Text(meta)
+                .font(SQType.caption)
+                .monospacedDigit()
+                .foregroundStyle(SQColor.labelSecondary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        if let match = RadioLogTaVisionText.matchLine(vision, ranked: candidate.isRanked) {
+            Text(match)
+                .font(SQFont.body(12, .bold))
+                .foregroundStyle(vision.plausible ? OutageTint.resolvedInk : P.ink)
+                .padding(.top, 2)
+                .accessibilityIdentifier("radioLogs.identify.match")
+        }
+        if let reasons = RadioLogTaVisionText.reasonsLine(vision) {
+            Text(reasons)
+                .font(SQType.caption)
+                .foregroundStyle(P.ink)
+                .multilineTextAlignment(.leading)
+        }
+        if !candidate.isSelectable {
+            Text(vision.kind == .estimated || vision.siteId == nil
+                 ? String(localized: "Site estimé sans identifiant : rien à confirmer pour l’instant.")
+                 : String(localized: "Ce site ne peut pas être confirmé pour l’instant."))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.leading)
+        }
+    }
+
+    private func visionMeta(_ vision: RadioLogTaCandidates.Candidate) -> String? {
+        var parts: [String] = []
+        if let kind = RadioLogTaVisionText.kindLabel(vision.kind, market: candidate.market) { parts.append(kind) }
+        let operators = candidate.operators.filter { $0.uppercased() != "ALL" }
+        if !operators.isEmpty { parts.append(operators.joined(separator: ", ")) }
+        if !vision.generations.isEmpty { parts.append(vision.generations.joined(separator: " ")) }
+        if candidate.isRanked, let center = vision.distanceToZoneCenterMeters {
+            parts.append(String(localized: "\(Self.unbreakable(SQUnits.distance(meters: center))) du centre de la zone"))
+        } else if let nearest = vision.nearestReadingMeters {
+            parts.append(String(localized: "\(Self.unbreakable(SQUnits.distance(meters: nearest))) de ton relevé le plus proche"))
+        }
+        if !vision.hasPosition { parts.append(String(localized: "position masquée")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// « 80 m » ne se coupe jamais entre le nombre et l'unité, même en très grande taille de texte.
+    private static func unbreakable(_ distance: String) -> String {
+        distance.replacingOccurrences(of: " ", with: "\u{00A0}")
     }
 
     private var metaLine: String? {
@@ -593,5 +667,90 @@ struct RadioLogSiteMapSheet: View {
     private var pins: [SQMapPin] {
         guard let latitude = site.latitude, let longitude = site.longitude else { return [] }
         return [SQMapPin(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))]
+    }
+}
+
+/// Ce que les anneaux TA permettent de dire, d'après le serveur (TA-VISION r1.2) — ou
+/// pourquoi rien n'est classé. Le tracé local reste là hors ligne, présenté comme non classé.
+struct RadioLogTaVisionSummaryView: View {
+    let state: RadioLogIdentifyPicker.TaVisionState
+    /// Des anneaux locaux sont tracés : hors ligne, on dit qu'ils restent visibles.
+    var hasLocalRings = false
+
+    var body: some View {
+        switch state {
+        case .loading:
+            EmptyView()
+        case let .served(response):
+            let summary = RadioLogTaVisionText.summary(response)
+            card(headline: summary.headline, detail: summary.detail, lines: summary.lines, tone: summary.tone)
+        case .unavailable:
+            card(
+                headline: String(localized: "Classement indisponible pour l’instant."),
+                detail: hasLocalRings
+                    ? String(localized: "Les anneaux restent tracés, rien n’est trié.")
+                    : nil,
+                lines: [],
+                tone: .neutral
+            )
+        case let .premiumRequired(message):
+            card(headline: message, detail: nil, lines: [], tone: .neutral)
+        }
+    }
+
+    private func card(headline: String, detail: String?, lines: [String], tone: RadioLogTaVisionText.Tone) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Label {
+                Text(headline)
+                    .font(SQFont.body(14, .bold))
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: icon(for: tone))
+                    .font(SQFont.body(13, .semibold))
+            }
+            .foregroundStyle(ink(for: tone))
+            if let detail {
+                Text(detail)
+                    .font(SQType.caption)
+                    .foregroundStyle(P.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(lines, id: \.self) { line in
+                Text(line)
+                    .font(SQType.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(P.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft(for: tone), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("radioLogs.identify.taVision")
+    }
+
+    private func icon(for tone: RadioLogTaVisionText.Tone) -> String {
+        switch tone {
+        case .good: return "scope"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .neutral: return "info.circle"
+        }
+    }
+
+    private func ink(for tone: RadioLogTaVisionText.Tone) -> Color {
+        switch tone {
+        case .good: return OutageTint.resolvedInk
+        case .warning: return OutageTint.degradedInk
+        case .neutral: return P.ink
+        }
+    }
+
+    private func soft(for tone: RadioLogTaVisionText.Tone) -> Color {
+        switch tone {
+        case .good: return SQColor.successSoft
+        case .warning: return SQColor.warningSoft
+        case .neutral: return P.chip
+        }
     }
 }

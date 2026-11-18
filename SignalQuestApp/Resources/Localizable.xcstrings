@@ -1,6 +1,750 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Ce site ne peut pas être confirmé pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site can’t be confirmed yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce site ne peut pas être confirmé pour l’instant."
+          }
+        }
+      }
+    },
+    "%lld anneaux retenus sur %lld relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld rings kept out of %lld readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld anneaux retenus sur %lld relevés"
+          }
+        }
+      }
+    },
+    "%lld écartés : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld set aside: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld écartés : %@"
+          }
+        }
+      }
+    },
+    "%lld écartés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld set aside"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld écartés"
+          }
+        }
+      }
+    },
+    "%lld TA 0 : antenne à moins de 400 m, affichés sans compter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld TA 0: site within 400 m, shown but not counted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld TA 0 : antenne à moins de 400 m, affichés sans compter"
+          }
+        }
+      }
+    },
+    "Lecture limitée aux 5 000 relevés les plus récents." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limited to the 5,000 most recent readings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture limitée aux 5 000 relevés les plus récents."
+          }
+        }
+      }
+    },
+    "Aucun relevé n’a de position : antennes proposées par identifiant et fréquence seulement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reading has a position: sites suggested by identifier and frequency only."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun relevé n’a de position : antennes proposées par identifiant et fréquence seulement."
+          }
+        }
+      }
+    },
+    "Les anneaux confirment le site validé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings confirm the validated site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux confirment le site validé"
+          }
+        }
+      }
+    },
+    "Les anneaux se croisent · zone de ≈ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings cross · area of ≈ %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux se croisent · zone de ≈ %@"
+          }
+        }
+      }
+    },
+    "Les anneaux se croisent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings cross"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux se croisent"
+          }
+        }
+      }
+    },
+    "Les anneaux ne se croisent pas : pas de classement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings don’t cross: no ranking"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux ne se croisent pas : pas de classement"
+          }
+        }
+      }
+    },
+    "Aucun point ne tient toutes ces distances. Souvent un changement de cellule ou deux sites sous le même identifiant. Les antennes restent toutes affichées, sans ordre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No point fits all these distances. Often a cell change, or two sites under the same identifier. All sites stay listed, in no particular order."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun point ne tient toutes ces distances. Souvent un changement de cellule ou deux sites sous le même identifiant. Les antennes restent toutes affichées, sans ordre."
+          }
+        }
+      }
+    },
+    "Trop peu d’anneaux pour classer : repasse près du site pour en ajouter." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too few rings to rank: pass near the site again to add some."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop peu d’anneaux pour classer : repasse près du site pour en ajouter."
+          }
+        }
+      }
+    },
+    "SQFormal|Trop peu d’anneaux pour classer : repasse près du site pour en ajouter." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop peu d’anneaux pour classer : repassez près du site pour en ajouter."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "TA non fiable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "unreliable TA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA non fiable"
+          }
+        }
+      }
+    },
+    "TA figé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "frozen TA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TA figé"
+          }
+        }
+      }
+    },
+    "position trop ancienne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "position too old"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "position trop ancienne"
+          }
+        }
+      }
+    },
+    "GPS imprécis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "imprecise GPS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS imprécis"
+          }
+        }
+      }
+    },
+    "au même endroit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "same spot"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "au même endroit"
+          }
+        }
+      }
+    },
+    "au-delà de 24 anneaux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "beyond 24 rings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "au-delà de 24 anneaux"
+          }
+        }
+      }
+    },
+    "contredit les autres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "contradicts the others"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "contredit les autres"
+          }
+        }
+      }
+    },
+    "autre raison" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "other reason"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "autre raison"
+          }
+        }
+      }
+    },
+    "Site validé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validated site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site validé"
+          }
+        }
+      }
+    },
+    "Registre officiel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official registry"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre officiel"
+          }
+        }
+      }
+    },
+    "Estimé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimé"
+          }
+        }
+      }
+    },
+    "Compatible avec %lld de tes %lld passages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matches %lld of your %lld passes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible avec %lld de tes %lld passages"
+          }
+        }
+      }
+    },
+    "SQFormal|Compatible avec %lld de tes %lld passages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible avec %lld de vos %lld passages"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Secteur tourné vers tes relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sector facing your readings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secteur tourné vers tes relevés"
+          }
+        }
+      }
+    },
+    "SQFormal|Secteur tourné vers tes relevés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secteur tourné vers vos relevés"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Relevés derrière le secteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Readings behind the sector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevés derrière le secteur"
+          }
+        }
+      }
+    },
+    "Bande relevée présente sur le site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorded band present on the site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande relevée présente sur le site"
+          }
+        }
+      }
+    },
+    "Bande relevée absente de la fiche" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorded band missing from the site sheet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande relevée absente de la fiche"
+          }
+        }
+      }
+    },
+    "Trop loin pour un de tes TA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too far for one of your TAs"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop loin pour un de tes TA"
+          }
+        }
+      }
+    },
+    "SQFormal|Trop loin pour un de tes TA" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop loin pour un de vos TA"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Validé pour un autre réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validated for another network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validé pour un autre réseau"
+          }
+        }
+      }
+    },
+    "Le classement par les anneaux est réservé aux membres Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ranking by rings is for Premium members."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le classement par les anneaux est réservé aux membres Premium."
+          }
+        }
+      }
+    },
+    "Les anneaux ne désignent pas clairement ce site. Vérifie-le avant de confirmer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings don’t clearly point to this site. Check it before confirming."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux ne désignent pas clairement ce site. Vérifie-le avant de confirmer."
+          }
+        }
+      }
+    },
+    "SQFormal|Les anneaux ne désignent pas clairement ce site. Vérifie-le avant de confirmer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux ne désignent pas clairement ce site. Vérifiez-le avant de confirmer."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Classement indisponible pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ranking unavailable for now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classement indisponible pour l’instant."
+          }
+        }
+      }
+    },
+    "Les anneaux restent tracés, rien n’est trié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rings stay drawn; nothing is sorted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les anneaux restent tracés, rien n’est trié."
+          }
+        }
+      }
+    },
+    "Antennes classées par les anneaux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites ranked by the rings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes classées par les anneaux"
+          }
+        }
+      }
+    },
+    "Antennes de la zone, sans classement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites in the area, not ranked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes de la zone, sans classement"
+          }
+        }
+      }
+    },
+    "Site estimé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site estimé"
+          }
+        }
+      }
+    },
+    "Site estimé sans identifiant : rien à confirmer pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated site with no identifier: nothing to confirm yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site estimé sans identifiant : rien à confirmer pour l’instant."
+          }
+        }
+      }
+    },
+    "%@ du centre de la zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from the center of the area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ du centre de la zone"
+          }
+        }
+      }
+    },
+    "%@ de ton relevé le plus proche" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from your nearest reading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de ton relevé le plus proche"
+          }
+        }
+      }
+    },
+    "SQFormal|%@ de ton relevé le plus proche" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de votre relevé le plus proche"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "position masquée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hidden position"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "position masquée"
+          }
+        }
+      }
+    },
     "TA hors de portée : distance non vérifiée" : {
       "localizations" : {
         "en" : {

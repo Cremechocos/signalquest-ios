@@ -30,6 +30,9 @@ protocol RadioLogsServicing: Sendable {
     /// comprise. Coûteuse : réservée à l'écran où l'on regarde un site à la fois.
     /// `nil` = le serveur n'a pas de piste ; une erreur = la piste n'a pas pu être demandée.
     func hypothesis(for site: RadioLogSite) async throws -> RadioLogSiteHypothesis?
+    /// TA-VISION : les relevés du nœud étiquetés par le serveur et les antennes classées par
+    /// les anneaux TA. Une erreur = classement indisponible : l'écran revient au tracé local.
+    func taCandidates(for site: RadioLogSite) async throws -> RadioLogTaCandidates
     /// Purge serveur du journal. Jamais gatée côté serveur : révoquer son
     /// consentement doit toujours aboutir.
     func purge() async throws
@@ -42,6 +45,10 @@ protocol RadioLogsServicing: Sendable {
 /// proposition vient de la MÊME réponse que le statut : aucun appel de plus.
 extension RadioLogsServicing {
     func cachedSiteProvenances() -> [String: RadioLogIdentificationProvenance] { [:] }
+    /// Sans serveur (aperçus, doublures de test) : classement indisponible.
+    func taCandidates(for site: RadioLogSite) async throws -> RadioLogTaCandidates {
+        throw URLError(.unsupportedURL)
+    }
 }
 
 struct RadioLogScanUpdate: Sendable, Equatable {
@@ -494,6 +501,24 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// `resolutionMode` du serveur qui valent identification du nœud même quand la
     /// réponse n'énumère pas `matchedRadio`.
     private static let nodeResolutionModes: Set<String> = ["exact_operator", "canada_ised", "community_user_site"]
+
+    // MARK: - TA-VISION (un nœud à la fois)
+
+    func taCandidates(for site: RadioLogSite) async throws -> RadioLogTaCandidates {
+        // Sans PLMN servant, aucune clé : le serveur ne saurait pas de quel réseau il s'agit.
+        guard let key = RadioLogTaSiteKey.make(for: site) else { throw URLError(.badURL) }
+        do {
+            return try await api.request(
+                APIEndpoint(path: "/api/radio-logs/sites/\(key)/candidates"),
+                as: RadioLogTaCandidates.self
+            )
+        } catch let APIError.http(status, code, _, _, _) where status == 403 && code == "PREMIUM_REQUIRED" {
+            // Refus de droit, pas « classement indisponible » : l'écran invite à Premium.
+            throw RadioLogSyncError.premiumRequired(
+                String(localized: "Le classement par les anneaux est réservé aux membres Premium.")
+            )
+        }
+    }
 
     // MARK: - Hypothèse (charge complète, un site à la fois)
 

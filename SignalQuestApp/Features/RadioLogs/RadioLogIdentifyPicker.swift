@@ -23,10 +23,33 @@ struct RadioLogCandidate: Identifiable, Equatable {
     let isServerHypothesis: Bool
     /// Vrai pour l'antenne que l'utilisateur a choisie lui-même sur la carte.
     var isManualChoice = false
+    /// Candidat classé par les anneaux TA du serveur (TA-VISION), avec ses raisons.
+    var vision: RadioLogTaCandidates.Candidate? = nil
+    /// Le serveur a classé les candidats ; faux quand il s'abstient.
+    var isRanked = false
+    /// Marché de la réponse TA-VISION, pour nommer le registre officiel.
+    var market: String? = nil
 
     /// Ni la piste du serveur, ni un choix à la main : l'antenne n'est là que parce
-    /// qu'elle est proche des relevés. Ce n'est pas une identification.
-    var needsVerification: Bool { !isServerHypothesis && !isManualChoice }
+    /// qu'elle est proche des relevés. Ce n'est pas une identification. Un candidat
+    /// TA-VISION n'en a pas besoin quand les anneaux le désignent.
+    var needsVerification: Bool {
+        if isManualChoice { return false }
+        if let vision { return !(isRanked && vision.plausible) }
+        return !isServerHypothesis
+    }
+
+    /// Un site estimé sans clé ne peut pas être confirmé : il reste affiché, jamais choisi.
+    var isSelectable: Bool { vision?.confirmable ?? true }
+
+    /// Ce que la confirmation rappelle avant l'envoi, quand le choix n'est pas désigné.
+    var verificationCaution: String? {
+        guard needsVerification else { return nil }
+        if vision != nil {
+            return String(localized: "Les anneaux ne désignent pas clairement ce site. Vérifie-le avant de confirmer.")
+        }
+        return String(localized: "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer.")
+    }
 
     var distanceLabel: String? {
         guard let distanceMeters else { return nil }
@@ -76,6 +99,28 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// Relevés retirés du calcul parce qu'ils contredisaient franchement les autres. Compté
     /// pour être DIT : un élagage silencieux priverait l'utilisateur du moyen de nous corriger.
     @Published private(set) var taDiscardedCount: Int = 0
+    /// Classement des anneaux par le serveur (TA-VISION r1.2).
+    @Published private(set) var taVision: TaVisionState = .loading
+    /// Relevés écartés par le serveur, tracés en pointillés gris : ils ne comptent pas.
+    @Published private(set) var taDiscardedRings: [TaRingSelection.Ring] = []
+    /// TA = 0 : antenne à moins de 400 m. Un disque, affiché sans compter.
+    @Published private(set) var taNearDiscs: [TaRingSelection.Ring] = []
+    /// Zone où les anneaux se croisent ; `nil` sans convergence ou d'un seul côté.
+    @Published private(set) var taZone: RadioLogTaCandidates.Zone?
+
+    enum TaVisionState: Equatable {
+        case loading
+        case served(RadioLogTaCandidates)
+        /// Serveur injoignable : tracé et liste locaux, présentés comme « non classés ».
+        case unavailable
+        /// 403 `PREMIUM_REQUIRED` : ce n'est pas « non classé », c'est un droit.
+        case premiumRequired(String)
+
+        var response: RadioLogTaCandidates? {
+            if case let .served(response) = self { return response }
+            return nil
+        }
+    }
 
     private let service: RadioLogsServicing
     private let identify: IdentifyServicing
@@ -116,23 +161,101 @@ final class RadioLogIdentifyPicker: ObservableObject {
             return (all, matching)
         }.value
         journalEntries = entries
-        let readings = matching.compactMap { entry -> TaRingSelection.Reading? in
-            guard let latitude = entry.latitude, let longitude = entry.longitude else { return nil }
-            return TaRingSelection.Reading(
-                latitude: latitude,
-                longitude: longitude,
-                // Le TA d'une ligne gNB, NR, 2G ou 3G ne mesure pas une cellule 4G :
-                // absent, jamais 0 (TA-READ-1).
-                timingAdvance: entry.reliableTimingAdvance,
-                accuracyMeters: nil,
-                observedAt: entry.observedAt
-            )
-        }
+        let usable = matching.filter { $0.latitude != nil && $0.longitude != nil }
+        let readings = usable.compactMap(Self.localReading(from:))
         // Élagage : un TA peut être juste et décrire pourtant une AUTRE cellule (les mesures
         // d'une voisine collées à cette identité). Sur un cas réel, un seul anneau de ce genre
         // déplaçait le site estimé de 2,8 km. Ce qui est écarté est compté, jamais caché.
         let pruned = TaRingSelection.pruneOutliers(TaRingSelection.rings(for: readings))
-        return (pruned.kept, pruned.discarded.count, TaRingSelection.assess(pruned.kept))
+        let rejected = usable.count - readings.count
+        return (pruned.kept, pruned.discarded.count + rejected, TaRingSelection.assess(pruned.kept))
+    }
+
+    /// Relevé du tracé LOCAL (repli hors ligne), aux mêmes seuils que le serveur (TA-VISION §2) :
+    /// un fix de plus de 120 s ou une précision connue de plus de 200 m est écarté ; une
+    /// précision absente vaut 250 m supposés et n'écarte rien ; un âge absent n'est pas jugé.
+    /// `positionSeenAt` n'est jamais lu : c'est un rang de fusion, pas l'âge du fix.
+    nonisolated static func localReading(from entry: RadioLogEntry) -> TaRingSelection.Reading? {
+        guard let latitude = entry.latitude, let longitude = entry.longitude else { return nil }
+        if let age = entry.locationAgeMs, age > 120_000 { return nil }
+        if let accuracy = entry.locationAccuracyMeters, accuracy > 200 { return nil }
+        return TaRingSelection.Reading(
+            latitude: latitude,
+            longitude: longitude,
+            // Le TA d'une ligne gNB, NR, 2G ou 3G ne mesure pas une cellule 4G :
+            // absent, jamais 0 (TA-READ-1).
+            timingAdvance: entry.reliableTimingAdvance,
+            accuracyMeters: entry.locationAccuracyMeters,
+            observedAt: entry.observedAt
+        )
+    }
+
+    /// Le classement du serveur, ou ce qui l'a empêché.
+    private func fetchVision(for site: RadioLogSite) async -> TaVisionState {
+        do {
+            return .served(try await service.taCandidates(for: site))
+        } catch let RadioLogSyncError.premiumRequired(message) {
+            return .premiumRequired(message)
+        } catch {
+            return .unavailable
+        }
+    }
+
+    /// Le tracé du serveur remplace le tracé local : ses relevés sont étiquetés (gardés,
+    /// écartés avec leur raison, TA = 0), y compris ceux d'un autre appareil.
+    private func applyVision(_ state: TaVisionState) {
+        taVision = state
+        guard let response = state.response else { return }
+        func ring(_ reading: RadioLogTaCandidates.Reading) -> TaRingSelection.Ring? {
+            guard reading.radiusMeters > 0, reading.latitude.isFinite, reading.longitude.isFinite else { return nil }
+            return TaRingSelection.Ring(
+                latitude: reading.latitude,
+                longitude: reading.longitude,
+                radiusMeters: reading.radiusMeters,
+                timingAdvance: reading.timingAdvance ?? 0,
+                toleranceMeters: reading.toleranceMeters,
+                timestamp: 0
+            )
+        }
+        taRings = response.readings.filter { $0.status == .kept }.compactMap(ring)
+        taDiscardedRings = response.readings.filter { $0.status == .discarded }.compactMap(ring)
+        taNearDiscs = response.readings.filter { $0.status == .near }.compactMap(ring)
+        taDiscardedCount = response.readingCounts.discarded
+        taZone = response.zone
+        switch response.assessment {
+        case .convergent: taAssessment = .convergent
+        case .divergent: taAssessment = .divergent
+        default: taAssessment = .unusable
+        }
+    }
+
+    /// Les antennes du serveur, dans son ordre. Classées, la première confirmable est choisie ;
+    /// sans classement, rien n'est présélectionné : choisir reste le geste du membre.
+    private func applyVisionCandidates(_ response: RadioLogTaCandidates, site: RadioLogSite) -> Bool {
+        guard !response.candidates.isEmpty else { return false }
+        candidates = response.candidates.enumerated().map { index, vision in
+            let distance = response.isRanked
+                ? (vision.distanceToZoneCenterMeters ?? vision.nearestReadingMeters)
+                : vision.nearestReadingMeters
+            return RadioLogCandidate(
+                id: vision.siteId ?? "vision-\(index)",
+                siteId: vision.siteId ?? "",
+                latitude: vision.latitude,
+                longitude: vision.longitude,
+                operators: [site.operatorName].compactMap { $0 },
+                technologies: vision.generations,
+                address: vision.label,
+                distanceMeters: distance.map { Int($0.rounded()) },
+                confidenceScore: nil,
+                isServerHypothesis: false,
+                vision: vision,
+                isRanked: response.isRanked,
+                market: response.market
+            )
+        }
+        selectedId = response.isRanked ? candidates.first(where: \.isSelectable)?.id : nil
+        errorMessage = nil
+        return true
     }
 
     func load(for site: RadioLogSite) async {
@@ -150,8 +273,14 @@ final class RadioLogIdentifyPicker: ObservableObject {
         taRings = []
         taDiscardedCount = 0
         taAssessment = .unusable
+        taVision = .loading
+        taDiscardedRings = []
+        taNearDiscs = []
+        taZone = nil
         defer { if loadGeneration == generation { isLoading = false } }
 
+        // Le classement du serveur part tout de suite, en parallèle du tracé local.
+        async let visionTask = fetchVision(for: site)
         let ta = await loadTaRings(for: site)
         guard loadGeneration == generation, !Task.isCancelled else { return }
         taRings = ta.rings
@@ -159,6 +288,11 @@ final class RadioLogIdentifyPicker: ObservableObject {
         taAssessment = ta.assessment
 
         guard let latitude = site.latitude, let longitude = site.longitude else {
+            // Sans position, le serveur propose encore des antennes par nœud et fréquence.
+            let vision = await visionTask
+            guard loadGeneration == generation, !Task.isCancelled else { return }
+            applyVision(vision)
+            if let response = vision.response, applyVisionCandidates(response, site: site) { return }
             // Sans position, ni le serveur ni nous ne pouvons proposer quoi que
             // ce soit d'honnête. On le dit, plutôt que d'afficher une liste vide.
             errorMessage = String(localized: "Aucun de ces relevés ne porte de position : impossible de proposer une antenne.")
@@ -190,10 +324,13 @@ final class RadioLogIdentifyPicker: ObservableObject {
             technologies: []
         )
 
+        let vision = await visionTask
         let (hypothesis, hypothesisDidFail) = await hypothesisTask
         // `nil` : la recherche a échoué ; `[]` : rien à moins de 3 km.
         let nearbyResult = await nearbyTask
         guard loadGeneration == generation, !Task.isCancelled else { return }
+        applyVision(vision)
+        if let response = vision.response, applyVisionCandidates(response, site: site) { return }
         hypothesisFailed = hypothesisDidFail
         let nearby = nearbyResult ?? []
 
@@ -315,22 +452,21 @@ final class RadioLogIdentifyPicker: ObservableObject {
         nodeLabel: String,
         siteId: String,
         address: String?,
-        needsVerification: Bool = false
+        caution: String? = nil
     ) -> String {
         let base = String(localized: "\(nodeLabel) sera identifié sur le site \(siteId)")
         let place = address.flatMap { $0.isEmpty ? nil : $0 }
         let located = place.map { String(localized: "\(base) — \($0)") } ?? base
-        // Antenne retenue pour sa seule proximité : on le dit avant que le geste ne parte.
-        let caution = needsVerification
-            ? String(localized: "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer.") + "\n\n"
-            : ""
-        return located + ".\n\n" + caution + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
+        // Antenne que rien ne désigne : on le dit avant que le geste ne parte.
+        let warning = caution.map { $0 + "\n\n" } ?? ""
+        return located + ".\n\n" + warning + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
     }
 
     /// Écrit l'identification. Retourne le `siteId` retenu, ou nil en cas d'échec
     /// (le message d'erreur est alors posé sur `errorMessage`).
     func submit(site: RadioLogSite) async -> String? {
-        guard let selectedId, let candidate = candidates.first(where: { $0.id == selectedId }) else {
+        guard let selectedId, let candidate = candidates.first(where: { $0.id == selectedId }),
+              candidate.isSelectable else {
             errorMessage = String(localized: "Choisis une antenne avant de valider.")
             submitError = errorMessage
             return nil

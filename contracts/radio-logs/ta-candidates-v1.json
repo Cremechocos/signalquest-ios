@@ -1,0 +1,850 @@
+{
+  "contract": "ta-candidates-v1",
+  "contractVersion": 1,
+  "decidedOn": "2026-11-18",
+  "note": "Vecteurs partagés avec Web, iOS et Android. Rejoués par apps/web/lib/radio-logs/ta-candidates-vectors.test.ts (moteur) et par la route (clés, cell, réponses).",
+  "constants": {
+    "taStepMeters": 78.12,
+    "halfStepMeters": 39,
+    "assumedAccuracyMeters": 250,
+    "gpsImpreciseOverMeters": 200,
+    "positionStaleOverMs": 120000,
+    "nearRadiusMeters": 400,
+    "dedupeMeters": 40,
+    "maxRings": 24,
+    "maxReadings": 200,
+    "maxCandidates": 30,
+    "safetyFactor": 1.5,
+    "rankTolerance": 1,
+    "minRings": 3,
+    "minZoneRadiusMeters": 150,
+    "minZoneAngularSpreadDegrees": 90,
+    "zoneRadiusRule": "max(toleranceMoyenne x 1.5, residualMeters x 2, 150) ; zone null si l'etalement angulaire des anneaux vus du centre < 90 degres",
+    "bandFormat": "B<n> (LTE) ou n<n> (NR) ; frequency compare le couple (technologie, bande)"
+  },
+  "keys": [
+    {
+      "name": "enb-only",
+      "enb": "123456",
+      "gnb": "",
+      "mccMnc": "20801",
+      "key": "MTIzNDU2fHwyMDgwMQ",
+      "valid": true
+    },
+    {
+      "name": "gnb-only",
+      "enb": "",
+      "gnb": "987654",
+      "mccMnc": "20815",
+      "key": "fDk4NzY1NHwyMDgxNQ",
+      "valid": true
+    },
+    {
+      "name": "mnc-3-digits",
+      "enb": "123456",
+      "gnb": "",
+      "mccMnc": "310260",
+      "key": "MTIzNDU2fHwzMTAyNjA",
+      "valid": true
+    },
+    {
+      "name": "invalid-no-node",
+      "key": "fHwyMDgwMQ",
+      "valid": false,
+      "error": "INVALID_SITE_KEY"
+    },
+    {
+      "name": "invalid-letters",
+      "key": "MTJhfHwyMDgwMQ",
+      "valid": false,
+      "error": "INVALID_SITE_KEY"
+    },
+    {
+      "name": "invalid-not-base64url",
+      "key": "!!!",
+      "valid": false,
+      "error": "INVALID_SITE_KEY"
+    }
+  ],
+  "cells": [
+    {
+      "name": "eci-4g",
+      "cell": "31457281",
+      "valid": true
+    },
+    {
+      "name": "nci-5g",
+      "cell": "4521985793",
+      "valid": true
+    },
+    {
+      "name": "absent",
+      "cell": null,
+      "valid": true
+    },
+    {
+      "name": "invalid-letters",
+      "cell": "abc",
+      "valid": false,
+      "error": "INVALID_CELL"
+    }
+  ],
+  "readingCases": [
+    {
+      "name": "kept-ta7-acc50",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "kept",
+        "reason": null,
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "kept-accuracy-absent-assumes-250",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": null,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "kept",
+        "reason": null,
+        "radiusMeters": 547,
+        "toleranceMeters": 289
+      }
+    },
+    {
+      "name": "kept-accuracy-200-edge",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 200,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "kept",
+        "reason": null,
+        "radiusMeters": 547,
+        "toleranceMeters": 239
+      }
+    },
+    {
+      "name": "gps-imprecise-201",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 201,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "gps_imprecise",
+        "radiusMeters": 547,
+        "toleranceMeters": 240
+      }
+    },
+    {
+      "name": "location-age-absent-not-judged",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "kept",
+        "reason": null,
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "location-age-120000-edge-kept",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": 120000,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "kept",
+        "reason": null,
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "location-age-120001-stale",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": 120001,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "position_stale",
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "ta-unreliable",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": null,
+        "reliable": false,
+        "frozen": true
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "ta_unreliable",
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "ta-frozen-before-stale",
+      "input": {
+        "timingAdvance": 7,
+        "accuracyMeters": 50,
+        "locationAgeMs": 999999,
+        "reliable": true,
+        "frozen": true
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "ta_frozen",
+        "radiusMeters": 547,
+        "toleranceMeters": 89
+      }
+    },
+    {
+      "name": "ta0-near",
+      "input": {
+        "timingAdvance": 0,
+        "accuracyMeters": 30,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "near",
+        "reason": "ta_zero",
+        "radiusMeters": 400,
+        "toleranceMeters": 30
+      }
+    },
+    {
+      "name": "ta0-near-accuracy-absent",
+      "input": {
+        "timingAdvance": 0,
+        "accuracyMeters": null,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "near",
+        "reason": "ta_zero",
+        "radiusMeters": 400,
+        "toleranceMeters": 250
+      }
+    },
+    {
+      "name": "ta0-gps-imprecise",
+      "input": {
+        "timingAdvance": 0,
+        "accuracyMeters": 250,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": false
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "gps_imprecise",
+        "radiusMeters": 0,
+        "toleranceMeters": 289
+      }
+    },
+    {
+      "name": "ta0-frozen",
+      "input": {
+        "timingAdvance": 0,
+        "accuracyMeters": 30,
+        "locationAgeMs": null,
+        "reliable": true,
+        "frozen": true
+      },
+      "expected": {
+        "status": "discarded",
+        "reason": "ta_frozen",
+        "radiusMeters": 0,
+        "toleranceMeters": 69
+      }
+    }
+  ],
+  "geometry": {
+    "origin": {
+      "latitude": 45.0,
+      "longitude": 5.0
+    },
+    "ringReadings": [
+      {
+        "id": "r1",
+        "latitude": 45.00701,
+        "longitude": 5.0,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-11T10:00:00.000Z"
+      },
+      {
+        "id": "r2",
+        "latitude": 45.0,
+        "longitude": 5.00991,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-12T10:00:00.000Z"
+      },
+      {
+        "id": "r3",
+        "latitude": 44.99299,
+        "longitude": 5.0,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-13T10:00:00.000Z"
+      },
+      {
+        "id": "r4",
+        "latitude": 45.0,
+        "longitude": 4.99009,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-14T10:00:00.000Z"
+      },
+      {
+        "id": "r5",
+        "latitude": 45.00495,
+        "longitude": 5.00701,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-15T10:00:00.000Z"
+      },
+      {
+        "id": "r6",
+        "latitude": 44.99505,
+        "longitude": 4.99299,
+        "timingAdvance": 10,
+        "accuracyMeters": 20,
+        "observedAt": "2026-11-16T10:00:00.000Z"
+      }
+    ],
+    "farSite": {
+      "latitude": 45.02246,
+      "longitude": 5.0
+    }
+  },
+  "responseCases": [
+    {
+      "name": "valid-key-without-reading",
+      "status": 200,
+      "expected": {
+        "assessment": "no_position",
+        "readingCounts": {
+          "kept": 0,
+          "discarded": 0,
+          "near": 0,
+          "total": 0
+        },
+        "ranking": "abstained",
+        "rankingReason": "no_position",
+        "zone": null,
+        "readings": []
+      }
+    },
+    {
+      "name": "abstention-two-rings",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        }
+      ],
+      "expected": {
+        "assessment": "unusable",
+        "ranking": "abstained",
+        "rankingReason": "rings_few"
+      }
+    },
+    {
+      "name": "convergent-ranked",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 44.99299,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0,
+          "longitude": 4.99009,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00495,
+          "longitude": 5.00701,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 44.99505,
+          "longitude": 4.99299,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-16T10:00:00.000Z"
+        }
+      ],
+      "candidates": [
+        {
+          "siteId": "site-true",
+          "latitude": 45.0,
+          "longitude": 5.0
+        },
+        {
+          "siteId": "site-far",
+          "latitude": 45.02246,
+          "longitude": 5.0
+        }
+      ],
+      "expected": {
+        "assessment": "convergent",
+        "ranking": "ranked",
+        "rankingReason": null,
+        "order": [
+          "site-true",
+          "site-far"
+        ],
+        "matchedRings": {
+          "site-true": 6,
+          "site-far": 0
+        }
+      }
+    },
+    {
+      "name": "validated-site-rank-1",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 44.99299,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0,
+          "longitude": 4.99009,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00495,
+          "longitude": 5.00701,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 44.99505,
+          "longitude": 4.99299,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-16T10:00:00.000Z"
+        }
+      ],
+      "candidates": [
+        {
+          "siteId": "site-true",
+          "latitude": 45.0,
+          "longitude": 5.0
+        },
+        {
+          "siteId": "site-validated",
+          "kind": "validated",
+          "latitude": 45.02246,
+          "longitude": 5.0
+        }
+      ],
+      "expected": {
+        "order": [
+          "site-validated",
+          "site-true"
+        ],
+        "validatedSiteId": "site-validated",
+        "validatedInCandidates": true,
+        "confidence": {
+          "site-validated": "high"
+        }
+      }
+    },
+    {
+      "name": "hidden-community-not-compared",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 44.99299,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0,
+          "longitude": 4.99009,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00495,
+          "longitude": 5.00701,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 44.99505,
+          "longitude": 4.99299,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-16T10:00:00.000Z"
+        }
+      ],
+      "candidates": [
+        {
+          "siteId": "site-hidden",
+          "kind": "community",
+          "latitude": null,
+          "longitude": null
+        }
+      ],
+      "expected": {
+        "matchedRings": {
+          "site-hidden": null
+        },
+        "plausible": {
+          "site-hidden": false
+        },
+        "distanceToZoneCenterMeters": {
+          "site-hidden": null
+        },
+        "noReason": "ta_ring_impossible",
+        "note": "position masquee : jamais comparee aux anneaux. Un site masque ne sort que s'il declare le noeud, jamais par la seule proximite."
+      }
+    },
+    {
+      "name": "frequency-technology-band",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 44.99299,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0,
+          "longitude": 4.99009,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00495,
+          "longitude": 5.00701,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 44.99505,
+          "longitude": 4.99299,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-16T10:00:00.000Z"
+        }
+      ],
+      "nodeBands": [
+        "B28"
+      ],
+      "candidates": [
+        {
+          "siteId": "site-nr",
+          "latitude": 45.0,
+          "longitude": 5.0,
+          "bands": [
+            "n28"
+          ]
+        },
+        {
+          "siteId": "site-lte",
+          "latitude": 45.0,
+          "longitude": 5.0,
+          "bands": [
+            "B28",
+            "B3"
+          ]
+        },
+        {
+          "siteId": "site-unknown",
+          "latitude": 45.0,
+          "longitude": 5.0,
+          "bands": null
+        }
+      ],
+      "expected": {
+        "frequency": {
+          "site-nr": "mismatch",
+          "site-lte": "match",
+          "site-unknown": "unknown"
+        }
+      }
+    },
+    {
+      "name": "one-sided-no-zone",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00912,
+          "longitude": 5.0,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-10T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.00898,
+          "longitude": 5.00224,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 45.00857,
+          "longitude": 5.00441,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0079,
+          "longitude": 5.00645,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00699,
+          "longitude": 5.00829,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 45.00586,
+          "longitude": 5.00988,
+          "timingAdvance": 13,
+          "accuracyMeters": 10,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        }
+      ],
+      "candidates": [],
+      "expected": {
+        "zone": null,
+        "note": "relevés sur un arc de 50 degres : centre mal contraint, pas de disque"
+      }
+    },
+    {
+      "name": "estimated-without-candidate-key",
+      "readings": [
+        {
+          "id": "r1",
+          "latitude": 45.00701,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-11T10:00:00.000Z"
+        },
+        {
+          "id": "r2",
+          "latitude": 45.0,
+          "longitude": 5.00991,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-12T10:00:00.000Z"
+        },
+        {
+          "id": "r3",
+          "latitude": 44.99299,
+          "longitude": 5.0,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-13T10:00:00.000Z"
+        },
+        {
+          "id": "r4",
+          "latitude": 45.0,
+          "longitude": 4.99009,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-14T10:00:00.000Z"
+        },
+        {
+          "id": "r5",
+          "latitude": 45.00495,
+          "longitude": 5.00701,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-15T10:00:00.000Z"
+        },
+        {
+          "id": "r6",
+          "latitude": 44.99505,
+          "longitude": 4.99299,
+          "timingAdvance": 10,
+          "accuracyMeters": 20,
+          "observedAt": "2026-11-16T10:00:00.000Z"
+        }
+      ],
+      "candidates": [
+        {
+          "siteId": null,
+          "kind": "estimated",
+          "confirmable": false,
+          "latitude": 45.0,
+          "longitude": 5.0
+        }
+      ],
+      "expected": {
+        "siteId": null,
+        "confirmable": false,
+        "kind": "estimated",
+        "note": "sans candidateKey : siteId null, jamais un identifiant forge"
+      }
+    }
+  ]
+}

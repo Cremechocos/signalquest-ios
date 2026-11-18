@@ -81,6 +81,11 @@ struct RadioLogEntry: Codable, Identifiable, Sendable, Equatable {
     // Position du relevé
     let latitude: Double?
     let longitude: Double?
+    /// Précision GPS du relevé, en mètres, quand l'appareil l'a enregistrée.
+    let locationAccuracyMeters: Double?
+    /// Âge du fix GPS au moment de la mesure, en ms (horloge monotone de l'appareil émetteur,
+    /// TA-VISION r1.1). Absent = non jugé. Jamais déduit de `positionSeenAt`.
+    let locationAgeMs: Int?
 
     // Temps
     let observedAt: Date
@@ -103,7 +108,7 @@ struct RadioLogEntry: Codable, Identifiable, Sendable, Equatable {
         case networkIdentitySource, networkIdentityConfidence, networkIdentityObservedAt
         case nodeIdentityKind, nodeIdentityRaw, plmnEvidenceRequiresRefresh, cellIdentityEvidenceRequiresRefresh
         case rsrp, rsrq, sinr, rssi, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId
-        case latitude, longitude
+        case latitude, longitude, locationAccuracyMeters, locationAgeMs
         case observedAt, firstSeenAt, lastSeenAt, updatedAt, deletedAt
         case `operator`
     }
@@ -176,6 +181,8 @@ struct RadioLogEntry: Codable, Identifiable, Sendable, Equatable {
         timingAdvanceSourceCellId = c.decodeFlexibleString(forKey: .timingAdvanceSourceCellId)
         latitude = try? c.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try? c.decodeIfPresent(Double.self, forKey: .longitude)
+        locationAccuracyMeters = (try? c.decodeIfPresent(Double.self, forKey: .locationAccuracyMeters)) ?? nil
+        locationAgeMs = (try? c.decodeIfPresent(Int.self, forKey: .locationAgeMs)) ?? nil
         observedAt = (try? c.decodeIfPresent(Date.self, forKey: .observedAt)) ?? Date(timeIntervalSince1970: 0)
         firstSeenAt = (try? c.decodeIfPresent(Date.self, forKey: .firstSeenAt)) ?? nil
         lastSeenAt = (try? c.decodeIfPresent(Date.self, forKey: .lastSeenAt)) ?? nil
@@ -236,6 +243,8 @@ struct RadioLogEntry: Codable, Identifiable, Sendable, Equatable {
         try c.encodeIfPresent(timingAdvanceSourceCellId, forKey: .timingAdvanceSourceCellId)
         try c.encodeIfPresent(latitude, forKey: .latitude)
         try c.encodeIfPresent(longitude, forKey: .longitude)
+        try c.encodeIfPresent(locationAccuracyMeters, forKey: .locationAccuracyMeters)
+        try c.encodeIfPresent(locationAgeMs, forKey: .locationAgeMs)
         try c.encode(observedAt, forKey: .observedAt)
         try c.encodeIfPresent(firstSeenAt, forKey: .firstSeenAt)
         try c.encodeIfPresent(lastSeenAt, forKey: .lastSeenAt)

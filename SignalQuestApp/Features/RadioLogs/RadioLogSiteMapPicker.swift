@@ -210,6 +210,24 @@ struct RadioLogSiteMapPicker: View {
     @available(iOS 17.0, *)
     private var modernMap: some View {
         Map(initialPosition: .region(region)) {
+            // TA-VISION : la zone où les anneaux se croisent, puis les relevés que le serveur a
+            // écartés (pointillés gris, sans couronne) et les TA = 0 (disque pointillé, « à moins
+            // de 400 m », affiché sans compter).
+            if let zone = picker.taZone {
+                MapCircle(center: CLLocationCoordinate2D(latitude: zone.latitude, longitude: zone.longitude), radius: zone.radiusMeters)
+                    .foregroundStyle(SQColor.accentInk.opacity(0.12))
+                    .stroke(SQColor.accentInk, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+            }
+            ForEach(picker.taDiscardedRings) { ring in
+                MapCircle(center: ring.coordinate, radius: ring.radiusMeters)
+                    .foregroundStyle(.clear)
+                    .stroke(SQColor.labelTertiary, style: StrokeStyle(lineWidth: 1.2, dash: [4, 6]))
+            }
+            ForEach(picker.taNearDiscs) { disc in
+                MapCircle(center: disc.coordinate, radius: disc.radiusMeters)
+                    .foregroundStyle(P.ink.opacity(0.04))
+                    .stroke(P.ink.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [1, 5]))
+            }
             // Les anneaux d'abord : ils sont un fond de raisonnement, les épingles se
             // lisent par-dessus.
             ForEach(picker.taRings) { ring in
@@ -577,6 +595,10 @@ struct RadioLogSiteMapPicker: View {
 
     /// Résumé de ce que les anneaux permettent de conclure — jamais un simple décompte.
     private var taGeometrySummary: String {
+        // Le classement du serveur, quand il a répondu : la même phrase que la feuille.
+        if let response = picker.taVision.response {
+            return RadioLogTaVisionText.summary(response).headline
+        }
         let count = picker.taRings.count
         var text: String
         switch picker.taAssessment {
@@ -594,6 +616,10 @@ struct RadioLogSiteMapPicker: View {
             text += picker.taDiscardedCount > 1
                 ? String(localized: "\(picker.taDiscardedCount) relevés incohérents écartés.")
                 : String(localized: "1 relevé incohérent écarté.")
+        }
+        // Repli local : le serveur n'a pas classé ces anneaux.
+        if picker.taVision == .unavailable {
+            text += " " + String(localized: "Classement indisponible pour l’instant.")
         }
         return text
     }

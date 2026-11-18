@@ -229,6 +229,7 @@
 		37A3AB3BD9CA8F55AFC8B406 /* E2EEAutoDeviceRevocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80688E358C9C44A9F57C5A15 /* E2EEAutoDeviceRevocation.swift */; };
 		3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */; };
 		3817D42225B030A228C581D5 /* OutageContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1A5B76D33ECAD240F471C5 /* OutageContextTests.swift */; };
+		3829F55FB3D8BD1EA3935F55 /* RadioLogTaCandidatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41C949459EB26518349AD32 /* RadioLogTaCandidatesTests.swift */; };
 		3866C1CA8EEC2E696EAE8C8E /* SentinelleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430454E901BFB79E1C37A0E2 /* SentinelleView.swift */; };
 		38B3BCD193F87AF57A825082 /* MapFeedAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16374DCA26753933414E679A /* MapFeedAvailabilityTests.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
@@ -748,6 +749,7 @@
 		BF6C11953C6A4F448569095B /* LocalizationBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC51B558FC8D2BD425C08864 /* LocalizationBundleTests.swift */; };
 		BFE7E3250B583D9C55A1B433 /* MyMeasurementsHTTPQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28375B245A717A406C853972 /* MyMeasurementsHTTPQATests.swift */; };
 		BFF7354BDB3F58AF98940DC3 /* CustomSiteOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0B6011D6BB75DFD2652023 /* CustomSiteOutbox.swift */; };
+		C022A76E1EE0D844D807C0F9 /* RadioLogTaCandidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA335C0E28D911E82A274ED /* RadioLogTaCandidates.swift */; };
 		C063D2E2FDCFBB26618934FE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66DFBB8FE15CA2DBA663B20 /* AppDelegate.swift */; };
 		C06919796545F7DC03E42920 /* PhotoBlurCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA4B62730DEC85BED160A7E /* PhotoBlurCanvas.swift */; };
 		C097999FF642A4BB7FB69938 /* MessageNotificationCategoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780B7E8749E094DA45EB47CC /* MessageNotificationCategoryTests.swift */; };
@@ -1533,6 +1535,7 @@
 		7DAB8EA7B350B181429EE0A5 /* SpeedtestVisibilityViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestVisibilityViewModelTests.swift; sourceTree = "<group>"; };
 		7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationService.swift; sourceTree = "<group>"; };
 		7DE4E9AF2E441E9BC074D737 /* MapNativeViewportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapNativeViewportTests.swift; sourceTree = "<group>"; };
+		7EA335C0E28D911E82A274ED /* RadioLogTaCandidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogTaCandidates.swift; sourceTree = "<group>"; };
 		7EB76566DD42F7C4A5E81198 /* FeedPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedPreferencesView.swift; sourceTree = "<group>"; };
 		7EE528A7DF919DF61EAFCD95 /* CarPlayMapLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapLayers.swift; sourceTree = "<group>"; };
 		7EF6816E6565319D822C6C80 /* MapViewportLoadGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapViewportLoadGate.swift; sourceTree = "<group>"; };
@@ -1905,6 +1908,7 @@
 		E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoModels.swift; sourceTree = "<group>"; };
 		E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzimuthBeamGroupingTests.swift; sourceTree = "<group>"; };
 		E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheetTests.swift; sourceTree = "<group>"; };
+		E41C949459EB26518349AD32 /* RadioLogTaCandidatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogTaCandidatesTests.swift; sourceTree = "<group>"; };
 		E4ABAC896B0F7D40AB2F97B5 /* ShareContentLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareContentLoader.swift; sourceTree = "<group>"; };
 		E4BD349142FA1277F0D1ADC5 /* ActiveCellularServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveCellularServiceTests.swift; sourceTree = "<group>"; };
 		E4D38E0CB180E8E0F533A27D /* MapBands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBands.swift; sourceTree = "<group>"; };
@@ -2125,6 +2129,7 @@
 				44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */,
 				C263B41C968A1E89912CAEA9 /* RadioLogModels.swift */,
 				2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */,
+				7EA335C0E28D911E82A274ED /* RadioLogTaCandidates.swift */,
 				055A661FC799E8A29E448AF7 /* SentinelleIpv6.swift */,
 				267A49276A6A6F922F316125 /* SentinelleModels.swift */,
 				3FE5C79C83022DCA9EF9955F /* SessionAnalysisModels.swift */,
@@ -3350,6 +3355,7 @@
 				674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */,
 				86C14553EB41501D2971CAFE /* RadioLogsRenderingTests.swift */,
 				4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */,
+				E41C949459EB26518349AD32 /* RadioLogTaCandidatesTests.swift */,
 				FFEDF50792978A1127B6CE18 /* RecentlyViewedStoreTests.swift */,
 				49F698B1964EB775ACCA35C3 /* RecipeBackendPersistenceTests.swift */,
 				ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */,
@@ -4307,6 +4313,7 @@
 				D57FB42D1064CB2A6172E6A2 /* RadioLogSiteMapPicker.swift in Sources */,
 				4B210BA00F5D6D35E73E36AA /* RadioLogSiteModels.swift in Sources */,
 				F87A9373237B5F0AE131AA87 /* RadioLogStore.swift in Sources */,
+				C022A76E1EE0D844D807C0F9 /* RadioLogTaCandidates.swift in Sources */,
 				A1ABC76C1DC3033D0345F5AC /* RadioLogsFilterSheet.swift in Sources */,
 				AC0E3A17246AC53079793B7E /* RadioLogsService.swift in Sources */,
 				B6FB2B5B1F6516981E6A8ACF /* RadioLogsSiteCard.swift in Sources */,
@@ -4790,6 +4797,7 @@
 				09D2F7CCBBD36CC87B98DCAC /* QualityScaleContractTests.swift in Sources */,
 				CAEF2F5EDEBB9DC5AD6970A6 /* QualityScaleContractV11Tests.swift in Sources */,
 				669A95D9E954E5641284B736 /* QualityScaleTests.swift in Sources */,
+				3829F55FB3D8BD1EA3935F55 /* RadioLogTaCandidatesTests.swift in Sources */,
 				F47129B56129A43519FD18DF /* RadioLogsRenderingTests.swift in Sources */,
 				E1B2D16B328B500C0B3E1E1E /* RadioLogsTests.swift in Sources */,
 				F2EF05268B587AA661DB2D96 /* RecentlyViewedStoreTests.swift in Sources */,
