@@ -166,6 +166,8 @@ extension FrequencyBlocks {
         var unknown: [Range] = []
         /// Part du temps en descente d'un TDD (ISED).
         var dlSharePercent: Double?
+        /// Générations de cet opérateur dans la rangée, 2G → 5G (support partagé, forme B du 19/11).
+        var generations: [BandRow.GenerationTag] = []
 
         /// Une seule paire FDD : elle tient sur une ligne « ↓ … · ↑ … MHz ».
         var isSinglePair: Bool { dl.count == 1 && ul.count == 1 && both.isEmpty && unknown.isEmpty }
@@ -205,6 +207,11 @@ extension FrequencyBlocks {
         /// Générations de la rangée, dans l'ordre 2G → 5G ; « en projet » si aucun bloc n'est en service.
         let generations: [GenerationTag]
         let isPlanned: Bool
+        /// Tous les libellés de la rangée, B… puis n… puis les autres (« B28 · n28 ») : l'en-tête
+        /// d'une rangée partagée, comme le site.
+        var labels: [String] = []
+        /// Part du temps en descente d'un TDD de la rangée : en tête de rangée sur un support partagé.
+        var dlSharePercent: Double?
 
         struct GenerationTag: Equatable, Sendable {
             let generation: String
@@ -234,15 +241,26 @@ extension FrequencyBlocks {
             let live = inRow.filter { !$0.planned }
             let shown = live.isEmpty ? inRow : live
             let distinct = Set(shown.map { BoundsKey(dl: $0.dl, ul: $0.ul, range: $0.range, duplex: nil) }).count
+            func tags(_ blocks: [Block]) -> [BandRow.GenerationTag] {
+                ["2G", "3G", "4G", "5G"].compactMap { gen -> BandRow.GenerationTag? in
+                    guard blocks.contains(where: { $0.generation == gen }) else { return nil }
+                    return .init(generation: gen, planned: !blocks.contains { $0.generation == gen && !$0.planned })
+                }
+            }
             let ranges = visible.compactMap { key2, blocks -> OperatorRanges? in
                 let own = blocks.filter { rowKey($0) == key }
                 let ownLive = own.filter { !$0.planned }
-                return own.isEmpty ? nil : OperatorRanges(operatorKey: key2, blocks: ownLive.isEmpty ? own : ownLive)
+                guard !own.isEmpty else { return nil }
+                var entry = OperatorRanges(operatorKey: key2, blocks: ownLive.isEmpty ? own : ownLive)
+                entry.generations = tags(own)
+                return entry
             }
-            let tags = ["2G", "3G", "4G", "5G"].compactMap { gen -> BandRow.GenerationTag? in
-                guard inRow.contains(where: { $0.generation == gen }) else { return nil }
-                return .init(generation: gen, planned: !live.contains { $0.generation == gen })
+            var labels: [String] = []
+            for name in inRow.map({ $0.band ?? $0.system }) where !name.isEmpty && !labels.contains(name) {
+                labels.append(name)
             }
+            labels = labels.filter { $0.hasPrefix("B") } + labels.filter { $0.hasPrefix("n") }
+                + labels.filter { !$0.hasPrefix("B") && !$0.hasPrefix("n") }
             return BandRow(
                 id: key,
                 bandMhz: inRow.first?.bandMhz,
@@ -251,8 +269,10 @@ extension FrequencyBlocks {
                 widthMhz: !shared && distinct == 1 && source != .bandPlan ? shown.first?.widthMhz.flatMap { $0 > 0 ? $0 : nil } : nil,
                 carriers: !shared && distinct > 1 && source == .ised ? distinct : nil,
                 operators: ranges,
-                generations: tags,
-                isPlanned: live.isEmpty
+                generations: tags(inRow),
+                isPlanned: live.isEmpty,
+                labels: labels,
+                dlSharePercent: inRow.lazy.compactMap(\.dlSharePercent).first
             )
         }
         return rows.enumerated().sorted { a, b in
@@ -268,6 +288,29 @@ extension FrequencyBlocks {
             sum + Set(Self.visibleBlocks(op.blocks).filter { !$0.planned }
                 .map { BoundsKey(dl: $0.dl, ul: $0.ul, range: $0.range, duplex: nil) }).count
         }
+    }
+
+    /// Les opérateurs dans l'ordre des lignes opérateur de la fiche, l'actif en tête (choix d'Alexandre
+    /// du 19/11) ; un opérateur servi hors de cette liste garde sa place servie, à la suite.
+    func ordered(by keys: [String]) -> FrequencyBlocks {
+        let rank = Dictionary(keys.enumerated().map { ($1.uppercased(), $0) }, uniquingKeysWith: { first, _ in first })
+        let sorted = operators.enumerated().sorted { a, b in
+            let ra = rank[a.element.operatorKey.uppercased()] ?? Int.max
+            let rb = rank[b.element.operatorKey.uppercased()] ?? Int.max
+            return ra != rb ? ra < rb : a.offset < b.offset
+        }.map(\.element)
+        return FrequencyBlocks(source: source, datasetDate: datasetDate, operators: sorted)
+    }
+
+    /// Les opérateurs du support sans bloc servi, dans l'ordre du support : une ligne « Bandes non
+    /// publiées » chacun. Seulement sur une réponse partagée dont toutes les clés sont celles du
+    /// support : une réponse à un seul opérateur (serveur d'avant le 19/11) ne dit rien des autres.
+    func unpublishedOperators(of support: [String]) -> [String] {
+        let served = operators.filter { !Self.visibleBlocks($0.blocks).isEmpty }.map { $0.operatorKey.uppercased() }
+        let known = Set(support.map { $0.uppercased() })
+        guard served.count > 1, served.allSatisfy(known.contains) else { return [] }
+        var seen = Set(served)
+        return support.filter { seen.insert($0.uppercased()).inserted && $0.uppercased() != "ALL" }
     }
 
     private static func keyNumber(_ value: Double) -> String {

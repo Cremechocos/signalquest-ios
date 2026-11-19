@@ -446,6 +446,17 @@ struct AntennaDetailSheet: View {
         MarketRegistryEntry.operatorLabel(key, in: marketEntry)
     }
 
+    /// « Bouygues » quand « Bouygues Telecom » ne tient pas (cadre Fréquences).
+    private func shortOperatorLabel(_ key: String) -> String {
+        if let short = marketEntry?.operatorEntry(forKey: key)?.shortLabel, !short.isEmpty { return short }
+        return SQBrand.operatorShortName(key) ?? photoOperatorLabel(key)
+    }
+
+    /// Les opérateurs du support dans l'ordre des lignes de la fiche, l'actif en tête (forme B du 19/11).
+    private var supportOperatorsActiveFirst: [String] {
+        [selectedOperator] + site.operators.filter { $0 != selectedOperator }
+    }
+
     /// Des visages sur la photo : l'éditeur « Flouter » s'ouvre avant l'envoi,
     /// qu'on peut aussi faire sans flou. Sans visage, l'envoi part directement.
     private func submitPhotoUpload(_ item: PhotosPickerItem, operatorName: String) {
@@ -863,7 +874,9 @@ struct AntennaDetailSheet: View {
             radioBlock
             // FREQ-BLOCKS : les bornes réelles de chaque opérateur, quand le pays a une source.
             if let frequencyBlocks = model.details?.core?.frequencyBlocks {
-                FrequencyBlocksCard(blocks: frequencyBlocks, operatorLabel: photoOperatorLabel, operatorColor: registryColor)
+                FrequencyBlocksCard(blocks: frequencyBlocks, supportOperators: supportOperatorsActiveFirst,
+                                    operatorLabel: photoOperatorLabel, operatorShortLabel: shortOperatorLabel,
+                                    operatorColor: registryColor)
             }
             // Les cellules que le membre a placées ici, à corriger sans passer par les logs.
             SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify,
@@ -930,18 +943,6 @@ struct AntennaDetailSheet: View {
             }
             .padding(.horizontal, SQSpace.md)
             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            if let projectNote {
-                Text(projectNote)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityIdentifier("antenna.detail.projectBands")
-            }
-            if let sameBandsNote {
-                Text(sameBandsNote)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityIdentifier("antenna.detail.sameBands")
-            }
             if site.operators.count > 1 {
                 Text("Touche un opérateur pour voir sa fiche.")
                     .font(SQType.caption)
@@ -975,15 +976,21 @@ struct AntennaDetailSheet: View {
             }
         }
         .frame(minHeight: 46)
-        // Forme B (BANDES-OP) : sous chaque opérateur, une rangée par génération
-        // avec SES bandes. Plus de pastilles ni de liste réunissant le support.
+        // Forme B du 19/11 : sous chaque opérateur, ses générations en pastilles ; ses bandes
+        // vont dans le cadre Fréquences et, génération par génération, dans l'onglet Identifiants.
         let row = VStack(alignment: .leading, spacing: 0) {
             header
             Group {
                 if let rows = bandRows(for: op) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(rows) { generationRow($0) }
+                    HStack(spacing: 4) {
+                        ForEach(Self.generationTags(rows), id: \.generation) {
+                            FrequencyGenerationTag(generation: $0.generation, planned: $0.planned)
+                        }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: Self.generationTags(rows).map {
+                        $0.planned ? String(localized: "\($0.generation) en projet") : $0.generation
+                    }.joined(separator: ", ")))
                 } else if (isActive && model.details == nil && model.error == nil) || (!isActive && loadingOtherOperators.contains(op)) {
                     // La fiche scopée charge et la tuile ne lui attribue rien :
                     // un squelette plutôt que les bandes du support.
@@ -1013,6 +1020,54 @@ struct AntennaDetailSheet: View {
                 .accessibilityAddTraits(site.operators.count > 1 ? .isSelected : [])
                 .accessibilityIdentifier("antenna.detail.operator.\(op)")
         }
+    }
+
+    /// Générations d'un opérateur, 2G → 5G : pleine si une bande est en service, en pointillé sinon.
+    nonisolated static func generationTags(_ rows: [GenerationBands]) -> [(generation: String, planned: Bool)] {
+        rows.reversed().map { ($0.generation, $0.bands.isEmpty) }
+    }
+
+    /// « Bandes par opérateur » (onglet Identifiants) : « 4G ····· 800 · 1800 » sous chaque
+    /// opérateur, puis les projets du support et « Mêmes bandes déclarées par … ».
+    private var operatorBandsContent: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            ForEach(site.operators.isEmpty ? [selectedOperator] : supportOperatorsActiveFirst, id: \.self) { op in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: SQSpace.sm) {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(registryColor(op))
+                            .frame(width: 3, height: 14)
+                        Text(photoOperatorLabel(op))
+                            .font(SQType.caption(.bold))
+                            .foregroundStyle(SQColor.label)
+                    }
+                    .accessibilityAddTraits(.isHeader)
+                    if let rows = bandRows(for: op) {
+                        ForEach(rows) { generationRow($0) }
+                    } else if (op == selectedOperator && model.details == nil && model.error == nil) || loadingOtherOperators.contains(op) {
+                        SkeletonBlock(width: 160, height: 14, radius: SQRadius.sm)
+                            .accessibilityHidden(true)
+                    } else {
+                        Text("Bandes non publiées")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+            }
+            if let projectNote {
+                Text(projectNote)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("antenna.detail.projectBands")
+            }
+            if let sameBandsNote {
+                Text(sameBandsNote)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("antenna.detail.sameBands")
+            }
+        }
+        .accessibilityIdentifier("antenna.detail.operatorBands")
     }
 
     /// « eNB 812345 » ou « gNB 1203344 » : le numéro du site pour l'opérateur affiché.
@@ -1568,6 +1623,9 @@ struct AntennaDetailSheet: View {
                 }
                 section("Site") {
                     factCard { siteContent(core) }
+                }
+                section("Bandes par opérateur") {
+                    factCard { operatorBandsContent }
                 }
                 section("Technique") {
                     factCard { technicalContent(core) }

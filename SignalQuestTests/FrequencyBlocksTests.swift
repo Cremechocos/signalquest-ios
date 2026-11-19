@@ -181,6 +181,83 @@ final class FrequencyBlocksTests: XCTestCase {
         XCTAssertTrue(value.showsPlanned)
     }
 
+    // MARK: Forme B (fréquences par opérateur, choix d'Alexandre du 19/11)
+
+    /// Les opérateurs suivent les lignes opérateur de la fiche, l'actif en tête ; un opérateur servi hors
+    /// de la liste garde sa place servie, à la suite.
+    func testSharedRowsPutTheActiveOperatorFirst() throws {
+        let value = try fixture("frequency-blocks-fr-shared-v1")
+        XCTAssertEqual(value.bandRows[0].operators.map(\.operatorKey), ["SFR", "BOUYGUES"])
+        let card = FrequencyBlocksCard(blocks: value, supportOperators: ["BOUYGUES", "SFR", "ORANGE"],
+                                       operatorLabel: { $0 }, operatorColor: { _ in .gray })
+        XCTAssertEqual(card.blocks.operators.map(\.operatorKey), ["BOUYGUES", "SFR"])
+        XCTAssertEqual(card.blocks.bandRows.map { $0.operators.map(\.operatorKey) },
+                       Array(repeating: ["BOUYGUES", "SFR"], count: 7))
+        XCTAssertEqual(value.ordered(by: ["free"]).operators.map(\.operatorKey), ["SFR", "BOUYGUES"])
+        XCTAssertEqual(try blocks(Self.shared).ordered(by: ["free"]).operators.map(\.operatorKey), ["FREE", "ORANGE"])
+    }
+
+    /// « Bandes non publiées » seulement quand la réponse est partagée et ne nomme que des opérateurs du
+    /// support : une réponse à un seul opérateur (serveur d'avant) ne dit rien des autres.
+    func testUnpublishedOperatorsNeedASharedAnswer() throws {
+        let value = try fixture("frequency-blocks-fr-shared-v1")
+        XCTAssertEqual(value.unpublishedOperators(of: ["SFR", "ORANGE", "BOUYGUES", "FREE"]), ["ORANGE", "FREE"])
+        XCTAssertEqual(value.unpublishedOperators(of: ["SFR", "BOUYGUES"]), [])
+        XCTAssertEqual(value.unpublishedOperators(of: ["SFR", "ORANGE", "ALL"]), [], "BOUYGUES est servi hors du support")
+        XCTAssertEqual(value.unpublishedOperators(of: ["sfr", "bouygues", "ALL", "orange"]), ["orange"])
+        XCTAssertEqual(try blocks(Self.france).unpublishedOperators(of: ["ORANGE", "SFR", "FREE"]), [])
+        XCTAssertEqual(value.unpublishedOperators(of: []), [])
+    }
+
+    /// En-tête de rangée partagée : tous ses libellés (« B1 · n1 »), et les générations de chaque opérateur.
+    func testSharedRowsCarryAllLabelsAndEachOperatorsGenerations() throws {
+        let real = try fixture("frequency-blocks-fr-shared-v1").bandRows
+        XCTAssertEqual(real.map(\.labels), [["B28"], ["B20"], ["UMTS 900"], ["B3"], ["B1", "n1"], ["B7"], ["n78"]])
+        for entry in real[4].operators {
+            XCTAssertEqual(entry.generations.map(\.generation), ["4G", "5G"], entry.operatorKey)
+            XCTAssertEqual(entry.generations.map(\.planned), [false, false], entry.operatorKey)
+        }
+        XCTAssertEqual(real[2].operators.map { $0.generations.map(\.generation) }, [["3G"], ["3G"]])
+        // Ligne d'opérateur : ni « MHz » ni part du TDD, comme le site.
+        let n78 = try XCTUnwrap(real[6].operators.first { $0.operatorKey == "BOUYGUES" })
+        XCTAssertEqual(FrequencyBandRowView.rangeLines(n78, share: false, unit: false).map(plain), ["↓↑ 3570–3640"])
+        let sfr = try XCTUnwrap(real[4].operators.first { $0.operatorKey == "SFR" })
+        XCTAssertEqual(FrequencyBandRowView.rangeLines(sfr, share: false, unit: false).map(plain),
+                       ["↓ 2110,5–2125,3 · ↑ 1920,5–1935,3"].map(localized))
+
+        let planche = try blocks(Self.shared).bandRows
+        XCTAssertEqual(planche[0].labels, ["B28", "n28"])
+        XCTAssertEqual(planche[0].operators.map { $0.generations.map(\.generation) }, [["4G"], ["5G"]])
+        XCTAssertNil(planche[2].dlSharePercent)
+        let canada = try blocks(Self.canada).bandRows
+        XCTAssertEqual(canada[3].dlSharePercent, 75)
+        let n78Bell = try XCTUnwrap(canada[3].operators.first)
+        XCTAssertEqual(FrequencyBandRowView.rangeLines(n78Bell, share: false, unit: false).map(plain), ["↓↑ 3500–3600"])
+        XCTAssertEqual(FrequencyBandRowView.rangeLines(n78Bell).count, 2, "la part reste sur un opérateur seul")
+    }
+
+    /// En-tête du cadre : un opérateur seul est nommé ; un support compte aussi ses opérateurs non publiés.
+    func testCountLineNamesASingleOperator() throws {
+        guard Bundle.main.preferredLocalizations.first == "fr" else { throw XCTSkip("textes français seulement") }
+        let names = ["ORANGE": "Orange", "BELL": "Bell", "SFR": "SFR", "BOUYGUES": "Bouygues Telecom"]
+        func line(_ value: FrequencyBlocks, _ support: [String] = []) -> String {
+            FrequencyBlocksCard(blocks: value, supportOperators: support, operatorLabel: { names[$0] ?? $0 },
+                                operatorColor: { _ in .gray }).countLine
+        }
+        XCTAssertEqual(line(try blocks(Self.france)), "Orange · 6 bandes")
+        XCTAssertEqual(line(try blocks(Self.canada)), "Bell · 5 porteuses · 4 bandes")
+        let real = try fixture("frequency-blocks-fr-shared-v1")
+        XCTAssertEqual(line(real, ["SFR", "BOUYGUES"]), "2 opérateurs · 7 bandes")
+        XCTAssertEqual(line(real, ["SFR", "ORANGE", "BOUYGUES"]), "3 opérateurs · 7 bandes")
+    }
+
+    /// Les pastilles du bloc Radio, 2G → 5G : en pointillé quand l'opérateur n'a que des projets.
+    func testRadioBlockTagsGoFrom2GTo5G() {
+        let rows = GenerationBands.rows(systems: ["LTE 800", "5G NR 3500", "GSM 900"], planned: ["3G 2100"])
+        XCTAssertEqual(AntennaDetailSheet.generationTags(rows).map(\.generation), ["2G", "3G", "4G", "5G"])
+        XCTAssertEqual(AntennaDetailSheet.generationTags(rows).map(\.planned), [false, true, false, false])
+    }
+
     /// Les vecteurs sont écrits en français : en anglais, la virgule décimale devient un point.
     private func localized(_ text: String) -> String {
         Bundle.main.preferredLocalizations.first == "fr" ? text : text.replacingOccurrences(of: ",", with: ".")
@@ -258,14 +335,19 @@ final class FrequencyBlocksTests: XCTestCase {
                                        "BELL": Color(hex: 0x0066CC), "POST_LU": Color(hex: 0xFFCC00)]
         let names = ["ORANGE": "Orange", "FREE": "Free Mobile", "BELL": "Bell", "POST_LU": "POST",
                      "SFR": "SFR", "BOUYGUES": "Bouygues Telecom"]
+        let shortNames = ["FREE": "Free", "BOUYGUES": "Bouygues"]
+        // Forme B : le support réel avec Orange sans bloc servi, l'actif (SFR) en tête.
+        let supports = ["partage": ["FREE", "ORANGE"], "frequency-blocks-fr-shared-v1": ["SFR", "BOUYGUES", "ORANGE"]]
         let variants: [(String, ColorScheme, DynamicTypeSize)] = [
             ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2),
         ]
         for (fixture, json) in fixtures {
             let value = try blocks(json)
-            for (name, scheme, size) in variants where fixture == "france" || fixture.hasSuffix("umts-range-v1") || name == "clair" {
+            for (name, scheme, size) in variants
+            where fixture == "france" || fixture.hasSuffix("umts-range-v1") || supports[fixture] != nil || name == "clair" {
                 let view = ScrollView {
-                    FrequencyBlocksCard(blocks: value, operatorLabel: { names[$0] ?? $0 },
+                    FrequencyBlocksCard(blocks: value, supportOperators: supports[fixture] ?? [],
+                                        operatorLabel: { names[$0] ?? $0 }, operatorShortLabel: { shortNames[$0] ?? names[$0] ?? $0 },
                                         operatorColor: { colors[$0] ?? .gray })
                         .padding(16)
                 }
@@ -280,6 +362,17 @@ final class FrequencyBlocksTests: XCTestCase {
                     window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
                 }
                 try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: output).appendingPathComponent("\(fixture)-\(name).png"))
+                // Le cadre entier, hors fenêtre : le bas d'un long support (« Bandes non publiées ») dépasse l'écran.
+                if supports[fixture] != nil {
+                    let full = ImageRenderer(content: FrequencyBlocksCard(
+                        blocks: value, supportOperators: supports[fixture] ?? [], operatorLabel: { names[$0] ?? $0 },
+                        operatorShortLabel: { shortNames[$0] ?? names[$0] ?? $0 }, operatorColor: { colors[$0] ?? .gray })
+                        .padding(16).frame(width: window.bounds.width).background(SQColor.bg)
+                        .environment(\.colorScheme, scheme).environment(\.dynamicTypeSize, size))
+                    full.scale = 2
+                    try XCTUnwrap(full.uiImage?.pngData())
+                        .write(to: URL(fileURLWithPath: output).appendingPathComponent("\(fixture)-\(name)-entier.png"))
+                }
             }
         }
     }
