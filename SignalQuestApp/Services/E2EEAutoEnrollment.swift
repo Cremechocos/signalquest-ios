@@ -484,11 +484,14 @@ extension E2EEAutoEnrollment {
             if let revocation = E2EEAutoRevocationMarker.read(
                 store: markerStore, ownerNamespace: scope.ownerNamespace, authToken: api.credentials.accessToken()
             ) { return .revoked(revocation.reason) }
+            // Retenue avant la création : aucune autre requête ne signe avec l'identité neuve.
+            E2EEAutoEnrollmentGate.holdIfFresh(ownerNamespace: scope.ownerNamespace, identityStore: identityStore)
             _ = try? identityStore.loadOrCreate(ownerNamespace: scope.ownerNamespace)
             guard let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == scope.ownerScopeId,
                   let enrollment = live(session: session, api: api, label: label, identityStore: identityStore, markerStore: markerStore)
             else { return outcome }
             outcome = await enrollment.run()
+            if outcome?.deviceAccepted == true { E2EEAutoEnrollmentGate.release(ownerNamespace: session.ownerNamespace) }
             switch outcome {
             case .identityReplaced? where !replaced:
                 replaced = true
@@ -504,7 +507,57 @@ extension E2EEAutoEnrollment {
     }
 }
 
+/// Identité neuve que le serveur n'a pas encore acceptée. Constat de la 186 :
+/// l'identité est créée avant son inscription, et les jetons push comme les
+/// exigences de rotation, partis en même temps à la connexion, signaient déjà
+/// avec elle (`401 E2EE_DEVICE_SIGNATURE_INVALID`, appareil inconnu). Seule
+/// l'inscription signe donc avec une identité retenue : les autres requêtes
+/// attendent son acceptation, bornée, puis échouent ici, à rejouer.
+enum E2EEAutoEnrollmentGate {
+    private static let lock = NSLock()
+    // Accès exclusivement sous `lock`.
+    nonisolated(unsafe) private static var held: Set<String> = []
+
+    /// Avant de créer l'identité : retenue seulement si aucune n'existe. Une
+    /// lecture en erreur ne retient rien, la création échouera de même.
+    @discardableResult
+    static func holdIfFresh(ownerNamespace: String, identityStore: E2EEV2DeviceIdentityStore) -> Bool {
+        let fresh: Bool
+        do { fresh = try identityStore.load(ownerNamespace: ownerNamespace) == nil } catch { fresh = false }
+        guard fresh else { return false }
+        lock.withLock { _ = held.insert(ownerNamespace) }
+        return true
+    }
+
+    /// Le serveur connaît l'appareil : inscrit, actif ou en attente.
+    static func release(ownerNamespace: String) {
+        lock.withLock { _ = held.remove(ownerNamespace) }
+    }
+
+    static func isHeld(ownerNamespace: String) -> Bool {
+        lock.withLock { held.contains(ownerNamespace) }
+    }
+
+    /// `true` dès que l'identité n'est pas, ou plus, retenue ; `false` au bout du délai.
+    static func awaitAcceptance(ownerNamespace: String, timeoutSeconds: TimeInterval = 15) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while isHeld(ownerNamespace: ownerNamespace) {
+            guard Date() < deadline, !Task.isCancelled else { return false }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return true
+    }
+}
+
 extension E2EEAutoEnrollment.Outcome {
+    /// Le serveur connaît l'appareil : les autres requêtes peuvent signer avec lui.
+    var deviceAccepted: Bool {
+        switch self {
+        case .active, .pending, .registered: return true
+        default: return false
+        }
+    }
+
     /// Étape pour la trace, sans identifiant.
     var traceStep: String {
         switch self {

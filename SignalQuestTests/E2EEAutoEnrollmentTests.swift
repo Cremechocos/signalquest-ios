@@ -609,3 +609,96 @@ final class E2EEAutoEnrollmentTests: XCTestCase {
         XCTAssertFalse(parse(Self.written(entry, seq: 22)), "maillon d'un autre seq")
     }
 }
+
+/// Constat de la 186 : une identité neuve signait les jetons push et les
+/// exigences de rotation avant son inscription (`401 E2EE_DEVICE_SIGNATURE_INVALID`).
+final class E2EEAutoEnrollmentGateTests: XCTestCase {
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    private func store() -> E2EEV2DeviceIdentityStore {
+        E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+    }
+
+    func testOnlyAFreshIdentityIsHeldUntilTheServerAcceptsIt() async throws {
+        let identities = store()
+        let fresh = LocalAccountScope.storageNamespace(for: "user:gate-fresh-\(UUID().uuidString)")
+        XCTAssertTrue(E2EEAutoEnrollmentGate.holdIfFresh(ownerNamespace: fresh, identityStore: identities))
+        _ = try identities.loadOrCreate(ownerNamespace: fresh)
+        XCTAssertTrue(E2EEAutoEnrollmentGate.isHeld(ownerNamespace: fresh))
+        let timedOut = await E2EEAutoEnrollmentGate.awaitAcceptance(ownerNamespace: fresh, timeoutSeconds: 0.2)
+        XCTAssertFalse(timedOut, "retenue : l'attente se termine sans acceptation")
+        E2EEAutoEnrollmentGate.release(ownerNamespace: fresh)
+        let accepted = await E2EEAutoEnrollmentGate.awaitAcceptance(ownerNamespace: fresh, timeoutSeconds: 0.2)
+        XCTAssertTrue(accepted)
+
+        let existing = LocalAccountScope.storageNamespace(for: "user:gate-existing-\(UUID().uuidString)")
+        _ = try identities.loadOrCreate(ownerNamespace: existing)
+        XCTAssertFalse(E2EEAutoEnrollmentGate.holdIfFresh(ownerNamespace: existing, identityStore: identities),
+                       "une identité déjà là n'est jamais retenue")
+        XCTAssertFalse(E2EEAutoEnrollmentGate.isHeld(ownerNamespace: existing))
+    }
+
+    func testOnlyAnOutcomeTheServerKnowsReleasesTheIdentity() {
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.registered(deviceId: "d", status: .active).deviceAccepted)
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.registered(deviceId: "d", status: .pending).deviceAccepted)
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.active(deviceId: "d", rotated: false).deviceAccepted)
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.pending(deviceId: "d").deviceAccepted)
+        for outcome: E2EEAutoEnrollment.Outcome in [
+            .retryLater, .logClosed(retryAfterSeconds: 30), .logRefused, .failed("x"), .identityReplaced,
+            .revoked(nil), .reauthenticate, .sessionRefreshRequired, .updateRequired, .accountDeleted,
+        ] {
+            XCTAssertFalse(outcome.deviceAccepted, outcome.traceStep)
+        }
+    }
+
+    /// Retenue : la requête signée attend sans partir, l'inscription passe,
+    /// l'acceptation libère l'attente, une annulation échoue ici, à rejouer.
+    func testSignedRequestsWaitForTheRegistrationOfAFreshIdentity() async throws {
+        let previousUserId = LocalAccountScope.currentUserId
+        LocalAccountScope.activate(userId: "gate-\(UUID().uuidString.lowercased())")
+        defer { if let previousUserId { LocalAccountScope.activate(userId: previousUserId) } else { LocalAccountScope.deactivate() } }
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let identities = store()
+        XCTAssertTrue(E2EEAutoEnrollmentGate.holdIfFresh(ownerNamespace: session.ownerNamespace, identityStore: identities))
+        defer { E2EEAutoEnrollmentGate.release(ownerNamespace: session.ownerNamespace) }
+        _ = try identities.loadOrCreate(ownerNamespace: session.ownerNamespace)
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("gate-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let transport = E2EEV2APITransport(api: api, identityStore: identities)
+        let owner = session.ownerScopeId
+
+        let cancelled = Task {
+            await transport.getJSON(path: "/api/e2ee/v2/epoch-rotation-requirements", expectedOwnerScopeId: owner, capabilitySet: .message)
+        }
+        cancelled.cancel()
+        guard case .failure(let failure) = await cancelled.value else { return XCTFail("échec local attendu") }
+        XCTAssertEqual(failure.kind, .retryable)
+        XCTAssertEqual(failure.message, "e2ee-device-enrolling")
+
+        let waiting = Task {
+            await transport.putJSON(path: "/api/e2ee/v2/devices/d/push-tokens", body: Data("{}".utf8),
+                                    expectedOwnerScopeId: owner, capabilitySet: .calls)
+        }
+        let registration = await transport.postJSON(path: E2EEAutoEnrollmentContract.registerPath, body: Data("{}".utf8),
+                                                     expectedOwnerScopeId: owner, capabilitySet: .deviceLifecycle)
+        guard case .success = registration else { return XCTFail("l'inscription signe avec l'identité retenue") }
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(seen.all.map { $0.0.url?.path }, [E2EEAutoEnrollmentContract.registerPath],
+                       "rien d'autre ne part avant l'acceptation")
+
+        E2EEAutoEnrollmentGate.release(ownerNamespace: session.ownerNamespace)
+        guard case .success = await waiting.value else { return XCTFail("la requête part une fois l'appareil accepté") }
+        XCTAssertEqual(seen.all.map { $0.0.url?.path }, [E2EEAutoEnrollmentContract.registerPath, "/api/e2ee/v2/devices/d/push-tokens"])
+    }
+}

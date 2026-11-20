@@ -1651,6 +1651,9 @@ final class E2EEV2APITransport: @unchecked Sendable {
         guard let size = fileSize(fileURL), (1...Self.maxBinaryPartBytes).contains(size) else {
             return localFailure("missing-or-invalid-e2ee-ciphertext-part")
         }
+        guard await deviceAccepted(path: path, ownerScopeId: expectedOwnerScopeId) else {
+            return .failure(.init(kind: .retryable, message: "e2ee-device-enrolling"))
+        }
         guard currentOwnerIs(expectedOwnerScopeId) else {
             return authenticationFailure("account-scope-changed")
         }
@@ -1740,6 +1743,9 @@ final class E2EEV2APITransport: @unchecked Sendable {
         // A.2 (v0.4.15) : la requête part telle qu'elle est signée.
         let encodedQuery = E2EEV2SignedTarget.encodedQuery(query)
         let signedPath = path + (encodedQuery.map { "?\($0)" } ?? "")
+        if signs, !(await deviceAccepted(path: path, ownerScopeId: expectedOwnerScopeId)) {
+            return .failure(.init(kind: .retryable, message: "e2ee-device-enrolling"))
+        }
         guard currentOwnerIs(expectedOwnerScopeId) else {
             return authenticationFailure("account-scope-changed")
         }
@@ -1868,6 +1874,15 @@ final class E2EEV2APITransport: @unchecked Sendable {
 
     private func validOwner(_ ownerScopeId: String) -> Bool {
         ownerScopeId.hasPrefix("user:") && ownerScopeId.count > "user:".count
+    }
+
+    /// Identité neuve pas encore acceptée par le serveur (`E2EEAutoEnrollmentGate`) :
+    /// seule l'inscription signe avec elle, les autres l'attendent.
+    private func deviceAccepted(path: String, ownerScopeId: String) async -> Bool {
+        if path == E2EEAutoEnrollmentContract.registerPath { return true }
+        return await E2EEAutoEnrollmentGate.awaitAcceptance(
+            ownerNamespace: LocalAccountScope.storageNamespace(for: ownerScopeId)
+        )
     }
 
     private func currentOwnerIs(_ expectedOwnerScopeId: String) -> Bool {
