@@ -448,7 +448,7 @@ struct SpeedtestResultSummary: View {
     /// « Orange · 5G NSA · Cloudflare Paris ». L'heure est déjà dans le sur-titre.
     private var contextLine: String {
         var parts: [String] = []
-        if let name = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+        if let name = result.displayOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
             // Nom complet d'un opérateur mobile ; en Wi‑Fi c'est le FAI, gardé tel quel
             // (le FAI « Free » n'est pas Free Mobile).
             parts.append(result.connectionType == .cellular ? SQBrand.operatorName(name) ?? name : name)

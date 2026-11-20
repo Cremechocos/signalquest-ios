@@ -203,7 +203,9 @@ enum SQShareCardBuilder {
     /// sa place — `networkOperatorName` le porte en Wi-Fi, résolu par IP/ASN,
     /// donc sans rien révéler du réseau local.
     ///
-    /// Opérateur hors palette : son nom, sans barre. Opérateur inconnu, ou lien
+    /// Opérateur hors palette : son nom, sans barre. MVNO multi-réseaux sans
+    /// réseau attribué (AIRMOB-1, « Airmob ») : sa marque, sans barre non plus.
+    /// Opérateur inconnu, ou lien
     /// `.other` (VPN : l'adresse vue est celle du tunnel) : la techno seule, sans
     /// barre — on n'attribue pas un réseau qu'on ne connaît pas.
     static func networkLine(for result: SpeedtestRunResult) -> SQShareCardModel.NetworkLine? {
@@ -230,7 +232,7 @@ enum SQShareCardBuilder {
     /// box ; ici le type de lien est mesuré, pas déduit de l'ASN. Hors
     /// palette : le nom reçu, tel quel.
     static func operatorDisplayName(for result: SpeedtestRunResult) -> String? {
-        guard result.connectionType != .other, let operatorName = result.networkOperatorName?.shareTrimmed else { return nil }
+        guard result.connectionType != .other, let operatorName = result.displayOperatorName?.shareTrimmed else { return nil }
         let colors = SQBrand.operatorColors(operatorName)
         guard colors.name != SQBrand.defaultOperator.name else { return operatorName }
         if colors.name == SQBrand.operatorName("free"), result.connectionType != .cellular {

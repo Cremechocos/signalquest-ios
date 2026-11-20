@@ -273,7 +273,7 @@ struct DriveSpeedtestDetailSheet: View {
         result.cellularTechnology?.rawValue
     }
     private var operatorText: String? {
-        if let name = result.networkOperatorName, !name.isEmpty { return name }
+        if let name = result.displayOperatorName, !name.isEmpty { return name }
         guard let key = result.operatorKey, !key.isEmpty else { return nil }
         return MarketRegistryEntry.operatorLabel(key, in: marketEntry)
     }

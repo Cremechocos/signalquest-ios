@@ -579,8 +579,10 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let carrierName: String?
     let mvnoKey: String?
     let mvnoName: String?
-    /// MVNO-1 r3 : marque servie par l'API pour un test relu (`operatorDisplay.brand`,
-    /// vrai MVNO d'un test Android seulement). Jamais remplie par une mesure de l'iPhone.
+    /// MVNO-1 r3 : marque servie par l'API pour un test relu (`operatorDisplay.brand`).
+    /// AIRMOB-1 : une mesure de l'iPhone la remplit aussi, en cellulaire, quand
+    /// `/api/speedtest/operator` reconnaît un MVNO multi-réseaux sans réseau (« Airmob »).
+    /// Affichage seul : jamais envoyée (voir `displayOperatorName`).
     let servedBrand: String?
     let wifiSSID: String?
     let city: String?
@@ -770,6 +772,19 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.pingServerPort = pingServerPort
         self.uploadServerHost = uploadServerHost
         self.uploadServerPort = uploadServerPort
+    }
+
+    /// Le nom d'opérateur à afficher : le réseau reconnu, sinon, en cellulaire, la marque
+    /// servie sans réseau (AIRMOB-1 : « Airmob », reconnu à son AS). Affichage seul : l'envoi
+    /// lit `networkOperatorName`, jamais cette marque, qui ne désigne aucun réseau.
+    var displayOperatorName: String? {
+        if networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return networkOperatorName
+        }
+        guard connectionType == .cellular,
+              let brand = servedBrand?.trimmingCharacters(in: .whitespacesAndNewlines), !brand.isEmpty
+        else { return nil }
+        return brand
     }
 
     var networkDisplayName: String {

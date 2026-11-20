@@ -82,7 +82,7 @@ struct SpeedtestHistoryRow: View {
     var subtitleLine: String {
         var parts = [result.networkDisplayName]
         if result.runOrigin == "drive_test" { parts.insert(String(localized: "Drive Test"), at: 0) }
-        if let op = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty {
+        if let op = result.displayOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty {
             parts.append(op)
         }
         if let city = result.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty {

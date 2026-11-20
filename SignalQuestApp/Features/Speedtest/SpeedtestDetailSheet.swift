@@ -194,7 +194,7 @@ struct SpeedtestDetailContent: View {
     /// « Orange » plutôt que « ORANGE » en mobile ; en Wi‑Fi, le FAI tel quel
     /// (le FAI « Free » n'est pas Free Mobile).
     private var operatorLabel: String? {
-        guard let raw = result.networkOperatorName?.trimmedNonEmptyDetail else { return nil }
+        guard let raw = result.displayOperatorName?.trimmedNonEmptyDetail else { return nil }
         return result.connectionType == .cellular ? SQBrand.operatorName(raw) ?? raw : raw
     }
 

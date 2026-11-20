@@ -521,6 +521,21 @@ struct DetectedOperator: Decodable, Equatable, Sendable {
     let shortLabel: String?
     let color: String?
     let viaVpn: Bool?
+    /// AIRMOB-1 (20/11) : MVNO multi-réseaux qui sort par ses propres AS (Airmob).
+    /// Son IP dit la marque, jamais le réseau : `networkKnown` reste faux.
+    var mvnoKey: String? = nil
+    var mvnoLabel: String? = nil
+    var networkKnown: Bool? = nil
+
+    /// La marque seule d'un MVNO sans réseau attribué (« Airmob »), pour l'affichage.
+    /// Jamais un opérateur : ni clé, ni couleur, ni `networkOperatorName`, que l'envoi
+    /// transmet comme `mobileOperator` et que le serveur rattacherait à l'hôte du registre.
+    var brandWithoutNetwork: String? {
+        guard viaVpn != true, operatorKey == nil, networkKnown != true,
+              let label = mvnoLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty
+        else { return nil }
+        return label
+    }
 }
 
 protocol NetworkOperatorServicing: Sendable {

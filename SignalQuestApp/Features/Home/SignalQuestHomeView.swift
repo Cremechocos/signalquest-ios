@@ -816,7 +816,7 @@ struct SignalQuestHomeView: View {
         let local = latestMeasurement.map {
             DisplayedMeasurement(date: $0.createdAt, downloadMbps: $0.downloadAverageMbps,
                                  latencyMs: $0.primaryPingMs, technology: measurementTech($0),
-                                 operatorName: $0.networkOperatorName)
+                                 operatorName: $0.displayOperatorName)
         }
         let account = accountLatest.flatMap { test -> DisplayedMeasurement? in
             guard let download = test.downloadAverageMbps else { return nil }

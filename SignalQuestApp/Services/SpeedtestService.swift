@@ -1576,7 +1576,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             pingServerHost: m.pingServerHost,
             pingServerPort: m.pingServerPort,
             uploadServerHost: m.uploadServerHost,
-            uploadServerPort: m.uploadServerPort
+            uploadServerPort: m.uploadServerPort,
+            servedBrand: operatorContext.brandWithoutNetwork
         )
 
         do {
@@ -2475,6 +2476,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let simPlmn: String?
         let marketCode: String?
         let operatorKey: String?
+        /// AIRMOB-1 : marque d'un MVNO multi-réseaux reconnu à l'IP, sans réseau.
+        /// Affichage seul, jamais dans `mobileOperator` ni `operatorKey`.
+        var brandWithoutNetwork: String? = nil
 
         static let empty = CellularOperatorContext(
             mobileOperator: nil,
@@ -2539,7 +2543,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             mnc: ctMnc,
             simPlmn: pathStatus.simPlmn,
             marketCode: market?.marketCode,
-            operatorKey: trusted?.operatorKey ?? operatorEntry?.key
+            operatorKey: trusted?.operatorKey ?? operatorEntry?.key,
+            brandWithoutNetwork: operatorEntry == nil ? trusted?.brandWithoutNetwork : nil
         )
     }
 
@@ -2785,7 +2790,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadMbps: result.uploadMbps,
             pingMs: result.primaryPingMs,
             jitterMs: result.jitterMs,
-            network: result.networkOperatorName ?? result.wifiSSID ?? String(localized: "Réseau"),
+            network: result.displayOperatorName ?? result.wifiSSID ?? String(localized: "Réseau"),
             label: result.label,
             date: result.createdAt
         )
@@ -2795,7 +2800,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // proche n'est pas connue ici : mieux vaut aucune qu'une distance périmée.
         if result.connectionType == .cellular {
             WidgetSharedStore.saveNetworkGlance(NetworkGlanceSnapshot(
-                operatorLabel: result.networkOperatorName,
+                operatorLabel: result.displayOperatorName,
                 generation: result.cellularTechnology?.rawValue,
                 nearestDistanceMeters: nil,
                 nearestOperator: nil,

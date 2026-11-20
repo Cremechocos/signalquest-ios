@@ -160,7 +160,7 @@ enum SpeedtestTemplateBuilder {
         case .wifi:
             return "Wi-Fi"
         case .cellular:
-            let raw = result.operatorKey ?? result.networkOperatorName ?? result.carrierName
+            let raw = result.operatorKey ?? result.displayOperatorName ?? result.carrierName
             let name = SQBrand.operatorShortName(raw) ?? raw.flatMap { $0.isEmpty ? nil : $0 }
             let generation = SQQualityScale.Generation(technology: result.cellularTechnology?.rawValue)
             let parts = [name, generation == .none ? nil : generation.label].compactMap { $0 }

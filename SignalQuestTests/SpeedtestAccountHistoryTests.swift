@@ -164,6 +164,47 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertEqual(AccountSpeedtestRow(test: listed).subtitleLine, "4G · La Poste Mobile · réseau Bouygues Telecom")
     }
 
+    /// AIRMOB-1 (servi le 20/11) : un MVNO multi-réseaux reconnu à son AS s'affiche par sa
+    /// marque seule, sans réseau ni couleur, et cette marque ne part jamais à l'envoi.
+    func testAirmobBrandIsShownWithoutANetworkAndNeverSent() throws {
+        func detected(_ json: String) throws -> DetectedOperator {
+            try JSONDecoder.signalQuest.decode(DetectedOperator.self, from: Data(json.utf8))
+        }
+        let airmob = try detected(#"{"operatorKey":null,"label":null,"shortLabel":null,"color":null,"viaVpn":false,"source":"ip-asn","mvnoKey":"AIRMOB","mvnoLabel":"Airmob","networkKnown":false}"#)
+        XCTAssertEqual(airmob.brandWithoutNetwork, "Airmob")
+        XCTAssertNil(try detected(#"{"operatorKey":"ORANGE","label":"Orange","shortLabel":"Orange","viaVpn":false,"mvnoKey":null,"mvnoLabel":null,"networkKnown":true}"#).brandWithoutNetwork)
+        XCTAssertNil(try detected(#"{"operatorKey":null,"viaVpn":true,"mvnoLabel":"Airmob","networkKnown":false}"#).brandWithoutNetwork, "sous VPN, rien")
+        XCTAssertNil(try detected(#"{"operatorKey":null,"label":null,"viaVpn":false}"#).brandWithoutNetwork, "serveur antérieur")
+
+        // Test relu : la marque servie, aucun réseau.
+        let base = #""id":"x","timestamp":"2026-11-20T10:00:00.000Z","averageSpeed":80,"uploadSpeed":20,"ping":24,"connectionType":"CELLULAR","networkType":"LTE""#
+        let reread = SpeedtestAccountHistory.runResult(from: try detail("{\(base),\"operatorDisplay\":{\"brand\":\"Airmob\",\"brandSource\":\"ip-asn\",\"network\":null,\"networkKey\":null}}"))
+        XCTAssertNil(reread.networkOperatorName)
+        XCTAssertEqual(reread.displayOperatorName, "Airmob")
+        XCTAssertEqual(reread.networkShareDisplayName, "Airmob 4G")
+        XCTAssertEqual(SQShareCardBuilder.operatorDisplayName(for: reread), "Airmob")
+        let line = try XCTUnwrap(SQShareCardBuilder.networkLine(for: reread))
+        XCTAssertEqual(line.name, "Airmob")
+        XCTAssertNil(line.barColor, "aucune couleur de réseau")
+        XCTAssertNotNil(SpeedtestShareImageRenderer.shareText(for: reread).range(of: "Airmob"))
+
+        // Mesure de l'iPhone : la marque vient de /api/speedtest/operator, l'envoi l'ignore.
+        func local(_ connection: NetworkConnectionKind) -> SpeedtestRunResult {
+            SpeedtestRunResult(label: "local", downloadMbps: 80, downloadAverageMbps: 80, downloadMaxMbps: 90,
+                               durationSeconds: 10, connectionType: connection, cellularTechnology: .fourG,
+                               createdAt: Date(timeIntervalSince1970: 1_795_190_000), servedBrand: airmob.brandWithoutNetwork)
+        }
+        let measured = local(.cellular)
+        XCTAssertEqual(measured.displayOperatorName, "Airmob")
+        XCTAssertEqual(SpeedtestHistoryRow(result: measured).subtitleLine, "4G · Airmob")
+        let payload = SpeedtestSubmission.iosPayload(from: measured, streams: 4, deviceModel: "iPhone")
+        XCTAssertNil(payload.mobileOperator, "la marque n'est pas un réseau")
+        XCTAssertNil(payload.operatorKey)
+        XCTAssertNil(payload.mvnoKey, "le serveur relit l'AS lui-même")
+        XCTAssertNil(payload.mvnoName)
+        XCTAssertNil(local(.wifi).displayOperatorName, "jamais en Wi-Fi : l'IP décrit la box")
+    }
+
     func testNetworkKindIsReadWithoutGuessing() {
         XCTAssertEqual(SpeedtestAccountHistory.cellularTechnology("LTE"), .fourG)
         XCTAssertNil(SpeedtestAccountHistory.cellularTechnology("5G"), "5G alone is neither NSA nor SA")

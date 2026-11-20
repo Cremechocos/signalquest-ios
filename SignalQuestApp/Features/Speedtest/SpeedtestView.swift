@@ -144,10 +144,12 @@ struct SpeedtestView: View {
                 ?? detectedOperator?.shortLabel
                 ?? detectedOperator?.label
         case .cellular:
-            return result?.networkOperatorName
+            // AIRMOB-1 : à défaut de réseau, la marque seule d'un MVNO multi-réseaux.
+            return result?.displayOperatorName
                 ?? currentNetworkStatus.operatorName
                 ?? detectedOperator?.shortLabel
                 ?? detectedOperator?.label
+                ?? detectedOperator?.brandWithoutNetwork
         case .wired, .other:
             return nil
         }
