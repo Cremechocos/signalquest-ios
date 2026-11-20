@@ -229,6 +229,9 @@ final class SessionRowTests: XCTestCase {
       "avgSignalStrength":-92.4,"operators":[{"key":"SFR","label":"SFR","color":"#E2001A"}]},
      {"id":"t5","source":"manual","startTime":"2026-09-08T11:32:00.000Z","duration":24300,"totalPoints":2121,"distance":97.4,
       "avgSignalStrength":-94.1,"operators":[{"key":"SFR","label":"SFR","color":"#E2001A"}]},
+     {"id":"d2","source":"drive_test","startTime":"2026-09-06T10:20:00.000Z","duration":4200,"totalPoints":410,"distance":52.3,
+      "avgSignalStrength":-104.6,"operators":[{"key":"BOUYGUES","label":"Bouygues Telecom","color":"#009DDC"},
+      {"key":"FREE","label":"Free Mobile","color":"#CD1E25"}]},
      {"id":"d1","source":"drive_test","startTime":"2026-09-05T15:40:00.000Z","totalPoints":0,
       "driveSummary":{"testCount":3,"downloadAvgMbps":245.3},"operators":[{"key":"FREE","label":"Free Mobile","color":"#CD1E25"}]},
      {"id":"n1","name":"Tournée du plateau","source":"manual","startTime":"2026-09-02T07:05:00.000Z","duration":3000,
@@ -267,6 +270,7 @@ final class SessionRowTests: XCTestCase {
         XCTAssertEqual(SessionRow.quality(of: try XCTUnwrap(rows["t5"])), .signal(.fair))
         XCTAssertEqual(SessionRow.quality(of: try XCTUnwrap(rows["n1"])), .signal(.good))
         XCTAssertEqual(SessionRow.quality(of: try XCTUnwrap(rows["d1"])), .throughput(245.3))
+        XCTAssertEqual(SessionRow.quality(of: try XCTUnwrap(rows["d2"])), .signal(.weak))
         XCTAssertNil(SessionRow.quality(of: try XCTUnwrap(rows["i1"])), "une couverture iOS n'a pas de RSRP")
     }
 
@@ -297,7 +301,8 @@ final class SessionRowTests: XCTestCase {
         XCTAssertEqual(SessionsListViewModel.Filter.all.label, "Tous")
     }
 
-    /// Captures de revue : la page entière dans une vraie fenêtre, clair, sombre et AX.
+    /// Captures de revue : la page entière dans une vraie fenêtre, clair, sombre, AX, et sur 320 pt
+    /// (iPad en Split View) pour le pire cas : Drive Test, Bouygues Telecom et Free Mobile.
     func testCaptureTripsListForReview() async throws {
         guard let output = ProcessInfo.processInfo.environment["SQ_TRIPS_SHOTS"] else {
             throw XCTSkip("SQ_TRIPS_SHOTS absent")
@@ -309,9 +314,11 @@ final class SessionRowTests: XCTestCase {
         window.frame = scene.coordinateSpace.bounds
         window.makeKeyAndVisible()
         let variants: [(String, ColorScheme, DynamicTypeSize)] = [
-            ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2),
+            ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2), ("etroit", .light, .large),
         ]
+        let full = scene.coordinateSpace.bounds
         for (variant, scheme, size) in variants {
+            window.frame = variant == "etroit" ? CGRect(x: 0, y: 0, width: 320, height: full.height) : full
             let model = SessionsListViewModel { _, _ in
                 try JSONDecoder.signalQuest.decode(SessionsListResponse.self, from: data)
             }

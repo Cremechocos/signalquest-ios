@@ -104131,16 +104131,6 @@
         }
       }
     },
-    "Enregistrements de trajet" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trip recordings"
-          }
-        }
-      }
-    },
     "Modifier le profil" : {
       "localizations" : {
         "en" : {

@@ -263,7 +263,7 @@ final class Audit2TourQATests: XCTestCase {
             ("Sentinelle", "Sentinel", "sentinelle"),
             ("Antennes suivies", "Followed antennas", "antennes-suivies"),
             ("Territoires", "Territories", "territoires"),
-            ("Enregistrements de trajet", "Trip recordings", "trajets"),
+            ("Trajets", "Trips", "trajets"),
             ("Mes mesures", "My measurements", "mes-mesures"),
             ("Logs antennes", "Antenna logs", "logs-antennes"),
             ("Mes identifications", "My identifications", "identifications"),

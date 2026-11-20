@@ -614,7 +614,7 @@ struct ProfileView: View {
             menuSection("Avec l’app Android") {
                 if androidPresence.showsAndroidScreens {
                     Button { push(ProfileDestination.sessions) } label: {
-                        menuRow(title: "Enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                        menuRow(title: "Trajets", icon: "point.topleft.down.curvedto.point.bottomright.up")
                     }
                     menuSeparator
                     Button { push(ProfileDestination.radioLogs) } label: {

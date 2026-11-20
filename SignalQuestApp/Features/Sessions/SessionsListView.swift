@@ -642,27 +642,32 @@ struct SessionRow: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     operatorsLine
-                    if let quality { SessionQualityLabel(quality: quality) }
+                    // Empilée, la ligne ne peut pas déborder : le mot reste à côté des barres.
+                    if let quality { SessionQualityLabel(quality: quality, showsWord: true) }
                 } else {
-                    // Pas d'espaceur : il prenait la moitié de la place et tronquait « Bouyg… ».
-                    // La partie gauche reçoit toute la largeur que laisse la droite.
-                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
-                        headlineText
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if let date = session.startTime {
-                            Text(date, format: .dateTime.hour().minute())
-                                .font(SQFont.body(13.5, relativeTo: .subheadline))
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .monospacedDigit()
-                                .fixedSize()
+                    // Rien n'est coupé, même sur 320 pt (iPad en Split View) : un titre trop long
+                    // pour tenir à côté de l'heure passe au-dessus d'elle.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                            headlineText.fixedSize()
+                            Spacer(minLength: SQSpace.sm)
+                            timeText
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            headlineText
+                            timeText
                         }
                     }
                     detailText
+                    // Pas d'espaceur : il prenait la moitié de la place et tronquait « Bouyg… ».
+                    // La partie gauche reçoit toute la largeur que laisse la droite.
                     HStack(spacing: SQSpace.sm) {
                         operatorsLine
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        // Les barres seules (retour d'Alexandre du 20/11) : deux noms d'opérateurs
+                        // gardent leur place ; VoiceOver lit toujours la qualité.
                         if let quality {
-                            SessionQualityLabel(quality: quality)
+                            SessionQualityLabel(quality: quality, showsWord: false)
                                 .fixedSize()
                         }
                     }
@@ -679,7 +684,18 @@ struct SessionRow: View {
         Text(verbatim: Self.headline(session))
             .font(SQFont.body(16, .semibold, relativeTo: .body))
             .foregroundStyle(SQColor.label)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+    }
+
+    @ViewBuilder
+    private var timeText: some View {
+        if let date = session.startTime {
+            Text(date, format: .dateTime.hour().minute())
+                .font(SQFont.body(13.5, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.labelSecondary)
+                .monospacedDigit()
+                .fixedSize()
+        }
     }
 
     @ViewBuilder
@@ -694,42 +710,43 @@ struct SessionRow: View {
     @ViewBuilder
     private var operatorsLine: some View {
         if session.isDriveTest || !session.operators.isEmpty {
-            // Les noms complets, ou les noms courts s'ils ne tiennent pas (« Bouygues »).
+            // Les noms complets, puis les noms courts (« Bouygues »), puis les noms courts sur
+            // plusieurs lignes : jamais « B… ».
             ViewThatFits(in: .horizontal) {
-                operators(short: false)
-                operators(short: true)
+                HStack(spacing: SQSpace.sm2) { operatorItems(short: false) }
+                HStack(spacing: SQSpace.sm2) { operatorItems(short: true) }
+                FlowLayout(spacing: SQSpace.sm) { operatorItems(short: true) }
             }
+            .font(SQFont.body(13.5, relativeTo: .subheadline))
+            .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
-    private func operators(short: Bool) -> some View {
+    /// Chaque élément garde sa largeur : `ViewThatFits` passe à la forme suivante au lieu de couper.
+    @ViewBuilder
+    private func operatorItems(short: Bool) -> some View {
         let visible = Self.visibleOperators(session.operators)
-        return HStack(spacing: SQSpace.sm2) {
-            if session.isDriveTest {
-                Text("Drive Test")
-                    .font(SQFont.body(11, .semibold, relativeTo: .caption2))
-                    .foregroundStyle(SQColor.chipInk)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(SQColor.chip, in: Capsule(style: .continuous))
-                    .fixedSize()
-            }
-            ForEach(visible.shown) { op in
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(SessionDetailView.operatorColor(op.colorHex))
-                        .frame(width: 8, height: 8)
-                    Text(verbatim: short ? Self.shortLabel(op) : op.label)
-                        .lineLimit(1)
-                }
-                .fixedSize(horizontal: !short, vertical: false)
-            }
-            if visible.overflow > 0 {
-                Text(verbatim: "+\(visible.overflow)").fixedSize()
-            }
+        if session.isDriveTest {
+            Text("Drive Test")
+                .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                .foregroundStyle(SQColor.chipInk)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(SQColor.chip, in: Capsule(style: .continuous))
+                .fixedSize()
         }
-        .font(SQFont.body(13.5, relativeTo: .subheadline))
-        .foregroundStyle(SQColor.labelSecondary)
+        ForEach(visible.shown) { op in
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(SessionDetailView.operatorColor(op.colorHex))
+                    .frame(width: 8, height: 8)
+                Text(verbatim: short ? Self.shortLabel(op) : op.label)
+            }
+            .fixedSize()
+        }
+        if visible.overflow > 0 {
+            Text(verbatim: "+\(visible.overflow)").fixedSize()
+        }
     }
 }
 
@@ -763,16 +780,18 @@ private struct SessionDayTile: View {
     }
 }
 
-/// « ▂▄ Moyen » aux couleurs de la carte, ou le débit moyen d'un Drive Test sans tracé.
+/// « ▂▄ » aux couleurs de la carte (« ▂▄ Moyen » en très grand texte), ou le débit moyen
+/// d'un Drive Test sans tracé.
 private struct SessionQualityLabel: View {
     let quality: SessionRow.Quality
+    let showsWord: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             switch quality {
             case .signal(let level):
                 SessionSignalBars(level: level)
-                Text(level.label)
+                if showsWord { Text(level.label) }
             case .throughput(let mbps):
                 Image(systemName: "speedometer")
                     .foregroundStyle(SQQualityScale.Throughput(mbps: mbps).color)
@@ -789,7 +808,7 @@ private struct SessionQualityLabel: View {
 /// Quatre barres : 4 excellent, 3 bon, 2 moyen, 1 faible ou critique (la couleur les sépare).
 private struct SessionSignalBars: View {
     let level: SQQualityScale.Signal
-    @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 12
+    @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 14
 
     private var filled: Int {
         switch level {
