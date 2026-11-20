@@ -140,6 +140,12 @@ struct AntennaDetailSheet: View {
     /// que la fiche de l'opérateur les a, retour d'Alexandre du 11/11).
     @State private var otherOperatorSystems: [String: [String]] = [:]
     @State private var loadingOtherOperators: Set<String> = []
+    /// N° ARCEP des autres opérateurs, lus dans la même fiche que leurs bandes ; `nil` en valeur :
+    /// fiche lue, numéro non publié. Absent : fiche pas (encore) lue.
+    @State private var otherOperatorSiteNumbers: [String: String?] = [:]
+    /// Historique ANFR du support, pour « Dernier changement ANFR » (choix d'Alexandre du 20/11).
+    @State private var anfrHistory: ANFRSiteHistory?
+    @State private var anfrHistorySupId: String?
     /// Message notifié, montré une fois chargé dans l'onglet Discussion.
     private let focusCommentId: String?
     @State private var showReportSheet = false
@@ -234,8 +240,9 @@ struct AntennaDetailSheet: View {
                     MapSegmented(selection: $tab,
                                  options: visibleTabs.map { ($0, tabLabel($0)) },
                                  identifier: "antenna.detail.tab")
+                        .id(Self.tabsAnchor)
                     switch tab {
-                    case .essential: essentialTab
+                    case .essential: essentialTab(proxy)
                     case .identifiers: detailsTab { identifiersTab($0) }
                     case .measures: detailsTab { measuresTab($0) }
                     case .photos: detailsTab { photosContent($0) }
@@ -269,10 +276,12 @@ struct AntennaDetailSheet: View {
                 async let outagesLoad: Void = loadOutages()
                 await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 await loadMarketEntry()
+                async let historyLoad: Void = loadAnfrHistory()
                 await outagesLoad
                 // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
                 // service refuse d'écrire avant d'avoir lu la liste des suivis.
                 await services.favoriteAntennas.load()
+                await historyLoad
             }
             .task(id: site.id) { await loadOtherOperatorBands() }
         }
@@ -790,6 +799,9 @@ struct AntennaDetailSheet: View {
         return components?.url
     }
 
+    /// Le sélecteur d'onglets : un fait de l'Essentiel y remonte en ouvrant son onglet.
+    private static let tabsAnchor = "antenna.detail.tabs"
+
     /// Un fil par opérateur : « ALL » n'en a pas, l'onglet Discussion demande une facette précise.
     private var visibleTabs: [AntennaDetailTab] {
         AntennaDetailTab.allCases.filter { $0 != .discussion || selectedOperator.uppercased() != "ALL" }
@@ -848,7 +860,7 @@ struct AntennaDetailSheet: View {
 
     /// Ce qu'on vient chercher devant un pylône : une panne en cours d'abord,
     /// qui émet ici, où est le site, ce qu'il rayonne, puis les gestes.
-    private var essentialTab: some View {
+    private func essentialTab(_ proxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             // L'OPÉRATEUR D'ABORD, la communauté ensuite. C'est l'ordre de l'autorité : une
             // déclaration de première main précède une observation qui attend d'être corroborée.
@@ -878,6 +890,32 @@ struct AntennaDetailSheet: View {
                                     operatorLabel: photoOperatorLabel, operatorShortLabel: shortOperatorLabel,
                                     operatorColor: registryColor)
             }
+            // Ordre de la fiche Web (choix d'Alexandre du 20/11) : Fréquences, la rose des secteurs,
+            // le dernier changement ANFR, ce que la communauté sait, puis les identifications du membre.
+            if let details = model.details {
+                if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
+                    section("Secteurs et bandes") {
+                        sectorContent(details)
+                            .padding(SQSpace.md)
+                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    }
+                }
+            } else if let error = model.error {
+                ErrorStateView(title: "Détails indisponibles", message: error) {
+                    Task {
+                        model.error = nil
+                        await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                    }
+                }
+            } else {
+                SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+            }
+            if let latest = Self.latestAnfrChange(anfrHistory) {
+                AntennaLatestChangeCard(text: latest)
+            }
+            if let details = model.details {
+                communityBlock(details, proxy)
+            }
             // Les cellules que le membre a placées ici, à corriger sans passer par les logs.
             SiteIdentificationsSection(siteId: site.siteId ?? site.id, service: services.identify,
                                        sectorCounts: model.details?.core?.cellIdentifiers)
@@ -892,31 +930,13 @@ struct AntennaDetailSheet: View {
             }
             .id(site.siteId ?? site.id)
             sightCard
-            if let details = model.details {
-                if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
-                    section("Secteurs et bandes") {
-                        sectorContent(details)
-                            .padding(SQSpace.md)
-                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                    }
+            // OFFICIAL-NEARBY r1 §3 : la Suisse sert sa classe de puissance, sa limite et son
+            // type d'installation ; Bruxelles, le nombre d'opérateurs. Une ligne par champ servi.
+            if let official = model.details?.officialDetails, !official.isEmpty {
+                section(official.title) {
+                    factCard { officialContent(official) }
                 }
-                // OFFICIAL-NEARBY r1 §3 : la Suisse sert sa classe de puissance, sa limite et son
-                // type d'installation ; Bruxelles, le nombre d'opérateurs. Une ligne par champ servi.
-                if let official = details.officialDetails, !official.isEmpty {
-                    section(official.title) {
-                        factCard { officialContent(official) }
-                    }
-                    .accessibilityIdentifier("antenna.detail.official")
-                }
-            } else if let error = model.error {
-                ErrorStateView(title: "Détails indisponibles", message: error) {
-                    Task {
-                        model.error = nil
-                        await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
-                    }
-                }
-            } else {
-                SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                .accessibilityIdentifier("antenna.detail.official")
             }
             // Ouverte depuis la carte, la fiche a le site juste derrière elle :
             // la mini-carte ne sert que depuis une liste (favoris, photos, trajet).
@@ -1022,6 +1042,111 @@ struct AntennaDetailSheet: View {
         }
     }
 
+    /// « n° 3810003843 » sous un opérateur, en France et outre-mer comme le Web ; « n° non publié par
+    /// l’ARCEP » une fois sa fiche lue sans numéro ; rien tant qu'elle ne l'est pas, ni ailleurs.
+    private func operatorNumberLine(_ op: String) -> String? {
+        let code = market.uppercased()
+        guard code == "FR" || code == "DROM", !isCustomSite else { return nil }
+        let number: String?
+        if op == selectedOperator {
+            guard let core = model.details?.core else { return nil }
+            number = core.operatorSiteNumber
+        } else {
+            guard let served = otherOperatorSiteNumbers[op] else { return nil }
+            number = served
+        }
+        return Self.operatorNumberText(number)
+    }
+
+    nonisolated static func operatorNumberText(_ number: String?) -> String {
+        number.map { String(localized: "n° \($0)") } ?? String(localized: "n° non publié par l’ARCEP")
+    }
+
+    /// Lit une fois par support son historique ANFR : en France, et outre-mer une fois ses relevés
+    /// ouverts (le serveur répond 404 avant, contrat ANFR-MAP-DROM §5), jamais pour un site relevé.
+    private func loadAnfrHistory() async {
+        guard let core = model.details?.core, !isCustomSite else { return }
+        let code = market.uppercased()
+        guard code == "FR" || (code == "DROM" && marketEntry?.capabilities.archives == true) else { return }
+        let supId = core.supId
+        guard !supId.isEmpty, anfrHistorySupId != supId else { return }
+        // Un échec laisse la tuile absente, sans message : elle n'est qu'un repère.
+        guard let history = try? await services.anfr.siteHistory(supId: supId) else { return }
+        anfrHistory = history
+        anfrHistorySupId = supId
+    }
+
+    /// « 5 novembre 2026 · 5G 3,5 GHz en service » : le changement le plus récent du support, tous
+    /// opérateurs, à sa date réelle sinon à celle du relevé (`latestAnfrChange` du Web).
+    nonisolated static func latestAnfrChange(_ history: ANFRSiteHistory?) -> String? {
+        guard let history else { return nil }
+        let changes = history.entries.flatMap { entry in
+            entry.changes.map { (change: $0, date: String(($0.effectiveDate ?? entry.archiveDate).prefix(10))) }
+        }
+        // Le premier des plus récents, dans l'ordre servi, comme le tri stable du Web.
+        guard let latest = changes.max(by: { $0.date < $1.date }) else { return nil }
+        let technology = ANFRText.technology(system: latest.change.technology, generation: latest.change.generation)
+        let what: String
+        switch latest.change.modType {
+        case .activated: what = String(localized: "\(technology) en service")
+        case .added: what = String(localized: "\(technology) ajoutée")
+        case .new: what = String(localized: "\(technology) sur un nouveau support")
+        case .deleted: what = String(localized: "\(technology) retirée")
+        case .modified: what = String(localized: "\(technology) repassée en projet")
+        }
+        // Espace insécable avant le point : passée à la ligne, la valeur ne commence pas par « · ».
+        return [ANFRText.date(latest.date), what].compactMap { $0 }.joined(separator: "\u{00A0}· ")
+    }
+
+    /// « Ce que la communauté sait » (Web, planche du 13/11) : seulement ce que la fiche a déjà chargé.
+    @ViewBuilder
+    private func communityBlock(_ details: AntennaDetails, _ proxy: ScrollViewProxy) -> some View {
+        let identifiers = details.core?.cellIdentifiers
+        let facts = Self.communityFacts(
+            enb: identifiers?.enb ?? [],
+            gnb: identifiers?.gnb ?? [],
+            // Canada : les eNB/gNB servis sont tirés du registre ISED, pas des identifications.
+            identifiesNodes: market.uppercased() != "CA",
+            photos: details.photosCount ?? details.photos.count,
+            lastMeasurement: details.signalStats.flatMap { $0.measurementCount > 0 ? $0.lastMeasurement : nil }
+        )
+        if !facts.isEmpty {
+            AntennaCommunityCard(facts: facts) { target in
+                tab = target.detailTab
+                Task { @MainActor in
+                    withAnimation(reduceMotionForScroll ? nil : .easeOut(duration: 0.3)) {
+                        proxy.scrollTo(Self.tabsAnchor, anchor: .top)
+                    }
+                }
+            }
+        }
+    }
+
+    nonisolated static func communityFacts(enb: [String], gnb: [String], identifiesNodes: Bool,
+                                           photos: Int, lastMeasurement: String?) -> [AntennaCommunityFact] {
+        var facts: [AntennaCommunityFact] = []
+        if identifiesNodes {
+            // Le Web ne nomme que l'eNB ; un site identifié par son seul gNB n'est pas « pas encore identifié ».
+            if !enb.isEmpty {
+                let list = enb.joined(separator: " · ")
+                facts.append(.init(text: enb.count == 1 ? String(localized: "eNB \(list) validé") : String(localized: "eNB \(list) validés"),
+                                   validated: true, tab: .identifiers))
+            } else if !gnb.isEmpty {
+                let list = gnb.joined(separator: " · ")
+                facts.append(.init(text: gnb.count == 1 ? String(localized: "gNB \(list) validé") : String(localized: "gNB \(list) validés"),
+                                   validated: true, tab: .identifiers))
+            } else {
+                facts.append(.init(text: String(localized: "Pas encore identifié"), validated: false, tab: .identifiers))
+            }
+        }
+        facts.append(.init(text: photos > 0 ? String(localized: "\(photos) photo") : String(localized: "Aucune photo"),
+                           validated: false, tab: .photos))
+        if let date = ANFRText.date(lastMeasurement, month: .abbreviated) {
+            facts.append(.init(text: String(localized: "Mesuré le \(date)"), validated: false, tab: .measures))
+        }
+        return facts
+    }
+
     /// Générations d'un opérateur, 2G → 5G : pleine si une bande est en service, en pointillé sinon.
     nonisolated static func generationTags(_ rows: [GenerationBands]) -> [(generation: String, planned: Bool)] {
         rows.reversed().map { ($0.generation, $0.bands.isEmpty) }
@@ -1042,6 +1167,12 @@ struct AntennaDetailSheet: View {
                             .foregroundStyle(SQColor.label)
                     }
                     .accessibilityAddTraits(.isHeader)
+                    if let number = operatorNumberLine(op) {
+                        Text(verbatim: number)
+                            .font(SQType.caption.monospacedDigit())
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityIdentifier("antenna.detail.operatorNumber")
+                    }
                     if let rows = bandRows(for: op) {
                         ForEach(rows) { generationRow($0) }
                     } else if (op == selectedOperator && model.details == nil && model.error == nil) || loadingOtherOperators.contains(op) {
@@ -1126,16 +1257,17 @@ struct AntennaDetailSheet: View {
         let id = site.siteId ?? site.id
         let anfrCode = site.anfrCode
         let market = market
-        await withTaskGroup(of: (String, [String]?).self) { group in
+        await withTaskGroup(of: (String, [String]?, String??).self) { group in
             for op in others {
                 group.addTask {
                     let details = try? await service.details(id: id, market: market, operatorName: op, anfrCode: anfrCode)
-                    return (op, details.map(Self.scopedSystems(of:)))
+                    return (op, details.map(Self.scopedSystems(of:)), details.map { $0.core?.operatorSiteNumber })
                 }
             }
-            for await (op, systems) in group {
+            for await (op, systems, number) in group {
                 loadingOtherOperators.remove(op)
                 if let systems, !systems.isEmpty { otherOperatorSystems[op] = systems }
+                if let number { otherOperatorSiteNumbers[op] = number }
             }
         }
     }
@@ -2168,6 +2300,114 @@ struct AzimuthFanView: View {
 /// Les cinq onglets de la fiche antenne ; Discussion seulement sur une facette d'opérateur.
 private enum AntennaDetailTab: Hashable, CaseIterable {
     case essential, identifiers, measures, photos, discussion
+}
+
+/// Un fait du bloc « Ce que la communauté sait » et l'onglet qu'il ouvre.
+struct AntennaCommunityFact: Equatable {
+    enum Tab: Equatable {
+        case identifiers, photos, measures
+
+        fileprivate var detailTab: AntennaDetailTab {
+            switch self {
+            case .identifiers: return .identifiers
+            case .photos: return .photos
+            case .measures: return .measures
+            }
+        }
+
+        var hint: String {
+            switch self {
+            case .identifiers: return String(localized: "Ouvre l’onglet Identifiants")
+            case .photos: return String(localized: "Ouvre l’onglet Photos")
+            case .measures: return String(localized: "Ouvre l’onglet Mesures")
+            }
+        }
+    }
+
+    let text: String
+    /// Identifié par la communauté : coche verte, comme la pastille du Web.
+    let validated: Bool
+    let tab: Tab
+}
+
+/// Titre en kicker puis carte, comme les sections de la fiche.
+private struct AntennaEssentialSection<Content: View>: View {
+    let title: LocalizedStringKey
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(title).sqKicker().accessibilityAddTraits(.isHeader)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// « Dernier changement ANFR » de l'Essentiel (choix d'Alexandre du 20/11, comme le Web).
+struct AntennaLatestChangeCard: View {
+    let text: String
+
+    var body: some View {
+        AntennaEssentialSection(title: "Dernier changement ANFR") {
+            Text(verbatim: text)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(SQSpace.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("antenna.detail.latestChange")
+    }
+}
+
+/// « Ce que la communauté sait » : une ligne par fait, chacune ouvrant son onglet (choix du 20/11).
+struct AntennaCommunityCard: View {
+    let facts: [AntennaCommunityFact]
+    let onOpen: (AntennaCommunityFact.Tab) -> Void
+
+    var body: some View {
+        AntennaEssentialSection(title: "Ce que la communauté sait") {
+            VStack(spacing: 0) {
+                ForEach(Array(facts.enumerated()), id: \.offset) { index, fact in
+                    Button {
+                        onOpen(fact.tab)
+                    } label: {
+                        HStack(spacing: SQSpace.sm) {
+                            if fact.validated {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(SQColor.success)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(verbatim: fact.text)
+                                .font(SQType.body)
+                                .foregroundStyle(SQColor.label)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: SQSpace.sm)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityHint(fact.tab.hint)
+                    .overlay(alignment: .top) {
+                        if index > 0 { Rectangle().fill(SQColor.separator).frame(height: 1) }
+                    }
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
+        .accessibilityIdentifier("antenna.detail.community")
+    }
 }
 
 /// Points de conduite entre la génération et ses bandes (BANDES-OP).

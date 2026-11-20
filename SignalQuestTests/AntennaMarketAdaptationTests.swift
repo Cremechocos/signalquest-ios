@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import SignalQuest
 
@@ -207,6 +208,134 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         XCTAssertFalse(core.isCustomSite)
         XCTAssertNil(core.displayName)
         XCTAssertEqual(core.registryLabel, "Code ANFR")
+    }
+
+    // MARK: Alignement sur la fiche Web (choix d'Alexandre du 20/11)
+
+    private var french: Bool { Bundle.main.preferredLocalizations.first == "fr" }
+
+    /// Le n° ARCEP de l'opérateur ouvert : `operatorSiteId`, sinon le premier de `operatorSiteIds`,
+    /// jamais le code ANFR (il passait pour le numéro de l'opérateur sur le Web).
+    func testOperatorSiteNumberIsTheArcepNumberNeverTheAnfrCode() throws {
+        let single = try core(minimal(market: "FR", extraTop: "\"operatorSiteId\": \"3810003843\", \"operatorSiteIds\": [\"3810003843\"],"))
+        XCTAssertEqual(single.operatorSiteNumber, "3810003843")
+        let list = try core(minimal(market: "FR", extraTop: "\"operatorSiteIds\": [\"\", \"00000123\", \"00000456\"],"))
+        XCTAssertEqual(list.operatorSiteNumber, "00000123")
+        XCTAssertNil(try core(minimal(market: "FR", extraTop: "\"operatorSiteId\": \" \", \"operatorSiteIds\": null,")).operatorSiteNumber)
+        XCTAssertNil(try core(minimal(market: "FR")).operatorSiteNumber, "Jamais le code ANFR ID-1 en repli")
+        XCTAssertEqual(AntennaDetailSheet.operatorNumberText("3810003843"), french ? "n° 3810003843" : "no. 3810003843")
+        XCTAssertEqual(AntennaDetailSheet.operatorNumberText(nil),
+                       french ? "n° non publié par l’ARCEP" : "no. not published by ARCEP")
+    }
+
+    private func change(_ id: String, _ technology: String, _ generation: String, _ type: String,
+                        _ effective: String?) -> ANFRSiteHistoryChange {
+        ANFRSiteHistoryChange(id: id, operatorRaw: "ORANGE", technology: technology, generation: generation,
+                              modTypeRaw: type, statut: "En service", effectiveDate: effective)
+    }
+
+    private func entry(_ date: String, _ changes: [ANFRSiteHistoryChange]) -> ANFRSiteHistoryEntry {
+        ANFRSiteHistoryEntry(archiveDate: date, isCurrentSnapshot: false, city: "", address: nil, operators: ["ORANGE"],
+                             modTypes: [], changeCount: changes.count, changes: changes)
+    }
+
+    /// « Dernier changement ANFR » : le plus récent du support à sa date réelle, sinon à celle du
+    /// relevé ; à égalité, le premier servi, comme le tri stable du Web (exemple de la planche).
+    func testLatestAnfrChangeIsTheMostRecentOfTheSupport() {
+        let history = ANFRSiteHistory(supId: "1", currentSnapshotDate: "2026-11-12", entries: [
+            // Rattrapage publié le 12/11, en service depuis juin : pas le plus récent.
+            entry("2026-11-12", [change("a", "LTE 800", "4G", "activated", "2026-06-01")]),
+            entry("2026-11-05", [change("b", "GSM 900", "2G", "deleted", nil),
+                                 change("c", "5G NR 3500", "5G", "activated", "2026-11-05")]),
+            entry("2026-10-15", [change("d", "LTE 2100", "4G", "added", "2026-10-15")]),
+        ])
+        XCTAssertEqual(AntennaDetailSheet.latestAnfrChange(history),
+                       french ? "5 novembre 2026\u{00A0}· 2G 900 retirée" : "November 5, 2026\u{00A0}· 2G 900 removed")
+        let activated = ANFRSiteHistory(supId: "1", currentSnapshotDate: nil, entries: [
+            entry("2026-11-05", [change("c", "5G NR 3500", "5G", "activated", "2026-11-01")]),
+        ])
+        XCTAssertEqual(AntennaDetailSheet.latestAnfrChange(activated),
+                       french ? "1 novembre 2026\u{00A0}· 5G 3,5\u{00A0}GHz en service"
+                              : "November 1, 2026\u{00A0}· 5G 3.5\u{00A0}GHz on air")
+        let modified = ANFRSiteHistory(supId: "1", currentSnapshotDate: nil, entries: [
+            entry("2026-11-05", [change("e", "LTE 700", "4G", "modified", nil), change("f", "UMTS 900", "3G", "new", nil)]),
+        ])
+        XCTAssertEqual(AntennaDetailSheet.latestAnfrChange(modified),
+                       french ? "5 novembre 2026\u{00A0}· 4G 700 repassée en projet" : "November 5, 2026\u{00A0}· 4G 700 back to planned")
+        XCTAssertNil(AntennaDetailSheet.latestAnfrChange(nil))
+        XCTAssertNil(AntennaDetailSheet.latestAnfrChange(ANFRSiteHistory(supId: "1", currentSnapshotDate: nil,
+                                                                          entries: [entry("2026-11-05", [])])))
+    }
+
+    /// « Ce que la communauté sait » : eNB validés, sinon gNB, sinon « Pas encore identifié » ; photos ;
+    /// date de la dernière mesure. Chaque fait ouvre son onglet. Au Canada, les eNB/gNB viennent du registre.
+    func testCommunityFactsFollowTheWebBlock() {
+        let full = AntennaDetailSheet.communityFacts(enb: ["812345", "812346"], gnb: ["1203344"], identifiesNodes: true,
+                                                     photos: 2, lastMeasurement: "2026-11-03T08:12:00.000Z")
+        XCTAssertEqual(full.map(\.text), french
+                       ? ["eNB 812345 · 812346 validés", "2 photos", "Mesuré le 3 nov. 2026"]
+                       : ["eNB 812345 · 812346 validated", "2 photos", "Measured on Nov 3, 2026"])
+        XCTAssertEqual(full.map(\.tab), [.identifiers, .photos, .measures])
+        XCTAssertEqual(full.map(\.validated), [true, false, false])
+
+        let gnbOnly = AntennaDetailSheet.communityFacts(enb: [], gnb: ["1203344"], identifiesNodes: true,
+                                                        photos: 1, lastMeasurement: nil)
+        XCTAssertEqual(gnbOnly.map(\.text), french ? ["gNB 1203344 validé", "1 photo"] : ["gNB 1203344 validated", "1 photo"])
+
+        let nothing = AntennaDetailSheet.communityFacts(enb: [], gnb: [], identifiesNodes: true, photos: 0, lastMeasurement: nil)
+        XCTAssertEqual(nothing.map(\.text), french ? ["Pas encore identifié", "Aucune photo"] : ["Not identified yet", "No photos"])
+        XCTAssertEqual(nothing.map(\.validated), [false, false])
+
+        let canada = AntennaDetailSheet.communityFacts(enb: ["4501"], gnb: [], identifiesNodes: false, photos: 0,
+                                                       lastMeasurement: "pas une date")
+        XCTAssertEqual(canada.map(\.tab), [.photos])
+    }
+
+    /// Captures des deux blocs de l'Essentiel, pour relecture (variable SQ_ESSENTIAL_SHOTS).
+    @MainActor
+    func testCaptureEssentialWebBlocksForReview() async throws {
+        guard let output = ProcessInfo.processInfo.environment["SQ_ESSENTIAL_SHOTS"] else {
+            throw XCTSkip("SQ_ESSENTIAL_SHOTS absent")
+        }
+        try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
+        let latest = AntennaDetailSheet.latestAnfrChange(ANFRSiteHistory(supId: "1", currentSnapshotDate: nil, entries: [
+            entry("2026-11-05", [change("c", "5G NR 3500", "5G", "activated", "2026-11-05")]),
+        ])) ?? ""
+        let cases: [(String, [AntennaCommunityFact])] = [
+            ("identifie", AntennaDetailSheet.communityFacts(enb: ["812345", "812346"], gnb: [], identifiesNodes: true,
+                                                            photos: 2, lastMeasurement: "2026-11-03T08:12:00.000Z")),
+            ("vide", AntennaDetailSheet.communityFacts(enb: [], gnb: [], identifiesNodes: true, photos: 0, lastMeasurement: nil)),
+        ]
+        let variants: [(String, ColorScheme, DynamicTypeSize)] = [
+            ("clair", .light, .large), ("sombre", .dark, .large), ("ax", .light, .accessibility2),
+        ]
+        // Dans une vraie fenêtre, comme la fiche : ImageRenderer tronquait un titre en AX.
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.makeKeyAndVisible()
+        for (name, facts) in cases {
+            for (variant, scheme, size) in variants {
+                let view = ScrollView {
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        AntennaLatestChangeCard(text: latest)
+                        AntennaCommunityCard(facts: facts) { _ in }
+                    }
+                    .padding(16)
+                }
+                .background(SQColor.bg)
+                .environment(\.colorScheme, scheme)
+                .environment(\.dynamicTypeSize, size)
+                let host = UIHostingController(rootView: view)
+                host.overrideUserInterfaceStyle = scheme == .dark ? .dark : .light
+                window.rootViewController = host
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: output).appendingPathComponent("\(name)-\(variant).png"))
+            }
+        }
     }
 }
 

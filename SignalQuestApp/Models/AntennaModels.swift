@@ -555,6 +555,15 @@ struct AntennaCoreDetails: Decodable, Equatable {
     /// FREQ-BLOCKS r0 : bornes de fréquences par opérateur. `nil` sans source pour le pays, sur un
     /// site sans bande relevée ou sur un serveur antérieur.
     let frequencyBlocks: FrequencyBlocks?
+    /// N° de site de l'opérateur de la fiche (ARCEP `num_site`), distinct du code ANFR de la station.
+    let operatorSiteId: String?
+    let operatorSiteIds: [String]
+
+    /// Le n° ARCEP de l'opérateur ouvert, comme `getOperatorSiteValue` du Web en France : jamais le
+    /// code ANFR en repli, il passerait pour le numéro de l'opérateur.
+    var operatorSiteNumber: String? {
+        operatorSiteId ?? operatorSiteIds.first
+    }
 
     /// Le site est-il réellement en service ? L'ANFR distingue « En service » de
     /// « Techniquement opérationnel » (prêt, pas ouvert) et de « Projet approuvé ».
@@ -684,7 +693,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
         case datasetPublishedAt, operatorBrand, licences, municipality, provinceCode
         case isCustomSite, validationStatus, source, displayName, description
-        case frequencyBlocks
+        case frequencyBlocks, operatorSiteId, operatorSiteIds
     }
 
     /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
@@ -760,6 +769,10 @@ struct AntennaCoreDetails: Decodable, Equatable {
         description = c.decodeFlexibleString(forKey: .description)
         frequencyBlocks = (try? c.decodeIfPresent(FrequencyBlocks.self, forKey: .frequencyBlocks))
             .flatMap { $0 }.flatMap { $0.isEmpty ? nil : $0 }
+        operatorSiteId = c.decodeFlexibleString(forKey: .operatorSiteId)
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        operatorSiteIds = c.decodeLossyArray([String].self, forKey: .operatorSiteIds)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 
