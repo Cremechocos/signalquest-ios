@@ -407,13 +407,14 @@ final class SQShareCardBuilderTests: XCTestCase {
     /// l'opérateur seulement sur le réseau mobile et si le contexte réseau reste coché ;
     /// jamais de lieu, de serveur ni de lien.
     func testShareTextIsTheMeasuredCaption() {
+        // Unité après chaque débit (presentation-v1 sans ratePair, 815e42e1 du 15/11).
         let cellular = result(operatorName: "Bouygues")
         XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, language: .fr),
-                       "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence chez Bouygues Telecom, mesuré avec #SignalQuest")
+                       "↓ 770\u{00A0}Mb/s · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence chez Bouygues Telecom, mesuré avec #SignalQuest")
         XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, language: .en),
-                       "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms latency on Bouygues Telecom, measured with #SignalQuest")
+                       "↓ 770\u{00A0}Mb/s · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms latency on Bouygues Telecom, measured with #SignalQuest")
         // Contexte réseau décoché, ou Wi-Fi (le FAI de l'image n'entre pas dans la légende).
-        let withoutOperator = "↓ 770 · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence, mesuré avec #SignalQuest"
+        let withoutOperator = "↓ 770\u{00A0}Mb/s · ↑ 126\u{00A0}Mb/s · 14\u{00A0}ms de latence, mesuré avec #SignalQuest"
         XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: cellular, options: .init(includeNetworkContext: false), language: .fr), withoutOperator)
         XCTAssertEqual(SpeedtestShareImageRenderer.shareText(for: result(connection: .wifi, operatorName: "Free"), language: .fr), withoutOperator)
         // Latence de l'image : la médiane quand le minimum manque.
