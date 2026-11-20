@@ -39,7 +39,7 @@ final class SessionsListViewModel: ObservableObject {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: return "Toutes"
+            case .all: return "Tous"
             case .driveTest: return "Drive Test"
             case .coverage: return "Couverture"
             }
@@ -173,28 +173,25 @@ struct SessionsListView: View {
         _model = StateObject(wrappedValue: SessionsListViewModel(service: service))
     }
 
+    /// Captures et tests : une liste déjà branchée sur ses pages.
+    init(model: SessionsListViewModel) {
+        _model = StateObject(wrappedValue: model)
+    }
+
     var body: some View {
         List {
             Section {
                 header
                     .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
                     .listRowBackground(Color.clear)
-                SQSegmentedFilter(
+                // Piste A du 20/11 : le segment sur toute la largeur, le compte dans l'en-tête.
+                MapSegmented(
                     selection: $model.filter,
-                    options: SessionsListViewModel.Filter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+                    options: SessionsListViewModel.Filter.allCases.map { ($0, $0.label) },
+                    identifier: "sessions.filter"
                 )
-                .accessibilityIdentifier("sessions.filter")
-                // Le segment ajoute sa propre marge latérale de 16 pt : on la compense.
-                .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: -SQSpace.lg, bottom: SQSpace.xs, trailing: -SQSpace.lg))
+                .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
                 .listRowBackground(Color.clear)
-                if let total = model.total, total > 0 {
-                    Text("\(total) trajets · les plus récents d’abord")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xs, bottom: 0, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .accessibilityIdentifier("sessions.summary")
-                }
             }
             .listRowSeparator(.hidden)
 
@@ -289,7 +286,7 @@ struct SessionsListView: View {
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
-        .navigationTitle("Enregistrements de trajet")
+        .navigationTitle("Trajets")
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()
@@ -310,16 +307,19 @@ struct SessionsListView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessions.back") { dismiss() }
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Enregistrements de trajet")
+            // Un titre court et le compte ; l'origine Android n'est dite que dans l'état vide.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Trajets")
                     .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
                     .accessibilityIdentifier("sessions.title")
-                Text("Tes trajets enregistrés avec l’app Android : Drive Test et couverture.")
-                    .font(SQType.callout)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let total = model.total, total > 0 {
+                    Text("\(total) trajets")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("sessions.summary")
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -550,69 +550,265 @@ private struct LocalCoverageArchiveDetailView: View {
     }
 }
 
-private struct SessionRow: View {
+/// Ligne d'un trajet (piste A, choix d'Alexandre du 20/11) : le jour en tuile ; la distance et
+/// la durée en titre, l'heure à droite ; les opérateurs en points de couleur ; la qualité en un
+/// mot. Les points et les dBm restent dans le détail.
+struct SessionRow: View {
     let session: CoverageSession
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// « 240 points · 18,4 km · 40 min · −91 dBm », ce qui est connu seulement.
-    private var metrics: String {
+    /// Qualité affichée à droite : le signal moyen aux seuils de la carte, ou le débit moyen
+    /// d'un Drive Test connu par son récap seulement.
+    enum Quality: Equatable {
+        case signal(SQQualityScale.Signal)
+        case throughput(Double)
+    }
+
+    /// « 27,9 km · 1 h 43 », ce qui est connu seulement.
+    nonisolated static func measures(_ session: CoverageSession) -> String? {
         var parts: [String] = []
-        if session.isSummaryOnly, let summary = session.driveSummary {
-            // Trajet Drive Test sans tracé (MES-14) : ses tests, pas « 0 points ».
-            if let tests = summary.testCount { parts.append(String(localized: "\(tests) test")) }
-            if let average = summary.downloadAvgMbps {
-                parts.append(String(localized: "\(SQUnits.throughput(mbps: average)) en moyenne"))
-            }
-        } else if let points = session.totalPoints {
-            parts.append(String(localized: "\(points) points"))
-        }
         if let km = session.distanceKm, km > 0 { parts.append(SQUnits.distance(kilometers: km)) }
         if let duration = session.durationLabel { parts.append(duration) }
-        if let rsrp = session.avgRsrpLabel { parts.append(rsrp) }
-        return parts.joined(separator: " · ")
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Le nom donné au trajet s'il y en a un, sinon la distance et la durée ; « 3 tests » pour un
+    /// Drive Test sans tracé ni distance ; le type en dernier recours.
+    nonisolated static func headline(_ session: CoverageSession) -> String {
+        if let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty { return name }
+        if let measures = measures(session) { return measures }
+        if session.isSummaryOnly, let tests = session.driveSummary?.testCount { return String(localized: "\(tests) test") }
+        return session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")
+    }
+
+    /// Sous un nom donné, la distance et la durée passent en deuxième ligne.
+    nonisolated static func detailLine(_ session: CoverageSession) -> String? {
+        guard let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
+        return measures(session)
+    }
+
+    nonisolated static func quality(of session: CoverageSession) -> Quality? {
+        if session.isSummaryOnly {
+            guard let average = session.driveSummary?.downloadAvgMbps, average > 0 else { return nil }
+            return .throughput(average)
+        }
+        // Couverture iOS : pas de RSRP, une sentinelle que l'échelle lit « Pas de mesure ».
+        switch SQQualityScale.Signal(rsrp: session.avgSignalStrength) {
+        case .noService, .unknown: return nil
+        case let level: return .signal(level)
+        }
+    }
+
+    /// Deux opérateurs au plus, puis « +N ».
+    nonisolated static func visibleOperators(_ operators: [SessionOperator]) -> (shown: [SessionOperator], overflow: Int) {
+        (Array(operators.prefix(2)), max(0, operators.count - 2))
+    }
+
+    /// « Bouygues » quand « Bouygues Telecom » ne tient pas.
+    nonisolated static func shortLabel(_ op: SessionOperator) -> String {
+        SQBrand.operatorShortName(op.key) ?? SQBrand.operatorShortName(op.label) ?? op.label
+    }
+
+    /// Une seule phrase pour VoiceOver, dans l'ordre de la ligne.
+    nonisolated static func accessibilityText(_ session: CoverageSession) -> String {
+        var parts: [String] = []
+        if let date = session.startTime {
+            parts.append(date.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()))
+        }
+        parts.append(headline(session))
+        if let detail = detailLine(session) { parts.append(detail) }
+        if session.isDriveTest { parts.append(String(localized: "Drive Test")) }
+        if !session.operators.isEmpty { parts.append(session.operators.map(\.label).joined(separator: ", ")) }
+        switch quality(of: session) {
+        case .signal(let level): parts.append(String(localized: "Signal \(level.label.lowercased())"))
+        case .throughput(let mbps): parts.append(String(localized: "\(SQUnits.throughput(mbps: mbps)) en moyenne"))
+        case nil: break
+        }
+        return parts.joined(separator: ". ")
     }
 
     var body: some View {
+        let quality = Self.quality(of: session)
+        let stacked = dynamicTypeSize.isAccessibilitySize
         HStack(spacing: SQSpace.sm2) {
-            SQIconPastille(systemImage: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right", size: 38, font: .system(size: 15, weight: .medium))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(session.name ?? (session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
-                    .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(SQColor.label)
-                    .sqSingleLine()
-                if !metrics.isEmpty {
-                    Text(metrics)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .monospacedDigit()
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 5) {
-                    ForEach(session.operators.prefix(4)) { op in
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(SessionDetailView.operatorColor(op.colorHex))
-                                .frame(width: 7, height: 7)
-                                .accessibilityHidden(true)
-                            Text(op.label)
-                                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
-                                .foregroundStyle(SQColor.label)
-                        }
-                        .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
-                    }
+            if !stacked { SessionDayTile(date: session.startTime) }
+            VStack(alignment: .leading, spacing: 6) {
+                if stacked {
+                    headlineText
+                    detailText
                     if let date = session.startTime {
-                        Text(date, format: .dateTime.day().month().hour().minute())
-                            .font(SQType.caption)
+                        Text(date, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+                            .font(SQFont.body(13.5, relativeTo: .subheadline))
                             .foregroundStyle(SQColor.labelSecondary)
-                            .sqSingleLine()
+                    }
+                    operatorsLine
+                    if let quality { SessionQualityLabel(quality: quality) }
+                } else {
+                    // Pas d'espaceur : il prenait la moitié de la place et tronquait « Bouyg… ».
+                    // La partie gauche reçoit toute la largeur que laisse la droite.
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                        headlineText
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let date = session.startTime {
+                            Text(date, format: .dateTime.hour().minute())
+                                .font(SQFont.body(13.5, relativeTo: .subheadline))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .monospacedDigit()
+                                .fixedSize()
+                        }
+                    }
+                    detailText
+                    HStack(spacing: SQSpace.sm) {
+                        operatorsLine
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let quality {
+                            SessionQualityLabel(quality: quality)
+                                .fixedSize()
+                        }
                     }
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(.vertical, SQSpace.xs)
         .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(session.isDriveTest ? Text("Drive Test") : Text("Couverture"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: Self.accessibilityText(session)))
+    }
+
+    private var headlineText: some View {
+        Text(verbatim: Self.headline(session))
+            .font(SQFont.body(16, .semibold, relativeTo: .body))
+            .foregroundStyle(SQColor.label)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+    }
+
+    @ViewBuilder
+    private var detailText: some View {
+        if let detail = Self.detailLine(session) {
+            Text(verbatim: detail)
+                .font(SQFont.body(13.5, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var operatorsLine: some View {
+        if session.isDriveTest || !session.operators.isEmpty {
+            // Les noms complets, ou les noms courts s'ils ne tiennent pas (« Bouygues »).
+            ViewThatFits(in: .horizontal) {
+                operators(short: false)
+                operators(short: true)
+            }
+        }
+    }
+
+    private func operators(short: Bool) -> some View {
+        let visible = Self.visibleOperators(session.operators)
+        return HStack(spacing: SQSpace.sm2) {
+            if session.isDriveTest {
+                Text("Drive Test")
+                    .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                    .foregroundStyle(SQColor.chipInk)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(SQColor.chip, in: Capsule(style: .continuous))
+                    .fixedSize()
+            }
+            ForEach(visible.shown) { op in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(SessionDetailView.operatorColor(op.colorHex))
+                        .frame(width: 8, height: 8)
+                    Text(verbatim: short ? Self.shortLabel(op) : op.label)
+                        .lineLimit(1)
+                }
+                .fixedSize(horizontal: !short, vertical: false)
+            }
+            if visible.overflow > 0 {
+                Text(verbatim: "+\(visible.overflow)").fixedSize()
+            }
+        }
+        .font(SQFont.body(13.5, relativeTo: .subheadline))
+        .foregroundStyle(SQColor.labelSecondary)
+    }
+}
+
+/// Jour du trajet : « VEN. » au-dessus de « 20 » ; le mois est dans l'en-tête de section.
+private struct SessionDayTile: View {
+    let date: Date?
+    @ScaledMetric(relativeTo: .body) private var width: CGFloat = 44
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 50
+
+    var body: some View {
+        VStack(spacing: 3) {
+            if let date {
+                Text(date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                    .font(SQFont.body(10, .semibold, relativeTo: .caption2))
+                    .tracking(0.8)
+                    .foregroundStyle(SQColor.ink2)
+                Text(date.formatted(.dateTime.day()))
+                    .font(SQFont.display(19, .semibold, relativeTo: .title3))
+                    .foregroundStyle(SQColor.label)
+            } else {
+                Image(systemName: "calendar")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(width: width, height: height)
+        .background(SQColor.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
+/// « ▂▄ Moyen » aux couleurs de la carte, ou le débit moyen d'un Drive Test sans tracé.
+private struct SessionQualityLabel: View {
+    let quality: SessionRow.Quality
+
+    var body: some View {
+        HStack(spacing: 6) {
+            switch quality {
+            case .signal(let level):
+                SessionSignalBars(level: level)
+                Text(level.label)
+            case .throughput(let mbps):
+                Image(systemName: "speedometer")
+                    .foregroundStyle(SQQualityScale.Throughput(mbps: mbps).color)
+                Text(verbatim: SQUnits.throughput(mbps: mbps))
+                    .monospacedDigit()
+            }
+        }
+        .font(SQFont.body(13.5, .semibold, relativeTo: .subheadline))
+        .foregroundStyle(SQColor.label)
+        .lineLimit(1)
+    }
+}
+
+/// Quatre barres : 4 excellent, 3 bon, 2 moyen, 1 faible ou critique (la couleur les sépare).
+private struct SessionSignalBars: View {
+    let level: SQQualityScale.Signal
+    @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 12
+
+    private var filled: Int {
+        switch level {
+        case .excellent: return 4
+        case .good: return 3
+        case .fair: return 2
+        default: return 1
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: height / 8) {
+            ForEach(0..<4, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(index < filled ? level.color : SQColor.dots)
+                    .frame(width: height / 4, height: height * [0.34, 0.54, 0.76, 1][index])
+            }
+        }
+        .frame(height: height, alignment: .bottom)
+        .accessibilityHidden(true)
     }
 }
