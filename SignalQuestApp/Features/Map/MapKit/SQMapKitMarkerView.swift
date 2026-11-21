@@ -287,6 +287,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         hitRadius = max(dotSize / 2 + 4, Self.minRadius)
         dot.frame = CGRect(x: radius - dotSize / 2, y: radius - dotSize / 2, width: dotSize, height: dotSize)
         dot.layer.cornerRadius = dotSize / 2
+        // Pastille toujours pleine et ronde : l'ombre suit ce disque sans que Core
+        // Animation la recalcule depuis le contenu à chaque image (audit perf, C8).
+        dot.layer.shadowPath = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: dotSize, height: dotSize)).cgPath
         // `bounds` + `position`, jamais `frame` : le calque des lobes porte une
         // transform de rotation (cap de la carte), et `frame` n'a pas de sens sur
         // un calque transformé — une vue recyclée pendant que la carte est

@@ -31,6 +31,36 @@ enum MapSearchResult: Identifiable, Equatable {
     }
 }
 
+/// Recherches récentes de la carte (audit perf, R2) : effacer puis retaper le
+/// même mot dans les 30 s ne relance ni la recherche de sites ni celle d'Apple.
+/// Une entrée vaut pour un marché, un territoire et une zone de carte d'environ
+/// 10 km (les lieux sont cherchés autour du centre), et seulement pour une
+/// recherche de sites qui a répondu et un résultat non vide.
+struct MapSearchMemory {
+    static let lifetime: TimeInterval = 30
+    static let capacity = 20
+    private var entries: [String: (at: Date, results: [MapSearchResult])] = [:]
+
+    static func key(query: String, market: String, department: String?, center: CLLocationCoordinate2D?) -> String {
+        let zone = center.map { "\(Int(($0.latitude * 10).rounded())),\(Int(($0.longitude * 10).rounded()))" } ?? "-"
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: .caseInsensitive, locale: nil)
+        return [market.uppercased(), department ?? "-", zone, text].joined(separator: "|")
+    }
+
+    func results(for key: String, now: Date = Date()) -> [MapSearchResult]? {
+        guard let entry = entries[key], now.timeIntervalSince(entry.at) <= Self.lifetime else { return nil }
+        return entry.results
+    }
+
+    mutating func store(_ results: [MapSearchResult], for key: String, now: Date = Date()) {
+        entries = entries.filter { now.timeIntervalSince($0.value.at) <= Self.lifetime }
+        if entries.count >= Self.capacity, let oldest = entries.min(by: { $0.value.at < $1.value.at })?.key {
+            entries[oldest] = nil
+        }
+        entries[key] = (now, results)
+    }
+}
+
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
     enum FriendsConnectionState: Equatable {
@@ -144,6 +174,7 @@ final class MapExplorerViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     /// Dernier centre caméra connu — biais de proximité de la recherche de lieux.
     private var lastCenter: CLLocationCoordinate2D?
+    private var searchMemory = MapSearchMemory()
     private var hasResolvedInitialSelection = false
     private var initialCameraConsumed = false
     private var initialSelectionToObserve: (market: String, operatorName: String)?
@@ -1401,6 +1432,10 @@ final class MapExplorerViewModel: ObservableObject {
             searchResults = []; isSearching = false; searchFailed = false
             return
         }
+        if let remembered = searchMemory.results(for: searchMemoryKey(q)) {
+            searchResults = remembered; isSearching = false; searchFailed = false
+            return
+        }
         // En recherche dès la frappe : pendant l'anti-rebond, la liste encore vide
         // affichait « Aucun résultat » avant même d'avoir cherché (UI-14).
         isSearching = true
@@ -1420,22 +1455,43 @@ final class MapExplorerViewModel: ObservableObject {
         await performSearch(q)
     }
 
+    /// Même seuil que `/api/antennas/quick-search` : moins de 2 unités UTF-16 après
+    /// `trim()`, il répond `results: []` sans chercher.
+    nonisolated static func searchesSites(_ query: String) -> Bool {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).utf16.count >= 2
+    }
+
+    private func searchMemoryKey(_ q: String) -> String {
+        MapSearchMemory.key(query: q, market: marketFilter, department: currentDromRegion?.department, center: lastCenter)
+    }
+
     /// Exécute la recherche : antennes (backend) ET lieux (ville/adresse via
     /// MKLocalSearch, Apple) EN PARALLÈLE, puis fusionne. Annulable.
     private func performSearch(_ q: String) async {
+        let memoryKey = searchMemoryKey(q)
+        if let remembered = searchMemory.results(for: memoryKey) {
+            searchResults = remembered; isSearching = false; searchFailed = false
+            return
+        }
         isSearching = true
         searchFailed = false
         // `nil` : la recherche d'antennes a échoué ; `[]` : elle n'a rien trouvé.
-        async let antennasResult = try? await antennasService.quickSearch(
-            query: q,
-            market: marketFilter,
-            department: currentDromRegion?.department
-        )
+        // Sous deux caractères, le serveur répond toujours une liste vide : la
+        // requête n'est pas envoyée (audit perf, R1).
+        async let antennasResult: [AntennaSite]? = Self.searchesSites(q)
+            ? try? await antennasService.quickSearch(
+                query: q,
+                market: marketFilter,
+                department: currentDromRegion?.department
+            )
+            : []
         async let placesResult = geocodePlaces(q)
         let antennas = await antennasResult
         let places = await placesResult
         guard !Task.isCancelled, searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == q else { return }
         let merged = Self.mergeSearchResults(places: places, antennas: antennas ?? [], query: q)
+        // Une liste vide peut venir d'une recherche Apple ratée : elle se refait.
+        if antennas != nil, !merged.isEmpty { searchMemory.store(merged, for: memoryKey) }
         searchResults = merged
         // « Indisponible » seulement si la recherche a échoué : une requête
         // sans résultat n'est pas une panne (AF-CARTE-02).

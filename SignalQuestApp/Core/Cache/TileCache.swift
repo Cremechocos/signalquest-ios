@@ -73,9 +73,13 @@ actor TileCache {
         }
 
         let flight: Flight
+        // Le lanceur a déjà validé ces octets avec sa propre règle ; un appel
+        // qui rejoint un vol en cours la revérifie avec la sienne.
+        var validatedByThisCall = false
         if let existing = inFlight[key], !forced || existing.forced {
             flight = existing
         } else {
+            validatedByThisCall = true
             if let replaced = inFlight[key] { replaced.task.cancel() }
             let id = UUID()
             let task = Task<CacheEnvelope<Data>, Error> {
@@ -112,7 +116,7 @@ actor TileCache {
         if !forced && diskAge > 0 && !isFresh(entry, maxAge: diskAge) {
             return try await data(for: key, maxAge: 0, validate: validate, fetch: fetch)
         }
-        try validate(entry.value)
+        if !validatedByThisCall { try validate(entry.value) }
         return entry.value
     }
 
@@ -125,20 +129,26 @@ actor TileCache {
             accessOrder.removeFirst()
             memory[oldest] = nil
         }
+        // La tuile s'affiche sans attendre son écriture disque (audit perf,
+        // C4) : en rafale, chaque tuile attendait toutes les écritures d'avant.
+        // L'ordre tient toujours : la chaîne passe avant toute purge.
         if fetched {
             let previous = lastDiskMutation
             let disk = disk
-            let write = Task {
+            lastDiskMutation = Task {
                 await previous?.value
                 try? await disk.write(entry.value, for: Self.storagePrefix + key, createdAt: entry.createdAt)
             }
-            lastDiskMutation = write
-            await write.value
         }
         try Task.checkCancellation()
         guard inFlight[key]?.id == id else { throw CancellationError() }
         inFlight[key] = nil
         return entry
+    }
+
+    /// Attend les écritures disque déjà lancées (tests, relance à froid).
+    func diskWritesSettled() async {
+        await lastDiskMutation?.value
     }
 
     /// Retourne seulement après la purge disque. Les appels suivants attendent

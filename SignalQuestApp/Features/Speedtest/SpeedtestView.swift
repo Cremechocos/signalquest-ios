@@ -1108,14 +1108,17 @@ struct SpeedtestView: View {
     }
 
     /// Speedtests et tests d'expérience : le sélecteur n'apparaît qu'avec un test d'expérience.
+    /// Les tests du compte absents du téléphone sont comparés une seule fois par rendu,
+    /// et non à chacune de leurs cinq lectures (audit perf, E4).
     private var historySection: some View {
-        UnifiedHistorySection(
+        let accountOnly = accountOnlyHistory
+        return UnifiedHistorySection(
             experience: services.experienceHistory,
             kind: $historyKind,
             local: history,
             pendingIds: pendingHistoryIds,
             account: accountHistory,
-            accountOnly: accountOnlyHistory,
+            accountOnly: accountOnly,
             accountHasMore: accountHasMore,
             loadingMoreAccount: loadingMoreAccountHistory,
             openLocal: { detailResult = $0 },
@@ -1123,11 +1126,11 @@ struct SpeedtestView: View {
             loadMoreAccount: { await loadMoreAccountHistory() },
             loadDetail: { [services] in try await services.experienceTests.entryDetail($0) }
         ) {
-            speedtestHistory
+            speedtestHistory(accountOnly: accountOnly)
         }
     }
 
-    private var speedtestHistory: some View {
+    private func speedtestHistory(accountOnly accountOnlyHistory: [SocialShareableSpeedtest]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             if !guestMode, !history.isEmpty, !mapPublicationNoticeSeen {
                 mapPublicationNotice
@@ -1165,7 +1168,7 @@ struct SpeedtestView: View {
                 // Visible aussi quand la première page ne contient que des tests de
                 // ce téléphone : les plus anciens restent à charger.
                 if !accountOnlyHistory.isEmpty || accountHasMore {
-                    accountHistorySection
+                    accountHistorySection(accountOnly: accountOnlyHistory)
                 }
             }
         }
@@ -1193,7 +1196,7 @@ struct SpeedtestView: View {
     /// Les tests du compte absents de ce téléphone : après une réinstallation
     /// ou sur un nouvel iPhone, l'onglet n'affiche plus « Aucun test » pour un
     /// compte qui en a des centaines (UI-12).
-    private var accountHistorySection: some View {
+    private func accountHistorySection(accountOnly accountOnlyHistory: [SocialShareableSpeedtest]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 historyKicker("Sur ton compte")

@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import SignalQuest
 
 @MainActor
@@ -13,6 +14,39 @@ final class MapSearchTests: XCTestCase {
             operators: [], technologies: [], bands: [], azimuths: [],
             sharingType: nil, crozonLeader: nil, isZTD: false, address: nil, height: nil, owner: nil
         )
+    }
+
+    /// Audit perf, R1 : même seuil que la route quick-search, qui répond vide sous 2 caractères.
+    func testSiteSearchStartsAtTwoCharactersLikeTheServer() {
+        XCTAssertFalse(MapExplorerViewModel.searchesSites(""))
+        XCTAssertFalse(MapExplorerViewModel.searchesSites(" L "))
+        XCTAssertTrue(MapExplorerViewModel.searchesSites("Ly"))
+        XCTAssertTrue(MapExplorerViewModel.searchesSites("38"))
+    }
+
+    /// Audit perf, R2 : un mot retapé dans les 30 s sert les mêmes résultats, sans
+    /// déborder sur un autre marché, un autre territoire ou une autre zone de carte.
+    func testRecentSearchesLastThirtySecondsPerMarketAndZone() {
+        let lyon = CLLocationCoordinate2D(latitude: 45.764, longitude: 4.836)
+        let start = Date(timeIntervalSince1970: 1_000)
+        var memory = MapSearchMemory()
+        let key = MapSearchMemory.key(query: " Gare ", market: "fr", department: nil, center: lyon)
+        memory.store([.place(place(1))], for: key, now: start)
+
+        XCTAssertEqual(memory.results(for: MapSearchMemory.key(query: "gare", market: "FR", department: nil,
+                                                              center: CLLocationCoordinate2D(latitude: 45.77, longitude: 4.84)),
+                                      now: start.addingTimeInterval(29))?.map(\.id), ["p1"])
+        XCTAssertNil(memory.results(for: key, now: start.addingTimeInterval(31)), "Plus de 30 s : nouvelle recherche")
+        XCTAssertNotEqual(key, MapSearchMemory.key(query: "gare", market: "BE", department: nil, center: lyon))
+        XCTAssertNotEqual(key, MapSearchMemory.key(query: "gare", market: "FR", department: "971", center: lyon))
+        XCTAssertNotEqual(key, MapSearchMemory.key(query: "gare", market: "FR", department: nil,
+                                                    center: CLLocationCoordinate2D(latitude: 48.857, longitude: 2.352)))
+
+        for index in 0..<MapSearchMemory.capacity {
+            memory.store([], for: "k\(index)", now: start.addingTimeInterval(Double(index + 1)))
+        }
+        XCTAssertNil(memory.results(for: key, now: start.addingTimeInterval(21)), "La plus ancienne sort la première")
+        XCTAssertNotNil(memory.results(for: "k19", now: start.addingTimeInterval(21)))
     }
 
     func testMergePlacesFirstCappedAt8() {

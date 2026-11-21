@@ -12,11 +12,42 @@ final class AntennaDetailViewModel: ObservableObject {
     @Published var photoUploadMessage: String?
 
     private let service: AntennasServicing
+    /// Fiches déjà lues des opérateurs du support, le temps de la fiche : passer
+    /// de l'un à l'autre les montre sans nouvel appel (audit perf, C7). Toute
+    /// relecture explicite (photo, vote, relance) les oublie, car elle suit une écriture.
+    private var operatorDetails: [String: AntennaDetails] = [:]
+    private var detailsOperator: String?
     init(service: AntennasServicing) { self.service = service }
 
+    /// Fiche lue ailleurs dans la feuille (bandes des autres opérateurs).
+    func remember(_ details: AntennaDetails, operatorName: String) {
+        operatorDetails[operatorName] = details
+    }
+
+    /// Ouverture ou changement d'opérateur : la fiche déjà lue s'il y en a une.
+    func show(id: String, market: String, operatorName: String, anfrCode: String?) async {
+        if let shown = details, let op = detailsOperator { operatorDetails[op] = shown }
+        error = nil
+        if let known = operatorDetails[operatorName] {
+            details = known
+            detailsOperator = operatorName
+            return
+        }
+        details = nil
+        await fetch(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
+    }
+
     func load(id: String, market: String, operatorName: String, anfrCode: String?) async {
+        operatorDetails.removeAll()
+        await fetch(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
+    }
+
+    private func fetch(id: String, market: String, operatorName: String, anfrCode: String?) async {
         do {
-            details = try await service.details(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
+            let loaded = try await service.details(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
+            details = loaded
+            detailsOperator = operatorName
+            operatorDetails[operatorName] = loaded
         } catch {
             // Un chargement remplacé (changement d'opérateur) n'est pas un échec à afficher.
             guard !error.isCancellation else { return }
@@ -266,21 +297,23 @@ struct AntennaDetailSheet: View {
             // `id: selectedOperator` → recharge la fiche quand l'utilisateur change
             // d'opérateur sur un site partagé.
             .task(id: selectedOperator) {
-                model.details = nil
-                model.error = nil
                 // Les pannes sont scopées à l'opérateur : si leur relecture échoue, celles de la
                 // facette précédente ne doivent pas rester affichées sous la nouvelle.
                 outages = []
                 operatorIncidents = []
                 // En parallèle de la fiche : les pannes n'ont pas à attendre `details`.
                 async let outagesLoad: Void = loadOutages()
-                await model.load(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
-                await loadMarketEntry()
+                // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
+                // service refuse d'écrire avant d'avoir lu la liste des suivis. Ni elle ni le
+                // registre n'attendent la fiche (audit perf, C7).
+                async let favoritesLoad: Void = services.favoriteAntennas.load()
+                async let marketLoad: Void = loadMarketEntry()
+                await model.show(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                await marketLoad
+                // L'historique lit le n° de support de la fiche, et le registre outre-mer.
                 async let historyLoad: Void = loadAnfrHistory()
                 await outagesLoad
-                // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
-                // service refuse d'écrire avant d'avoir lu la liste des suivis.
-                await services.favoriteAntennas.load()
+                await favoritesLoad
                 await historyLoad
             }
             .task(id: site.id) { await loadOtherOperatorBands() }
@@ -1257,17 +1290,21 @@ struct AntennaDetailSheet: View {
         let id = site.siteId ?? site.id
         let anfrCode = site.anfrCode
         let market = market
-        await withTaskGroup(of: (String, [String]?, String??).self) { group in
+        await withTaskGroup(of: (String, AntennaDetails?).self) { group in
             for op in others {
                 group.addTask {
                     let details = try? await service.details(id: id, market: market, operatorName: op, anfrCode: anfrCode)
-                    return (op, details.map(Self.scopedSystems(of:)), details.map { $0.core?.operatorSiteNumber })
+                    return (op, details)
                 }
             }
-            for await (op, systems, number) in group {
+            for await (op, details) in group {
                 loadingOtherOperators.remove(op)
-                if let systems, !systems.isEmpty { otherOperatorSystems[op] = systems }
-                if let number { otherOperatorSiteNumbers[op] = number }
+                guard let details else { continue }
+                model.remember(details, operatorName: op)
+                let systems = Self.scopedSystems(of: details)
+                let number = details.core?.operatorSiteNumber
+                if !systems.isEmpty { otherOperatorSystems[op] = systems }
+                otherOperatorSiteNumbers[op] = .some(number)
             }
         }
     }

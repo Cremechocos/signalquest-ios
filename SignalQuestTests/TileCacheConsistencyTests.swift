@@ -21,6 +21,8 @@ final class TileCacheConsistencyTests: XCTestCase {
         clock.advance(15)
         let second = try await cache.data(for: "a") { Data("fresh".utf8) }
         XCTAssertEqual(second, Data("fresh".utf8))
+        // La tuile est rendue avant son écriture disque (audit perf, C4).
+        await cache.diskWritesSettled()
         let stored = try await disk.readEntry(Data.self, for: TileCache.storagePrefix + "a")
         XCTAssertEqual(stored?.createdAt, clock.value)
     }
@@ -36,6 +38,7 @@ final class TileCacheConsistencyTests: XCTestCase {
         await gate.finish(Data("old".utf8))
         do { _ = try await old.value; XCTFail("A superseded response was returned") }
         catch { XCTAssertTrue(error is CancellationError) }
+        await cache.diskWritesSettled()
         let relaunched = TileCache(disk: disk)
         let persisted = try await relaunched.data(for: "a") { Data("unexpected".utf8) }
         XCTAssertEqual(persisted, Data("new".utf8))
@@ -119,6 +122,22 @@ final class TileCacheConsistencyTests: XCTestCase {
         XCTAssertEqual(retained, valid)
     }
 
+    /// Audit perf, C4 : l'appel qui télécharge valide une fois ; celui qui
+    /// rejoint son vol, ou lit la mémoire, revérifie avec sa propre règle.
+    func testAFetchedTileIsValidatedOnceByItsCallerAndAgainByAJoiner() async throws {
+        let cache = TileCache(disk: makeDisk())
+        let gate = TileFetchGate()
+        let launcher = TileValidationCounter()
+        let joiner = TileValidationCounter()
+        let first = Task { try await cache.data(for: "a", validate: launcher.record) { await gate.fetch() } }
+        await gate.waitUntilStarted()
+        let second = Task { try await cache.data(for: "a", validate: joiner.record) { await gate.fetch() } }
+        await gate.finish(Data("one".utf8))
+        _ = try await [first.value, second.value]
+        XCTAssertEqual(launcher.count, 1)
+        XCTAssertEqual(joiner.count, 1)
+    }
+
     private nonisolated static func validateJSON(_ data: Data) throws {
         struct Payload: Decodable { let value: Int }
         _ = try JSONDecoder().decode(Payload.self, from: data)
@@ -155,4 +174,11 @@ private actor TileFetchGate {
 private actor TileFetchCounter {
     private(set) var count = 0
     func next() -> Data { count += 1; return Data(String(count).utf8) }
+}
+
+private final class TileValidationCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+    var count: Int { lock.withLock { calls } }
+    func record(_ data: Data) throws { lock.withLock { calls += 1 } }
 }

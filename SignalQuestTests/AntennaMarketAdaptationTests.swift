@@ -526,3 +526,57 @@ final class CustomSiteDecodeTests: XCTestCase {
         XCTAssertEqual(response.markers.first?.typeLabel, "Antenne Murale")
     }
 }
+
+/// Audit perf, C7 : changer d'opérateur sur un support partagé montre la fiche
+/// déjà lue pour ses bandes ; une relecture explicite suit une écriture et
+/// oublie ces fiches.
+@MainActor
+final class AntennaDetailOperatorSwitchTests: XCTestCase {
+    func testOperatorSwitchReusesReadDetailsUntilAnExplicitReload() async throws {
+        let service = CountingDetailsService()
+        let model = AntennaDetailViewModel(service: service)
+        await model.show(id: "799050", market: "FR", operatorName: "ORANGE", anfrCode: nil)
+        XCTAssertEqual(model.details?.core?.operators, ["ORANGE"])
+        XCTAssertEqual(service.calls, ["ORANGE"])
+
+        model.remember(try CountingDetailsService.details(operatorName: "SFR"), operatorName: "SFR")
+        await model.show(id: "799050", market: "FR", operatorName: "SFR", anfrCode: nil)
+        XCTAssertEqual(model.details?.core?.operators, ["SFR"])
+        await model.show(id: "799050", market: "FR", operatorName: "ORANGE", anfrCode: nil)
+        XCTAssertEqual(model.details?.core?.operators, ["ORANGE"])
+        XCTAssertEqual(service.calls, ["ORANGE"], "Les deux fiches étaient déjà lues")
+
+        await model.load(id: "799050", market: "FR", operatorName: "ORANGE", anfrCode: nil)
+        await model.show(id: "799050", market: "FR", operatorName: "SFR", anfrCode: nil)
+        XCTAssertEqual(model.details?.core?.operators, ["SFR"])
+        XCTAssertEqual(service.calls, ["ORANGE", "ORANGE", "SFR"], "Après une relecture, plus rien n'est repris")
+    }
+}
+
+private final class CountingDetailsService: AntennasServicing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var requested: [String] = []
+    var calls: [String] { lock.withLock { requested } }
+
+    nonisolated static func details(operatorName: String) throws -> AntennaDetails {
+        try JSONDecoder.signalQuest.decode(AntennaDetails.self, from: Data("""
+        {"antenna":{"id":"799050","supId":"799050","lat":45.0,"lng":5.0,"operators":["\(operatorName)"],"technologies":["4G"],"azimuts":[]}}
+        """.utf8))
+    }
+
+    func list(bbox: BoundingBox) async throws -> [AntennaSite] { [] }
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { [] }
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite] { [] }
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode, sharing: Set<String>) async throws -> [AntennaSite] { [] }
+    func details(id: String) async throws -> AntennaDetails { throw APIError.cancelled }
+    func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails {
+        try await details(id: id, market: market, operatorName: operatorName, anfrCode: nil)
+    }
+    func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails {
+        lock.withLock { requested.append(operatorName) }
+        return try Self.details(operatorName: operatorName)
+    }
+    func search(query: String) async throws -> [AntennaSite] { [] }
+    func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] { [] }
+    func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
+}
