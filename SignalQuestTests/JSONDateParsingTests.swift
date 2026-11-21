@@ -74,6 +74,29 @@ final class JSONDateParsingTests: XCTestCase {
         assertLegacyEquivalent(inputs)
     }
 
+    /// `lastUpdated` d'un support ANFR arrive en horodatage PostgreSQL (« 2026-11-12
+    /// 15:15:26.732616 ») : la fiche l'affichait brut (21/11). Seul l'affichage le lit ;
+    /// le lecteur commun et le décodage JSON gardent leur refus.
+    func testSpacedPostgresTimestampIsDisplayedAsADate() throws {
+        let expected = Date(timeIntervalSince1970: 1_762_960_526.732)   // 12/11/2025 15:15:26.732 UTC
+        let cases: [(String, TimeInterval)] = [
+            ("2025-11-12 15:15:26.732616", 1_762_960_526.732),
+            ("2025-11-12 15:15:26.7", 1_762_960_526.7),
+            ("2025-11-12 15:15:26", 1_762_960_526)
+        ]
+        for (input, epoch) in cases {
+            let parsed = try XCTUnwrap(SignalFormatters.spacedTimestamp(input), input)
+            XCTAssertEqual(parsed.timeIntervalSince1970, epoch, accuracy: 0.001, input)
+        }
+        for input in ["2025-11-12", "2025-11-12 15:15:26.", "2025-11-12 15:15:26.7a", "le 12 novembre", "2025-11-12  15:15:26"] {
+            XCTAssertNil(SignalFormatters.spacedTimestamp(input), input)
+        }
+        XCTAssertNil(SQDateParsing.parse("2025-11-12 15:15:26.732616"), "The shared parser keeps refusing it")
+        let shown = try XCTUnwrap(SignalFormatters.date("2025-11-12 15:15:26.732616", relative: true))
+        XCTAssertEqual(shown, SignalFormatters.date(expected, relative: true))
+        XCTAssertFalse(shown.contains("15:15:26"), shown)
+    }
+
     func testMalformedAndOutOfRangeDatesKeepLegacyAcceptanceRules() {
         // Some malformed calendar dates are normalized by Foundation. Preserve
         // the deployed result rather than imposing a new validation policy.

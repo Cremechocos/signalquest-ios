@@ -77,8 +77,24 @@ enum SignalFormatters {
     /// delà d'un mois, on retombe sur la date absolue.
     static func date(_ value: String?, includingTime: Bool = false, relative: Bool = false) -> String? {
         guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        guard let date = SQDateParsing.parse(value) else { return value }
+        guard let date = SQDateParsing.parse(value) ?? spacedTimestamp(value) else { return value }
         return self.date(date, includingTime: includingTime, relative: relative)
+    }
+
+    /// Horodatage PostgreSQL sans fuseau, à espace et jusqu'à 6 décimales (« 2026-11-12
+    /// 15:15:26.732616 », `lastUpdated` d'un support ANFR) : le lecteur commun le refuse, et la
+    /// fiche montrait la chaîne brute. Ramené à « 2026-11-12T15:15:26.732 », lu en UTC comme les
+    /// autres dates sans fuseau. Affichage seulement : le décodage JSON ne change pas.
+    static func spacedTimestamp(_ value: String) -> Date? {
+        let parts = value.trimmingCharacters(in: .whitespaces).split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0].count == 10 else { return nil }
+        var time = String(parts[1])
+        if let dot = time.firstIndex(of: ".") {
+            let fraction = String(time[time.index(after: dot)...])
+            guard !fraction.isEmpty, fraction.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+            time = String(time[..<dot]) + "." + String((fraction + "000").prefix(3))
+        }
+        return SQDateParsing.parse("\(parts[0])T\(time)")
     }
 
     /// Même rendu, pour les modèles qui décodent déjà une `Date` (tuiles carte)
