@@ -122,6 +122,29 @@ final class LocalizationBundleTests: XCTestCase {
                        "2 identifications en conflit : d’autres sites ont plus de validations sur ces antennes. Vérifiez-les ou retirez-les.")
     }
 
+    /// Invitations faites à un invité sur la carte des changements et le comparatif de zone
+    /// (`EmptyStateView`, clés lues à l'exécution) : au vous dans le paquet formel, et en anglais.
+    func testGuestInvitationsHaveFormalAndEnglishText() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SQFormalTest-\(UUID().uuidString).bundle", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let formal = try XCTUnwrap(SQAddress.makeFormalBundle(from: .main, at: root))
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        let cases: [(key: String, formal: String, english: String)] = [
+            ("Réservé aux membres", "Réservé aux membres", "Members only"),
+            ("Connecte-toi pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit.",
+             "Connectez-vous pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit.",
+             "Sign in to see the sites that changed on the map. Creating an account is free."),
+            ("Connecte-toi pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit.",
+             "Connectez-vous pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit.",
+             "Sign in to compare antennas, throughput and signal around a point. Creating an account is free.")
+        ]
+        for item in cases {
+            XCTAssertEqual(String(localized: String.LocalizationValue(item.key), bundle: formal), item.formal)
+            XCTAssertEqual(english.localizedString(forKey: item.key, value: nil, table: nil), item.english)
+        }
+    }
+
     /// En français, le vouvoiement actif s'applique aussi aux phrases construites
     /// par `String(localized:)`, que `SQAddressBundle` ne voit pas.
     func testFormalToneRoutesStringLocalized() throws {

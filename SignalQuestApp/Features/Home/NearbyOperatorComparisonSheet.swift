@@ -20,11 +20,14 @@ struct NearbyOperatorComparisonSheet: View {
     var onRadiusChange: ((Double, Bool) -> Void)?
 
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var tab: Tab
     @State private var detail: ZoneMetricsOperator?
+    @State private var showSignup = false
     @StateObject private var zone: ZoneCompareModel
     @StateObject private var metrics = ZoneMetricsModel()
 
@@ -45,8 +48,19 @@ struct NearbyOperatorComparisonSheet: View {
 
     private var metric: NearbyOperatorMetric { tab == .signal ? .signal : .download }
 
-    /// Une requête par onglet, point, rayon, période, détail de bandes et relance ; changer de clé annule la précédente.
+    /// Invité, sans session. `zone-compare` et `zone-metrics` sont en `first-party-or-api-key` :
+    /// le site et Android ont leur preuve d'origine, l'app iOS n'a que la session. Sans elle,
+    /// le serveur répond 401 et les trois onglets disaient « Chargement impossible » : on
+    /// invite à créer un compte ou à se connecter, sans appeler les routes.
+    private var isSignedOut: Bool {
+        if case .loggedOut = session.state { return true }
+        return false
+    }
+
+    /// Une requête par onglet, point, rayon, période, détail de bandes, relance et connexion ;
+    /// changer de clé annule la précédente.
     private struct TaskKey: Equatable {
+        let signedOut: Bool
         let tab: Tab
         let latitude: Double
         let longitude: Double
@@ -57,22 +71,26 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private var taskKey: TaskKey {
-        TaskKey(tab: tab, latitude: latitude, longitude: longitude, radius: zone.radius, period: metrics.period,
-                bands: zone.wantsBands, reload: zone.reloadToken &+ metrics.reloadToken)
+        TaskKey(signedOut: isSignedOut, tab: tab, latitude: latitude, longitude: longitude, radius: zone.radius,
+                period: metrics.period, bands: zone.wantsBands, reload: zone.reloadToken &+ metrics.reloadToken)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 header
-                metricPicker
-                ZoneRadiusPicker(model: zone) { kilometers in
-                    onRadiusChange?(Double(kilometers) * 1000, false)
-                }
-                if tab == .antennas {
-                    ZoneAntennasSection(model: zone)
+                if isSignedOut {
+                    guestInvitation
                 } else {
-                    ZoneMetricsSection(model: metrics, marketEntry: zone.marketEntry, metric: metric) { detail = $0 }
+                    metricPicker
+                    ZoneRadiusPicker(model: zone) { kilometers in
+                        onRadiusChange?(Double(kilometers) * 1000, false)
+                    }
+                    if tab == .antennas {
+                        ZoneAntennasSection(model: zone)
+                    } else {
+                        ZoneMetricsSection(model: metrics, marketEntry: zone.marketEntry, metric: metric) { detail = $0 }
+                    }
                 }
             }
             .padding(.horizontal, SQSpace.lg)
@@ -89,7 +107,12 @@ struct NearbyOperatorComparisonSheet: View {
                 color: zone.marketEntry?.operatorColor(forKey: item.key) ?? SQBrand.operatorColor(item.label)
             )
         }
+        .sheet(isPresented: $showSignup) {
+            NavigationStack { SignupView() }
+        }
         .task(id: taskKey) {
+            // Invité : aucune requête ; connecté depuis l'invitation, la clé change et l'onglet se charge.
+            guard !isSignedOut else { return }
             zone.attach(service: services.anfr, markets: services.markets)
             zone.move(latitude: latitude, longitude: longitude)
             if tab == .antennas {
@@ -121,6 +144,26 @@ struct NearbyOperatorComparisonSheet: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "home.compare.close") { dismiss() }
+        }
+    }
+
+    /// Invité (voir `isSignedOut`) : ce que la comparaison montre, et comment y accéder.
+    /// Composé ici, comme l'offre de Sentinelle, plutôt qu'ajouté à `EmptyStateView`.
+    private var guestInvitation: some View {
+        VStack(spacing: SQSpace.sm) {
+            EmptyStateView(
+                title: "Réservé aux membres",
+                message: "Connecte-toi pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit.",
+                systemImage: "person.crop.circle"
+            )
+            GradientButton("Créer un compte") { showSignup = true }
+                .accessibilityIdentifier("home.compare.guest.signup")
+            GradientButton("Se connecter", style: .secondary) {
+                // La connexion vit dans l'onglet Profil : la feuille se ferme pour la laisser voir.
+                dismiss()
+                router.selectedTab = .profile
+            }
+            .accessibilityIdentifier("home.compare.guest.login")
         }
     }
 

@@ -1,6 +1,81 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Réservé aux membres" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Members only"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réservé aux membres"
+          }
+        }
+      }
+    },
+    "Connecte-toi pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to see the sites that changed on the map. Creating an account is free."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit."
+          }
+        }
+      }
+    },
+    "SQFormal|Connecte-toi pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Connecte-toi pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to compare antennas, throughput and signal around a point. Creating an account is free."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit."
+          }
+        }
+      }
+    },
+    "SQFormal|Connecte-toi pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous pour comparer les antennes, les débits et le signal autour d’un point. Créer un compte est gratuit."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Nous aider à corriger les plantages ?" : {
       "localizations" : {
         "en" : {

@@ -2900,6 +2900,9 @@ struct MapExplorerView: View {
     private var showsZoneCompareTip: Bool {
         // Un message d'état passe d'abord : l'astuce attend au lieu de s'empiler dessus.
         guard statusNotice == nil else { return false }
+        // Le comparatif exige une session sur iOS : un invité n'est pas invité à l'« Essayer »
+        // (un appui long lui ouvre l'invitation à créer un compte). La démo n'a pas de jeton.
+        guard AppEnvironment.usesDemoData || services.auth.hasStoredCredentials() else { return false }
         #if DEBUG
         if ProcessInfo.processInfo.environment["SQ_QA_ZONE_COMPARE_TIP"] == "1" { return !zoneCompareTipDone }
         #endif

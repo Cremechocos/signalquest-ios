@@ -933,6 +933,7 @@ struct ANFRMapView: View {
 private struct ANFRMapContent: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var session: AuthSessionViewModel
     @StateObject private var model: ANFRMapViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -962,6 +963,17 @@ private struct ANFRMapContent: View {
     /// Cadre de la barre d'onglets quand elle est en colonne (iPhone Duo), en
     /// coordonnées de la fenêtre ; nil quand elle est en bas.
     @State private var verticalDockFrame: CGRect?
+    @State private var showSignup = false
+
+    /// Invité, sans session. Les relevés (`map-snapshot`, `map-diff`, `archives`,
+    /// `reorientations`) sont en `first-party-or-api-key` : le site et Android ont leur
+    /// preuve d'origine, l'app iOS n'a que la session. Sans elle, le serveur répond 401
+    /// et l'écran disait « Session expirée » à qui n'en avait jamais eu : on invite à
+    /// créer un compte ou à se connecter, sans appeler la route.
+    private var isSignedOut: Bool {
+        if case .loggedOut = session.state { return true }
+        return false
+    }
 
     /// Vrai quand l'écran a été ouvert depuis les statistiques : leur bouton revient en arrière.
     private let cameFromStats: Bool
@@ -1043,7 +1055,13 @@ private struct ANFRMapContent: View {
             .presentationDetents([.medium, .large])
             .presentationBackgroundCompat(SQColor.bg)
         }
-        .task {
+        .sheet(isPresented: $showSignup) {
+            NavigationStack { SignupView() }
+        }
+        // Relancé à la connexion : l'invité qui se connecte depuis l'invitation voit la carte.
+        .task(id: isSignedOut) {
+            // Invité : aucune requête, elle serait refusée (voir `isSignedOut`).
+            guard !isSignedOut else { return }
             // Un relevé ou une zone visés par une notification sont français : la carte
             // y revient, et l'écran recréé lit la demande.
             if model.market != .fr, router.pendingANFRFocus != nil {
@@ -1056,7 +1074,8 @@ private struct ANFRMapContent: View {
             await model.load(focus: focus)
         }
         .onChangeCompat(of: router.pendingANFRFocus) { _, focus in
-            guard let focus else { return }
+            // Invité : la demande attend la connexion, lue alors par la tâche du dessus.
+            guard let focus, !isSignedOut else { return }
             guard model.market == .fr else {
                 market = .fr
                 return
@@ -1285,15 +1304,19 @@ private struct ANFRMapContent: View {
     @ViewBuilder
     private var statusPills: some View {
         VStack(spacing: SQSpace.sm) {
-            if model.isLoading {
-                loadingPill
-            } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
-                emptyPill
-            }
-            if let error = model.errorMessage {
-                errorPill(error)
-            } else if model.isShowingCachedCopy {
-                cachedCopyPill
+            if isSignedOut {
+                guestCard
+            } else {
+                if model.isLoading {
+                    loadingPill
+                } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
+                    emptyPill
+                }
+                if let error = model.errorMessage {
+                    errorPill(error)
+                } else if model.isShowingCachedCopy {
+                    cachedCopyPill
+                }
             }
             if let notice = locationNotice {
                 noticePill(notice)
@@ -1722,6 +1745,26 @@ private struct ANFRMapContent: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm + 1)
         .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowCard()
+    }
+
+    /// Invité (voir `isSignedOut`) : ce que la carte montre, et comment y accéder. Composé
+    /// ici, comme l'offre de Sentinelle, plutôt qu'ajouté à `EmptyStateView`.
+    private var guestCard: some View {
+        VStack(spacing: SQSpace.sm) {
+            EmptyStateView(
+                title: "Réservé aux membres",
+                message: "Connecte-toi pour voir sur la carte les sites qui ont changé. Créer un compte est gratuit.",
+                systemImage: "person.crop.circle"
+            )
+            GradientButton("Créer un compte") { showSignup = true }
+                .accessibilityIdentifier("anfr.map.guest.signup")
+            GradientButton("Se connecter", style: .secondary) { router.selectedTab = .profile }
+                .accessibilityIdentifier("anfr.map.guest.login")
+        }
+        .padding([.horizontal, .bottom], SQSpace.lg)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .frame(maxWidth: 360)
         .sqShadowCard()
     }
 
