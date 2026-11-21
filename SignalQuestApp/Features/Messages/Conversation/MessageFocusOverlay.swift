@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UIKit.UIGestureRecognizerSubclass
 
 /// Action du menu d'un message (appui long). Une seule liste nourrit le panneau
 /// façon iMessage et les actions VoiceOver de la bulle.
@@ -37,25 +39,101 @@ struct FocusedMessage: Identifiable {
 /// désactivée (`bubbleBody`), pour que le relâcher n'actionne pas aussi ce bouton.
 /// La priorité haute, elle, coupait le toucher simple d'un bouton sous le double
 /// toucher ❤️ (essais au simulateur du 10/11).
+/// Depuis iOS 18, ce `LongPressGesture` SwiftUI, même simultané, empêchait la conversation
+/// de défiler quand le doigt partait d'une bulle, photo ou texte (signalé par Alexandre
+/// le 21/11 ; au simulateur, 0 pt de défilement avec lui, environ 495 pt sans lui). Il
+/// passe donc par un appui long UIKit reconnu en même temps que le défilement, comme le
+/// glisser pour répondre (`HorizontalReplyPan`).
 struct MessageLongPress: ViewModifier {
     let isEnabled: Bool
     let onOpen: () -> Void
     @GestureState private var pressing = false
+    /// iOS 18+ : doigt posé, signalé par le geste UIKit.
+    @State private var touching = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    static let minimumDuration: TimeInterval = 0.32
+    static let maximumDistance: CGFloat = 12
 
     func body(content: Content) -> some View {
         if isEnabled {
-            content
-                .scaleEffect(pressing && !reduceMotion ? 0.96 : 1)
-                .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: pressing)
-                .simultaneousGesture(
-                    LongPressGesture(minimumDuration: 0.32, maximumDistance: 12)
-                        .updating($pressing) { value, state, _ in state = value }
-                        .onEnded { _ in onOpen() }
-                )
+            if #available(iOS 18.0, *) {
+                content
+                    .scaleEffect(touching && !reduceMotion ? 0.96 : 1)
+                    .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: touching)
+                    .gesture(BubbleLongPress(onPressingChanged: { touching = $0 }, onOpen: onOpen))
+            } else {
+                content
+                    .scaleEffect(pressing && !reduceMotion ? 0.96 : 1)
+                    .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: pressing)
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: Self.minimumDuration, maximumDistance: Self.maximumDistance)
+                            .updating($pressing) { value, state, _ in state = value }
+                            .onEnded { _ in onOpen() }
+                    )
+            }
         } else {
             content
         }
+    }
+}
+
+/// iOS 18+ : appui long UIKit de la bulle. Il ne bloque ni le défilement ni les boutons de
+/// la bulle (reconnu en même temps qu'eux), et échoue dès que le doigt bouge de plus de 12 pt.
+@available(iOS 18.0, *)
+private struct BubbleLongPress: UIGestureRecognizerRepresentable {
+    let onPressingChanged: (Bool) -> Void
+    let onOpen: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> PressTrackingLongPress {
+        let press = PressTrackingLongPress()
+        press.minimumPressDuration = MessageLongPress.minimumDuration
+        press.allowableMovement = MessageLongPress.maximumDistance
+        press.delegate = context.coordinator
+        return press
+    }
+
+    func updateUIGestureRecognizer(_ recognizer: PressTrackingLongPress, context: Context) {
+        recognizer.onPressingChanged = onPressingChanged
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: PressTrackingLongPress, context: Context) {
+        guard recognizer.state == .began else { return }
+        // Comme le `LongPressGesture` d'avant : l'enfoncement cesse à l'ouverture.
+        recognizer.setPressing(false)
+        onOpen()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
+    }
+}
+
+/// Appui long qui signale aussi le doigt posé, pour enfoncer la bulle avant l'ouverture.
+@available(iOS 18.0, *)
+final class PressTrackingLongPress: UILongPressGestureRecognizer {
+    var onPressingChanged: ((Bool) -> Void)?
+    private var pressing = false
+
+    func setPressing(_ value: Bool) {
+        guard value != pressing else { return }
+        pressing = value
+        onPressingChanged?(value)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        if state == .possible { setPressing(true) }
+    }
+
+    /// Appelé après l'ouverture, l'échec (doigt qui bouge, défilement) ou l'annulation.
+    override func reset() {
+        super.reset()
+        setPressing(false)
     }
 }
 
