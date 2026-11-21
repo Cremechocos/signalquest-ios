@@ -225,6 +225,9 @@ final class MapExplorerViewModel: ObservableObject {
 
     private var displayedContext: LoadContext?
     private var activeLoad: (id: UUID, context: LoadContext)?
+    /// Chargement dont la couverture peut encore se montrer tuile par tuile (C13) ; remis à
+    /// nil quand son lot complet arrive, pour qu'un envoi en retard ne l'écrase jamais.
+    private var coverageProgressLoad: UUID?
 
     private func loadContext(filters: Set<MapDisplayItem.Kind>, lightweight: Bool) -> LoadContext {
         LoadContext(
@@ -269,6 +272,17 @@ final class MapExplorerViewModel: ObservableObject {
         await mapService.invalidateTiles()
         guard !Task.isCancelled else { return }
         await load(bounds: bounds, zoom: zoom, filters: filters, requestID: requestID, refresh: true)
+    }
+
+    /// C13 : tuiles de couverture déjà reçues d'un lot lent, montrées sans attendre la dernière.
+    /// Le lot complet, à son arrivée, reste seul juge (tuiles en échec, revalidation).
+    private func applyCoverageProgress(_ progress: MapTileProgress<AndroidCoverageTileResponse>, load: UUID) {
+        guard coverageProgressLoad == load, let context = activeLoad?.context,
+              isCurrentLoad(load, context: context), context.filters.contains(.coverage) else { return }
+        let merged = progress.merged(over: coverageTiles)
+        guard merged != coverageTiles else { return }
+        coverageTiles = merged
+        dataVersion &+= 1
     }
 
     private func isCurrentLoad(_ id: UUID, context: LoadContext) -> Bool {
@@ -992,6 +1006,10 @@ final class MapExplorerViewModel: ObservableObject {
         var communityOutage: (value: [CommunityOutage]?, error: String?, atLimit: Bool) = (nil, nil, false)
         var coverage: (value: (tiles: MapTileLayerResult<AndroidCoverageTileResponse>, heat: [CoverageHeatPoint])?, error: String?) = (nil, nil)
         var photos: (value: [MapPublicPhoto]?, error: String?) = (nil, nil)
+        coverageProgressLoad = wantsCoverage ? id : nil
+        let coverageProgress: @Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void = { [weak self] partial in
+            Task { @MainActor [weak self] in self?.applyCoverageProgress(partial, load: id) }
+        }
 
         await withTaskGroup(of: LayerResult.self) { group in
             group.addTask {
@@ -1087,7 +1105,7 @@ final class MapExplorerViewModel: ObservableObject {
                 let result: (value: (tiles: MapTileLayerResult<AndroidCoverageTileResponse>, heat: [CoverageHeatPoint])?, error: String?) = await {
                     guard wantsCoverage else { return ((MapTileLayerResult(tiles: []), []), nil) }
                     let result = await MapTileLayerResult.load {
-                        try await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: refresh ? 0 : nil, focus: focus)
+                        try await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: refresh ? 0 : nil, focus: focus, onProgress: coverageProgress)
                     }
                     if result.tiles != nil {
                         return ((result, []), result.errorMessage)
@@ -1215,6 +1233,7 @@ final class MapExplorerViewModel: ObservableObject {
                     }
                 case .coverage(let result):
                     coverage = result
+                    coverageProgressLoad = nil
                     // D-N2-TUILES (« points à 60 s ») : la couche vient d'être affichée depuis
                     // le cache ; une fois ce premier chargement réussi seulement, on redemande
                     // les tuiles de points de plus de 60 s et on remplace la couche si elles ont
@@ -4895,6 +4914,23 @@ struct MapExplorerView: View {
         return result
     }
 
+    /// Ordre de dessin d'une tuile, du plus ancien au plus récent (le renderer dessine dans
+    /// l'ordre du tableau, le dernier au-dessus). Sans date, une mesure passe dessous ; à date
+    /// égale, l'ordre du serveur (du plus récent au plus ancien) est inversé. Tri déterministe :
+    /// le garde de diff de `setCoverage` tient.
+    static func oldestFirst<Item>(_ items: [Item], date: (Item) -> Date?) -> [Item] {
+        // Cas courant : le serveur sert déjà du plus récent au plus ancien ; l'inverser donne
+        // exactement le tri stable ci-dessous (égalités comprises) sans trier 2 500 points.
+        let dates = items.map { date($0) ?? .distantPast }
+        if zip(dates, dates.dropFirst()).allSatisfy({ $0 >= $1 }) { return items.reversed() }
+        return items.enumerated()
+            .sorted { lhs, rhs in
+                let left = date(lhs.element) ?? .distantPast, right = date(rhs.element) ?? .distantPast
+                return left != right ? left < right : lhs.offset > rhs.offset
+            }
+            .map(\.element)
+    }
+
     /// Pendant de `dominantGenerationPoints` pour le REPLI bbox `/api/coverage/points`.
     /// Le modèle `CoverageHeatPoint` n'a pas de `groupId` → on regroupe par COORDONNÉE
     /// (les frères NSA 4G+5G sont co-localisés à lat/lng identiques) et on ne conserve
@@ -4962,15 +4998,24 @@ struct MapExplorerView: View {
                 // signal propre) et la séquence reste paresseuse (rien de matérialisé).
                 let filtered = tile.points.lazy.filter { CoverageRenderPolicy.matches($0, selectedBands: model.bandFilters) }
                 let cap = CoverageRenderPolicy.pointCapPerTile
+                // Le plafond garde les plus récents (le serveur les sert en tête), puis on dessine
+                // du plus ancien au plus récent : deux pastilles qui se chevauchent montrent la
+                // mesure la plus récente au-dessus (C15, audit du 21/11).
                 if coverageByGeneration {
-                    features += Self.dominantGenerationPoints(filtered).prefix(cap).compactMap { coverageFeature(from: $0) }
+                    let kept = Self.dominantGenerationPoints(filtered).prefix(cap).compactMap { point in
+                        coverageFeature(from: point).map { (date: point.timestamp, feature: $0) }
+                    }
+                    features += Self.oldestFirst(kept) { $0.date }.map { $0.feature }
                 } else {
                     // Couche SIGNAL (RSRP) : on exclut la couverture iOS « génération seule »
                     // (source == "ios", aucun RSRP) — elle n'a de sens que sur la couche
                     // génération. Filtrage par SOURCE et non par rsrp==nil, pour ne pas
                     // masquer les vraies zones blanches Android (RSRP absent mais réel).
                     // Les points sans valeur pour la mesure choisie ne comptent pas dans le plafond.
-                    features += filtered.filter { $0.source != "ios" }.compactMap { coverageFeature(from: $0) }.prefix(cap)
+                    let kept = filtered.filter { $0.source != "ios" }.compactMap { point in
+                        coverageFeature(from: point).map { (date: point.timestamp, feature: $0) }
+                    }.prefix(cap)
+                    features += Self.oldestFirst(Array(kept)) { $0.date }.map { $0.feature }
                 }
             }
         }

@@ -23,8 +23,17 @@ protocol MapSnapshotServicing: Sendable {
     func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidSpeedtestTileResponse]
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidCoverageTileResponse]
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse]
+    /// Même lot, avec les tuiles déjà reçues signalées en route (C13).
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?, onProgress: @escaping @Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void) async throws -> [AndroidCoverageTileResponse]
     func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int>) async throws -> [AndroidCommunitySiteTileResponse]
     func customSiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String) async throws -> [AndroidCustomSiteTileResponse]
+}
+
+extension MapSnapshotServicing {
+    /// Sans suivi des tuiles (doublures de test) : le lot arrive d'un bloc.
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?, onProgress: @escaping @Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void) async throws -> [AndroidCoverageTileResponse] {
+        try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: focus)
+    }
 }
 
 struct MapBounds: Equatable, Sendable {
@@ -454,6 +463,14 @@ final class MapSnapshotService: MapSnapshotServicing {
     static let coveragePointsMaxAge: TimeInterval = 60
 
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse] {
+        try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: focus, progress: nil)
+    }
+
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?, onProgress: @escaping @Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void) async throws -> [AndroidCoverageTileResponse] {
+        try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: focus, progress: onProgress)
+    }
+
+    private func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?, progress: (@Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void)?) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
         // Le focus entre dans la CLÉ de cache : sans ça, la couverture isolée
         // d'un site servirait les tuiles déjà en cache pour « tout l'opérateur ».
@@ -466,6 +483,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             zoom: zoom,
             detailBoost: request.detailBoost,
             maxTiles: request.tileBudget,
+            onProgress: progress,
             // Par tuile : la grille du dézoom garde sa propre fraîcheur, 5 min au plus
             // (D-N2-GRILLE, 10/11, contre 60 min sur disque par défaut), que seul un
             // rafraîchissement forcé (0) contourne ; une revalidation des points à 60 s
@@ -576,6 +594,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         detailBoost: Int = 0,
         maxTiles: Int = 24,
         maxAge: TimeInterval? = nil,
+        onProgress: (@Sendable (MapTileProgress<T>) -> Void)? = nil,
         tileMaxAge: (@Sendable (AndroidMapTile) -> TimeInterval?)? = nil,
         cacheKey: @escaping @Sendable (AndroidMapTile) -> String,
         endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint,
@@ -584,7 +603,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         let tiles = try MapTilePlanner.plan(bounds: bounds, zoom: zoom,
                                              detailBoost: detailBoost, tileBudget: maxTiles).tiles
         let owner = api.credentials.snapshot()
-        return try await Self.collectTiles(tiles, api: api, owner: owner) { [api, tileCache] tile in
+        return try await Self.collectTiles(tiles, api: api, owner: owner, onProgress: onProgress) { [api, tileCache] tile in
             let data = try await tileCache.data(for: cacheKey(tile), maxAge: tileMaxAge.map { $0(tile) } ?? maxAge, validate: {
                 let value = try MapTileAdmission.decode(T.self, from: $0, expectedTile: tile)
                 try validate(value)
@@ -598,8 +617,16 @@ final class MapSnapshotService: MapSnapshotServicing {
         }
     }
 
-    private static func collectTiles<T: MapTilePayload>(
+    /// Délai avant de montrer les tuiles déjà reçues d'un lot, puis entre deux envois (C13).
+    /// Un lot servi plus vite reste publié d'un seul coup, comme avant.
+    static let progressInterval: Duration = .milliseconds(400)
+
+    /// Réveil du suivi d'un lot : une tâche du groupe, d'index négatif, jamais une tuile.
+    private struct ProgressWake: Error {}
+
+    static func collectTiles<T: MapTilePayload>(
         _ tiles: [AndroidMapTile], api: APIClient, owner: CredentialStore.Snapshot,
+        onProgress: (@Sendable (MapTileProgress<T>) -> Void)? = nil,
         fetch: @escaping @Sendable (AndroidMapTile) async throws -> T
     ) async throws -> [T] {
         try Task.checkCancellation()
@@ -624,7 +651,43 @@ final class MapSnapshotService: MapSnapshotServicing {
                 }
             }
             var results: [(Int, Result<T, Error>)] = []
-            for try await result in group { results.append(result) }
+            // C13 : passé `progressInterval`, les tuiles reçues partent à l'appelant, puis au
+            // plus une fois par intervalle ; le réveil est annulé dès la dernière tuile.
+            let clock = ContinuousClock()
+            var lastProgress = clock.now
+            var wakePending = false
+            var unpublished = false
+            if onProgress != nil, !tiles.isEmpty {
+                wakePending = true
+                group.addTask {
+                    try? await Task.sleep(for: MapSnapshotService.progressInterval)
+                    return (-1, .failure(ProgressWake()))
+                }
+            }
+            for try await result in group {
+                if result.0 >= 0 {
+                    results.append(result)
+                    if results.count == tiles.count { group.cancelAll(); break }
+                    if case .success = result.1 { unpublished = true }
+                } else {
+                    wakePending = false
+                }
+                guard let onProgress, unpublished else { continue }
+                let elapsed = clock.now - lastProgress
+                if elapsed >= MapSnapshotService.progressInterval {
+                    unpublished = false
+                    lastProgress = clock.now
+                    let received = results.sorted { $0.0 < $1.0 }.compactMap { try? $0.1.get() }
+                    onProgress(MapTileProgress(received: received, requested: tiles))
+                } else if !wakePending {
+                    wakePending = true
+                    let delay = MapSnapshotService.progressInterval - elapsed
+                    group.addTask {
+                        try? await Task.sleep(for: delay)
+                        return (-1, .failure(ProgressWake()))
+                    }
+                }
+            }
             try Task.checkCancellation()
             guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
             var successful: [T] = []

@@ -8,6 +8,59 @@ final class MapPartialTilesTests: XCTestCase {
     private let bounds = MapBounds(north: 0.001, south: -0.001, east: 0.001, west: -0.001)
     private let remainingIDs: Set<String> = ["SFR-8191-8191", "SFR-8191-8192", "SFR-8192-8191"]
 
+    /// C13 (audit du 21/11) : une tuile lente ne retient plus les tuiles déjà reçues du lot.
+    /// Elles partent après `progressInterval` ; un lot rapide reste publié d'un seul coup.
+    func testSlowTileNoLongerHoldsBackTheTilesAlreadyReceived() async throws {
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()))
+        let owner = api.credentials.snapshot()
+        let tiles = [AndroidMapTile(z: 6, x: 32, y: 22), AndroidMapTile(z: 6, x: 33, y: 22), AndroidMapTile(z: 6, x: 32, y: 23)]
+        let recorder = TileProgressRecorder()
+        let clock = ContinuousClock(), started = clock.now
+        let slow: [AndroidCoverageTileResponse] = try await MapSnapshotService.collectTiles(tiles, api: api, owner: owner,
+            onProgress: { recorder.record($0.received.map(\.tile), after: clock.now - started) }) { tile in
+            if tile.x == 33 { try await Task.sleep(for: .seconds(3)) }
+            return try Self.gridTile(tile)
+        }
+        XCTAssertEqual(slow.map(\.tile), tiles)
+        let events = recorder.events
+        XCTAssertEqual(events.map(\.tiles), [[tiles[0], tiles[2]]])
+        let first = try XCTUnwrap(events.first?.after)
+        XCTAssertGreaterThanOrEqual(first, MapSnapshotService.progressInterval)
+        XCTAssertLessThan(first, .milliseconds(2_500))
+
+        let quick = TileProgressRecorder()
+        let fast: [AndroidCoverageTileResponse] = try await MapSnapshotService.collectTiles(tiles, api: api, owner: owner,
+            onProgress: { quick.record($0.received.map(\.tile), after: .zero) }) { tile in try Self.gridTile(tile) }
+        XCTAssertEqual(fast.map(\.tile), tiles)
+        XCTAssertTrue(quick.events.isEmpty)
+    }
+
+    /// C13 : pendant le lot, une ancienne tuile reste tant qu'une tuile demandée qui la recouvre
+    /// manque ; les tuiles reçues se dessinent par-dessus.
+    func testTilesReceivedDuringABatchReplaceOnlyTheAreasTheyCover() throws {
+        let parent = AndroidMapTile(z: 6, x: 32, y: 22), neighbour = AndroidMapTile(z: 6, x: 33, y: 22)
+        let inside = AndroidMapTile(z: 9, x: 32 * 8 + 3, y: 22 * 8 + 5)
+        let elsewhere = AndroidMapTile(z: 9, x: 33 * 8 + 1, y: 22 * 8)
+        XCTAssertTrue(parent.overlaps(inside) && inside.overlaps(parent) && parent.overlaps(parent))
+        XCTAssertFalse(parent.overlaps(elsewhere) || parent.overlaps(neighbour))
+        // Dézoom : les points de la ville restent jusqu'à l'arrivée de leur grande tuile.
+        let zoomOut = MapTileProgress(received: [try Self.gridTile(parent)], requested: [parent, neighbour])
+        XCTAssertEqual(zoomOut.merged(over: [try Self.gridTile(inside), try Self.gridTile(elsewhere)]).map(\.tile),
+                       [elsewhere, parent])
+        // Zoom avant : la grande tuile reste tant qu'une de ses petites manque.
+        let children = [AndroidMapTile(z: 7, x: 64, y: 44), AndroidMapTile(z: 7, x: 65, y: 44)]
+        let half = MapTileProgress(received: [try Self.gridTile(children[0])], requested: children)
+        XCTAssertEqual(half.merged(over: [try Self.gridTile(parent)]).map(\.tile), [parent, children[0]])
+        let all = MapTileProgress(received: try children.map(Self.gridTile), requested: children)
+        XCTAssertEqual(all.merged(over: [try Self.gridTile(parent)]).map(\.tile), children)
+    }
+
+    nonisolated private static func gridTile(_ tile: AndroidMapTile) throws -> AndroidCoverageTileResponse {
+        try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: Data("""
+        {"tile":{"z":\(tile.z),"x":\(tile.x),"y":\(tile.y)},"clusters":[],"points":[],"stats":{"sampleCount":0}}
+        """.utf8))
+    }
+
     func testSpeedtestTile503KeepsOtherTilesAndReportsIncompleteResponse() async throws {
         let harness = try makeHarness()
         defer { harness.cleanUp() }
@@ -327,6 +380,13 @@ private struct PartialTileHarness {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         try? FileManager.default.removeItem(at: caches.appendingPathComponent(folder))
     }
+}
+
+private final class TileProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [(tiles: [AndroidMapTile], after: Duration)] = []
+    var events: [(tiles: [AndroidMapTile], after: Duration)] { lock.withLock { recorded } }
+    func record(_ tiles: [AndroidMapTile], after: Duration) { lock.withLock { recorded.append((tiles, after)) } }
 }
 
 /// URLProtocol calls this object off MainActor; mutable recipe state is locked.

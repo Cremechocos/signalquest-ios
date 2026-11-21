@@ -14,6 +14,31 @@ final class CoverageRenderPolicyTests: XCTestCase {
         XCTAssertEqual(visibleIDs, ["8/130/87:lte-band7"], "A verified overview must not disappear when its band is selected")
     }
 
+    /// C15 (audit du 21/11) : le serveur sert les points du plus récent au plus ancien et le
+    /// renderer dessine le dernier au-dessus ; une tuile se dessine donc du plus ancien au plus
+    /// récent. Sans date, dessous ; à date égale, l'ordre du serveur inversé ; résultat stable.
+    func testCoveragePointsDrawOldestFirstSoTheNewestStaysOnTop() {
+        let day: TimeInterval = 86_400
+        let base = Date(timeIntervalSince1970: 1_790_000_000)
+        let served: [(id: String, date: Date?)] = [
+            ("newest", base.addingTimeInterval(3 * day)),
+            ("tie-served-first", base.addingTimeInterval(day)),
+            ("undated", nil),
+            ("tie-served-second", base.addingTimeInterval(day)),
+            ("oldest", base),
+        ]
+        let drawn = MapExplorerView.oldestFirst(served) { $0.date }.map(\.id)
+        XCTAssertEqual(drawn, ["undated", "oldest", "tie-served-second", "tie-served-first", "newest"])
+        XCTAssertEqual(MapExplorerView.oldestFirst(served) { $0.date }.map(\.id), drawn)
+        XCTAssertTrue(MapExplorerView.oldestFirst([(id: String, date: Date?)]()) { $0.date }.isEmpty)
+        // Cas courant, déjà servi du plus récent au plus ancien (égalités et point sans date en
+        // fin) : simple inversion, même résultat que le tri.
+        let alreadyNewestFirst: [(id: String, date: Date?)] = [
+            ("recent", base.addingTimeInterval(2 * day)), ("tie-a", base), ("tie-b", base), ("no-date", nil),
+        ]
+        XCTAssertEqual(MapExplorerView.oldestFirst(alreadyNewestFirst) { $0.date }.map(\.id), ["no-date", "tie-b", "tie-a", "recent"])
+    }
+
     /// `detail=grid` (N2-3a) : `clusters: []` servi, les cellules deviennent les clusters
     /// d'overview, un par techno × source ; les identités PLMN fusionnent (position pondérée
     /// par les échantillons, RSRP par les mesures) ; sans position, le centre de la cellule.

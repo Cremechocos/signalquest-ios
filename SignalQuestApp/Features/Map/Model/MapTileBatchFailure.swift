@@ -26,6 +26,35 @@ struct MapTileBatchFailure<Value: MapTilePayload>: Error, LocalizedError {
     }
 }
 
+/// Tuiles déjà reçues d'un lot encore en cours (C13, audit du 21/11) : une grille calculée à
+/// froid côté serveur (jusqu'à 21 s) ne fait plus attendre les tuiles prêtes du même lot.
+struct MapTileProgress<Value: MapTilePayload>: Sendable {
+    let received: [Value]
+    let requested: [AndroidMapTile]
+
+    /// Couche montrée pendant le lot : les anciennes tuiles dont une tuile demandée qui les
+    /// recouvre manque encore, puis les tuiles reçues (dessinées au-dessus). Une ancienne tuile
+    /// s'efface dès que toute sa zone est couverte de tuiles reçues : au dézoom, la zone déjà
+    /// affichée garde ses points jusqu'à l'arrivée de sa grande tuile.
+    func merged(over previous: [Value]) -> [Value] {
+        let receivedTiles = Set(received.map(\.tile))
+        let pending = requested.filter { !receivedTiles.contains($0) }
+        let kept = previous.filter { old in
+            !receivedTiles.contains(old.tile) && pending.contains { $0.overlaps(old.tile) }
+        }
+        return kept + received
+    }
+}
+
+extension AndroidMapTile {
+    /// Deux tuiles se recouvrent quand l'une contient l'autre (ou si c'est la même).
+    func overlaps(_ other: AndroidMapTile) -> Bool {
+        let zoom = min(z, other.z)
+        guard zoom >= 0 else { return false }
+        return x >> (z - zoom) == other.x >> (other.z - zoom) && y >> (z - zoom) == other.y >> (other.z - zoom)
+    }
+}
+
 struct MapTileLoadIssue: Equatable, Sendable {
     let requestedCount: Int
     let receivedCount: Int

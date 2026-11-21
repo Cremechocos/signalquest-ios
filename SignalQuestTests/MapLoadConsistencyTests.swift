@@ -473,6 +473,36 @@ final class MapLoadConsistencyTests: XCTestCase {
         """.utf8))
     }
 
+    /// C13 (audit du 21/11) : les tuiles de couverture déjà reçues se montrent pendant qu'une
+    /// tuile lente se fait attendre ; le lot complet reste seul juge, et un envoi en retard ne
+    /// l'écrase jamais.
+    func testCoverageTilesAlreadyReceivedShowBeforeTheSlowestAndNeverOverwriteTheBatch() async throws {
+        let (model, service) = makeModel()
+        let fast = try coverageTile("fast-point", x: 1), slow = try coverageTile("slow-point", x: 2)
+        await service.setCoverage(.success([fast, slow]))
+        await service.holdCoverage(after: [fast])
+        let load = Task { await model.load(bounds: bounds, zoom: 14, filters: [.coverage]) }
+        for _ in 0..<400 where model.coverageTiles.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertEqual(model.coverageTiles.flatMap(\.points).map(\.id), ["fast-point"])
+
+        await service.releaseCoverage()
+        await load.value
+        XCTAssertEqual(model.coverageTiles.flatMap(\.points).map(\.id), ["fast-point", "slow-point"])
+        let version = model.dataVersion
+        let recorded = await service.lastCoverageProgress
+        let late = try XCTUnwrap(recorded)
+        late(MapTileProgress(received: [try coverageTile("stale-point", x: 2)], requested: [fast.tile, slow.tile]))
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(model.coverageTiles.flatMap(\.points).map(\.id), ["fast-point", "slow-point"])
+        XCTAssertEqual(model.dataVersion, version)
+    }
+
+    private func coverageTile(_ id: String, x: Int) throws -> AndroidCoverageTileResponse {
+        try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: Data("""
+        {"tile":{"z":14,"x":\(x),"y":1},"clusters":[],"points":[{"id":"\(id)","lat":48.85,"lng":2.35,"tech":"4G"}],"stats":{"sampleCount":1}}
+        """.utf8))
+    }
+
     private func coverageTile(_ id: String?) throws -> AndroidCoverageTileResponse {
         let points = id.map { """
         [{"id":"\($0)","lat":48.85,"lng":2.35,"tech":"4G"}]
@@ -507,6 +537,22 @@ private actor ControlledMapLoadService: MapSnapshotServicing {
     }
     func setImmediateSpeedtests(_ value: [AndroidSpeedtestTileResponse]) { immediateSpeedtests = value }
     func setCoverage(_ value: Result<[AndroidCoverageTileResponse], Error>) { coverage = value }
+    private var heldCoverageProgress: [AndroidCoverageTileResponse]?
+    private var coverageHold: CheckedContinuation<Void, Never>?
+    private(set) var lastCoverageProgress: (@Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void)?
+    /// Le prochain lot de couverture signale `partial`, puis attend `releaseCoverage()`.
+    func holdCoverage(after partial: [AndroidCoverageTileResponse]) { heldCoverageProgress = partial }
+    func releaseCoverage() { coverageHold?.resume(); coverageHold = nil }
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?, onProgress: @escaping @Sendable (MapTileProgress<AndroidCoverageTileResponse>) -> Void) async throws -> [AndroidCoverageTileResponse] {
+        lastCoverageMaxAge = maxAge
+        lastCoverageProgress = onProgress
+        if let partial = heldCoverageProgress {
+            heldCoverageProgress = nil
+            onProgress(MapTileProgress(received: partial, requested: try coverage.get().map(\.tile)))
+            await withCheckedContinuation { coverageHold = $0 }
+        }
+        return try coverage.get()
+    }
     func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidSpeedtestTileResponse] {
         lastSpeedtestMaxAge = maxAge
         speedtestRequestCount += 1
