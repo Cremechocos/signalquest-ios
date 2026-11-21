@@ -2993,8 +2993,13 @@ struct MapExplorerView: View {
         }
     }
 
-    /// Barre de recherche flottante Halo : carte blanche de 46 pt à 13 pt de
-    /// coins, ombre carte, filet carmin pendant la saisie.
+    /// Hauteur et rayon communs au champ de recherche et au bouton Filtres :
+    /// posés côte à côte, une seule valeur les garde identiques.
+    private static let topBarControlHeight: CGFloat = 46
+    private static let topBarControlShape = RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+
+    /// Barre de recherche flottante Halo : carte blanche de 46 pt aux coins du
+    /// bouton Filtres, ombre carte, filet carmin pendant la saisie.
     private var mapSearchField: some View {
         HStack(spacing: SQSpace.sm) {
             // Slot de tête à largeur fixe : loupe au repos, spinner pendant un
@@ -3017,7 +3022,7 @@ struct MapExplorerView: View {
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 if !model.searchQuery.isEmpty {
                     Text("Recherche")
-                        .font(.caption)
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .accessibilityIdentifier("map.search.label")
                 }
@@ -3034,7 +3039,9 @@ struct MapExplorerView: View {
                     .lineLimit(1...2)
                     .submitLabel(.search)
                     .autocorrectionDisabled()
-                    .accessibilityLabel("Rechercher une ville, une adresse ou un site")
+                    // Le nom lu reprend le texte affiché : Contrôle vocal le retrouve.
+                    .accessibilityLabel(Text("Rechercher un lieu ou un site"))
+                    .accessibilityHint(Text("Ville, adresse ou site"))
                     .accessibilityIdentifier("map.search.input")
                     .onSubmit { Task { await model.search() } }
                     // Suggestions à la frappe (anti-rebond + annulation côté modèle).
@@ -3076,17 +3083,20 @@ struct MapExplorerView: View {
         }
         .padding(.leading, SQSpace.md2)
         .padding(.trailing, !searchIsActive && sightOrigin == .device ? SQSpace.md2 : 0)
-        .frame(minHeight: 46)
+        .frame(minHeight: Self.topBarControlHeight)
         .frame(maxWidth: .infinity)
         // Toute la barre donne le focus au champ, pas seulement sa ligne de texte.
-        .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .contentShape(Self.topBarControlShape)
         .onTapGesture { searchFieldFocused = true }
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .sqSurface(SQColor.surface, in: Self.topBarControlShape)
         .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
+            Self.topBarControlShape
                 .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 1.5)
         }
         .sqShadowCard()
+        // Cadre de la barre entière pour les tests ; le champ garde son identifiant.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("map.search.bar")
     }
 
     private var filterButton: some View {
@@ -3099,8 +3109,8 @@ struct MapExplorerView: View {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 46, height: 46)
-                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .frame(width: Self.topBarControlHeight, height: Self.topBarControlHeight)
+                    .sqSurface(SQColor.surface, in: Self.topBarControlShape)
                     .sqShadowCard()
                 if activeFilterCount > 0 && !dynamicTypeSize.isAccessibilitySize {
                     SQCountBadge(count: activeFilterCount)
@@ -3189,9 +3199,11 @@ struct MapExplorerView: View {
     /// La carte recharge seule à chaque déplacement : pas de bouton « rafraîchir ».
     private var mapFabStack: some View {
         VStack(spacing: SQSpace.sm2) {
-            mapFab(icon: "square.3.layers.3d", label: "Couches") {
+            // Même nom que la pastille d'état et que la feuille qu'il ouvre.
+            mapFab(icon: "square.3.layers.3d", label: "Carte") {
                 showLayersSheet = true
             }
+            .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
             .accessibilityIdentifier("map.layers")
             mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
                 centerOnCurrentLocation()

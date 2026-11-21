@@ -86,6 +86,10 @@ struct MapLayersSheet: View {
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Icône des tuiles et son cadre, à l'échelle du libellé : le cadre de hauteur
+    /// fixe aligne les libellés, quelle que soit la hauteur du symbole.
+    @ScaledMetric(relativeTo: .footnote) private var layerIconSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .footnote) private var layerIconFrame: CGFloat = 22
 
     init(market: String, operatorName: String,
          layers: Binding<Set<MapDisplayItem.Kind>>,
@@ -271,9 +275,11 @@ struct MapLayersSheet: View {
                 set: { azimuthStyle = $0 ? MapAzimuthStyleStore.lastDrawing() : .hidden })
     }
 
+    /// Trois tuiles par rangée ; aux tailles d'accessibilité, une rangée par couche,
+    /// pour qu'aucun mot ne se coupe en son milieu (« Couvertu / re »).
     private var layerColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm),
-              count: dynamicTypeSize.isAccessibilitySize ? 2 : 3)
+              count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
     }
 
     private var layerSection: some View {
@@ -306,19 +312,37 @@ struct MapLayersSheet: View {
             Haptics.selection()
             if isOn { layers.remove(kind) } else { layers.insert(kind) }
         } label: {
-            VStack(spacing: SQSpace.xs) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .accessibilityHidden(true)
-                Text(LocalizedStringKey(title))
-                    .font(SQType.chip)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            let frameSide = min(layerIconFrame, 36)
+            // En rangée, une largeur commune (les antennes sont larges) aligne les libellés.
+            let symbol = Image(systemName: icon)
+                .font(.system(size: min(layerIconSize, 30), weight: .medium))
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? frameSide * 1.5 : nil, height: frameSide)
+                .accessibilityHidden(true)
+            let label = Text(LocalizedStringKey(title))
+                .font(SQType.chip)
+                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    HStack(spacing: SQSpace.md) {
+                        symbol
+                        label.multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                } else {
+                    // Contenu calé en haut : les libellés d'une rangée partagent leur ligne de base.
+                    VStack(spacing: SQSpace.xs) {
+                        symbol
+                        label.multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, SQSpace.xs)
+                    .padding(.vertical, SQSpace.md)
+                    .frame(maxWidth: .infinity, minHeight: 66, maxHeight: .infinity, alignment: .top)
+                }
             }
             .foregroundStyle(isOn ? SQColor.bg : (disabled ? SQColor.labelTertiary : SQColor.ink2))
-            .padding(.horizontal, SQSpace.xs)
-            .padding(.vertical, SQSpace.sm)
-            .frame(maxWidth: .infinity, minHeight: 66)
             .sqSurface(isOn ? SQColor.label : SQColor.surfaceMuted,
                        in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -334,7 +358,12 @@ struct MapLayersSheet: View {
     private var backdropSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Fond").sqKicker().accessibilityAddTraits(.isHeader)
-            HStack(spacing: SQSpace.sm) {
+            // Calées en haut : un libellé sur deux lignes ne décale plus les vignettes ;
+            // aux tailles d'accessibilité, une rangée par fond.
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: SQSpace.sm))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: SQSpace.sm))
+            layout {
                 backdropTile(.applePlan, title: "Plan")
                 backdropTile(.satellite, title: "Satellite")
                 backdropTile(.topo, title: "Relief")
@@ -349,17 +378,30 @@ struct MapLayersSheet: View {
             Haptics.selection()
             backdropRaw = value.rawValue
         } label: {
-            VStack(spacing: SQSpace.xs) {
-                shape.fill(backdropPreview(value))
-                    .frame(height: 44)
-                    .overlay {
-                        shape.strokeBorder(selected ? SQColor.brandRed : SQColor.separator,
-                                           lineWidth: selected ? 2.5 : 1)
+            let preview = shape.fill(backdropPreview(value))
+                .frame(height: 44)
+                .overlay {
+                    shape.strokeBorder(selected ? SQColor.brandRed : SQColor.separator,
+                                       lineWidth: selected ? 2.5 : 1)
+                }
+                .accessibilityHidden(true)
+            let label = Text(LocalizedStringKey(title))
+                .font(SQFont.body(12, selected ? .heavy : .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    HStack(spacing: SQSpace.md) {
+                        preview.frame(width: 72)
+                        label.frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .accessibilityHidden(true)
-                Text(LocalizedStringKey(title))
-                    .font(SQFont.body(12, selected ? .heavy : .semibold, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
+                    .frame(minHeight: 56)
+                } else {
+                    VStack(spacing: SQSpace.xs) {
+                        preview
+                        label.multilineTextAlignment(.center)
+                    }
+                }
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
