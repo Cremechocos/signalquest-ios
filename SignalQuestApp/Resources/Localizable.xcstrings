@@ -11771,7 +11771,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This feature needs a SIM card from a supported carrier."
+            "value" : "This feature needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -12288,7 +12288,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Live sharing needs a SIM card from a supported carrier."
+            "value" : "Live sharing needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -12304,7 +12304,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sharing a session needs a SIM card from a supported carrier."
+            "value" : "Sharing a session needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -12320,7 +12320,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sending coverage needs a SIM card from a supported carrier."
+            "value" : "Sending coverage needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -12336,7 +12336,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importing a coverage session needs a SIM card from a supported carrier."
+            "value" : "Importing a coverage session needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -12352,7 +12352,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Identifying a site needs a SIM card from a supported carrier."
+            "value" : "Identifying a site needs a SIM card from a supported operator."
           }
         },
         "fr" : {
@@ -14086,7 +14086,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source: ANFR observatory. Departments follow the carrier chosen in “Trend”."
+            "value" : "Source: ANFR observatory. Departments follow the operator chosen in “Trend”."
           }
         },
         "fr" : {
@@ -18642,7 +18642,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Long-press the map to compare carriers around a point."
+            "value" : "Long-press the map to compare operators around a point."
           }
         },
         "fr" : {
@@ -20805,7 +20805,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Each column counts the sites that transmit in that generation; a site can count in several. Outlined: the carrier with the most."
+            "value" : "Each column counts the sites that transmit in that generation; a site can count in several. Outlined: the operator with the most."
           }
         },
         "fr" : {
@@ -21337,7 +21337,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compare carriers here"
+            "value" : "Compare operators here"
           }
         },
         "fr" : {
@@ -26623,7 +26623,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Numbers count the sites concerned, for the selected carriers."
+            "value" : "Numbers count the sites concerned, for the selected operators."
           }
         },
         "fr" : {
@@ -32157,7 +32157,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier sites · %@"
+            "value" : "Operator sites · %@"
           }
         },
         "fr" : {
@@ -32173,7 +32173,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Operational and projected sites, all carriers."
+            "value" : "Operational and projected sites, all operators."
           }
         },
         "fr" : {
@@ -32189,7 +32189,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Operational sites, all carriers."
+            "value" : "Operational sites, all operators."
           }
         },
         "fr" : {
@@ -32245,7 +32245,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source: ANFR observatory. Regions follow the carrier chosen in “Trend”."
+            "value" : "Source: ANFR observatory. Regions follow the operator chosen in “Trend”."
           }
         },
         "fr" : {
@@ -32690,7 +32690,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On the map, a marker takes the colour of the site’s dominant carrier; its symbol is the most significant type of change."
+            "value" : "On the map, a marker takes the colour of the site’s dominant operator; its symbol is the most significant type of change."
           }
         },
         "fr" : {
@@ -33638,7 +33638,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your carrier can’t be detected: this test won’t be published on the map."
+            "value" : "Your operator can’t be detected: this test won’t be published on the map."
           }
         },
         "fr" : {
@@ -33850,7 +33850,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap a carrier to show or hide it"
+            "value" : "Tap an operator to show or hide it"
           }
         },
         "fr" : {
@@ -36404,7 +36404,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "by carrier"
+            "value" : "by operator"
           }
         },
         "fr" : {
@@ -37487,7 +37487,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cannot be checked: country or carrier missing from the readings"
+            "value" : "Cannot be checked: country or operator missing from the readings"
           }
         },
         "fr" : {
@@ -37504,7 +37504,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "These readings have no serving network: this site cannot be identified without guessing its carrier."
+            "value" : "These readings have no serving network: this site cannot be identified without guessing its operator."
           }
         },
         "fr" : {
@@ -48692,7 +48692,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Antenna shared by %lld carriers"
+            "value" : "Antenna shared by %lld operators"
           }
         },
         "fr" : {
@@ -50225,7 +50225,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No carrier ticked: every outage. Two at most."
+            "value" : "No operator ticked: every outage. Two at most."
           }
         },
         "fr" : {
@@ -51072,7 +51072,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No carrier measurement shared within this radius yet."
+            "value" : "No operator measurement shared within this radius yet."
           }
         },
         "fr" : {
@@ -51488,7 +51488,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No verified source is available for this country and carrier."
+            "value" : "No verified source is available for this country and operator."
           }
         },
         "fr" : {
@@ -51690,7 +51690,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow location access to compare carriers."
+            "value" : "Allow location access to compare operators."
           }
         },
         "fr" : {
@@ -51718,7 +51718,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow location to see measurements, outages and the fastest carrier within 1 km."
+            "value" : "Allow location to see measurements, outages and the fastest operator within 1 km."
           }
         },
         "fr" : {
@@ -54008,7 +54008,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This route could not be linked to a country: it may not appear on the map. This happens when the carrier stays undetectable (Wi-Fi, VPN, or an unsupported country)."
+            "value" : "This route could not be linked to a country: it may not appear on the map. This happens when the operator stays undetectable (Wi-Fi, VPN, or an unsupported country)."
           }
         },
         "fr" : {
@@ -54236,7 +54236,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Some carriers have no verified public source."
+            "value" : "Some operators have no verified public source."
           }
         },
         "fr" : {
@@ -56129,7 +56129,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a carrier to show coverage."
+            "value" : "Choose an operator to show coverage."
           }
         },
         "fr" : {
@@ -56659,7 +56659,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier code"
+            "value" : "Operator code"
           }
         },
         "fr" : {
@@ -56675,7 +56675,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier code (MCC-MNC)"
+            "value" : "Operator code (MCC-MNC)"
           }
         },
         "fr" : {
@@ -57091,7 +57091,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compare carriers around you"
+            "value" : "Compare operators around you"
           }
         },
         "fr" : {
@@ -57675,7 +57675,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confirmed by the carrier"
+            "value" : "Confirmed by the operator"
           }
         },
         "fr" : {
@@ -58578,7 +58578,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier colors, sectors and site markers"
+            "value" : "Operator colors, sectors and site markers"
           }
         },
         "fr" : {
@@ -60995,7 +60995,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Speed by carrier"
+            "value" : "Speed by operator"
           }
         },
         "fr" : {
@@ -67199,7 +67199,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The carrier lists this outage in its own feed."
+            "value" : "The operator lists this outage in its own feed."
           }
         },
         "fr" : {
@@ -67525,7 +67525,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Coverage will be recorded without a carrier, and the nearest cell sector stays unavailable."
+            "value" : "Coverage will be recorded without an operator, and the nearest cell sector stays unavailable."
           }
         },
         "fr" : {
@@ -69297,7 +69297,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A mobile network’s code: the country (MCC, 208 for France) followed by the carrier (MNC)."
+            "value" : "A mobile network’s code: the country (MCC, 208 for France) followed by the operator (MNC)."
           }
         },
         "fr" : {
@@ -70099,7 +70099,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A summary of recent community measurements around you: median speed, average signal and best carrier in the area."
+            "value" : "A summary of recent community measurements around you: median speed, average signal and best operator in the area."
           }
         },
         "fr" : {
@@ -76311,7 +76311,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier"
+            "value" : "Operator"
           }
         },
         "fr" : {
@@ -76343,7 +76343,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier shown: %@"
+            "value" : "Operator shown: %@"
           }
         },
         "fr" : {
@@ -76359,7 +76359,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier guessed from the IP address"
+            "value" : "Operator guessed from the IP address"
           }
         },
         "fr" : {
@@ -76391,7 +76391,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier inferred from the SIM PLMN. When roaming, it may differ from the radio network in use."
+            "value" : "Operator inferred from the SIM PLMN. When roaming, it may differ from the radio network in use."
           }
         },
         "fr" : {
@@ -76407,7 +76407,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Detected carrier"
+            "value" : "Detected operator"
           }
         },
         "fr" : {
@@ -76423,7 +76423,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Detecting carrier…"
+            "value" : "Detecting operator…"
           }
         },
         "fr" : {
@@ -76439,7 +76439,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier estimated from mobile Internet access (IP/ASN). When roaming, this does not confirm the serving radio network."
+            "value" : "Operator estimated from mobile Internet access (IP/ASN). When roaming, this does not confirm the serving radio network."
           }
         },
         "fr" : {
@@ -76472,7 +76472,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown carrier"
+            "value" : "Unknown operator"
           }
         },
         "fr" : {
@@ -76488,7 +76488,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wrong carrier"
+            "value" : "Wrong operator"
           }
         },
         "fr" : {
@@ -76504,7 +76504,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invalid carrier."
+            "value" : "Invalid operator."
           }
         },
         "fr" : {
@@ -76521,7 +76521,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier not detected"
+            "value" : "Operator not detected"
           }
         },
         "fr" : {
@@ -76569,7 +76569,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wrong host carrier"
+            "value" : "Wrong host operator"
           }
         },
         "fr" : {
@@ -76601,7 +76601,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carriers"
+            "value" : "Operators"
           }
         },
         "fr" : {
@@ -76617,7 +76617,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carriers around you"
+            "value" : "Operators around you"
           }
         },
         "fr" : {
@@ -76646,7 +76646,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown carriers"
+            "value" : "Unknown operators"
           }
         },
         "fr" : {
@@ -78272,7 +78272,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "By carrier"
+            "value" : "By operator"
           }
         },
         "fr" : {
@@ -78757,7 +78757,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Attaches the carrier and technology of your latest reading"
+            "value" : "Attaches the operator and technology of your latest reading"
           }
         },
         "fr" : {
@@ -80439,7 +80439,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Several carriers share the same structure, sometimes the same antennas. On a shared site, the carrier running it may not be yours."
+            "value" : "Several operators share the same structure, sometimes the same antennas. On a shared site, the operator running it may not be yours."
           }
         },
         "fr" : {
@@ -88389,7 +88389,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "If the carrier shown for a shared site looks wrong, you can report it from its page."
+            "value" : "If the operator shown for a shared site looks wrong, you can report it from its page."
           }
         },
         "fr" : {
@@ -88524,7 +88524,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signal by carrier"
+            "value" : "Signal by operator"
           }
         },
         "fr" : {
@@ -89322,7 +89322,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shared site: one slice per carrier"
+            "value" : "Shared site: one slice per operator"
           }
         },
         "fr" : {
@@ -89656,7 +89656,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Through a tunnel, the detected carrier is the VPN exit's: the measurement would be attributed to the wrong network. Nothing is recorded or published in that case."
+            "value" : "Through a tunnel, the detected operator is the VPN exit's: the measurement would be attributed to the wrong network. Nothing is recorded or published in that case."
           }
         },
         "fr" : {
@@ -91934,7 +91934,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Technology, carrier and quality at the time of sharing."
+            "value" : "Technology, operator and quality at the time of sharing."
           }
         },
         "fr" : {
@@ -93552,7 +93552,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Every 500 m on the motorway: the map shows where your carrier holds up."
+            "value" : "Every 500 m on the motorway: the map shows where your operator holds up."
           }
         },
         "fr" : {
@@ -93580,7 +93580,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All carriers"
+            "value" : "All operators"
           }
         },
         "fr" : {
@@ -95439,7 +95439,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A place without proper mobile coverage. Sites from the white-zone programme are built there by one carrier, which shares them with the others."
+            "value" : "A place without proper mobile coverage. Sites from the white-zone programme are built there by one operator, which shares them with the others."
           }
         },
         "fr" : {
@@ -96279,7 +96279,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "VPN active: carrier can't be detected, these tests won't be published to the map."
+            "value" : "VPN active: operator can't be detected, these tests won't be published to the map."
           }
         },
         "fr" : {
@@ -96312,7 +96312,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "VPN active: your carrier can't be detected, this test won't be published to the map."
+            "value" : "VPN active: your operator can't be detected, this test won't be published to the map."
           }
         },
         "fr" : {
@@ -98809,7 +98809,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "eNB, gNB, carrier…"
+            "value" : "eNB, gNB, operator…"
           }
         },
         "fr" : {
@@ -99181,7 +99181,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognises the carrier from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
+            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognises the operator from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
           }
         },
         "fr" : {
@@ -99683,7 +99683,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "best carrier %@"
+            "value" : "best operator %@"
           }
         },
         "fr" : {
@@ -100104,7 +100104,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "carrier"
+            "value" : "operator"
           }
         },
         "fr" : {
@@ -102872,7 +102872,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose the carrier, layers and base map"
+            "value" : "Choose the operator, layers and base map"
           }
         },
         "fr" : {
@@ -109032,7 +109032,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS does not give access to the radio signal (strength, bands, cell): only the carrier and the network type are known."
+            "value" : "iOS does not give access to the radio signal (strength, bands, cell): only the operator and the network type are known."
           }
         },
         "fr" : {
@@ -116299,7 +116299,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Licensed sites, all carriers."
+            "value" : "Licensed sites, all operators."
           }
         },
         "fr" : {
