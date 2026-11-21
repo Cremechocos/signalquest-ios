@@ -4098,7 +4098,8 @@ struct MapExplorerView: View {
                     clusterCount: cluster.count,
                     azimuths: [],
                     showsAzimuths: false,
-                    tint: model.operatorFilter.uppercased() == "ALL" ? nil : model.operatorAccent(model.operatorFilter)
+                    tint: model.operatorFilter.uppercased() == "ALL" ? nil : model.operatorAccent(model.operatorFilter),
+                    operatorTints: antennaClusterTints(operatorKeys: cluster.operatorCounts.map { Array($0.keys) } ?? [])
                 )
             }
             // Badges de panne : uniquement quand le filtre « Pannes » est ÉTEINT.
@@ -5205,7 +5206,39 @@ struct MapExplorerView: View {
         label: (Int) -> String
     ) -> [MapAnnotationPayload] {
         Self.clusteredPayloads(from: payloads, kind: kind, idPrefix: idPrefix,
-                               minCount: minCount, zoom: mapZoom, label: label)
+                               minCount: minCount, zoom: mapZoom, label: label,
+                               operatorPalette: kind == .antenna ? operatorPalette : [])
+    }
+
+    /// Couleurs des opérateurs de la carte, dans l'ordre du sélecteur : elles
+    /// rangent les arcs de l'anneau d'une grappe d'antennes.
+    private var operatorPalette: [Color] {
+        model.operatorOptions
+            .filter { $0.uppercased() != "ALL" }
+            .map { model.operatorAccent($0) }
+    }
+
+    /// Anneau d'une grappe servie : un arc par opérateur présent, comme sur le
+    /// Web. Filtrée sur un opérateur, la grappe n'a que lui.
+    private func antennaClusterTints(operatorKeys: [String]) -> [Color] {
+        let filter = model.operatorFilter
+        let keys = filter.uppercased() == "ALL" ? operatorKeys : [filter]
+        return Self.orderedClusterTints(keys.map { model.operatorAccent($0) }, palette: operatorPalette)
+    }
+
+    /// Chaque couleur une fois, dans l'ordre de la palette ; les couleurs hors
+    /// palette suivent, dans leur ordre d'arrivée. Sans cet ordre, les arcs
+    /// changeraient de place d'une tuile ou d'un déplacement à l'autre.
+    static func orderedClusterTints(_ tints: [Color], palette: [Color]) -> [Color] {
+        var unique: [Color] = []
+        for tint in tints where !unique.contains(tint) { unique.append(tint) }
+        return unique.enumerated()
+            .sorted { lhs, rhs in
+                let left = palette.firstIndex(of: lhs.element) ?? palette.count + lhs.offset
+                let right = palette.firstIndex(of: rhs.element) ?? palette.count + rhs.offset
+                return left < right
+            }
+            .map(\.element)
     }
 
     static func clusteredPayloads(
@@ -5214,7 +5247,8 @@ struct MapExplorerView: View {
         idPrefix: String,
         minCount: Int,
         zoom: Double,
-        label: (Int) -> String
+        label: (Int) -> String,
+        operatorPalette: [Color] = []
     ) -> [MapAnnotationPayload] {
         guard zoom < 14, payloads.count > minCount else { return payloads }
         let cellSize: Double
@@ -5255,7 +5289,15 @@ struct MapExplorerView: View {
                 antennaId: nil,
                 clusterCount: group.count,
                 azimuths: [],
-                showsAzimuths: false
+                showsAzimuths: false,
+                // Grappe d'antennes : les couleurs de ses sites (camembert d'un
+                // site partagé, sinon sa teinte), pour l'anneau.
+                operatorTints: kind == .antenna
+                    ? orderedClusterTints(
+                        group.flatMap { $0.operatorTints.isEmpty ? [$0.tint].compactMap { $0 } : $0.operatorTints },
+                        palette: operatorPalette
+                    )
+                    : []
             )
         }
     }

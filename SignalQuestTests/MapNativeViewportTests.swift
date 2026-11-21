@@ -36,6 +36,41 @@ final class MapNativeViewportTests: XCTestCase {
         XCTAssertEqual(moved.map(\.clusterCount).compactMap { $0 }.sorted(), [2, 3])
     }
 
+    /// Une grappe d'antennes calculée par l'app réunit les couleurs de ses sites
+    /// (camembert d'un site partagé, sinon sa teinte), chacune une fois, dans
+    /// l'ordre du sélecteur d'opérateurs ; les autres couches n'en ont pas.
+    func testAntennaClustersGatherTheirSitesOperatorColoursInSelectorOrder() throws {
+        func site(_ id: String, _ latitude: Double, kind: MapDisplayItem.Kind = .antenna,
+                  tint: Color?, shared: [Color] = []) -> MapAnnotationPayload {
+            var payload = MapAnnotationPayload(
+                id: id, kind: kind, title: id, subtitle: "",
+                coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: 0.02),
+                metric: nil, backendId: nil, details: nil, antennaId: nil,
+                clusterCount: nil, azimuths: [], showsAzimuths: false, tint: tint
+            )
+            payload.operatorTints = shared
+            return payload
+        }
+        let palette: [Color] = [.orange, .red, .blue]
+        let sites = [site("a", 0.010, tint: .blue), site("b", 0.011, tint: .orange, shared: [.red, .orange]),
+                     site("c", 0.012, tint: .blue), site("d", 0.013, tint: .purple)]
+
+        let cluster = try XCTUnwrap(MapExplorerView.clusteredPayloads(
+            from: sites, kind: .antenna, idPrefix: "antenna", minCount: 1, zoom: 10,
+            label: { "\($0) antennes" }, operatorPalette: palette
+        ).first)
+        XCTAssertEqual(cluster.clusterCount, 4)
+        XCTAssertEqual(cluster.operatorTints, [.orange, .red, .blue, .purple])
+
+        let others = sites.map { site($0.id, $0.coordinate.latitude, kind: .customSite, tint: $0.tint) }
+        let custom = try XCTUnwrap(MapExplorerView.clusteredPayloads(
+            from: others, kind: .customSite, idPrefix: "custom-site", minCount: 1, zoom: 10,
+            label: { "\($0) sites" }, operatorPalette: palette
+        ).first)
+        XCTAssertEqual(custom.clusterCount, 4)
+        XCTAssertTrue(custom.operatorTints.isEmpty)
+    }
+
     func testNativeClusterUpdatesCountAndPositionWithoutReplacingAnnotation() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }

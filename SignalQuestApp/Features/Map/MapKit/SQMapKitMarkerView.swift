@@ -36,6 +36,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     private var beamLayers: [CAShapeLayer] = []
     /// Arcs d'anneau 5G, un par opérateur concerné sur un support partagé.
     private var ringArcs: [CAShapeLayer] = []
+    /// Anneau d'une grappe d'antennes, un arc par opérateur présent.
+    private var clusterArcs: [CAShapeLayer] = []
     private let checkBadge = UIImageView()
     private let photoBadge = UIImageView()
     /// Panne communautaire signalée sur ce site, quand le filtre « Pannes » est
@@ -194,14 +196,22 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         applyAccessibility(for: payload)
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {
-            // Grappe Halo : disque d'encre, chiffre couleur papier, anneau carmin.
-            // Elle se distingue ainsi d'un site, coloré par son opérateur.
+            // Grappe Halo : disque d'encre, chiffre couleur papier. Son anneau
+            // prend les couleurs des opérateurs présents, comme sur le Web ;
+            // carmin quand on ne les connaît pas (autres couches, ancien serveur).
             let size: CGFloat = count >= 100 ? 44 : 38
             resize(to: size, radius: size / 2)
             let ink = UIColor(SQColor.label).resolvedColor(with: traitCollection)
             dot.backgroundColor = ink
-            dot.layer.borderColor = UIColor(SQColor.brandRed).resolvedColor(with: traitCollection).cgColor
-            dot.layer.borderWidth = 3
+            let tints = payload.kind == .antenna ? payload.operatorTints : []
+            if tints.isEmpty {
+                hideClusterArcs()
+                dot.layer.borderColor = UIColor(SQColor.brandRed).resolvedColor(with: traitCollection).cgColor
+                dot.layer.borderWidth = 3
+            } else {
+                dot.layer.borderWidth = 0
+                applyClusterArcs(tints, size: size)
+            }
             dot.alpha = 1
             countLabel.frame = dot.bounds
             countLabel.font = .systemFont(ofSize: count >= 100 ? 12 : 11, weight: .heavy)
@@ -220,6 +230,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             operatorBadge.isHidden = true
             operatorDot.isHidden = true
         } else {
+            hideClusterArcs()
             let isAntenna = payload.kind == .antenna
             let size = isAntenna ? Self.antennaDotSize : Self.otherDotSize
             let reach = isAntenna ? payload.azimuthReachPoints : 0
@@ -597,6 +608,48 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         for arc in ringArcs { arc.isHidden = true }
     }
 
+    /// Anneau d'une grappe d'antennes : un arc égal par opérateur présent, le
+    /// premier au sommet, séparés de 2 pt comme sur le Web ; un seul opérateur
+    /// donne un anneau plein. Dessiné sur le bord du disque, à la place du liseré.
+    private func applyClusterArcs(_ tints: [Color], size: CGFloat) {
+        let lineWidth: CGFloat = 3
+        let radius = size / 2 - lineWidth / 2
+        let center = CGPoint(x: size / 2, y: size / 2)
+        let step = (.pi * 2) / CGFloat(tints.count)
+        let gap: CGFloat = tints.count > 1 ? 2 / radius : 0
+        // Une grappe se met à jour sur place pendant un déplacement : aucun
+        // fondu implicite des arcs.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        for index in 0..<max(tints.count, clusterArcs.count) {
+            if index >= clusterArcs.count {
+                let arc = CAShapeLayer()
+                arc.fillColor = nil
+                arc.lineWidth = lineWidth
+                dot.layer.addSublayer(arc)
+                clusterArcs.append(arc)
+            }
+            let arc = clusterArcs[index]
+            guard index < tints.count else { arc.isHidden = true; continue }
+            arc.isHidden = false
+            arc.frame = CGRect(origin: .zero, size: CGSize(width: size, height: size))
+            let start = -CGFloat.pi / 2 + step * CGFloat(index)
+            arc.path = UIBezierPath(
+                arcCenter: center,
+                radius: radius,
+                startAngle: start + gap / 2,
+                endAngle: start + step - gap / 2,
+                clockwise: true
+            ).cgPath
+            arc.strokeColor = UIColor(tints[index]).resolvedColor(with: traitCollection).cgColor
+        }
+    }
+
+    private func hideClusterArcs() {
+        for arc in clusterArcs { arc.isHidden = true }
+    }
+
     private func applyBadges(_ payload: MapAnnotationPayload, size: CGFloat) {
         let isAntenna = payload.kind == .antenna
         let showsCheck = isAntenna && payload.hasEnb
@@ -723,6 +776,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     var outageBadgeFrameForTesting: CGRect { outageBadge.frame }
     var operatorBadgeFrameForTesting: CGRect { operatorBadge.frame }
     var glyphColorForTesting: UIColor? { glyph.tintColor }
+    /// Couleurs des arcs visibles de l'anneau d'une grappe.
+    var clusterArcColorsForTesting: [CGColor] { clusterArcs.filter { !$0.isHidden }.compactMap(\.strokeColor) }
 
     static func glyphName(for p: MapAnnotationPayload) -> String {
         if let g = p.glyphOverride { return g }

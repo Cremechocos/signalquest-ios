@@ -517,6 +517,21 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertEqual(antennas[1].clusters[1].lat, 48.85)
     }
 
+    /// Les tuiles d'antennes servent les opérateurs de chaque grappe : ils
+    /// colorent son anneau et survivent au préfixe de tuile ; une grappe sans
+    /// eux (ancien serveur) les laisse absents.
+    func testAntennaTileClustersKeepTheirOperatorCounts() throws {
+        let json = Data("""
+        {"tile":{"z":12,"x":2074,"y":1409},"markers":[],
+         "clusters":[{"id":"0:0","lat":48.81,"lng":2.30,"count":49,"operatorCounts":{"ORANGE":20,"SFR":29}},
+                     {"id":"1:1","lat":48.82,"lng":2.31,"count":3}]}
+        """.utf8)
+        let response = try JSONDecoder.signalQuest.decode(AndroidAntennaTileResponse.self, from: json)
+        XCTAssertEqual(response.clusters[0].id, "12/2074/1409:0:0")
+        XCTAssertEqual(response.clusters[0].operatorCounts, ["ORANGE": 20, "SFR": 29])
+        XCTAssertNil(response.clusters[1].operatorCounts)
+    }
+
     /// Le niveau de confiance d'une cellule observée est traduit ; une valeur inconnue reste telle
     /// quelle, et la casse du serveur n'y change rien.
     func testObservedCellConfidenceLevelIsLocalizedAndTolerant() {

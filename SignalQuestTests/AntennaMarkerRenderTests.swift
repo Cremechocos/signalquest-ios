@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 import MapKit
 import CoreLocation
 @testable import SignalQuest
@@ -244,6 +245,42 @@ final class AntennaMarkerRenderTests: XCTestCase {
         XCTAssertTrue(view.checkBadgeIsHiddenForTesting)
         XCTAssertTrue(view.photoBadgeIsHiddenForTesting)
         XCTAssertEqual(view.countLabel.text, "42")
+    }
+
+    /// Grappe d'antennes : l'anneau prend les couleurs des opérateurs présents,
+    /// un arc chacun et dans leur ordre, à la place du liseré carmin. Sans
+    /// opérateurs connus, ou sur une autre couche, le liseré carmin reste.
+    func testAntennaClusterRingTakesItsOperatorsColours() throws {
+        var shared = payload(clusterCount: 42)
+        shared.operatorTints = [.orange, .blue]
+        let view = markerView(shared)
+        let arcs = view.clusterArcColorsForTesting.map { UIColor(cgColor: $0) }
+        XCTAssertEqual(arcs.count, 2)
+        XCTAssertEqual(view.dot.layer.borderWidth, 0)
+        func rgb(_ color: UIColor) -> [CGFloat] {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return [r, g, b]
+        }
+        let first = rgb(arcs[0]), orange = rgb(UIColor(Color.orange).resolvedColor(with: view.traitCollection))
+        for (value, expected) in zip(first, orange) { XCTAssertEqual(value, expected, accuracy: 0.01) }
+
+        let unknown = markerView(payload(clusterCount: 42))
+        XCTAssertTrue(unknown.clusterArcColorsForTesting.isEmpty)
+        XCTAssertEqual(unknown.dot.layer.borderWidth, 3)
+
+        var photos = MapAnnotationPayload(
+            id: "photo-cluster-1", kind: .photo, title: "3 photos", subtitle: "",
+            coordinate: CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35),
+            metric: "cluster", backendId: nil, details: nil, antennaId: nil,
+            clusterCount: 3, azimuths: [], showsAzimuths: false
+        )
+        photos.operatorTints = [.orange]
+        XCTAssertTrue(markerView(photos).clusterArcColorsForTesting.isEmpty)
+
+        // Recyclée pour un site, la vue ne garde aucun arc de grappe.
+        view.apply(payload())
+        XCTAssertTrue(view.clusterArcColorsForTesting.isEmpty)
     }
 
     // MARK: Pannes communautaires

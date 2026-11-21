@@ -731,13 +731,17 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
     let medianRsrp: Double?
     let medianRsrq: Double?
     let medianSnr: Double?
+    /// Grappe d'antennes : nombre de sites par opérateur (clé du registre),
+    /// servi par les tuiles en mode serveur. Absent sur la couverture.
+    let operatorCounts: [String: Int]?
 
     enum CodingKeys: String, CodingKey {
-        case id, lat, lng, count, avgRsrp, tech, source, latestTimestamp, medianRsrp, medianRsrq, medianSnr
+        case id, lat, lng, count, avgRsrp, tech, source, latestTimestamp, medianRsrp, medianRsrq, medianSnr, operatorCounts
     }
 
     init(id: String, lat: Double, lng: Double, count: Int, avgRsrp: Double? = nil, tech: String? = nil, source: String? = nil,
-         latestTimestamp: Date? = nil, medianRsrp: Double? = nil, medianRsrq: Double? = nil, medianSnr: Double? = nil) {
+         latestTimestamp: Date? = nil, medianRsrp: Double? = nil, medianRsrq: Double? = nil, medianSnr: Double? = nil,
+         operatorCounts: [String: Int]? = nil) {
         self.id = id
         self.lat = lat
         self.lng = lng
@@ -749,6 +753,7 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         self.medianRsrp = medianRsrp
         self.medianRsrq = medianRsrq
         self.medianSnr = medianSnr
+        self.operatorCounts = operatorCounts
     }
 
     /// Le RSRP qui colore le cluster : la médiane, sinon l'ancienne moyenne.
@@ -767,6 +772,7 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         medianRsrp = try? c.decodeIfPresent(Double.self, forKey: .medianRsrp)
         medianRsrq = try? c.decodeIfPresent(Double.self, forKey: .medianRsrq)
         medianSnr = try? c.decodeIfPresent(Double.self, forKey: .medianSnr)
+        operatorCounts = try? c.decodeIfPresent([String: Int].self, forKey: .operatorCounts)
     }
 
     /// Le serveur numérote les clusters par cellule À L'INTÉRIEUR d'une tuile
@@ -776,7 +782,8 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
     func scoped(to tile: AndroidMapTile) -> AndroidMapCluster {
         AndroidMapCluster(id: "\(tile.z)/\(tile.x)/\(tile.y):\(id)", lat: lat, lng: lng, count: count,
                           avgRsrp: avgRsrp, tech: tech, source: source, latestTimestamp: latestTimestamp,
-                          medianRsrp: medianRsrp, medianRsrq: medianRsrq, medianSnr: medianSnr)
+                          medianRsrp: medianRsrp, medianRsrq: medianRsrq, medianSnr: medianSnr,
+                          operatorCounts: operatorCounts)
     }
 }
 
