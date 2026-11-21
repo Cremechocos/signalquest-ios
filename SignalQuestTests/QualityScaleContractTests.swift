@@ -120,7 +120,8 @@ final class QualityScaleContractTests: XCTestCase {
         XCTAssertEqual(SQQualityScale.Signal.noService.hex, try lightHex(states["noService"], "noService"))
         XCTAssertEqual(SQQualityScale.Signal.unknown.hex, try lightHex(states["unknown"], "unknown"))
         XCTAssertEqual((states["noService"] as? [String: Any])?["pattern"] as? String, "hatched")
-        XCTAssertTrue(SQQualityScale.Signal.noService.isHatched)
+        // La v3 (21/11) retire la hachure : la v1 reste figée, l'app suit la v3.
+        XCTAssertFalse(SQQualityScale.Signal.noService.isHatched)
     }
 
     func testDownloadThresholdsAndColors() throws {
@@ -169,5 +170,61 @@ final class QualityScaleContractTests: XCTestCase {
         XCTAssertEqual(checked, brandKeys.count)
         // Les opérateurs des DOM d'une marque métropolitaine en reprennent la teinte.
         XCTAssertEqual(components(of: SQBrand.operators["freecaraibes"]!.solid), components(of: SQBrand.operators["free"]!.solid))
+    }
+}
+
+/// Contrat v3 (21/11, choix d'Alexandre) : RSRQ et SINR sur les cinq niveaux,
+/// seulement en 4G et en 5G. Les plages viennent du code d'Android (AOSP) ; 0
+/// est une sentinelle pour les deux, comme pour le RSRP.
+final class SignalQualityMeasureTests: XCTestCase {
+    private func level(_ measure: SQQualityScale.Signal.Measure, _ value: Double?, _ technology: String? = "4G") -> String {
+        SQQualityScale.Signal(measure: measure, rsrp: -90, rsrq: measure == .rsrq ? value : nil,
+                              sinr: measure == .sinr ? value : nil, technology: technology).contractKey
+    }
+
+    func testRSRQThresholdsRoundingAndRange() {
+        let cases: [(Double, String)] = [
+            (3, "excellent"), (-9, "excellent"), (-9.5, "excellent"), (-9.6, "good"), (-12, "good"),
+            (-13, "fair"), (-15, "fair"), (-16, "poor"), (-19, "poor"), (-20, "critical"), (-34, "critical"),
+            (-35, "unknown"), (4, "unknown"), (0, "unknown"),
+        ]
+        for (value, expected) in cases {
+            XCTAssertEqual(level(.rsrq, value), expected, "RSRQ 4G \(value)")
+        }
+        XCTAssertEqual(level(.rsrq, -40, "5G"), "critical", "SS-RSRQ jusqu'à −43")
+        XCTAssertEqual(level(.rsrq, -43, "5G NSA"), "critical")
+        XCTAssertEqual(level(.rsrq, -44, "5G"), "unknown")
+        XCTAssertEqual(level(.rsrq, 20, "NR"), "excellent")
+        XCTAssertEqual(level(.rsrq, -40, "4G"), "unknown", "RSRQ 4G borné à −34")
+    }
+
+    func testSINRThresholdsAndZeroSentinel() {
+        let cases: [(Double, String)] = [
+            (40, "excellent"), (20, "excellent"), (19, "good"), (13, "good"), (12, "fair"), (5, "fair"),
+            (4, "poor"), (1, "poor"), (0, "unknown"), (-1, "critical"), (-23, "critical"),
+            (-24, "unknown"), (41, "unknown"),
+        ]
+        for (value, expected) in cases {
+            XCTAssertEqual(level(.sinr, value), expected, "SINR 4G \(value)")
+            XCTAssertEqual(level(.sinr, value, "5G"), expected, "SS-SINR \(value)")
+        }
+    }
+
+    func testOnly4GAnd5GHaveAQualityMeasure() {
+        for technology in ["2G", "3G", "GSM", "UMTS", "Inconnu", nil] as [String?] {
+            XCTAssertEqual(level(.rsrq, -10, technology), "unknown", technology ?? "nil")
+            XCTAssertEqual(level(.sinr, 15, technology), "unknown", technology ?? "nil")
+        }
+        XCTAssertEqual(level(.rsrq, nil), "unknown", "valeur absente")
+        XCTAssertEqual(level(.sinr, -10, "Aucun"), "noService", "sans réseau quelle que soit la mesure")
+    }
+
+    func testRSRPMeasureIsTheTechnologyMetric() {
+        for (dbm, technology) in [(-85.0, "4G"), (-85, "3G"), (-85, "2G"), (-120, "5G"), (0, "4G")] {
+            XCTAssertEqual(
+                SQQualityScale.Signal(measure: .rsrp, rsrp: dbm, rsrq: -5, sinr: 30, technology: technology),
+                SQQualityScale.Signal(dbm: dbm, technology: technology), "\(technology) \(dbm)"
+            )
+        }
     }
 }

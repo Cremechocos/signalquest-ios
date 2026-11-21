@@ -115,12 +115,13 @@ struct SignalBarsView: View {
             } else {
                 // Des barres seulement pour un niveau mesuré : la technologie seule
                 // n'en dit rien, trois barres sur quatre étaient un faux niveau (F-13).
-                if let level {
-                    ForEach(0..<4, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(index <= level ? AnyShapeStyle(SQColor.success) : AnyShapeStyle(SQColor.fill))
-                            .frame(width: 6, height: CGFloat(8 + index * 5))
-                    }
+                // Niveau et teinte de l'échelle commune, comme la carte et CarPlay :
+                // les barres étaient toujours vertes, même sur un signal critique (21/11).
+                if let quality {
+                    Image(systemName: quality.glyph,
+                          variableValue: quality.glyph == "cellularbars" ? quality.barsFraction : nil)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(quality.color)
                 }
                 if let technology = summary?.technology {
                     Text(verbatim: technology)
@@ -133,20 +134,22 @@ struct SignalBarsView: View {
         .accessibilityLabel(accessibilityText)
     }
 
-    private var accessibilityText: String {
+    var accessibilityText: String {
         let technology = summary?.technology ?? ""
         guard let rsrp = summary?.rsrp else {
             return technology.isEmpty ? String(localized: "Radio indisponible sur iOS") : String(localized: "Réseau \(technology)")
         }
-        let signal = String(localized: "Signal \(SignalFormatters.dbm(rsrp))")
+        var signal = String(localized: "Signal \(SignalFormatters.dbm(rsrp))")
+        if let quality { signal += ", \(quality.label.lowercased())" }
         return technology.isEmpty ? signal : "\(signal), \(technology)"
     }
 
-    private var level: Int? {
+    /// Niveau de l'échelle commune, aux seuils de la technologie du post ; sans
+    /// technologie lisible, aux seuils du RSRP. `nil` sans mesure valable.
+    var quality: SQQualityScale.Signal? {
         guard let rsrp = summary?.rsrp else { return nil }
-        if rsrp > -85 { return 3 }
-        if rsrp > -100 { return 2 }
-        if rsrp > -112 { return 1 }
-        return 0
+        let byTechnology = SQQualityScale.Signal(dbm: rsrp, technology: summary?.technology)
+        let quality = byTechnology == .unknown ? SQQualityScale.Signal(rsrp: rsrp) : byTechnology
+        return quality == .unknown ? nil : quality
     }
 }

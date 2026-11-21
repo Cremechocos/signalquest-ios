@@ -69,8 +69,9 @@ final class FeedAutomaticCardsRedesignTests: XCTestCase {
         }
     }
 
-    func testNoServiceIsDashedSlateAndUnknownIsGrey() {
-        XCTAssertTrue(SQQualityScale.Signal.noService.isHatched)
+    /// Contrat v3 (21/11) : « Sans réseau » est un gris ardoise plein, plus hachuré.
+    func testNoServiceIsPlainSlateAndUnknownIsGrey() {
+        XCTAssertFalse(SQQualityScale.Signal.noService.isHatched)
         XCTAssertEqual(SQQualityScale.Signal.noService.hex, 0x64748B)
         XCTAssertEqual(SQQualityScale.Signal.unknown.hex, 0x9CA3AF)
     }
@@ -103,7 +104,7 @@ final class FeedAutomaticCardsRedesignTests: XCTestCase {
         let overlay = SessionPointsOverlay(points: points, followsContract: true, connects: true)
         let expected: [SQQualityScale.Signal] = [.excellent, .noService, .weak, .unknown]
         XCTAssertEqual(overlay.dots.map(\.color), expected.map(\.uiColor.cgColor))
-        XCTAssertEqual(overlay.dots.map(\.dashed), [false, true, false, false])
+        XCTAssertEqual(overlay.dots.map(\.dashed), [false, false, false, false], "v3 : plus de pointillé sans réseau")
         // Contrat v1 : aucune coupure, même sur un trou de mesure.
         XCTAssertFalse(overlay.cutsGaps)
     }

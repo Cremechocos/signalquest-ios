@@ -1116,3 +1116,47 @@ final class OutagePostLinkTests: XCTestCase {
         XCTAssertEqual(OutageFeedBadge.fallbackSiteId("802123", targetKind: nil), "802123", "anciens posts, tous anfr")
     }
 }
+
+/// Barres de signal d'un post : niveau et teinte de l'échelle commune, comme la
+/// carte. Elles étaient toujours vertes, même à −111 dBm « Critique » (21/11).
+final class FeedSignalBarsTests: XCTestCase {
+    private func bars(_ json: String) throws -> SignalBarsView {
+        SignalBarsView(summary: try JSONDecoder().decode(SocialSignalSummary.self, from: Data(json.utf8)))
+    }
+
+    func testBarsFollowTheCommonScale() throws {
+        let cases: [(Double, SQQualityScale.Signal)] = [
+            (-79, .excellent), (-80, .excellent), (-84, .good), (-90, .good), (-95, .fair),
+            (-100, .fair), (-101, .weak), (-110, .weak), (-111, .poor), (-130, .poor),
+        ]
+        for (rsrp, expected) in cases {
+            let quality = try bars(#"{"technology":"4G","rsrp":\#(rsrp)}"#).quality
+            XCTAssertEqual(quality, expected, "\(rsrp) dBm")
+        }
+        let critical = try XCTUnwrap(try bars(#"{"technology":"4G","rsrp":-111}"#).quality)
+        XCTAssertEqual(critical.hex, 0xEF4444, "critique en rouge, plus en vert")
+        XCTAssertEqual(critical.barsFraction, 0)
+        XCTAssertEqual(try bars(#"{"technology":"5G","rsrp":-85}"#).quality?.hex, 0x65A30D)
+    }
+
+    func testThresholdsFollowTheTechnologyThenTheRSRP() throws {
+        XCTAssertEqual(try bars(#"{"technology":"3G","rsrp":-80}"#).quality, .good, "RSCP : bon dès −85")
+        XCTAssertEqual(try bars(#"{"rsrp":-85}"#).quality, .good, "sans technologie : seuils du RSRP")
+        XCTAssertEqual(try bars(#"{"technology":"WiFi","rsrp":-85}"#).quality, .good)
+        XCTAssertEqual(try bars(#"{"technology":"AUCUN","rsrp":-85}"#).quality?.glyph,
+                       "antenna.radiowaves.left.and.right.slash")
+    }
+
+    func testNoValidMeasureShowsNoBars() throws {
+        XCTAssertNil(try bars(#"{"technology":"4G"}"#).quality)
+        XCTAssertNil(try bars(#"{"technology":"4G","rsrp":0}"#).quality, "sentinelle 0")
+        XCTAssertNil(try bars(#"{"technology":"4G","rsrp":-150}"#).quality, "hors plage")
+    }
+
+    func testVoiceOverReadsTheLevel() throws {
+        let french = Bundle.main.preferredLocalizations.first == "fr"
+        let text = try bars(#"{"technology":"4G","rsrp":-111}"#).accessibilityText
+        XCTAssertTrue(text.contains(french ? "critique" : "critical"), text)
+        XCTAssertTrue(text.hasSuffix(", 4G"), text)
+    }
+}

@@ -97,36 +97,55 @@ enum SQQualityScale {
 
         enum Metric: Sendable {
             case rssi, rscp, rsrp, ssRsrp
+            /// Qualité du signal (contrat v3) : RSRQ en 4G, SS-RSRQ en 5G, SINR
+            /// (RSSNR en 4G, SS-SINR en 5G) aux mêmes seuils dans les deux.
+            case rsrq, ssRsrq, sinr
 
-            /// Seuils bas d'excellent, bon, moyen et faible, en dBm.
+            /// Seuils bas d'excellent, bon, moyen et faible, en dBm pour une
+            /// puissance, en dB pour le RSRQ et le SINR.
             var thresholds: [Int] {
                 switch self {
                 case .rsrp, .ssRsrp: return [-80, -90, -100, -110]
                 case .rscp: return [-75, -85, -95, -105]
                 case .rssi: return [-70, -80, -90, -100]
+                case .rsrq, .ssRsrq: return [-9, -12, -15, -19]
+                case .sinr: return [20, 13, 5, 0]
                 }
             }
 
+            /// Plages du RSRQ et du SINR : celles du code d'Android (AOSP), que
+            /// l'app Android envoie après ses propres filtres (vérifié le 21/11).
             var validRange: ClosedRange<Int> {
                 switch self {
                 case .rssi: return -120 ... -51
                 case .rscp: return -130 ... -24
                 case .rsrp: return -140 ... -40
                 case .ssRsrp: return -156 ... -31
+                case .rsrq: return -34 ... 3
+                case .ssRsrq: return -43 ... 20
+                case .sinr: return -23 ... 40
                 }
             }
 
             /// Valeurs qui disent « pas de mesure » même dans la plage : 0 (import
-            /// iOS, CoreTelephony ne donne pas le RSRP) et les planchers ou plafonds
-            /// de chaque modem.
+            /// iOS, CoreTelephony ne donne pas le RSRP ; RSRQ et SINR bloqués à 0
+            /// de certains modems, environ 240 000 points en 30 jours) et les
+            /// planchers ou plafonds de chaque modem.
             func isSentinel(_ dbm: Int) -> Bool {
                 if dbm == 0 { return true }
                 switch self {
                 case .rssi: return dbm <= -113
                 case .rscp: return dbm >= -24
                 case .rsrp, .ssRsrp: return dbm <= -140
+                case .rsrq, .ssRsrq, .sinr: return false
                 }
             }
+        }
+
+        /// Ce que colore la carte de couverture (contrat v3) : la puissance, dans
+        /// la métrique de la technologie du point, la qualité (RSRQ) ou le SINR.
+        enum Measure: String, CaseIterable, Sendable {
+            case rsrp, rsrq, sinr
         }
 
         private enum Reading { case metric(Metric), noService, unknown }
@@ -164,6 +183,23 @@ enum SQQualityScale {
         /// Un RSRP déjà connu comme tel (4G, ou SS-RSRP aux mêmes seuils).
         init(rsrp: Double?) {
             self = Self.level(dbm: rsrp, metric: .rsrp)
+        }
+
+        /// Un point de couverture pour la mesure choisie. Le RSRQ et le SINR
+        /// n'existent qu'en 4G et en 5G : en 2G, en 3G ou sans technologie
+        /// lisible, le point n'a rien à montrer (`unknown`, jamais dessiné).
+        init(measure: Measure, rsrp: Double?, rsrq: Double?, sinr: Double?, technology: String?) {
+            guard measure != .rsrp else {
+                self.init(dbm: rsrp, technology: technology)
+                return
+            }
+            let value = measure == .rsrq ? rsrq : sinr
+            switch Self.reading(technology: technology) {
+            case .noService: self = .noService
+            case .metric(.rsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .rsrq : .sinr)
+            case .metric(.ssRsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .ssRsrq : .sinr)
+            default: self = .unknown
+            }
         }
 
         private static func level(dbm: Double?, metric: Metric) -> Signal {
@@ -205,8 +241,10 @@ enum SQQualityScale {
             }
         }
 
-        /// « Sans réseau constaté » se dessine hachuré (contrat).
-        var isHatched: Bool { self == .noService }
+        /// « Sans réseau constaté » ne se dessine plus hachuré : gris plein depuis
+        /// le contrat v3 (choix d'Alexandre du 21/11), d'une teinte distincte du
+        /// gris « pas de mesure ».
+        var isHatched: Bool { false }
 
         /// Remplissage du symbole `cellularbars` (valeur variable, iOS 16).
         var barsFraction: Double {
