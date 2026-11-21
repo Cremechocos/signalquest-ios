@@ -407,6 +407,26 @@ final class BugReportsServiceTests: XCTestCase {
         XCTAssertEqual((context["location"] as? [String: Any])?["latitude"] as? Double, 45.19)
         XCTAssertTrue(files.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) }, "File vide = fichier effacé")
     }
+
+    /// Captures privées (cadrage bug-photos r0, 21/11) : le cache du compte, jamais le
+    /// cache public partagé ; deux URL signées du même objet tombent dans le même
+    /// fichier ; sans session locale, aucune capture distante ne se charge.
+    func testBugCapturesUseTheAccountImageCacheAndNothingWithoutASession() throws {
+        let previousUserId = LocalAccountScope.currentUserId
+        defer { if let previousUserId { LocalAccountScope.activate(userId: previousUserId) } else { LocalAccountScope.deactivate() } }
+        LocalAccountScope.activate(userId: "bug-capture-account")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        XCTAssertEqual(BugCaptureImageScope.current, .privateAccount(session))
+
+        let first = try XCTUnwrap(URL(string: "https://s3.signalquest.fr/bug-photos/bugs/b-1/c.jpg?X-Amz-Date=20261121T220000Z&X-Amz-Signature=aa"))
+        let second = try XCTUnwrap(URL(string: "https://s3.signalquest.fr/bug-photos/bugs/b-1/c.jpg?X-Amz-Date=20261121T230000Z&X-Amz-Signature=bb"))
+        let other = try XCTUnwrap(URL(string: "https://s3.signalquest.fr/bug-photos/bugs/b-1/d.jpg?X-Amz-Signature=aa"))
+        XCTAssertEqual(PrivateImageDiskCache.fileName(for: first), PrivateImageDiskCache.fileName(for: second))
+        XCTAssertNotEqual(PrivateImageDiskCache.fileName(for: first), PrivateImageDiskCache.fileName(for: other))
+
+        LocalAccountScope.deactivate()
+        XCTAssertNil(BugCaptureImageScope.current)
+    }
 }
 
 /// Espace Admin : `/api/admin/bugs`, aux formes servies par le site (lot 9a).

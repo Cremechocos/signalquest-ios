@@ -248,6 +248,17 @@ extension PendingReportImage {
     }
 }
 
+/// Cache des captures d'un signalement : celui du compte, jamais le cache public
+/// partagé. Les captures sont privées (auteur et admins) et servies en URL signées
+/// d'une heure (cadrage bug-photos r0 de Backend, choix d'Alexandre du 21/11) ; le
+/// cache du compte les range sans les paramètres de signature et part à la déconnexion.
+/// `nil` sans session locale : aucune capture distante n'est chargée.
+enum BugCaptureImageScope {
+    static var current: ImageCacheScope? {
+        LocalAccountScope.sessionSnapshot().map { .privateAccount($0) }
+    }
+}
+
 /// « Bugs et idées » : mes signalements et les réponses de l'équipe, les mêmes
 /// que sur le site (`/api/bugs?myBugs=true`).
 struct BugReportsListView: View {
@@ -1147,7 +1158,7 @@ struct BugReportDetailView: View {
             Task { await model.processPickedItems() }
         }
         .fullScreenCover(item: $viewerImage) { image in
-            AntennaReportImageViewer(image: image)
+            AntennaReportImageViewer(image: image, cacheScope: BugCaptureImageScope.current)
         }
         .confirmationDialog("Supprimer ce signalement ?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Supprimer", role: .destructive) {
@@ -1277,7 +1288,9 @@ struct BugReportDetailView: View {
                         Group {
                             switch image {
                             case .remote(let url):
-                                RemoteImage(url: url, maxDimension: side * 2, contentMode: .fill) { SQColor.surfaceMuted }
+                                let scope = BugCaptureImageScope.current
+                                RemoteImage(url: scope == nil ? nil : url, maxDimension: side * 2, contentMode: .fill,
+                                            cacheScope: scope ?? .publicContent) { SQColor.surfaceMuted }
                             case .inline(let uiImage):
                                 Image(uiImage: uiImage).resizable().scaledToFill()
                             }
@@ -2018,7 +2031,7 @@ struct AdminBugDetailView: View {
             if let bug = detail?.bug { onChange?(bug) }
         }
         .fullScreenCover(item: $viewerImage) { image in
-            AntennaReportImageViewer(image: image)
+            AntennaReportImageViewer(image: image, cacheScope: BugCaptureImageScope.current)
         }
         .sheet(isPresented: $editingResponse) {
             AdminBugResponseSheet(initial: model.bug?.report.adminResponse ?? "", errorMessage: model.actionError) { text in
@@ -2209,7 +2222,9 @@ struct AdminBugDetailView: View {
                                 Group {
                                     switch image {
                                     case .remote(let url):
-                                        RemoteImage(url: url, maxDimension: 148, contentMode: .fill) { SQColor.surfaceMuted }
+                                        let scope = BugCaptureImageScope.current
+                                        RemoteImage(url: scope == nil ? nil : url, maxDimension: 148, contentMode: .fill,
+                                                    cacheScope: scope ?? .publicContent) { SQColor.surfaceMuted }
                                     case .inline(let uiImage):
                                         Image(uiImage: uiImage).resizable().scaledToFill()
                                     }

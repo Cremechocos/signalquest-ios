@@ -609,6 +609,9 @@ private struct FlexibleImageRow: View {
 /// embarquées (data-URL décodée) que le pipeline distant ne sait pas charger.
 struct AntennaReportImageViewer: View {
     let image: AntennaReportImage
+    /// Cache de l'image distante. Les captures de bug passent celui du compte
+    /// (`BugCaptureImageScope`) ; `nil` (aucune session) : rien n'est chargé.
+    var cacheScope: ImageCacheScope? = .publicContent
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -652,7 +655,8 @@ struct AntennaReportImageViewer: View {
     private var imageContent: some View {
         switch image {
         case .remote(let url):
-            RemoteImage(url: url, maxDimension: 1600, contentMode: .fit, showsFailureUI: true) {
+            RemoteImage(url: cacheScope == nil ? nil : url, maxDimension: 1600, contentMode: .fit,
+                        cacheScope: cacheScope ?? .publicContent, showsFailureUI: true) {
                 SQSpinner().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         case .inline(let uiImage):
