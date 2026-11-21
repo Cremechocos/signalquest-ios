@@ -14,6 +14,8 @@ protocol MapSnapshotServicing: Sendable {
     func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
     func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
     func plannedSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<PlannedSiteLive>
+    /// Sites prévus d'un cadre seulement (Accueil, audit du 21/11, E3).
+    func plannedSitesLayer(market: String, operatorName: String, near bounds: MapBounds) async throws -> MapFeedResult<PlannedSiteLive>
     func outageSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<OutageSiteLive>
     /// Les incidents déclarés par les opérateurs pour UN site (fiche antenne).
     func operatorIncidents(forSiteId siteId: String?, market: String, operatorName: String?, latitude: Double, longitude: Double, territory: String?) async throws -> SiteOperatorIncidentsResponse
@@ -180,6 +182,25 @@ final class MapSnapshotService: MapSnapshotServicing {
             query.append(URLQueryItem(name: "territory", value: territory))
         }
         query.append(contentsOf: Self.bandQueryItems(bands))
+        return try await plannedSitesFeed(query)
+    }
+
+    /// Sites prévus d'un cadre seulement : le serveur ne renvoie que ceux du cadre, triés par
+    /// distance au centre (north, south, east et west ensemble, sinon 400 INVALID_BOUNDS).
+    /// L'Accueil n'en garde que ceux à 5 km : la liste du marché entier n'a plus à descendre
+    /// (audit du 21/11, E3).
+    func plannedSitesLayer(market: String, operatorName: String, near bounds: MapBounds) async throws -> MapFeedResult<PlannedSiteLive> {
+        try await plannedSitesFeed([
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "operator", value: operatorName),
+            URLQueryItem(name: "north", value: String(bounds.north)),
+            URLQueryItem(name: "south", value: String(bounds.south)),
+            URLQueryItem(name: "east", value: String(bounds.east)),
+            URLQueryItem(name: "west", value: String(bounds.west))
+        ])
+    }
+
+    private func plannedSitesFeed(_ query: [URLQueryItem]) async throws -> MapFeedResult<PlannedSiteLive> {
         let endpoint = APIEndpoint(path: "/api/map/planned-sites", query: query)
         // Route authentifiée : la réponse peut dépendre du compte, la session entre dans la clé.
         let key = Self.feedKey(endpoint, session: api.credentials.snapshot().sessionID)
@@ -909,6 +930,10 @@ private actor MapFeedCache {
 extension MapSnapshotServicing {
     func plannedSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<PlannedSiteLive> {
         MapFeedResult(sites: try await plannedSites(market: market, operatorName: operatorName, territory: territory, bands: bands))
+    }
+    /// Doublures : la liste du marché, que l'appelant filtre de toute façon par distance.
+    func plannedSitesLayer(market: String, operatorName: String, near bounds: MapBounds) async throws -> MapFeedResult<PlannedSiteLive> {
+        try await plannedSitesLayer(market: market, operatorName: operatorName, territory: nil, bands: [])
     }
     func outageSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<OutageSiteLive> {
         MapFeedResult(sites: try await outageSites(market: market, operatorName: operatorName, territory: territory, bands: bands))

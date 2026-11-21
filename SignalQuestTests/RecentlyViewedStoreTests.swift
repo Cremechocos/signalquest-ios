@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import SignalQuest
 
@@ -231,4 +232,59 @@ final class HomeFeedPreviewTests: XCTestCase {
         let items = [item("mine", mine: true), item("a"), item("b", mine: false), item("c"), item("d")]
         XCTAssertEqual(HomeFeedPreview.others(in: items).map(\.id), ["a", "b", "c"])
     }
+}
+
+/// E3 (audit du 21/11) : l'Accueil demande les sites prévus d'un cadre qui couvre ses 5 km, à une
+/// adresse stable d'une position voisine à l'autre, au lieu de la liste du marché entier.
+final class HomeEvolutionsBoundsTests: XCTestCase {
+    @MainActor
+    func testEvolutionsAskForABoxCoveringFiveKilometresAtAStableAddress() {
+        let roanne = CLLocationCoordinate2D(latitude: 46.0368, longitude: 4.0726)
+        let box = SignalQuestHomeView.evolutionBounds(around: roanne)
+        let metresPerDegree = 111_320.0, cosLat = cos(roanne.latitude * .pi / 180)
+        XCTAssertGreaterThanOrEqual((box.north - roanne.latitude) * metresPerDegree, 5_000)
+        XCTAssertGreaterThanOrEqual((roanne.latitude - box.south) * metresPerDegree, 5_000)
+        XCTAssertGreaterThanOrEqual((box.east - roanne.longitude) * metresPerDegree * cosLat, 5_000)
+        XCTAssertGreaterThanOrEqual((roanne.longitude - box.west) * metresPerDegree * cosLat, 5_000)
+        XCTAssertLessThan((box.north - box.south) * metresPerDegree, 14_000, "un cadre, pas le marché")
+        // 300 m plus loin, dans le même centième de degré : même cadre, donc même cache.
+        XCTAssertEqual(SignalQuestHomeView.evolutionBounds(around: CLLocationCoordinate2D(latitude: 46.0395, longitude: 4.0741)), box)
+        XCTAssertEqual(box.north, (box.north * 10_000).rounded() / 10_000)
+    }
+
+    func testPlannedSitesOfABoxSendTheFourBoundsTogether() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let seen = PlannedSitesQueries()
+        defer { MockURLProtocol.requestHandler = nil }
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request.url!)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"sites":[]}"#.utf8))
+        }
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("unit-test-session")
+        let service = MapSnapshotService(api: APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config)),
+                                         cache: DiskCache(folderName: "PlannedBox-\(UUID().uuidString)", evicts: false))
+        let box = MapBounds(north: 46.09, south: 45.98, east: 4.15, west: 3.99)
+        _ = try await service.plannedSitesLayer(market: "FR", operatorName: "ALL", near: box)
+        _ = try await service.plannedSitesLayer(market: "FR", operatorName: "ALL", near: box)
+        let urls = seen.urls
+        XCTAssertEqual(urls.count, 1, "le second appel lit le cache de 5 min")
+        let items = URLComponents(url: try XCTUnwrap(urls.first), resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let values = Dictionary(items.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { first, _ in first })
+        XCTAssertEqual(urls.first?.path, "/api/map/planned-sites")
+        XCTAssertEqual(values["market"], "FR")
+        XCTAssertEqual(values["operator"], "ALL")
+        XCTAssertEqual(values["north"], "46.09")
+        XCTAssertEqual(values["south"], "45.98")
+        XCTAssertEqual(values["east"], "4.15")
+        XCTAssertEqual(values["west"], "3.99")
+    }
+}
+
+private final class PlannedSitesQueries: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [URL] = []
+    var urls: [URL] { lock.withLock { stored } }
+    func append(_ url: URL) { lock.withLock { stored.append(url) } }
 }

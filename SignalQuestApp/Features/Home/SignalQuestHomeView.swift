@@ -1682,7 +1682,7 @@ struct SignalQuestHomeView: View {
     private func nearbyEvolutions(around location: CLLocation, market: String?) async -> [PlannedSiteLive]? {
         guard let market else { return [] }
         guard let result = try? await services.map.plannedSitesLayer(
-            market: market, operatorName: "ALL", territory: nil, bands: []
+            market: market, operatorName: "ALL", near: Self.evolutionBounds(around: location.coordinate)
         ) else { return nil }
         return result.sites
             .filter { $0.activation?.status != .active }
@@ -1693,6 +1693,20 @@ struct SignalQuestHomeView: View {
             .filter { $0.1 <= Self.wideRadiusMeters }
             .sorted { $0.1 < $1.1 }
             .map(\.0)
+    }
+
+    /// Cadre demandé pour les évolutions : le cercle de 5 km plus 1 km de marge, autour d'un centre
+    /// arrondi au centième de degré (environ 1 km), pour que deux positions voisines demandent la
+    /// même adresse et retrouvent le cache de 5 min (audit du 21/11, E3).
+    static func evolutionBounds(around coordinate: CLLocationCoordinate2D) -> MapBounds {
+        let lat = (coordinate.latitude * 100).rounded() / 100
+        let lng = (coordinate.longitude * 100).rounded() / 100
+        let halfSpan = wideRadiusMeters + 1_000
+        let dLat = halfSpan / 111_320
+        let dLng = halfSpan / (111_320 * max(0.1, cos(lat * .pi / 180)))
+        func fourDecimals(_ value: Double) -> Double { (value * 10_000).rounded() / 10_000 }
+        return MapBounds(north: fourDecimals(min(85, lat + dLat)), south: fourDecimals(max(-85, lat - dLat)),
+                         east: fourDecimals(min(180, lng + dLng)), west: fourDecimals(max(-180, lng - dLng)))
     }
 
     /// Les 3 speedtests communautaires les PLUS RÉCENTS à ≤ 1 km, via l'endpoint dédié ;
