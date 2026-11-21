@@ -84,6 +84,8 @@ final class AppServices: ObservableObject {
     let bugReports: BugReportsServicing
     /// Espace Admin : tous les signalements, réservé aux administrateurs.
     let adminBugs: AdminBugsServicing
+    /// Décisions de modération du compte et leurs recours (MOD-1, DSA art. 17 et 20).
+    let moderationDecisions: ModerationDecisionsServicing
     /// Signalement communautaire de pannes — cf. `CommunityOutageService`.
     let communityOutages: CommunityOutageServicing
     /// Antennes suivies. Observable et UNIQUE : le contrat serveur remplace la liste entière,
@@ -234,6 +236,7 @@ final class AppServices: ObservableObject {
         antennaReports = AntennaReportsService(api: api)
         bugReports = BugReportsService(api: api)
         adminBugs = AdminBugsService(api: api)
+        moderationDecisions = ModerationDecisionsService(api: api)
         communityOutages = CommunityOutageService(api: api)
         favoriteAntennas = FavoriteAntennasService(api: api)
         customSites = CustomSitesService(

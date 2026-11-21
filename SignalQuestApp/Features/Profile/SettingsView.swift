@@ -166,7 +166,7 @@ final class SettingsViewModel: ObservableObject {
 
 /// Écrans ouverts depuis les Réglages, poussés par `pushed`.
 private enum SettingsDestination: Hashable {
-    case password, devices, privacy, notifications, glossary, bugs
+    case password, devices, privacy, notifications, glossary, bugs, moderation
 }
 
 struct SettingsView: View {
@@ -203,6 +203,8 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appleError: String?
     @State private var showUnlinkAppleConfirm = false
+    /// Décisions de modération jamais vues, relues à chaque affichage de la ligne.
+    @State private var unseenModerationDecisions = 0
     @State private var showAppleSheet = false
 
     private var appleLinked: Bool {
@@ -240,6 +242,7 @@ struct SettingsView: View {
         case .notifications: NotificationSettingsView(userService: services.users)
         case .glossary: SQGlossaryView()
         case .bugs: BugReportsListView()
+        case .moderation: ModerationDecisionsView(service: services.moderationDecisions)
         }
     }
 
@@ -432,6 +435,22 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.bugs")
+                // MOD-1 (DSA art. 17 et 20) : motif, règle et recours de chaque décision ; à côté
+                // du contact de modération, comme la rubrique légale d'Android.
+                Button { push(SettingsDestination.moderation) } label: {
+                    SQSettingsRowLabel("Décisions de modération", systemImage: "exclamationmark.shield",
+                                       subtitle: String(localized: "Motif, règle et recours"),
+                                       value: unseenModerationDecisions > 0
+                                           ? String(localized: "\(unseenModerationDecisions) nouvelles") : nil,
+                                       showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.moderation")
+                .task {
+                    guard !AppEnvironment.usesDemoData,
+                          let page = try? await services.moderationDecisions.page(cursor: nil, limit: 1) else { return }
+                    unseenModerationDecisions = page.unseenCount
+                }
                 if let contact = AppConfig.current.contactMailtoURL {
                     Link(destination: contact) {
                         SQSettingsRowLabel("Contact et signalement", systemImage: "envelope",

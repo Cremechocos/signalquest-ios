@@ -1,6 +1,1450 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Décisions de modération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderation decisions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décisions de modération"
+          }
+        }
+      }
+    },
+    "Décision de modération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderation decision"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décision de modération"
+          }
+        }
+      }
+    },
+    "Ce que l’équipe a décidé sur tes contenus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What the team decided about your content"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que l’équipe a décidé sur tes contenus"
+          }
+        }
+      }
+    },
+    "SQFormal|Ce que l’équipe a décidé sur tes contenus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que l’équipe a décidé sur vos contenus"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Règles de la communauté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community rules"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règles de la communauté"
+          }
+        }
+      }
+    },
+    "Motif, règle et recours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reason, rule and appeal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motif, règle et recours"
+          }
+        }
+      }
+    },
+    "Connecte-toi pour voir les décisions qui concernent ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to see the decisions about your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour voir les décisions qui concernent ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Connecte-toi pour voir les décisions qui concernent ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous pour voir les décisions qui concernent votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Décisions indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decisions unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décisions indisponibles"
+          }
+        }
+      }
+    },
+    "Décision indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decision unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décision indisponible"
+          }
+        }
+      }
+    },
+    "Aucune décision sur ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No decisions on your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune décision sur ton compte"
+          }
+        }
+      }
+    },
+    "SQFormal|Aucune décision sur ton compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune décision sur votre compte"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Si l’équipe retire ou masque un de tes contenus, tu verras ici le motif, la règle concernée et comment contester." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the team removes or hides any of your content, you will see the reason, the rule involved and how to appeal here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’équipe retire ou masque un de tes contenus, tu verras ici le motif, la règle concernée et comment contester."
+          }
+        }
+      }
+    },
+    "SQFormal|Si l’équipe retire ou masque un de tes contenus, tu verras ici le motif, la règle concernée et comment contester." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’équipe retire ou masque un de vos contenus, vous verrez ici le motif, la règle concernée et comment contester."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette décision n’existe plus ou ne concerne pas ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This decision no longer exists or is not about your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette décision n’existe plus ou ne concerne pas ton compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette décision n’existe plus ou ne concerne pas ton compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette décision n’existe plus ou ne concerne pas votre compte."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Contenu retiré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu retiré"
+          }
+        }
+      }
+    },
+    "Contenu refusé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content rejected"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu refusé"
+          }
+        }
+      }
+    },
+    "Avertissement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warning"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avertissement"
+          }
+        }
+      }
+    },
+    "Compte suspendu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account suspended"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte suspendu"
+          }
+        }
+      }
+    },
+    "Envoi de photos suspendu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploads suspended"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de photos suspendu"
+          }
+        }
+      }
+    },
+    "Aucune mesure prise" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No action taken"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure prise"
+          }
+        }
+      }
+    },
+    "Décision de l’équipe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Team decision"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décision de l’équipe"
+          }
+        }
+      }
+    },
+    "Ton commentaire sur une photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your comment on a photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton commentaire sur une photo"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton commentaire sur une photo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre commentaire sur une photo"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton message"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre message"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta publication"
+          }
+        }
+      }
+    },
+    "SQFormal|Ta publication" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre publication"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton commentaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton commentaire"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton commentaire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre commentaire"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton message sur un site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your message on a site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton message sur un site"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton message sur un site" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre message sur un site"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton message dans un salon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your message in a room"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton message dans un salon"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton message dans un salon" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre message dans un salon"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ta note de réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your network rating"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta note de réseau"
+          }
+        }
+      }
+    },
+    "SQFormal|Ta note de réseau" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre note de réseau"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton site communautaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your community site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton site communautaire"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton site communautaire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre site communautaire"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton contenu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your content"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton contenu"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton contenu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre contenu"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@ du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ du %@"
+          }
+        }
+      }
+    },
+    "Décidé le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decided on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décidé le %@"
+          }
+        }
+      }
+    },
+    "Règle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rule"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règle"
+          }
+        }
+      }
+    },
+    "Portée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scope"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portée"
+          }
+        }
+      }
+    },
+    "Motif non précisé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reason not given"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motif non précisé"
+          }
+        }
+      }
+    },
+    "Aucune règle citée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No rule cited"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune règle citée"
+          }
+        }
+      }
+    },
+    "Décidé automatiquement, sans examen humain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decided automatically, with no human review"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décidé automatiquement, sans examen humain"
+          }
+        }
+      }
+    },
+    "Décidé par un modérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decided by a moderator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décidé par un modérateur"
+          }
+        }
+      }
+    },
+    "Retiré pour tout le monde" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed for everyone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retiré pour tout le monde"
+          }
+        }
+      }
+    },
+    "Masqué pour tout le monde" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidden for everyone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masqué pour tout le monde"
+          }
+        }
+      }
+    },
+    "Refusé avant publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rejected before publishing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refusé avant publication"
+          }
+        }
+      }
+    },
+    "Rien n’est retiré : simple avertissement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is removed: just a warning"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est retiré : simple avertissement"
+          }
+        }
+      }
+    },
+    "Aucune mesure sur le contenu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No action on the content"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure sur le contenu"
+          }
+        }
+      }
+    },
+    "Compte suspendu jusqu’au %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account suspended until %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte suspendu jusqu’au %@"
+          }
+        }
+      }
+    },
+    "Compte suspendu, sans date de fin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account suspended, with no end date"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte suspendu, sans date de fin"
+          }
+        }
+      }
+    },
+    "Envoi de photos bloqué jusqu’au %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploads blocked until %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de photos bloqué jusqu’au %@"
+          }
+        }
+      }
+    },
+    "Envoi de photos bloqué, sans date de fin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo uploads blocked, with no end date"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de photos bloqué, sans date de fin"
+          }
+        }
+      }
+    },
+    "Précision du modérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderator’s note"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précision du modérateur"
+          }
+        }
+      }
+    },
+    "Vignette du contenu concerné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thumbnail of the content concerned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vignette du contenu concerné"
+          }
+        }
+      }
+    },
+    "Lire les règles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the rules"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire les règles"
+          }
+        }
+      }
+    },
+    "Recours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recours"
+          }
+        }
+      }
+    },
+    "Contester la décision" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal the decision"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contester la décision"
+          }
+        }
+      }
+    },
+    "Tu peux contester jusqu’au %@ ; une autre personne réexamine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can appeal until %@; someone else reviews it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu peux contester jusqu’au %@ ; une autre personne réexamine."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu peux contester jusqu’au %@ ; une autre personne réexamine." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pouvez contester jusqu’au %@ ; une autre personne réexamine."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu peux contester ; une autre personne réexamine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can appeal; someone else reviews it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu peux contester ; une autre personne réexamine."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu peux contester ; une autre personne réexamine." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pouvez contester ; une autre personne réexamine."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette décision ne peut plus être contestée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This decision can no longer be appealed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette décision ne peut plus être contestée."
+          }
+        }
+      }
+    },
+    "Contestation envoyée le %@ : une autre personne réexamine la décision." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal sent on %@: someone else is reviewing the decision."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestation envoyée le %@ : une autre personne réexamine la décision."
+          }
+        }
+      }
+    },
+    "Contestation envoyée : une autre personne réexamine la décision." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal sent: someone else is reviewing the decision."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestation envoyée : une autre personne réexamine la décision."
+          }
+        }
+      }
+    },
+    "Contestation envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestation envoyée."
+          }
+        }
+      }
+    },
+    "Contestée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appealed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestée"
+          }
+        }
+      }
+    },
+    "Contestation acceptée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal accepted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestation acceptée"
+          }
+        }
+      }
+    },
+    "Contestation refusée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeal rejected"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contestation refusée"
+          }
+        }
+      }
+    },
+    "Réexaminée le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reviewed on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réexaminée le %@"
+          }
+        }
+      }
+    },
+    "Précision de la personne qui a réexaminé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note from the reviewer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précision de la personne qui a réexaminé"
+          }
+        }
+      }
+    },
+    "Explique pourquoi la décision te semble injuste. Une autre personne que celle qui a décidé lit ton message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explain why the decision seems unfair to you. Someone other than the person who decided reads your message."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explique pourquoi la décision te semble injuste. Une autre personne que celle qui a décidé lit ton message."
+          }
+        }
+      }
+    },
+    "SQFormal|Explique pourquoi la décision te semble injuste. Une autre personne que celle qui a décidé lit ton message." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expliquez pourquoi la décision vous semble injuste. Une autre personne que celle qui a décidé lit votre message."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Au moins %lld caractères" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least %lld characters"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au moins %lld caractères"
+          }
+        }
+      }
+    },
+    "Envoyer la contestation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the appeal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer la contestation"
+          }
+        }
+      }
+    },
+    "Hors ligne : ta contestation n’est pas partie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline: your appeal was not sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors ligne : ta contestation n’est pas partie."
+          }
+        }
+      }
+    },
+    "SQFormal|Hors ligne : ta contestation n’est pas partie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors ligne : votre contestation n’est pas partie."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Une contestation est déjà en cours pour cette décision." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An appeal is already in progress for this decision."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une contestation est déjà en cours pour cette décision."
+          }
+        }
+      }
+    },
+    "Le délai pour contester est passé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The time to appeal has passed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le délai pour contester est passé."
+          }
+        }
+      }
+    },
+    "Ton message doit faire entre %lld et %lld caractères." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your message must be between %lld and %lld characters."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton message doit faire entre %lld et %lld caractères."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton message doit faire entre %lld et %lld caractères." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre message doit faire entre %lld et %lld caractères."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "La contestation n’a pas pu être envoyée. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The appeal could not be sent. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La contestation n’a pas pu être envoyée. Réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|La contestation n’a pas pu être envoyée. Réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La contestation n’a pas pu être envoyée. Réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Afficher plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show more"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher plus"
+          }
+        }
+      }
+    },
+    "Version du %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version of %@ · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version du %@ · %@"
+          }
+        }
+      }
+    },
+    "Ces règles ne sont pas encore traduites dans ta langue : elles s’affichent en anglais." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These rules are not translated into your language yet, so they are shown in English."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces règles ne sont pas encore traduites dans ta langue : elles s’affichent en anglais."
+          }
+        }
+      }
+    },
+    "SQFormal|Ces règles ne sont pas encore traduites dans ta langue : elles s’affichent en anglais." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces règles ne sont pas encore traduites dans votre langue : elles s’affichent en anglais."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible de charger les règles." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t load the rules."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les règles."
+          }
+        }
+      }
+    },
+    "%lld nouvelles" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouvelle"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouvelles"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Trajets" : {
       "localizations" : {
         "en" : {

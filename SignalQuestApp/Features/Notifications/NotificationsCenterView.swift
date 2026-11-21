@@ -502,7 +502,8 @@ struct NotificationsCenterView: View {
             operatorKey: metaString(meta, "operator"),
             commentId: metaString(meta, "commentId") ?? metaString(meta, "replyId"),
             month: metaString(meta, "month")
-                ?? item.link.flatMap { URL(string: $0)?.path ?? $0 }.flatMap(MonthlyRecapLink.month(fromPath:))
+                ?? item.link.flatMap { URL(string: $0)?.path ?? $0 }.flatMap(MonthlyRecapLink.month(fromPath:)),
+            decisionId: metaString(meta, "decisionId", "decision_id")
         )
     }
 
@@ -529,7 +530,8 @@ struct NotificationsCenterView: View {
     /// Modération sans écran iOS (message ou photo signalés, contestation, nom d'antenne
     /// proposé) : la page d'administration du site. Seul un chemin `/admin` est suivi.
     static func adminWebURL(type: String?, link: String?, base: URL) -> URL? {
-        let adminTypes: Set<String> = ["message_report", "photo_reported", "photo_appeal", "antenna_name_proposal_admin"]
+        let adminTypes: Set<String> = ["message_report", "photo_reported", "photo_appeal", "moderation_appeal",
+                                       "antenna_name_proposal_admin"]
         guard adminTypes.contains(type?.lowercased() ?? ""), let link, link.hasPrefix("/admin"),
               let url = URL(string: link, relativeTo: base)?.absoluteURL,
               url.host == base.host else { return nil }
@@ -571,6 +573,7 @@ struct NotificationsCenterView: View {
         case "community_outage": return String(localized: "Panne signalée")
         case "site_follow": return String(localized: "Site suivi")
         case "anfr_map_update": return String(localized: "Carte des antennes mise à jour")
+        case "moderation_decision": return String(localized: "Décision de modération")
         default: return String(localized: "Notification")
         }
     }
@@ -584,6 +587,7 @@ struct NotificationsCenterView: View {
     private func icon(for kind: String?) -> String {
         let k = (kind ?? "").lowercased()
         if Self.isOutage(k) { return "exclamationmark.triangle.fill" }
+        if k == "moderation_decision" { return "exclamationmark.shield.fill" }
         if k.contains("repost") { return "arrow.2.squarepath" }
         if k.contains("antenna_report") || k.contains("site_report") {
             return "exclamationmark.bubble.fill"

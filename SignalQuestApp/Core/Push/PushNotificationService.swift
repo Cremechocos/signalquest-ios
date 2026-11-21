@@ -944,6 +944,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let commentId = Self.string(info, "commentId") ?? Self.string(info, "replyId")
         // Bilan mensuel prêt (`recap.ready`) : le mois `yyyy-mm`, contrôlé par le routeur.
         let month = Self.string(info, "month")
+        // Décision de modération (MOD-1) : la décision visée.
+        let decisionId = Self.string(info, "decisionId", "decision_id")
         // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
         let anfrFocus = ANFRFocus.parse(
             date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),
@@ -1000,7 +1002,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     market: market,
                     operatorKey: operatorKey,
                     commentId: commentId,
-                    month: month
+                    month: month,
+                    decisionId: decisionId
                 )
                 AppServicesHolder.services.syncIconBadge()
             }

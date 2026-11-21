@@ -182,6 +182,9 @@ final class AppRouter: ObservableObject {
         var id: String { rawValue }
     }
     @Published var openProfileScreen: ProfileScreen?
+    /// Décision de modération à ouvrir (push ou cloche `moderation_decision`, MOD-1) ;
+    /// une chaîne vide ouvre la liste. Consommé par le Profil.
+    @Published var openModerationDecisionId: String?
     /// Bilan mensuel (notification `recap.ready`, lien `/profile/bilan/{yyyy-mm}`) : le mois
     /// visé, ou une chaîne vide pour le dernier mois clos. Consommé par le Profil.
     @Published var openRecapMonth: String?
@@ -250,7 +253,7 @@ final class AppRouter: ObservableObject {
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil
             || openSentinelleTargetId != nil || openFriendRequests
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
-            || openProfileScreen != nil || openANFRMap || openANFRStats != nil
+            || openProfileScreen != nil || openModerationDecisionId != nil || openANFRMap || openANFRStats != nil
             || pendingMapFocus != nil || pendingLiveFriendId != nil || pendingMapSession != nil || pendingDriveTest || pendingSpeedtestStart
             || pendingShare != nil || pendingSharedPost != nil
     }
@@ -326,7 +329,8 @@ final class AppRouter: ObservableObject {
         market: String? = nil,
         operatorKey: String? = nil,
         commentId: String? = nil,
-        month: String? = nil
+        month: String? = nil,
+        decisionId: String? = nil
     ) {
         switch rawType?.lowercased() {
         // Bilan mensuel prêt (contrat Abonnements v1.20 §3) : le Bilan du mois porté.
@@ -401,8 +405,12 @@ final class AppRouter: ObservableObject {
             route(toConversation: nil)
         // Modération sans écran iOS : le centre de notifications ouvre la page
         // d'administration du site ; jamais la conversation d'un autre membre.
-        case "message_report", "photo_reported", "photo_appeal":
+        case "message_report", "photo_reported", "photo_appeal", "moderation_appeal":
             break
+        // Décision de modération ou issue d'un recours (MOD-1) : la décision elle-même. La charge
+        // ne porte que `decisionId` ; le repli plus bas n'aurait rien ouvert.
+        case "moderation_decision":
+            route(toModerationDecision: decisionId)
         // Photo approuvée, masquée ou retirée, avertissement : la page Photos.
         case "improvement", "status_change", "photo_comment", "photo_like", "photo_mention", "photo_reply":
             route(toProfileScreen: .photos)
@@ -590,6 +598,12 @@ final class AppRouter: ObservableObject {
     func route(toProfileScreen screen: ProfileScreen) {
         selectedTab = .profile
         openProfileScreen = screen
+    }
+
+    /// Sans identifiant lisible, la liste des décisions.
+    func route(toModerationDecision id: String?) {
+        selectedTab = .profile
+        openModerationDecisionId = id?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     /// Un mois mal formé ou absent ouvre le dernier mois clos.

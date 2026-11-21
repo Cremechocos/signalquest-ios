@@ -65,6 +65,8 @@ struct ProfileView: View {
     /// Signalement « Bugs et idées » à ouvrir en sheet (notification `bug_*`).
     @State private var deepLinkBug: AntennaReportDeepLink?
     @State private var deepLinkScreen: AppRouter.ProfileScreen?
+    /// Décision de modération ouverte par un push ou la cloche ; `id` vide = la liste.
+    @State private var deepLinkModeration: AntennaReportDeepLink?
     /// Écran Sentinelle à ouvrir en sheet (tap sur une notification de coupure).
     @State private var deepLinkSentinelle: SentinelleDeepLink?
     /// Box partagée ouverte depuis un lien universel.
@@ -176,6 +178,16 @@ struct ProfileView: View {
                 }
             }
         }
+        .sheet(item: $deepLinkModeration) { link in
+            NavigationStack {
+                if link.id.isEmpty {
+                    ModerationDecisionsView(service: services.moderationDecisions)
+                } else {
+                    ModerationDecisionDetailView(service: services.moderationDecisions, decisionId: link.id,
+                                                 onClose: { deepLinkModeration = nil })
+                }
+            }
+        }
         // Notification sans fiche précise : l'écran du Profil qui en parle.
         .sheet(item: $deepLinkScreen) { screen in
             NavigationStack {
@@ -260,6 +272,7 @@ struct ProfileView: View {
             consumeAntennaReportDeepLink()
             consumeBugDeepLink()
             consumeScreenDeepLink()
+            consumeModerationDeepLink()
             consumeSentinelleDeepLink()
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
@@ -273,6 +286,7 @@ struct ProfileView: View {
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openBugId) { _, _ in consumeBugDeepLink() }
         .onChangeCompat(of: router.openProfileScreen) { _, _ in consumeScreenDeepLink() }
+        .onChangeCompat(of: router.openModerationDecisionId) { _, _ in consumeModerationDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .onChangeCompat(of: router.openE2EEApprovalQR) { _, _ in consumeE2EEApprovalQRDeepLink() }
@@ -316,6 +330,12 @@ struct ProfileView: View {
         guard let id = router.openBugId else { return }
         router.openBugId = nil
         deepLinkBug = AntennaReportDeepLink(id: id)
+    }
+
+    private func consumeModerationDeepLink() {
+        guard let id = router.openModerationDecisionId else { return }
+        router.openModerationDecisionId = nil
+        deepLinkModeration = AntennaReportDeepLink(id: id)
     }
 
     private func consumeScreenDeepLink() {
