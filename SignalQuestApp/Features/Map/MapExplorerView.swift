@@ -2855,10 +2855,19 @@ struct MapExplorerView: View {
                 MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
                 mapStatusToast
             }
-            HStack(alignment: .bottom) {
-                mapStatePill
-                Spacer(minLength: SQSpace.sm)
-                mapFabStack
+            // Deux rangées : la pastille d'état ne partage la sienne qu'avec le recentrage.
+            // Dans une seule HStack, la colonne de droite gardait sur toute sa hauteur la
+            // largeur de sa rangée la plus large (mesure + bouton Carte) et la pastille se
+            // coupait (« Or… · Ant… », retour d'Alexandre du 21/11).
+            VStack(alignment: .trailing, spacing: SQSpace.sm2) {
+                mapLayersRow
+                HStack(alignment: .bottom) {
+                    mapStatePill
+                    Spacer(minLength: SQSpace.sm)
+                    mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
+                        centerOnCurrentLocation()
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -3172,44 +3181,20 @@ struct MapExplorerView: View {
 
     /// Pastille d'état (bas-gauche) : l'opérateur et la couche principale, plus
     /// le nombre des autres. Elle ouvre la feuille Carte, où tout se règle.
+    /// Si elle ne tient pas en entier (très grand texte, iPhone étroit), le nom de la
+    /// couche s'efface et le nombre compte toutes les couches (« ● Orange +3 ») :
+    /// l'opérateur n'est jamais coupé pour garder la couche (choix d'Alexandre du 21/11).
     private var mapStatePill: some View {
         let layers = shownLayers
         let primary = layers.first.map { MapLayersSheet.layerTitle($0, communityOnly: model.isCommunityOnlyMarket) }
-        let others = max(layers.count - 1, 0)
         let operatorText = model.operatorShortLabel(model.operatorFilter)
         return Button {
             Haptics.light()
             showLayersSheet = true
         } label: {
-            HStack(spacing: SQSpace.xs2) {
-                Circle()
-                    .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.label : model.operatorAccent(model.operatorFilter))
-                    .frame(width: 10, height: 10)
-                Text(operatorText)
-                    .font(SQFont.body(13, .heavy, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityIdentifier("map.operator.label")
-                Circle()
-                    .fill(SQColor.labelTertiary)
-                    .frame(width: 3, height: 3)
-                    .accessibilityHidden(true)
-                Text(primary ?? String(localized: "Aucune couche"))
-                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityIdentifier("map.layers.primary")
-                if others > 0 {
-                    Text(verbatim: "+\(others)")
-                        .font(SQFont.body(11, .semibold, relativeTo: .caption2))
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.chipInk)
-                        .accessibilityIdentifier("map.layers.more")
-                        .padding(.horizontal, SQSpace.xs2)
-                        .frame(minHeight: 20)
-                        .background(SQColor.chip, in: Capsule())
-                }
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(SQColor.labelSecondary)
+            ViewThatFits(in: .horizontal) {
+                statePillContent(operatorText: operatorText, primary: primary, layerCount: layers.count, compact: false)
+                statePillContent(operatorText: operatorText, primary: primary, layerCount: layers.count, compact: true)
             }
             .lineLimit(1)
             .padding(.horizontal, SQSpace.md2)
@@ -3226,28 +3211,62 @@ struct MapExplorerView: View {
         .accessibilityIdentifier("map.operator")
     }
 
+    /// Forme complète (« ● Orange · Antennes +2 ») ou compacte (« ● Orange +3 »).
+    private func statePillContent(operatorText: String, primary: String?, layerCount: Int, compact: Bool) -> some View {
+        let count = compact ? layerCount : max(layerCount - 1, 0)
+        return HStack(spacing: SQSpace.xs2) {
+            Circle()
+                .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.label : model.operatorAccent(model.operatorFilter))
+                .frame(width: 10, height: 10)
+            Text(operatorText)
+                .font(SQFont.body(13, .heavy, relativeTo: .footnote))
+                .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("map.operator.label")
+            if !compact {
+                Circle()
+                    .fill(SQColor.labelTertiary)
+                    .frame(width: 3, height: 3)
+                    .accessibilityHidden(true)
+                Text(primary ?? String(localized: "Aucune couche"))
+                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityIdentifier("map.layers.primary")
+            }
+            if count > 0 {
+                Text(verbatim: "+\(count)")
+                    .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.chipInk)
+                    .accessibilityIdentifier("map.layers.more")
+                    .padding(.horizontal, SQSpace.xs2)
+                    .frame(minHeight: 20)
+                    .background(SQColor.chip, in: Capsule())
+                    .fixedSize()
+            }
+            Image(systemName: "chevron.up")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+    }
+
     private func stateAccessibilityValue(operatorText: String, layers: [MapDisplayItem.Kind]) -> String {
         let titles = layers.map { MapLayersSheet.layerTitle($0, communityOnly: model.isCommunityOnlyMarket) }
         let layersText = titles.isEmpty ? String(localized: "Aucune couche") : ListFormatter.localizedString(byJoining: titles)
         return "\(operatorText), \(layersText)"
     }
 
-    /// Boutons flottants (bas-droite) : la feuille Carte, puis le recentrage GPS.
-    /// La carte recharge seule à chaque déplacement : pas de bouton « rafraîchir ».
-    private var mapFabStack: some View {
-        VStack(alignment: .trailing, spacing: SQSpace.sm2) {
-            HStack(spacing: SQSpace.sm) {
-                if showsCoverageMeasurePill { coverageMeasurePill }
-                // Même nom que la pastille d'état et que la feuille qu'il ouvre.
-                mapFab(icon: "square.3.layers.3d", label: "Carte") {
-                    showLayersSheet = true
-                }
-                .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
-                .accessibilityIdentifier("map.layers")
+    /// Rangée flottante au-dessus du recentrage GPS (bas-droite) : la mesure de la
+    /// couverture, puis la feuille Carte. La carte recharge seule à chaque
+    /// déplacement : pas de bouton « rafraîchir ».
+    private var mapLayersRow: some View {
+        HStack(spacing: SQSpace.sm) {
+            if showsCoverageMeasurePill { coverageMeasurePill }
+            // Même nom que la pastille d'état et que la feuille qu'il ouvre.
+            mapFab(icon: "square.3.layers.3d", label: "Carte") {
+                showLayersSheet = true
             }
-            mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
-                centerOnCurrentLocation()
-            }
+            .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
+            .accessibilityIdentifier("map.layers")
         }
     }
 
