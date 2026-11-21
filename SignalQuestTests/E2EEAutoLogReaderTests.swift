@@ -184,8 +184,79 @@ final class E2EEAutoLogReaderTests: XCTestCase {
         _ = try await reader.refreshLinks()
         _ = try await reader.account(alice)
         _ = try await reader.account(alice)
-        let lastAliceSeq = try XCTUnwrap(reference.accounts[alice]?.entries.last.flatMap { E2EEAutoLog.parseEntry($0)?.entry.seq })
-        XCTAssertEqual(server.accountAfters, [0, lastAliceSeq], "les entrées gardées ne sont pas relues")
+        XCTAssertEqual(server.accountAfters, [0], "les entrées gardées ne sont pas relues, ni le compte sans maillon nouveau (audit D4)")
+    }
+
+    /// Audit D4 : chaque étape d'un retour au premier plan a son lecteur, et relisait son
+    /// propre compte. Sans maillon `ENTRY` de ce compte après sa dernière entrée gardée, la
+    /// vérification se refait sur le fichier, sans requête ; un maillon nouveau ou une
+    /// lecture vieille de 24 h la font repartir du serveur.
+    func testAnUnchangedAccountIsVerifiedFromTheKeptFileWithoutARequest() async throws {
+        let reference = try reference(), server = Server(reference), store = makeStore()
+        let alice = "user_alice_00000000001", account = try XCTUnwrap(reference.accounts[alice])
+        let seqs = account.entries.compactMap { E2EEAutoLog.parseEntry($0)?.entry.seq }
+        XCTAssertGreaterThan(seqs.count, 1)
+        let chain = try E2EEAutoLog.extendChain(
+            .initial(pinnedLogKeyB64: reference.pinnedLogKeyB64, nextLogKeysB64: reference.nextLogKeysB64),
+            links: reference.links, logKeyEntries: reference.logKeyEntries
+        ).get()
+        let bySeq = Dictionary(uniqueKeysWithValues: reference.links.enumerated().map { (Int64($0.offset + 1), $0.element) })
+        let expected = E2EEAutoLog.verifyAccount(
+            userId: alice, accountSaltB64: account.salt, entries: account.entries, links: bySeq, chain: chain
+        )
+        func read(nowMs: Int64 = reference.headNowMs) async throws -> Result<E2EEAutoLog.AccountState, E2EEAutoLog.AccountFailure>? {
+            let reader = makeReader(reference, server: server, store: store, nowMs: nowMs)
+            _ = try await reader.refreshLinks()
+            return try await reader.account(alice)
+        }
+
+        guard case .success = expected else { return XCTFail("Alice doit se vérifier") }
+        var result = try await read()
+        XCTAssertEqual(result, expected)
+        XCTAssertEqual(server.accountAfters, [0])
+        // Huit lecteurs, comme au premier plan : aucun ne redemande le compte.
+        for _ in 0..<8 {
+            result = try await read()
+            XCTAssertEqual(result, expected)
+        }
+        XCTAssertEqual(server.accountAfters, [0], "compte inchangé : aucune requête")
+
+        // Une entrée d'Alice que le fichier n'a pas encore : son maillon la signale, elle est demandée.
+        var file = store.load(ownerScopeId: Self.owner)
+        let recent = try XCTUnwrap(file.accounts[alice]?.fetchedAtMs)
+        file.accounts[alice] = .init(accountSaltB64: account.salt, entries: Array(account.entries.dropLast()), fetchedAtMs: recent)
+        try store.save(file, ownerScopeId: Self.owner)
+        result = try await read()
+        XCTAssertEqual(result, expected)
+        XCTAssertEqual(server.accountAfters, [0, seqs[seqs.count - 2]])
+        result = try await read()
+        XCTAssertEqual(result, expected)
+        XCTAssertEqual(server.accountAfters.count, 2, "relu une fois, puis de nouveau inchangé")
+
+        // Lecture vieille de 24 h : le serveur est redemandé (compte supprimé ou tu), même sans maillon nouveau.
+        file = store.load(ownerScopeId: Self.owner)
+        let full = try XCTUnwrap(file.accounts[alice])
+        file.accounts[alice] = .init(
+            accountSaltB64: full.accountSaltB64, entries: full.entries,
+            fetchedAtMs: reference.headNowMs - E2EEAutoLogReader.unchangedAccountRereadMs
+        )
+        try store.save(file, ownerScopeId: Self.owner)
+        result = try await read()
+        XCTAssertEqual(result, expected)
+        XCTAssertEqual(server.accountAfters, [0, seqs[seqs.count - 2], seqs[seqs.count - 1]])
+        server.accounts[alice] = nil
+        result = try await read()
+        XCTAssertEqual(result, expected, "lu il y a moins de 24 h : le 404 attend la prochaine relecture")
+        XCTAssertEqual(server.accountAfters.count, 3)
+
+        // Fichier d'avant l'audit, sans heure de lecture : relu, et le 404 s'y voit.
+        file = store.load(ownerScopeId: Self.owner)
+        let kept = try XCTUnwrap(file.accounts[alice])
+        file.accounts[alice] = .init(accountSaltB64: kept.accountSaltB64, entries: kept.entries)
+        try store.save(file, ownerScopeId: Self.owner)
+        let afterDeletion = try await read()
+        XCTAssertNil(afterDeletion, "compte non servi")
+        XCTAssertEqual(server.accountAfters.count, 4)
     }
 
     func testEmptyJournal() async throws {

@@ -95,6 +95,9 @@ final class E2EEAutoLogStore: @unchecked Sendable {
     struct AccountFile: Codable, Equatable, Sendable {
         let accountSaltB64: String?
         let entries: [String]
+        /// Dernière lecture du compte auprès du serveur (horloge locale) ; absente
+        /// dans un fichier d'avant l'audit D4 : le compte est alors relu.
+        var fetchedAtMs: Int64? = nil
     }
 
     struct LogFile: Codable, Equatable, Sendable {
@@ -625,6 +628,12 @@ actor E2EEAutoLogReader {
         // Un compte lu pour la première fois n'a aucun appareil « nouveau » :
         // seules les entrées d'après une lecture vérifiée en disent un (§3.5).
         let seenUpTo: Int64? = kept == nil || reread ? nil : after
+        // Audit D4 : chaque entrée a son maillon `ENTRY`, au `accountTag` du compte, dans la
+        // chaîne vérifiée. Sans maillon de ce compte après sa dernière entrée gardée, le
+        // serveur n'a rien de plus à servir : les entrées gardées sont revérifiées ici.
+        if !reread, let kept, let unchanged = unchangedAccount(userId, kept: kept, after: after, links: links, chain: chain) {
+            return .success(unchanged)
+        }
 
         var pageSalt: String??
         for _ in 0..<Self.maxAccountPages {
@@ -664,7 +673,7 @@ actor E2EEAutoLogReader {
                 try raiseAccount(failure, userId: userId)
             }
             if case .success = result {
-                file.accounts[userId] = .init(accountSaltB64: salt, entries: entries)
+                file.accounts[userId] = .init(accountSaltB64: salt, entries: entries, fetchedAtMs: nowMs)
                 try store.save(file, ownerScopeId: ownerScopeId)
                 if let seenUpTo {
                     let added = Self.addedDevices(entries, after: seenUpTo)
@@ -674,6 +683,28 @@ actor E2EEAutoLogReader {
             return result
         }
         throw Failure.malformed
+    }
+
+    /// Au-delà, un compte sans maillon nouveau est relu quand même : un `404` (compte
+    /// supprimé) ou un compte tu ne se voient que par le serveur.
+    static let unchangedAccountRereadMs: Int64 = 24 * 3_600_000
+
+    /// L'état d'un compte gardé qu'aucun maillon `ENTRY` n'a touché après `after`, sa
+    /// dernière entrée gardée, jusqu'à la tête vérifiée ; nil : il faut le relire.
+    private func unchangedAccount(
+        _ userId: String, kept: E2EEAutoLogStore.AccountFile, after: Int64,
+        links: [Int64: String], chain: E2EEAutoLog.ChainState
+    ) -> E2EEAutoLog.AccountState? {
+        guard let salt = kept.accountSaltB64, let fetchedAtMs = kept.fetchedAtMs,
+              (0..<Self.unchangedAccountRereadMs).contains(nowMs - fetchedAtMs) else { return nil }
+        let tag = E2EEAutoLog.accountTag(userId: userId, accountSaltB64: salt)
+        let touched = links.contains { seq, text in
+            seq > after && E2EEAutoLog.parseLink(text).map { $0.kind == .entry && $0.tag == tag } ?? true
+        }
+        guard !touched, case .success(let state) = E2EEAutoLog.verifyAccount(
+            userId: userId, accountSaltB64: salt, entries: kept.entries, links: links, chain: chain
+        ) else { return nil }
+        return state
     }
 
     /// Appareils apparus depuis la dernière reprise, vidés à la lecture.
