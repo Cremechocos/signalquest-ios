@@ -100,6 +100,42 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
 
     var isHatched: Bool { scale.isHatched }
 
+    /// Un point de la carte pour la mesure choisie (contrat v3) : `nil` quand le
+    /// point n'a rien à montrer (valeur absente, hors plage, sentinelle, ou 2G et
+    /// 3G en RSRQ et SINR). Il n'est alors pas dessiné du tout (choix d'Alexandre
+    /// du 21/11) : la carte n'a plus d'état « pas de mesure ».
+    static func band(measure: SQQualityScale.Signal.Measure, rsrp: Double?, rsrq: Double?, sinr: Double?,
+                     technology: String?) -> CoverageQualityBand? {
+        let result = band(SQQualityScale.Signal(measure: measure, rsrp: rsrp, rsrq: rsrq, sinr: sinr, technology: technology))
+        return result == .unknown ? nil : result
+    }
+
+    /// Bornes exactes du niveau dans la légende, après l'arrondi du contrat : en
+    /// RSRP celles de la 4G et de la 5G, en dBm ; en RSRQ et SINR, en dB. Une
+    /// borne qui serait la sentinelle 0 (SINR « Faible ») commence à 1.
+    func bounds(for measure: SQQualityScale.Signal.Measure) -> String? {
+        let metric: SQQualityScale.Signal.Metric
+        switch measure {
+        case .rsrp: metric = .rsrp
+        case .rsrq: metric = .rsrq
+        case .sinr: metric = .sinr
+        }
+        let unit = measure == .rsrp ? "dBm" : "dB"
+        let thresholds = metric.thresholds
+        func number(_ value: Int) -> String { "\(value)".replacingOccurrences(of: "-", with: "\u{2212}") }
+        func lower(_ value: Int) -> Int { metric.isSentinel(value) ? value + 1 : value }
+        let index: Int
+        switch self {
+        case .excellent: return String(localized: "≥ \(number(thresholds[0])) \(unit)")
+        case .good: index = 1
+        case .fair: index = 2
+        case .weak: index = 3
+        case .poor: return String(localized: "< \(number(thresholds[3])) \(unit)")
+        case .noService, .unknown: return nil
+        }
+        return String(localized: "\(number(lower(thresholds[index]))) à \(number(thresholds[index - 1] - 1)) \(unit)")
+    }
+
     private var scale: SQQualityScale.Signal {
         switch self {
         case .excellent: return .excellent
@@ -167,6 +203,56 @@ enum CoverageGenerationBand: String, CaseIterable, Identifiable {
     var colorHex: UInt32 { scale.hex }
 
     var swiftUIColor: Color { Color(hex: colorHex) }
+}
+
+/// Ce que colore la couche couverture : une mesure du signal ou la génération
+/// (contrat quality-scale-v3, 21/11). Un seul réglage, partagé par la feuille
+/// Carte, sa légende et la pastille posée sur la carte.
+enum CoverageColoring: String, CaseIterable, Identifiable {
+    case rsrp, rsrq, sinr, generation
+
+    var id: String { rawValue }
+
+    init(byGeneration: Bool, measure: SQQualityScale.Signal.Measure) {
+        self = byGeneration ? .generation : (CoverageColoring(rawValue: measure.rawValue) ?? .rsrp)
+    }
+
+    var measure: SQQualityScale.Signal.Measure? { SQQualityScale.Signal.Measure(rawValue: rawValue) }
+
+    var title: String {
+        switch self {
+        case .rsrp: return "RSRP"
+        case .rsrq: return "RSRQ"
+        case .sinr: return "SINR"
+        case .generation: return String(localized: "Génération")
+        }
+    }
+
+    /// Teintes de l'échelle, de la meilleure à la pire (sans « Sans réseau » ni
+    /// « aucune génération », qui ne sont pas des niveaux).
+    var swatches: [Color] {
+        switch self {
+        case .generation: return CoverageGenerationBand.visibleBands.filter { $0 != .none }.map(\.swiftUIColor)
+        default: return CoverageQualityBand.visibleBands.filter { $0 != .noService }.map(\.swiftUIColor)
+        }
+    }
+
+    /// Les deux réglages gardés sur l'appareil vus comme un seul choix ;
+    /// Génération garde la mesure d'avant, pour y revenir.
+    static func binding(byGeneration: Binding<Bool>,
+                        measure: Binding<SQQualityScale.Signal.Measure>) -> Binding<CoverageColoring> {
+        Binding(
+            get: { CoverageColoring(byGeneration: byGeneration.wrappedValue, measure: measure.wrappedValue) },
+            set: { value in
+                if let chosen = value.measure {
+                    measure.wrappedValue = chosen
+                    byGeneration.wrappedValue = false
+                } else {
+                    byGeneration.wrappedValue = true
+                }
+            }
+        )
+    }
 }
 
 /// Paliers de débit descendant pour colorer la couche dense des speedtests —

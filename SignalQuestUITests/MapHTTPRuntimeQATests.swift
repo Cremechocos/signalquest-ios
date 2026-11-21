@@ -37,8 +37,8 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         try tap(legend, in: app)
         // Le mode est mémorisé entre lancements : exercer une vraie bascule,
         // quel que soit le réglage laissé par une autre recette.
-        try tap(app.buttons["map.coverage.mode.false"], in: app)
-        let generation = app.buttons["map.coverage.mode.true"]
+        try tap(app.buttons["map.coverage.mode.rsrp"], in: app)
+        let generation = app.buttons["map.coverage.mode.generation"]
         try tap(generation, in: app)
         XCTAssertTrue(generation.isSelected)
         XCTAssertEqual(generation.label, locale == "en" ? "Generation" : "Génération")
@@ -135,13 +135,15 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         try reveal(legend, in: app, sheet: Self.layersSheet)
         try tap(legend, in: app)
         // Les segments s'empilent aux très grandes tailles. Ne pas supposer que
-        // la préférence persistée est encore « Signal ».
-        let signal = app.buttons["map.coverage.mode.false"]
+        // la préférence persistée est encore « RSRP ».
+        let signal = app.buttons["map.coverage.mode.rsrp"]
         try tap(signal, in: app)
-        // Libellés du contrat quality-scale v1.
-        for title in ["Excellent", "Good", "Fair", "Poor", "Critical", "No network found"] {
-            XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
+        // Libellés du contrat quality-scale v3, lus avec leurs bornes (« Good, −90 to −81 dBm »).
+        for title in ["Excellent", "Good", "Fair", "Poor", "Critical"] {
+            let entry = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "\(title), ")).firstMatch
+            XCTAssertTrue(entry.waitForExistence(timeout: 10), title)
         }
+        XCTAssertTrue(app.staticTexts["No network found"].waitForExistence(timeout: 10))
         capture(app, name: "map-coverage-accessibility-legend-detail")
         // L'iPhone est verrouillé en portrait dans Info.plist ; l'iPad prend
         // en charge les deux orientations et exerce le redimensionnement.

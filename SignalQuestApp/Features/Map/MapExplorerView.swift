@@ -1748,6 +1748,13 @@ struct MapExplorerView: View {
     /// Couche Couverture : coloration par génération (5G/4G/…) plutôt que par RSRP.
     /// Persisté localement. Modes mutuellement exclusifs (jamais mélangés).
     @AppStorage("map_coverage_by_generation") private var coverageByGeneration = false
+    /// Mesure de la couche Couverture hors génération (contrat quality-scale-v3) :
+    /// RSRP par défaut, RSRQ ou SINR. Persistée à côté de `coverageByGeneration`,
+    /// qui garde le choix Génération des versions précédentes.
+    @AppStorage("map_coverage_measure") private var coverageMeasureRaw = SQQualityScale.Signal.Measure.rsrp.rawValue
+    private var coverageMeasure: SQQualityScale.Signal.Measure {
+        SQQualityScale.Signal.Measure(rawValue: coverageMeasureRaw) ?? .rsrp
+    }
     @State private var selectedItem: MapDisplayItem?
     @State private var selectedAntenna: AntennaSite?
     /// Marché et opérateur demandés par le lien qui a ouvert la fiche (site suivi d'un autre
@@ -2025,6 +2032,7 @@ struct MapExplorerView: View {
                 layers: $filters,
                 photosFriendsOnly: $model.photosFriendsOnly,
                 byGeneration: $coverageByGeneration,
+                coverageMeasure: Binding(get: { coverageMeasure }, set: { coverageMeasureRaw = $0.rawValue }),
                 azimuthStyle: $model.azimuthStyle,
                 allMarkets: model.registryMarkets,
                 showsFriendsLayer: services.auth.hasStoredCredentials(),
@@ -2212,6 +2220,10 @@ struct MapExplorerView: View {
         }
         .onChangeCompat(of: coverageByGeneration) { _, _ in
             // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
+            refreshMapRender()
+        }
+        .onChangeCompat(of: coverageMeasureRaw) { _, _ in
+            // RSRP, RSRQ ou SINR : mêmes données, autre coloration.
             refreshMapRender()
         }
         // Données rechargées → reconstruit le cache des couches une seule fois.
@@ -3203,17 +3215,73 @@ struct MapExplorerView: View {
     /// Boutons flottants (bas-droite) : la feuille Carte, puis le recentrage GPS.
     /// La carte recharge seule à chaque déplacement : pas de bouton « rafraîchir ».
     private var mapFabStack: some View {
-        VStack(spacing: SQSpace.sm2) {
-            // Même nom que la pastille d'état et que la feuille qu'il ouvre.
-            mapFab(icon: "square.3.layers.3d", label: "Carte") {
-                showLayersSheet = true
+        VStack(alignment: .trailing, spacing: SQSpace.sm2) {
+            HStack(spacing: SQSpace.sm) {
+                if showsCoverageMeasurePill { coverageMeasurePill }
+                // Même nom que la pastille d'état et que la feuille qu'il ouvre.
+                mapFab(icon: "square.3.layers.3d", label: "Carte") {
+                    showLayersSheet = true
+                }
+                .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
+                .accessibilityIdentifier("map.layers")
             }
-            .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
-            .accessibilityIdentifier("map.layers")
             mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
                 centerOnCurrentLocation()
             }
         }
+    }
+
+    /// La couverture se dessine seulement pour un opérateur choisi.
+    private var showsCoverageMeasurePill: Bool {
+        filters.contains(.coverage) && model.operatorFilter.uppercased() != "ALL" && sessionFocus == nil
+    }
+
+    private var coverageColoring: Binding<CoverageColoring> {
+        CoverageColoring.binding(
+            byGeneration: $coverageByGeneration,
+            measure: Binding(get: { coverageMeasure }, set: { coverageMeasureRaw = $0.rawValue })
+        )
+    }
+
+    /// Ce que colore la couverture, changé d'un geste sur la carte (retour
+    /// d'Alexandre du 21/11 : le choix au fond de la légende ne se trouvait pas).
+    /// À droite, à côté du bouton Carte : la mention légale de Plans reste libre à gauche.
+    private var coverageMeasurePill: some View {
+        let coloring = coverageColoring
+        return Menu {
+            Picker(selection: coloring) {
+                ForEach(CoverageColoring.allCases) { option in
+                    Text(verbatim: option.title).tag(option)
+                }
+            } label: {
+                Text("Couleurs de la couverture")
+            }
+        } label: {
+            HStack(spacing: SQSpace.xs2) {
+                Text(verbatim: coloring.wrappedValue.title)
+                    .font(SQFont.body(13, .heavy, relativeTo: .footnote))
+                    .foregroundStyle(SQColor.label)
+                HStack(spacing: 2) {
+                    ForEach(Array(coloring.wrappedValue.swatches.enumerated()), id: \.offset) { _, color in
+                        RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 7, height: 8)
+                    }
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .lineLimit(1)
+            .padding(.horizontal, SQSpace.md2)
+            .frame(minHeight: 44)
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
+        }
+        // L'ordre de la feuille, même quand le menu s'ouvre vers le haut.
+        .menuOrder(.fixed)
+        .accessibilityLabel(Text("Couleurs de la couverture"))
+        .accessibilityValue(Text(verbatim: coloring.wrappedValue.title))
+        .accessibilityHint(Text("Choisir la mesure qui colore la couverture"))
+        .accessibilityIdentifier("map.coverage.measure")
     }
 
     private func mapFab(icon: String, tint: Color = SQColor.label, label: String, action: @escaping () -> Void) -> some View {
@@ -4768,9 +4836,12 @@ struct MapExplorerView: View {
     }
 
     /// Couleur + clé de regroupement d'un point de couverture selon le mode courant :
-    /// par RSRP (signal) ou par génération réseau. Modes mutuellement exclusifs
-    /// (jamais mélangés) — la légende suit `coverageByGeneration`.
-    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int, hatched: Bool) {
+    /// par génération réseau, ou par la mesure choisie (RSRP, RSRQ ou SINR). Modes
+    /// mutuellement exclusifs (jamais mélangés) — la légende suit le même choix.
+    /// `nil` : le point n'a rien à montrer pour la mesure choisie et n'est pas
+    /// dessiné (contrat quality-scale-v3, choix d'Alexandre du 21/11).
+    private func coverageColorParts(rsrp: Double?, rsrq: Double? = nil, sinr: Double? = nil,
+                                    tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int, hatched: Bool)? {
         if coverageByGeneration {
             let band = CoverageGenerationBand.band(for: tech)
             // `band.rank` (5G=5 > 4G=4 > … > aucun=0) pilote le z-order (cf. tri en
@@ -4778,15 +4849,18 @@ struct MapExplorerView: View {
             return ("g-\(band.rawValue)", band.colorHex, band == .none, band.rank, false)
         } else {
             // Seuils de la technologie du point, « sans réseau constaté » avant
-            // toute valeur (contrat quality-scale v1, comme Android et le web).
-            let band = CoverageQualityBand.band(forDbm: rsrp, technology: tech)
-            // Rang neutre en mode RSRP → le tri par génération est un no-op.
-            return ("q-\(band.rawValue)", band.colorHex, band == .unknown, 0, band.isHatched)
+            // toute valeur (contrat quality-scale, comme Android et le web).
+            guard let band = CoverageQualityBand.band(measure: coverageMeasure, rsrp: rsrp, rsrq: rsrq,
+                                                      sinr: sinr, technology: tech) else { return nil }
+            // Rang neutre en mode signal → le tri par génération est un no-op.
+            return ("q-\(band.rawValue)", band.colorHex, false, 0, band.isHatched)
         }
     }
 
-    private func coverageFeature(from point: AndroidCoveragePoint) -> CoverageHeatFeature {
-        let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
+    private func coverageFeature(from point: AndroidCoveragePoint) -> CoverageHeatFeature? {
+        guard let parts = coverageColorParts(rsrp: point.rsrp, rsrq: point.rsrq, sinr: point.snr, tech: point.tech) else {
+            return nil
+        }
         return CoverageHeatFeature(
             id: "coverage-heat-\(point.id)",
             coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
@@ -4853,7 +4927,7 @@ struct MapExplorerView: View {
                 // (source == "ios", sans RSRP), comme pour les points bruts. La couche
                 // génération les conserve.
                 let clusters = coverageByGeneration ? tile.clusters : tile.clusters.filter { $0.source != "ios" }
-                features += clusters.map { cluster in
+                features += clusters.compactMap { cluster in
                     // Clusters (région/pays) : couleur = génération dominante backend
                     // (`cluster.tech`), gardée VERBATIM — le backend ne renvoie qu'UNE
                     // génération + `count` + `avgRsrp`, pas la distribution par génération,
@@ -4861,7 +4935,9 @@ struct MapExplorerView: View {
                     // supplémentaire (ce serait une modif backend). Le tri par génération
                     // (fin de `coverageHeatFeatures`) s'applique néanmoins : un cluster 5G
                     // passe au-dessus d'un cluster 4G chevauchant.
-                    let parts = coverageColorParts(rsrp: cluster.avgRsrp, tech: cluster.tech)
+                    // Mesure choisie : la médiane du cluster (v3), jamais dessiné sans valeur.
+                    guard let parts = coverageColorParts(rsrp: cluster.colorRsrp, rsrq: cluster.medianRsrq,
+                                                         sinr: cluster.medianSnr, tech: cluster.tech) else { return nil }
                     return CoverageHeatFeature(
                         id: "coverage-heat-cluster-\(cluster.id)",
                         coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
@@ -4881,13 +4957,14 @@ struct MapExplorerView: View {
                 let filtered = tile.points.lazy.filter { CoverageRenderPolicy.matches($0, selectedBands: model.bandFilters) }
                 let cap = CoverageRenderPolicy.pointCapPerTile
                 if coverageByGeneration {
-                    features += Self.dominantGenerationPoints(filtered).prefix(cap).map { coverageFeature(from: $0) }
+                    features += Self.dominantGenerationPoints(filtered).prefix(cap).compactMap { coverageFeature(from: $0) }
                 } else {
                     // Couche SIGNAL (RSRP) : on exclut la couverture iOS « génération seule »
                     // (source == "ios", aucun RSRP) — elle n'a de sens que sur la couche
                     // génération. Filtrage par SOURCE et non par rsrp==nil, pour ne pas
                     // masquer les vraies zones blanches Android (RSRP absent mais réel).
-                    features += filtered.filter { $0.source != "ios" }.prefix(cap).map { coverageFeature(from: $0) }
+                    // Les points sans valeur pour la mesure choisie ne comptent pas dans le plafond.
+                    features += filtered.filter { $0.source != "ios" }.compactMap { coverageFeature(from: $0) }.prefix(cap)
                 }
             }
         }
@@ -4906,8 +4983,9 @@ struct MapExplorerView: View {
             let source: [CoverageHeatPoint] = coverageByGeneration
                 ? Self.dominantGenerationHeatPoints(Array(matches))
                 : Array(matches.prefix(CoverageRenderPolicy.fallbackCap))
-            features = source.prefix(CoverageRenderPolicy.fallbackCap).map { point in
-                let parts = coverageColorParts(rsrp: point.signalStrength, tech: point.technology ?? point.networkType)
+            features = source.prefix(CoverageRenderPolicy.fallbackCap).compactMap { point in
+                guard let parts = coverageColorParts(rsrp: point.signalStrength, rsrq: point.rsrq, sinr: point.snr,
+                                                     tech: point.technology ?? point.networkType) else { return nil }
                 return CoverageHeatFeature(
                     id: "coverage-heat-api-\(point.id)",
                     coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),

@@ -694,6 +694,10 @@ struct CoverageHeatPoint: Decodable, Identifiable, Equatable {
     let latitude: Double
     let longitude: Double
     let signalStrength: Double?
+    /// RSRQ et SINR bruts (contrat quality-scale-v3) : l'app les filtre elle-même
+    /// avec les plages du contrat ; absents des serveurs qui ne les servent pas.
+    let rsrq: Double?
+    let snr: Double?
     let technology: String?
     let networkType: String?
     let band: Int?
@@ -721,12 +725,19 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
     /// Exclu de la couche RSRP/qualité (comme les points).
     let source: String?
     let latestTimestamp: Date?
+    /// Médianes du cluster (contrat quality-scale-v3), sur les seuls points qui
+    /// ont la valeur ; absentes quand aucun n'en a. `medianRsrp` remplace la
+    /// moyenne `avgRsrp`, gardée pour les serveurs qui ne la servent pas encore.
+    let medianRsrp: Double?
+    let medianRsrq: Double?
+    let medianSnr: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, lat, lng, count, avgRsrp, tech, source, latestTimestamp
+        case id, lat, lng, count, avgRsrp, tech, source, latestTimestamp, medianRsrp, medianRsrq, medianSnr
     }
 
-    init(id: String, lat: Double, lng: Double, count: Int, avgRsrp: Double? = nil, tech: String? = nil, source: String? = nil, latestTimestamp: Date? = nil) {
+    init(id: String, lat: Double, lng: Double, count: Int, avgRsrp: Double? = nil, tech: String? = nil, source: String? = nil,
+         latestTimestamp: Date? = nil, medianRsrp: Double? = nil, medianRsrq: Double? = nil, medianSnr: Double? = nil) {
         self.id = id
         self.lat = lat
         self.lng = lng
@@ -735,7 +746,13 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         self.tech = tech
         self.source = source
         self.latestTimestamp = latestTimestamp
+        self.medianRsrp = medianRsrp
+        self.medianRsrq = medianRsrq
+        self.medianSnr = medianSnr
     }
+
+    /// Le RSRP qui colore le cluster : la médiane, sinon l'ancienne moyenne.
+    var colorRsrp: Double? { medianRsrp ?? avgRsrp }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -747,6 +764,9 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         tech = c.decodeFlexibleString(forKey: .tech)
         source = c.decodeFlexibleString(forKey: .source)
         latestTimestamp = try? c.decodeIfPresent(Date.self, forKey: .latestTimestamp)
+        medianRsrp = try? c.decodeIfPresent(Double.self, forKey: .medianRsrp)
+        medianRsrq = try? c.decodeIfPresent(Double.self, forKey: .medianRsrq)
+        medianSnr = try? c.decodeIfPresent(Double.self, forKey: .medianSnr)
     }
 
     /// Le serveur numérote les clusters par cellule À L'INTÉRIEUR d'une tuile
@@ -755,7 +775,8 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
     /// dédoublonnage par identifiant ne gardait qu'un cluster par cellule.
     func scoped(to tile: AndroidMapTile) -> AndroidMapCluster {
         AndroidMapCluster(id: "\(tile.z)/\(tile.x)/\(tile.y):\(id)", lat: lat, lng: lng, count: count,
-                          avgRsrp: avgRsrp, tech: tech, source: source, latestTimestamp: latestTimestamp)
+                          avgRsrp: avgRsrp, tech: tech, source: source, latestTimestamp: latestTimestamp,
+                          medianRsrp: medianRsrp, medianRsrq: medianRsrq, medianSnr: medianSnr)
     }
 }
 

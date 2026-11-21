@@ -1,6 +1,139 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "5G : seulement quand le téléphone l’utilisait." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G: only when the phone was using it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G : seulement quand le téléphone l’utilisait."
+          }
+        }
+      }
+    },
+    "Couleurs de la couverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage colours"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs de la couverture"
+          }
+        }
+      }
+    },
+    "Choisir la mesure qui colore la couverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the measurement that colours the coverage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir la mesure qui colore la couverture"
+          }
+        }
+      }
+    },
+    "≥ %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "≥ %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "≥ %@ %@"
+          }
+        }
+      }
+    },
+    "< %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "< %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "< %@ %@"
+          }
+        }
+      }
+    },
+    "%@ à %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ to %2$@ %3$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ à %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "Seuils de la 4G et de la 5G ; la 3G et la 2G ont les leurs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4G and 5G thresholds; 3G and 2G have their own."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuils de la 4G et de la 5G ; la 3G et la 2G ont les leurs."
+          }
+        }
+      }
+    },
+    "4G et 5G seulement : un point sans cette mesure n’est pas affiché." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4G and 5G only: a point without this measurement is not shown."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4G et 5G seulement : un point sans cette mesure n’est pas affiché."
+          }
+        }
+      }
+    },
     "Réservé aux membres" : {
       "extractionState" : "manual",
       "localizations" : {

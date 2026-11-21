@@ -69,6 +69,8 @@ struct MapLayersSheet: View {
     @Binding var layers: Set<MapDisplayItem.Kind>
     @Binding var photosFriendsOnly: Bool
     @Binding var byGeneration: Bool
+    /// Mesure de la couverture hors génération : RSRP, RSRQ ou SINR (contrat v3).
+    @Binding var coverageMeasure: SQQualityScale.Signal.Measure
     @Binding var azimuthStyle: AzimuthStyle
     let allMarkets: [MarketRegistryEntry]
     /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
@@ -95,6 +97,7 @@ struct MapLayersSheet: View {
          layers: Binding<Set<MapDisplayItem.Kind>>,
          photosFriendsOnly: Binding<Bool> = .constant(false),
          byGeneration: Binding<Bool> = .constant(false),
+         coverageMeasure: Binding<SQQualityScale.Signal.Measure> = .constant(.rsrp),
          azimuthStyle: Binding<AzimuthStyle> = .constant(.lobes),
          allMarkets: [MarketRegistryEntry], showsFriendsLayer: Bool = true,
          operatorOptions: [String] = ["ALL"],
@@ -110,6 +113,7 @@ struct MapLayersSheet: View {
         _layers = layers
         _photosFriendsOnly = photosFriendsOnly
         _byGeneration = byGeneration
+        _coverageMeasure = coverageMeasure
         _azimuthStyle = azimuthStyle
         self.allMarkets = allMarkets
         self.showsFriendsLayer = showsFriendsLayer
@@ -206,6 +210,7 @@ struct MapLayersSheet: View {
                     if let sessionSection { sessionSection }
                     operatorSection
                     layerSection
+                    if layers.contains(.coverage) && !allOperators { coverageSection }
                     if layers.contains(.antenna) { antennaSection }
                     backdropSection
                     moreRows
@@ -245,6 +250,19 @@ struct MapLayersSheet: View {
                              options: [AzimuthStyle.lobes, .lines].map { ($0, $0.label) },
                              identifier: "map.layers.azimuth")
             }
+        }
+    }
+
+    /// Ce que colore la couverture, à côté des couches plutôt qu'au fond de la
+    /// légende (retour d'Alexandre du 21/11), comme les azimuts juste dessous.
+    /// L'échelle tient en une ligne ; les bornes exactes restent dans la légende.
+    private var coverageSection: some View {
+        let coloring = CoverageColoring.binding(byGeneration: $byGeneration, measure: $coverageMeasure)
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Couverture").sqKicker().accessibilityAddTraits(.isHeader)
+            MapSegmented(selection: coloring, options: CoverageColoring.allCases.map { ($0, $0.title) },
+                         identifier: "map.layers.coverage.mode")
+            CoverageScaleStrip(coloring: coloring.wrappedValue, marketCode: market)
         }
     }
 
@@ -434,7 +452,7 @@ struct MapLayersSheet: View {
             .disabled(allMarkets.isEmpty)
             Divider().overlay(SQColor.separator)
             NavigationLink {
-                MapLegendPage(byGeneration: $byGeneration, marketCode: market,
+                MapLegendPage(byGeneration: $byGeneration, measure: $coverageMeasure, marketCode: market,
                               operators: antennaOperators, showsCoverage: layers.contains(.coverage))
             } label: {
                 MapSheetRow(title: String(localized: "Légende")) {
@@ -732,6 +750,7 @@ struct MapFlowLayout: Layout {
 /// Page poussée depuis la feuille Carte.
 struct MapLegendPage: View {
     @Binding var byGeneration: Bool
+    @Binding var measure: SQQualityScale.Signal.Measure
     let marketCode: String?
     let operators: [MapAntennaLegendOperator]
     let showsCoverage: Bool
@@ -782,26 +801,34 @@ struct MapLegendPage: View {
     private var coverageSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Text("Couverture").sqKicker().accessibilityAddTraits(.isHeader)
-            MapSegmented(
-                selection: $byGeneration,
-                options: [(false, String(localized: "Signal")), (true, String(localized: "Génération"))],
-                identifier: "map.coverage.mode"
-            )
+            MapSegmented(selection: coloring, options: CoverageColoring.allCases.map { ($0, $0.title) },
+                         identifier: "map.coverage.mode")
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 if byGeneration {
                     ForEach(CoverageGenerationBand.visibleBands) { band in
                         swatchEntry(band.title(forMarket: marketCode), color: band.swiftUIColor)
                     }
+                    // Choix d'Alexandre du 21/11 : la 5G au repos (icône seule) reste en 4G.
+                    Text("5G : seulement quand le téléphone l’utilisait.")
+                        .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     ForEach(CoverageQualityBand.visibleBands) { band in
-                        swatchEntry(band.title, color: band.swiftUIColor, hatched: band.isHatched)
+                        swatchEntry(band.title, detail: band.bounds(for: measure), color: band.swiftUIColor, hatched: band.isHatched)
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                        Text(measureNote)
+                            .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        SQInfoButton(term: measureTerm)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .id(byGeneration)
+            .id(coloring.wrappedValue)
             .transition(.opacity)
-            .animation(SQMotion.resolve(SQMotion.fast, reduceMotion), value: byGeneration)
+            .animation(SQMotion.resolve(SQMotion.fast, reduceMotion), value: coloring.wrappedValue)
             if !showsCoverage {
                 Text("Active la couche Couverture pour voir ces couleurs sur la carte.")
                     .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
@@ -822,7 +849,28 @@ struct MapLegendPage: View {
         }
     }
 
-    private func swatchEntry(_ title: String, color: Color, hatched: Bool = false) -> some View {
+    /// Un seul choix pour la couche : RSRP, RSRQ, SINR ou Génération (contrat
+    /// quality-scale-v3, 21/11). Génération garde son réglage d'avant.
+    private var coloring: Binding<CoverageColoring> {
+        CoverageColoring.binding(byGeneration: $byGeneration, measure: $measure)
+    }
+
+    private var measureNote: String {
+        switch measure {
+        case .rsrp: return String(localized: "Seuils de la 4G et de la 5G ; la 3G et la 2G ont les leurs.")
+        case .rsrq, .sinr: return String(localized: "4G et 5G seulement : un point sans cette mesure n’est pas affiché.")
+        }
+    }
+
+    private var measureTerm: SQTerm {
+        switch measure {
+        case .rsrp: return .rsrp
+        case .rsrq: return .rsrq
+        case .sinr: return .snr
+        }
+    }
+
+    private func swatchEntry(_ title: String, detail: String? = nil, color: Color, hatched: Bool = false) -> some View {
         HStack(spacing: SQSpace.md) {
             Group {
                 if hatched {
@@ -835,7 +883,56 @@ struct MapLegendPage: View {
             .accessibilityHidden(true)
             Text(title).font(SQType.subhead).foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Spacer(minLength: SQSpace.sm)
+                Text(verbatim: detail).font(SQType.subhead).monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.trailing)
+            }
         }
+        // Niveau et bornes lus d'une traite ; sans bornes, rien ne change.
+        .accessibilityElement(children: detail == nil ? .contain : .combine)
+    }
+}
+
+/// Échelle de la couverture en une ligne : les teintes, de la meilleure à la
+/// pire, et les deux extrêmes. Les bornes de chaque niveau sont dans la légende.
+struct CoverageScaleStrip: View {
+    let coloring: CoverageColoring
+    let marketCode: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: 3) {
+                ForEach(Array(coloring.swatches.enumerated()), id: \.offset) { _, color in
+                    RoundedRectangle(cornerRadius: 3).fill(color).frame(height: 8)
+                }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                Text(verbatim: ends.best)
+                Spacer(minLength: 0)
+                Text(verbatim: ends.worst).multilineTextAlignment(.trailing)
+            }
+            .font(SQType.caption)
+            .monospacedDigit()
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(ends.best), \(ends.worst)"))
+        .accessibilityIdentifier("map.layers.coverage.scale")
+    }
+
+    var ends: (best: String, worst: String) {
+        guard let measure = coloring.measure else {
+            let bands = CoverageGenerationBand.visibleBands.filter { $0 != .none }
+            return (bands.first?.title(forMarket: marketCode) ?? "", bands.last?.title(forMarket: marketCode) ?? "")
+        }
+        func end(_ band: CoverageQualityBand) -> String {
+            [band.title, band.bounds(for: measure)].compactMap { $0 }.joined(separator: " ")
+        }
+        return (end(.excellent), end(.poor))
     }
 }
 

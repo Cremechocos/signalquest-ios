@@ -228,3 +228,94 @@ final class SignalQualityMeasureTests: XCTestCase {
         }
     }
 }
+
+/// Carte de couverture, contrat v3 : légende aux bornes exactes, points et
+/// clusters sans valeur jamais dessinés, médianes des clusters.
+final class CoverageMeasureMapTests: XCTestCase {
+    private var french: Bool { Bundle.main.preferredLocalizations.first == "fr" }
+    private func range(_ low: String, _ high: String, _ unit: String) -> String {
+        french ? "\(low) à \(high) \(unit)" : "\(low) to \(high) \(unit)"
+    }
+
+    func testLegendShowsTheExactBounds() {
+        XCTAssertEqual(CoverageQualityBand.excellent.bounds(for: .rsrp), "≥ −80 dBm")
+        XCTAssertEqual(CoverageQualityBand.good.bounds(for: .rsrp), range("−90", "−81", "dBm"))
+        XCTAssertEqual(CoverageQualityBand.poor.bounds(for: .rsrp), "< −110 dBm")
+        XCTAssertEqual(CoverageQualityBand.excellent.bounds(for: .rsrq), "≥ −9 dB")
+        XCTAssertEqual(CoverageQualityBand.fair.bounds(for: .rsrq), range("−15", "−13", "dB"))
+        XCTAssertEqual(CoverageQualityBand.weak.bounds(for: .rsrq), range("−19", "−16", "dB"))
+        XCTAssertEqual(CoverageQualityBand.weak.bounds(for: .sinr), range("1", "4", "dB"), "0 est une sentinelle")
+        XCTAssertEqual(CoverageQualityBand.poor.bounds(for: .sinr), "< 0 dB")
+        XCTAssertNil(CoverageQualityBand.noService.bounds(for: .rsrp))
+    }
+
+    func testAPointWithoutTheMeasureIsNotDrawn() {
+        XCTAssertNil(CoverageQualityBand.band(measure: .rsrq, rsrp: -85, rsrq: -10, sinr: 15, technology: "3G"))
+        XCTAssertNil(CoverageQualityBand.band(measure: .sinr, rsrp: -85, rsrq: -10, sinr: nil, technology: "4G"))
+        XCTAssertNil(CoverageQualityBand.band(measure: .sinr, rsrp: -85, rsrq: -10, sinr: 0, technology: "5G"))
+        XCTAssertNil(CoverageQualityBand.band(measure: .rsrp, rsrp: 0, rsrq: nil, sinr: nil, technology: "4G"), "plus de gris « pas de mesure »")
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrq, rsrp: nil, rsrq: nil, sinr: nil, technology: "Aucun"), .noService)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrq, rsrp: -85, rsrq: -10, sinr: 15, technology: "4G"), .good)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .sinr, rsrp: -85, rsrq: -10, sinr: 15, technology: "5G"), .good)
+        XCTAssertFalse(CoverageQualityBand.noService.isHatched, "v3 : gris plein")
+    }
+
+    func testClustersDecodeTheirMedians() throws {
+        let json = #"{"id":"0:1","lat":45.2,"lng":5.7,"count":12,"avgRsrp":-95.4,"tech":"4G","medianRsrp":-97,"medianRsrq":-11,"medianSnr":8}"#
+        let cluster = try JSONDecoder().decode(AndroidMapCluster.self, from: Data(json.utf8))
+        XCTAssertEqual(cluster.colorRsrp, -97, "la médiane d'abord")
+        XCTAssertEqual(cluster.medianRsrq, -11)
+        XCTAssertEqual(cluster.medianSnr, 8)
+        let scoped = cluster.scoped(to: AndroidMapTile(z: 8, x: 1, y: 2))
+        XCTAssertEqual(scoped.medianRsrq, -11)
+        XCTAssertEqual(scoped.medianSnr, 8)
+        let older = try JSONDecoder().decode(AndroidMapCluster.self, from: Data(#"{"id":"0:1","lat":1,"lng":2,"count":3,"avgRsrp":-95}"#.utf8))
+        XCTAssertEqual(older.colorRsrp, -95, "serveur d'avant : la moyenne")
+        XCTAssertNil(older.medianRsrq)
+    }
+
+    /// Un seul réglage pour la feuille Carte, sa légende et la pastille de la
+    /// carte : Génération garde la mesure d'avant (retour d'Alexandre du 21/11).
+    func testColoringIsOneSettingSharedBySheetLegendAndPill() {
+        var byGeneration = false
+        var measure = SQQualityScale.Signal.Measure.rsrq
+        let coloring = CoverageColoring.binding(
+            byGeneration: Binding(get: { byGeneration }, set: { byGeneration = $0 }),
+            measure: Binding(get: { measure }, set: { measure = $0 })
+        )
+        XCTAssertEqual(coloring.wrappedValue, .rsrq)
+        coloring.wrappedValue = .generation
+        XCTAssertTrue(byGeneration)
+        XCTAssertEqual(measure, .rsrq, "Génération garde la mesure d'avant")
+        coloring.wrappedValue = .sinr
+        XCTAssertFalse(byGeneration)
+        XCTAssertEqual(measure, .sinr)
+        XCTAssertEqual(CoverageColoring.allCases.map { "map.coverage.mode.\(String(describing: $0))" },
+                       ["map.coverage.mode.rsrp", "map.coverage.mode.rsrq", "map.coverage.mode.sinr", "map.coverage.mode.generation"],
+                       "identifiants des tests UI inchangés")
+    }
+
+    func testScaleStripShowsTheTwoEnds() {
+        XCTAssertEqual(CoverageColoring.rsrp.swatches.count, 5)
+        XCTAssertEqual(CoverageColoring.generation.swatches.count, 4)
+        let rsrp = CoverageScaleStrip(coloring: .rsrp, marketCode: "FR").ends
+        XCTAssertEqual(rsrp.best, "Excellent ≥ \u{2212}80 dBm", "même mot dans les deux langues")
+        XCTAssertEqual(rsrp.worst, french ? "Critique < \u{2212}110 dBm" : "Critical < \u{2212}110 dBm")
+        let sinr = CoverageScaleStrip(coloring: .sinr, marketCode: "FR").ends
+        XCTAssertTrue(sinr.best.hasSuffix("≥ 20 dB"), sinr.best)
+        XCTAssertTrue(sinr.worst.hasSuffix("< 0 dB"), sinr.worst)
+        let generation = CoverageScaleStrip(coloring: .generation, marketCode: "FR").ends
+        XCTAssertEqual(generation.best, "5G")
+        XCTAssertEqual(generation.worst, "2G")
+    }
+
+    func testFallbackPointsDecodeRawRsrqAndSnr() throws {
+        let json = #"{"points":[{"id":"a","latitude":45.2,"longitude":5.7,"signalStrength":-97,"rsrq":-11,"snr":8,"technology":"4G"},{"id":"b","latitude":45.3,"longitude":5.8,"signalStrength":-90,"technology":"4G"}]}"#
+        let points = try JSONDecoder().decode(CoveragePointsResponse.self, from: Data(json.utf8)).points
+        XCTAssertEqual(points[0].rsrq, -11)
+        XCTAssertEqual(points[0].snr, 8)
+        XCTAssertNil(points[1].rsrq, "serveur d'avant : pas de RSRQ, le point n'est pas dessiné en RSRQ")
+        XCTAssertNil(CoverageQualityBand.band(measure: .rsrq, rsrp: points[1].signalStrength, rsrq: points[1].rsrq,
+                                              sinr: points[1].snr, technology: points[1].technology))
+    }
+}
