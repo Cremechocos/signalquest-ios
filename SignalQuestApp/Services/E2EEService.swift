@@ -2805,6 +2805,9 @@ struct E2EEV2RotationState: Codable, Equatable, Sendable {
     var attempts = 0
     var notBeforeMs: Int64 = 0
     var completedAtMs: Int64 = 0
+    /// Exigence servie dont la conversation répond `404 E2EE_CONVERSATION_NOT_FOUND`
+    /// (supprimée, ou quittée) : sa révision, qui n'est plus rejouée (audit D4).
+    var notFoundRevisions: [String: Int]? = nil
     var hasWork: Bool { scanRequired || !pending.isEmpty }
 }
 
@@ -2836,7 +2839,9 @@ final class E2EEV2RotationBacklog: @unchecked Sendable {
             return .init()
         }
         let value = try JSONDecoder().decode(E2EEV2RotationState.self, from: data)
-        guard value.pending.count <= 10_000, value.pending.keys.allSatisfy(E2EEV2DeviceApprovalContract.validOpaqueId) else {
+        let notFound = value.notFoundRevisions ?? [:]
+        guard value.pending.count <= 10_000, value.pending.keys.allSatisfy(E2EEV2DeviceApprovalContract.validOpaqueId),
+              notFound.count <= 10_000, notFound.keys.allSatisfy(E2EEV2DeviceApprovalContract.validOpaqueId) else {
             throw E2EEError.invalidKey
         }
         return value
@@ -2869,6 +2874,25 @@ final class E2EEV2RotationBacklog: @unchecked Sendable {
     func acknowledge(_ session: LocalAccountSession, conversation: String, ticket: Int64) throws {
         try change(session) { state in
             if state.pending[conversation] == ticket { state.pending.removeValue(forKey: conversation) }
+        }
+    }
+
+    func recordNotFound(_ session: LocalAccountSession, conversation: String, revision: Int) throws {
+        try change(session) { state in
+            guard E2EEV2DeviceApprovalContract.validOpaqueId(conversation) else { throw E2EEError.invalidKey }
+            var notFound = state.notFoundRevisions ?? [:]
+            notFound[conversation] = max(notFound[conversation] ?? 0, revision)
+            guard notFound.count <= 10_000 else { throw E2EEError.invalidKey }
+            state.notFoundRevisions = notFound
+        }
+    }
+
+    /// Les exigences que le serveur ne sert plus sont oubliées.
+    func keepNotFound(_ session: LocalAccountSession, served: Set<String>) throws {
+        try change(session) { state in
+            guard let notFound = state.notFoundRevisions else { return }
+            let kept = notFound.filter { served.contains($0.key) }
+            state.notFoundRevisions = kept.isEmpty ? nil : kept
         }
     }
 
@@ -2954,12 +2978,21 @@ actor E2EEV2RotationDrain {
         case .success(let values):
             try backlog.merge(session, conversations: values.map(\.conversationId), scannedRevision: initial.revision)
             required = Dictionary(values.map { ($0.conversationId, $0.revision) }, uniquingKeysWith: max)
+            try backlog.keepNotFound(session, served: Set(required.keys))
         }
-        let tickets = try backlog.snapshot(session).pending.sorted { $0.key < $1.key }.prefix(limit)
+        let queued = try backlog.snapshot(session)
+        let tickets = queued.pending.sorted { $0.key < $1.key }.prefix(limit)
+        let notFound = queued.notFoundRevisions ?? [:]
         var failure: E2EEV2TransportFailureKind?
         for (id, ticket) in tickets {
             guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
             let revision = required[id]
+            // Audit D4 : la même exigence, déjà refusée en 404, n'est plus rejouée ; une
+            // révision plus grande l'est. L'ouverture et l'envoi relisent la conversation.
+            if let revision, let refused = notFound[id], revision <= refused {
+                try backlog.acknowledge(session, conversation: id, ticket: ticket)
+                continue
+            }
             var forced = false
             if let revision { forced = refusedRevisions[id].map { revision > $0 } ?? true }
             let result = await d.rotate(id, forced)
@@ -2978,6 +3011,12 @@ actor E2EEV2RotationDrain {
             case .rotated(let followUp):
                 guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
                 if !followUp { try backlog.acknowledge(session, conversation: id, ticket: ticket) }
+            // Conversation supprimée, ou dont ce compte n'est plus membre : rejouée à chaque
+            // passage, elle ne tournerait jamais d'ici. Le ticket est retiré (audit D4).
+            case .failure(let error) where Self.conversationNotFound(error):
+                guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
+                try backlog.acknowledge(session, conversation: id, ticket: ticket)
+                if let revision { try backlog.recordNotFound(session, conversation: id, revision: revision) }
             case .failure(let error): failure = error.kind
             }
             if failure == .authentication || failure == .activationBlocked { break }
@@ -2991,6 +3030,10 @@ actor E2EEV2RotationDrain {
 
     func snapshot(session: LocalAccountSession, backlog: E2EEV2RotationBacklog) throws -> E2EEV2RotationState {
         try backlog.snapshot(session)
+    }
+
+    static func conversationNotFound(_ failure: E2EEV2TransportFailure) -> Bool {
+        failure.statusCode == 404 && failure.code == "E2EE_CONVERSATION_NOT_FOUND"
     }
 
     func request(session: LocalAccountSession, backlog: E2EEV2RotationBacklog, resetRetry: Bool = false) throws {

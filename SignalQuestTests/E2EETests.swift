@@ -3468,6 +3468,66 @@ extension E2EETests {
         XCTAssertEqual(forced.value, [true, true, true, false, true])
     }
 
+    /// Audit D4 : une conversation supprimée, ou quittée, répond `404
+    /// E2EE_CONVERSATION_NOT_FOUND` et restait en file, rejouée à chaque premier plan.
+    /// Son ticket est retiré ; l'exigence servie n'est plus rejouée à la même révision,
+    /// même après un relancement, et l'est de nouveau à une révision plus grande.
+    func testV2RotationConversationNotFoundLeavesTheBacklogAndItsRequirementIsNotReplayed() async throws {
+        let session = LocalAccountSession(ownerScopeId: "user:rotation-not-found-fixture", sessionId: UUID().uuidString)
+        let current = LockedBox(session), clock = LockedBox(Int64(1_000))
+        let rotated = LockedBox([String]()), revision = LockedBox<Int?>(1)
+        let store = InMemoryTokenStore()
+        let served = "conversation_rotation_0001", local = "conversation_rotation_0002", other = "conversation_rotation_0003"
+        let notFound = E2EEV2TransportFailure(
+            kind: .permanent, statusCode: 404, code: "E2EE_CONVERSATION_NOT_FOUND", message: "conversation-not-found"
+        )
+        let deps = E2EEV2RotationDrainDependencies(
+            isCurrent: { current.value == session }, activationEnabled: { true },
+            pending: {
+                guard let value = revision.value else { return .success([]) }
+                return .success([.init(
+                    conversationId: served, reason: "DEVICE_REVOKED", revision: value,
+                    triggeredAt: "2026-11-21T22:10:00.000Z", currentEpochNumber: 3, currentEpochStatus: "active"
+                )])
+            },
+            rotate: { id, _ in
+                rotated.value.append(id)
+                // Un autre 404 que celui de la conversation garde le ticket, comme avant.
+                if id == other { return .failure(.init(kind: .permanent, statusCode: 404, code: "E2EE_EPOCH_NOT_FOUND", message: "other")) }
+                return .failure(notFound)
+            }, now: { clock.value }
+        )
+        // Chaque passage, comme un relancement : file relue du trousseau, nouvel acteur.
+        func pass() async throws -> E2EEV2RotationState {
+            let backlog = rotationBacklog(store: store, session: current, clock: clock)
+            _ = try await E2EEV2RotationDrain().run(session: session, backlog: backlog, dependencies: deps)
+            return try backlog.snapshot(session)
+        }
+        try rotationBacklog(store: store, session: current, clock: clock).request(session, conversations: [local, other])
+
+        var state = try await pass()
+        XCTAssertEqual(Set(rotated.value), [served, local, other])
+        XCTAssertEqual(Set(state.pending.keys), [other], "seul le 404 de la conversation retire le ticket")
+        XCTAssertEqual(state.notFoundRevisions, [served: 1], "une demande locale n'est pas retenue, l'exigence l'est")
+
+        rotated.value = []
+        state = try await pass()
+        XCTAssertEqual(rotated.value, [other], "même révision : ni annuaire, ni appartenance redemandés")
+        XCTAssertNil(state.pending[served])
+
+        rotated.value = []
+        revision.value = 2
+        state = try await pass()
+        XCTAssertEqual(rotated.value, [served, other], "révision plus grande : rejouée")
+        XCTAssertEqual(state.notFoundRevisions, [served: 2])
+
+        rotated.value = []
+        revision.value = nil
+        state = try await pass()
+        XCTAssertEqual(rotated.value, [other])
+        XCTAssertNil(state.notFoundRevisions, "exigence close : oubliée")
+    }
+
     func testV2RotationBoundedPassAndFollowUpDoNotAnnouncePrematureCompletion() async throws {
         let session = LocalAccountSession(ownerScopeId: "user:rotation-budget-fixture", sessionId: UUID().uuidString)
         let current = LockedBox(session), clock = LockedBox(Int64(1_000)), calls = LockedBox(0)
