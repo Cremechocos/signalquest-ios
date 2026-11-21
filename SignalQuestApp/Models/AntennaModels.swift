@@ -592,14 +592,27 @@ struct AntennaCoreDetails: Decodable, Equatable {
         if raw.compare("Octroye", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
             return String(localized: "Licence octroyée")
         }
-        return raw
+        // France : les statuts de l'ANFR arrivent en français ; `Text(String)` ne les
+        // traduit pas, la pastille restait « En service » en anglais (21/11).
+        return Self.anfrStatusLabel(raw) ?? raw
+    }
+
+    private static func anfrStatusLabel(_ raw: String) -> String? {
+        func matches(_ known: String) -> Bool {
+            raw.compare(known, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+        if matches("En service") { return String(localized: "En service") }
+        if matches("Projet approuvé") { return String(localized: "Projet approuvé") }
+        if matches("Techniquement opérationnel") { return String(localized: "Techniquement opérationnel") }
+        return nil
     }
 
     /// Un statut n'est « à surveiller » (orange) que si l'on sait qu'il décrit un
     /// site pas encore allumé. Un statut simplement inconnu reste neutre : le
-    /// peindre en orange inventait une alerte.
+    /// peindre en orange inventait une alerte. Lu sur le statut source, pas sur
+    /// sa traduction : en anglais, « Licence granted » ne contient pas « octroy ».
     var isPendingStatus: Bool {
-        guard let raw = displayStatus?.lowercased() else { return false }
+        guard displayStatus != nil, let raw = status?.lowercased() else { return false }
         return raw.contains("projet") || raw.contains("prévu") || raw.contains("octroy")
     }
 

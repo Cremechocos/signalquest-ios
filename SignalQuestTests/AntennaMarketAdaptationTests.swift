@@ -49,20 +49,30 @@ final class AntennaMarketAdaptationTests: XCTestCase {
     /// mais de licence — on l'affiche correctement écrit et en attente.
     func testBelgianLicenceStatusIsSpelledAndFlaggedPending() throws {
         let core = try core(minimal(market: "BE", status: "Octroye"))
-        XCTAssertEqual(core.displayStatus, "Licence octroyée")
-        XCTAssertTrue(core.isPendingStatus)
+        XCTAssertEqual(core.displayStatus, french ? "Licence octroyée" : "Licence granted")
+        XCTAssertTrue(core.isPendingStatus, "Pending in both languages: read on the source status")
         XCTAssertFalse(core.isInService)
     }
 
+    /// Les statuts de l'ANFR arrivent en français : gardés tels quels en français,
+    /// traduits en anglais (la pastille restait « En service », 21/11).
     func testFrenchStatusesAreKeptAsIs() throws {
         let inService = try core(minimal(market: "FR", status: "En service", supportType: "Immeuble"))
-        XCTAssertEqual(inService.displayStatus, "En service")
+        XCTAssertEqual(inService.displayStatus, french ? "En service" : "Live")
         XCTAssertTrue(inService.isInService)
         XCTAssertFalse(inService.isPendingStatus)
 
         let project = try core(minimal(market: "FR", status: "Projet approuvé", supportType: "Pylône"))
-        XCTAssertEqual(project.displayStatus, "Projet approuvé")
+        XCTAssertEqual(project.displayStatus, french ? "Projet approuvé" : "Project approved")
         XCTAssertTrue(project.isPendingStatus)
+        XCTAssertFalse(project.isInService)
+
+        let ready = try core(minimal(market: "FR", status: "Techniquement opérationnel", supportType: "Pylône"))
+        XCTAssertEqual(ready.displayStatus, french ? "Techniquement opérationnel" : "Technically operational")
+        XCTAssertFalse(ready.isPendingStatus)
+
+        let unknown = try core(minimal(market: "FR", status: "Autre statut", supportType: "Pylône"))
+        XCTAssertEqual(unknown.displayStatus, "Autre statut", "An unknown status is shown as served")
     }
 
     /// Canada : `status` est absent. Pas de badge, et surtout pas d'orange.
@@ -77,7 +87,7 @@ final class AntennaMarketAdaptationTests: XCTestCase {
     func testFollowedSiteBadgeShowsTheRealState() throws {
         let project = try core(minimal(market: "FR", status: "Projet approuvé", supportType: "Pylône"))
         let live = try core(minimal(market: "FR", status: "En service", supportType: "Pylône"))
-        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: false, core: project), .published("Projet approuvé", pending: true))
+        XCTAssertEqual(FollowedSiteState.resolve(hasOutage: false, core: project), .published(french ? "Projet approuvé" : "Project approved", pending: true))
         XCTAssertEqual(FollowedSiteState.resolve(hasOutage: false, core: live), .inService)
         XCTAssertEqual(FollowedSiteState.resolve(hasOutage: true, core: project), .outage)
         XCTAssertEqual(FollowedSiteState.resolve(hasOutage: true, core: nil), .outage)
