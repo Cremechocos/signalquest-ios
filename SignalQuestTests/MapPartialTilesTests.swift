@@ -45,7 +45,9 @@ final class MapPartialTilesTests: XCTestCase {
         defer { harness.cleanUp() }
         harness.fixture.set(failure: .malformed)
 
-        await harness.model.load(bounds: bounds, zoom: 14, filters: [.customSite])
+        // Sites ajoutés : tuiles deux crans plus grossières que la caméra (audit perf,
+        // C10) ; le zoom 16 demande les quatre tuiles z14 de la fixture.
+        await harness.model.load(bounds: bounds, zoom: 16, filters: [.customSite])
 
         XCTAssertEqual(Set(harness.model.customSiteTiles.flatMap(\.markers).map(\.id)), remainingIDs)
         XCTAssertNotNil(harness.model.errorMessage)

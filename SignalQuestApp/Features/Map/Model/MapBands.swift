@@ -42,6 +42,16 @@ enum CoverageRenderPolicy {
         }
     }
 
+    /// Zoom de tuile et budget de la couche couverture pour un zoom caméra. Un cran
+    /// plus fin seulement entre 10 et 11 : la tuile z11 y fait passer aux points bruts.
+    /// Plus bas, la grille du serveur (128 cellules par tuile) reste fine au zoom de la
+    /// caméra ; le cran de plus y quadruplait les tuiles par palier, sur des clés
+    /// qu'Android ne demande pas (audit perf du 21/11, C2 : 10,6 s pour une tuile froide).
+    static func tileRequest(forZoom zoom: Double) -> (detailBoost: Int, tileBudget: Int) {
+        let boostRange = Double(rawPointsFromZoom - 1)..<Double(rawPointsFromZoom)
+        return (boostRange.contains(zoom) ? 1 : 0, zoom < Double(rawPointsFromZoom) ? 40 : 24)
+    }
+
     static func mode(hasPoints: Bool, hasClusters: Bool, hasBandFilter: Bool) -> (useClusters: Bool, useRawPoints: Bool) {
         let useRawPoints = hasPoints || hasBandFilter
         let useClusters = hasClusters && !useRawPoints

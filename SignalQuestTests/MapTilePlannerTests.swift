@@ -208,4 +208,26 @@ final class MapTilePlannerTests: XCTestCase {
                 && point.y >= minY - epsilon && point.y <= maxY + epsilon
         }
     }
+
+    /// Audit perf du 21/11 (C10) : les sites ajoutés, rares, suivent une grille plus
+    /// grossière dès le zoom 9, jamais sous z8 (plafond serveur de 800 sites par tuile).
+    func testCustomSiteTilesAreCoarserFromZoomNineButNeverBelowZoomEight() throws {
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: 6.5), 0)
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: 8.9), 0)
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: 9.2), -1)
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: 10), -2)
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: 14.6), -2)
+        XCTAssertEqual(MapSnapshotService.customSiteDetailBoost(forZoom: .nan), 0)
+
+        let bounds = MapBounds(north: 45.82, south: 45.70, east: 4.92, west: 4.78)
+        let usual = try MapTilePlanner.plan(bounds: bounds, zoom: 12.4)
+        let coarse = try MapTilePlanner.plan(bounds: bounds, zoom: 12.4,
+                                             detailBoost: MapSnapshotService.customSiteDetailBoost(forZoom: 12.4))
+        XCTAssertEqual(coarse.selectedZoom, 10)
+        XCTAssertLessThan(coarse.tiles.count, usual.tiles.count)
+        for zoom in stride(from: 0.0, through: 20.0, by: 0.5) {
+            let tileZoom = Int(floor(zoom)) + MapSnapshotService.customSiteDetailBoost(forZoom: zoom)
+            XCTAssertTrue(tileZoom >= min(Int(floor(zoom)), MapSnapshotService.customSiteFloorZoom), "zoom \(zoom)")
+        }
+    }
 }

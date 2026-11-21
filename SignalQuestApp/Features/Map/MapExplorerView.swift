@@ -937,8 +937,9 @@ final class MapExplorerViewModel: ObservableObject {
                 plans.append(try MapTilePlanner.plan(bounds: bounds, zoom: zoom))
             }
             if wantsCoverage {
-                let boost = zoom < 11 ? 1 : 0
-                plans.append(try MapTilePlanner.plan(bounds: bounds, zoom: zoom, detailBoost: boost, tileBudget: boost > 0 ? 40 : 24))
+                let request = CoverageRenderPolicy.tileRequest(forZoom: zoom)
+                plans.append(try MapTilePlanner.plan(bounds: bounds, zoom: zoom, detailBoost: request.detailBoost,
+                                                     tileBudget: request.tileBudget))
             }
             if plans.contains(where: \.usesReducedDetail) {
                 displayLimitMessages.append(String(localized: "Niveau de détail adapté pour couvrir toute la zone visible. Zoome pour préciser."))

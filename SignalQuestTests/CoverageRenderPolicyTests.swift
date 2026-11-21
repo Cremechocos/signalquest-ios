@@ -17,6 +17,30 @@ final class CoverageRenderPolicyTests: XCTestCase {
     /// `detail=grid` (N2-3a) : `clusters: []` servi, les cellules deviennent les clusters
     /// d'overview, un par techno × source ; les identités PLMN fusionnent (position pondérée
     /// par les échantillons, RSRP par les mesures) ; sans position, le centre de la cellule.
+    /// Audit perf du 21/11 (C2) : sous le zoom 10, la grille de couverture suit le zoom
+    /// de la caméra ; seul l'intervalle 10..<11 garde le cran qui mène aux points bruts.
+    func testCoverageGridFollowsTheCameraZoomAndOnlyZoomTenAsksFinerTiles() throws {
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 6.2).detailBoost, 0)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 9.99).detailBoost, 0)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 10).detailBoost, 1)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 10.7).detailBoost, 1)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 11).detailBoost, 0)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 9.4).tileBudget, 40)
+        XCTAssertEqual(CoverageRenderPolicy.tileRequest(forZoom: 13).tileBudget, 24)
+
+        // An iPhone-sized view around Lyon at camera zoom 9.4 now asks z9 grid tiles, which
+        // the server prewarms and Android shares, instead of four times as many z10 tiles.
+        let bounds = MapBounds(north: 46.10, south: 45.40, east: 5.15, west: 4.55)
+        let request = CoverageRenderPolicy.tileRequest(forZoom: 9.4)
+        let plan = try MapTilePlanner.plan(bounds: bounds, zoom: 9.4, detailBoost: request.detailBoost,
+                                           tileBudget: request.tileBudget)
+        let boosted = try MapTilePlanner.plan(bounds: bounds, zoom: 9.4, detailBoost: 1, tileBudget: 40)
+        XCTAssertEqual(plan.selectedZoom, 9)
+        XCTAssertLessThan(plan.selectedZoom, CoverageRenderPolicy.rawPointsFromZoom, "Still the aggregated grid")
+        XCTAssertLessThan(plan.tiles.count, boosted.tiles.count)
+        XCTAssertFalse(plan.usesReducedDetail)
+    }
+
     func testGridCellsBecomeOverviewClusters() throws {
         let bytes = Data(#"""
         {"tile":{"z":8,"x":129,"y":88},"points":[],"clusters":[],"revision":"r1",

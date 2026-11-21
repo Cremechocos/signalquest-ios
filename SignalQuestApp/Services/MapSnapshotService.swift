@@ -458,18 +458,14 @@ final class MapSnapshotService: MapSnapshotServicing {
         // Le focus entre dans la CLÉ de cache : sans ça, la couverture isolée
         // d'un site servirait les tuiles déjà en cache pour « tout l'opérateur ».
         let focusKey = focus.map { "|focus=\($0.id)" } ?? ""
-        // COV-DENSITY : au DÉZOOM uniquement (z<11), tuiles PLUS FINES (tile.z +1). Le
-        // backend plafonne ~2000 pts/tuile ; des tuiles plus petites = moins d'écrêtage
-        // = plus de points (trails continus, moins de « sauts »). On limite le boost au
-        // dézoom où les tuiles de base sont peu nombreuses : le ×4 reste sous le plafond
-        // (pas de troncature = pas de nouveaux trous) et le nombre de requêtes borné.
-        // Le boost fixe aussi le passage aux points bruts (dès le zoom 10) : gardé avec la grille.
-        let boost = zoom < 11 ? 1 : 0
+        // COV-DENSITY : un cran plus fin entre les zooms 10 et 11 seulement, où il fait
+        // passer aux points bruts (plafonnés par tuile) ; voir `CoverageRenderPolicy.tileRequest`.
+        let request = CoverageRenderPolicy.tileRequest(forZoom: zoom)
         return try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
-            detailBoost: boost,
-            maxTiles: boost > 0 ? 40 : 24,
+            detailBoost: request.detailBoost,
+            maxTiles: request.tileBudget,
             // Par tuile : la grille du dézoom garde sa propre fraîcheur, 5 min au plus
             // (D-N2-GRILLE, 10/11, contre 60 min sur disque par défaut), que seul un
             // rafraîchissement forcé (0) contourne ; une revalidation des points à 60 s
@@ -541,10 +537,26 @@ final class MapSnapshotService: MapSnapshotServicing {
     /// Pas de filtre `bands` ni `includeObserved` : la route n'accepte que
     /// `market` et `operator`. Et pas de garde de marché côté client — c'est la
     /// seule couche d'antennes qui existe là où il n'y a pas d'open data.
+    /// Sites ajoutés : très peu nombreux (6 en France, 841 au plus dans une tuile, au
+    /// Luxembourg, relevé du 21/11), mais demandés sur la même grille que les antennes,
+    /// presque toujours vide (audit perf, C10 : 100 réponses vides sur 126). Dès le
+    /// zoom 9, tuiles plus grossières (deux crans à partir du zoom 10), jamais sous z8,
+    /// où une tuile reste sous le plafond serveur de 800 sites (695 au plus) ; sous le
+    /// zoom 9, rien ne change.
+    static let customSiteFloorZoom = 8
+
+    static func customSiteDetailBoost(forZoom zoom: Double) -> Int {
+        guard zoom.isFinite else { return 0 }
+        let base = Int(min(16, max(0, floor(zoom))))
+        guard base > customSiteFloorZoom else { return 0 }
+        return max(customSiteFloorZoom, base - 2) - base
+    }
+
     func customSiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String) async throws -> [AndroidCustomSiteTileResponse] {
         try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
+            detailBoost: Self.customSiteDetailBoost(forZoom: zoom),
             cacheKey: { tile in "custom-sites:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y)" },
             endpoint: { tile in
                 APIEndpoint(
