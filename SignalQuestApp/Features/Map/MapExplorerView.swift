@@ -4842,7 +4842,7 @@ struct MapExplorerView: View {
     /// `nil` : le point n'a rien à montrer pour la mesure choisie et n'est pas
     /// dessiné (contrat quality-scale-v3, choix d'Alexandre du 21/11).
     private func coverageColorParts(rsrp: Double?, rsrq: Double? = nil, sinr: Double? = nil,
-                                    tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int, hatched: Bool)? {
+                                    tech: String?, median: Bool = false) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int, hatched: Bool)? {
         if coverageByGeneration {
             let band = CoverageGenerationBand.band(for: tech)
             // `band.rank` (5G=5 > 4G=4 > … > aucun=0) pilote le z-order (cf. tri en
@@ -4852,7 +4852,7 @@ struct MapExplorerView: View {
             // Seuils de la technologie du point, « sans réseau constaté » avant
             // toute valeur (contrat quality-scale, comme Android et le web).
             guard let band = CoverageQualityBand.band(measure: coverageMeasure, rsrp: rsrp, rsrq: rsrq,
-                                                      sinr: sinr, technology: tech) else { return nil }
+                                                      sinr: sinr, technology: tech, median: median) else { return nil }
             // Rang neutre en mode signal → le tri par génération est un no-op.
             return ("q-\(band.rawValue)", band.colorHex, false, 0, band.isHatched)
         }
@@ -4937,8 +4937,12 @@ struct MapExplorerView: View {
                     // (fin de `coverageHeatFeatures`) s'applique néanmoins : un cluster 5G
                     // passe au-dessus d'un cluster 4G chevauchant.
                     // Mesure choisie : la médiane du cluster (v3), jamais dessiné sans valeur.
+                    // Une médiane n'est jamais une sentinelle ; l'ancienne moyenne RSRP,
+                    // repli de transition, garde la règle des valeurs brutes.
                     guard let parts = coverageColorParts(rsrp: cluster.colorRsrp, rsrq: cluster.medianRsrq,
-                                                         sinr: cluster.medianSnr, tech: cluster.tech) else { return nil }
+                                                         sinr: cluster.medianSnr, tech: cluster.tech,
+                                                         median: coverageMeasure != .rsrp || cluster.medianRsrp != nil)
+                    else { return nil }
                     return CoverageHeatFeature(
                         id: "coverage-heat-cluster-\(cluster.id)",
                         coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),

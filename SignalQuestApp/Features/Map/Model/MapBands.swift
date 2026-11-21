@@ -103,10 +103,12 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
     /// Un point de la carte pour la mesure choisie (contrat v3) : `nil` quand le
     /// point n'a rien à montrer (valeur absente, hors plage, sentinelle, ou 2G et
     /// 3G en RSRQ et SINR). Il n'est alors pas dessiné du tout (choix d'Alexandre
-    /// du 21/11) : la carte n'a plus d'état « pas de mesure ».
+    /// du 21/11) : la carte n'a plus d'état « pas de mesure ». `median` : les
+    /// valeurs sont les médianes d'un cluster, jamais des sentinelles.
     static func band(measure: SQQualityScale.Signal.Measure, rsrp: Double?, rsrq: Double?, sinr: Double?,
-                     technology: String?) -> CoverageQualityBand? {
-        let result = band(SQQualityScale.Signal(measure: measure, rsrp: rsrp, rsrq: rsrq, sinr: sinr, technology: technology))
+                     technology: String?, median: Bool = false) -> CoverageQualityBand? {
+        let result = band(SQQualityScale.Signal(measure: measure, rsrp: rsrp, rsrq: rsrq, sinr: sinr,
+                                                technology: technology, median: median))
         return result == .unknown ? nil : result
     }
 

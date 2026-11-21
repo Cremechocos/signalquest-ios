@@ -172,11 +172,13 @@ enum SQQualityScale {
         /// Ordre du contrat, le même sur les trois plateformes : la technologie
         /// d'abord (« sans réseau constaté » quelle que soit la valeur, même 0),
         /// puis dBm absent, arrondi, plage, sentinelles et seuils.
-        init(dbm: Double?, technology: String?) {
+        /// `median` : la valeur est une médiane servie par le serveur, jamais
+        /// une sentinelle (voir `level`).
+        init(dbm: Double?, technology: String?, median: Bool = false) {
             switch Self.reading(technology: technology) {
             case .noService: self = .noService
             case .unknown: self = .unknown
-            case .metric(let metric): self = Self.level(dbm: dbm, metric: metric)
+            case .metric(let metric): self = Self.level(dbm: dbm, metric: metric, median: median)
             }
         }
 
@@ -188,26 +190,30 @@ enum SQQualityScale {
         /// Un point de couverture pour la mesure choisie. Le RSRQ et le SINR
         /// n'existent qu'en 4G et en 5G : en 2G, en 3G ou sans technologie
         /// lisible, le point n'a rien à montrer (`unknown`, jamais dessiné).
-        init(measure: Measure, rsrp: Double?, rsrq: Double?, sinr: Double?, technology: String?) {
+        init(measure: Measure, rsrp: Double?, rsrq: Double?, sinr: Double?, technology: String?,
+             median: Bool = false) {
             guard measure != .rsrp else {
-                self.init(dbm: rsrp, technology: technology)
+                self.init(dbm: rsrp, technology: technology, median: median)
                 return
             }
             let value = measure == .rsrq ? rsrq : sinr
             switch Self.reading(technology: technology) {
             case .noService: self = .noService
-            case .metric(.rsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .rsrq : .sinr)
-            case .metric(.ssRsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .ssRsrq : .sinr)
+            case .metric(.rsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .rsrq : .sinr, median: median)
+            case .metric(.ssRsrp): self = Self.level(dbm: value, metric: measure == .rsrq ? .ssRsrq : .sinr, median: median)
             default: self = .unknown
             }
         }
 
-        private static func level(dbm: Double?, metric: Metric) -> Signal {
+        private static func level(dbm: Double?, metric: Metric, median: Bool = false) -> Signal {
             guard let dbm, dbm.isFinite else { return .unknown }
             // Arrondi de Math.round (JavaScript, Java) : plancher(x + 0,5), soit
             // −80,5 → −80. Jamais `.rounded()`, qui s'éloigne de zéro (−81).
             let rounded = Int((dbm + 0.5).rounded(.down))
-            guard metric.validRange.contains(rounded), !metric.isSentinel(rounded) else { return .unknown }
+            // Une médiane n'est jamais une sentinelle (coverage-signal-medians-v1,
+            // 21/11) : le serveur l'a calculée sur des relevés déjà filtrés, et
+            // elle peut valoir 0 dB après arrondi (−1 et +1 en bordure de cellule).
+            guard metric.validRange.contains(rounded), median || !metric.isSentinel(rounded) else { return .unknown }
             let thresholds = metric.thresholds
             if rounded >= thresholds[0] { return .excellent }
             if rounded >= thresholds[1] { return .good }

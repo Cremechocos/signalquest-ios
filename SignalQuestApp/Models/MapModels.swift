@@ -1044,6 +1044,15 @@ struct AndroidCoverageGrid: Decodable, Equatable, Sendable {
         let count: Int
         let measuredCount: Int?
         let avgRsrp: Double?
+        /// Médianes de signal v3 (coverage-signal-medians-v1), brutes, chacune
+        /// avec son nombre de points valables ; omises ensemble sans point valable
+        /// et absentes d'une grille construite avant l'allumage du drapeau.
+        let medianRsrp: Double?
+        let rsrpCount: Int?
+        let medianRsrq: Double?
+        let rsrqCount: Int?
+        let medianSnr: Double?
+        let snrCount: Int?
         let latestTimestamp: Date?
     }
     struct Cell: Decodable, Equatable, Sendable {
@@ -1088,10 +1097,38 @@ struct AndroidCoverageGrid: Decodable, Equatable, Sendable {
                 return AndroidMapCluster(
                     id: "\(cell.id):\(key)", lat: lat, lng: lng, count: count, avgRsrp: avgRsrp,
                     tech: first.tech, source: first.source,
-                    latestTimestamp: groups.compactMap(\.latestTimestamp).max()
+                    latestTimestamp: groups.compactMap(\.latestTimestamp).max(),
+                    medianRsrp: Self.mergedMedian(groups.compactMap { group in
+                        group.medianRsrp.map { ($0, group.rsrpCount ?? group.measuredCount ?? group.count) }
+                    }),
+                    medianRsrq: Self.mergedMedian(groups.compactMap { group in
+                        group.medianRsrq.map { ($0, group.rsrqCount ?? 1) }
+                    }),
+                    medianSnr: Self.mergedMedian(groups.compactMap { group in
+                        group.medianSnr.map { ($0, group.snrCount ?? 1) }
+                    })
                 )
             }
         }
+    }
+
+    /// Médiane d'une case qui réunit plusieurs identités observées : la médiane
+    /// de leurs médianes, pondérée par leur nombre de points. Exacte avec un seul
+    /// groupe, le cas courant ; une approximation sinon, le serveur ne servant
+    /// pas les points. Quand les poids se partagent à égalité, la moyenne des deux
+    /// médianes du milieu, comme `percentile_cont`. Brute : l'échelle l'arrondit.
+    static func mergedMedian(_ parts: [(median: Double, count: Int)]) -> Double? {
+        let sorted = parts.filter { $0.median.isFinite && $0.count > 0 }.sorted { $0.median < $1.median }
+        let total = sorted.reduce(0) { $0 + $1.count }
+        var cumulative = 0
+        for (index, part) in sorted.enumerated() {
+            cumulative += part.count
+            if cumulative * 2 > total { return part.median }
+            if cumulative * 2 == total, index + 1 < sorted.count {
+                return (part.median + sorted[index + 1].median) / 2
+            }
+        }
+        return sorted.last?.median
     }
 }
 

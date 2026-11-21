@@ -71,6 +71,71 @@ final class CoverageRenderPolicyTests: XCTestCase {
         XCTAssertTrue(CoverageRenderPolicy.mode(for: tile, selectedBands: []).useClusters)
     }
 
+    /// Médianes de signal v3 (coverage-signal-medians-v1, allumées le 21/11) : iOS
+    /// dessine la grille sous le zoom 11, donc c'est elle qui colore le RSRQ et le
+    /// SINR. Un groupe seul donne sa médiane brute, que l'échelle arrondit (½ vers
+    /// +∞) ; plusieurs identités, la médiane pondérée de leurs médianes ; une grille
+    /// d'avant le drapeau garde le repli sur `avgRsrp`.
+    func testGridCellsCarryTheirSignalMedians() throws {
+        let bytes = Data(#"""
+        {"tile":{"z":8,"x":129,"y":88},"points":[],"clusters":[],
+         "grid":{"version":1,"projection":"web-mercator","divisions":4,"cells":[
+          {"id":"0:0","row":0,"col":0,"groups":[
+            {"tech":"4G","source":"android","count":5,"measuredCount":5,"avgRsrp":-99,"medianRsrp":-100.5,"rsrpCount":5,"medianRsrq":-12.5,"rsrqCount":4,"medianSnr":4.5,"snrCount":3,"latestTimestamp":null}]},
+          {"id":"0:1","row":0,"col":1,"groups":[
+            {"tech":"4G","source":"android","observedPlmn":"20801","count":3,"measuredCount":3,"avgRsrp":-91,"medianRsrp":-90,"rsrpCount":3,"medianRsrq":-10,"rsrqCount":1,"latestTimestamp":null},
+            {"tech":"4G","source":"android","observedPlmn":"20815","count":1,"measuredCount":1,"avgRsrp":-109,"medianRsrp":-110,"rsrpCount":1,"medianRsrq":-14,"rsrqCount":1,"medianSnr":12,"snrCount":1,"latestTimestamp":null}]},
+          {"id":"1:0","row":1,"col":0,"groups":[
+            {"tech":"4G","source":"android","count":2,"measuredCount":2,"avgRsrp":-95,"latestTimestamp":null},
+            {"tech":"5G","source":"ios","count":2,"measuredCount":0,"avgRsrp":null,"latestTimestamp":null}]}]}}
+        """#.utf8)
+        let clusters = try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: bytes).clusters
+
+        let single = try XCTUnwrap(clusters.first { $0.id.hasSuffix("0:0:4G|android") })
+        XCTAssertEqual(single.medianRsrp, -100.5)
+        XCTAssertEqual(single.colorRsrp, -100.5, "La médiane passe avant la moyenne")
+        XCTAssertEqual(single.medianRsrq, -12.5)
+        XCTAssertEqual(single.medianSnr, 4.5)
+        // −100,5 → −100 (moyen) ; −12,5 → −12 (bon) ; 4,5 → 5 (moyen).
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrp, rsrp: single.colorRsrp, rsrq: nil, sinr: nil, technology: single.tech), .fair)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrq, rsrp: nil, rsrq: single.medianRsrq, sinr: nil, technology: single.tech), .good)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .sinr, rsrp: nil, rsrq: nil, sinr: single.medianSnr, technology: single.tech), .fair)
+
+        let merged = try XCTUnwrap(clusters.first { $0.id.hasSuffix("0:1:4G|android") })
+        XCTAssertEqual(merged.medianRsrp, -90, "3 points à −90 contre 1 à −110")
+        XCTAssertEqual(merged.medianRsrq, -12, "Poids égaux : la moyenne des deux médianes")
+        XCTAssertEqual(merged.medianSnr, 12, "Seul le groupe qui a un SINR compte")
+
+        let before = try XCTUnwrap(clusters.first { $0.id.hasSuffix("1:0:4G|android") })
+        XCTAssertNil(before.medianRsrp)
+        XCTAssertNil(before.medianRsrq)
+        XCTAssertNil(before.medianSnr)
+        XCTAssertEqual(before.colorRsrp, -95, "Grille d'avant le drapeau : repli sur la moyenne")
+        XCTAssertNil(CoverageQualityBand.band(measure: .rsrq, rsrp: nil, rsrq: before.medianRsrq, sinr: nil, technology: before.tech),
+                     "Sans médiane, la case ne se dessine pas en RSRQ")
+        let ios = try XCTUnwrap(clusters.first { $0.id.hasSuffix("1:0:5G|ios") })
+        XCTAssertNil(ios.medianRsrp)
+
+        XCTAssertEqual(AndroidCoverageGrid.mergedMedian([(-80, 1), (-90, 1), (-100, 1)]), -90)
+        XCTAssertEqual(AndroidCoverageGrid.mergedMedian([(-80, 0), (.nan, 2)]), nil)
+    }
+
+    /// Une médiane n'est jamais une sentinelle (contrat clarifié le 21/11, #1503) :
+    /// le serveur a déjà retiré les 0 bruts, et deux relevés à −1 et +1 donnent
+    /// une médiane de 0 dB, une vraie mesure. La plage s'applique toujours, et un
+    /// relevé brut à 0 reste « pas de mesure ».
+    func testAMedianIsNeverASentinel() {
+        let edge = AndroidCoverageGrid.mergedMedian([(-1, 1), (1, 1)])
+        XCTAssertEqual(edge, 0)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .sinr, rsrp: nil, rsrq: nil, sinr: edge, technology: "4G", median: true), .weak)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrq, rsrp: nil, rsrq: -0.5, sinr: nil, technology: "5G", median: true), .excellent)
+        XCTAssertEqual(CoverageQualityBand.band(measure: .rsrp, rsrp: -140, rsrq: nil, sinr: nil, technology: "4G", median: true), .poor)
+        XCTAssertNil(CoverageQualityBand.band(measure: .sinr, rsrp: nil, rsrq: nil, sinr: 40.5, technology: "4G", median: true),
+                     "41 dB après arrondi : hors plage, même pour une médiane")
+        XCTAssertNil(CoverageQualityBand.band(measure: .sinr, rsrp: nil, rsrq: nil, sinr: 0, technology: "4G"))
+        XCTAssertNil(CoverageQualityBand.band(measure: .rsrp, rsrp: -140, rsrq: nil, sinr: nil, technology: "4G"))
+    }
+
     /// Une grille d'une version ou d'une projection inconnue ne dessine rien plutôt qu'au mauvais endroit.
     func testUnknownGridShapeDrawsNothing() throws {
         let bytes = Data(#"{"tile":{"z":8,"x":129,"y":88},"points":[],"clusters":[],"grid":{"version":2,"projection":"web-mercator","divisions":4,"cells":[{"id":"0:0","row":0,"col":0,"groups":[{"tech":"4G","source":"android","count":1,"avgRsrp":-90}]}]}}"#.utf8)
