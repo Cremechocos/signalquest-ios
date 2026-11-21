@@ -356,15 +356,21 @@ struct MapLayersSheet: View {
             Haptics.selection()
             backdropRaw = value.rawValue
         } label: {
-            let preview = shape.fill(backdropPreview(value))
+            // Un seul style de sélection dans la feuille : l'encre, comme l'aplat des tuiles.
+            // L'anneau est décollé de la vignette : lisible sur Satellite comme sur Plan,
+            // et le libellé garde sa graisse.
+            let preview = backdropPreview(value)
+                .clipShape(shape)
+                .overlay { shape.strokeBorder(SQColor.separator, lineWidth: 1) }
                 .frame(height: 44)
+                .padding(3)
                 .overlay {
-                    shape.strokeBorder(selected ? SQColor.brandRed : SQColor.separator,
-                                       lineWidth: selected ? 2.5 : 1)
+                    RoundedRectangle(cornerRadius: SQRadius.iconTile + 3, style: .continuous)
+                        .strokeBorder(selected ? SQColor.label : .clear, lineWidth: 2)
                 }
                 .accessibilityHidden(true)
             let label = Text(LocalizedStringKey(title))
-                .font(SQFont.body(12, selected ? .heavy : .semibold, relativeTo: .footnote))
+                .font(SQFont.body(12, .semibold, relativeTo: .footnote))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             Group {
@@ -390,16 +396,17 @@ struct MapLayersSheet: View {
         .accessibilityIdentifier("map.backdrop.\(value.rawValue)")
     }
 
-    private func backdropPreview(_ value: MapBackdrop) -> LinearGradient {
+    @ViewBuilder
+    private func backdropPreview(_ value: MapBackdrop) -> some View {
         switch value {
         case .satellite:
-            return LinearGradient(colors: [Color(hex: 0x4F5D4A), Color(hex: 0x7A8460), Color(hex: 0x3D4A3E)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [Color(hex: 0x4F5D4A), Color(hex: 0x7A8460), Color(hex: 0x3D4A3E)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
         case .topo:
-            return LinearGradient(colors: [Color(hex: 0xDCD7C4), Color(hex: 0xB9B29A), Color(hex: 0xE6E1CF)],
-                                  startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [Color(hex: 0xDCD7C4), Color(hex: 0xB9B29A), Color(hex: 0xE6E1CF)],
+                           startPoint: .top, endPoint: .bottom)
         default:
-            return LinearGradient(colors: [SQColor.bg, SQColor.surfaceMuted], startPoint: .top, endPoint: .bottom)
+            MapPlanThumbnail()
         }
     }
 
@@ -537,6 +544,35 @@ struct MapSheetRow<Icon: View>: View {
         }
         .frame(minHeight: 52)
         .contentShape(Rectangle())
+    }
+}
+
+/// Vignette du fond Plan : un bout de plan dessiné aux couleurs du thème (terre,
+/// parc, rivière, deux routes), qui se lit en clair comme en sombre au lieu d'un
+/// aplat de la couleur de la feuille.
+struct MapPlanThumbnail: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        Canvas { context, size in
+            let w = size.width, h = size.height
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(hex: dark ? 0x2A2F2C : 0xF1EEE6)))
+            context.fill(Path(roundedRect: CGRect(x: w * 0.64, y: h * 0.1, width: w * 0.24, height: h * 0.36), cornerRadius: 3),
+                         with: .color(Color(hex: dark ? 0x2F4335 : 0xCDE3BF)))
+            var river = Path()
+            river.move(to: CGPoint(x: 0, y: h * 0.8))
+            river.addCurve(to: CGPoint(x: w, y: h * 0.72),
+                           control1: CGPoint(x: w * 0.35, y: h * 0.58), control2: CGPoint(x: w * 0.62, y: h * 1.0))
+            context.stroke(river, with: .color(Color(hex: dark ? 0x23405A : 0xADD2EE)), lineWidth: h * 0.16)
+            var roads = Path()
+            roads.move(to: CGPoint(x: w * 0.2, y: 0))
+            roads.addLine(to: CGPoint(x: w * 0.46, y: h))
+            roads.move(to: CGPoint(x: 0, y: h * 0.38))
+            roads.addLine(to: CGPoint(x: w, y: h * 0.3))
+            context.stroke(roads, with: .color(Color(hex: dark ? 0x3C4340 : 0xD8D2C4)), lineWidth: 5)
+            context.stroke(roads, with: .color(Color(hex: dark ? 0x5E6662 : 0xFFFFFF)), lineWidth: 3)
+        }
     }
 }
 
