@@ -75,6 +75,12 @@ enum SQAddress {
     /// Le vouvoiement s'applique-t-il à cette recherche ? Seulement en français.
     fileprivate static var usesFormalKeys: Bool { appIsFrench && isFormal }
 
+    /// Préfixe à essayer avant la clé d'origine : le vous en français, l'orthographe
+    /// britannique ou canadienne en anglais ; `nil` au tutoiement et en anglais US.
+    fileprivate static var variantKeyPrefix: String? {
+        usesFormalKeys ? formalKeyPrefix : SQEnglishSpelling.current?.keyPrefix
+    }
+
     /// Pose la surcharge sur `Bundle.main` (une fois) et recharge le ton en cache.
     /// À appeler avant toute vue : le premier rendu doit déjà être dans le bon ton.
     static func install() {
@@ -258,27 +264,28 @@ final class SQAddressStore: ObservableObject {
 }
 
 /// Redirige la lecture des chaînes vers les clés `SQFormal|` quand le vouvoiement
-/// est actif et que l'app est en français. Aucune propriété stockée : la classe
-/// remplace celle de `Bundle.main` en place (`object_setClass`).
+/// est actif et que l'app est en français, et vers `SQEnGB|` ou `SQEnCA|` quand
+/// l'anglais de l'appareil est britannique ou canadien. Aucune propriété stockée :
+/// la classe remplace celle de `Bundle.main` en place (`object_setClass`).
 ///
 /// Deux entrées, car Foundation et SwiftUI n'en partagent pas une seule (mesuré au
 /// simulateur) : `NSLocalizedString`, UIKit et les alertes passent par
 /// `localizedString(forKey:)`, tout `Text`, `Button` et titre SwiftUI par la version
-/// attribuée. `String(localized:)` lit le tutoiement.
+/// attribuée. `String(localized:)` passe par `SQAddress.lookupBundle`.
 private final class SQAddressBundle: Bundle, @unchecked Sendable {
     override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
-        if SQAddress.usesFormalKeys {
+        if let prefix = SQAddress.variantKeyPrefix {
             let marker = SQAddress.missingMarker
-            let text = super.localizedString(forKey: SQAddress.formalKeyPrefix + key, value: marker, table: tableName)
+            let text = super.localizedString(forKey: prefix + key, value: marker, table: tableName)
             if text != marker { return text }
         }
         return super.localizedString(forKey: key, value: value, table: tableName)
     }
 
     override func __localizedAttributedString(forKey key: String, value: String?, table tableName: String?) -> NSAttributedString {
-        if SQAddress.usesFormalKeys {
+        if let prefix = SQAddress.variantKeyPrefix {
             let marker = SQAddress.missingMarker
-            let text = super.__localizedAttributedString(forKey: SQAddress.formalKeyPrefix + key, value: marker, table: tableName)
+            let text = super.__localizedAttributedString(forKey: prefix + key, value: marker, table: tableName)
             if text.string != marker { return text }
         }
         return super.__localizedAttributedString(forKey: key, value: value, table: tableName)
@@ -307,36 +314,49 @@ extension AttributedString {
 }
 
 extension SQAddress {
-    /// Paquet où chercher une chaîne : celui du vouvoiement s'il s'applique.
+    /// Paquet où chercher une chaîne : celui du vouvoiement s'il s'applique, sinon
+    /// celui de l'anglais britannique ou canadien, sinon `Bundle.main`.
     static var lookupBundle: Bundle {
-        usesFormalKeys ? (formalBundle.bundle ?? .main) : .main
+        if usesFormalKeys { return formalBundle.bundle ?? .main }
+        return englishBundle.bundle ?? .main
     }
 
     /// Construit une seule fois, au premier besoin.
-    private static let formalBundle = SQFormalBundle(
+    private static let formalBundle = SQPrebuiltBundle(
         bundle: makeFormalBundle(from: .main, at: FileManager.default.temporaryDirectory
             .appendingPathComponent("SQFormal.bundle", isDirectory: true)))
 
-    /// Écrit un paquet qui ne contient que le français : chaque table de l'app,
-    /// avec la variante `SQFormal|` à la place de la chaîne d'origine quand elle
-    /// existe. Récrit à chaque lancement, il suit toujours le catalogue de la
-    /// build ; `nil` si l'écriture échoue, et l'app reste au tutoiement.
+    /// `nil` en français et en anglais US : `Bundle.main` suffit.
+    private static let englishBundle = SQPrebuiltBundle(bundle: SQEnglishSpelling.current?.keyPrefix.flatMap {
+        makeVariantBundle(from: .main, at: FileManager.default.temporaryDirectory
+            .appendingPathComponent("SQEnglish.bundle", isDirectory: true), language: "en", keyPrefix: $0)
+    })
+
+    /// Le paquet au vous, en français.
     static func makeFormalBundle(from source: Bundle, at root: URL) -> Bundle? {
+        makeVariantBundle(from: source, at: root, language: "fr", keyPrefix: formalKeyPrefix)
+    }
+
+    /// Écrit un paquet qui ne contient qu'une langue : chaque table de l'app, avec
+    /// la variante `<préfixe><clé>` à la place de la chaîne d'origine quand elle
+    /// existe. Récrit à chaque lancement, il suit toujours le catalogue de la
+    /// build ; `nil` si l'écriture échoue, et l'app garde le texte de base.
+    static func makeVariantBundle(from source: Bundle, at root: URL, language: String, keyPrefix: String) -> Bundle? {
         let fileManager = FileManager.default
-        let lproj = root.appendingPathComponent("fr.lproj", isDirectory: true)
+        let lproj = root.appendingPathComponent("\(language).lproj", isDirectory: true)
         do {
             try? fileManager.removeItem(at: root)
             try fileManager.createDirectory(at: lproj, withIntermediateDirectories: true)
             for ext in ["strings", "stringsdict"] {
-                guard let url = source.url(forResource: "Localizable", withExtension: ext, subdirectory: "fr.lproj"),
+                guard let url = source.url(forResource: "Localizable", withExtension: ext, subdirectory: "\(language).lproj"),
                       let table = try PropertyListSerialization.propertyList(
                         from: Data(contentsOf: url), options: [], format: nil) as? [String: Any]
                 else { continue }
-                var formal = table.filter { !$0.key.hasPrefix(formalKeyPrefix) }
-                for (key, value) in table where key.hasPrefix(formalKeyPrefix) {
-                    formal[String(key.dropFirst(formalKeyPrefix.count))] = value
+                var variant = table.filter { !$0.key.hasPrefix(keyPrefix) }
+                for (key, value) in table where key.hasPrefix(keyPrefix) {
+                    variant[String(key.dropFirst(keyPrefix.count))] = value
                 }
-                try PropertyListSerialization.data(fromPropertyList: formal, format: .binary, options: 0)
+                try PropertyListSerialization.data(fromPropertyList: variant, format: .binary, options: 0)
                     .write(to: lproj.appendingPathComponent("Localizable.\(ext)"), options: .atomic)
             }
         } catch {
@@ -348,6 +368,47 @@ extension SQAddress {
 
 /// `Bundle` n'est pas déclaré `Sendable` ; celui-ci n'est jamais modifié après sa
 /// création.
-private struct SQFormalBundle: @unchecked Sendable {
+private struct SQPrebuiltBundle: @unchecked Sendable {
     let bundle: Bundle?
+}
+
+// MARK: - Orthographe anglaise : américaine, britannique, canadienne
+
+/// L'anglais du catalogue s'écrit à l'américaine. Un appareil dont l'anglais est
+/// britannique (en-GB, mais aussi en-FR, en-BE, en-CH, en-AU…, que Foundation range
+/// sous en-GB) ou canadien (en-CA) lit d'abord la variante rangée sous `SQEnGB|<clé>`
+/// ou `SQEnCA|<clé>`, dans la localisation `en` du même catalogue ; une clé sans
+/// variante garde l'anglais américain, jamais le français.
+///
+/// POURQUOI PAS DE VRAIES LANGUES `en-GB` ET `en-CA`. Le catalogue a le français pour
+/// langue source : compilée, une langue `en-GB` reçoit le texte français de chaque clé
+/// qu'elle ne traduit pas (« Annuler » au lieu de « Cancel », vu au simulateur le
+/// 21/11). Les variantes ne portent que la centaine de chaînes qui changent et passent
+/// par le même aiguillage que le vouvoiement. Widget, partage et notifications, qui ne
+/// voient pas cet aiguillage, restent à l'américaine.
+enum SQEnglishSpelling: String, Sendable {
+    case american, british, canadian
+
+    /// Préfixe des clés de la variante ; `nil` pour l'américain, qui est la base.
+    var keyPrefix: String? {
+        switch self {
+        case .american: nil
+        case .british: "SQEnGB|"
+        case .canadian: "SQEnCA|"
+        }
+    }
+
+    /// Fixée au lancement, comme la langue de l'app ; `nil` quand l'app n'est pas en anglais.
+    static let current = resolve(appLanguage: Bundle.main.preferredLocalizations.first,
+                                 preferences: Locale.preferredLanguages)
+
+    /// Même choix que Foundation entre `en`, `en-GB` et `en-CA` pour les langues de l'appareil.
+    static func resolve(appLanguage: String?, preferences: [String]) -> SQEnglishSpelling? {
+        guard appLanguage == "en" else { return nil }
+        switch Bundle.preferredLocalizations(from: ["en", "en-GB", "en-CA"], forPreferences: preferences).first {
+        case "en-GB": return .british
+        case "en-CA": return .canadian
+        default: return .american
+        }
+    }
 }

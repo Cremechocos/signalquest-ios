@@ -49,7 +49,9 @@ final class AntennaMarketAdaptationTests: XCTestCase {
     /// mais de licence — on l'affiche correctement écrit et en attente.
     func testBelgianLicenceStatusIsSpelledAndFlaggedPending() throws {
         let core = try core(minimal(market: "BE", status: "Octroye"))
-        XCTAssertEqual(core.displayStatus, french ? "Licence octroyée" : "Licence granted")
+        // « License » en anglais américain, « Licence » en britannique et en canadien.
+        let granted = SQEnglishSpelling.current == .american ? "License granted" : "Licence granted"
+        XCTAssertEqual(core.displayStatus, french ? "Licence octroyée" : granted)
         XCTAssertTrue(core.isPendingStatus, "Pending in both languages: read on the source status")
         XCTAssertFalse(core.isInService)
     }

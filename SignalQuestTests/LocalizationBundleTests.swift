@@ -84,6 +84,126 @@ final class LocalizationBundleTests: XCTestCase {
         }
     }
 
+    /// L'anglais de l'appareil choisit l'orthographe : ce que Foundation range sous
+    /// en-GB (France, Belgique, Suisse, Australie…) lit le britannique, en-CA le
+    /// canadien, le reste l'américain. Rejoué sur iOS, quelle que soit la langue du test.
+    func testEnglishSpellingFollowsTheDeviceEnglish() {
+        let cases: [([String], SQEnglishSpelling)] = [
+            (["en-US"], .american), (["en"], .american), (["en-GB"], .british), (["en-FR"], .british),
+            (["en-BE"], .british), (["en-CH"], .british), (["en-AU"], .british), (["en-IE"], .british),
+            (["en-CA"], .canadian), (["fr-CA", "en-CA"], .canadian), (["fr-FR", "en-GB"], .british)]
+        for (preferences, expected) in cases {
+            XCTAssertEqual(SQEnglishSpelling.resolve(appLanguage: "en", preferences: preferences), expected, "\(preferences)")
+        }
+        XCTAssertNil(SQEnglishSpelling.resolve(appLanguage: "fr", preferences: ["en-GB"]))
+    }
+
+    /// Paquet britannique ou canadien : la variante quand elle existe, l'anglais
+    /// américain sinon (jamais le français), pluriels compris ; sans dépendre de la
+    /// langue du test.
+    func testEnglishVariantBundlesFallBackToAmericanEnglish() throws {
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        XCTAssertEqual(english.localizedString(forKey: "Couleur des points", value: nil, table: nil), "Point color")
+        let count = 4
+        for (prefix, authorised, postcode) in [("SQEnGB|", "Authorised sites", "Postcode"),
+                                               ("SQEnCA|", "Authorized sites", "Postal code")] {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("SQEnglishTest-\(UUID().uuidString).bundle", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let bundle = try XCTUnwrap(SQAddress.makeVariantBundle(from: .main, at: root, language: "en", keyPrefix: prefix))
+            XCTAssertEqual(String(localized: "Couleur des points", bundle: bundle), "Point colour", prefix)
+            XCTAssertEqual(String(localized: "Sites autorisés", bundle: bundle), authorised, prefix)
+            XCTAssertEqual(String(localized: "Code postal", bundle: bundle), postcode, prefix)
+            XCTAssertEqual(String(localized: "Annuler", bundle: bundle), "Cancel", prefix)
+            XCTAssertEqual(String(localized: "Partagé · \(count) opérateurs", bundle: bundle), "Shared · 4 operators", prefix)
+        }
+    }
+
+    /// Dans l'app, `NSLocalizedString`, `Bundle.main` (dont la version attribuée que lit
+    /// SwiftUI) et `String(localized:)` lisent la même orthographe ; une clé sans
+    /// variante garde l'anglais américain.
+    func testAppLookupsUseTheDeviceEnglishSpelling() throws {
+        guard let spelling = SQEnglishSpelling.current else {
+            throw XCTSkip("Test à lancer avec -testLanguage en, en-GB ou en-CA")
+        }
+        SQAddress.install()
+        let colour = spelling == .american ? "Point color" : "Point colour"
+        XCTAssertEqual(NSLocalizedString("Couleur des points", comment: ""), colour)
+        XCTAssertEqual(Bundle.main.localizedString(forKey: "Couleur des points", value: nil, table: nil), colour)
+        XCTAssertEqual(Bundle.main.__localizedAttributedString(forKey: "Couleur des points", value: nil, table: nil).string, colour)
+        XCTAssertEqual(String(localized: "Couleur des points"), colour)
+        XCTAssertEqual(String(localized: "Sites autorisés"), spelling == .british ? "Authorised sites" : "Authorized sites")
+        XCTAssertEqual(NSLocalizedString("Annuler", comment: ""), "Cancel")
+        XCTAssertEqual(String(localized: "Annuler"), "Cancel")
+        let count = 4
+        XCTAssertEqual(String(localized: "Partagé · \(count) opérateurs"), "Shared · 4 operators")
+    }
+
+    /// L'anglais de base s'écrit à l'américaine ; `SQEnGB|` à la britannique, `SQEnCA|`
+    /// à la canadienne (-our, -re, licence, catalogue, cancelled, mais -ize). Chaque
+    /// orthographe est lue telle que l'app la voit : la variante, sinon l'américain.
+    /// Une nouvelle chaîne écrite avec « color » ou « canceled » fait échouer ce test
+    /// tant que ses clés `SQEnGB|` et `SQEnCA|` manquent.
+    func testEachEnglishSpellingKeepsItsOwnWords() throws {
+        func leaves(_ value: Any) -> [String] {
+            if let text = value as? String { return [text] }
+            guard let dict = value as? [String: Any] else { return [] }
+            return dict.filter { !$0.key.hasPrefix("NSStringFormat") }.values.flatMap(leaves)
+        }
+        var table: [String: [String]] = [:]
+        for ext in ["strings", "stringsdict"] {
+            let url = try XCTUnwrap(Bundle.main.url(forResource: "Localizable", withExtension: ext, subdirectory: "en.lproj"))
+            let plist = try XCTUnwrap(PropertyListSerialization.propertyList(
+                from: Data(contentsOf: url), options: [], format: nil) as? [String: Any])
+            for (key, value) in plist { table[key] = leaves(value) }
+        }
+        let prefixes = [SQAddress.formalKeyPrefix, "SQEnGB|", "SQEnCA|"]
+        let american = table.filter { entry in !prefixes.contains { entry.key.hasPrefix($0) } }
+        XCTAssertGreaterThan(american.count, 5000)
+        func variant(_ prefix: String) -> [String: [String]] {
+            let own = Dictionary(uniqueKeysWithValues: table.filter { $0.key.hasPrefix(prefix) }
+                .map { (String($0.key.dropFirst(prefix.count)), $0.value) })
+            XCTAssertGreaterThan(own.count, 50, prefix)
+            XCTAssertEqual(own.keys.filter { american[$0] == nil }.sorted(), [], "\(prefix) sans clé de base")
+            return american.merging(own) { $1 }
+        }
+        let british = variant("SQEnGB|")
+        let canadian = variant("SQEnCA|")
+
+        let stems = ["recogni", "authori", "organi", "customi", "optimi", "prioriti", "summari", "synchroni",
+                     "minimi", "maximi", "initiali", "anonymi", "personali", "visuali", "categori", "finali",
+                     "reali", "normali", "standardi", "locali", "memori", "apologi", "emphasi", "utili",
+                     "characteri", "seriali", "randomi", "moneti", "stabili", "centrali", "digiti"]
+        let endings = ["e", "es", "ed", "ing", "ation", "ations", "er", "ers", "able"]
+        // « analyses » manque exprès : c'est aussi le pluriel d'« analysis » en américain.
+        let ise = stems.flatMap { stem in endings.map { stem + "s" + $0 } } + ["analyse", "analysed", "analysing"]
+        let ize = stems.flatMap { stem in endings.map { stem + "z" + $0 } } + ["analyze", "analyzes", "analyzed", "analyzing"]
+        // -our, -re, -ll, -ce, -ogue : commun au britannique et au canadien.
+        let commonwealth = ["colour", "colours", "neighbour", "neighbours", "neighbouring", "favourite", "favourites",
+                            "centre", "centres", "centred", "recentre", "metre", "metres", "kilometre", "kilometres",
+                            "cancelled", "cancelling", "travelled", "travelling", "grey", "licence", "licences",
+                            "catalogue", "catalogues"]
+        let us = ["color", "colors", "neighbor", "neighbors", "neighboring", "favorite", "favorites",
+                  "center", "centers", "centered", "recenter", "meter", "meters", "kilometer", "kilometers",
+                  "canceled", "canceling", "traveled", "traveling", "gray", "license", "licenses",
+                  "catalog", "catalogs"]
+
+        func offenders(_ table: [String: [String]], _ words: [String]) -> [String] {
+            let forbidden = Set(words)
+            return table.flatMap { key, values in
+                values.flatMap { value -> [String] in
+                    // Nom de fonction Apple, écrit comme Apple l'écrit en anglais US.
+                    let text = value.replacingOccurrences(of: "Control Center", with: "")
+                    return text.lowercased().components(separatedBy: CharacterSet.letters.inverted)
+                        .filter(forbidden.contains).map { "\($0) ← \(key)" }
+                }
+            }.sorted()
+        }
+        XCTAssertEqual(offenders(american, commonwealth + ise + ["programme", "postcode", "motorway", "ticked"]), [], "anglais US")
+        XCTAssertEqual(offenders(british, us + ize), [], "britannique : il manque une clé SQEnGB|")
+        XCTAssertEqual(offenders(canadian, us + ise + ["programme"]), [], "canadien : il manque une clé SQEnCA|")
+    }
+
     /// En français, le vouvoiement actif redirige `NSLocalizedString` vers les clés
     /// `SQFormal|` ; une clé sans variante reste en tutoiement.
     func testFormalToneRoutesBundleLookups() throws {

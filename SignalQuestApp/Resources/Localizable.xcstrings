@@ -22,7 +22,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Coverage colours"
+            "value" : "Coverage colors"
           }
         },
         "fr" : {
@@ -33,18 +33,62 @@
         }
       }
     },
+    "SQEnGB|Couleurs de la couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage colours"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleurs de la couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage colours"
+          }
+        }
+      }
+    },
     "Choisir la mesure qui colore la couverture" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose the measurement that colours the coverage"
+            "value" : "Choose the measurement that colors the coverage"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir la mesure qui colore la couverture"
+          }
+        }
+      }
+    },
+    "SQEnGB|Choisir la mesure qui colore la couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the measurement that colours the coverage"
+          }
+        }
+      }
+    },
+    "SQEnCA|Choisir la mesure qui colore la couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the measurement that colours the coverage"
           }
         }
       }
@@ -3845,6 +3889,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ du centre de la zone"
+          }
+        }
+      }
+    },
+    "SQEnGB|%@ du centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from the centre of the area"
+          }
+        }
+      }
+    },
+    "SQEnCA|%@ du centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from the centre of the area"
           }
         }
       }
@@ -18669,6 +18735,28 @@
         }
       }
     },
+    "SQEnGB|Appel vidéo annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call cancelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|Appel vidéo annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call cancelled"
+          }
+        }
+      }
+    },
     "Appel vidéo manqué" : {
       "localizations" : {
         "en" : {
@@ -18761,6 +18849,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appel vocal annulé"
+          }
+        }
+      }
+    },
+    "SQEnGB|Appel vocal annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call cancelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|Appel vocal annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call cancelled"
           }
         }
       }
@@ -19054,13 +19164,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "At the centre of the area"
+            "value" : "At the center of the area"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Au centre de la zone"
+          }
+        }
+      }
+    },
+    "SQEnGB|Au centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the centre of the area"
+          }
+        }
+      }
+    },
+    "SQEnCA|Au centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the centre of the area"
           }
         }
       }
@@ -20351,6 +20483,17 @@
         }
       }
     },
+    "SQEnGB|Ce qui aide à le reconnaître" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What helps to recognise it"
+          }
+        }
+      }
+    },
     "Ce qui ne va pas" : {
       "localizations" : {
         "en" : {
@@ -20464,7 +20607,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This site is only the closest to your logs; the server didn't recognise it. Check it before you confirm."
+            "value" : "This site is only the closest to your logs; the server didn't recognize it. Check it before you confirm."
           }
         },
         "fr" : {
@@ -20486,6 +20629,17 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site is only the closest to your logs; the server didn't recognise it. Check it before you confirm."
+          }
+        }
+      }
     },
     "Ce soir %@" : {
       "localizations" : {
@@ -22111,7 +22265,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Point colour"
+            "value" : "Point color"
           }
         },
         "fr" : {
@@ -22122,12 +22276,34 @@
         }
       }
     },
+    "SQEnGB|Couleur des points" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleur des points" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour"
+          }
+        }
+      }
+    },
     "Couleur des points : génération" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Point colour: generation"
+            "value" : "Point color: generation"
           }
         },
         "fr" : {
@@ -22138,18 +22314,62 @@
         }
       }
     },
+    "SQEnGB|Couleur des points : génération" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: generation"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleur des points : génération" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: generation"
+          }
+        }
+      }
+    },
     "Couleur des points : signal" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Point colour: signal"
+            "value" : "Point color: signal"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couleur des points : signal"
+          }
+        }
+      }
+    },
+    "SQEnGB|Couleur des points : signal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: signal"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleur des points : signal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: signal"
           }
         }
       }
@@ -26283,13 +26503,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signal comes from measurements made with the Android app: the iPhone doesn’t measure it. Points without signal stay grey."
+            "value" : "Signal comes from measurements made with the Android app: the iPhone doesn’t measure it. Points without signal stay gray."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le signal vient des mesures faites avec l’app Android : l’iPhone ne le mesure pas. Les points sans signal restent en gris."
+          }
+        }
+      }
+    },
+    "SQEnGB|Le signal vient des mesures faites avec l’app Android : l’iPhone ne le mesure pas. Les points sans signal restent en gris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal comes from measurements made with the Android app: the iPhone doesn’t measure it. Points without signal stay grey."
+          }
+        }
+      }
+    },
+    "SQEnCA|Le signal vient des mesures faites avec l’app Android : l’iPhone ne le mesure pas. Les points sans signal restent en gris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal comes from measurements made with the Android app: the iPhone doesn’t measure it. Points without signal stay grey."
           }
         }
       }
@@ -32898,7 +33140,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On the map, a marker takes the colour of the site’s dominant operator; its symbol is the most significant type of change."
+            "value" : "On the map, a marker takes the color of the site’s dominant operator; its symbol is the most significant type of change."
           }
         },
         "fr" : {
@@ -32909,18 +33151,62 @@
         }
       }
     },
+    "SQEnGB|Sur la carte, un repère prend la couleur de l’opérateur dominant du site ; son symbole est le type de modification le plus marquant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s dominant operator; its symbol is the most significant type of change."
+          }
+        }
+      }
+    },
+    "SQEnCA|Sur la carte, un repère prend la couleur de l’opérateur dominant du site ; son symbole est le type de modification le plus marquant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s dominant operator; its symbol is the most significant type of change."
+          }
+        }
+      }
+    },
     "Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On the map, a marker takes the colour of the site’s main operator; its symbol is the most notable type of change."
+            "value" : "On the map, a marker takes the color of the site’s main operator; its symbol is the most notable type of change."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant."
+          }
+        }
+      }
+    },
+    "SQEnGB|Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s main operator; its symbol is the most notable type of change."
+          }
+        }
+      }
+    },
+    "SQEnCA|Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s main operator; its symbol is the most notable type of change."
           }
         }
       }
@@ -36465,13 +36751,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "km travelled"
+            "value" : "km traveled"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "km parcourus"
+          }
+        }
+      }
+    },
+    "SQEnGB|km parcourus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km travelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|km parcourus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km travelled"
           }
         }
       }
@@ -37097,13 +37405,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ %2$@ of the centre of the area"
+            "value" : "%1$@ %2$@ of the center of the area"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "À %1$@ au %2$@ du centre de la zone"
+          }
+        }
+      }
+    },
+    "SQEnGB|À %1$@ au %2$@ du centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ of the centre of the area"
+          }
+        }
+      }
+    },
+    "SQEnCA|À %1$@ au %2$@ du centre de la zone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ of the centre of the area"
           }
         }
       }
@@ -40890,7 +41220,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ travelled"
+            "value" : "%@ traveled"
           }
         },
         "fr" : {
@@ -40901,7 +41231,46 @@
         }
       }
     },
+    "SQEnGB|%@ parcourus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ travelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|%@ parcourus" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ travelled"
+          }
+        }
+      }
+    },
     "%@ parcourus, %@ de données" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ traveled, %@ of data"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ parcourus, %@ de données"
+          }
+        }
+      }
+    },
+    "SQEnGB|%@ parcourus, %@ de données" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -40909,11 +41278,16 @@
             "state" : "translated",
             "value" : "%@ travelled, %@ of data"
           }
-        },
-        "fr" : {
+        }
+      }
+    },
+    "SQEnCA|%@ parcourus, %@ de données" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ parcourus, %@ de données"
+            "value" : "%@ travelled, %@ of data"
           }
         }
       }
@@ -44758,7 +45132,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. Try again in a few minutes."
+            "value" : "Your subscription could not be canceled right now, so your account has not been deleted. Try again in a few minutes."
           }
         },
         "fr" : {
@@ -44781,12 +45155,34 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. Try again in a few minutes."
+          }
+        }
+      }
+    },
+    "SQEnCA|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Réessaie dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. Try again in a few minutes."
+          }
+        }
+      }
+    },
     "La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. This code has already been used: request a new one to try again in a few minutes."
+            "value" : "Your subscription could not be canceled right now, so your account has not been deleted. This code has already been used: request a new one to try again in a few minutes."
           }
         },
         "fr" : {
@@ -44808,6 +45204,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. This code has already been used: request a new one to try again in a few minutes."
+          }
+        }
+      }
+    },
+    "SQEnCA|La résiliation de ton abonnement n’a pas pu aboutir pour l’instant : ton compte n’a pas été supprimé. Ce code a déjà servi : demandes-en un nouveau pour réessayer dans quelques minutes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription could not be cancelled right now, so your account has not been deleted. This code has already been used: request a new one to try again in a few minutes."
+          }
+        }
+      }
     },
     "Période en cours jusqu’au %@." : {
       "localizations" : {
@@ -44966,7 +45384,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your App Store subscription is already cancelled: it will end on %@, with no new payment. Refunds are requested from Apple."
+            "value" : "Your App Store subscription is already canceled: it will end on %@, with no new payment. Refunds are requested from Apple."
           }
         },
         "fr" : {
@@ -44989,12 +45407,34 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Ton abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end on %@, with no new payment. Refunds are requested from Apple."
+          }
+        }
+      }
+    },
+    "SQEnCA|Ton abonnement App Store est déjà résilié : il s’arrêtera le %@, sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end on %@, with no new payment. Refunds are requested from Apple."
+          }
+        }
+      }
+    },
     "Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your App Store subscription is already cancelled: it will end with no new payment. Refunds are requested from Apple."
+            "value" : "Your App Store subscription is already canceled: it will end with no new payment. Refunds are requested from Apple."
           }
         },
         "fr" : {
@@ -45017,12 +45457,34 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end with no new payment. Refunds are requested from Apple."
+          }
+        }
+      }
+    },
+    "SQEnCA|Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your App Store subscription is already cancelled: it will end with no new payment. Refunds are requested from Apple."
+          }
+        }
+      }
+    },
     "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period."
+            "value" : "Your subscription taken out on the web will be canceled on deletion, with no refund, unless you’re still within your 14-day withdrawal period."
           }
         },
         "fr" : {
@@ -45045,12 +45507,34 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period."
+          }
+        }
+      }
+    },
+    "SQEnCA|Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period."
+          }
+        }
+      }
+    },
     "Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your subscription taken out on another device will be cancelled on deletion: no new charge. The current period isn’t refunded by SignalQuest; refunds are requested where it was taken out."
+            "value" : "Your subscription taken out on another device will be canceled on deletion: no new charge. The current period isn’t refunded by SignalQuest; refunds are requested where it was taken out."
           }
         },
         "fr" : {
@@ -45072,6 +45556,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on another device will be cancelled on deletion: no new charge. The current period isn’t refunded by SignalQuest; refunds are requested where it was taken out."
+          }
+        }
+      }
+    },
+    "SQEnCA|Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your subscription taken out on another device will be cancelled on deletion: no new charge. The current period isn’t refunded by SignalQuest; refunds are requested where it was taken out."
+          }
+        }
+      }
     },
     "Abonnement en cours" : {
       "localizations" : {
@@ -45666,13 +46172,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trial cancelled"
+            "value" : "Trial canceled"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Essai résilié"
+          }
+        }
+      }
+    },
+    "SQEnGB|Essai résilié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial cancelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|Essai résilié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trial cancelled"
           }
         }
       }
@@ -45778,13 +46306,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cancelled"
+            "value" : "Canceled"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Résilié"
+          }
+        }
+      }
+    },
+    "SQEnGB|Résilié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|Résilié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
           }
         }
       }
@@ -46318,7 +46868,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Premium is a monthly or yearly auto-renewing subscription, charged to your Apple Account when you confirm the purchase. It renews at the same price unless cancelled at least 24 hours before the end of the current period, in your Apple Account settings. No Family Sharing. The price Apple shows at the time of purchase applies."
+            "value" : "Premium is a monthly or yearly auto-renewing subscription, charged to your Apple Account when you confirm the purchase. It renews at the same price unless canceled at least 24 hours before the end of the current period, in your Apple Account settings. No Family Sharing. The price Apple shows at the time of purchase applies."
           }
         },
         "fr" : {
@@ -46340,6 +46890,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium is a monthly or yearly auto-renewing subscription, charged to your Apple Account when you confirm the purchase. It renews at the same price unless cancelled at least 24 hours before the end of the current period, in your Apple Account settings. No Family Sharing. The price Apple shows at the time of purchase applies."
+          }
+        }
+      }
+    },
+    "SQEnCA|Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium is a monthly or yearly auto-renewing subscription, charged to your Apple Account when you confirm the purchase. It renews at the same price unless cancelled at least 24 hours before the end of the current period, in your Apple Account settings. No Family Sharing. The price Apple shows at the time of purchase applies."
+          }
+        }
+      }
     },
     "Pendant l’essai gratuit, rien n’est prélevé. Sans résiliation au moins 24 heures avant sa fin, l’abonnement démarre et le premier paiement est prélevé." : {
       "localizations" : {
@@ -46870,7 +47442,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest doesn’t recognise this offer yet. Your purchase will be checked again automatically, with no new payment."
+            "value" : "SignalQuest doesn’t recognize this offer yet. Your purchase will be checked again automatically, with no new payment."
           }
         },
         "fr" : {
@@ -46892,6 +47464,17 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Cette offre n’est pas encore reconnue par SignalQuest. Ton achat sera vérifié de nouveau automatiquement, sans nouveau paiement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest doesn’t recognise this offer yet. Your purchase will be checked again automatically, with no new payment."
+          }
+        }
+      }
     },
     "Acquittés TCP (en-têtes inclus)" : {
       "localizations" : {
@@ -48121,6 +48704,28 @@
         }
       }
     },
+    "SQEnGB|Ajouter aux favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to favourites"
+          }
+        }
+      }
+    },
+    "SQEnCA|Ajouter aux favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to favourites"
+          }
+        }
+      }
+    },
     "Ajouter cette adresse" : {
       "localizations" : {
         "en" : {
@@ -48762,6 +49367,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annulé"
+          }
+        }
+      }
+    },
+    "SQEnGB|Annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
+          }
+        }
+      }
+    },
+    "SQEnCA|Annulé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
           }
         }
       }
@@ -50253,6 +50880,28 @@
         }
       }
     },
+    "SQEnGB|Aucun essai gratuit et aucun partage familial. L’abonnement se renouvelle automatiquement et peut être résilié depuis les réglages App Store. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No free trial and no Family Sharing. The subscription renews automatically and can be cancelled from your App Store settings. The price shown by Apple at the time of purchase prevails."
+          }
+        }
+      }
+    },
+    "SQEnCA|Aucun essai gratuit et aucun partage familial. L’abonnement se renouvelle automatiquement et peut être résilié depuis les réglages App Store. Le prix affiché par Apple au moment de l’achat fait foi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No free trial and no Family Sharing. The subscription renews automatically and can be cancelled from your App Store settings. The price shown by Apple at the time of purchase prevails."
+          }
+        }
+      }
+    },
     "Aucun identifiant de cellule (PCI/CI) associé à cette antenne." : {
       "localizations" : {
         "en" : {
@@ -50433,13 +51082,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No operator ticked: every outage. Two at most."
+            "value" : "No operator checked: every outage. Two at most."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun opérateur coché : toutes les pannes. Deux au plus."
+          }
+        }
+      }
+    },
+    "SQEnGB|Aucun opérateur coché : toutes les pannes. Deux au plus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No operator ticked: every outage. Two at most."
           }
         }
       }
@@ -53586,10 +54246,32 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Catalogue"
+            "value" : "Catalog"
           }
         },
         "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue"
+          }
+        }
+      }
+    },
+    "SQEnGB|Catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue"
+          }
+        }
+      }
+    },
+    "SQEnCA|Catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Catalogue"
@@ -53602,13 +54284,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Catalogue %lld percent verified"
+            "value" : "Catalog %lld percent verified"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Catalogue vérifié à %lld pour cent"
+          }
+        }
+      }
+    },
+    "SQEnGB|Catalogue vérifié à %lld pour cent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue %lld percent verified"
+          }
+        }
+      }
+    },
+    "SQEnCA|Catalogue vérifié à %lld pour cent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue %lld percent verified"
           }
         }
       }
@@ -54071,13 +54775,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This site was not recognised."
+            "value" : "This site was not recognized."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce site n'a pas été reconnu."
+          }
+        }
+      }
+    },
+    "SQEnGB|Ce site n'a pas été reconnu." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site was not recognised."
           }
         }
       }
@@ -54402,6 +55117,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Centrer"
+          }
+        }
+      }
+    },
+    "SQEnGB|Centrer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centre"
+          }
+        }
+      }
+    },
+    "SQEnCA|Centrer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centre"
           }
         }
       }
@@ -55062,6 +55799,28 @@
         }
       }
     },
+    "SQEnGB|Cette antenne ne peut pas être ajoutée aux favoris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This antenna cannot be added to favourites."
+          }
+        }
+      }
+    },
+    "SQEnCA|Cette antenne ne peut pas être ajoutée aux favoris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This antenna cannot be added to favourites."
+          }
+        }
+      }
+    },
     "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer." : {
       "localizations" : {
         "en" : {
@@ -55700,6 +56459,28 @@
         }
       }
     },
+    "SQEnGB|Chargement des favoris…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading favourites…"
+          }
+        }
+      }
+    },
+    "SQEnCA|Chargement des favoris…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading favourites…"
+          }
+        }
+      }
+    },
     "Chargement des partages…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -55893,6 +56674,28 @@
         }
       }
     },
+    "SQEnGB|Charger les favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load favourites"
+          }
+        }
+      }
+    },
+    "SQEnCA|Charger les favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load favourites"
+          }
+        }
+      }
+    },
     "Chauffe" : {
       "localizations" : {
         "en" : {
@@ -56078,6 +56881,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir les couleurs et consulter la légende"
+          }
+        }
+      }
+    },
+    "SQEnGB|Choisir les couleurs et consulter la légende" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose colours and view the legend"
+          }
+        }
+      }
+    },
+    "SQEnCA|Choisir les couleurs et consulter la légende" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose colours and view the legend"
           }
         }
       }
@@ -57515,6 +58340,17 @@
         }
       }
     },
+    "SQEnGB|Compte créé mais session non initialisée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account created but session not initialised"
+          }
+        }
+      }
+    },
     "Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion." : {
       "localizations" : {
         "en" : {
@@ -58797,6 +59633,28 @@
         }
       }
     },
+    "SQEnGB|Couleurs des opérateurs, secteurs et repères des sites" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator colours, sectors and site markers"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleurs des opérateurs, secteurs et repères des sites" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator colours, sectors and site markers"
+          }
+        }
+      }
+    },
     "Couper la caméra" : {
       "localizations" : {
         "en" : {
@@ -59679,6 +60537,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé."
+          }
+        }
+      }
+    },
+    "SQEnGB|Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discord, Slack and ntfy are recognised by their address and get their own format. Other recipients receive a signed call."
           }
         }
       }
@@ -67243,6 +68112,17 @@
         }
       }
     },
+    "SQEnGB|J’ai compris que cette action est irréversible et que mes contributions listées ci-dessus resteront anonymisées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I understand this action is irreversible and that the contributions listed above will remain anonymised."
+          }
+        }
+      }
+    },
     "J’ai confirmé" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -67397,6 +68277,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ."
+          }
+        }
+      }
+    },
+    "SQEnGB|L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna's downward tilt. Operators use it to focus energy on the coverage area instead of sending it toward the horizon, where it could interfere with neighbouring cells. This value is purely geometric: the angle that would point exactly toward the starting point."
+          }
+        }
+      }
+    },
+    "SQEnCA|L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An antenna's downward tilt. Operators use it to focus energy on the coverage area instead of sending it toward the horizon, where it could interfere with neighbouring cells. This value is purely geometric: the angle that would point exactly toward the starting point."
           }
         }
       }
@@ -68082,6 +68984,28 @@
         }
       }
     },
+    "SQEnGB|La liste des favoris n’a pas pu être chargée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The favourites list could not be loaded."
+          }
+        }
+      }
+    },
+    "SQEnCA|La liste des favoris n’a pas pu être chargée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The favourites list could not be loaded."
+          }
+        }
+      }
+    },
     "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour situer tes mesures sur la carte. Le test fonctionne quand même sans." : {
       "localizations" : {
         "en" : {
@@ -68284,13 +69208,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "How clean the received signal is, in dB: it drops when the cell is busy or disturbed by its neighbours. Close to zero is good."
+            "value" : "How clean the received signal is, in dB: it drops when the cell is busy or disturbed by its neighbors. Close to zero is good."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "La propreté du signal reçu, en dB : elle baisse quand la cellule est chargée ou brouillée par ses voisines. Proche de zéro, c’est bon."
+          }
+        }
+      }
+    },
+    "SQEnGB|La propreté du signal reçu, en dB : elle baisse quand la cellule est chargée ou brouillée par ses voisines. Proche de zéro, c’est bon." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How clean the received signal is, in dB: it drops when the cell is busy or disturbed by its neighbours. Close to zero is good."
+          }
+        }
+      }
+    },
+    "SQEnCA|La propreté du signal reçu, en dB : elle baisse quand la cellule est chargée ou brouillée par ses voisines. Proche de zéro, c’est bon." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How clean the received signal is, in dB: it drops when the cell is busy or disturbed by its neighbours. Close to zero is good."
           }
         }
       }
@@ -69605,6 +70551,28 @@
         }
       }
     },
+    "SQEnGB|Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account has been deleted, but local favourites could not be cleared from this device."
+          }
+        }
+      }
+    },
+    "SQEnCA|Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account has been deleted, but local favourites could not be cleared from this device."
+          }
+        }
+      }
+    },
     "Le contenu complet est proposé par défaut : toute personne devant l’écran peut le lire. Pour cet aperçu, un accès protégé aux messages reste disponible après le premier déverrouillage de cet appareil." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -70117,6 +71085,28 @@
         }
       }
     },
+    "SQEnGB|Le rayon doit être compris entre 100 et 20 000 mètres." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The radius must be between 100 and 20,000 metres."
+          }
+        }
+      }
+    },
+    "SQEnCA|Le rayon doit être compris entre 100 et 20 000 mètres." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The radius must be between 100 and 20,000 metres."
+          }
+        }
+      }
+    },
     "Le registre belge (BIPT)" : {
       "localizations" : {
         "en" : {
@@ -70379,13 +71369,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The server returned incomplete pagination: synchronisation stopped."
+            "value" : "The server returned incomplete pagination: synchronization stopped."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le serveur a renvoyé une pagination incomplète : synchronisation interrompue."
+          }
+        }
+      }
+    },
+    "SQEnGB|Le serveur a renvoyé une pagination incomplète : synchronisation interrompue." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server returned incomplete pagination: synchronisation stopped."
           }
         }
       }
@@ -70495,13 +71496,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The server keeps returning the same measurements: synchronisation incomplete."
+            "value" : "The server keeps returning the same measurements: synchronization incomplete."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le serveur renvoie toujours les mêmes relevés : synchronisation incomplète."
+          }
+        }
+      }
+    },
+    "SQEnGB|Le serveur renvoie toujours les mêmes relevés : synchronisation incomplète." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server keeps returning the same measurements: synchronisation incomplete."
           }
         }
       }
@@ -71189,6 +72201,28 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites saved on this device are unavailable. Try again before changing them."
+          }
+        }
+      }
+    },
+    "SQEnCA|Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites saved on this device are unavailable. Try again before changing them."
+          }
+        }
+      }
+    },
     "Les identifiants radio sont repris tels quels ; c'est toi qui places l'antenne au bon endroit." : {
       "localizations" : {
         "en" : {
@@ -71377,13 +72411,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The numbers that designate an antenna: the eNB (4G) or gNB (5G) identifies the site, the CI one specific cell, the PCI tells it apart from its neighbours, and the TAC gives its tracking area."
+            "value" : "The numbers that designate an antenna: the eNB (4G) or gNB (5G) identifies the site, the CI one specific cell, the PCI tells it apart from its neighbors, and the TAC gives its tracking area."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les numéros qui désignent une antenne : l’eNB (4G) ou le gNB (5G) repère le site, le CI une cellule précise, le PCI la distingue de ses voisines, le TAC indique sa zone de rattachement."
+          }
+        }
+      }
+    },
+    "SQEnGB|Les numéros qui désignent une antenne : l’eNB (4G) ou le gNB (5G) repère le site, le CI une cellule précise, le PCI la distingue de ses voisines, le TAC indique sa zone de rattachement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The numbers that designate an antenna: the eNB (4G) or gNB (5G) identifies the site, the CI one specific cell, the PCI tells it apart from its neighbours, and the TAC gives its tracking area."
+          }
+        }
+      }
+    },
+    "SQEnCA|Les numéros qui désignent une antenne : l’eNB (4G) ou le gNB (5G) repère le site, le CI une cellule précise, le PCI la distingue de ses voisines, le TAC indique sa zone de rattachement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The numbers that designate an antenna: the eNB (4G) or gNB (5G) identifies the site, the CI one specific cell, the PCI tells it apart from its neighbours, and the TAC gives its tracking area."
           }
         }
       }
@@ -71811,13 +72867,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Licence granted"
+            "value" : "License granted"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Licence octroyée"
+          }
+        }
+      }
+    },
+    "SQEnGB|Licence octroyée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence granted"
+          }
+        }
+      }
+    },
+    "SQEnCA|Licence octroyée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence granted"
           }
         }
       }
@@ -72234,13 +73312,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The French national frequency agency publishes the official list of authorised antennas in France, with their technologies and switch-on dates."
+            "value" : "The French national frequency agency publishes the official list of authorized antennas in France, with their technologies and switch-on dates."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’Agence nationale des fréquences publie la liste officielle des antennes autorisées en France, avec leurs technologies et leurs dates de mise en service."
+          }
+        }
+      }
+    },
+    "SQEnGB|L’Agence nationale des fréquences publie la liste officielle des antennes autorisées en France, avec leurs technologies et leurs dates de mise en service." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The French national frequency agency publishes the official list of authorised antennas in France, with their technologies and switch-on dates."
           }
         }
       }
@@ -74038,13 +75127,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Measurement cancelled."
+            "value" : "Measurement canceled."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mesure annulée."
+          }
+        }
+      }
+    },
+    "SQEnGB|Mesure annulée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measurement cancelled."
+          }
+        }
+      }
+    },
+    "SQEnCA|Mesure annulée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measurement cancelled."
           }
         }
       }
@@ -79969,6 +81080,17 @@
         }
       }
     },
+    "SQEnGB|Photo claire, site facile à reconnaître." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear photo, site easy to recognise."
+          }
+        }
+      }
+    },
     "Photo d'antenne (QA)" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -81198,6 +82320,28 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Position récente indisponible. Choisis le centre sur la carte ou saisis ses coordonnées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A recent location is unavailable. Choose the centre on the map or enter its coordinates."
+          }
+        }
+      }
+    },
+    "SQEnCA|Position récente indisponible. Choisis le centre sur la carte ou saisis ses coordonnées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A recent location is unavailable. Choose the centre on the map or enter its coordinates."
+          }
+        }
+      }
+    },
     "Positions publiques exactes" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -81659,13 +82803,35 @@
         }
       }
     },
+    "SQEnGB|Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain profile: starting elevation %lld metres, site %@ at %lld metres, %@ apart"
+          }
+        }
+      }
+    },
+    "SQEnCA|Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain profile: starting elevation %lld metres, site %@ at %lld metres, %@ apart"
+          }
+        }
+      }
+    },
     "Profil du relief : toi à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
       "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Terrain profile: you at %lld metres above sea level, site %@ at %lld metres, %@ apart"
+            "value" : "Terrain profile: you at %lld meters above sea level, site %@ at %lld meters, %@ apart"
           }
         },
         "fr" : {
@@ -81687,6 +82853,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Profil du relief : toi à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain profile: you at %lld metres above sea level, site %@ at %lld metres, %@ apart"
+          }
+        }
+      }
+    },
+    "SQEnCA|Profil du relief : toi à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain profile: you at %lld metres above sea level, site %@ at %lld metres, %@ apart"
+          }
+        }
+      }
     },
     "Profil du relief vers le site %@" : {
       "localizations" : {
@@ -83611,6 +84799,28 @@
         }
       }
     },
+    "SQEnGB|Recentrer sur ma position" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recentre on my location"
+          }
+        }
+      }
+    },
+    "SQEnCA|Recentrer sur ma position" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recentre on my location"
+          }
+        }
+      }
+    },
     "Recevoir l’alerte de panne ?" : {
       "localizations" : {
         "en" : {
@@ -84402,6 +85612,28 @@
         }
       }
     },
+    "SQEnGB|Requête annulée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request cancelled."
+          }
+        }
+      }
+    },
+    "SQEnCA|Requête annulée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request cancelled."
+          }
+        }
+      }
+    },
     "Requête invalide." : {
       "localizations" : {
         "en" : {
@@ -84660,6 +85892,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer des favoris"
+          }
+        }
+      }
+    },
+    "SQEnGB|Retirer des favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from favourites"
+          }
+        }
+      }
+    },
+    "SQEnCA|Retirer des favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from favourites"
           }
         }
       }
@@ -85641,6 +86895,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réduire l’appel"
+          }
+        }
+      }
+    },
+    "SQEnGB|Réduire l’appel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minimise call"
           }
         }
       }
@@ -87093,6 +88358,17 @@
         }
       }
     },
+    "SQEnGB|SSE non autorisé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SSE not authorised"
+          }
+        }
+      }
+    },
     "SSE refusé" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -87966,6 +89242,17 @@
         }
       }
     },
+    "SQEnGB|Sera anonymisé et conservé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will be anonymised and kept"
+          }
+        }
+      }
+    },
     "Sera supprimé" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -88127,6 +89414,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serveur iPerf3 du catalogue"
+          }
+        }
+      }
+    },
+    "SQEnGB|Serveur iPerf3 du catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPerf3 server from the catalogue"
+          }
+        }
+      }
+    },
+    "SQEnCA|Serveur iPerf3 du catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPerf3 server from the catalogue"
           }
         }
       }
@@ -91433,6 +92742,28 @@
         }
       }
     },
+    "SQEnGB|Synchronisation des favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites sync"
+          }
+        }
+      }
+    },
+    "SQEnCA|Synchronisation des favoris" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favourites sync"
+          }
+        }
+      }
+    },
     "Synchronisation en attente" : {
       "localizations" : {
         "en" : {
@@ -93365,6 +94696,28 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the map to choose the centre. The circle shows the zone to protect; check its location before saving."
+          }
+        }
+      }
+    },
+    "SQEnCA|Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the map to choose the centre. The circle shows the zone to protect; check its location before saving."
+          }
+        }
+      }
+    },
     "Touche le marque-page d'une publication pour la retrouver ici." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -93760,7 +95113,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Every 500 m on the motorway: the map shows where your operator holds up."
+            "value" : "Every 500 m on the highway: the map shows where your operator holds up."
           }
         },
         "fr" : {
@@ -93782,6 +95135,17 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Tous les 500 m sur l’autoroute : la carte montre où ton opérateur tient la route." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every 500 m on the motorway: the map shows where your operator holds up."
+          }
+        }
+      }
     },
     "Tous les opérateurs" : {
       "localizations" : {
@@ -95087,6 +96451,28 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can follow up to 500 antennas. Remove a favourite before adding another."
+          }
+        }
+      }
+    },
+    "SQEnCA|Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can follow up to 500 antennas. Remove a favourite before adding another."
+          }
+        }
+      }
+    },
     "Tu peux te connecter avec Apple, même en masquant ton e-mail." : {
       "localizations" : {
         "en" : {
@@ -95647,13 +97033,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A place without proper mobile coverage. Sites from the white-zone programme are built there by one operator, which shares them with the others."
+            "value" : "A place without proper mobile coverage. Sites from the white-zone program are built there by one operator, which shares them with the others."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un endroit sans couverture mobile correcte. Les sites du programme « zones blanches » y sont construits par un opérateur, qui les partage avec les autres."
+          }
+        }
+      }
+    },
+    "SQEnGB|Un endroit sans couverture mobile correcte. Les sites du programme « zones blanches » y sont construits par un opérateur, qui les partage avec les autres." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A place without proper mobile coverage. Sites from the white-zone programme are built there by one operator, which shares them with the others."
           }
         }
       }
@@ -96215,13 +97612,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A position rounded to about 50 metres"
+            "value" : "A position rounded to about 50 meters"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une position arrondie à environ 50 mètres"
+          }
+        }
+      }
+    },
+    "SQEnGB|Une position arrondie à environ 50 mètres" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A position rounded to about 50 metres"
+          }
+        }
+      }
+    },
+    "SQEnCA|Une position arrondie à environ 50 mètres" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A position rounded to about 50 metres"
           }
         }
       }
@@ -97447,7 +98866,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verification cancelled. Your input is preserved."
+            "value" : "Verification canceled. Your input is preserved."
           }
         },
         "fr" : {
@@ -97469,6 +98888,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Vérification annulée. Ta saisie est conservée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification cancelled. Your input is preserved."
+          }
+        }
+      }
+    },
+    "SQEnCA|Vérification annulée. Ta saisie est conservée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification cancelled. Your input is preserved."
+          }
+        }
+      }
     },
     "Vérification de la disponibilité…" : {
       "localizations" : {
@@ -97584,13 +99025,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Checking catalogue"
+            "value" : "Checking catalog"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérification du catalogue"
+          }
+        }
+      }
+    },
+    "SQEnGB|Vérification du catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking catalogue"
+          }
+        }
+      }
+    },
+    "SQEnCA|Vérification du catalogue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking catalogue"
           }
         }
       }
@@ -99389,13 +100852,24 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognises the operator from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
+            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognizes the operator from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS ne dit pas aux apps quel réseau sert le téléphone : SignalQuest reconnaît l’opérateur à l’adresse Internet utilisée. En itinérance ou sous VPN, cette estimation peut se tromper."
+          }
+        }
+      }
+    },
+    "SQEnGB|iOS ne dit pas aux apps quel réseau sert le téléphone : SignalQuest reconnaît l’opérateur à l’adresse Internet utilisée. En itinérance ou sous VPN, cette estimation peut se tromper." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognises the operator from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
           }
         }
       }
@@ -99665,13 +101139,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "kilometres and metres"
+            "value" : "kilometers and meters"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "kilomètres et mètres"
+          }
+        }
+      }
+    },
+    "SQEnGB|kilomètres et mètres" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kilometres and metres"
+          }
+        }
+      }
+    },
+    "SQEnCA|kilomètres et mètres" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kilometres and metres"
           }
         }
       }
@@ -103126,7 +104622,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on the Coverage layer to see these colours on the map."
+            "value" : "Turn on the Coverage layer to see these colors on the map."
           }
         },
         "fr" : {
@@ -103148,6 +104644,28 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "SQEnGB|Active la couche Couverture pour voir ces couleurs sur la carte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the Coverage layer to see these colours on the map."
+          }
+        }
+      }
+    },
+    "SQEnCA|Active la couche Couverture pour voir ces couleurs sur la carte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the Coverage layer to see these colours on the map."
+          }
+        }
+      }
     },
     "%lld filtres actifs" : {
       "extractionState" : "manual",
@@ -104076,6 +105594,28 @@
       }
     },
     "Aucune mesure récente à moins d’un kilomètre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recent measurement within a kilometer."
+          }
+        }
+      }
+    },
+    "SQEnGB|Aucune mesure récente à moins d’un kilomètre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recent measurement within a kilometre."
+          }
+        }
+      }
+    },
+    "SQEnCA|Aucune mesure récente à moins d’un kilomètre." : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -111151,6 +112691,17 @@
       },
       "shouldTranslate" : false
     },
+    "SQEnGB|Si l’équipe te le conseille, ou si tu reconnais tous tes appareils, cet appareil peut refaire confiance au journal que montre le serveur maintenant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the team advises it, or if you recognise all your devices, this device can trust the log the server shows now."
+          }
+        }
+      }
+    },
     "La réinitialisation a échoué. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -115606,7 +117157,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opens the ISED licence record"
+            "value" : "Opens the ISED license record"
           }
         },
         "fr" : {
@@ -115617,18 +117168,62 @@
         }
       }
     },
+    "SQEnGB|Ouvre la ligne de licence ISED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the ISED licence record"
+          }
+        }
+      }
+    },
+    "SQEnCA|Ouvre la ligne de licence ISED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the ISED licence record"
+          }
+        }
+      }
+    },
     "Licence ISED" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ISED licence"
+            "value" : "ISED license"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Licence ISED"
+          }
+        }
+      }
+    },
+    "SQEnGB|Licence ISED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED licence"
+          }
+        }
+      }
+    },
+    "SQEnCA|Licence ISED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED licence"
           }
         }
       }
@@ -115645,6 +117240,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autorisation %@"
+          }
+        }
+      }
+    },
+    "SQEnGB|Autorisation %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authorisation %@"
           }
         }
       }
@@ -115967,7 +117573,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The colour: the operator"
+            "value" : "The color: the operator"
           }
         },
         "fr" : {
@@ -115978,18 +117584,62 @@
         }
       }
     },
+    "SQEnGB|La couleur : l’opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The colour: the operator"
+          }
+        }
+      }
+    },
+    "SQEnCA|La couleur : l’opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The colour: the operator"
+          }
+        }
+      }
+    },
     "Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On a shared site, the marker takes the colour of the operator with the most changes."
+            "value" : "On a shared site, the marker takes the color of the operator with the most changes."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements."
+          }
+        }
+      }
+    },
+    "SQEnGB|Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On a shared site, the marker takes the colour of the operator with the most changes."
+          }
+        }
+      }
+    },
+    "SQEnCA|Sur un support partagé, le repère prend la couleur de l’opérateur qui a le plus de changements." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On a shared site, the marker takes the colour of the operator with the most changes."
           }
         }
       }
@@ -116315,13 +117965,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Canada: licensed sites from ISED’s monthly licence extract, generation by generation and by frequency family."
+            "value" : "Canada: licensed sites from ISED’s monthly license extract, generation by generation and by frequency family."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences."
+          }
+        }
+      }
+    },
+    "SQEnGB|Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada: licensed sites from ISED’s monthly licence extract, generation by generation and by frequency family."
+          }
+        }
+      }
+    },
+    "SQEnCA|Canada : sites autorisés d’après l’extrait mensuel des licences ISED, génération par génération et par famille de fréquences." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada: licensed sites from ISED’s monthly licence extract, generation by generation and by frequency family."
           }
         }
       }
@@ -116379,13 +118051,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Source: ISED licences, extract of %@."
+            "value" : "Source: ISED licenses, extract of %@."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Source : licences ISED, extrait du %@."
+          }
+        }
+      }
+    },
+    "SQEnGB|Source : licences ISED, extrait du %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ISED licences, extract of %@."
+          }
+        }
+      }
+    },
+    "SQEnCA|Source : licences ISED, extrait du %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ISED licences, extract of %@."
           }
         }
       }
@@ -116475,13 +118169,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Canada’s mobile network, from the licences published by ISED."
+            "value" : "Canada’s mobile network, from the licenses published by ISED."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le réseau mobile canadien, d’après les licences publiées par ISED."
+          }
+        }
+      }
+    },
+    "SQEnGB|Le réseau mobile canadien, d’après les licences publiées par ISED." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada’s mobile network, from the licences published by ISED."
+          }
+        }
+      }
+    },
+    "SQEnCA|Le réseau mobile canadien, d’après les licences publiées par ISED." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada’s mobile network, from the licences published by ISED."
           }
         }
       }
@@ -117838,6 +119554,17 @@
         }
       }
     },
+    "SQEnGB|Sites autorisés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authorised sites"
+          }
+        }
+      }
+    },
     "Territoire et sites comptés" : {
       "localizations" : {
         "en" : {
@@ -117902,6 +119629,17 @@
         }
       }
     },
+    "SQEnGB|ISED ne publie que les sites autorisés : il n’y a pas de sites en projet au Canada." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED only publishes authorised sites: there are no planned sites in Canada."
+          }
+        }
+      }
+    },
     "Les sites en service." : {
       "localizations" : {
         "en" : {
@@ -117930,6 +119668,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajoute les sites autorisés qui ne sont pas encore en service."
+          }
+        }
+      }
+    },
+    "SQEnGB|Ajoute les sites autorisés qui ne sont pas encore en service." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds authorised sites that are not in service yet."
           }
         }
       }
@@ -117971,13 +119720,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ISED licences, extracted every month."
+            "value" : "ISED licenses, extracted every month."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Licences ISED, extrait chaque mois."
+          }
+        }
+      }
+    },
+    "SQEnGB|Licences ISED, extrait chaque mois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED licences, extracted every month."
+          }
+        }
+      }
+    },
+    "SQEnCA|Licences ISED, extrait chaque mois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISED licences, extracted every month."
           }
         }
       }
@@ -118654,13 +120425,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld%% of the catalogue checked"
+            "value" : "%lld%% of the catalog checked"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld %% du catalogue vérifié"
+          }
+        }
+      }
+    },
+    "SQEnGB|%lld %% du catalogue vérifié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% of the catalogue checked"
+          }
+        }
+      }
+    },
+    "SQEnCA|%lld %% du catalogue vérifié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% of the catalogue checked"
           }
         }
       }
@@ -118907,13 +120700,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Catalogue checked"
+            "value" : "Catalog checked"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Catalogue vérifié"
+          }
+        }
+      }
+    },
+    "SQEnGB|Catalogue vérifié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue checked"
+          }
+        }
+      }
+    },
+    "SQEnCA|Catalogue vérifié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue checked"
           }
         }
       }
@@ -119810,13 +121625,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Postcode"
+            "value" : "ZIP code"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code postal"
+          }
+        }
+      }
+    },
+    "SQEnGB|Code postal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Postcode"
+          }
+        }
+      }
+    },
+    "SQEnCA|Code postal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Postal code"
           }
         }
       }
@@ -122187,10 +124024,32 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Licences"
+            "value" : "Licenses"
           }
         },
         "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences"
+          }
+        }
+      }
+    },
+    "SQEnGB|Licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences"
+          }
+        }
+      }
+    },
+    "SQEnCA|Licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Licences"
@@ -122203,13 +124062,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Licence no."
+            "value" : "License no."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "N° de licence"
+          }
+        }
+      }
+    },
+    "SQEnGB|N° de licence" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence no."
+          }
+        }
+      }
+    },
+    "SQEnCA|N° de licence" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence no."
           }
         }
       }
