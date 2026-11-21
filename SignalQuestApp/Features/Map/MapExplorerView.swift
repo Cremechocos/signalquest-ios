@@ -2198,7 +2198,10 @@ struct MapExplorerView: View {
         .onChangeCompat(of: scenePhase) { _, phase in
             guard phase == .active, router.selectedTab == .map else { return }
             fetchTask?.cancel()
-            fetchTask = Task { await reloadCurrentRegion() }
+            // Retour au premier plan : chargement ordinaire, les caches de tuiles
+            // gardent leurs durées de vie. Purger ici retéléchargeait toute la vue
+            // (58 requêtes, 218 Kio après 10 s d'arrière-plan, audit perf du 21/11).
+            fetchTask = Task { await reloadCurrentRegion(forced: false) }
         }
         .onChangeCompat(of: networkPath.isOnline) { wasOnline, isOnline in
             guard !wasOnline, isOnline, scenePhase == .active, router.selectedTab == .map,
@@ -5377,14 +5380,16 @@ struct MapExplorerView: View {
 
     /// Recharge la zone visible. Appelé après création d'un site pour que le
     /// marqueur apparaisse sans attendre le prochain déplacement de carte.
-    private func reloadCurrentRegion() async {
+    /// `forced` purge les caches et redemande tout (après une écriture, un
+    /// réessai) ; sinon, la vue courante est rechargée comme après un déplacement.
+    private func reloadCurrentRegion(forced: Bool = true) async {
         guard let viewport = viewportGate.admitted else { return }
         let requestedFilters = filters
         let requestID = model.prepareLoad(filters: requestedFilters)
-        await model.mapService.invalidateTiles()
+        if forced { await model.mapService.invalidateTiles() }
         guard !Task.isCancelled else { return }
         await model.load(bounds: viewport.bounds, zoom: viewport.zoom, filters: requestedFilters,
-                         requestID: requestID, refresh: true)
+                         requestID: requestID, refresh: forced)
     }
 
     private func handlePrivacyZoneMapChange() {

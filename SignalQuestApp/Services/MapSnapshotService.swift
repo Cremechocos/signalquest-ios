@@ -47,6 +47,7 @@ final class MapSnapshotService: MapSnapshotServicing {
     private let api: APIClient
     private let socialCache: TileCache
     private let tileCache: TileCache
+    private let feedCache: MapFeedCache
     var sessionIdentifier: UUID { api.credentials.snapshot().sessionID }
 
     // Dossier DÉDIÉ. `MapSnapshotService` et `MarketRegistryService` prenaient
@@ -55,10 +56,14 @@ final class MapSnapshotService: MapSnapshotServicing {
     // instance, le scan tournait deux fois plus souvent, et chacun pouvait
     // supprimer les fichiers de l'autre en atteignant le plafond de 64 Mo. Leurs
     // TTL n'ont rien à voir (snapshot 30 s, registre 24 h).
-    init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestMapCache"), tileCache: TileCache = TileCache()) {
+    // `feedCacheTTL` : durée de vie des listes au périmètre du marché (incidents,
+    // sites prévus), alignée sur le `max-age=300` du serveur ; 0 la désactive.
+    init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestMapCache"), tileCache: TileCache = TileCache(),
+         feedCacheTTL: TimeInterval = 5 * 60) {
         self.api = api
         self.socialCache = TileCache(disk: cache, memoryTTL: 30, diskTTL: 30)
         self.tileCache = tileCache
+        self.feedCache = MapFeedCache(ttl: feedCacheTTL)
     }
 
     func snapshot(bounds: MapBounds, zoom: Double, lightweight: Bool = true) async throws -> SocialMapSnapshot {
@@ -166,11 +171,15 @@ final class MapSnapshotService: MapSnapshotServicing {
             query.append(URLQueryItem(name: "territory", value: territory))
         }
         query.append(contentsOf: Self.bandQueryItems(bands))
-        let response: PlannedSitesResponse = try await api.request(
-            APIEndpoint(path: "/api/map/planned-sites", query: query),
-            as: PlannedSitesResponse.self
-        )
-        return MapFeedResult(sites: response.sites, availability: response.availability)
+        let endpoint = APIEndpoint(path: "/api/map/planned-sites", query: query)
+        // Route authentifiée : la réponse peut dépendre du compte, la session entre dans la clé.
+        let key = Self.feedKey(endpoint, session: api.credentials.snapshot().sessionID)
+        let generation = await feedCache.currentGeneration()
+        if let cached = await feedCache.value(MapFeedResult<PlannedSiteLive>.self, for: key) { return cached }
+        let response: PlannedSitesResponse = try await api.request(endpoint, as: PlannedSitesResponse.self)
+        let result = MapFeedResult(sites: response.sites, availability: response.availability)
+        if result.availability.isComplete { await feedCache.store(result, for: key, generation: generation) }
+        return result
     }
 
     func outageSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [OutageSiteLive] {
@@ -192,11 +201,21 @@ final class MapSnapshotService: MapSnapshotServicing {
         // coordonnées `lat`/`lon` minuscules + un `issueType` exploitable, là où
         // `/api/sites-hs` renvoyait `Lat`/`Lon` (majuscules) que iOS ne décodait
         // pas → les pannes ne s'affichaient jamais.
-        let response: OutageSitesResponse = try await api.request(
-            APIEndpoint(path: "/api/android/map/incidents", query: query, authenticated: false),
-            as: OutageSitesResponse.self
-        )
-        return MapFeedResult(sites: response.sites, availability: response.availability)
+        let endpoint = APIEndpoint(path: "/api/android/map/incidents", query: query, authenticated: false)
+        let key = Self.feedKey(endpoint, session: nil)
+        let generation = await feedCache.currentGeneration()
+        if let cached = await feedCache.value(MapFeedResult<OutageSiteLive>.self, for: key) { return cached }
+        let response: OutageSitesResponse = try await api.request(endpoint, as: OutageSitesResponse.self)
+        let result = MapFeedResult(sites: response.sites, availability: response.availability)
+        if result.availability.isComplete { await feedCache.store(result, for: key, generation: generation) }
+        return result
+    }
+
+    /// Clé d'une liste au périmètre du marché : chemin et paramètres exacts, plus
+    /// la session quand la route est authentifiée.
+    private static func feedKey(_ endpoint: APIEndpoint, session: UUID?) -> String {
+        let query = endpoint.query.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+        return "\(endpoint.path)?\(query)#\(session?.uuidString ?? "public")"
     }
 
     /// Les incidents qu'un opérateur déclare LUI-MÊME sur un site précis.
@@ -620,7 +639,8 @@ final class MapSnapshotService: MapSnapshotServicing {
     func invalidateTiles() async {
         async let tiles: Void = tileCache.removeAll()
         async let social: Void = socialCache.removeAll()
-        _ = await (tiles, social)
+        async let feeds: Void = feedCache.removeAll()
+        _ = await (tiles, social, feeds)
     }
 
     private struct AvailableTile<Value: Decodable>: Decodable {
@@ -756,6 +776,56 @@ extension SocialMapSnapshot {
         rawCoveragePointsCount: 0,
         logicalCoveragePointsCount: 0
     )
+}
+
+/// Listes de carte au périmètre d'un marché entier (incidents opérateurs, sites
+/// prévus) : la réponse ne dépend pas du cadrage et le serveur la déclare valable
+/// 5 min (`max-age=300`), mais APIClient ignore le cache HTTP (isolation des
+/// comptes). Sans ce cache, chaque déplacement de carte retéléchargeait la liste
+/// entière : 115,8 Kio, 21 fois en 7 min (audit perf du 21/11). Seules les
+/// réponses complètes y entrent, pour qu'une source en panne soit redemandée au
+/// geste suivant ; `removeAll` (rechargement forcé) fait foi sur les lectures en vol.
+private actor MapFeedCache {
+    private struct Entry {
+        let createdAt: Date
+        let value: any Sendable
+    }
+    /// Peu de clés possibles (marché × opérateur × territoire × bandes) ; au-delà,
+    /// on repart de zéro plutôt que de tenir un ordre d'accès.
+    private static let entryLimit = 16
+    private let ttl: TimeInterval
+    private let now: @Sendable () -> Date
+    private var entries: [String: Entry] = [:]
+    private var generation = 0
+
+    init(ttl: TimeInterval, now: @escaping @Sendable () -> Date = { Date() }) {
+        self.ttl = ttl
+        self.now = now
+    }
+
+    func currentGeneration() -> Int { generation }
+
+    func value<T: Sendable>(_ type: T.Type, for key: String) -> T? {
+        guard let entry = entries[key] else { return nil }
+        let age = now().timeIntervalSince(entry.createdAt)
+        guard ttl > 0, age >= 0, age <= ttl, let value = entry.value as? T else {
+            entries[key] = nil
+            return nil
+        }
+        return value
+    }
+
+    /// N'écrit rien si un `removeAll` est passé depuis le début de la lecture.
+    func store<T: Sendable>(_ value: T, for key: String, generation readGeneration: Int) {
+        guard ttl > 0, readGeneration == generation else { return }
+        if entries[key] == nil, entries.count >= Self.entryLimit { entries.removeAll() }
+        entries[key] = Entry(createdAt: now(), value: value)
+    }
+
+    func removeAll() {
+        generation &+= 1
+        entries.removeAll()
+    }
 }
 
 extension MapSnapshotServicing {

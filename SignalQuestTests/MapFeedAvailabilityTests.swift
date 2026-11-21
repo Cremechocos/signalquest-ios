@@ -19,7 +19,8 @@ final class MapFeedAvailabilityTests: XCTestCase {
                             session: URLSession(configuration: config))
         let folder = "MapFeedAvailabilityTests-\(UUID())"
         let disk = DiskCache(folderName: folder)
-        let map = MapSnapshotService(api: api, cache: disk, tileCache: TileCache(disk: disk, memoryTTL: 0, diskTTL: 0))
+        let map = MapSnapshotService(api: api, cache: disk, tileCache: TileCache(disk: disk, memoryTTL: 0, diskTTL: 0),
+                                     feedCacheTTL: 0)
         let model = MapExplorerViewModel(map: map, antennas: AntennasService(api: api), markets: MarketRegistryService(api: api),
                                         communityOutages: CommunityOutageService(api: api))
         model.marketFilter = "FR"; model.operatorFilter = "SFR"
@@ -65,7 +66,8 @@ final class MapFeedAvailabilityTests: XCTestCase {
                             session: URLSession(configuration: config))
         let folder = "MapFeedAvailabilityTests-\(UUID())"
         let disk = DiskCache(folderName: folder)
-        let map = MapSnapshotService(api: api, cache: disk, tileCache: TileCache(disk: disk, memoryTTL: 0, diskTTL: 0))
+        let map = MapSnapshotService(api: api, cache: disk, tileCache: TileCache(disk: disk, memoryTTL: 0, diskTTL: 0),
+                                     feedCacheTTL: 0)
         let model = MapExplorerViewModel(map: map, antennas: AntennasService(api: api), markets: MarketRegistryService(api: api),
                                         communityOutages: CommunityOutageService(api: api))
         model.marketFilter = "FR"; model.operatorFilter = "SFR"
@@ -88,6 +90,44 @@ final class MapFeedAvailabilityTests: XCTestCase {
         XCTAssertNotNil(model.errorMessage)
     }
 
+    /// Audit perf du 21/11 : la liste des pannes du marché entier était
+    /// retéléchargée à chaque déplacement de carte (115,8 Kio, 21 fois en 7 min).
+    func testCompleteMarketFeedsAreReusedUntilAForcedReloadAndIncompleteOnesAreNot() async throws {
+        let fixture = FeedAvailabilityHTTPFixture()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                            session: URLSession(configuration: config))
+        let folder = "MapFeedAvailabilityTests-\(UUID())"
+        let disk = DiskCache(folderName: folder)
+        let map = MapSnapshotService(api: api, cache: disk, tileCache: TileCache(disk: disk, memoryTTL: 0, diskTTL: 0))
+        MockURLProtocol.requestHandler = fixture.response
+        defer {
+            MockURLProtocol.requestHandler = nil
+            let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            try? FileManager.default.removeItem(at: cacheRoot.appendingPathComponent(folder))
+        }
+        let incidents = "/api/android/map/incidents", planned = "/api/map/planned-sites"
+        for _ in 0..<2 {
+            let outages = try await map.outageSitesLayer(market: "FR", operatorName: "SFR")
+            let plans = try await map.plannedSitesLayer(market: "FR", operatorName: "SFR")
+            XCTAssertEqual(outages.sites.map(\.id), ["old-outage"])
+            XCTAssertEqual(plans.sites.map(\.id), ["old-planned"])
+        }
+        XCTAssertEqual(fixture.requestCount(incidents), 1, "A second pan must reuse the market-wide list")
+        XCTAssertEqual(fixture.requestCount(planned), 1)
+        _ = try await map.outageSitesLayer(market: "FR", operatorName: "ORANGE")
+        XCTAssertEqual(fixture.requestCount(incidents), 2, "Another operator is another list")
+
+        await map.invalidateTiles()
+        fixture.phase = .partial
+        for _ in 0..<2 { _ = try await map.outageSitesLayer(market: "FR", operatorName: "SFR") }
+        XCTAssertEqual(fixture.requestCount(incidents), 4, "A forced reload refetches, and a partial list is asked again next time")
+        fixture.phase = .complete
+        _ = try await map.outageSitesLayer(market: "FR", operatorName: "SFR")
+        _ = try await map.outageSitesLayer(market: "FR", operatorName: "SFR")
+        XCTAssertEqual(fixture.requestCount(incidents), 5)
+    }
 }
 
 private final class FeedAvailabilityHTTPFixture: @unchecked Sendable {
@@ -98,8 +138,11 @@ private final class FeedAvailabilityHTTPFixture: @unchecked Sendable {
         get { lock.withLock { current } }
         set { lock.withLock { current = newValue } }
     }
+    private var counts: [String: Int] = [:]
+    func requestCount(_ path: String) -> Int { lock.withLock { counts[path, default: 0] } }
     func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
         let url = try XCTUnwrap(request.url)
+        lock.withLock { counts[url.path, default: 0] += 1 }
         let state = phase
         var body: [String: Any]
         if url.path == "/api/community-outages" { body = ["outages": []] }
