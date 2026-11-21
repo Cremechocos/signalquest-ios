@@ -56,6 +56,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
         FirebaseApp.configure()
         Self.isFirebaseConfigured = true
+        // Collecte coupée par l'Info.plist : seul un « oui » enregistré la rallume, un
+        // « non » supprime les rapports restés sur l'appareil.
+        CrashReportingConsent.applyAtLaunch(collector: .crashlytics)
         // Sorties par chien de garde ou mémoire, blocages, énergie : ce que
         // Crashlytics ne voit pas seul (OBS-01).
         MetricKitReporter.shared.start()

@@ -72,7 +72,9 @@ enum SQDiagnostics {
 
     private static func send(_ report: NSError) {
         logger.error("non-fatal \(report.domain, privacy: .public) \(report.code, privacy: .public)")
-        guard FirebaseApp.app() != nil else { return }
+        // Rien sans le « oui » de la personne (CrashReportingConsent), relu à chaque envoi :
+        // un retrait dans Confidentialité vaut tout de suite, MetricKit et la sonde de gel compris.
+        guard FirebaseApp.app() != nil, CrashReportingConsent.allowsReports() else { return }
         #if DEBUG
         // En Debug (poste de développement, tests automatiques qui provoquent des
         // échecs exprès), rien ne part vers le tableau de bord de production, sauf

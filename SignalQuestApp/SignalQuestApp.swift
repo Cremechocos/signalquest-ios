@@ -524,6 +524,8 @@ struct RootView: View {
     @StateObject private var historyKeyAlerts = E2EEAutoHistoryKeyAlertCoordinator()
     /// Carte « Protège ton compte » (contrat 2FA r3.4, §6) : en tête de la liste Messages.
     @StateObject private var securityPrompt = SecurityPromptCoordinator()
+    /// Rapports de plantage : une question, une fois par appareil, invités compris.
+    @ObservedObject private var crashConsent = CrashReportingConsentStore.shared
     @EnvironmentObject private var addressStore: SQAddressStore
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
@@ -577,7 +579,14 @@ struct RootView: View {
 
     private var presentsLastBackupCodeNotice: Bool {
         session.lastBackupCodeNotice && isAuthenticated && !showsOtherLaunchPrompt && !presentsUsernameConfirmation
-            && !presentsDisplayNamePrompt && !callManager.showCallScreen
+            && !presentsDisplayNamePrompt && !presentsCrashConsent && !callManager.showCallScreen
+    }
+
+    /// Au-dessous de toutes les autres invites : cachée, sans être fermée, tant que
+    /// l'une d'elles ou une alerte de sécurité est à l'écran.
+    private var presentsCrashConsent: Bool {
+        crashConsent.needsDecision && !showsOtherLaunchPrompt && !presentsUsernameConfirmation
+            && !presentsDisplayNamePrompt
     }
 
     private var showsOtherLaunchPrompt: Bool {
@@ -768,7 +777,15 @@ struct RootView: View {
                     .accessibilityHidden(showsAddressPrompt || newDeviceAlerts.presented != nil || logAlerts.isPresented
                                          || showsHistoryApproval || showsHistoryRequester || showsHistoryKeyAlert
                                          || presentsUsernameConfirmation
-                                         || presentsDisplayNamePrompt)
+                                         || presentsDisplayNamePrompt || presentsCrashConsent)
+                    .overlay {
+                        if presentsCrashConsent {
+                            CrashReportingConsentPrompt(store: crashConsent) {}
+                                .accessibilityAddTraits(.isModal)
+                                .transition(.move(edge: .bottom))
+                        }
+                    }
+                    .sqAnimation(SQMotion.smooth, value: presentsCrashConsent)
                     .overlay {
                         if showsAddressPrompt {
                             SQAddressFormPrompt(onClose: {

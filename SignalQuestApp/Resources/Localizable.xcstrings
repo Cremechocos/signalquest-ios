@@ -1,6 +1,230 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Nous aider à corriger les plantages ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help us fix crashes?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nous aider à corriger les plantages ?"
+          }
+        }
+      }
+    },
+    "Si l’app plante ou se fige, un rapport technique peut nous être envoyé : l’endroit du code en cause, la version de l’app et le modèle de l’appareil. Jamais tes messages ni ta position." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the app crashes or freezes, a technical report can be sent to us: where in the code it happened, the app version and the device model. Never your messages or your location."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’app plante ou se fige, un rapport technique peut nous être envoyé : l’endroit du code en cause, la version de l’app et le modèle de l’appareil. Jamais tes messages ni ta position."
+          }
+        }
+      }
+    },
+    "SQFormal|Si l’app plante ou se fige, un rapport technique peut nous être envoyé : l’endroit du code en cause, la version de l’app et le modèle de l’appareil. Jamais tes messages ni ta position." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’app plante ou se fige, un rapport technique peut nous être envoyé : l’endroit du code en cause, la version de l’app et le modèle de l’appareil. Jamais vos messages ni votre position."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu pourras changer d’avis à tout moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change your mind at any time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras changer d’avis à tout moment."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu pourras changer d’avis à tout moment." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pourrez changer d’avis à tout moment."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Envoyer les rapports" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send reports"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer les rapports"
+          }
+        }
+      }
+    },
+    "Plantages et blocages, sans tes contenus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crashes and freezes, without your content."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plantages et blocages, sans tes contenus."
+          }
+        }
+      }
+    },
+    "SQFormal|Plantages et blocages, sans tes contenus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plantages et blocages, sans vos contenus."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ne pas envoyer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t send"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne pas envoyer"
+          }
+        }
+      }
+    },
+    "Rien ne part, et les rapports en attente sont supprimés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is sent, and pending reports are deleted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien ne part, et les rapports en attente sont supprimés."
+          }
+        }
+      }
+    },
+    "Lire la politique de confidentialité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the privacy policy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire la politique de confidentialité"
+          }
+        }
+      }
+    },
+    "Rapports de plantage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crash reports"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapports de plantage"
+          }
+        }
+      }
+    },
+    "Amélioration de l’app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App improvement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amélioration de l’app"
+          }
+        }
+      }
+    },
+    "Plantages, blocages et erreurs techniques, avec la version de l’app et le modèle de l’appareil, pour corriger les problèmes. Jamais tes messages ni ta position. Les désactiver supprime les rapports pas encore envoyés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crashes, freezes and technical errors, with the app version and the device model, to fix problems. Never your messages or your location. Turning them off deletes reports not sent yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plantages, blocages et erreurs techniques, avec la version de l’app et le modèle de l’appareil, pour corriger les problèmes. Jamais tes messages ni ta position. Les désactiver supprime les rapports pas encore envoyés."
+          }
+        }
+      }
+    },
+    "SQFormal|Plantages, blocages et erreurs techniques, avec la version de l’app et le modèle de l’appareil, pour corriger les problèmes. Jamais tes messages ni ta position. Les désactiver supprime les rapports pas encore envoyés." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plantages, blocages et erreurs techniques, avec la version de l’app et le modèle de l’appareil, pour corriger les problèmes. Jamais vos messages ni votre position. Les désactiver supprime les rapports pas encore envoyés."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
     "Aucune cellule repérée par la communauté ici pour l’instant." : {
       "localizations" : {
         "en" : {

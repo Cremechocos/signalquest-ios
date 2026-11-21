@@ -43,6 +43,8 @@ struct LoginView: View {
     @State private var usesBackupCode = false
     @State private var showSignup = false
     @State private var showForgotPassword = false
+    @State private var showsCrashConsent = false
+    @ObservedObject private var crashConsent = CrashReportingConsentStore.shared
     @State private var pendingAppleConsent: PendingAppleConsent?
     @State private var appeared = false
     @FocusState private var focus: Field?
@@ -272,7 +274,7 @@ struct LoginView: View {
 
     /// Liens légaux discrets (LOGIN-LEGAL-01), URLs centralisées d'AppConfig.
     private var legalFooter: some View {
-        Group {
+        VStack(spacing: 0) {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.xs) {
                     termsLink
@@ -285,6 +287,15 @@ struct LoginView: View {
                     privacyLink
                 }
             }
+            // Un invité n'atteint pas Confidentialité : il change d'avis d'ici.
+            if crashConsent.isAvailable {
+                Button("Rapports de plantage") { showsCrashConsent = true }
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("login.crashReports")
+            }
+        }
+        .sheet(isPresented: $showsCrashConsent) {
+            CrashReportingConsentPrompt(store: crashConsent, showsClose: true) { showsCrashConsent = false }
         }
         .font(SQType.caption)
         .tint(SQColor.labelSecondary)

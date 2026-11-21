@@ -15,6 +15,8 @@ struct PrivacySettingsView: View {
     @State private var liveShareConsented = false
     @State private var zoneEditor: PrivacyZoneEditorRoute?
     @EnvironmentObject private var unitsStore: SQUnitsStore
+    /// Propre à l'appareil, sans compte : jamais grisé avec les réglages du serveur.
+    @ObservedObject private var crashConsent = CrashReportingConsentStore.shared
 
     init(service: PrivacyServicing) {
         _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
@@ -239,6 +241,26 @@ struct PrivacySettingsView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
             .listRowBackground(SQColor.surface)
+
+            if crashConsent.isAvailable {
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { crashConsent.choice == .granted },
+                        set: { crashConsent.choose($0 ? .granted : .denied) }
+                    )) {
+                        SQSettingsRowLabel("Rapports de plantage", systemImage: "ladybug")
+                    }
+                    .accessibilityIdentifier("privacy.crashReports")
+                } header: {
+                    Text("Amélioration de l’app").sqKicker()
+                } footer: {
+                    Text("Plantages, blocages et erreurs techniques, avec la version de l’app et le modèle de l’appareil, pour corriger les problèmes. Jamais tes messages ni ta position. Les désactiver supprime les rapports pas encore envoyés.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .tint(SQColor.brandRed)
+                .listRowBackground(SQColor.surface)
+            }
 
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.dangerInk) }
