@@ -569,6 +569,21 @@ final class AntennaDetailOperatorSwitchTests: XCTestCase {
         XCTAssertEqual(model.details?.core?.operators, ["SFR"])
         XCTAssertEqual(service.calls, ["ORANGE", "ORANGE", "SFR"], "Après une relecture, plus rien n'est repris")
     }
+
+    /// Free absent de la fiche de 485431 ouverte depuis la carte en SFR (audit perf du
+    /// 21/11) : la tuile ne porte que la station SFR et Bouygues, la fiche annonce
+    /// tous les opérateurs du support dans `operatorFacets`.
+    func testSupportOperatorsAddTheSheetFacetsMissingFromTheTile() throws {
+        let details = try JSONDecoder.signalQuest.decode(AntennaDetails.self, from: Data("""
+        {"antenna":{"id":"485431","supId":"485431","lat":45.0,"lng":5.0,"operators":["SFR"],"operatorFacets":["SFR","BOUYGUES","FREE"],"technologies":["4G"],"azimuts":[]}}
+        """.utf8))
+        let facets = try XCTUnwrap(details.core?.operatorFacets)
+        XCTAssertEqual(AntennaDetailSheet.supportOperators(site: ["SFR", "BOUYGUES"], facets: facets),
+                       ["SFR", "BOUYGUES", "FREE"])
+        XCTAssertEqual(AntennaDetailSheet.supportOperators(site: ["SFR", "Bouygues"], facets: ["ALL", "", " FREE ", "bouygues", "FREE"]),
+                       ["SFR", "Bouygues", "FREE"], "Ni « ALL », ni vide, ni doublon, la casse de la tuile gardée")
+        XCTAssertEqual(AntennaDetailSheet.supportOperators(site: ["SFR", "BOUYGUES"], facets: []), ["SFR", "BOUYGUES"])
+    }
 }
 
 private final class CountingDetailsService: AntennasServicing, @unchecked Sendable {

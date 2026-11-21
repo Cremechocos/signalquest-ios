@@ -175,6 +175,10 @@ struct AntennaDetailSheet: View {
     /// N° ARCEP des autres opérateurs, lus dans la même fiche que leurs bandes ; `nil` en valeur :
     /// fiche lue, numéro non publié. Absent : fiche pas (encore) lue.
     @State private var otherOperatorSiteNumbers: [String: String?] = [:]
+    /// Opérateurs du support selon la fiche (`operatorFacets`, cumulés au fil des
+    /// lectures) : la tuile filtrée sur un opérateur ne porte que sa station et son
+    /// partenaire Crozon.
+    @State private var supportFacets: [String] = []
     /// Historique ANFR du support, pour « Dernier changement ANFR » (choix d'Alexandre du 20/11).
     @State private var anfrHistory: ANFRSiteHistory?
     @State private var anfrHistorySupId: String?
@@ -316,6 +320,9 @@ struct AntennaDetailSheet: View {
                 async let favoritesLoad: Void = services.favoriteAntennas.load()
                 async let marketLoad: Void = loadMarketEntry()
                 await model.show(id: detailsSiteId, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                if let facets = model.details?.core?.operatorFacets {
+                    supportFacets = Self.supportOperators(site: supportFacets, facets: facets)
+                }
                 await marketLoad
                 // L'historique lit le n° de support de la fiche, et le registre outre-mer.
                 async let historyLoad: Void = loadAnfrHistory()
@@ -323,7 +330,8 @@ struct AntennaDetailSheet: View {
                 await favoritesLoad
                 await historyLoad
             }
-            .task(id: site.id) { await loadOtherOperatorBands() }
+            // Relancé quand la fiche ajoute un opérateur absent de la tuile.
+            .task(id: supportOperators) { await loadOtherOperatorBands() }
         }
         .presentationDetents([.medium, .large])
         .sqSheet(background: SQColor.bg)
@@ -485,7 +493,7 @@ struct AntennaDetailSheet: View {
     }
 
     private var photoOperatorChoices: [String] {
-        Array(Set(site.operators
+        Array(Set(supportOperators
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
             .filter { !$0.isEmpty && $0 != "ALL" }))
             .sorted()
@@ -503,7 +511,28 @@ struct AntennaDetailSheet: View {
 
     /// Les opérateurs du support dans l'ordre des lignes de la fiche, l'actif en tête (forme B du 19/11).
     private var supportOperatorsActiveFirst: [String] {
-        [selectedOperator] + site.operators.filter { $0 != selectedOperator }
+        [selectedOperator] + supportOperators.filter { $0 != selectedOperator }
+    }
+
+    /// Tous les opérateurs du support, quel que soit le chemin d'ouverture. Le site
+    /// vient de la tuile de la carte, filtrée sur l'opérateur affiché, ou d'un récent
+    /// enregistré depuis elle : sur 485431 vu en SFR, la tuile ne porte que la station
+    /// SFR et Bouygues, et Free (sa propre station) disparaissait (audit perf du 21/11).
+    /// Un site sans opérateur (ouvert en « ALL ») garde sa ligne unique.
+    private var supportOperators: [String] {
+        site.operators.isEmpty ? [] : Self.supportOperators(site: site.operators, facets: supportFacets)
+    }
+
+    /// Les opérateurs du site, puis ceux de la fiche qui leur manquent, sans « ALL » ni doublon.
+    nonisolated static func supportOperators(site: [String], facets: [String]) -> [String] {
+        var result = site
+        for facet in facets {
+            let key = facet.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, key.caseInsensitiveCompare("ALL") != .orderedSame,
+                  !result.contains(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) else { continue }
+            result.append(key)
+        }
+        return result
     }
 
     /// Des visages sur la photo : l'éditeur « Flouter » s'ouvre avant l'envoi,
@@ -694,7 +723,7 @@ struct AntennaDetailSheet: View {
             status: core?.displayStatus,
             statusColor: core.map { $0.isInService ? SQColor.success : $0.isPendingStatus ? SQColor.warning : SQColor.labelSecondary }
                 ?? SQColor.labelSecondary,
-            operators: site.operators.map { MapPhotoSite.Operator(label: photoOperatorLabel($0), color: registryColor($0)) },
+            operators: supportOperators.map { MapPhotoSite.Operator(label: photoOperatorLabel($0), color: registryColor($0)) },
             technologies: displayedTechnologies,
             height: (core?.siteInfo.supportHeightMeters ?? core?.siteInfo.pylonHeight).map { "\(Int($0.rounded())) m" }
         )
@@ -759,9 +788,9 @@ struct AntennaDetailSheet: View {
             if hasStatusTags {
                 HStack(spacing: SQSpace.xs2) {
                     statusTag
-                    if site.operators.count > 1 {
+                    if supportOperators.count > 1 {
                         SQEditorialTag(
-                            text: String(localized: "Partagé · \(site.operators.count) opérateurs"),
+                            text: String(localized: "Partagé · \(supportOperators.count) opérateurs"),
                             color: SQColor.labelSecondary
                         )
                     }
@@ -813,7 +842,7 @@ struct AntennaDetailSheet: View {
     }
 
     private var hasStatusTags: Bool {
-        model.details?.core?.displayStatus != nil || site.operators.count > 1
+        model.details?.core?.displayStatus != nil || supportOperators.count > 1
             || model.details?.core?.hasFhLink == true
     }
 
@@ -991,19 +1020,19 @@ struct AntennaDetailSheet: View {
     private var radioBlock: some View {
         section("Radio") {
             VStack(spacing: 0) {
-                ForEach(Array(site.operators.enumerated()), id: \.element) { index, op in
+                ForEach(Array(supportOperators.enumerated()), id: \.element) { index, op in
                     operatorRow(op)
                         .overlay(alignment: .top) {
                             if index > 0 { Rectangle().fill(SQColor.separator).frame(height: 1) }
                         }
                 }
-                if site.operators.isEmpty {
+                if supportOperators.isEmpty {
                     operatorRow(selectedOperator)
                 }
             }
             .padding(.horizontal, SQSpace.md)
             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            if site.operators.count > 1 {
+            if supportOperators.count > 1 {
                 Text("Touche un opérateur pour voir sa fiche.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -1014,7 +1043,7 @@ struct AntennaDetailSheet: View {
     @ViewBuilder
     private func operatorRow(_ op: String) -> some View {
         let isActive = op == selectedOperator
-        let isSwitchable = site.operators.count > 1 && !isActive
+        let isSwitchable = supportOperators.count > 1 && !isActive
         let header = HStack(spacing: SQSpace.sm) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(registryColor(op))
@@ -1081,7 +1110,7 @@ struct AntennaDetailSheet: View {
         } else {
             row
                 .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(site.operators.count > 1 ? .isSelected : [])
+                .accessibilityAddTraits(supportOperators.count > 1 ? .isSelected : [])
                 .accessibilityIdentifier("antenna.detail.operator.\(op)")
         }
     }
@@ -1216,7 +1245,7 @@ struct AntennaDetailSheet: View {
     /// opérateur, puis les projets du support et « Mêmes bandes déclarées par … ».
     private var operatorBandsContent: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            ForEach(site.operators.isEmpty ? [selectedOperator] : supportOperatorsActiveFirst, id: \.self) { op in
+            ForEach(supportOperators.isEmpty ? [selectedOperator] : supportOperatorsActiveFirst, id: \.self) { op in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: SQSpace.sm) {
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -1298,8 +1327,8 @@ struct AntennaDetailSheet: View {
     /// Lit une fois par support la fiche de chaque autre opérateur, en parallèle.
     /// Un échec garde la tuile (ou « Bandes non publiées »), sans message.
     private func loadOtherOperatorBands() async {
-        let others = site.operators.filter { $0 != selectedOperator && $0.caseInsensitiveCompare("ALL") != .orderedSame && otherOperatorSystems[$0] == nil }
-        guard site.operators.count > 1, !others.isEmpty else { return }
+        let others = supportOperators.filter { $0 != selectedOperator && $0.caseInsensitiveCompare("ALL") != .orderedSame && otherOperatorSystems[$0] == nil }
+        guard supportOperators.count > 1, !others.isEmpty else { return }
         loadingOtherOperators.formUnion(others)
         let service = services.antennas
         let id = site.siteId ?? site.id
@@ -1332,11 +1361,11 @@ struct AntennaDetailSheet: View {
     /// opérateurs du support déclarent les mêmes bandes (choix d'Alexandre du
     /// 09/11 : nommer les opérateurs plutôt que dire « équipement partagé »).
     private var sameBandsNote: String? {
-        guard site.operators.count > 1 else { return nil }
-        let lists = site.operators.map { bandRows(for: $0) }
+        guard supportOperators.count > 1 else { return nil }
+        let lists = supportOperators.map { bandRows(for: $0) }
         guard lists.allSatisfy({ $0 != nil }), GenerationBands.sameDeclaredBands(lists.compactMap { $0 }) else { return nil }
         // Ordre alphabétique : la phrase ne dépend pas de l'ordre servi par la tuile.
-        let names = site.operators.map(photoOperatorLabel)
+        let names = supportOperators.map(photoOperatorLabel)
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         return String(localized: "Mêmes bandes déclarées par \(names.formatted(.list(type: .and)))")
     }
@@ -1608,8 +1637,8 @@ struct AntennaDetailSheet: View {
     private var headerSubtitle: String? {
         if siteName != nil { return locationLine }
         if locationLine != nil {
-            return site.operators.count > 1
-                ? String(localized: "Antenne partagée par \(site.operators.count) opérateurs")
+            return supportOperators.count > 1
+                ? String(localized: "Antenne partagée par \(supportOperators.count) opérateurs")
                 : nil
         }
         return site.owner ?? String(localized: "Opérateurs inconnus")
