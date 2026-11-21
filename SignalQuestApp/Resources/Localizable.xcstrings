@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Aucune cellule repérée par la communauté ici pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cells spotted by the community here yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune cellule repérée par la communauté ici pour l’instant."
+          }
+        }
+      }
+    },
     "Décisions de modération" : {
       "localizations" : {
         "en" : {
@@ -21097,7 +21113,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compare operators here"
+            "value" : "Compare carriers here"
           }
         },
         "fr" : {
@@ -55889,7 +55905,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose an operator to display coverage."
+            "value" : "Choose a carrier to show coverage."
           }
         },
         "fr" : {
@@ -102326,7 +102342,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Map"
+            "value" : "Standard"
           }
         },
         "fr" : {

@@ -522,6 +522,8 @@ struct MapSheetRow<Icon: View>: View {
                     Text(LocalizedStringKey(subtitle)).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                 }
             }
+            // Étiquette d'un `Menu`, la ligne centrerait sinon ses textes sur plusieurs lignes.
+            .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: SQSpace.sm)
             if let value {

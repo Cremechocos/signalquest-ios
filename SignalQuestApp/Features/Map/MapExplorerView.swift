@@ -2898,6 +2898,8 @@ struct MapExplorerView: View {
     /// Rien ne signale l'appui long sur la carte : une astuce, une seule fois, dans tout pays
     /// suivi (le comparatif y répond), jamais dans les tests UI.
     private var showsZoneCompareTip: Bool {
+        // Un message d'état passe d'abord : l'astuce attend au lieu de s'empiler dessus.
+        guard statusNotice == nil else { return false }
         #if DEBUG
         if ProcessInfo.processInfo.environment["SQ_QA_ZONE_COMPARE_TIP"] == "1" { return !zoneCompareTipDone }
         #endif
@@ -3321,9 +3323,54 @@ struct MapExplorerView: View {
         }
     }
 
+    /// Message d'état posé sur la carte : un seul à la fois, et l'astuce de l'appui
+    /// long attend qu'il disparaisse au lieu de s'empiler dessus.
+    private enum MapStatusNotice {
+        case location(MapLocationIssue)
+        case error(String)
+        case info(String, icon: String)
+    }
+
+    private var statusNotice: MapStatusNotice? {
+        if let issue = locationIssue { return .location(issue) }
+        if let error = model.errorMessage { return .error(error) }
+        // Le contrôle « Vue partielle » porte cet état et son explication.
+        if !model.displayLimitMessages.isEmpty { return nil }
+        if viewportGate.admitted == nil {
+            return .info(String(localized: "Préparation de la carte…"), icon: "map")
+        }
+        if filters.contains(.coverage), model.operatorFilter.uppercased() == "ALL" {
+            return .info(String(localized: "Choisis un opérateur pour afficher la couverture."), icon: "line.3.horizontal.decrease.circle")
+        }
+        let nothingShown = !model.isLoading && model.hasCurrentResponse && renderedAnnotations.isEmpty
+            && renderedCoverageFeatures.isEmpty && renderedSpeedtestFeatures.isEmpty
+        // Cellules vide : la couche le dit elle-même, même quand une autre couche a des résultats.
+        if showsEmptyCellsNotice && (!nothingShown || shownLayers == [.communitySite]) {
+            return .info(String(localized: "Aucune cellule repérée par la communauté ici pour l’instant."), icon: "scope")
+        }
+        if nothingShown {
+            return .info(String(localized: "Aucun résultat reçu pour cette vue et ces filtres."), icon: "map")
+        }
+        if !model.isLoading && !model.hasCurrentResponse {
+            return .info(String(localized: "Chargement interrompu. Déplace la carte pour réessayer."), icon: "arrow.clockwise")
+        }
+        return nil
+    }
+
+    /// Couche Cellules allumée, réponse complète, aucune cellule. En France, le serveur
+    /// ne sert aujourd'hui aucun candidat communautaire (audit de la carte du 21/11) :
+    /// sans ce message, la couche restait vide sans rien dire.
+    private var showsEmptyCellsNotice: Bool {
+        filters.contains(.communitySite) && model.supportsCommunityLayers
+            && !model.isLoading && model.hasCurrentResponse
+            && model.tileLoadIssues[.communitySite] == nil
+            && model.communitySiteTiles.allSatisfy { $0.markers.isEmpty }
+    }
+
     @ViewBuilder
     private var mapStatusToast: some View {
-        if let issue = locationIssue {
+        switch statusNotice {
+        case .location(let issue)?:
             VStack(spacing: SQSpace.xs) {
                 mapToast(issue.message, icon: "location.slash", tint: SQColor.warning)
                 Button(issue.actionTitle) {
@@ -3340,7 +3387,7 @@ struct MapExplorerView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("map.location.action")
             }
-        } else if let error = model.errorMessage {
+        case .error(let error)?:
             VStack(spacing: SQSpace.xs) {
                 mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
                 Button("Réessayer") { fetchTask = Task { await reloadCurrentRegion() } }
@@ -3350,18 +3397,10 @@ struct MapExplorerView: View {
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("map.status.retry")
             }
-        } else if !model.displayLimitMessages.isEmpty {
-            // Le contrôle « Vue partielle » porte cet état et son explication.
+        case .info(let text, let icon)?:
+            mapToast(text, icon: icon, tint: SQColor.labelSecondary)
+        case nil:
             EmptyView()
-        } else if viewportGate.admitted == nil {
-            mapToast(String(localized: "Préparation de la carte…"), icon: "map", tint: SQColor.labelSecondary)
-        } else if filters.contains(.coverage), model.operatorFilter.uppercased() == "ALL" {
-            mapToast(String(localized: "Choisis un opérateur pour afficher la couverture."), icon: "line.3.horizontal.decrease.circle", tint: SQColor.labelSecondary)
-        } else if !model.isLoading && model.hasCurrentResponse && renderedAnnotations.isEmpty
-                    && renderedCoverageFeatures.isEmpty && renderedSpeedtestFeatures.isEmpty {
-            mapToast(String(localized: "Aucun résultat reçu pour cette vue et ces filtres."), icon: "map", tint: SQColor.labelSecondary)
-        } else if !model.isLoading && !model.hasCurrentResponse {
-            mapToast(String(localized: "Chargement interrompu. Déplace la carte pour réessayer."), icon: "arrow.clockwise", tint: SQColor.labelSecondary)
         }
     }
 
@@ -3371,7 +3410,7 @@ struct MapExplorerView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(text)
-                .font(.subheadline.weight(.semibold))
+                .font(SQFont.body(14, .semibold))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("map.status.text")
