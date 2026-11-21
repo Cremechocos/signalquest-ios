@@ -192,6 +192,60 @@ final class FeedContextTests: XCTestCase {
         XCTAssertEqual(model.pendingCount, 0)
     }
 
+    /// Audit perf, E2 : deux instantanés reçus dans l'intervalle ne font qu'une relecture,
+    /// à l'échéance ; aucun n'est perdu. Chaque relecture rend un post de plus.
+    func testStreamRechecksAtMostOncePerIntervalWithoutLosingALateSnapshot() async throws {
+        let streams = FeedFixtureStreams(), calls = FeedCallCount()
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in
+            let count = await calls.next()
+            return Self.page("read-\(count)", items: (1...count).map { Self.item("post-\($0)") })
+        }, liveCheckInterval: 1.5)
+        await model.load()
+        model.startStream { streams.make() }
+        defer { model.stopStream() }
+        let raw = String(decoding: try JSONEncoder.signalQuest.encode(Self.page("global", items: [Self.item("x")])), as: UTF8.self)
+        streams.emit(0, raw)
+        await eventually { model.pendingCount == 1 }
+
+        streams.emit(0, raw); streams.emit(0, raw)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(model.pendingCount, 1, "Pas de relecture avant l'échéance")
+        await eventually { model.pendingCount == 2 }
+        try await Task.sleep(for: .seconds(2))
+        XCTAssertEqual(model.pendingCount, 2, "Une seule relecture pour les deux instantanés")
+    }
+
+    /// Audit perf, E2 : seule la première page demande stories, tendances et suggestions ;
+    /// la page suivante et le fil d'un hashtag demandent les posts seuls.
+    func testNextPagesAskForPostsOnly() async throws {
+        var includes: [String] = []
+        // Le gestionnaire tourne sur une file de CFNetwork : rien d'isolé au MainActor dedans.
+        MockURLProtocol.requestHandler = { request in
+            if request.url?.path == "/api/social/feed" {
+                includes.append(Self.queryValue("include", of: request) ?? "")
+            }
+            let json = Self.queryValue("cursor", of: request) != nil
+                ? #"{"items":[],"nextCursor":null}"#
+                : #"{"items":[{"id":"a","kind":"post","author":{"id":"qa-author","name":"Recette"},"text":"a"}],"nextCursor":"next"}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("feed-include-access-token")
+        let service = SocialFeedService(api: APIClient(config: .test, credentials: credentials,
+                                                       session: URLSession(configuration: configuration)))
+        let model = FeedViewModel(service: service)
+
+        await model.load()
+        await model.loadMore()
+        _ = try await service.loadFeedItems(cursor: nil, hashtag: "beta", tab: nil)
+        XCTAssertEqual(includes, ["items,stories,trends,suggestions", "items", "items"])
+        XCTAssertEqual(model.page?.items.map(\.id), ["a"])
+    }
+
     /// Jusqu'à 5 s : une seconde ne suffisait pas sous la charge des portes
     /// (simulateur partagé), le test passant pourtant seul.
     private func eventually(_ condition: () -> Bool) async {
@@ -200,6 +254,10 @@ final class FeedContextTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(condition())
+    }
+
+    nonisolated private static func queryValue(_ name: String, of request: URLRequest) -> String? {
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
     }
 
     nonisolated private static func item(_ id: String) -> UnifiedSocialFeedItem {

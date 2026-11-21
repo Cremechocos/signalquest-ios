@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import SignalQuest
 
@@ -676,6 +677,31 @@ final class InboxBadgePresentationStateTests: XCTestCase {
         let currentFetch = try XCTUnwrap(state.beginRefresh(force: false))
         XCTAssertTrue(state.publish(unreadCount: 6, for: currentFetch))
         XCTAssertEqual(state.unreadCount, 6)
+    }
+
+    /// Audit perf, D2 : AppServices est observé par toute l'app ; un compteur relu à
+    /// l'identique ne doit plus réveiller ses observateurs.
+    func testAnUnchangedBadgeCountDoesNotWakeTheAppServicesObservers() throws {
+        let previousUserId = LocalAccountScope.currentUserId
+        LocalAccountScope.activate(userId: "d2-badge-account")
+        defer { if let previousUserId { LocalAccountScope.activate(userId: previousUserId) } else { LocalAccountScope.deactivate() } }
+        let services = AppServices(config: .test)
+        var changes = 0
+        let observation = services.objectWillChange.sink { changes += 1 }
+        defer { observation.cancel() }
+
+        services.publishNotificationBadge(unreadCount: 3, for: try XCTUnwrap(services.notificationBadgeRefreshTicket()))
+        XCTAssertEqual(services.unreadNotifications, 3)
+        XCTAssertEqual(changes, 1)
+
+        services.publishNotificationBadge(unreadCount: 3, for: try XCTUnwrap(services.notificationBadgeRefreshTicket()))
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        services.applyNotificationBadgeMutation(unreadCount: 3, for: session)
+        XCTAssertEqual(changes, 1, "Même valeur : aucune notification aux vues")
+
+        services.applyNotificationBadgeMutation(unreadCount: 2, for: session)
+        XCTAssertEqual(services.unreadNotifications, 2)
+        XCTAssertEqual(changes, 2, "Une vraie variation se publie toujours")
     }
 }
 

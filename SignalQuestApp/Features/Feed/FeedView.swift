@@ -22,11 +22,19 @@ final class FeedViewModel: ObservableObject {
     private let service: SocialFeedServicing
     private let storiesService: StoriesServicing?
     private let location: LocationService?
+    /// Au plus une revérification du fil par intervalle : chaque instantané du flux en
+    /// relançait une (20 posts complets), sans délai (audit perf, E2). Un instantané reçu
+    /// entre-temps n'est pas perdu : il en déclenche une seule, à l'échéance.
+    private let liveCheckInterval: TimeInterval
+    private var lastLiveCheckAt: Date?
+    private var deferredLiveCheck: Task<Void, Never>?
 
-    init(service: SocialFeedServicing, storiesService: StoriesServicing? = nil, location: LocationService? = nil) {
+    init(service: SocialFeedServicing, storiesService: StoriesServicing? = nil, location: LocationService? = nil,
+         liveCheckInterval: TimeInterval = 10) {
         self.service = service
         self.storiesService = storiesService
         self.location = location
+        self.liveCheckInterval = liveCheckInterval
     }
 
     /// Charge le pouls réseau autour de la position courante. Ne déclenche JAMAIS
@@ -117,6 +125,8 @@ final class FeedViewModel: ObservableObject {
     private func restartStream() {
         streamRevision = UUID()
         streamTask?.cancel(); streamTask = nil
+        // Un nouveau flux (onglet, hashtag, reconnexion) revérifie sans attendre l'intervalle.
+        deferredLiveCheck?.cancel(); deferredLiveCheck = nil; lastLiveCheckAt = nil
         guard let streamFactory else { return }
         let streamID = streamRevision, context = query
         let messages = streamFactory()
@@ -132,10 +142,11 @@ final class FeedViewModel: ObservableObject {
     func stopStream() {
         streamFactory = nil; streamRevision = UUID(); loadRevision = UUID()
         streamTask?.cancel(); streamTask = nil
+        deferredLiveCheck?.cancel(); deferredLiveCheck = nil
         isLoading = false; isLoadingMore = false; needsLiveCheck = false; liveCheckID = nil
     }
 
-    deinit { streamTask?.cancel() }
+    deinit { streamTask?.cancel(); deferredLiveCheck?.cancel() }
 
     private func handleSnapshot(_ raw: String, context: Query, streamID: UUID) async {
         guard await Self.isValidSnapshot(raw),
@@ -159,6 +170,17 @@ final class FeedViewModel: ObservableObject {
     private func refreshPending(context: Query, streamID: UUID) async {
         guard context == query, streamID == streamRevision, !Task.isCancelled else { return }
         guard !isLoading, page != nil, liveCheckID == nil else { needsLiveCheck = true; return }
+        if let last = lastLiveCheckAt, case let wait = liveCheckInterval - Date().timeIntervalSince(last), wait > 0 {
+            guard deferredLiveCheck == nil else { return }
+            deferredLiveCheck = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(wait))
+                guard !Task.isCancelled else { return }
+                self?.deferredLiveCheck = nil
+                await self?.refreshPending(context: context, streamID: streamID)
+            }
+            return
+        }
+        lastLiveCheckAt = Date()
         let check = UUID()
         liveCheckID = check
         defer {
@@ -172,7 +194,7 @@ final class FeedViewModel: ObservableObject {
         }
         let loading = loadRevision
         do {
-            let freshPage = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab)
+            let freshPage = try await service.loadFeedItems(cursor: nil, hashtag: context.hashtag, tab: context.tab)
             guard context == query, streamID == streamRevision, loading == loadRevision,
                   !Task.isCancelled, let page else { return }
             let fresh = Set(freshPage.items.map(\.id)).subtracting(page.items.map(\.id)).subtracting(knownIds)
@@ -252,7 +274,7 @@ final class FeedViewModel: ObservableObject {
         defer { if context == query && loading == loadRevision { isLoadingMore = false } }
         do {
             for _ in 0..<Self.emptyPageHops {
-                let next = try await service.loadFeed(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
+                let next = try await service.loadFeedItems(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
                 guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
                 var seen = Set(current.items.map(\.id))
                 let appended = next.items.filter { seen.insert($0.id).inserted }

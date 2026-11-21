@@ -378,6 +378,75 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertEqual(model.conversations.map(\.id), ["a"])
     }
 
+    /// Audit perf, E1 : le sondage relit la page 1 seule. Les pages déjà défilées restent,
+    /// curseur compris ; une conversation qui remonte arrive par la page 1 ; une page 1
+    /// sans suite remplace toute la liste ; une relecture complète repasse par chaque page.
+    @MainActor
+    func testPollingRereadsTheFirstPageOnlyAndKeepsTheScrolledPages() async throws {
+        func row(_ id: String, _ lastMessageAt: String? = nil) -> String {
+            let date = lastMessageAt.map { ",\"lastMessageAt\":\"\($0)\"" } ?? ""
+            return "{\"id\":\"\(id)\",\"isGroup\":false,\"participants\":[]\(date)}"
+        }
+        var firstPage = #"{"conversations":[\#(row("a"))],"hasMore":true,"nextCursor":"p2"}"#
+        // Le gestionnaire tourne sur une file de CFNetwork : rien d'isolé au MainActor dedans.
+        let secondPage = #"{"conversations":[\#(row("b")),\#(row("c"))],"hasMore":true,"nextCursor":"p3"}"#
+        let thirdPage = #"{"conversations":[\#(row("d"))],"hasMore":false}"#
+        var requests: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            let cursor = Self.cursor(of: request)
+            requests.append(cursor ?? "p1")
+            let json: String
+            switch cursor {
+            case "p2": json = secondPage
+            case "p3": json = thirdPage
+            default: json = firstPage
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("first-page-poll-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let model = MessagesViewModel(service: MessagesService(api: api))
+
+        await model.load()
+        await model.loadMore()
+        XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "b", "c"])
+        requests.removeAll()
+
+        // « b » reçoit un message : le serveur le remonte en page 1.
+        firstPage = #"{"conversations":[\#(row("b", "2026-11-21T04:00:00.000Z")),\#(row("a"))],"hasMore":true,"nextCursor":"p2"}"#
+        await model.load(firstPageOnly: true)
+        XCTAssertEqual(requests, ["p1"], "Le sondage ne relit que la page 1")
+        XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "b", "c"], "La page déjà défilée reste")
+        XCTAssertEqual(model.conversations.first?.id, "b")
+        XCTAssertNotNil(model.conversations.first?.lastMessageAt, "La version de la page 1 remplace l'ancienne")
+        XCTAssertTrue(model.hasMoreConversations)
+
+        await model.loadMore()
+        XCTAssertEqual(requests, ["p1", "p3"], "La suite repart du curseur de la dernière page lue")
+        XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "b", "c", "d"])
+        XCTAssertFalse(model.hasMoreConversations)
+
+        requests.removeAll()
+        await model.load()
+        XCTAssertEqual(requests, ["p1", "p2", "p3"], "Une relecture complète repasse par chaque page")
+
+        requests.removeAll()
+        firstPage = #"{"conversations":[\#(row("a"))],"hasMore":false}"#
+        await model.load(firstPageOnly: true)
+        XCTAssertEqual(requests, ["p1"])
+        XCTAssertEqual(model.conversations.map(\.id), ["a"], "Une page 1 sans suite est toute la liste")
+        XCTAssertFalse(model.hasMoreConversations)
+    }
+
+    private static func cursor(of request: URLRequest) -> String? {
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "cursor" }?.value
+    }
+
     func testDeliveredAndReceiptsUseTheServerRoutes() async throws {
         var calls: [(method: String?, path: String?, body: [String: Any])] = []
         MockURLProtocol.requestHandler = { request in

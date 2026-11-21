@@ -20,6 +20,41 @@ struct PendingCallTermination: Codable, Equatable {
     let createdAt: Date
 }
 
+/// Dernier jeton VoIP accepté par le serveur pour ce compte, cette session locale et
+/// cet appareil. Chaque lancement le renvoyait (audit perf, D1 : 1 947 POST iOS en
+/// 7 jours) : il ne part plus que s'il a changé, ou une fois par jour, pour qu'un
+/// serveur qui l'aurait perdu le retrouve. Seule une empreinte est gardée, pas le jeton.
+struct VoIPTokenSyncRecord {
+    static let maximumAge: TimeInterval = 24 * 60 * 60
+
+    private let defaults: UserDefaults
+    private let key: String
+
+    init(defaults: UserDefaults = .standard, key: String = "call.voip-token-sync.v1") {
+        self.defaults = defaults
+        self.key = key
+    }
+
+    static func fingerprint(token: String, deviceID: String, environment: String, session: LocalAccountSession) -> String {
+        let material = [token, deviceID, environment, session.ownerScopeId, session.sessionId].joined(separator: "\n")
+        return SHA256.hash(data: Data(material.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func isSynced(_ fingerprint: String, now: Date = Date()) -> Bool {
+        guard let stored = defaults.dictionary(forKey: key),
+              stored["fingerprint"] as? String == fingerprint,
+              let at = stored["at"] as? Double else { return false }
+        let age = now.timeIntervalSince1970 - at
+        return age >= 0 && age < Self.maximumAge
+    }
+
+    func markSynced(_ fingerprint: String, now: Date = Date()) {
+        defaults.set(["fingerprint": fingerprint, "at": now.timeIntervalSince1970], forKey: key)
+    }
+
+    func clear() { defaults.removeObject(forKey: key) }
+}
+
 /// Small account-scoped outbox for a hang-up performed while offline. Call IDs
 /// are opaque and bounded; stale entries expire locally even if the server TTL
 /// has already closed the room.
@@ -1498,6 +1533,7 @@ final class CallManager: NSObject, ObservableObject {
     /// échoué. On ne retente alors qu'au prochain foreground OU au retour réseau,
     /// au lieu de re-POSTer inutilement un token déjà synchronisé.
     private var voipTokenNeedsSync = false
+    private let voipTokenSync = VoIPTokenSyncRecord()
 
     fileprivate func registerVoIPToken(_ token: String) async {
         lastVoipToken = token
@@ -1508,23 +1544,32 @@ final class CallManager: NSObject, ObservableObject {
             voipTokenNeedsSync = true
             return
         }
-        do {
-            let _: SuccessResponse = try await api.requestJSON(
-                "/api/user/voip-token",
-                body: [
-                    "voipToken": token,
-                    "platform": "ios",
-                    "deviceId": deviceID,
-                    "environment": api.config.environment.rawValue,
-                ]
-            )
+        let fingerprint = LocalAccountScope.sessionSnapshot().map {
+            VoIPTokenSyncRecord.fingerprint(token: token, deviceID: deviceID,
+                                            environment: api.config.environment.rawValue, session: $0)
+        }
+        if let fingerprint, voipTokenSync.isSynced(fingerprint) {
             voipTokenNeedsSync = false
-        } catch {
-            // CALL-VOIP-04 : ne plus avaler l'échec silencieusement ; on marque le
-            // token à resynchroniser et on le garde pour le ré-enregistrer au
-            // prochain passage authentifié / foreground / retour réseau.
-            voipTokenNeedsSync = true
-            logger.error("VoIP token registration failed: \(error.localizedDescription, privacy: .public)")
+        } else {
+            do {
+                let _: SuccessResponse = try await api.requestJSON(
+                    "/api/user/voip-token",
+                    body: [
+                        "voipToken": token,
+                        "platform": "ios",
+                        "deviceId": deviceID,
+                        "environment": api.config.environment.rawValue,
+                    ]
+                )
+                voipTokenNeedsSync = false
+                if let fingerprint { voipTokenSync.markSynced(fingerprint) }
+            } catch {
+                // CALL-VOIP-04 : ne plus avaler l'échec silencieusement ; on marque le
+                // token à resynchroniser et on le garde pour le ré-enregistrer au
+                // prochain passage authentifié / foreground / retour réseau.
+                voipTokenNeedsSync = true
+                logger.error("VoIP token registration failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
         // Appareil v2 : jetons liés à l'appareil, et session liée à lui (E.1).
         await pushRegistrar?.register(voipToken: token)
@@ -1559,6 +1604,8 @@ final class CallManager: NSObject, ObservableObject {
     /// l'APPAREIL, pas du compte) : il sera ré-associé au prochain login via
     /// `registerVoIPTokenForSession`, sans attendre un nouveau `didUpdate`.
     func unregisterVoIPToken() async {
+        // Révoqué ou non, le prochain compte connecté devra le renvoyer.
+        voipTokenSync.clear()
         guard let token = lastVoipToken else { return }
         do {
             let _: SuccessResponse = try await api.requestJSON(
@@ -1748,6 +1795,7 @@ extension CallManager: PKPushRegistryDelegate {
             // fournira un neuf.
             self.lastVoipToken = nil
             self.voipTokenNeedsSync = false
+            self.voipTokenSync.clear()
         }
     }
 

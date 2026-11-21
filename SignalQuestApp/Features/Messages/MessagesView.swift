@@ -65,7 +65,12 @@ final class MessagesViewModel: ObservableObject {
     /// L'archivage n'existe côté serveur que s'il a servi `shelvedSummary`.
     var supportsShelving: Bool { shelvedSummary != nil }
 
-    func load() async {
+    /// `firstPageOnly` : le sondage et les messages reçus ne relisent que la page 1, au
+    /// lieu de toutes les pages défilées, en série, toutes les 15 s (audit perf, E1). Le
+    /// serveur trie par épingle puis par activité avec un curseur stable : une ancienne
+    /// conversation qui reçoit un message remonte en page 1. Le retour d'une
+    /// conversation et le tirer-pour-rafraîchir relisent toujours tout.
+    func load(firstPageOnly: Bool = false) async {
         if AppEnvironment.usesDemoData {
             // Sans serveur pour retenir l'épingle ou la lecture, une rangée déjà
             // affichée garde son état local ; le sondage ne l'efface plus.
@@ -93,14 +98,19 @@ final class MessagesViewModel: ObservableObject {
             var seen = Set(all.map(\.id))
             var last = first
             var pages = 1
+            // Sondage : les pages suivantes restent celles de leur dernière lecture, curseur
+            // compris. Une page 1 sans suite est toute la liste, et la remplace.
+            let keepsLaterPages = firstPageOnly && loadedPages > 1 && first.hasMore
+            if keepsLaterPages {
+                all += conversations.filter { seen.insert($0.id).inserted }
+            }
             // Relit les pages déjà défilées ; une page qui échoue garde ce qui précède.
-            while pages < loadedPages, last.hasMore, let cursor = last.nextCursor {
+            while !keepsLaterPages, pages < loadedPages, last.hasMore, let cursor = last.nextCursor {
                 guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else { break }
                 all += Self.withoutIncomingRequests(page.conversations).filter { seen.insert($0.id).inserted }
                 last = page
                 pages += 1
             }
-            loadedPages = pages
             if let openId = openConversationId, !seen.contains(openId),
                let kept = conversations.first(where: { $0.id == openId }) {
                 all.append(kept)
@@ -109,9 +119,12 @@ final class MessagesViewModel: ObservableObject {
             pinLimit = first.pinLimit
             shelvedSummary = first.shelvedSummary
             requestsSummary = first.requestsSummary
-            hasMoreConversations = last.hasMore && last.nextCursor != nil
-            nextCursor = last.nextCursor
-            loadMoreFailed = false
+            if !keepsLaterPages {
+                loadedPages = pages
+                hasMoreConversations = last.hasMore && last.nextCursor != nil
+                nextCursor = last.nextCursor
+                loadMoreFailed = false
+            }
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
@@ -955,7 +968,7 @@ struct MessagesView: View {
         // Message v1 reçu au premier plan : liste et badge se mettent à jour.
         .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.inboxMessageReceived)) { _ in
             Task {
-                await model.load()
+                await model.load(firstPageOnly: true)
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
@@ -969,7 +982,7 @@ struct MessagesView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 guard !Task.isCancelled else { break }
-                await model.load()
+                await model.load(firstPageOnly: true)
                 if showingRequests { await model.loadRequests() }
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)

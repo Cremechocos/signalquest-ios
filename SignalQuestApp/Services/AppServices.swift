@@ -350,7 +350,9 @@ final class AppServices: ObservableObject {
         // Messages reçus : l'expéditeur les voit « Distribués » sans attendre l'ouverture de la conversation.
         Task { await deliveryAcks.acknowledgeLatest(of: conversations, currentUserId: userId, using: messages) }
         guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
-        unreadConversations = inboxBadgeState.unreadCount
+        // Un @Published prévient ses observateurs même à valeur égale : chaque relecture
+        // invalidait toutes les vues qui observent AppServices (audit perf, D2).
+        if unreadConversations != inboxBadgeState.unreadCount { unreadConversations = inboxBadgeState.unreadCount }
         syncIconBadge()
     }
 
@@ -512,12 +514,12 @@ final class AppServices: ObservableObject {
 
     func publishNotificationBadge(unreadCount: Int, for ticket: InboxBadgePresentationState.RefreshTicket) {
         guard notificationBadgeState.publish(unreadCount: unreadCount, for: ticket) else { return }
-        unreadNotifications = notificationBadgeState.unreadCount
+        if unreadNotifications != notificationBadgeState.unreadCount { unreadNotifications = notificationBadgeState.unreadCount }
     }
 
     func applyNotificationBadgeMutation(unreadCount: Int, for session: LocalAccountSession) {
         guard notificationBadgeState.replaceAfterMutation(unreadCount: unreadCount, for: session) else { return }
-        unreadNotifications = notificationBadgeState.unreadCount
+        if unreadNotifications != notificationBadgeState.unreadCount { unreadNotifications = notificationBadgeState.unreadCount }
     }
 
     /// Efface immédiatement tout état visuel privé de l'ancien compte. Le reset

@@ -3,6 +3,9 @@ import Foundation
 
 protocol SocialFeedServicing: Sendable {
     func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage
+    /// Les posts seuls : la page suivante, la revérification du flux et le fil d'un
+    /// hashtag jetaient stories, tendances et suggestions (audit perf, E2).
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage
     /// Récupère un post unique (deep-link / notification) par son identifiant.
     func post(id: String) async throws -> UnifiedSocialFeedItem?
     /// Détail d'un test d'expérience (`GET /api/experience-tests/{id}`), nil si
@@ -100,6 +103,10 @@ protocol SocialFeedServicing: Sendable {
 }
 
 extension SocialFeedServicing {
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage {
+        try await loadFeed(cursor: cursor, hashtag: hashtag, tab: tab)
+    }
+
     func retryPendingPosts() async {}
 
     func experienceTest(id: String) async throws -> ExperienceTestDetail? { nil }
@@ -185,11 +192,19 @@ final class SocialFeedService: SocialFeedServicing {
         hashtag: String? = nil,
         tab: FeedTab? = nil
     ) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, include: "items,stories,trends,suggestions")
+    }
+
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, include: "items")
+    }
+
+    private func feed(cursor: String?, hashtag: String?, tab: FeedTab?, include: String) async throws -> SocialFeedPage {
         var query = [
             URLQueryItem(name: "limit", value: "20"),
             URLQueryItem(name: "filter", value: tab?.filter ?? "all"),
             URLQueryItem(name: "ranking", value: tab?.ranking ?? "smart"),
-            URLQueryItem(name: "include", value: "items,stories,trends,suggestions")
+            URLQueryItem(name: "include", value: include)
         ]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let hashtag, !hashtag.isEmpty { query.append(URLQueryItem(name: "hashtag", value: hashtag)) }
