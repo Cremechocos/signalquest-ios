@@ -272,7 +272,10 @@ final class ANFRService: ANFRServicing {
         ).antennas
     }
 
+    /// Route réservée aux sessions (et aux clés d'API) : sans session, elle répond toujours
+    /// 401 API_KEY_REQUIRED, donc on ne l'appelle pas (audit du 21/11, C12).
     func siteHistory(supId: String) async throws -> ANFRSiteHistory {
+        guard api.credentials.accessToken() != nil else { throw APIError.missingAuthToken }
         let encoded = supId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? supId
         return try await api.request(APIEndpoint(path: "/api/anfr/site-history/\(encoded)"), as: ANFRSiteHistory.self)
     }

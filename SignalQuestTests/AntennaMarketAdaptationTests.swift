@@ -613,3 +613,45 @@ private final class CountingDetailsService: AntennasServicing, @unchecked Sendab
     func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] { [] }
     func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
 }
+
+/// C12 (audit du 21/11) : sans session, la fiche d'un site n'appelle plus les deux routes
+/// réservées aux sessions (incidents opérateur, historique ANFR), qui répondaient toujours 401 ;
+/// avec une session, elles partent comme avant.
+final class GuestSessionOnlyRoutesTests: XCTestCase {
+    func testWithoutASessionTheSheetSkipsTheTwoSessionOnlyRoutes() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let sent = SentPaths()
+        defer { MockURLProtocol.requestHandler = nil }
+        MockURLProtocol.requestHandler = { request in
+            sent.append(request.url?.path ?? "")
+            return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config))
+        let map = MapSnapshotService(api: api, cache: DiskCache(folderName: "GuestRoutes-\(UUID().uuidString)", evicts: false))
+        let anfr = ANFRService(api: api)
+
+        do {
+            _ = try await map.operatorIncidents(forSiteId: "site-1", market: "FR", operatorName: "ORANGE", latitude: 45.19, longitude: 5.71)
+            XCTFail("Sans session, aucune réponse n'est attendue")
+        } catch APIError.missingAuthToken {}
+        do {
+            _ = try await anfr.siteHistory(supId: "1234567")
+            XCTFail("Sans session, aucune réponse n'est attendue")
+        } catch APIError.missingAuthToken {}
+        XCTAssertEqual(sent.paths, [])
+
+        try credentials.setAccessToken("unit-test-session")
+        _ = try? await map.operatorIncidents(forSiteId: "site-1", market: "FR", operatorName: "ORANGE", latitude: 45.19, longitude: 5.71)
+        _ = try? await anfr.siteHistory(supId: "1234567")
+        XCTAssertEqual(sent.paths, ["/api/network-incidents/site", "/api/anfr/site-history/1234567"])
+    }
+}
+
+private final class SentPaths: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+    var paths: [String] { lock.withLock { stored } }
+    func append(_ path: String) { lock.withLock { stored.append(path) } }
+}

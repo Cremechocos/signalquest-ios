@@ -245,6 +245,9 @@ final class MapSnapshotService: MapSnapshotServicing {
         longitude: Double,
         territory: String? = nil
     ) async throws -> SiteOperatorIncidentsResponse {
+        // Sans session, la route répond toujours 401 (voir plus bas) : on ne l'appelle pas
+        // (audit du 21/11, C12 : deux allers-retours pour rien à chaque fiche en invité).
+        guard api.credentials.accessToken() != nil else { throw APIError.missingAuthToken }
         var query = [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "lat", value: "\(latitude)"),
